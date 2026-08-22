@@ -14,7 +14,7 @@ use crate::{
     GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256, GEMMA3_MULTIMODAL_SOURCE_SHA256,
     GEMMA4_MULTIMODAL_SOURCE_SHA256, LLAMA_SOURCE_SHA256, NativeDecoderTextEncoder,
     NativeFrameInterpolationModel, NativeGemmaMultimodal, NativePromptTokenizer,
-    NativeQwenMultimodal, NativeRaftLarge, NativeSdPoseModel, NativeVae,
+    NativeQwenMultimodal, NativeRaftLarge, NativeSdPoseModel, NativeStructuredVae, NativeVae,
     QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256,
     QWEN35_SOURCE_SHA256,
     clip::{LoadedSd1Clip, NativeTokenizer},
@@ -266,6 +266,9 @@ enum NativeModelResource {
     NativeVae {
         vae: Arc<NativeVae>,
     },
+    NativeStructuredVae {
+        vae: Arc<NativeStructuredVae>,
+    },
     OpticalFlow {
         raft: Arc<NativeRaftLarge>,
     },
@@ -296,6 +299,7 @@ pub enum NativeModelBackingKind {
     Sd1Tokenizer,
     Sd1Clip,
     NativeVae,
+    NativeStructuredVae,
     OpticalFlow,
     ClipVision,
     NativePromptTokenizer,
@@ -490,6 +494,32 @@ impl NativeModelPayload {
             identity,
             resident_bytes,
             resource: NativeModelResource::NativeVae { vae },
+        })
+    }
+
+    pub fn native_structured_vae(
+        vae: Arc<NativeStructuredVae>,
+    ) -> Result<Self, NativeModelPayloadError> {
+        vae.validate()
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let descriptor = vae.descriptor();
+        let resource_identity = descriptor.identity();
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::Vae,
+            resource_identity.digest(),
+            resource_identity.architecture().as_str(),
+            resource_identity.artifact_sha256(),
+            vae.execution_digest(),
+        )?;
+        let resident_bytes = payload_resident_bytes(
+            &identity,
+            vae.resident_bytes()
+                .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?,
+        )?;
+        Ok(Self {
+            identity,
+            resident_bytes,
+            resource: NativeModelResource::NativeStructuredVae { vae },
         })
     }
 
@@ -811,6 +841,15 @@ impl NativeModelPayload {
                     NativeModelPayloadError::ResourceAccounting(error.to_string())
                 })?,
             }],
+            NativeModelResource::NativeStructuredVae { vae } => {
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::NativeStructuredVae,
+                    address: Arc::as_ptr(vae) as usize,
+                    resident_bytes: vae.resident_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                }]
+            }
             NativeModelResource::OpticalFlow { raft } => {
                 let parts = raft.resident_parts().map_err(|error| {
                     NativeModelPayloadError::ResourceAccounting(error.to_string())
@@ -1045,6 +1084,7 @@ impl NativeModelPayload {
             NativeModelResource::Sd15Model { model } => Some(model),
             NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
+            | NativeModelResource::NativeStructuredVae { .. }
             | NativeModelResource::OpticalFlow { .. }
             | NativeModelResource::ClipVision { .. }
             | NativeModelResource::DecoderClip { .. }
@@ -1062,6 +1102,7 @@ impl NativeModelPayload {
             } => Some((tokenizer, clip)),
             NativeModelResource::Sd15Model { .. }
             | NativeModelResource::NativeVae { .. }
+            | NativeModelResource::NativeStructuredVae { .. }
             | NativeModelResource::OpticalFlow { .. }
             | NativeModelResource::ClipVision { .. }
             | NativeModelResource::DecoderClip { .. }
@@ -1077,6 +1118,7 @@ impl NativeModelPayload {
             NativeModelResource::NativeVae { vae } => Some(vae),
             NativeModelResource::Sd15Model { .. }
             | NativeModelResource::Sd1Clip { .. }
+            | NativeModelResource::NativeStructuredVae { .. }
             | NativeModelResource::OpticalFlow { .. }
             | NativeModelResource::ClipVision { .. }
             | NativeModelResource::DecoderClip { .. }
@@ -1087,12 +1129,20 @@ impl NativeModelPayload {
         }
     }
 
+    pub fn structured_vae(&self) -> Option<&Arc<NativeStructuredVae>> {
+        match &self.resource {
+            NativeModelResource::NativeStructuredVae { vae } => Some(vae),
+            _ => None,
+        }
+    }
+
     pub fn optical_flow_resource(&self) -> Option<&Arc<NativeRaftLarge>> {
         match &self.resource {
             NativeModelResource::OpticalFlow { raft } => Some(raft),
             NativeModelResource::Sd15Model { .. }
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
+            | NativeModelResource::NativeStructuredVae { .. }
             | NativeModelResource::ClipVision { .. }
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
@@ -1108,6 +1158,7 @@ impl NativeModelPayload {
             NativeModelResource::Sd15Model { .. }
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
+            | NativeModelResource::NativeStructuredVae { .. }
             | NativeModelResource::OpticalFlow { .. }
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
@@ -1161,6 +1212,9 @@ impl NativeModelPayload {
                 tokenizer, clip, ..
             } => Self::sd1_clip(tokenizer.clone(), clip.clone())?,
             NativeModelResource::NativeVae { vae } => Self::native_vae(vae.clone())?,
+            NativeModelResource::NativeStructuredVae { vae } => {
+                Self::native_structured_vae(vae.clone())?
+            }
             NativeModelResource::OpticalFlow { raft } => Self::optical_flow(raft.clone())?,
             NativeModelResource::ClipVision { clip_vision } => {
                 Self::clip_vision(clip_vision.clone())?
@@ -1933,11 +1987,17 @@ fn hash_field(hasher: &mut Sha256, bytes: &[u8]) -> Result<(), NativeModelPayloa
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        ArtifactAvailability, ArtifactKey, ArtifactRecord, GENERATED_LATENT_FORMATS,
+        ModelFamilyIdentity, NativeModule, PatchGraph, VaeArchitectureIdentity, VaeBoundary,
+        VaeDescriptor, VaeError, VaeKernelProfile, VaeStructuredDecodeRequest,
+        VaeStructuredOutputKind, VaeStructuredResult, vae::VaeModelBinding,
+    };
     use comfy_tensor::{
         CancellationToken, CpuBackend, CpuWorkspaceAuthority, DeviceId, ExecutionContext, StreamId,
         TensorDescriptor,
     };
-    use std::{collections::BTreeMap, error::Error};
+    use std::{collections::BTreeMap, error::Error, path::PathBuf};
 
     const TEST_MEMORY_LIMIT_BYTES: u64 = 1024 * 1024;
 
@@ -2012,6 +2072,75 @@ mod tests {
         raft.load_state_dict(state, &cancellation)?;
         raft.eval();
         Ok(Arc::new(raft))
+    }
+
+    fn unavailable_structured_decode(
+        _module: &NativeModule,
+        _backend: &CpuBackend,
+        _latent: &Tensor,
+        _request: &VaeStructuredDecodeRequest,
+        _context: &ExecutionContext<'_>,
+    ) -> Result<VaeStructuredResult, VaeError> {
+        Err(VaeError::InvalidStructuredResult(
+            "transport fixture does not execute the structured decoder".to_owned(),
+        ))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn structured_vae(
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+        profile: VaeKernelProfile,
+        family_feature_id: &str,
+        family_identifier: &str,
+        family_architecture_version: &str,
+        latent_identifier: &str,
+        architecture: &str,
+        output_kind: VaeStructuredOutputKind,
+        digest_byte: char,
+    ) -> Result<Arc<NativeStructuredVae>, Box<dyn Error>> {
+        let artifact_sha256: String = std::iter::repeat_n(digest_byte, 64).collect();
+        let artifact = ArtifactRecord {
+            key: ArtifactKey::new("models", PathBuf::from("vae/structured.safetensors"))?,
+            namespace: "vae".to_owned(),
+            canonical_path: PathBuf::from("/verified/models/vae/structured.safetensors"),
+            byte_size: 4,
+            modified_nanoseconds: 1,
+            sha256: artifact_sha256.clone(),
+            availability: ArtifactAvailability::Present,
+        };
+        let latent_definition = GENERATED_LATENT_FORMATS
+            .iter()
+            .find(|definition| definition.identifier == latent_identifier)
+            .ok_or("missing structured latent definition")?;
+        let descriptor = VaeDescriptor::checked(
+            &artifact,
+            ModelFamilyIdentity::new(
+                family_feature_id,
+                family_identifier,
+                family_architecture_version,
+            )?,
+            latent_definition,
+            VaeArchitectureIdentity::checked(architecture)?,
+            PatchGraph::checked_semantic(artifact_sha256, Vec::new())?.identity(),
+            DType::F32,
+            DeviceId::CPU,
+            VaeBoundary::structured_output(latent_definition.channels, output_kind)?,
+            profile,
+            [-1.0, 1.0],
+        )?;
+        let module = NativeModule::buffer(
+            "structured_vae",
+            f32_tensor(backend, context, vec![1], &[1.0])?,
+        )?;
+        let binding =
+            VaeModelBinding::checked_transport_fixture(&descriptor, module, context.cancellation)?;
+        Ok(Arc::new(NativeStructuredVae::checked_kernel(
+            descriptor,
+            latent_definition,
+            binding,
+            unavailable_structured_decode,
+        )?))
     }
 
     #[test]
@@ -2134,6 +2263,79 @@ mod tests {
             ))
         ));
         Ok(())
+    }
+
+    #[test]
+    fn structured_vae_payload_retains_shape_and_splat_resources_under_the_vae_role()
+    -> Result<(), Box<dyn Error>> {
+        with_context(|backend, context| {
+            let cases = [
+                (
+                    VaeKernelProfile::HunyuanShapeV1,
+                    "COMFY-MODEL-0084",
+                    "Hunyuan3Dv2",
+                    "hunyuan3d-v2-flow-transformer-v1",
+                    "Hunyuan3Dv2",
+                    "comfy.ldm.hunyuan3d.vae.ShapeVAE.v1",
+                    VaeStructuredOutputKind::Shape,
+                    'a',
+                ),
+                (
+                    VaeKernelProfile::TripoSplatV1,
+                    "COMFY-MODEL-0137",
+                    "TripoSplat",
+                    "triposplat-latent-sequence-flow-v1",
+                    "TripoSplat",
+                    "comfy.ldm.triposplat.vae.OctreeGaussianDecoder.v1",
+                    VaeStructuredOutputKind::GaussianSplats,
+                    'b',
+                ),
+            ];
+            let mut identities = Vec::new();
+            for (
+                profile,
+                family_feature_id,
+                family,
+                family_architecture_version,
+                latent,
+                architecture,
+                output_kind,
+                digest_byte,
+            ) in cases
+            {
+                let structured = structured_vae(
+                    backend,
+                    context,
+                    profile,
+                    family_feature_id,
+                    family,
+                    family_architecture_version,
+                    latent,
+                    architecture,
+                    output_kind,
+                    digest_byte,
+                )?;
+                let payload = NativeModelPayload::native_structured_vae(structured.clone())?;
+                payload.validate()?;
+                assert_eq!(payload.identity().role(), NativeModelResourceRole::Vae);
+                assert!(payload.vae().is_none());
+                assert!(
+                    payload
+                        .structured_vae()
+                        .is_some_and(|stored| Arc::ptr_eq(stored, &structured))
+                );
+                let parts = payload.resident_parts()?;
+                assert_eq!(parts.backing_allocations().len(), 1);
+                assert_eq!(
+                    parts.backing_allocations()[0].kind(),
+                    NativeModelBackingKind::NativeStructuredVae
+                );
+                assert_eq!(parts.resident_bytes()?, payload.resident_bytes());
+                identities.push(payload.identity().digest_sha256().to_owned());
+            }
+            assert_ne!(identities[0], identities[1]);
+            Ok(())
+        })
     }
 
     #[test]

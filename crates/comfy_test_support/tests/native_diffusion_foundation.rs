@@ -1,15 +1,15 @@
 use comfy_media::{PngLimits, encode_png_frame};
-use comfy_model::ModelTokenizerDescriptor;
 use comfy_model::clip::NativeTokenizer;
 use comfy_model::generated_native_diffusion::{
     Sd1Tokenizer, empty_sd15_latent, encode_sd15_prompt,
 };
+use comfy_model::{ModelTokenizerDescriptor, NativeModelPayload};
 use comfy_runtime::{NativeDiffusionBundle, NativeDiffusionProvider, Sd15GuidanceAdapter};
-use comfy_sampler::NoiseRequest;
 use comfy_sampler::generated_native_diffusion::{
     checked_native_diffusion_plan, normal_noise, normal_sigmas, sample_euler, scale_initial_noise,
     scale_model_input, sd15_interpret_prediction, sd15_model_time,
 };
+use comfy_sampler::{NativeDiffusionPayload, NoiseRequest};
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DeviceId, ExecutionContext,
     RngCheckpoint, StreamId,
@@ -29,6 +29,31 @@ const MEMORY_LIMIT: u64 = 2 * 1024 * 1024 * 1024;
 const SEED: u64 = 0x0123_4567_89ab_cdef;
 const FIXTURE_PROMPT_ID: &str = "53494d00-0000-0000-0000-000000003702";
 const FIXTURE_KSAMPLER_NODE_ID: &str = "5";
+
+#[test]
+fn native_vae_transport_preserves_the_existing_image_resource()
+-> Result<(), Box<dyn std::error::Error>> {
+    let cancellation = CancellationToken::default();
+    let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(MEMORY_LIMIT)?;
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        workspace_authority.authorize_workspace(MEMORY_LIMIT)?,
+        &cancellation,
+    );
+    let fixture = NativeDiffusionFixture::checked_in();
+    let bundle = fixture.load_bundle_with_context(Arc::new(backend), &context)?;
+    let model_payload = Arc::new(NativeModelPayload::native_vae(bundle.vae().clone())?);
+    let diffusion = NativeDiffusionPayload::vae(model_payload.clone())?;
+    diffusion.validate()?;
+    assert!(
+        diffusion
+            .vae_payload()
+            .is_some_and(|stored| Arc::ptr_eq(stored, &model_payload))
+    );
+    assert!(model_payload.vae().is_some());
+    assert!(model_payload.structured_vae().is_none());
+    Ok(())
+}
 
 #[test]
 fn native_diffusion_fixture_catalog_and_provenance_are_exact()

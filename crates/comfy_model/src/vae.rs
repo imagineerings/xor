@@ -1274,6 +1274,30 @@ impl VaeModelBinding {
         })
     }
 
+    #[cfg(test)]
+    pub(crate) fn checked_transport_fixture(
+        descriptor: &VaeDescriptor,
+        module: NativeModule,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, VaeError> {
+        cancellation.check().map_err(TensorError::from)?;
+        if !module.has_execution_state() {
+            return Err(VaeError::NativeModuleHasNoState);
+        }
+        let mut hasher = Sha256::new();
+        hash_field(&mut hasher, descriptor.identity().digest().as_bytes());
+        hash_field(&mut hasher, b"structured-vae-transport-fixture-v1");
+        hash_field(
+            &mut hasher,
+            module.semantic_state_digest(cancellation)?.as_bytes(),
+        );
+        Ok(Self {
+            identity: descriptor.identity().clone(),
+            module,
+            digest: format!("{:x}", hasher.finalize()),
+        })
+    }
+
     pub(crate) fn identity(&self) -> &VaeIdentity {
         &self.identity
     }
@@ -2013,6 +2037,55 @@ impl NativeStructuredVae {
         hash_field(&mut hasher, self.binding.digest().as_bytes());
         hash_field(&mut hasher, b"typed-structured-vae-v1");
         format!("{:x}", hasher.finalize())
+    }
+
+    pub fn resident_storage_bytes(&self) -> Result<u64, VaeError> {
+        self.binding
+            .module()
+            .resident_storage_bytes()
+            .map_err(Into::into)
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, VaeError> {
+        let object = u64::try_from(std::mem::size_of::<Self>()).map_err(|_| {
+            VaeError::Allocation("structured VAE resident object byte overflow".to_owned())
+        })?;
+        let descriptor = self.descriptor.owned_resident_bytes().ok_or_else(|| {
+            VaeError::Allocation("structured VAE descriptor byte overflow".to_owned())
+        })?;
+        let binding = self.binding.owned_resident_bytes().ok_or_else(|| {
+            VaeError::Allocation("structured VAE binding byte overflow".to_owned())
+        })?;
+        let storage = self.resident_storage_bytes()?;
+        object
+            .checked_add(descriptor)
+            .and_then(|bytes| bytes.checked_add(binding))
+            .and_then(|bytes| bytes.checked_add(storage))
+            .ok_or_else(|| {
+                VaeError::Allocation("structured VAE resident total byte overflow".to_owned())
+            })
+    }
+
+    pub fn validate(&self) -> Result<(), VaeError> {
+        if self.descriptor.boundary().kind() != VaeBoundaryKind::StructuredOutput {
+            return Err(VaeError::SelectionBoundaryMismatch {
+                expected: VaeBoundaryKind::StructuredOutput,
+                actual: self.descriptor.boundary().kind(),
+            });
+        }
+        if self.descriptor.identity() != self.binding.identity()
+            || self.descriptor.latent_format
+                != LatentFormatDescriptor::checked(self.latent_definition)?
+        {
+            return Err(VaeError::KernelIdentityBindingMismatch);
+        }
+        if !self.binding.module().has_execution_state() {
+            return Err(VaeError::NativeModuleHasNoState);
+        }
+        validate_sha256(self.binding.digest())?;
+        validate_sha256(&self.execution_digest())?;
+        self.resident_bytes()?;
+        Ok(())
     }
 
     pub fn decode(

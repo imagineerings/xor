@@ -1019,6 +1019,13 @@ impl NativeDiffusionPayload {
         }
     }
 
+    pub fn vae_payload(&self) -> Option<&Arc<NativeModelPayload>> {
+        match &self.resource {
+            NativeDiffusionResource::Vae { vae } => Some(vae),
+            NativeDiffusionResource::Model { .. } | NativeDiffusionResource::Clip { .. } => None,
+        }
+    }
+
     pub fn resident_bytes(&self) -> Result<usize, NativeDiffusionPayloadError> {
         usize::try_from(self.resident_parts()?.resident_bytes()?)
             .map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)
