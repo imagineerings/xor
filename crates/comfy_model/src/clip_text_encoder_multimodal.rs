@@ -1344,6 +1344,36 @@ pub struct NativeQwen25Multimodal {
     vision: Arc<NativeQwen25VisionEncoder>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeMultimodalOwnedAllocationKind {
+    Resource,
+    Tokenizer,
+    Decoder,
+    Vision,
+    Audio,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeMultimodalOwnedAllocation {
+    kind: NativeMultimodalOwnedAllocationKind,
+    address: usize,
+    resident_bytes: u64,
+}
+
+impl NativeMultimodalOwnedAllocation {
+    pub const fn kind(&self) -> NativeMultimodalOwnedAllocationKind {
+        self.kind
+    }
+
+    pub const fn address(&self) -> usize {
+        self.address
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
 #[derive(Clone, Debug)]
 struct NativeQwenVisionBlock {
     normalization_one: NativeModule,
@@ -5747,6 +5777,33 @@ impl NativeQwen25Multimodal {
             .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 multimodal residency"))
     }
 
+    pub fn resident_owned_allocations(
+        &self,
+    ) -> Result<Vec<NativeMultimodalOwnedAllocation>, MultimodalTextError> {
+        Ok(vec![
+            NativeMultimodalOwnedAllocation {
+                kind: NativeMultimodalOwnedAllocationKind::Resource,
+                address: self as *const Self as usize,
+                resident_bytes: self.resident_owned_bytes()?,
+            },
+            NativeMultimodalOwnedAllocation {
+                kind: NativeMultimodalOwnedAllocationKind::Tokenizer,
+                address: Arc::as_ptr(&self.tokenizer) as usize,
+                resident_bytes: self.tokenizer.resident_bytes()?,
+            },
+            NativeMultimodalOwnedAllocation {
+                kind: NativeMultimodalOwnedAllocationKind::Decoder,
+                address: Arc::as_ptr(&self.decoder) as usize,
+                resident_bytes: self.decoder.resident_owned_bytes()?,
+            },
+            NativeMultimodalOwnedAllocation {
+                kind: NativeMultimodalOwnedAllocationKind::Vision,
+                address: Arc::as_ptr(&self.vision) as usize,
+                resident_bytes: self.vision.resident_owned_bytes()?,
+            },
+        ])
+    }
+
     pub fn resident_tensor_allocations(
         &self,
     ) -> Result<Vec<(comfy_tensor::StorageId, u64)>, MultimodalTextError> {
@@ -6553,6 +6610,49 @@ impl NativeGemmaMultimodal {
     pub fn resident_owned_bytes(&self) -> Result<u64, MultimodalTextError> {
         u64::try_from(mem::size_of::<Self>())
             .map_err(|_| MultimodalTextError::Overflow("Gemma multimodal owner residency"))
+    }
+
+    pub fn resident_owned_allocations(
+        &self,
+    ) -> Result<Vec<NativeMultimodalOwnedAllocation>, MultimodalTextError> {
+        let mut allocations = vec![
+            NativeMultimodalOwnedAllocation {
+                kind: NativeMultimodalOwnedAllocationKind::Resource,
+                address: self as *const Self as usize,
+                resident_bytes: self.resident_owned_bytes()?,
+            },
+            NativeMultimodalOwnedAllocation {
+                kind: NativeMultimodalOwnedAllocationKind::Tokenizer,
+                address: Arc::as_ptr(&self.tokenizer) as usize,
+                resident_bytes: self.tokenizer.resident_bytes()?,
+            },
+            NativeMultimodalOwnedAllocation {
+                kind: NativeMultimodalOwnedAllocationKind::Decoder,
+                address: Arc::as_ptr(&self.decoder) as usize,
+                resident_bytes: self.decoder.resident_owned_bytes()?,
+            },
+        ];
+        let (vision_address, vision_bytes) = match &self.vision {
+            NativeGemmaVisionResource::Gemma3(vision) => {
+                (Arc::as_ptr(vision) as usize, vision.resident_owned_bytes()?)
+            }
+            NativeGemmaVisionResource::Gemma4(vision) => {
+                (Arc::as_ptr(vision) as usize, vision.resident_owned_bytes()?)
+            }
+        };
+        allocations.push(NativeMultimodalOwnedAllocation {
+            kind: NativeMultimodalOwnedAllocationKind::Vision,
+            address: vision_address,
+            resident_bytes: vision_bytes,
+        });
+        if let Some(audio) = &self.audio {
+            allocations.push(NativeMultimodalOwnedAllocation {
+                kind: NativeMultimodalOwnedAllocationKind::Audio,
+                address: Arc::as_ptr(audio) as usize,
+                resident_bytes: audio.resident_owned_bytes()?,
+            });
+        }
+        Ok(allocations)
     }
 
     pub fn resident_tensor_allocations(
