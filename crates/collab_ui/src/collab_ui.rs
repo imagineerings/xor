@@ -1,6 +1,8 @@
 mod call_stats_modal;
 pub mod channel_view;
 pub mod collab_panel;
+#[cfg(feature = "multiplayer-tools")]
+pub mod message_reconciliation;
 pub mod notifications;
 mod panel_settings;
 

@@ -7,6 +7,7 @@ pub mod env;
 pub mod executor;
 pub mod freshness;
 pub mod identity;
+pub mod messages;
 pub mod migration;
 pub mod nostr;
 pub mod pubsub;
