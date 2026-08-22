@@ -343,6 +343,24 @@ impl PushDeliveryRequest {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) const fn for_test(
+        request_id: Uuid,
+        lease_generation: PushLeaseGeneration,
+        endpoint_generation: PushEndpointGeneration,
+        capability_reference: PushCapabilityReference,
+        expires_at_millis: u64,
+    ) -> Self {
+        Self {
+            request_id,
+            lease_generation,
+            endpoint_generation,
+            capability_reference,
+            expires_at_millis,
+            payload: PushWakePayload::Reconnect,
+        }
+    }
+
     pub const fn request_id(&self) -> Uuid {
         self.request_id
     }
