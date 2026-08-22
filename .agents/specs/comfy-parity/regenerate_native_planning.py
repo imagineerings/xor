@@ -8991,7 +8991,7 @@ def native_model_resource_precursor_tasks(
     append(
         "comfy-parity-native-family-model-resource-foundation",
         "Retain executable native family models",
-        "Bridge the existing resolved family registry, mapped weights, and NativeFamilyModel execution into one concrete MODEL resource. Bind family, artifact, mapped-state, patch, conditioning, execution, residency, and semantic identities without retaining a reduced SD15-only accessor or a second model store.",
+        "Bridge the existing resolved family registry, mapped weights, and source-exact family denoiser invocation into one concrete MODEL resource and canonical guidance adapter. Bind family, artifact, mapped-state, patch, conditioning, execution, residency, and semantic identities without retaining a reduced SD15-only accessor or a second model store.",
         [
             "projects/comfy/ComfyUI/nodes.py",
             "projects/comfy/ComfyUI/comfy/sd.py",
@@ -8999,21 +8999,56 @@ def native_model_resource_precursor_tasks(
             "projects/comfy/ComfyUI/comfy/model_patcher.py",
             "projects/comfy/ComfyUI/comfy/supported_models.py",
             "projects/comfy/ComfyUI/comfy/model_detection.py",
+            "projects/comfy/ComfyUI/comfy/model_sampling.py",
+            "projects/comfy/ComfyUI/comfy/samplers.py",
             "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/families/auraflow_comfy_model_0064.rs",
+            "crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
             "crates/comfy_sampler/src/native_node_payload.rs",
+            "crates/comfy_sampler/src/guidance.rs",
+            "crates/comfy_sampler/src/sampling_profile.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/tests/native_family_model_invocation.rs",
         ],
         [
             "crates/comfy_model/src/model_family.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
             "crates/comfy_sampler/src/native_node_payload.rs",
+            "crates/comfy_sampler/src/guidance.rs",
             "crates/comfy_sampler/src/comfy_sampler.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
         ],
-        "Resolved tiny fixtures from multiple registered families map and execute through a retained NativeFamilyModel, publish a canonical MODEL payload with compatible conditioning and patch identities, charge aliased tensor storage once, and survive cache, persistence, eviction, and restart. Wrong family, probe, state plan, dtype, device, patch, conditioning, OOM, cancellation, and stale handles fail atomically; the reduced SD15 fixture remains compatible through the same model boundary.",
+        "Source-derived AuraFlow and Qwen Image fixtures map into retained NativeFamilyModel resources and execute through the canonical SamplingProfile and GuidanceDenoiser boundaries with exact latent scaling, model time, positive and negative conditioning, CFG, and prediction interpretation. The canonical MODEL payload binds compatible family, latent, patch, conditioning, and execution identities, charges aliased tensor storage once, and survives cache, persistence, eviction, and reconstructive restart. Unsupported families return typed unavailable before sampling; wrong family, probe, state plan, dtype, device, patch, conditioning, control, OOM, cancellation, and stale handles fail atomically; the reduced SD15 fixture remains compatible through the generalized model boundary.",
+    )
+    tasks.append(
+        native_model_resource_precursor_task(
+            "comfy-parity-native-family-denoiser-invocation-foundation",
+            "Execute source-exact native family denoisers",
+            "Add one model-side family denoiser invocation contract that admits scaled latent input, model time, canonical conditioning entries, and exact family context, then executes retained family weights without owning sigma equations, CFG, masks, regions, hooks, caches, handles, or publication. AuraFlow and Qwen Image form the first exact vertical slice; every unimplemented family fails typed rather than falling back to the unary checkpoint program.",
+            [
+                "projects/comfy/ComfyUI/comfy/model_base.py",
+                "projects/comfy/ComfyUI/comfy/model_sampling.py",
+                "projects/comfy/ComfyUI/comfy/samplers.py",
+                "projects/comfy/ComfyUI/comfy/supported_models.py",
+                "projects/comfy/ComfyUI/comfy/ldm/aura/mmdit.py",
+                "projects/comfy/ComfyUI/comfy/ldm/qwen_image/model.py",
+                "crates/comfy_model/src/model_family.rs",
+                "crates/comfy_model/src/conditioning.rs",
+                "crates/comfy_sampler/src/guidance.rs",
+                "crates/comfy_sampler/src/sampling_profile.rs",
+            ],
+            [
+                "crates/comfy_model/src/model_family.rs",
+                "crates/comfy_model/src/families/auraflow_comfy_model_0064.rs",
+                "crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs",
+                "crates/comfy_test_support/tests/native_family_model_invocation.rs",
+            ],
+            "Source-derived reduced AuraFlow and Qwen Image fixtures produce exact raw denoiser outputs from scaled latent, model time, and resolved conditioning inputs; independently changing latent, time, or conditioning changes output. Family and latent identity, value kind, rank, dtype, device, context, cancellation, and combined retained-weight plus activation budget are validated before execution, and unsupported families return typed unavailable without invoking the unary forward-checkpoint fallback. This task owns no sigma schedule, CFG, mask, region, hook, cache, handle, or publication behavior.",
+            [],
+        )
     )
     append(
         "comfy-parity-native-clip-resource-foundation",
@@ -9085,14 +9120,21 @@ def native_model_resource_precursor_tasks(
         "Implement and retain the source AUDIO_ENCODER architectures and checked waveform/sample-rate invocation behind one concrete native resource, producing the existing canonical AudioEncoderOutput values without substituting CLIP-internal audio encoders.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_audio_encoder.py",
+            "projects/comfy/ComfyUI/comfy/audio_encoders/audio_encoders.py",
+            "projects/comfy/ComfyUI/comfy/audio_encoders/wav2vec2.py",
+            "projects/comfy/ComfyUI/comfy/audio_encoders/whisper.py",
             "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
         ],
         [
             "crates/comfy_model/src/audio_encoder.rs",
             "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/fixtures/models/audio-encoder-resource-foundation",
         ],
-        "Pinned source audio-encoder fixtures detect, load, retain, invoke, persist, and restart with exact waveform layout, sample-rate handling, output tensors, digest, and residency. Unsupported architecture, invalid audio, malformed weights, OOM, cancellation, and stale handles publish no encoder or output.",
+        "Validated pinned audio-encoder fixtures detect, load, retain, invoke, and reconstruct exact waveform layout, sample-rate handling, layered output tensors, semantic digest, and alias-aware residency. Unsupported architecture, invalid audio, malformed weights, OOM, and cancellation publish no encoder or output. Canonical handle publication, persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
     append(
         "comfy-parity-native-upscale-model-resource-foundation",
@@ -9119,10 +9161,9 @@ def native_model_resource_precursor_tasks(
         ],
         [
             "crates/comfy_model/src/model_family.rs",
-            "crates/comfy_nodes/src/stored_payload.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
         ],
-        "All pinned latent-upscale variants load and execute exact normalization, output shape, digest, residency, cache, persistence, and restart behavior. Unsupported variant, incompatible latent or VAE state, malformed weights, OOM, cancellation, and stale handles publish no resource or latent.",
+        "All pinned latent-upscale variants load, execute, and reconstruct exact normalization, output shape, semantic digest, and alias-aware residency. Unsupported variant, incompatible latent or VAE state, malformed weights, OOM, and cancellation publish no resource or latent. Canonical handle publication, persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
     append(
         "comfy-parity-native-background-removal-resource-foundation",
@@ -9209,6 +9250,7 @@ def native_model_resource_precursor_tasks(
     ordered_ids = [
         "comfy-parity-native-vae-resource-foundation",
         "comfy-parity-native-clip-resource-foundation",
+        "comfy-parity-native-family-denoiser-invocation-foundation",
         "comfy-parity-native-family-model-resource-foundation",
         "comfy-parity-native-audio-encoder-resource-foundation",
         "comfy-parity-native-upscale-model-resource-foundation",
@@ -9243,7 +9285,7 @@ def native_model_resource_execution_foundation_task(
         [4, 6, 7, 18, 26, 28, 31, 34, 35, 37, 38, 41, 44],
         [8, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
         ["VAL-MODEL-FAMILY-001", "VAL-NODE-001", "VAL-MEMORY-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
-        "Integrate the typed resource prerequisites through the single native handle-store boundary. MODEL, CLIP, and VAE retain their canonical NativeDiffusionPayload transport; auxiliary model roles use checked NativeStoredModelPayload admission; the runtime loader service returns complete typed resources and the node boundary alone stages and publishes handles. Existing ControlNet, optical-flow, CLIP-vision, frame-interpolation, and face-detection owners remain canonical, while LoRA and executable model-patch resources remain assigned to the model-transform foundation.",
+        "Integrate the typed resource prerequisites through the single native handle-store boundary. MODEL, CLIP, and VAE retain their canonical NativeDiffusionPayload transport; AUDIO_ENCODER, LATENT_UPSCALE_MODEL, and other auxiliary model roles use checked concrete NativeStoredModelPayload admission; the runtime loader service returns complete typed resources and the node boundary alone stages and publishes handles. Existing ControlNet, optical-flow, CLIP-vision, frame-interpolation, and face-detection owners remain canonical, while LoRA and executable model-patch resources remain assigned to the model-transform foundation.",
         [
             ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
             "projects/comfy/ComfyUI/nodes.py",
@@ -9254,6 +9296,7 @@ def native_model_resource_execution_foundation_task(
             "projects/comfy/ComfyUI/comfy_extras/nodes_moge.py",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/audio_encoder.rs",
             "crates/comfy_model/src/vae.rs",
             "crates/comfy_model/src/vae_structured.rs",
             "crates/comfy_nodes/src/stored_payload.rs",
@@ -9270,7 +9313,7 @@ def native_model_resource_execution_foundation_task(
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
         ],
-        "All prerequisite resources plus the already canonical ControlNet, optical-flow, CLIP-vision, frame-interpolation, and face-detection resources can be published, resolved, leased, cached, persisted, restarted, and consumed through exactly one role-correct handle boundary without a crate cycle. MODEL, CLIP, and VAE use only NativeDiffusionPayload transport; auxiliary roles use only explicit concrete stored admission. Wrong-role, unsupported architecture, malformed weights, partial multi-file loads, OOM, cancellation, stale handles, service replacement, and invocation failures publish nothing, and repository scans find no family-local loader, fake resource, second store, or duplicate execution owner.",
+        "All prerequisite resources plus the already canonical ControlNet, optical-flow, CLIP-vision, frame-interpolation, and face-detection resources can be published, resolved, leased, cached, persisted, reconstructed after restart, and consumed through exactly one role-correct handle boundary without a crate cycle. MODEL, CLIP, and VAE use only NativeDiffusionPayload transport; AUDIO_ENCODER, LATENT_UPSCALE_MODEL, and other auxiliary roles use only explicit concrete stored admission. Old-generation handles reject after restart while fresh handles resolve the same semantic identity. Wrong-role or non-concrete backing, unsupported architecture, malformed weights, source or profile drift, partial multi-file loads, OOM, cancellation, stale handles, service replacement, failed reconstruction, and invocation failures publish no handle, cache record, effect, or durable success, and repository scans find no family-local loader, fake resource, second store, or duplicate execution owner.",
         dependency,
         locked=True,
         feature_scoped=True,

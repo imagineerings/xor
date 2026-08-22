@@ -80,7 +80,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 698)
+        self.assertEqual(len(tasks), 699)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -97,6 +97,7 @@ class ValidationGenerationTests(unittest.TestCase):
         model_resource_phases = [
             "comfy-parity-native-vae-resource-foundation",
             "comfy-parity-native-clip-resource-foundation",
+            "comfy-parity-native-family-denoiser-invocation-foundation",
             "comfy-parity-native-family-model-resource-foundation",
             "comfy-parity-native-audio-encoder-resource-foundation",
             "comfy-parity-native-upscale-model-resource-foundation",
@@ -128,13 +129,54 @@ class ValidationGenerationTests(unittest.TestCase):
         family_task = tasks_by_id[
             "comfy-parity-native-family-model-resource-foundation"
         ]
+        family_invocation_task = tasks_by_id[
+            "comfy-parity-native-family-denoiser-invocation-foundation"
+        ]
+        self.assertEqual(
+            family_invocation_task["writes"],
+            [
+                "crates/comfy_model/src/model_family.rs",
+                "crates/comfy_model/src/families/auraflow_comfy_model_0064.rs",
+                "crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs",
+                "crates/comfy_test_support/tests/native_family_model_invocation.rs",
+            ],
+        )
+        self.assertIn("unary forward-checkpoint fallback", family_invocation_task["done"])
         self.assertIn(
             "crates/comfy_sampler/src/native_node_payload.rs", family_task["writes"]
         )
+        self.assertIn("crates/comfy_sampler/src/guidance.rs", family_task["writes"])
         self.assertIn(
             "crates/comfy_runtime/src/native_execution_controller.rs",
             family_task["writes"],
         )
+        self.assertIn("positive and negative conditioning", family_task["done"])
+        audio_id = "comfy-parity-native-audio-encoder-resource-foundation"
+        latent_upscale_id = (
+            "comfy-parity-native-latent-upscale-model-resource-foundation"
+        )
+        execution_id = "comfy-parity-native-model-resource-execution-foundation"
+        stored_payload = "crates/comfy_nodes/src/stored_payload.rs"
+        self.assertNotIn(stored_payload, tasks_by_id[audio_id]["writes"])
+        self.assertNotIn(stored_payload, tasks_by_id[latent_upscale_id]["writes"])
+        self.assertIn(stored_payload, tasks_by_id[execution_id]["reads"])
+        self.assertIn(stored_payload, tasks_by_id[execution_id]["writes"])
+        writers = [
+            identifier
+            for identifier in [*model_resource_phases, execution_id]
+            if stored_payload in tasks_by_id[identifier]["writes"]
+        ]
+        self.assertEqual(writers, [execution_id])
+        self.assertIn(execution_id, tasks_by_id[audio_id]["done"])
+        self.assertIn(execution_id, tasks_by_id[latent_upscale_id]["done"])
+        for required in [
+            "AUDIO_ENCODER",
+            "LATENT_UPSCALE_MODEL",
+            "persisted",
+            "restart",
+            "stale",
+        ]:
+            self.assertIn(required, tasks_by_id[execution_id]["done"])
         video_phases = [
             "comfy-parity-native-video-codec-general-abi-foundation",
             "comfy-parity-native-video-codec-package-bootstrap-foundation",
