@@ -12,11 +12,11 @@ use comfy_tensor::{CancellationToken, DType, StorageId, Tensor, TensorError};
 
 use crate::{
     GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256, GEMMA3_MULTIMODAL_SOURCE_SHA256,
-    GEMMA4_MULTIMODAL_SOURCE_SHA256, LLAMA_SOURCE_SHA256, NativeDecoderTextEncoder,
-    NativeFrameInterpolationModel, NativeGemmaMultimodal, NativePromptTokenizer,
-    NativeQwenMultimodal, NativeRaftLarge, NativeSdPoseModel, NativeStructuredVae, NativeVae,
-    QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256,
-    QWEN35_SOURCE_SHA256,
+    GEMMA4_MULTIMODAL_SOURCE_SHA256, LLAMA_SOURCE_SHA256, NativeAudioEncoder,
+    NativeDecoderTextEncoder, NativeFrameInterpolationModel, NativeGemmaMultimodal,
+    NativePromptTokenizer, NativeQwenMultimodal, NativeRaftLarge, NativeSdPoseModel,
+    NativeStructuredVae, NativeVae, QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256,
+    QWEN3VL_SOURCE_SHA256, QWEN35_SOURCE_SHA256,
     clip::{LoadedSd1Clip, NativeClipResidentOwnerKind, NativeClipResource, NativeTokenizer},
     clip_vision::NativeClipVision,
     generated_native_diffusion::{Sd1Tokenizer, Sd15TinyModel},
@@ -263,6 +263,9 @@ enum NativeModelResource {
     NativeFamilyModel {
         resource: Arc<NativeFamilyModelResource>,
     },
+    AudioEncoder {
+        resource: Arc<NativeAudioEncoder>,
+    },
     Sd1Clip {
         tokenizer: Arc<Sd1Tokenizer>,
         clip: Arc<LoadedSd1Clip>,
@@ -307,6 +310,7 @@ pub enum NativeModelBackingKind {
     NativeFamilyModelMaterialized,
     NativeFamilyModelMappedWeights,
     NativeFamilyModelPatchGraph,
+    NativeAudioEncoder,
     Sd1Tokenizer,
     Sd1Clip,
     NativeVae,
@@ -524,6 +528,26 @@ impl NativeModelPayload {
             resident_bytes: payload_resident_bytes(&identity, backing_bytes)?,
             identity,
             resource: NativeModelResource::NativeFamilyModel { resource },
+        })
+    }
+
+    pub fn audio_encoder(
+        resource: Arc<NativeAudioEncoder>,
+    ) -> Result<Self, NativeModelPayloadError> {
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::AudioEncoder,
+            resource.identifier(),
+            "zed-native-audio-encoder-v1",
+            resource.artifact_sha256(),
+            resource.semantic_state_digest_sha256(),
+        )?;
+        let backing_bytes = resource
+            .resident_bytes()
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, backing_bytes)?,
+            identity,
+            resource: NativeModelResource::AudioEncoder { resource },
         })
     }
 
@@ -985,6 +1009,29 @@ impl NativeModelPayload {
                     })
                     .collect()
             }
+            NativeModelResource::AudioEncoder { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::NativeAudioEncoder,
+                    address: Arc::as_ptr(resource) as usize,
+                    resident_bytes: resource.resident_owned_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                }]
+            }
             NativeModelResource::Sd1Clip { tokenizer, clip } => vec![
                 NativeModelResidentAllocation {
                     kind: NativeModelBackingKind::Sd1Tokenizer,
@@ -1297,6 +1344,7 @@ impl NativeModelPayload {
                 Some(NativeExecutableModel::Family(resource.as_ref()))
             }
             NativeModelResource::Sd1Clip { .. }
+            | NativeModelResource::AudioEncoder { .. }
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::NativeStructuredVae { .. }
             | NativeModelResource::OpticalFlow { .. }
@@ -1324,6 +1372,7 @@ impl NativeModelPayload {
             } => Some((tokenizer, clip)),
             NativeModelResource::Sd15Model { .. }
             | NativeModelResource::NativeFamilyModel { .. }
+            | NativeModelResource::AudioEncoder { .. }
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::NativeStructuredVae { .. }
             | NativeModelResource::OpticalFlow { .. }
@@ -1342,6 +1391,7 @@ impl NativeModelPayload {
             NativeModelResource::NativeVae { vae } => Some(vae),
             NativeModelResource::Sd15Model { .. }
             | NativeModelResource::NativeFamilyModel { .. }
+            | NativeModelResource::AudioEncoder { .. }
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeStructuredVae { .. }
             | NativeModelResource::OpticalFlow { .. }
@@ -1362,11 +1412,19 @@ impl NativeModelPayload {
         }
     }
 
+    pub fn audio_encoder_resource(&self) -> Option<&Arc<NativeAudioEncoder>> {
+        match &self.resource {
+            NativeModelResource::AudioEncoder { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
     pub fn optical_flow_resource(&self) -> Option<&Arc<NativeRaftLarge>> {
         match &self.resource {
             NativeModelResource::OpticalFlow { raft } => Some(raft),
             NativeModelResource::Sd15Model { .. }
             | NativeModelResource::NativeFamilyModel { .. }
+            | NativeModelResource::AudioEncoder { .. }
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::NativeStructuredVae { .. }
@@ -1385,6 +1443,7 @@ impl NativeModelPayload {
             NativeModelResource::ClipVision { clip_vision } => Some(clip_vision),
             NativeModelResource::Sd15Model { .. }
             | NativeModelResource::NativeFamilyModel { .. }
+            | NativeModelResource::AudioEncoder { .. }
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::NativeStructuredVae { .. }
@@ -1447,6 +1506,9 @@ impl NativeModelPayload {
             NativeModelResource::Sd15Model { model } => Self::sd15_model(model.clone())?,
             NativeModelResource::NativeFamilyModel { resource } => {
                 Self::native_family_model(resource.clone())?
+            }
+            NativeModelResource::AudioEncoder { resource } => {
+                Self::audio_encoder(resource.clone())?
             }
             NativeModelResource::Sd1Clip {
                 tokenizer, clip, ..
@@ -1537,12 +1599,36 @@ impl AudioEncoderOutput {
         encoded_audio_all_layers: Vec<Tensor>,
         audio_samples: u64,
     ) -> Result<Self, NativeModelPayloadError> {
+        Self::layered_inner(encoded_audio, encoded_audio_all_layers, audio_samples, None)
+    }
+
+    pub fn layered_with_cancellation(
+        encoded_audio: Tensor,
+        encoded_audio_all_layers: Vec<Tensor>,
+        audio_samples: u64,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        Self::layered_inner(
+            encoded_audio,
+            encoded_audio_all_layers,
+            audio_samples,
+            Some(cancellation),
+        )
+    }
+
+    fn layered_inner(
+        encoded_audio: Tensor,
+        encoded_audio_all_layers: Vec<Tensor>,
+        audio_samples: u64,
+        cancellation: Option<&CancellationToken>,
+    ) -> Result<Self, NativeModelPayloadError> {
         let resource = AudioEncoderOutputResource::Layered {
             encoded_audio,
             encoded_audio_all_layers: encoded_audio_all_layers.into_boxed_slice(),
             audio_samples,
         };
-        let (semantic_digest_sha256, resident_bytes) = project_audio_encoder_output(&resource)?;
+        let (semantic_digest_sha256, resident_bytes) =
+            project_audio_encoder_output_inner(&resource, cancellation)?;
         Ok(Self {
             resource,
             semantic_digest_sha256,
@@ -1826,6 +1912,14 @@ fn structured_resident_parts<'a>(
 fn project_audio_encoder_output(
     resource: &AudioEncoderOutputResource,
 ) -> Result<([u8; 32], u64), NativeModelPayloadError> {
+    project_audio_encoder_output_inner(resource, None)
+}
+
+fn project_audio_encoder_output_inner(
+    resource: &AudioEncoderOutputResource,
+    cancellation: Option<&CancellationToken>,
+) -> Result<([u8; 32], u64), NativeModelPayloadError> {
+    check_projection_cancellation(cancellation)?;
     let mut projection = NativeStructuredProjection::new::<AudioEncoderOutput>(
         b"zed.comfy.model.audio-encoder-output.v1",
     )?;
@@ -1845,19 +1939,25 @@ fn project_audio_encoder_output(
             }
             require_tensor_shape(encoded_audio, 3, None, "encoded audio")?;
             projection.hash_tag(1);
-            projection.hash_float_tensor(encoded_audio)?;
+            projection.hash_float_tensor_inner(encoded_audio, cancellation)?;
             projection.hash_len(encoded_audio_all_layers.len())?;
             projection.add_allocation::<Tensor>(encoded_audio_all_layers.len())?;
             for layer in encoded_audio_all_layers {
+                check_projection_cancellation(cancellation)?;
                 require_tensor_shape(layer, 3, Some(encoded_audio), "encoded audio layer")?;
-                projection.hash_float_tensor(layer)?;
+                projection.hash_float_tensor_inner(layer, cancellation)?;
             }
             let final_layer = encoded_audio_all_layers.last().ok_or(
                 NativeModelPayloadError::InvalidStructuredPayload(
                     "layered audio encoder output has no final layer",
                 ),
             )?;
-            require_same_tensor_value(encoded_audio, final_layer, "encoded audio final layer")?;
+            require_same_tensor_value_inner(
+                encoded_audio,
+                final_layer,
+                "encoded audio final layer",
+                cancellation,
+            )?;
             projection.hash_u64(*audio_samples);
         }
         AudioEncoderOutputResource::WanDancer {
@@ -1885,6 +1985,7 @@ fn project_audio_encoder_output(
             projection.hash_f64(*audio_inject_scale);
         }
     }
+    check_projection_cancellation(cancellation)?;
     Ok(projection.finish())
 }
 
@@ -1998,6 +2099,15 @@ impl NativeStructuredProjection {
         &mut self,
         tensor: &Tensor,
     ) -> Result<(), NativeModelPayloadError> {
+        self.hash_float_tensor_inner(tensor, None)
+    }
+
+    fn hash_float_tensor_inner(
+        &mut self,
+        tensor: &Tensor,
+        cancellation: Option<&CancellationToken>,
+    ) -> Result<(), NativeModelPayloadError> {
+        check_projection_cancellation(cancellation)?;
         let descriptor = tensor.descriptor();
         if !descriptor.is_contiguous()? {
             return Err(NativeModelPayloadError::InvalidStructuredPayload(
@@ -2022,7 +2132,7 @@ impl NativeStructuredProjection {
         }
         let bytes = tensor.contiguous_bytes()?;
         self.hash_len(bytes.len())?;
-        hash_finite_float_bytes(&mut self.hasher, descriptor.dtype(), bytes)?;
+        hash_finite_float_bytes(&mut self.hasher, descriptor.dtype(), bytes, cancellation)?;
         if self.storage_ids.insert(tensor.storage_id().get()) {
             self.resident_bytes = self
                 .resident_bytes
@@ -2051,10 +2161,15 @@ fn hash_finite_float_bytes(
     hasher: &mut Sha256,
     dtype: DType,
     bytes: &[u8],
+    cancellation: Option<&CancellationToken>,
 ) -> Result<(), NativeModelPayloadError> {
+    const CANCELLATION_INTERVAL_BYTES: usize = 64 * 1024;
     match dtype {
         DType::F64 => {
-            for chunk in bytes.chunks_exact(8) {
+            for (index, chunk) in bytes.chunks_exact(8).enumerate() {
+                if index.is_multiple_of(CANCELLATION_INTERVAL_BYTES / 8) {
+                    check_projection_cancellation(cancellation)?;
+                }
                 let bits = u64::from_ne_bytes(copy_array(chunk)?);
                 if !f64::from_bits(bits).is_finite() {
                     return Err(NativeModelPayloadError::InvalidStructuredPayload(
@@ -2066,7 +2181,10 @@ fn hash_finite_float_bytes(
             require_exact_chunks(bytes, 8)?;
         }
         DType::F32 => {
-            for chunk in bytes.chunks_exact(4) {
+            for (index, chunk) in bytes.chunks_exact(4).enumerate() {
+                if index.is_multiple_of(CANCELLATION_INTERVAL_BYTES / 4) {
+                    check_projection_cancellation(cancellation)?;
+                }
                 let bits = u32::from_ne_bytes(copy_array(chunk)?);
                 if !f32::from_bits(bits).is_finite() {
                     return Err(NativeModelPayloadError::InvalidStructuredPayload(
@@ -2078,7 +2196,10 @@ fn hash_finite_float_bytes(
             require_exact_chunks(bytes, 4)?;
         }
         DType::F16 => {
-            for chunk in bytes.chunks_exact(2) {
+            for (index, chunk) in bytes.chunks_exact(2).enumerate() {
+                if index.is_multiple_of(CANCELLATION_INTERVAL_BYTES / 2) {
+                    check_projection_cancellation(cancellation)?;
+                }
                 let bits = u16::from_ne_bytes(copy_array(chunk)?);
                 if bits & 0x7c00 == 0x7c00 {
                     return Err(NativeModelPayloadError::InvalidStructuredPayload(
@@ -2090,7 +2211,10 @@ fn hash_finite_float_bytes(
             require_exact_chunks(bytes, 2)?;
         }
         DType::Bf16 => {
-            for chunk in bytes.chunks_exact(2) {
+            for (index, chunk) in bytes.chunks_exact(2).enumerate() {
+                if index.is_multiple_of(CANCELLATION_INTERVAL_BYTES / 2) {
+                    check_projection_cancellation(cancellation)?;
+                }
                 let bits = u16::from_ne_bytes(copy_array(chunk)?);
                 if bits & 0x7f80 == 0x7f80 {
                     return Err(NativeModelPayloadError::InvalidStructuredPayload(
@@ -2106,6 +2230,18 @@ fn hash_finite_float_bytes(
                 "structured tensor must use a finite floating-point dtype",
             ));
         }
+    }
+    check_projection_cancellation(cancellation)?;
+    Ok(())
+}
+
+fn check_projection_cancellation(
+    cancellation: Option<&CancellationToken>,
+) -> Result<(), NativeModelPayloadError> {
+    if let Some(cancellation) = cancellation {
+        cancellation
+            .check()
+            .map_err(|error| NativeModelPayloadError::Tensor(error.into()))?;
     }
     Ok(())
 }
@@ -2156,12 +2292,35 @@ fn require_same_tensor_value(
     right: &Tensor,
     field: &'static str,
 ) -> Result<(), NativeModelPayloadError> {
+    require_same_tensor_value_inner(left, right, field, None)
+}
+
+fn require_same_tensor_value_inner(
+    left: &Tensor,
+    right: &Tensor,
+    field: &'static str,
+    cancellation: Option<&CancellationToken>,
+) -> Result<(), NativeModelPayloadError> {
     if left.descriptor().shape() != right.descriptor().shape()
         || left.descriptor().dtype() != right.descriptor().dtype()
-        || left.contiguous_bytes()? != right.contiguous_bytes()?
     {
         return Err(NativeModelPayloadError::InvalidStructuredPayload(field));
     }
+    let left_bytes = left.contiguous_bytes()?;
+    let right_bytes = right.contiguous_bytes()?;
+    if left_bytes.len() != right_bytes.len() {
+        return Err(NativeModelPayloadError::InvalidStructuredPayload(field));
+    }
+    for (left_chunk, right_chunk) in left_bytes
+        .chunks(64 * 1024)
+        .zip(right_bytes.chunks(64 * 1024))
+    {
+        check_projection_cancellation(cancellation)?;
+        if left_chunk != right_chunk {
+            return Err(NativeModelPayloadError::InvalidStructuredPayload(field));
+        }
+    }
+    check_projection_cancellation(cancellation)?;
     Ok(())
 }
 
@@ -2230,9 +2389,10 @@ mod tests {
     use super::*;
     use crate::{
         ArtifactAvailability, ArtifactKey, ArtifactRecord, GENERATED_LATENT_FORMATS,
-        ModelFamilyIdentity, NativeModule, PatchGraph, VaeArchitectureIdentity, VaeBoundary,
-        VaeDescriptor, VaeError, VaeKernelProfile, VaeStructuredDecodeRequest,
-        VaeStructuredOutputKind, VaeStructuredResult, vae::VaeModelBinding,
+        ModelFamilyIdentity, NativeAudioEncoderArchitecture, NativeModule, PatchGraph,
+        VaeArchitectureIdentity, VaeBoundary, VaeDescriptor, VaeError, VaeKernelProfile,
+        VaeStructuredDecodeRequest, VaeStructuredOutputKind, VaeStructuredResult,
+        audio_encoder::deterministic_reduced_audio_encoder_fixture, vae::VaeModelBinding,
     };
     use comfy_tensor::{
         CancellationToken, CpuBackend, CpuWorkspaceAuthority, DeviceId, ExecutionContext, StreamId,
@@ -2507,6 +2667,89 @@ mod tests {
     }
 
     #[test]
+    fn audio_encoder_payload_binds_exact_identity_and_alias_aware_residency()
+    -> Result<(), Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(128 * 1024 * 1024)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(64 * 1024 * 1024)?,
+            &cancellation,
+        );
+        let resource = Arc::new(deterministic_reduced_audio_encoder_fixture(
+            &backend,
+            &context,
+            NativeAudioEncoderArchitecture::Wav2Vec2Base,
+            0,
+        )?);
+        let payload = NativeModelPayload::audio_encoder(resource.clone())?;
+        payload.validate()?;
+
+        assert_eq!(
+            payload.identity().role(),
+            NativeModelResourceRole::AudioEncoder
+        );
+        assert_eq!(payload.identity().identifier(), resource.identifier());
+        assert_eq!(payload.identity().format(), "zed-native-audio-encoder-v1");
+        assert_eq!(
+            payload.identity().artifact_sha256(),
+            resource.artifact_sha256()
+        );
+        assert_eq!(
+            payload.identity().execution_sha256(),
+            resource.semantic_state_digest_sha256()
+        );
+        assert!(
+            payload
+                .audio_encoder_resource()
+                .is_some_and(|stored| Arc::ptr_eq(stored, &resource))
+        );
+        assert!(payload.model().is_none());
+        assert!(payload.clip().is_none());
+        assert!(payload.vae().is_none());
+
+        let parts = payload.resident_parts()?;
+        assert_eq!(parts.backing_allocations().len(), 1);
+        let backing = parts.backing_allocations().first().ok_or(
+            NativeModelPayloadError::ResourceMismatch("AUDIO_ENCODER backing allocation"),
+        )?;
+        assert_eq!(backing.kind(), NativeModelBackingKind::NativeAudioEncoder);
+        assert_eq!(backing.address(), Arc::as_ptr(&resource) as usize);
+        assert_eq!(backing.resident_bytes(), resource.resident_owned_bytes()?);
+        assert_eq!(
+            parts
+                .tensor_allocations()
+                .iter()
+                .map(|allocation| (allocation.storage_id(), allocation.resident_bytes()))
+                .collect::<Vec<_>>(),
+            resource.resident_tensor_allocations()?
+        );
+        let unique_storage_ids = parts
+            .tensor_allocations()
+            .iter()
+            .map(NativeModelTensorResidentAllocation::storage_id)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(unique_storage_ids.len(), parts.tensor_allocations().len());
+        assert_eq!(parts.resident_bytes()?, payload.resident_bytes());
+
+        let reconstructed =
+            NativeModelPayload::audio_encoder(Arc::new(resource.reconstruct(&cancellation)?))?;
+        assert_eq!(reconstructed.identity(), payload.identity());
+        assert_eq!(reconstructed.resident_bytes(), payload.resident_bytes());
+
+        let changed = NativeModelPayload::audio_encoder(Arc::new(
+            deterministic_reduced_audio_encoder_fixture(
+                &backend,
+                &context,
+                NativeAudioEncoderArchitecture::Wav2Vec2Base,
+                1,
+            )?,
+        ))?;
+        assert_ne!(changed.identity(), payload.identity());
+        Ok(())
+    }
+
+    #[test]
     fn structured_vae_payload_retains_shape_and_splat_resources_under_the_vae_role()
     -> Result<(), Box<dyn Error>> {
         with_context(|backend, context| {
@@ -2609,6 +2852,18 @@ mod tests {
             let layered_parts = layered.resident_parts()?;
             assert_eq!(layered_parts.tensor_allocations().len(), 2);
             assert_eq!(layered_parts.resident_bytes()?, layered.resident_bytes());
+
+            let cancelled = CancellationToken::default();
+            assert!(cancelled.cancel());
+            assert!(matches!(
+                AudioEncoderOutput::layered_with_cancellation(
+                    encoded_audio.clone(),
+                    vec![encoded_audio.clone()],
+                    16_000,
+                    &cancelled,
+                ),
+                Err(NativeModelPayloadError::Tensor(TensorError::Cancelled))
+            ));
 
             let audio_feature = f32_tensor(backend, context, vec![1, 2, 35], &[0.25; 70])?;
             let dancer = AudioEncoderOutput::wan_dancer(audio_feature, 30.0, 1.5)?;
