@@ -104,7 +104,9 @@ extension.workspace = true
 file_finder.workspace = true
 fs = { workspace = true, features = ["test-support"] }
 git = { workspace = true, features = ["test-support"] }
+git_credential_nostr = { path = "../../tools/git_credential_nostr" }
 git_hosting_providers.workspace = true
+git_sign_nostr = { path = "../../tools/git_sign_nostr" }
 git_ui = { workspace = true, features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }
 gpui_tokio.workspace = true
@@ -146,3 +148,4 @@ workspace = { workspace = true, features = ["test-support"] }
 worktree = { workspace = true, features = ["test-support"] }
 zed_actions.workspace = true
 zlog.workspace = true
+zeroize.workspace = true

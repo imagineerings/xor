@@ -3612,7 +3612,9 @@ dependencies = [
  "fs",
  "futures 0.3.32",
  "git",
+ "git_credential_nostr",
  "git_hosting_providers",
+ "git_sign_nostr",
  "git_ui",
  "gpui",
  "gpui_tokio",
@@ -3680,6 +3682,7 @@ dependencies = [
  "workspace",
  "worktree",
  "zed_actions",
+ "zeroize",
  "zlog",
 ]
 
