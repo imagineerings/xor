@@ -306,6 +306,7 @@ dependencies = [
  "language_models",
  "log",
  "lsp",
+ "nostr",
  "nostr_compat",
  "parking_lot",
  "paths",
@@ -345,6 +346,7 @@ dependencies = [
  "watch",
  "web_search",
  "zed_env_vars",
+ "zeroize",
  "zlog",
  "zstd",
 ]
@@ -12553,6 +12555,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",
+ "collaboration_domain",
  "hex",
  "nostr",
  "proptest",
@@ -24546,6 +24549,7 @@ dependencies = [
  "mimalloc",
  "miniprofiler_ui",
  "node_runtime",
+ "nostr_compat",
  "notifications",
  "onboarding",
  "outline",

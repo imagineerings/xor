@@ -6,6 +6,7 @@ pub mod event;
 pub mod filter;
 pub mod generated_kinds;
 pub mod head;
+pub mod jobs;
 pub mod nip34_collaboration;
 pub mod nip34_repository;
 pub mod verification;

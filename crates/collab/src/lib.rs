@@ -8,6 +8,7 @@ pub mod executor;
 pub mod freshness;
 pub mod git;
 pub mod identity;
+pub mod jobs;
 pub mod messages;
 pub mod migration;
 pub mod nostr;
