@@ -2850,7 +2850,7 @@ mod tests {
             assert!(matches!(
                 AudioEncoderOutput::layered_with_cancellation(
                     encoded_audio.clone(),
-                    vec![encoded_audio.clone()],
+                    vec![encoded_audio],
                     16_000,
                     &cancelled,
                 ),
