@@ -500,6 +500,7 @@ dependencies = [
  "client",
  "clock",
  "cloud_api_types",
+ "collaboration_domain",
  "collections",
  "command_palette_hooks",
  "component",
