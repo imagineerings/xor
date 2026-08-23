@@ -7,6 +7,8 @@ pub mod activity_diff_link;
 pub mod activity_git;
 #[cfg(feature = "multiplayer-tools")]
 pub mod activity_observer;
+#[cfg(feature = "multiplayer-tools")]
+pub mod activity_platform;
 pub mod activity_projection;
 pub mod activity_reducer;
 mod agent_configuration;
