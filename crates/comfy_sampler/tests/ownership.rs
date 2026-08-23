@@ -449,14 +449,17 @@ fn authoritative_sampling_owners_have_no_competing_production_definitions()
     assert!(!runtime.contains("RngStreamAddress::new("));
     assert!(!runtime.contains("\"initial-noise-v1"));
     assert!(runtime.contains("INITIAL_NOISE_PHASE_ID"));
-    assert!(runtime.contains("checked_native_diffusion_plan("));
-    assert!(runtime.contains("scale_initial_noise("));
+    assert!(runtime.contains("checked_native_diffusion_plan_for_profile("));
+    assert!(runtime.contains("normal_sigmas_for_profile("));
+    assert!(runtime.contains("scale_initial_noise_for_profile("));
+    assert!(runtime.contains("sample_euler_for_profile("));
     assert!(runtime.contains("NoiseRequest::native_diffusion("));
     assert!(runtime.contains("sd15_model_time("));
     assert!(runtime.contains("scale_model_input("));
     assert!(runtime.contains("sd15_interpret_prediction("));
     assert!(runtime.contains("impl GuidanceDenoiser for Sd15GuidanceDenoiser"));
     assert!(runtime.contains("pub struct Sd15GuidanceAdapter"));
+    assert!(runtime.contains("NativeFamilyGuidanceDenoiser::checked("));
     assert!(runtime.contains("execute_guidance("));
     assert!(runtime.contains("[GUIDANCE_ADAPTER_ID.as_bytes()]"));
     assert!(runtime.contains("artifact_digests: identities.conditioning().artifact_digests()"));
@@ -466,13 +469,14 @@ fn authoritative_sampling_owners_have_no_competing_production_definitions()
         .and_then(|source| source.split("struct VaeDecodeNode").next())
         .ok_or("KSampler implementation slice is unavailable")?;
     let guidance_position = ksampler
-        .find("let prediction = match guidance.execute(")
+        .find("let prediction = if let (Some(guider), Some(guidance))")
         .ok_or("KSampler does not call canonical guidance")?;
     let publication_position = ksampler
         .find("publish_latent_bundle(&context, final_latent)")
         .ok_or("KSampler final latent publication is unavailable")?;
     assert!(guidance_position < publication_position);
-    assert!(ksampler[guidance_position..publication_position].contains(".execute("));
+    assert!(ksampler[guidance_position..publication_position].contains("guider.execute("));
+    assert!(ksampler[guidance_position..publication_position].contains("guidance.execute("));
     assert_eq!(
         ksampler
             .matches("publish_latent_bundle(&context, final_latent)")

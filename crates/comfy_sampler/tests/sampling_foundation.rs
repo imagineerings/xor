@@ -982,7 +982,7 @@ fn val_sampling_foundation_001() -> Result<(), Box<dyn Error>> {
 
     let runtime_adapter = fs::read_to_string(root.join(runtime_adapter_path))?;
     assert!(runtime_adapter.contains("let model_time = sd15_model_time("));
-    assert!(runtime_adapter.contains("let initial = scale_initial_noise("));
+    assert!(runtime_adapter.contains("let initial = scale_initial_noise_for_profile("));
     assert!(runtime_adapter.contains("let model_input = match scale_model_input("));
     assert!(!runtime_adapter.contains("noise.mul_add(initial_sigma"));
 

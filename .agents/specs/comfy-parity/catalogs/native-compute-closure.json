@@ -16,14 +16,14 @@
   ],
   "generator": "crates/comfy_sampler/tests/breadth_closure.rs",
   "inputs": {
-    ".agents/specs/comfy-parity/catalogs/backend-conditioning-contracts.csv": "18e92b66e37d8a7771567ef85205ee733bddbfb393d37284bafb0451f69b2529",
+    ".agents/specs/comfy-parity/catalogs/backend-conditioning-contracts.csv": "72bca253bca038748ff1c5ba2aba5859cff746eebed25ce822c6ed319471a7fb",
     ".agents/specs/comfy-parity/catalogs/backend-models.csv": "c3aef7d751586a15fe6add4991e106558e1e7c112fe4267b2ab1d343d9551a8d",
-    ".agents/specs/comfy-parity/catalogs/native-model-family-closure.json": "3933cf9d083a463e435aa7c92d72ff5297dae2859cfa2bffc63b60b8cc6c5575",
-    ".agents/specs/comfy-parity/catalogs/native-spec-mapping.json": "c7b42cf8dc91c0239e894560260077104556e082d537677af8399765cb2445f9",
+    ".agents/specs/comfy-parity/catalogs/native-model-family-closure.json": "1d22b5d86c7c67bbe570637dd1f2b82b7bb0ab7eb9ef25eef37c2c9963f86b52",
+    ".agents/specs/comfy-parity/catalogs/native-spec-mapping.json": "c2661725af3f8705e9376cbecfb9a5e7d71e8e82cb4ff381e0ad51a9fd3164e6",
     "crates/comfy_model/build.rs": "21af207ec9209270e4dd223f532483e7708f9b0a8008e0295985f14b09ebd6d0",
     "crates/comfy_model/src/latent_formats": "b2f13c62f7262d3bd6a20e67ce9e8a349a2140725b19395bf7608f073737d020",
     "crates/comfy_sampler/build.rs": "816c59e69cf28bf4b9aa5d87e487cc7117ad247a96ac2925297348074f34060f",
-    "crates/comfy_sampler/src/algorithms": "d91863f2391ce32223871994b250f471aa9ba6b7331c563b5b1f24ba4924b68c",
+    "crates/comfy_sampler/src/algorithms": "532c8b0f42b3cdd3998514e615996a0fd83ad7d376a6e3dee803bc9d77ab54e4",
     "crates/comfy_sampler/src/schedulers": "bd23eacda1eb784abe052f249a5e08e4872444c8eab0c4d877bfc39a0830548d",
     "crates/comfy_sampler/tests/breadth_closure.rs": "1af14ba5ef749d0d7e989a9858efb1acccebdb20184bad80e928cdefc219c94c",
     "crates/comfy_tensor/build.rs": "7980b4ee61fe0fd2f1f0b984b1c8576dbce623723fb14a9c9577000d4f12e35d",
@@ -4705,7 +4705,7 @@
       "backend_sha256": "695e4156296277762f96b12ab4741db4c6f1a0815eca69b0de8e1f59c73d9a49"
     }
   ],
-  "model_family_closure_sha256": "3933cf9d083a463e435aa7c92d72ff5297dae2859cfa2bffc63b60b8cc6c5575",
+  "model_family_closure_sha256": "1d22b5d86c7c67bbe570637dd1f2b82b7bb0ab7eb9ef25eef37c2c9963f86b52",
   "latent_formats": [
     {
       "feature_id": "COMFY-MODEL-0023",
@@ -5587,7 +5587,7 @@
       "source_sha256": "2850e0b4c2295cd87445415e287061fa3bfd69e88bd0aeb3eb16064864bd078d",
       "symbol_sha256": "94f4949f38d7f37f8267d68aac1f9e5389d8b3e1845cf7efd4f69357856d0c4d",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-family-equation-glora-calculate-weight-5a305deb",
@@ -5596,7 +5596,7 @@
       "source_sha256": "31cdd03f5b0beaa0df055512560128930f4f26b219ba57602d21abb086425b09",
       "symbol_sha256": "b887e3610e3c3b346f5a0d9da1e38a1fb0d0858caacec872833a50dc5a34bbf8",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-family-equation-loha-calculate-weight-5a305deb",
@@ -5605,7 +5605,7 @@
       "source_sha256": "579ca1e33e0d244e0d7eedd30fb727913341f8e7bfbd74b51221f567612286d5",
       "symbol_sha256": "f42cc8e5f56600a88d7f2b3eb6c738c74adbe9a568dc8c7d749feb15531784bf",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-family-equation-lokr-calculate-weight-5a305deb",
@@ -5614,7 +5614,7 @@
       "source_sha256": "b4763cc32215a47e4d906cfa6cbad9cf893f6a1329ada2225fda81fd99fcfeb4",
       "symbol_sha256": "ef6c194d7cb045b04f56312fee5a1d6934c68a354831e4237d038c4afc885041",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-family-equation-lora-calculate-weight-5a305deb",
@@ -5623,7 +5623,7 @@
       "source_sha256": "e506062b4eb189be4c36f88270e0fd4dcce038c79a98f7163604ed6b44efe4b5",
       "symbol_sha256": "bc5b4072356db35394c0be71b0f3cd09ad3c4bee91c1b26888681f3fa6bcd0cd",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-family-equation-oft-calculate-weight-5a305deb",
@@ -5632,7 +5632,7 @@
       "source_sha256": "88be3c32f610478bc6900a10009eaadf6fe2af973ed4861731e4f21e1afacf89",
       "symbol_sha256": "a01a25e6e53a021e86e4df70556eeef5fc8b33c597c72cbf33d6cc0703a12772",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-mapping-lora-load-lora-37a7b44e",
@@ -5767,7 +5767,7 @@
       "source_sha256": "484f0d83a96e700f80c793e4bcc6a897d633233e51a59191d91da5e59da345c7",
       "symbol_sha256": "c7007567d043dc6656940108226f267a81870b75f9c94bc7aad79d853d12fcbf",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-payload-base-pad-tensor-to-shape-e0f4f771",
@@ -5776,7 +5776,7 @@
       "source_sha256": "484f0d83a96e700f80c793e4bcc6a897d633233e51a59191d91da5e59da345c7",
       "symbol_sha256": "004881f9d9aa70551e73f8ab21f754dccae39ac754387d535e36a244dd085797",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-payload-base-tucker-weight-909e1055",
@@ -5785,7 +5785,7 @@
       "source_sha256": "484f0d83a96e700f80c793e4bcc6a897d633233e51a59191d91da5e59da345c7",
       "symbol_sha256": "89b887307047674de6947ab3ba11d096886a2caaa516426f78ce7c9a6f83be57",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-payload-base-tucker-weight-from-conv-d8ae2891",
@@ -5794,7 +5794,7 @@
       "source_sha256": "484f0d83a96e700f80c793e4bcc6a897d633233e51a59191d91da5e59da345c7",
       "symbol_sha256": "0ff9767da3dad42d30db32f098da84142eb77f014218b6ad9f8ba131080efb1e",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-payload-base-weight-decompose-fc84ed30",
@@ -5803,7 +5803,7 @@
       "source_sha256": "484f0d83a96e700f80c793e4bcc6a897d633233e51a59191d91da5e59da345c7",
       "symbol_sha256": "8d095051defa1f3ad7f873d945cd759c0789afe8ac5c79b700808b7b744d88b4",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-semantics-lora-calculate-shape-d168b9d7",
@@ -5812,7 +5812,7 @@
       "source_sha256": "8f75c95ddc8ab0144919fe5277c4e6b4fa4f4f45aa64aa3de5d2d3b1b4a927d8",
       "symbol_sha256": "943102b7e0db8fd783aa7cfc07ae74495b6a50855a778791cf8714c37e8c52f7",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-semantics-lora-calculate-weight-5a305deb",
@@ -5821,7 +5821,7 @@
       "source_sha256": "8f75c95ddc8ab0144919fe5277c4e6b4fa4f4f45aa64aa3de5d2d3b1b4a927d8",
       "symbol_sha256": "3678d60d344ef0a017368d7e14213aeb4bb40d69d0f583bef60240710bf0fb92",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     },
     {
       "contract_id": "conditioning-patch-semantics-lora-pad-tensor-to-shape-e0f4f771",
@@ -5830,7 +5830,7 @@
       "source_sha256": "8f75c95ddc8ab0144919fe5277c4e6b4fa4f4f45aa64aa3de5d2d3b1b4a927d8",
       "symbol_sha256": "525e54ffe02f47f43eb9914340a3030bd54f715d0f2a7f596fa95a4a7d354761",
       "closure_artifact": "VAL-PATCH-001",
-      "validation_artifact_sha256": "d5672792519a9bd23ea5e0891946a25cd5ae8ee2315a21ddebf84a02b4b6ca6d"
+      "validation_artifact_sha256": "31ab16c80a61417c20cdbac6f2cef2c04e07bd5f74c698e122ee4a4053985046"
     }
   ],
   "external_release_gates": [

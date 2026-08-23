@@ -183,6 +183,10 @@ class ValidationGenerationTests(unittest.TestCase):
         for path in (
             "crates/comfy_sampler/src/sampling_profile.rs",
             "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
+            ".agents/specs/comfy-parity/catalogs/native-compute-closure.json",
+            "crates/comfy_model/tests/clip_tokenizer.rs",
+            "crates/comfy_sampler/tests/ownership.rs",
+            "crates/comfy_sampler/tests/sampling_foundation.rs",
             "crates/comfy_test_support/fixtures/models/native-family-model-resource-foundation",
         ):
             self.assertIn(path, family_task["writes"])
