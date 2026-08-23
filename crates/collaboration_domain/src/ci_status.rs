@@ -35,6 +35,19 @@ impl CiLabel {
         &self.value
     }
 
+    pub fn from_record(
+        value: String,
+        truncated: bool,
+        sanitized: bool,
+    ) -> Result<Self, CiStatusError> {
+        validate_stored_text(&value, MAX_CI_LABEL_BYTES, false)?;
+        Ok(Self {
+            value,
+            truncated,
+            sanitized,
+        })
+    }
+
     pub const fn was_truncated(&self) -> bool {
         self.truncated
     }
@@ -63,6 +76,19 @@ impl CiOutputText {
 
     pub fn as_str(&self) -> &str {
         &self.value
+    }
+
+    pub fn from_record(
+        value: String,
+        truncated: bool,
+        sanitized: bool,
+    ) -> Result<Self, CiStatusError> {
+        validate_stored_text(&value, MAX_CI_OUTPUT_BYTES, true)?;
+        Ok(Self {
+            value,
+            truncated,
+            sanitized,
+        })
     }
 
     pub const fn was_truncated(&self) -> bool {
@@ -696,6 +722,22 @@ fn bound_untrusted_text(value: &str, max_bytes: usize) -> BoundedText {
         truncated,
         sanitized,
     }
+}
+
+fn validate_stored_text(
+    value: &str,
+    max_bytes: usize,
+    allow_empty: bool,
+) -> Result<(), CiStatusError> {
+    if value.len() > max_bytes
+        || (!allow_empty && value.trim().is_empty())
+        || value
+            .chars()
+            .any(|character| character.is_control() && !matches!(character, '\n' | '\t'))
+    {
+        return Err(CiStatusError::InvalidText);
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
