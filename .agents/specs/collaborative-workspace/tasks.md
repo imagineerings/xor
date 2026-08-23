@@ -2458,7 +2458,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Writes: crates/agent/src/job_delegation.rs_
     - _Validation: orchestration tests cover tree completion, partial failure, parent cancel, retry and cycle rejection_
 
-  - [ ] 31.7. Implement the job and executor-lease repository
+  - [x] 31.7. Implement the job and executor-lease repository
     - Read/write job transitions, ancestry and executor leases with idempotency and optimistic concurrency.
     - _Requirements: 2.1, 11.4, 11.5_
     - _Capability IDs: CAP-005, CAP-026_
@@ -2466,6 +2466,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/collab/migrations/collaboration_jobs.sql, crates/collaboration_domain/src/job.rs_
     - _Writes: crates/collab/src/jobs/repository.rs_
     - _Validation: repository tests cover concurrent accept, expired lease, retry, transition conflict and tenant isolation_
+    - _Discovered contradiction (2026-08-23): the migration is the timestamped `20260823000200_collaboration_jobs` pair rather than the planned unversioned path, and a usable repository requires crate-root/module registration plus an integration target beyond the standalone implementation file. Exact replay, transition serialization and lease recovery also require complete history/ancestry reads and transaction-local tenant setup inside the same write transaction; a write-only abstraction would not preserve the approved domain and forced-RLS invariants._
+    - _Evidence: 2026-08-23 — added the PostgreSQL-only canonical job repository with transaction-local tenant RLS, atomic request/head/version/ancestry creation, complete history reconstruction with denormalized-head verification, exact command/ancestry retry handling, locked domain transitions and optimistic head compare-and-swap. Executor leases are admitted only for the exact accepted/in-progress version and assigned executor, allocate monotonic generations, preserve and release recoverable expired generations, and fence heartbeat/release by tenant, job, version, generation, lease and executor. Seven deterministic release integration tests pass serialized competing accepts, exact retry, CAS rollback conflict, ordered ancestry persistence/reconstruction, expired-lease recovery, heartbeat/release fencing and pre-database tenant rejection. Focused warning-denied release Clippy, library checking, formatting, diff, dependency, Buzz inventory and canonical specification gates are recorded in the enclosing checkpoint commit._
 
 - [ ] 32. Enrich the semantic activity feed
 
