@@ -229,8 +229,32 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_05.rs",
             "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_11.rs",
             "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_18.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ]:
             self.assertIn(required_read, tasks_by_id[audio_id]["reads"])
+        for required_write in [
+            "crates/comfy_model/tests/audio_encoder.rs",
+            "crates/comfy_test_support/fixtures/models/audio-encoder-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ]:
+            self.assertIn(required_write, tasks_by_id[audio_id]["writes"])
+        self.assertNotIn(
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            tasks_by_id[audio_id]["writes"],
+        )
+        for phrase in [
+            "Wav2Vec2 marker precedence",
+            "post-resample audio_samples",
+            "unexpected nonexecuting state",
+            "zero-sample audio",
+            "CPU F32",
+            "comfy_model::audio_encoder::NativeAudioEncoder",
+        ]:
+            self.assertIn(phrase, tasks_by_id[audio_id]["done"])
         self.assertNotIn(stored_payload, tasks_by_id[latent_upscale_id]["writes"])
         self.assertIn(stored_payload, tasks_by_id[execution_id]["reads"])
         self.assertIn(stored_payload, tasks_by_id[execution_id]["writes"])

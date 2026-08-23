@@ -9172,14 +9172,20 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_11.rs",
             "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_18.rs",
             "crates/comfy_media/src/native_node_payload.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [
             "crates/comfy_model/src/audio_encoder.rs",
             "crates/comfy_model/src/comfy_model.rs",
-            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_model/tests/audio_encoder.rs",
             "crates/comfy_test_support/fixtures/models/audio-encoder-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "Validated pinned audio-encoder fixtures detect, load, retain, invoke, and reconstruct exact waveform layout, sample-rate handling, layered output tensors, semantic digest, and alias-aware residency. Unsupported architecture, invalid audio, malformed weights, OOM, and cancellation publish no encoder or output. Canonical handle publication, persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
+        "Pinned source-profile manifests and independent test-support-only reduced oracles preserve exact ordered prefix normalization and collision rejection, Wav2Vec2 marker precedence, 768/base versus 1024/large selection, Whisper Large V3 fallback, stereo channel mean, canonical 16 kHz resampling, post-resample audio_samples, Wav2Vec2 base and large convolution/normalization/transformer layer ordering, and Whisper trim-or-pad, torchaudio mel, log-floor, convolution, positional, transformer, and final-normalization behavior. Missing executable state or same-name shape, dtype, device, or stream mismatch fails atomically; unexpected nonexecuting state follows an explicit source-compatible retained-diagnostic policy rather than changing architecture selection. CPU F32 is the certified execution slice; zero-sample audio and uncertified placements fail typed before resampling or allocation. Semantic digest, alias-aware residency, reconstruction, bounded memory, cancellation, and OOM publish no partial encoder or AudioEncoderOutput. The authoritative ownership catalog records comfy_model::audio_encoder::NativeAudioEncoder as the sole execution/resource owner while resampling, mel/STFT, NativeModule, attention, tensor storage, AudioEncoderOutput, payload identity, and later handle/persistence owners remain delegated. Canonical handle publication, cache, persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
     append(
         "comfy-parity-native-spandrel-image-model-contract-foundation",
@@ -19629,6 +19635,19 @@ def task_validation_commands(item: dict[str, object]) -> str:
         commands.append(f"./script/clippy -p {' -p '.join(packages)}")
     else:
         commands = ["python3 .agents/specs/comfy-parity/regenerate_all.py --check"]
+    if identifier == "comfy-parity-native-audio-encoder-resource-foundation":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p comfy_model --test audio_encoder -- --nocapture",
+            "cargo test --locked -p comfy_model audio_encoder -- --nocapture",
+            "cargo test --locked -p comfy_model native_node_payload -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
     if identifier == "comfy-parity-native-node-schema-metadata-foundation":
         commands.extend([
             "cargo test --locked -p comfy_nodes val_node_001 -- --nocapture",
