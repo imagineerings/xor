@@ -10,6 +10,8 @@ pub mod activity_observer;
 #[cfg(feature = "multiplayer-tools")]
 pub mod activity_platform;
 pub mod activity_projection;
+#[cfg(feature = "multiplayer-tools")]
+pub mod activity_reconciliation;
 pub mod activity_reducer;
 mod agent_configuration;
 pub mod agent_connection_store;
