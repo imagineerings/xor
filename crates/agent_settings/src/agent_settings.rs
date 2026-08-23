@@ -1,4 +1,5 @@
 mod agent_profile;
+pub mod managed_agent;
 pub mod persona;
 pub mod team;
 mod user_agents_md;
