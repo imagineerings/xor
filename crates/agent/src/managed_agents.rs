@@ -470,7 +470,7 @@ enum PersistedEnvironmentReference {
     ProtectedCredential { reference: String },
 }
 
-fn encode_snapshot(
+pub(crate) fn encode_snapshot(
     record: &PrivateManagedAgentRecord,
 ) -> Result<String, ManagedAgentRepositoryError> {
     let state = match record.state() {
@@ -520,7 +520,7 @@ fn encode_snapshot(
     .map_err(|error| ManagedAgentRepositoryError::Unavailable(error.into()))
 }
 
-fn decode_snapshot(
+pub(crate) fn decode_snapshot(
     snapshot: &str,
 ) -> Result<PrivateManagedAgentRecord, ManagedAgentRepositoryError> {
     let snapshot: PersistedManagedAgentSnapshot =

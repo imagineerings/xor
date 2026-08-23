@@ -125,3 +125,8 @@ zlog.workspace = true
 name = "agent_memory_repository"
 path = "tests/agent_memory_repository.rs"
 required-features = ["multiplayer-tools", "test-support"]
+
+[[test]]
+name = "agent_snapshot_repository"
+path = "tests/agent_snapshot_repository.rs"
+required-features = ["multiplayer-tools", "test-support"]

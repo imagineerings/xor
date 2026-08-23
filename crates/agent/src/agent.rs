@@ -10,6 +10,8 @@ mod native_agent_server;
 pub mod outline;
 mod pattern_extraction;
 mod sandboxing;
+#[cfg(feature = "multiplayer-tools")]
+pub mod snapshot;
 mod templates;
 #[cfg(test)]
 mod tests;
@@ -31,6 +33,8 @@ pub use sandboxing::{
     settings_thread_sandbox,
 };
 pub use shell_command_parser::extract_commands;
+#[cfg(feature = "multiplayer-tools")]
+pub use snapshot::*;
 pub use templates::*;
 pub use thread::*;
 pub use thread_store::*;
