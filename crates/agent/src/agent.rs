@@ -1,3 +1,4 @@
+pub mod collaboration_session;
 mod db;
 mod legacy_thread;
 mod native_agent_server;
