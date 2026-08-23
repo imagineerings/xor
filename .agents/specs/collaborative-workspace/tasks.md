@@ -2054,7 +2054,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 26. Implement branch-as-channel linkage
 
-  - [ ] 26.1. Define branch collaboration identity and state
+  - [x] 26.1. Define branch collaboration identity and state
     - Model repository/branch/commit identity and create, update, merge and archive transitions.
     - _Requirements: 10.3_
     - _Capability IDs: CAP-020_
@@ -2062,6 +2062,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/VISION_PROJECTS.md, crates/project/src/git_store.rs_
     - _Writes: crates/collaboration_domain/src/branch_activity.rs_
     - _Validation: state tests cover branch recreation, force update, merge and stale commit_
+    - _Discovered contradiction (2026-08-23): the planned standalone domain file cannot compile or expose its public state API without crate-root module registration, and living-documentation traceability adds the specification paths. The canonical Zed and hosted Git owners alone can inspect ancestry or accept ref mutations, so the pure domain state consumes an explicit fast-forward/force classification after acceptance rather than importing Git, storage, transport or permission behavior._
+    - _Evidence: 2026-08-23 — added tenant/repository-scoped branch identity with a safe full heads ref, positive recreation generation and exact lowercase SHA-1/SHA-256 commit links. Create establishes an active first generation; accepted head updates retain the prior/current commits and explicit fast-forward or force classification; merge retains source head, target branch and resulting commit; delete/merge archival preserves those records; and recreation derives a new generation without mutating archived history. Every update, merge, archive and recreation requires both the current aggregate version and expected head, so stale commands fail atomically, while invalid refs, commits, nil scopes and inconsistent hydrated records fail closed. Five focused branch-state tests passed recreation, force update, merge/archive retention, stale commit/version atomicity and identifier rejection; the complete `collaboration_domain` suite passed 131/131 and repository-standard release all-target/all-feature warning-denied Clippy passed. Dependency, inventory, canonical specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 26.2. Create and bind branch channels idempotently
     - Create one canonical channel per approved branch binding and reuse it on retries/reconnect.

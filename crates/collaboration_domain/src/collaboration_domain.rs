@@ -1,6 +1,7 @@
 pub mod account_binding;
 pub mod admission_evidence;
 pub mod authorization;
+pub mod branch_activity;
 pub mod channel;
 pub mod channel_invite;
 pub mod channel_metadata;
@@ -43,6 +44,12 @@ pub use authorization::{
     AuthorizationAction, AuthorizationDecision, AuthorizationDenial, AuthorizationRequest,
     AuthorizationResource, AuthorizationResourceKind, ChannelMembership, CommunityMembership,
     DelegationGrant, MembershipRole, MembershipStatus, authorize,
+};
+pub use branch_activity::{
+    BranchArchiveReason, BranchCollaboration, BranchCollaborationError,
+    BranchCollaborationIdentity, BranchCollaborationRecordFields, BranchCommandOutcome,
+    BranchCommitIdentity, BranchGeneration, BranchHeadUpdate, BranchLifecycleState, BranchMerge,
+    BranchRefName, BranchUpdateKind, GitCommitId,
 };
 pub use channel::{
     Channel, ChannelCommandOutcome, ChannelCreateFields, ChannelDescription, ChannelError,
