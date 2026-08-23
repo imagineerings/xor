@@ -156,6 +156,7 @@ class ValidationGenerationTests(unittest.TestCase):
                 "crates/comfy_model/src/model_family.rs",
                 "crates/comfy_model/src/families/auraflow_comfy_model_0064.rs",
                 "crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs",
+                ".agents/specs/comfy-parity/catalogs/native-model-family-closure.json",
                 "crates/comfy_test_support/tests/native_family_execution_projection.rs",
                 "crates/comfy_test_support/fixtures/models/native-family-execution-projection-foundation",
             ],

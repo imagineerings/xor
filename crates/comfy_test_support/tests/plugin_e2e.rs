@@ -3268,8 +3268,12 @@ async fn val_plugin_host_001(executor: BackgroundExecutor) {
             ),
             (
                 "plugin_host_has_no_local_path_security_owner",
-                source_occurrences(&sources, "fn validate_relative_path").is_empty()
-                    && source_occurrences(&sources, "fn validate_artifact_path").is_empty(),
+                source_occurrences(&sources, "fn validate_relative_path")
+                    .iter()
+                    .all(|location| !location.contains("crates/comfy_plugin_host/"))
+                    && source_occurrences(&sources, "fn validate_artifact_path")
+                        .iter()
+                        .all(|location| !location.contains("crates/comfy_plugin_host/")),
             ),
             (
                 "component_linker_has_no_wasi_authority",

@@ -1,7 +1,8 @@
 use crate::{
     ModelClipTargetSelector, ModelDetectionRule, ModelDimensionExpression,
     ModelFamilyDefinition, ModelFamilyError, ModelFamilyProfile, ModelFamilyRegistration,
-    ModelFamilyStatePlanSelector, ModelForwardOperation, ModelForwardStep, ModelKeyPredicate,
+    ModelFamilyStatePlanSelector,
+    ModelForwardOperation, ModelForwardStep, ModelKeyPredicate,
     ModelKeyRewrite, ModelKeySelector, ModelProbe, ModelSourceConfigurationRule,
     ModelStateLayout, ModelStateTarget, ModelStateTransformOperation, ModelStateTransformPlan,
     ModelUnmatchedKeyDisposition, ModelWeightRule, qwen_image_configuration_for_probe,
@@ -11,6 +12,11 @@ use crate::{
         QWEN_IMAGE_SUPPORTED_DEVICES, QWEN_IMAGE_SUPPORTED_DTYPES, QwenImageConfiguration,
         QwenImageReferenceMethod,
     },
+};
+use crate::model_family::{
+    MODEL_FAMILY_EXECUTION_PROJECTION_SCHEMA_VERSION,
+    ModelFamilyExecutionProjectionDefinition, ModelFamilyExecutionProjectionTensorDefinition,
+    ModelFamilyExecutionProjectionValue,
 };
 use comfy_tensor::{DType, Scalar};
 
@@ -82,6 +88,85 @@ pub const DENOISER_INVOCATION_CONTEXT_WIDTH: usize = 3_584;
 pub const DENOISER_INVOCATION_HEAD_WIDTH: usize = 128;
 pub const DENOISER_INVOCATION_MLP_WIDTH: usize = 512;
 pub const DENOISER_INVOCATION_PATCH_SIZE: usize = 2;
+
+macro_rules! execution_tensor {
+    ($key:literal, $shape:expr) => {
+        ModelFamilyExecutionProjectionTensorDefinition {
+            key: $key,
+            shape: $shape,
+            value: ModelFamilyExecutionProjectionValue::Finite,
+        }
+    };
+    ($key:literal, $shape:expr, $bits:expr) => {
+        ModelFamilyExecutionProjectionTensorDefinition {
+            key: $key,
+            shape: $shape,
+            value: ModelFamilyExecutionProjectionValue::ExactF32($bits),
+        }
+    };
+}
+
+const EXECUTION_PROJECTION_TENSORS: &[ModelFamilyExecutionProjectionTensorDefinition] = &[
+    execution_tensor!("native.img_in.weight", &[128, 64]),
+    execution_tensor!("native.img_in.bias", &[128]),
+    execution_tensor!("native.txt_norm.weight", &[3_584]),
+    execution_tensor!("native.txt_in.weight", &[128, 3_584]),
+    execution_tensor!("native.txt_in.bias", &[128]),
+    execution_tensor!("native.time_text_embed.timestep_embedder.linear_1.weight", &[128, 256]),
+    execution_tensor!("native.time_text_embed.timestep_embedder.linear_1.bias", &[128]),
+    execution_tensor!("native.time_text_embed.timestep_embedder.linear_2.weight", &[128, 128]),
+    execution_tensor!("native.time_text_embed.timestep_embedder.linear_2.bias", &[128]),
+    execution_tensor!("native.transformer_blocks.0.img_mod.1.weight", &[768, 128]),
+    execution_tensor!("native.transformer_blocks.0.img_mod.1.bias", &[768]),
+    execution_tensor!("native.transformer_blocks.0.txt_mod.1.weight", &[768, 128]),
+    execution_tensor!("native.transformer_blocks.0.txt_mod.1.bias", &[768]),
+    execution_tensor!("native.transformer_blocks.0.attn.norm_q.weight", &[128]),
+    execution_tensor!("native.transformer_blocks.0.attn.norm_k.weight", &[128]),
+    execution_tensor!("native.transformer_blocks.0.attn.norm_added_q.weight", &[128]),
+    execution_tensor!("native.transformer_blocks.0.attn.norm_added_k.weight", &[128]),
+    execution_tensor!("native.transformer_blocks.0.attn.to_q.weight", &[128, 128]),
+    execution_tensor!("native.transformer_blocks.0.attn.to_q.bias", &[128]),
+    execution_tensor!("native.transformer_blocks.0.attn.to_k.weight", &[128, 128]),
+    execution_tensor!("native.transformer_blocks.0.attn.to_k.bias", &[128]),
+    execution_tensor!("native.transformer_blocks.0.attn.to_v.weight", &[128, 128]),
+    execution_tensor!("native.transformer_blocks.0.attn.to_v.bias", &[128]),
+    execution_tensor!("native.transformer_blocks.0.attn.add_q_proj.weight", &[128, 128]),
+    execution_tensor!("native.transformer_blocks.0.attn.add_q_proj.bias", &[128]),
+    execution_tensor!("native.transformer_blocks.0.attn.add_k_proj.weight", &[128, 128]),
+    execution_tensor!("native.transformer_blocks.0.attn.add_k_proj.bias", &[128]),
+    execution_tensor!("native.transformer_blocks.0.attn.add_v_proj.weight", &[128, 128]),
+    execution_tensor!("native.transformer_blocks.0.attn.add_v_proj.bias", &[128]),
+    execution_tensor!("native.transformer_blocks.0.attn.to_out.0.weight", &[128, 128]),
+    execution_tensor!("native.transformer_blocks.0.attn.to_out.0.bias", &[128]),
+    execution_tensor!("native.transformer_blocks.0.attn.to_add_out.weight", &[128, 128]),
+    execution_tensor!("native.transformer_blocks.0.attn.to_add_out.bias", &[128]),
+    execution_tensor!("native.transformer_blocks.0.img_mlp.net.0.proj.weight", &[512, 128]),
+    execution_tensor!("native.transformer_blocks.0.img_mlp.net.0.proj.bias", &[512]),
+    execution_tensor!("native.transformer_blocks.0.img_mlp.net.2.weight", &[128, 512]),
+    execution_tensor!("native.transformer_blocks.0.img_mlp.net.2.bias", &[128]),
+    execution_tensor!("native.transformer_blocks.0.txt_mlp.net.0.proj.weight", &[512, 128]),
+    execution_tensor!("native.transformer_blocks.0.txt_mlp.net.0.proj.bias", &[512]),
+    execution_tensor!("native.transformer_blocks.0.txt_mlp.net.2.weight", &[128, 512]),
+    execution_tensor!("native.transformer_blocks.0.txt_mlp.net.2.bias", &[128]),
+    execution_tensor!("native.norm_out.linear.weight", &[256, 128]),
+    execution_tensor!("native.norm_out.linear.bias", &[256]),
+    execution_tensor!("native.proj_out.weight", &[64, 128]),
+    execution_tensor!("native.proj_out.bias", &[64]),
+    execution_tensor!("native.__sampling_shift__", &[1], 1.15_f32.to_bits()),
+    execution_tensor!("native.__reference_method__", &[1], 0.0_f32.to_bits()),
+    execution_tensor!("native.__additional_timestep_condition__", &[1], 0.0_f32.to_bits()),
+];
+
+pub(crate) const DENOISER_EXECUTION_PROJECTION: ModelFamilyExecutionProjectionDefinition =
+    ModelFamilyExecutionProjectionDefinition {
+        schema_version: MODEL_FAMILY_EXECUTION_PROJECTION_SCHEMA_VERSION,
+        identifier: "qwen-image-reduced-denoiser-v1",
+        family_feature_id: MODEL_FAMILY_FEATURE_ID,
+        family_identifier: MODEL_FAMILY_IDENTIFIER,
+        source_ordinal: MODEL_FAMILY_SOURCE_ORDINAL,
+        source_architecture: "model_base.QwenImage",
+        tensors: EXECUTION_PROJECTION_TENSORS,
+    };
 
 const DETECTION_RULES: &[ModelDetectionRule] = &[
     ModelDetectionRule::AnyKeyPresent {

@@ -8,6 +8,11 @@ use crate::{
     ModelSourceConfigurationRule, ModelStateLayout, ModelStateTransformPlanDefinition,
     ModelWeightRule,
 };
+use crate::model_family::{
+    MODEL_FAMILY_EXECUTION_PROJECTION_SCHEMA_VERSION,
+    ModelFamilyExecutionProjectionDefinition, ModelFamilyExecutionProjectionTensorDefinition,
+    ModelFamilyExecutionProjectionValue,
+};
 use comfy_tensor::DType;
 use comfy_types::DeviceKind;
 
@@ -20,6 +25,7 @@ pub const MODEL_FAMILY_SOURCE_SHA256: &str =
 pub const MODEL_FAMILY_PROJECTION_SHA256: &str =
     "af15a94161e82214f1b1d8288c6c4fa810d1cfdc73691d684533d5abd1a009a5";
 pub const SOURCE_ARCHITECTURE: &str = "model_base.AuraFlow";
+pub const MODEL_FAMILY_SOURCE_ORDINAL: u16 = 22;
 pub const SOURCE_CONDITIONING_DIMENSION: u64 = 2_048;
 pub const SOURCE_SAMPLING_MULTIPLIER: f64 = 1.0;
 pub const SOURCE_SAMPLING_SHIFT: f64 = 1.73;
@@ -69,6 +75,65 @@ pub const DENOISER_INVOCATION_CONTEXT_WIDTH: usize = SOURCE_CONDITIONING_DIMENSI
 pub const DENOISER_INVOCATION_PATCH_SIZE: usize = 2;
 pub const DENOISER_INVOCATION_REGISTER_TOKENS: usize = 8;
 pub const DENOISER_INVOCATION_MLP_WIDTH: usize = 256;
+
+macro_rules! execution_tensor {
+    ($key:literal, $shape:expr) => {
+        ModelFamilyExecutionProjectionTensorDefinition {
+            key: $key,
+            shape: $shape,
+            value: ModelFamilyExecutionProjectionValue::Finite,
+        }
+    };
+}
+
+const EXECUTION_PROJECTION_TENSORS: &[ModelFamilyExecutionProjectionTensorDefinition] = &[
+    execution_tensor!("native.init_x_linear.weight", &[2, 16]),
+    execution_tensor!("native.init_x_linear.bias", &[2]),
+    execution_tensor!("native.positional_encoding", &[1, 16, 2]),
+    execution_tensor!("native.register_tokens", &[1, 8, 2]),
+    execution_tensor!("native.cond_seq_linear.weight", &[2, 2_048]),
+    execution_tensor!("native.t_embedder.mlp.0.weight", &[2, 256]),
+    execution_tensor!("native.t_embedder.mlp.0.bias", &[2]),
+    execution_tensor!("native.t_embedder.mlp.2.weight", &[2, 2]),
+    execution_tensor!("native.t_embedder.mlp.2.bias", &[2]),
+    execution_tensor!("native.double_layers.0.modC.1.weight", &[12, 2]),
+    execution_tensor!("native.double_layers.0.modX.1.weight", &[12, 2]),
+    execution_tensor!("native.double_layers.0.attn.w1q.weight", &[2, 2]),
+    execution_tensor!("native.double_layers.0.attn.w1k.weight", &[2, 2]),
+    execution_tensor!("native.double_layers.0.attn.w1v.weight", &[2, 2]),
+    execution_tensor!("native.double_layers.0.attn.w1o.weight", &[2, 2]),
+    execution_tensor!("native.double_layers.0.attn.w2q.weight", &[2, 2]),
+    execution_tensor!("native.double_layers.0.attn.w2k.weight", &[2, 2]),
+    execution_tensor!("native.double_layers.0.attn.w2v.weight", &[2, 2]),
+    execution_tensor!("native.double_layers.0.attn.w2o.weight", &[2, 2]),
+    execution_tensor!("native.double_layers.0.mlpC.c_fc1.weight", &[256, 2]),
+    execution_tensor!("native.double_layers.0.mlpC.c_fc2.weight", &[256, 2]),
+    execution_tensor!("native.double_layers.0.mlpC.c_proj.weight", &[2, 256]),
+    execution_tensor!("native.double_layers.0.mlpX.c_fc1.weight", &[256, 2]),
+    execution_tensor!("native.double_layers.0.mlpX.c_fc2.weight", &[256, 2]),
+    execution_tensor!("native.double_layers.0.mlpX.c_proj.weight", &[2, 256]),
+    execution_tensor!("native.single_layers.0.modCX.1.weight", &[12, 2]),
+    execution_tensor!("native.single_layers.0.attn.w1q.weight", &[2, 2]),
+    execution_tensor!("native.single_layers.0.attn.w1k.weight", &[2, 2]),
+    execution_tensor!("native.single_layers.0.attn.w1v.weight", &[2, 2]),
+    execution_tensor!("native.single_layers.0.attn.w1o.weight", &[2, 2]),
+    execution_tensor!("native.single_layers.0.mlp.c_fc1.weight", &[256, 2]),
+    execution_tensor!("native.single_layers.0.mlp.c_fc2.weight", &[256, 2]),
+    execution_tensor!("native.single_layers.0.mlp.c_proj.weight", &[2, 256]),
+    execution_tensor!("native.modF.1.weight", &[4, 2]),
+    execution_tensor!("native.final_linear.weight", &[16, 2]),
+];
+
+pub(crate) const DENOISER_EXECUTION_PROJECTION: ModelFamilyExecutionProjectionDefinition =
+    ModelFamilyExecutionProjectionDefinition {
+        schema_version: MODEL_FAMILY_EXECUTION_PROJECTION_SCHEMA_VERSION,
+        identifier: "auraflow-reduced-denoiser-v1",
+        family_feature_id: MODEL_FAMILY_FEATURE_ID,
+        family_identifier: MODEL_FAMILY_IDENTIFIER,
+        source_ordinal: MODEL_FAMILY_SOURCE_ORDINAL,
+        source_architecture: SOURCE_ARCHITECTURE,
+        tensors: EXECUTION_PROJECTION_TENSORS,
+    };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AuraFlowConfiguration {

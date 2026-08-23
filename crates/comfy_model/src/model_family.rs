@@ -65,6 +65,7 @@ use std::{
 use thiserror::Error;
 
 pub const MODEL_FAMILY_SCHEMA_VERSION: u16 = 1;
+pub const MODEL_FAMILY_EXECUTION_PROJECTION_SCHEMA_VERSION: u16 = 1;
 pub const MAX_MODEL_WEIGHT_STATISTIC_REQUESTS: usize = 16;
 const MAX_IDENTITY_BYTES: usize = 1024;
 const MAX_STATE_DICTIONARY_OPERATIONS: usize = 4_096;
@@ -1525,6 +1526,30 @@ pub struct ResolvedModelFamily {
     probe_identity: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ModelFamilyExecutionProjectionValue {
+    Finite,
+    ExactF32(u32),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct ModelFamilyExecutionProjectionTensorDefinition {
+    pub key: &'static str,
+    pub shape: &'static [u64],
+    pub value: ModelFamilyExecutionProjectionValue,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct ModelFamilyExecutionProjectionDefinition {
+    pub schema_version: u16,
+    pub identifier: &'static str,
+    pub family_feature_id: &'static str,
+    pub family_identifier: &'static str,
+    pub source_ordinal: u16,
+    pub source_architecture: &'static str,
+    pub tensors: &'static [ModelFamilyExecutionProjectionTensorDefinition],
+}
+
 impl ResolvedModelFamily {
     pub fn detection(&self) -> &ModelDetection {
         &self.detection
@@ -1552,6 +1577,67 @@ impl ResolvedModelFamily {
 
     pub fn state_plan(&self) -> Option<&ModelStateTransformPlan> {
         self.state_plan.as_ref()
+    }
+
+    pub fn probe_identity(&self) -> &str {
+        &self.probe_identity
+    }
+
+    pub fn bind_reduced_execution_projection(
+        &self,
+        base_artifact_digest: impl Into<String>,
+        projected_state: BTreeMap<String, Tensor>,
+        options: NativeFamilyBuildOptions,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeFamilyModel, ModelFamilyError> {
+        context.cancellation.check()?;
+        if options.allow_unexpected_weights {
+            return Err(ModelFamilyError::ExecutionProjectionBinding(
+                "execution projections require exact projected-state admission".to_owned(),
+            ));
+        }
+        let projection = execution_projection_for_resolved(self)?;
+        let projection_identity = validate_execution_projection(self, projection)?;
+        let base_artifact_digest = base_artifact_digest.into();
+        validate_digest(&base_artifact_digest)?;
+        let projection_state_digest =
+            validate_execution_projection_state(projection, &projected_state, options, context)?;
+        context.cancellation.check()?;
+        let state_plan_identity = self
+            .state_plan
+            .as_ref()
+            .ok_or_else(|| {
+                ModelFamilyError::ExecutionProjectionBinding(
+                    "resolved family has no authoritative state plan".to_owned(),
+                )
+            })?
+            .identity()
+            .to_owned();
+        let weights =
+            MappedModelWeights::from_parts(base_artifact_digest, projected_state, Vec::new())
+                .bind(ModelFamilyWeightBinding {
+                    family: self.detection.identity.clone(),
+                    profile_identity: model_profile_identity(&self.profile),
+                    state_plan_identity,
+                    probe_identity: Some(self.probe_identity.clone()),
+                    source_ordinal: Some(self.registration.source_ordinal),
+                    source_architecture: Some(self.registration.source_architecture.to_owned()),
+                    execution_projection_identity: Some(projection_identity),
+                    execution_projection_state_digest: Some(projection_state_digest),
+                })?;
+        context.cancellation.check()?;
+        let mut checked_options = options;
+        checked_options.allow_unexpected_weights = true;
+        build_model_family_with_profile(
+            self.registration.definition,
+            self.profile,
+            Some((
+                self.registration.source_ordinal,
+                self.registration.source_architecture,
+            )),
+            weights,
+            checked_options,
+        )
     }
 
     pub fn map_state_dictionary(
@@ -1605,6 +1691,10 @@ impl ResolvedModelFamily {
                 .map(|plan| plan.identity().to_owned())
                 .unwrap_or_else(|| "legacy-definition-rules-v1".to_owned()),
             probe_identity: Some(self.probe_identity.clone()),
+            source_ordinal: Some(self.registration.source_ordinal),
+            source_architecture: Some(self.registration.source_architecture.to_owned()),
+            execution_projection_identity: None,
+            execution_projection_state_digest: None,
         }));
         Ok(mapped)
     }
@@ -1641,6 +1731,274 @@ impl ResolvedModelFamily {
         MappedModelWeights::from_parts(mapped.base_artifact_digest, tensors, Vec::new())
             .bind(binding)
     }
+}
+
+fn execution_projection_for_resolved(
+    resolved: &ResolvedModelFamily,
+) -> Result<&'static ModelFamilyExecutionProjectionDefinition, ModelFamilyError> {
+    match resolved.definition().feature_id {
+        crate::generated_auraflow_comfy_model_0064::MODEL_FAMILY_FEATURE_ID => {
+            Ok(&crate::generated_auraflow_comfy_model_0064::DENOISER_EXECUTION_PROJECTION)
+        }
+        crate::generated_qwenimage_comfy_model_0113::MODEL_FAMILY_FEATURE_ID => {
+            Ok(&crate::generated_qwenimage_comfy_model_0113::DENOISER_EXECUTION_PROJECTION)
+        }
+        feature_id => Err(ModelFamilyError::ExecutionProjectionUnavailable(
+            feature_id.to_owned(),
+        )),
+    }
+}
+
+fn update_length_prefixed_digest(
+    digest: &mut Sha256,
+    value: &[u8],
+) -> Result<(), ModelFamilyError> {
+    let length = u64::try_from(value.len()).map_err(|_| ModelFamilyError::MemoryOverflow)?;
+    digest.update(length.to_le_bytes());
+    digest.update(value);
+    Ok(())
+}
+
+fn validate_execution_projection(
+    resolved: &ResolvedModelFamily,
+    projection: &ModelFamilyExecutionProjectionDefinition,
+) -> Result<String, ModelFamilyError> {
+    if projection.schema_version != MODEL_FAMILY_EXECUTION_PROJECTION_SCHEMA_VERSION {
+        return Err(ModelFamilyError::ExecutionProjectionSchemaVersion(
+            projection.schema_version,
+        ));
+    }
+    validate_identifier("execution projection", projection.identifier)?;
+    validate_feature_id(projection.family_feature_id)?;
+    validate_identifier("execution projection family", projection.family_identifier)?;
+    validate_qualified_model_symbol(
+        "execution projection source",
+        projection.source_architecture,
+    )?;
+    if projection.family_feature_id != resolved.definition().feature_id
+        || projection.family_identifier != resolved.definition().identifier
+        || projection.source_ordinal != resolved.source_ordinal()
+        || projection.source_architecture != resolved.source_architecture()
+    {
+        return Err(ModelFamilyError::ExecutionProjectionBinding(
+            "row projection does not match the authoritative resolved family".to_owned(),
+        ));
+    }
+    if resolved.state_plan.is_none() || resolved.probe_identity.is_empty() {
+        return Err(ModelFamilyError::ExecutionProjectionBinding(
+            "execution projections require a source-bound probe and state plan".to_owned(),
+        ));
+    }
+    let authoritative_probe = ModelProbe {
+        tensor_shapes: resolved.probe_tensor_shapes.clone(),
+        metadata: BTreeMap::new(),
+    };
+    match projection.family_feature_id {
+        crate::generated_auraflow_comfy_model_0064::MODEL_FAMILY_FEATURE_ID => {
+            let configuration =
+                crate::generated_auraflow_comfy_model_0064::configuration_for_probe(
+                    &authoritative_probe,
+                )?;
+            if configuration.conditioning_dimension != 2_048
+                || configuration.maximum_sequence_length < 16
+                || configuration.double_layer_count != 4
+                || configuration.layer_count != 36
+            {
+                return Err(ModelFamilyError::ExecutionProjectionBinding(
+                    "resolved AuraFlow configuration is outside the approved reduced execution projection"
+                        .to_owned(),
+                ));
+            }
+        }
+        crate::generated_qwenimage_comfy_model_0113::MODEL_FAMILY_FEATURE_ID => {
+            let configuration =
+                crate::generated_qwenimage_comfy_model_0113::configuration_for_probe(
+                    &authoritative_probe,
+                )?;
+            if configuration.input_channels != 64
+                || configuration.output_channels != 16
+                || configuration.number_of_layers != 60
+                || configuration.inner_dimension != 3_072
+                || configuration.number_of_attention_heads != 24
+                || configuration.attention_head_dimension != 128
+                || configuration.joint_attention_dimension != 3_584
+                || configuration.timestep_zero_marker
+                || configuration.use_additional_timestep_condition
+                || configuration.reference_method
+                    != crate::qwen_image_family::QwenImageReferenceMethod::Index
+            {
+                return Err(ModelFamilyError::ExecutionProjectionBinding(
+                    "resolved Qwen Image configuration is outside the approved base execution projection"
+                        .to_owned(),
+                ));
+            }
+        }
+        _ => {
+            return Err(ModelFamilyError::ExecutionProjectionUnavailable(
+                projection.family_feature_id.to_owned(),
+            ));
+        }
+    }
+    if projection.tensors.is_empty()
+        || projection.tensors.len() > MAX_STATE_DICTIONARY_SOURCE_TENSORS
+    {
+        return Err(ModelFamilyError::ExecutionProjectionDefinition(
+            "projection tensor schema is empty or exceeds its bound".to_owned(),
+        ));
+    }
+    let mut keys = BTreeSet::new();
+    let mut digest = Sha256::new();
+    digest.update(b"zed.comfy.model-family-execution-projection.v1\0");
+    for value in [
+        projection.identifier,
+        projection.family_feature_id,
+        projection.family_identifier,
+        projection.source_architecture,
+    ] {
+        update_length_prefixed_digest(&mut digest, value.as_bytes())?;
+    }
+    digest.update(projection.schema_version.to_le_bytes());
+    digest.update(projection.source_ordinal.to_le_bytes());
+    digest.update(
+        u64::try_from(projection.tensors.len())
+            .map_err(|_| ModelFamilyError::MemoryOverflow)?
+            .to_le_bytes(),
+    );
+    for tensor in projection.tensors {
+        validate_state_key(tensor.key)?;
+        if tensor.shape.is_empty() || tensor.shape.len() > MAX_TENSOR_RANK {
+            return Err(ModelFamilyError::ExecutionProjectionDefinition(format!(
+                "projection tensor {} has an invalid rank",
+                tensor.key
+            )));
+        }
+        if tensor.shape.contains(&0) {
+            return Err(ModelFamilyError::ExecutionProjectionDefinition(format!(
+                "projection tensor {} has an empty dimension",
+                tensor.key
+            )));
+        }
+        if !keys.insert(tensor.key) {
+            return Err(ModelFamilyError::ExecutionProjectionDefinition(format!(
+                "projection repeats tensor {}",
+                tensor.key
+            )));
+        }
+        update_length_prefixed_digest(&mut digest, tensor.key.as_bytes())?;
+        digest.update(
+            u64::try_from(tensor.shape.len())
+                .map_err(|_| ModelFamilyError::MemoryOverflow)?
+                .to_le_bytes(),
+        );
+        for dimension in tensor.shape {
+            digest.update(dimension.to_le_bytes());
+        }
+        match tensor.value {
+            ModelFamilyExecutionProjectionValue::Finite => digest.update([0]),
+            ModelFamilyExecutionProjectionValue::ExactF32(bits) => {
+                digest.update([1]);
+                digest.update(bits.to_le_bytes());
+            }
+        }
+    }
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn validate_execution_projection_state(
+    projection: &ModelFamilyExecutionProjectionDefinition,
+    projected_state: &BTreeMap<String, Tensor>,
+    options: NativeFamilyBuildOptions,
+    context: &ExecutionContext<'_>,
+) -> Result<String, ModelFamilyError> {
+    context.cancellation.check()?;
+    if options.dtype != DType::F32 || options.device != DeviceKind::Cpu {
+        return Err(ModelFamilyError::ExecutionProjectionUnavailable(
+            "reduced family execution is certified only for CPU F32".to_owned(),
+        ));
+    }
+    if projected_state.len() != projection.tensors.len() {
+        return Err(ModelFamilyError::ExecutionProjectionState(format!(
+            "projection expects {} tensors, got {}",
+            projection.tensors.len(),
+            projected_state.len()
+        )));
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"zed.comfy.model-family-execution-projection-state.v1\0");
+    update_length_prefixed_digest(&mut digest, projection.identifier.as_bytes())?;
+    for schema in projection.tensors {
+        context.cancellation.check()?;
+        let tensor = projected_state.get(schema.key).ok_or_else(|| {
+            ModelFamilyError::ExecutionProjectionState(format!(
+                "projection is missing tensor {}",
+                schema.key
+            ))
+        })?;
+        let descriptor = tensor.descriptor();
+        if descriptor.shape() != schema.shape
+            || descriptor.dtype() != DType::F32
+            || descriptor.device() != DeviceId::CPU
+            || descriptor.stream() != context.stream
+            || descriptor.layout() != Layout::Contiguous
+            || descriptor.offset_elements() != 0
+        {
+            return Err(ModelFamilyError::ExecutionProjectionState(format!(
+                "projection tensor {} has an invalid shape, dtype, device, stream, or layout",
+                schema.key
+            )));
+        }
+        validate_f32_tensor_finite(tensor, schema.key, context)?;
+        if let ModelFamilyExecutionProjectionValue::ExactF32(expected_bits) = schema.value {
+            let actual = decode_f32_scalar(tensor, schema.key)?;
+            if actual.to_bits() != expected_bits {
+                return Err(ModelFamilyError::ExecutionProjectionState(format!(
+                    "projection tensor {} has an unsupported marker value",
+                    schema.key
+                )));
+            }
+        }
+        update_length_prefixed_digest(&mut digest, schema.key.as_bytes())?;
+        digest.update(
+            u64::try_from(schema.shape.len())
+                .map_err(|_| ModelFamilyError::MemoryOverflow)?
+                .to_le_bytes(),
+        );
+        for dimension in schema.shape {
+            digest.update(dimension.to_le_bytes());
+        }
+        update_length_prefixed_digest(&mut digest, DType::F32.catalog_name().as_bytes())?;
+        digest.update(descriptor.device().ordinal().to_le_bytes());
+        let bytes = tensor.contiguous_bytes()?;
+        digest.update(
+            u64::try_from(bytes.len())
+                .map_err(|_| ModelFamilyError::MemoryOverflow)?
+                .to_le_bytes(),
+        );
+        for chunk in bytes.chunks(64 * 1024) {
+            context.cancellation.check()?;
+            for encoded in chunk.chunks_exact(4) {
+                let native = <[u8; 4]>::try_from(encoded).map_err(|_| {
+                    ModelFamilyError::ExecutionProjectionState(format!(
+                        "projection tensor {} has invalid F32 storage",
+                        schema.key
+                    ))
+                })?;
+                digest.update(u32::from_ne_bytes(native).to_le_bytes());
+            }
+        }
+    }
+    if let Some(unexpected) = projected_state.keys().find(|key| {
+        !projection
+            .tensors
+            .iter()
+            .any(|schema| schema.key == key.as_str())
+    }) {
+        return Err(ModelFamilyError::ExecutionProjectionState(format!(
+            "projection contains unexpected tensor {unexpected}"
+        )));
+    }
+    context.cancellation.check()?;
+    Ok(format!("{:x}", digest.finalize()))
 }
 
 #[derive(Clone, Debug)]
@@ -3361,6 +3719,8 @@ fn validate_weight_binding(
     profile: &ModelFamilyProfile,
     state_plan_identity: &str,
     probe_identity: Option<&str>,
+    source: Option<(u16, &str)>,
+    execution_projection_required: bool,
 ) -> Result<(), ModelFamilyError> {
     let binding = weights.binding.as_deref().ok_or_else(|| {
         ModelFamilyError::WeightBindingMismatch("weights have no family binding".to_owned())
@@ -3389,6 +3749,23 @@ fn validate_weight_binding(
                 "resolved model probe differs from mapped probe".to_owned(),
             ));
         }
+    }
+    if binding.source_ordinal != source.map(|source| source.0)
+        || binding.source_architecture.as_deref() != source.map(|source| source.1)
+    {
+        return Err(ModelFamilyError::WeightBindingMismatch(
+            "selected source differs from mapped source".to_owned(),
+        ));
+    }
+    let has_projection = binding.execution_projection_identity.is_some()
+        && binding.execution_projection_state_digest.is_some();
+    if binding.execution_projection_identity.is_some()
+        != binding.execution_projection_state_digest.is_some()
+        || has_projection != execution_projection_required
+    {
+        return Err(ModelFamilyError::WeightBindingMismatch(
+            "execution-projection binding mode differs from the requested build".to_owned(),
+        ));
     }
     Ok(())
 }
@@ -4617,12 +4994,16 @@ fn validate_state_source_bound(source_count: usize) -> Result<(), ModelFamilyErr
     Ok(())
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModelFamilyWeightBinding {
     family: ModelFamilyIdentity,
     profile_identity: String,
     state_plan_identity: String,
     probe_identity: Option<String>,
+    source_ordinal: Option<u16>,
+    source_architecture: Option<String>,
+    execution_projection_identity: Option<String>,
+    execution_projection_state_digest: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -4666,6 +5047,18 @@ impl ModelFamilyWeightBinding {
     }
     pub fn probe_identity(&self) -> Option<&str> {
         self.probe_identity.as_deref()
+    }
+    pub const fn source_ordinal(&self) -> Option<u16> {
+        self.source_ordinal
+    }
+    pub fn source_architecture(&self) -> Option<&str> {
+        self.source_architecture.as_deref()
+    }
+    pub fn execution_projection_identity(&self) -> Option<&str> {
+        self.execution_projection_identity.as_deref()
+    }
+    pub fn execution_projection_state_digest(&self) -> Option<&str> {
+        self.execution_projection_state_digest.as_deref()
     }
 }
 
@@ -4808,7 +5201,7 @@ impl MappedModelWeights {
 
     fn bind(mut self, binding: ModelFamilyWeightBinding) -> Result<Self, ModelFamilyError> {
         let mut digest = Sha256::new();
-        digest.update(b"zed.comfy.model-weights-binding.v1\0");
+        digest.update(b"zed.comfy.model-weights-binding.v2\0");
         for value in [
             self.base_artifact_digest.as_str(),
             binding.family.feature_id(),
@@ -4817,12 +5210,22 @@ impl MappedModelWeights {
             binding.profile_identity.as_str(),
             binding.state_plan_identity.as_str(),
             binding.probe_identity.as_deref().unwrap_or("none"),
+            binding.source_architecture.as_deref().unwrap_or("none"),
+            binding
+                .execution_projection_identity
+                .as_deref()
+                .unwrap_or("none"),
+            binding
+                .execution_projection_state_digest
+                .as_deref()
+                .unwrap_or("none"),
         ] {
             let length = u64::try_from(value.len())
                 .map_err(|_| ModelFamilyError::DimensionExpressionOverflow)?;
             digest.update(length.to_le_bytes());
             digest.update(value.as_bytes());
         }
+        digest.update(binding.source_ordinal.unwrap_or(u16::MAX).to_le_bytes());
         self.cache_identity = format!("{:x}", digest.finalize());
         self.binding = Some(Arc::new(binding));
         Ok(self)
@@ -4905,6 +5308,30 @@ fn mapped_binding_owned_bytes(binding: &ModelFamilyWeightBinding) -> Result<u64,
         .and_then(|bytes| {
             bytes.checked_add(binding.probe_identity.as_ref().map_or(0, String::capacity))
         })
+        .and_then(|bytes| {
+            bytes.checked_add(
+                binding
+                    .source_architecture
+                    .as_ref()
+                    .map_or(0, String::capacity),
+            )
+        })
+        .and_then(|bytes| {
+            bytes.checked_add(
+                binding
+                    .execution_projection_identity
+                    .as_ref()
+                    .map_or(0, String::capacity),
+            )
+        })
+        .and_then(|bytes| {
+            bytes.checked_add(
+                binding
+                    .execution_projection_state_digest
+                    .as_ref()
+                    .map_or(0, String::capacity),
+            )
+        })
         .ok_or(ModelFamilyError::MemoryOverflow)?;
     u64::try_from(
         (mem::size_of::<usize>() * 2)
@@ -4978,6 +5405,10 @@ pub fn map_model_weights(
             )),
             state_plan_identity: "legacy-definition-rules-v1".to_owned(),
             probe_identity: None,
+            source_ordinal: None,
+            source_architecture: None,
+            execution_projection_identity: None,
+            execution_projection_state_digest: None,
         },
     )
 }
@@ -5089,8 +5520,25 @@ impl NativeFamilyModel {
     pub fn weights(&self) -> &MappedModelWeights {
         &self.weights
     }
+    pub fn execution_projection_identity(&self) -> Option<&str> {
+        self.weights
+            .binding()
+            .and_then(ModelFamilyWeightBinding::execution_projection_identity)
+    }
+    pub fn execution_projection_state_digest(&self) -> Option<&str> {
+        self.weights
+            .binding()
+            .and_then(ModelFamilyWeightBinding::execution_projection_state_digest)
+    }
 
     pub fn with_weights(&self, weights: MappedModelWeights) -> Result<Self, ModelFamilyError> {
+        if self.weights.base_artifact_digest() != weights.base_artifact_digest()
+            || self.weights.binding() != weights.binding()
+        {
+            return Err(ModelFamilyError::WeightBindingMismatch(
+                "replacement weights do not preserve the model-family binding".to_owned(),
+            ));
+        }
         build_model_family_with_profile(
             self.definition,
             self.profile,
@@ -7821,6 +8269,8 @@ pub fn build_model_family_for_probe(
             .map(ModelStateTransformPlan::identity)
             .unwrap_or("legacy-definition-rules-v1"),
         Some(&resolved.probe_identity),
+        Some((resolved.source_ordinal(), resolved.source_architecture())),
+        false,
     )?;
     build_model_family_with_profile(
         resolved.definition(),
@@ -7847,6 +8297,8 @@ fn build_model_family_with_profile(
             &profile,
             "legacy-definition-rules-v1",
             None,
+            None,
+            false,
         )?;
     }
     if !profile.supported_dtypes.contains(&options.dtype) {
@@ -9642,6 +10094,16 @@ pub(crate) fn validate_digest(value: &str) -> Result<(), ModelFamilyError> {
 pub enum ModelFamilyError {
     #[error("unsupported model-family schema version {0}")]
     SchemaVersion(u16),
+    #[error("unsupported model-family execution-projection schema version {0}")]
+    ExecutionProjectionSchemaVersion(u16),
+    #[error("invalid model-family execution-projection definition: {0}")]
+    ExecutionProjectionDefinition(String),
+    #[error("model-family execution projection is unavailable: {0}")]
+    ExecutionProjectionUnavailable(String),
+    #[error("model-family execution-projection binding failed: {0}")]
+    ExecutionProjectionBinding(String),
+    #[error("model-family execution-projection state is invalid: {0}")]
+    ExecutionProjectionState(String),
     #[error("invalid model-family feature id: {0}")]
     InvalidFeatureId(String),
     #[error("invalid model-family {field}: {value}")]
@@ -9921,6 +10383,10 @@ mod model_probe_tests {
             profile_identity: String::from("fixture-profile"),
             state_plan_identity: String::from("fixture-state-plan"),
             probe_identity: Some(String::from("fixture-probe")),
+            source_ordinal: Some(7),
+            source_architecture: Some(String::from("fixture.architecture")),
+            execution_projection_identity: Some("b".repeat(64)),
+            execution_projection_state_digest: Some("c".repeat(64)),
         })?;
         let allocations = mapped.resident_owned_allocations()?;
         assert_eq!(allocations.len(), 4);

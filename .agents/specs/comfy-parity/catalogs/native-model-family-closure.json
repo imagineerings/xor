@@ -281,7 +281,7 @@
       "identifier": "AuraFlow",
       "fixture": "auraflow-comfy-model-0064",
       "source_projection_sha256": "3320ccde4fcbb730f8cb7d71f69f38677b069dd0a76b739c1a5848ad9e7fa69e",
-      "production_sha256": "e88a40bcd6d4aeea3a679ed6fca3dd806b1fa78db5cee5ad96f195905d4bf38e",
+      "production_sha256": "d2466d4513931c802cfddd37288a582d2d7e2abf5460f8599d6be2246d9ae8f4",
       "test_sha256": "9c4d701c3def8dd278113e02bb5589ea0f0b8385ce3600f2a41a066a7c535ed3",
       "fixture_sha256": "b747c597dd63e72249c96ac07c361d94a4dd399d48f4372cbf9645f59a8ecb5f",
       "provenance_sha256": "f67c9f5d4d5ff7dc745d0437726052773de1f4e44140ad151b4c5a1cd2319df1"
@@ -941,7 +941,7 @@
       "identifier": "QwenImage",
       "fixture": "qwenimage-comfy-model-0113",
       "source_projection_sha256": "27138e5691f93151df4199f0c0a03a3e5df5908168a82893466a07944d835753",
-      "production_sha256": "4130846fa711f1593c6391fe99bde6a66cf666e6b66265194fae11d1d83491cc",
+      "production_sha256": "ff1155daff43ba7eb2354eb6fa41fc4bc58c88b2fbcfdb1ffe8a9197eb3f1595",
       "test_sha256": "859a0c396ae202e6e24d170f0cf1f8929fa95036966d0e245a1f62f6c73a72d2",
       "fixture_sha256": "78eaee0722b23bbd82612d735d8090ec039aff846b87ae2e6f69ede261dc8507",
       "provenance_sha256": "d7925aa0f478ceeb91becb561ac49473881d76dab6f62096481a1da9619d0bd7"

@@ -1525,9 +1525,9 @@ pub enum MultimodalTextError {
     #[error(transparent)]
     ShapeLayoutThree(#[from] ShapeLayoutTransformPartThreeError),
     #[error(transparent)]
-    Bidirectional(#[from] BidirectionalTextError),
+    Bidirectional(Box<BidirectionalTextError>),
     #[error(transparent)]
-    Decoder(#[from] DecoderTextError),
+    Decoder(Box<DecoderTextError>),
     #[error(transparent)]
     Tokenizer(#[from] NativeTokenizerError),
     #[error(transparent)]
@@ -1559,6 +1559,18 @@ pub enum MultimodalTextError {
 impl From<comfy_types::CancellationError> for MultimodalTextError {
     fn from(_: comfy_types::CancellationError) -> Self {
         Self::Cancelled
+    }
+}
+
+impl From<BidirectionalTextError> for MultimodalTextError {
+    fn from(error: BidirectionalTextError) -> Self {
+        Self::Bidirectional(Box::new(error))
+    }
+}
+
+impl From<DecoderTextError> for MultimodalTextError {
+    fn from(error: DecoderTextError) -> Self {
+        Self::Decoder(Box::new(error))
     }
 }
 
