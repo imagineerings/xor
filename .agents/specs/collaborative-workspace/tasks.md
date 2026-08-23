@@ -2260,7 +2260,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 29. Port personas, teams and private managed-agent state
 
-  - [ ] 29.1. Port persona pack parsing and merge rules
+  - [x] 29.1. Port persona pack parsing and merge rules
     - Parse persona metadata/content and deterministic inheritance without runtime or UI concerns.
     - _Requirements: 11.2_
     - _Capability IDs: CAP-023_
@@ -2268,6 +2268,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-persona/**, projects/buzz/docs/nips/NIP-AP.md_
     - _Writes: crates/agent_settings/src/persona.rs_
     - _Validation: parser fixtures cover valid, inherited, conflicting and malformed packs_
+    - _Discovered contradiction (2026-08-23): the planned standalone source file cannot compile as a public settings boundary without crate-root registration and production JSON/YAML dependency declarations, so the narrow supporting writes are `crates/agent_settings/src/agent_settings.rs`, `crates/agent_settings/Cargo.toml` and `Cargo.lock`. Buzz's legacy loader accepts uppercase persona names, while the already-approved consolidated design and NIP-AP require `^[a-z0-9][a-z0-9_-]{0,63}$`; the canonical parser intentionally applies the stricter public grammar._
+    - _Evidence: 2026-08-23 — added a pure in-memory persona-pack parser with bounded manifest/frontmatter/body/instructions, safe pack-relative paths, strict YAML frontmatter, manifest-ordered output and redacted diagnostics. Pack version, model, temperature, context, subscription and reply defaults inherit deterministically; explicit empty subscription arrays override defaults; persona trigger objects shallow-replace pack triggers and fill only built-in trigger defaults. Pack instructions remain separate from prompts, and parsed MCP/hook declarations remain inert metadata. Four focused fixtures passed valid, inherited/overridden, conflicting and malformed packs; the complete `agent_settings` suite passed 44/44. Rust formatting, warning-denied crate Clippy, diff hygiene, collaboration dependency boundaries, Buzz inventory and canonical specification gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 29.2. Define agent-team and catalog records
     - Model team membership, roles, catalogs and public share records with owner attestations.
