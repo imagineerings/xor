@@ -1,5 +1,6 @@
 mod agent_profile;
 pub mod persona;
+pub mod team;
 mod user_agents_md;
 
 use std::cmp::Ordering::{Equal, Greater, Less};
