@@ -2287,14 +2287,6 @@ fn require_tensor_shape(
     Ok(())
 }
 
-fn require_same_tensor_value(
-    left: &Tensor,
-    right: &Tensor,
-    field: &'static str,
-) -> Result<(), NativeModelPayloadError> {
-    require_same_tensor_value_inner(left, right, field, None)
-}
-
 fn require_same_tensor_value_inner(
     left: &Tensor,
     right: &Tensor,
