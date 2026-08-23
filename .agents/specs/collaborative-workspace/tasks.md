@@ -2396,7 +2396,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 31. Implement signed jobs and delegation
 
-  - [ ] 31.1. Define the canonical job state machine
+  - [x] 31.1. Define the canonical job state machine
     - Model request, accept, progress, result, cancel and error transitions with idempotency/version invariants.
     - _Requirements: 11.4_
     - _Capability IDs: CAP-026_
@@ -2404,6 +2404,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-core/src/kind.rs, crates/task/**_
     - _Writes: crates/collaboration_domain/src/job.rs_
     - _Validation: property tests enumerate legal transitions and reject duplicates/out-of-order terminal updates_
+    - _Discovered contradiction (2026-08-23): Buzz's inspected job implementation is only the six-kind `43001`–`43006` registry and feed classification; it supplies no state machine to port. Zed's structured task lifecycle is process-local, unversioned and intentionally returns booleans for invalid or terminal updates, so it cannot itself serve as signed distributed job authority. The canonical domain therefore adds a transport-free versioned command aggregate that later adapters bind to those six kinds and native tasks. The planned standalone file also requires crate-root module registration and re-exports, plus living design synchronization for Requirement 11.4._
+    - _Evidence: 2026-08-23 — added a tenant-scoped canonical job aggregate whose first request fixes requester and target executor, whose accept/progress/result path preserves executor continuity and whose cancel/error transitions retain any accepted executor for later authorization and audit. Complete ordered command history provides exact reconstruction and operation-level idempotency at any historical version; conflicting operation reuse, same-version mutation, stale/gapped versions, regressing timestamps, wrong executors, result-before-accept and every non-replay terminal update fail closed without mutation. Two 256-case property tests cover the complete six-state/six-command legality matrix, exact replay and stale/future terminal fencing; focused history/executor and idempotency-conflict tests also passed. The complete domain suite passed 147/147, the four focused release tests passed, and repository-standard warning-denied release/all-target Clippy passed; formatting, diff, dependency, Buzz inventory and canonical specification gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 31.2. Add job and executor-lease schema
     - Create job versions, delegation ancestry and exactly-one executor lease tables with recovery timestamps.

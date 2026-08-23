@@ -14,6 +14,7 @@ pub mod feedback;
 pub mod forum;
 pub mod identity_types;
 pub mod inbox;
+pub mod job;
 pub mod membership;
 pub mod message;
 pub mod message_marker;
@@ -111,6 +112,10 @@ pub use identity_types::{
 pub use inbox::{
     InboxCategory, InboxError, InboxItem, InboxItemKey, InboxMessageInput, InboxProjection,
     InboxScope,
+};
+pub use job::{
+    Job, JobCommand, JobCommandKind, JobCommandOutcome, JobCommandType, JobError, JobIdentity,
+    JobState, JobStateKind,
 };
 pub use membership::{
     InviteMembershipProjection, Membership, MembershipCommandOutcome, MembershipCreateFields,
