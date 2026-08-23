@@ -18918,7 +18918,7 @@
         {
           "name": "prepared-decoder-prefill-executes-checked-multidimensional-rope",
           "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
-          "pattern": "pub enum DecoderRopePositions[\\s\\S]*validate_prepared_positions[\\s\\S]*apply_decoder_rope[\\s\\S]*precompute_multidimensional_rope"
+          "pattern": "pub enum DecoderRopePositions[\\s\\S]*pub fn precompute_multidimensional_rope[\\s\\S]*precompute_rotary_table[\\s\\S]*fn apply_decoder_rope[\\s\\S]*apply_rotary_table[\\s\\S]*fn validate_prepared_positions"
         },
         {
           "name": "prepared-decoder-state-remains-invocation-local-and-borrowed",

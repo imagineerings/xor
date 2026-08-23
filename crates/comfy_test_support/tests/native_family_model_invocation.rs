@@ -247,7 +247,7 @@ fn build_fixture_model_with_qwen_markers(
     )?)
 }
 
-fn resolved_conditioning<'a>(
+fn resolved_conditioning(
     model: &NativeFamilyModel,
     latent: &Tensor,
     conditioning: Tensor,
@@ -490,14 +490,10 @@ fn raw_f32_source_oracles_cover_complete_reduced_blocks() -> Result<(), Box<dyn 
     assert!(qwen_values.iter().all(|value| value.is_finite()));
     assert_independent_oracle(&qwen_values, &QWEN_ORACLE_BITS);
 
-    let mut changed_latent_values = qwen_latent_values.clone();
-    changed_latent_values[0] += 0.125;
-    let changed_latent = tensor_from_f32(
-        &backend,
-        &[1, 16, 1, 3, 3],
-        &changed_latent_values,
-        &context,
-    )?;
+    let mut qwen_latent_values = qwen_latent_values;
+    qwen_latent_values[0] += 0.125;
+    let changed_latent =
+        tensor_from_f32(&backend, &[1, 16, 1, 3, 3], &qwen_latent_values, &context)?;
     assert_ne!(
         invoke_values(
             &qwen_model,
@@ -525,12 +521,12 @@ fn raw_f32_source_oracles_cover_complete_reduced_blocks() -> Result<(), Box<dyn 
         )?,
         &qwen_values[..]
     );
-    let mut changed_conditioning_values = qwen_conditioning_values.clone();
-    changed_conditioning_values[17] += 0.25;
+    let mut qwen_conditioning_values = qwen_conditioning_values;
+    qwen_conditioning_values[17] += 0.25;
     let changed_conditioning = tensor_from_f32(
         &backend,
         &[1, 2, 3_584],
-        &changed_conditioning_values,
+        &qwen_conditioning_values,
         &context,
     )?;
     let (_, changed_entries) = resolved_conditioning(

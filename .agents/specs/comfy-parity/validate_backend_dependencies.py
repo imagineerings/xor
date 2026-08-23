@@ -498,10 +498,8 @@ def validate_later_task_writes() -> None:
             "Cargo.lock",
             "crates/comfy_nodes/Cargo.toml",
         },
-        "comfy-parity-native-video-execution-foundation": {
-            "Cargo.toml",
-            "Cargo.lock",
-            "crates/comfy_media/Cargo.toml",
+        "comfy-parity-provider-hermetic-component-harness": {
+            "crates/comfy_plugin_host/provider_components/Cargo.toml",
         },
         "comfy-parity-native-media-text-rendering-foundation": {
             "Cargo.toml",
