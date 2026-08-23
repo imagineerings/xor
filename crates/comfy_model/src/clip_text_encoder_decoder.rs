@@ -1,3 +1,7 @@
+use crate::attention::{
+    RotaryFrequencyLayout, RotaryPairLayout, RotaryPositionSequence, RotaryPositions,
+    RotaryScaling, RotaryTable, RotaryTableRequest, apply_rotary_table, precompute_rotary_table,
+};
 use crate::{
     AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionMask, AttentionMaskShape,
     AttentionRequest, EmbeddingOptions, MappedModelWeights, NativeExecutionRequirements,
@@ -4320,55 +4324,8 @@ pub fn precompute_rope(
     configuration: &DecoderRopeConfiguration,
     cancellation: &CancellationToken,
 ) -> Result<Vec<[f32; 2]>, DecoderTextError> {
-    if configuration.rotary_dimension == 0
-        || !configuration.rotary_dimension.is_multiple_of(2)
-        || !configuration.theta.is_finite()
-        || configuration.theta <= 0.0
-    {
-        return Err(DecoderTextError::InvalidConfiguration(
-            "RoPE dimensions or theta are invalid",
-        ));
-    }
-    let pairs = configuration.rotary_dimension / 2;
-    let count = positions
-        .len()
-        .checked_mul(pairs)
-        .ok_or(DecoderTextError::Overflow("RoPE table"))?;
-    let mut table = Vec::new();
-    table
-        .try_reserve_exact(count)
-        .map_err(|_| DecoderTextError::Allocation("RoPE table"))?;
-    for (position_index, position) in positions.iter().copied().enumerate() {
-        for pair in 0..pairs {
-            if (position_index * pairs + pair).is_multiple_of(256) {
-                cancellation.check()?;
-            }
-            let exponent = 2.0 * pair as f32 / configuration.rotary_dimension as f32;
-            let mut frequency = configuration.theta.powf(-exponent);
-            let mut scaled_position = position as f32;
-            match configuration.scaling {
-                RopeScaling::None => {}
-                RopeScaling::Linear { factor } => scaled_position /= factor,
-                RopeScaling::Yarn {
-                    factor,
-                    beta_fast,
-                    beta_slow,
-                } => {
-                    let progress = if pairs <= 1 {
-                        0.0
-                    } else {
-                        pair as f32 / (pairs - 1) as f32
-                    };
-                    let ramp = ((progress * beta_fast - beta_slow) / (beta_fast - beta_slow))
-                        .clamp(0.0, 1.0);
-                    frequency *= (1.0 - ramp) / factor + ramp;
-                }
-            }
-            let angle = scaled_position * frequency;
-            table.push([angle.cos(), angle.sin()]);
-        }
-    }
-    Ok(table)
+    let table = decoder_scalar_rotary_table(positions, configuration, cancellation)?;
+    copy_rotary_entries(&table)
 }
 
 pub fn precompute_multidimensional_rope(
@@ -4376,89 +4333,92 @@ pub fn precompute_multidimensional_rope(
     configuration: &DecoderRopeConfiguration,
     cancellation: &CancellationToken,
 ) -> Result<Vec<[f32; 2]>, DecoderTextError> {
-    if configuration.interleaved_sections.is_empty()
-        || position_axes.len() != configuration.interleaved_sections.len()
-        || position_axes.is_empty()
-    {
-        return Err(DecoderTextError::InvalidInput(
-            "multidimensional RoPE axes do not match the configured sections",
-        ));
+    let table = decoder_multiaxis_rotary_table(position_axes, configuration, cancellation)?;
+    copy_rotary_entries(&table)
+}
+
+fn decoder_scalar_rotary_table(
+    positions: &[usize],
+    configuration: &DecoderRopeConfiguration,
+    cancellation: &CancellationToken,
+) -> Result<RotaryTable, DecoderTextError> {
+    precompute_rotary_table(
+        RotaryTableRequest {
+            positions: RotaryPositions::Scalar(RotaryPositionSequence::Unsigned(positions)),
+            axis_dimensions: &[],
+            rotary_dimension: configuration.rotary_dimension,
+            theta: configuration.theta,
+            scaling: decoder_rotary_scaling(configuration.scaling),
+            frequency_layout: RotaryFrequencyLayout::Global,
+        },
+        cancellation,
+    )
+    .map_err(Into::into)
+}
+
+fn decoder_multiaxis_rotary_table(
+    position_axes: &[Vec<usize>],
+    configuration: &DecoderRopeConfiguration,
+    cancellation: &CancellationToken,
+) -> Result<RotaryTable, DecoderTextError> {
+    let mut axes = Vec::new();
+    axes.try_reserve_exact(position_axes.len())
+        .map_err(|_| DecoderTextError::Allocation("multidimensional RoPE axes"))?;
+    for axis in position_axes {
+        axes.push(RotaryPositionSequence::Unsigned(axis));
     }
-    let tokens = position_axes
-        .first()
-        .map(Vec::len)
-        .ok_or(DecoderTextError::InvalidInput("RoPE axes are empty"))?;
-    if tokens == 0 || position_axes.iter().any(|axis| axis.len() != tokens) {
-        return Err(DecoderTextError::InvalidInput(
-            "multidimensional RoPE axes must have one equal nonzero token length",
-        ));
+    let mut axis_dimensions = Vec::new();
+    axis_dimensions
+        .try_reserve_exact(configuration.interleaved_sections.len())
+        .map_err(|_| DecoderTextError::Allocation("multidimensional RoPE dimensions"))?;
+    for section in configuration.interleaved_sections.iter().copied() {
+        axis_dimensions.push(
+            section
+                .checked_mul(2)
+                .ok_or(DecoderTextError::Overflow("multidimensional RoPE section"))?,
+        );
     }
-    let pairs = configuration.rotary_dimension / 2;
-    let section_total = configuration
-        .interleaved_sections
-        .iter()
-        .try_fold(0_usize, |sum, section| sum.checked_add(*section));
-    if section_total != Some(pairs) {
-        return Err(DecoderTextError::InvalidConfiguration(
-            "multidimensional RoPE sections do not cover every rotary pair",
-        ));
+    precompute_rotary_table(
+        RotaryTableRequest {
+            positions: RotaryPositions::Multiaxis(&axes),
+            axis_dimensions: &axis_dimensions,
+            rotary_dimension: configuration.rotary_dimension,
+            theta: configuration.theta,
+            scaling: decoder_rotary_scaling(configuration.scaling),
+            frequency_layout: RotaryFrequencyLayout::Global,
+        },
+        cancellation,
+    )
+    .map_err(Into::into)
+}
+
+fn decoder_rotary_scaling(scaling: RopeScaling) -> RotaryScaling {
+    match scaling {
+        RopeScaling::None => RotaryScaling::None,
+        RopeScaling::Linear { factor } => RotaryScaling::Linear { factor },
+        RopeScaling::Yarn {
+            factor,
+            beta_fast,
+            beta_slow,
+        } => RotaryScaling::Yarn {
+            factor,
+            beta_fast,
+            beta_slow,
+        },
     }
+}
+
+fn copy_rotary_entries(table: &RotaryTable) -> Result<Vec<[f32; 2]>, DecoderTextError> {
+    let entries = table
+        .legacy_f32_entries()
+        .ok_or(DecoderTextError::InvalidConfiguration(
+            "decoder RoPE requires F32 frequency entries",
+        ))?;
     let mut output = Vec::new();
     output
-        .try_reserve_exact(
-            tokens
-                .checked_mul(pairs)
-                .ok_or(DecoderTextError::Overflow("multidimensional RoPE"))?,
-        )
-        .map_err(|_| DecoderTextError::Allocation("multidimensional RoPE"))?;
-    for token in 0..tokens {
-        let mut section_start = 0_usize;
-        for (axis_index, section) in configuration
-            .interleaved_sections
-            .iter()
-            .copied()
-            .enumerate()
-        {
-            let position = *position_axes
-                .get(axis_index)
-                .and_then(|axis| axis.get(token))
-                .ok_or(DecoderTextError::InvalidInput(
-                    "RoPE axis position is missing",
-                ))?;
-            for local_pair in 0..section {
-                cancellation.check()?;
-                let pair = section_start
-                    .checked_add(local_pair)
-                    .ok_or(DecoderTextError::Overflow("RoPE section pair"))?;
-                let exponent = 2.0 * pair as f32 / configuration.rotary_dimension as f32;
-                let mut frequency = configuration.theta.powf(-exponent);
-                let mut scaled_position = position as f32;
-                match configuration.scaling {
-                    RopeScaling::None => {}
-                    RopeScaling::Linear { factor } => scaled_position /= factor,
-                    RopeScaling::Yarn {
-                        factor,
-                        beta_fast,
-                        beta_slow,
-                    } => {
-                        let progress = if pairs <= 1 {
-                            0.0
-                        } else {
-                            pair as f32 / (pairs - 1) as f32
-                        };
-                        let ramp = ((progress * beta_fast - beta_slow) / (beta_fast - beta_slow))
-                            .clamp(0.0, 1.0);
-                        frequency *= (1.0 - ramp) / factor + ramp;
-                    }
-                }
-                let angle = scaled_position * frequency;
-                output.push([angle.cos(), angle.sin()]);
-            }
-            section_start = section_start
-                .checked_add(section)
-                .ok_or(DecoderTextError::Overflow("RoPE section"))?;
-        }
-    }
+        .try_reserve_exact(entries.len())
+        .map_err(|_| DecoderTextError::Allocation("RoPE table"))?;
+    output.extend_from_slice(entries);
     Ok(output)
 }
 
@@ -4478,63 +4438,18 @@ pub fn apply_rope(
             "RoPE positions or rotary width are invalid",
         ));
     }
-    let expected = batch
-        .checked_mul(tokens)
-        .and_then(|value| value.checked_mul(heads))
-        .and_then(|value| value.checked_mul(head_dimension))
-        .ok_or(DecoderTextError::Overflow("RoPE input"))?;
-    if values.len() != expected {
-        return Err(DecoderTextError::InvalidInput(
-            "RoPE input length does not match its dimensions",
-        ));
-    }
-    let table = precompute_rope(positions, configuration, cancellation)?;
-    let pairs = configuration.rotary_dimension / 2;
-    let mut output = values.to_vec();
-    for batch_index in 0..batch {
-        for token in 0..tokens {
-            for head in 0..heads {
-                for pair in 0..pairs {
-                    let work = (((batch_index * tokens + token) * heads + head) * pairs) + pair;
-                    if work.is_multiple_of(256) {
-                        cancellation.check()?;
-                    }
-                    let base = ((batch_index * tokens + token) * heads + head) * head_dimension;
-                    let left_index = base + pair;
-                    let right_index = base + pair + pairs;
-                    let left = *values
-                        .get(left_index)
-                        .ok_or(DecoderTextError::InvalidInput(
-                            "RoPE left component is missing",
-                        ))?;
-                    let right = *values
-                        .get(right_index)
-                        .ok_or(DecoderTextError::InvalidInput(
-                            "RoPE right component is missing",
-                        ))?;
-                    let [cosine, sine] =
-                        *table
-                            .get(token * pairs + pair)
-                            .ok_or(DecoderTextError::InvalidInput(
-                                "RoPE table entry is missing",
-                            ))?;
-                    let rotated_left = left * cosine - right * sine;
-                    let rotated_right = right * cosine + left * sine;
-                    *output
-                        .get_mut(left_index)
-                        .ok_or(DecoderTextError::InvalidInput(
-                            "RoPE output left component is missing",
-                        ))? = rotated_left;
-                    *output
-                        .get_mut(right_index)
-                        .ok_or(DecoderTextError::InvalidInput(
-                            "RoPE output right component is missing",
-                        ))? = rotated_right;
-                }
-            }
-        }
-    }
-    Ok(output)
+    let table = decoder_scalar_rotary_table(positions, configuration, cancellation)?;
+    apply_rotary_table(
+        values,
+        batch,
+        tokens,
+        heads,
+        head_dimension,
+        &table,
+        RotaryPairLayout::SplitHalf,
+        cancellation,
+    )
+    .map_err(Into::into)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4555,7 +4470,7 @@ fn apply_decoder_rope(
                     "RoPE position count must equal query token count",
                 ));
             }
-            precompute_rope(positions, configuration, cancellation)?
+            decoder_scalar_rotary_table(positions, configuration, cancellation)?
         }
         DecoderRopePositions::Multidimensional(position_axes) => {
             if position_axes.iter().any(|axis| axis.len() != tokens) {
@@ -4563,19 +4478,20 @@ fn apply_decoder_rope(
                     "multidimensional RoPE position count must equal query token count",
                 ));
             }
-            precompute_multidimensional_rope(position_axes, configuration, cancellation)?
+            decoder_multiaxis_rotary_table(position_axes, configuration, cancellation)?
         }
     };
-    apply_rope_table(
+    apply_rotary_table(
         values,
         batch,
         tokens,
         heads,
         head_dimension,
         &table,
-        configuration,
+        RotaryPairLayout::SplitHalf,
         cancellation,
     )
+    .map_err(Into::into)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4615,113 +4531,29 @@ fn apply_decoder_layer_rope(
             "Gemma4 global RoPE geometry is invalid",
         ));
     }
-    let expected = batch
-        .checked_mul(tokens)
-        .and_then(|value| value.checked_mul(heads))
-        .and_then(|value| value.checked_mul(head_dimension))
-        .ok_or(DecoderTextError::Overflow("Gemma4 global RoPE input"))?;
-    if values.len() != expected {
-        return Err(DecoderTextError::InvalidInput(
-            "Gemma4 global RoPE input length is invalid",
-        ));
-    }
-    let mut output = values.to_vec();
-    let pair_stride = head_dimension / 2;
-    for batch_index in 0..batch {
-        for (token, position) in positions.iter().copied().enumerate() {
-            for head in 0..heads {
-                for pair in 0..gemma4.global_rotary_pairs {
-                    let work = (((batch_index * tokens + token) * heads + head)
-                        * gemma4.global_rotary_pairs)
-                        + pair;
-                    if work.is_multiple_of(256) {
-                        cancellation.check()?;
-                    }
-                    let exponent = 2.0 * pair as f32 / head_dimension as f32;
-                    let angle = position as f32 * configuration.theta.powf(-exponent);
-                    let cosine = angle.cos();
-                    let sine = angle.sin();
-                    let base = ((batch_index * tokens + token) * heads + head) * head_dimension;
-                    let left_index = base + pair;
-                    let right_index = base + pair_stride + pair;
-                    let left = values[left_index];
-                    let right = values[right_index];
-                    output[left_index] = left * cosine - right * sine;
-                    output[right_index] = right * cosine + left * sine;
-                }
-            }
-        }
-    }
-    Ok(output)
-}
-
-#[allow(clippy::too_many_arguments)]
-fn apply_rope_table(
-    values: &[f32],
-    batch: usize,
-    tokens: usize,
-    heads: usize,
-    head_dimension: usize,
-    table: &[[f32; 2]],
-    configuration: &DecoderRopeConfiguration,
-    cancellation: &CancellationToken,
-) -> Result<Vec<f32>, DecoderTextError> {
-    if configuration.rotary_dimension > head_dimension {
-        return Err(DecoderTextError::InvalidInput(
-            "RoPE rotary width exceeds the attention head width",
-        ));
-    }
-    let expected = batch
-        .checked_mul(tokens)
-        .and_then(|value| value.checked_mul(heads))
-        .and_then(|value| value.checked_mul(head_dimension))
-        .ok_or(DecoderTextError::Overflow("RoPE input"))?;
-    if values.len() != expected {
-        return Err(DecoderTextError::InvalidInput(
-            "RoPE input length does not match its dimensions",
-        ));
-    }
-    let pairs = configuration.rotary_dimension / 2;
-    if table.len() != tokens.saturating_mul(pairs) {
-        return Err(DecoderTextError::InvalidInput(
-            "RoPE table length does not match the query tokens",
-        ));
-    }
-    let mut output = values.to_vec();
-    for batch_index in 0..batch {
-        for token in 0..tokens {
-            for head in 0..heads {
-                for pair in 0..pairs {
-                    let work = (((batch_index * tokens + token) * heads + head) * pairs) + pair;
-                    if work.is_multiple_of(256) {
-                        cancellation.check()?;
-                    }
-                    let base = ((batch_index * tokens + token) * heads + head) * head_dimension;
-                    let left_index = base + pair;
-                    let right_index = base + pair + pairs;
-                    let left = *values
-                        .get(left_index)
-                        .ok_or(DecoderTextError::InvalidInput(
-                            "RoPE left component is missing",
-                        ))?;
-                    let right = *values
-                        .get(right_index)
-                        .ok_or(DecoderTextError::InvalidInput(
-                            "RoPE right component is missing",
-                        ))?;
-                    let [cosine, sine] =
-                        *table
-                            .get(token * pairs + pair)
-                            .ok_or(DecoderTextError::InvalidInput(
-                                "RoPE table entry is missing",
-                            ))?;
-                    output[left_index] = left * cosine - right * sine;
-                    output[right_index] = right * cosine + left * sine;
-                }
-            }
-        }
-    }
-    Ok(output)
+    let table = decoder_scalar_rotary_table(
+        positions,
+        &DecoderRopeConfiguration {
+            theta: configuration.theta,
+            rotary_dimension: head_dimension,
+            interleaved_sections: Vec::new(),
+            scaling: configuration.scaling,
+        },
+        cancellation,
+    )?;
+    apply_rotary_table(
+        values,
+        batch,
+        tokens,
+        heads,
+        head_dimension,
+        &table,
+        RotaryPairLayout::SplitHeadHalfPrefix {
+            rotated_pairs: gemma4.global_rotary_pairs,
+        },
+        cancellation,
+    )
+    .map_err(Into::into)
 }
 
 pub fn gpt_oss_top_k_route(
