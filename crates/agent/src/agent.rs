@@ -2,6 +2,7 @@ pub mod buzz_tool_compat;
 pub mod collaboration_mention;
 pub mod collaboration_session;
 mod db;
+pub mod job_delegation;
 pub mod jobs;
 mod legacy_thread;
 pub mod managed_agents;
