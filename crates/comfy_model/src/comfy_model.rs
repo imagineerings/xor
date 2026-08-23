@@ -1,6 +1,7 @@
 pub mod alias_free_activation;
 pub mod artifact_index;
 pub mod attention;
+pub mod audio_encoder;
 pub mod clip;
 pub mod clip_text;
 pub mod clip_text_encoder_composite;
@@ -69,6 +70,13 @@ pub use attention::{
     enable_flash_sdp_exact_native, enable_math_sdp_exact_native,
     enable_mem_efficient_sdp_exact_native, scaled_dot_product_attention_with_context,
     sdpa_kernel_exact_native,
+};
+pub use audio_encoder::{
+    AUDIO_ENCODERS_SOURCE_PATH, AUDIO_ENCODERS_SOURCE_SHA256, AudioEncoderError,
+    AudioEncoderProfile, NativeAudioEncoder, NativeAudioEncoderArchitecture,
+    NativeAudioEncoderCheckpoint, NativeAudioEncoderDiagnostic, NormalizedAudioEncoderCheckpoint,
+    WAV2VEC2_SOURCE_PATH, WAV2VEC2_SOURCE_SHA256, WHISPER_SOURCE_PATH, WHISPER_SOURCE_SHA256,
+    normalize_and_select_architecture, normalize_and_select_profile,
 };
 pub use clip_text::{
     CLIP_TEXT_CATALOG_SYMBOLS, CLIP_TEXT_SOURCE_PATH, CLIP_TEXT_SOURCE_SHA256, ClipTextActivation,

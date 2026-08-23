@@ -214,6 +214,17 @@ class NodeContractCatalogTests(unittest.TestCase):
         self.assertIn("node_id", class_targets)
         self.assertIn("extra_inputs", class_targets)
 
+        for feature_id, display_name in (
+            ("COMFY-NODE-0542", "Resize Images by Longer Edge (DEPRECATED)"),
+            ("COMFY-NODE-0543", "Resize Images by Shorter Edge (DEPRECATED)"),
+        ):
+            inherited_presentation = self.contracts[feature_id]["schema"]["portable"][
+                "presentation"
+            ]
+            self.assertEqual(inherited_presentation["display_name"], display_name)
+            self.assertTrue(inherited_presentation["is_deprecated"])
+            self.assertTrue(inherited_presentation["is_experimental"])
+
     def test_provider_disposition_uses_registered_api_identity_not_deprecation(self) -> None:
         deprecated_provider = self.contracts["COMFY-NODE-0462"]
         self.assertEqual(deprecated_provider["availability"], "deprecated/dead")

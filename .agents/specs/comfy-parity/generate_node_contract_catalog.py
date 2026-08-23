@@ -850,7 +850,6 @@ def v3_portable_schema(
                 "ordinal": index,
             }
         )
-    node_options = {field["name"]: field["value"] for field in contract.get("node_options", [])}
     recognized_node_options = {
         "node_id",
         "display_name",
@@ -869,6 +868,17 @@ def v3_portable_schema(
         "search_aliases",
         "price_badge",
     }
+    node_options = {field["name"]: field["value"] for field in contract.get("node_options", [])}
+    for override_group in ("inherited_overrides", "class_overrides"):
+        for override in contract.get(override_group, []):
+            targets = override.get("targets", [])
+            value = override.get("value")
+            if (
+                len(targets) == 1
+                and targets[0] in recognized_node_options
+                and isinstance(value, dict)
+            ):
+                node_options[targets[0]] = value
     return {
         "provenance": "source_v3",
         "inputs": inputs,

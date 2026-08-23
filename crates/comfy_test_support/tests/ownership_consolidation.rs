@@ -12076,6 +12076,10 @@ fn validate_native_stored_payload_boundary(
             "crates/comfy_model/src/native_node_payload.rs",
         ),
         (
+            "pub struct NativeAudioEncoder {",
+            "crates/comfy_model/src/audio_encoder.rs",
+        ),
+        (
             "pub struct NativeModelResidentAllocation {",
             "crates/comfy_model/src/native_node_payload.rs",
         ),
@@ -17572,6 +17576,154 @@ fn val_ownership_frame_interpolation_resource_foundation_001()
                     == Some("native_frame_interpolation_model_resource")
             }))
     );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_audio_encoder_resource_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let sources = rust_sources(&root)?
+        .into_iter()
+        .map(|path| {
+            let source = fs::read_to_string(&path)?;
+            Ok((path, source))
+        })
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+
+    let gemma = production_source_occurrences(&sources, "pub struct NativeGemma4AudioEncoder {");
+    assert_eq!(gemma.len(), 1, "Gemma audio owner drifted: {gemma:?}");
+    assert!(gemma[0].contains("crates/comfy_model/src/clip_text_encoder_multimodal.rs"));
+
+    let audio = production_source_occurrences(&sources, "pub struct NativeAudioEncoder {");
+    assert_eq!(audio.len(), 1, "AUDIO_ENCODER owner drifted: {audio:?}");
+    assert!(audio[0].contains("crates/comfy_model/src/audio_encoder.rs"));
+
+    let crate_root = fs::read_to_string(root.join("crates/comfy_model/src/comfy_model.rs"))?;
+    assert!(crate_root.contains("pub mod audio_encoder;"));
+    assert!(crate_root.contains("pub use audio_encoder::{"));
+    assert!(crate_root.contains("NativeAudioEncoder"));
+
+    let owner = fs::read_to_string(root.join("crates/comfy_model/src/audio_encoder.rs"))?;
+    for required in [
+        "pub enum NativeAudioEncoderArchitecture",
+        "Wav2Vec2Base",
+        "Wav2Vec2Large",
+        "WhisperLargeV3",
+        "AUDIO_ENCODERS_SOURCE_SHA256",
+        "WAV2VEC2_SOURCE_SHA256",
+        "WHISPER_SOURCE_SHA256",
+        "normalize_and_select_architecture",
+        "pub struct NativeAudioEncoder {",
+        "pub fn from_checkpoint(",
+        "pub fn encode(",
+        "pub fn reconstruct(",
+        "pub fn semantic_state_digest_sha256(",
+        "pub fn resident_owned_bytes(",
+        "pub fn resident_tensor_allocations(",
+        "pub fn resident_bytes(",
+    ] {
+        assert!(
+            owner.contains(required),
+            "audio encoder owner lacks {required}"
+        );
+    }
+    for forbidden in [
+        "NativeGemma4AudioEncoder",
+        "NativeCache",
+        "NativeStoredPayload",
+        "NativeHandleStore",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !owner.contains(forbidden),
+            "audio encoder resource duplicates later or distinct owner {forbidden}"
+        );
+    }
+
+    let payload = fs::read_to_string(root.join("crates/comfy_model/src/native_node_payload.rs"))?;
+    for required in [
+        "AudioEncoder {\n        resource: Arc<NativeAudioEncoder>",
+        "NativeModelBackingKind::NativeAudioEncoder",
+        "pub fn audio_encoder(",
+        "NativeModelResourceRole::AudioEncoder",
+        "zed-native-audio-encoder-v1",
+        "pub fn audio_encoder_resource(",
+        "Self::audio_encoder(resource.clone())?",
+    ] {
+        assert!(
+            payload.contains(required),
+            "audio encoder payload lacks {required}"
+        );
+    }
+    let model_accessor = payload
+        .split_once("pub fn model(&self) -> Option<NativeExecutableModel<'_>>")
+        .and_then(|(_, source)| source.split_once("pub fn native_family_model_resource"))
+        .map(|(source, _)| source)
+        .ok_or("model accessor projection is missing")?;
+    assert!(model_accessor.contains("NativeModelResource::AudioEncoder { .. }"));
+
+    let stored = fs::read_to_string(root.join("crates/comfy_nodes/src/stored_payload.rs"))?;
+    assert!(!stored.contains(
+        "NativeModelResourceRole::AudioEncoder => resource.audio_encoder_resource().is_some()"
+    ));
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_audio_encoder_model_resource")
+            })
+        })
+        .ok_or("missing native audio encoder ownership concern")?;
+    assert_eq!(
+        concern
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some("comfy_model::audio_encoder::NativeAudioEncoder")
+    );
+    assert_eq!(
+        concern
+            .get("required_mappings")
+            .and_then(serde_json::Value::as_array)
+            .map(Vec::len),
+        Some(8)
+    );
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-audio-encoder-resource-foundation")
+            }))
+    );
+    assert!(
+        serde_json::to_string(concern)?
+            .contains("comfy-parity-native-model-resource-execution-foundation")
+    );
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let row = catalog
+        .lines()
+        .find(|line| line.starts_with("native_audio_encoder_model_resource,"))
+        .ok_or("missing generated native audio encoder ownership row")?;
+    for required in [
+        "comfy_model::audio_encoder::NativeAudioEncoder",
+        "comfy-parity-native-audio-encoder-resource-foundation",
+        "VAL-OWNERSHIP-001",
+        "authoritative_owner_confirmed",
+    ] {
+        assert!(
+            row.contains(required),
+            "audio encoder ownership row lacks {required}"
+        );
+    }
     Ok(())
 }
 

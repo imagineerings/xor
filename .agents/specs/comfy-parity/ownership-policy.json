@@ -5851,6 +5851,133 @@
       "decision_reason": "Task 67 owns one biquad recurrence, one phase-indexed arbitrary-rate sinc-Hann resampler, and one mel-filter-bank composition. Coefficient facades and later external-kernel leaves delegate these mechanics; canonical Tensor, CpuBackend, CancellationToken, Hann, and STFT owners retain their domains, and no external audio runtime or DSP cache is introduced."
     },
     {
+      "concern": "native_audio_encoder_model_resource",
+      "canonical_owner": "comfy_model::audio_encoder::NativeAudioEncoder",
+      "owner_files": [
+        "crates/comfy_model/src/audio_encoder.rs",
+        "crates/comfy_model/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeAudioEncoder",
+        "NativeAudioEncoder::from_checkpoint",
+        "NativeAudioEncoder::encode",
+        "NativeModelPayload::audio_encoder",
+        "NativeModelBackingKind::NativeAudioEncoder"
+      ],
+      "allowed_adapters": [
+        "Model-family parsing and mapped tensor state remain delegated to the existing safe parser, ModelProbe, and tensor-storage owners; NativeAudioEncoder alone selects and retains the source AUDIO_ENCODER graph",
+        "NativeModule, attention, and comfy_tensor exact operations retain module, tensor, backend, workspace, dtype, device, stream, memory, and cancellation ownership",
+        "comfy_media retains canonical AUDIO payload and waveform identity ownership while NativeAudioEncoder owns only checked source waveform/sample-rate projection into its admitted encoder graph",
+        "comfy_tensor::generated_external_tensor_kernel_01 retains canonical resampling, mel-spectrogram, and STFT ownership while NativeAudioEncoder supplies only the pinned source configuration",
+        "AudioEncoderOutput remains the sole checked model-derived AUDIO_ENCODER_OUTPUT value and NativeAudioEncoder constructs it through the existing layered constructor",
+        "NativeModelPayload seals the concrete AUDIO_ENCODER identity and alias-aware residency without owning architecture selection or execution equations",
+        "NativeStoredModelPayload and NativeHandleStore do not admit or publish AUDIO_ENCODER in this task; handle, cache, persistence, restart, eviction, lease, and stale-generation ownership remain assigned to comfy-parity-native-model-resource-execution-foundation",
+        "NativeGemma4AudioEncoder remains the separate CLIP-internal Gemma audio graph and cannot substitute for or consume the source AUDIO_ENCODER role"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/audio_encoder.rs",
+          "qualified": "comfy_model::audio_encoder::NativeAudioEncoder",
+          "role": "canonical",
+          "symbol": "NativeAudioEncoder",
+          "pattern": "^pub struct NativeAudioEncoder \\{"
+        }
+      ],
+      "call_symbols": [
+        "NativeAudioEncoder::from_checkpoint",
+        "NativeAudioEncoder::encode",
+        "NativeModelPayload::audio_encoder",
+        "audio_encoder_resource"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "audio-encoder-profiles-preserve-source-selection-and-marker-precedence",
+          "path": "crates/comfy_model/src/audio_encoder.rs",
+          "pattern": "pub enum NativeAudioEncoderArchitecture[\\s\\S]*Wav2Vec2Base[\\s\\S]*Wav2Vec2Large[\\s\\S]*WhisperLargeV3[\\s\\S]*normalize_and_select_architecture"
+        },
+        {
+          "name": "audio-encoder-resource-binds-artifact-state-and-source-profile",
+          "path": "crates/comfy_model/src/audio_encoder.rs",
+          "pattern": "pub struct NativeAudioEncoder \\{[\\s\\S]*architecture: NativeAudioEncoderArchitecture[\\s\\S]*artifact_sha256: String[\\s\\S]*semantic_state_digest_sha256: String"
+        },
+        {
+          "name": "audio-encoder-invocation-produces-canonical-layered-output",
+          "path": "crates/comfy_model/src/audio_encoder.rs",
+          "pattern": "pub fn encode\\([\\s\\S]*AudioEncoderOutput::layered_with_cancellation\\([\\s\\S]*audio_samples"
+        },
+        {
+          "name": "audio-encoder-identity-residency-and-reconstruction-are-content-bound",
+          "path": "crates/comfy_model/src/audio_encoder.rs",
+          "pattern": "semantic_state_digest_sha256[\\s\\S]*reconstruct[\\s\\S]*resident_owned_bytes[\\s\\S]*resident_tensor_allocations[\\s\\S]*resident_bytes"
+        },
+        {
+          "name": "audio-encoder-model-payload-seals-exact-role-identity-and-residency",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "pub fn audio_encoder\\([\\s\\S]*NativeModelResourceRole::AudioEncoder[\\s\\S]*zed-native-audio-encoder-v1[\\s\\S]*NativeModelResource::AudioEncoder[\\s\\S]*NativeModelBackingKind::NativeAudioEncoder[\\s\\S]*pub fn audio_encoder_resource"
+        },
+        {
+          "name": "audio-encoder-fixture-is-pinned-independent-and-reduced",
+          "path": "crates/comfy_test_support/fixtures/models/audio-encoder-resource-foundation/manifest.json",
+          "pattern": "source_sha256[\\s\\S]*Wav2Vec2[\\s\\S]*Whisper[\\s\\S]*reduced[\\s\\S]*CPU[\\s\\S]*F32"
+        },
+        {
+          "name": "audio-encoder-tests-cover-source-oracles-identity-residency-and-rollback",
+          "path": "crates/comfy_model/tests/audio_encoder.rs",
+          "pattern": "audio_encoder_profiles_normalize_and_select_source_exactly[\\s\\S]*audio_encoder_reduced_oracles_are_exact_and_transactional[\\s\\S]*audio_encoder_identity_residency_reconstruction_and_failures_are_atomic"
+        },
+        {
+          "name": "audio-encoder-ownership-remains-distinct-from-gemma-and-handle-lifecycle",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "val_ownership_audio_encoder_resource_foundation_001[\\s\\S]*NativeGemma4AudioEncoder[\\s\\S]*NativeAudioEncoder[\\s\\S]*comfy-parity-native-model-resource-execution-foundation"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-audio-encoder-resource-foundation"
+      ],
+      "production_consumers": [
+        "native LoadAudioEncoder and AudioEncoderEncode node leaves",
+        "future canonical AUDIO_ENCODER handle publication and recovery"
+      ],
+      "requirements": [
+        "Requirement 6",
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 26",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 37",
+        "Requirement 38",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeAudioEncoder is the sole immutable retained and execution owner for source AUDIO_ENCODER Wav2Vec2 and Whisper profiles. It binds normalized state, source profile, artifact and semantic identities, exact checked invocation, and size-checked StorageId-deduplicated residency while delegating waveform/media preparation, modules, attention, tensor operations, backend placement, workspace, and cancellation to existing owners. NativeModelPayload is only the sealed AUDIO_ENCODER identity/residency adapter. The distinct Gemma CLIP-internal audio encoder, AudioEncoderOutput, handle store, cache, persistence, restart, eviction, and publication remain separate owners."
+    },
+    {
       "concern": "native_box_coordinate_conversion",
       "canonical_owner": "comfy_tensor::generated_external_tensor_kernel_03::box_convert_with_context_exact_native",
       "owner_files": [

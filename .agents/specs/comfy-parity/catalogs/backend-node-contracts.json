@@ -716,9 +716,9 @@
             }
           ],
           "presentation": {
-            "description": null,
+            "description": "Add a prefix to all texts.",
             "display_name": "Add Text Prefix (DEPRECATED)",
-            "is_deprecated": false,
+            "is_deprecated": true,
             "is_experimental": true
           },
           "provenance": "source_v3",
@@ -1160,9 +1160,9 @@
             }
           ],
           "presentation": {
-            "description": null,
+            "description": "Add a suffix to all texts.",
             "display_name": "Add Text Suffix (DEPRECATED)",
-            "is_deprecated": false,
+            "is_deprecated": true,
             "is_experimental": true
           },
           "provenance": "source_v3",
@@ -227924,7 +227924,7 @@
           "presentation": {
             "description": "Concatenate multiple image lists into one.",
             "display_name": "Merge Image Lists (DEPRECATED)",
-            "is_deprecated": false,
+            "is_deprecated": true,
             "is_experimental": true
           },
           "provenance": "source_v3",
@@ -228603,9 +228603,9 @@
             }
           ],
           "presentation": {
-            "description": null,
+            "description": "Concatenate multiple text lists into one.",
             "display_name": "Merge Text Lists (DEPRECATED)",
-            "is_deprecated": false,
+            "is_deprecated": true,
             "is_experimental": true
           },
           "provenance": "source_v3",
@@ -292455,9 +292455,9 @@
             }
           ],
           "presentation": {
-            "description": null,
+            "description": "Replace text in all texts.",
             "display_name": "Replace Text (DEPRECATED)",
-            "is_deprecated": false,
+            "is_deprecated": true,
             "is_experimental": true
           },
           "provenance": "source_v3",
@@ -295594,7 +295594,7 @@
           "presentation": {
             "description": "Resize images so that the longer edge matches the specified dimension while preserving aspect ratio.",
             "display_name": "Resize Images by Longer Edge (DEPRECATED)",
-            "is_deprecated": false,
+            "is_deprecated": true,
             "is_experimental": true
           },
           "provenance": "source_v3",
@@ -296108,7 +296108,7 @@
           "presentation": {
             "description": "Resize images so that the shorter edge matches the specified dimension while preserving aspect ratio.",
             "display_name": "Resize Images by Shorter Edge (DEPRECATED)",
-            "is_deprecated": false,
+            "is_deprecated": true,
             "is_experimental": true
           },
           "provenance": "source_v3",
@@ -347189,9 +347189,9 @@
             }
           ],
           "presentation": {
-            "description": null,
+            "description": "Strip leading and trailing whitespace from all texts.",
             "display_name": "Strip Whitespace (DEPRECATED)",
-            "is_deprecated": false,
+            "is_deprecated": true,
             "is_experimental": true
           },
           "provenance": "source_v3",
@@ -363047,9 +363047,9 @@
             }
           ],
           "presentation": {
-            "description": null,
+            "description": "Convert text to lowercase.",
             "display_name": "Convert Text to Lowercase (DEPRECATED)",
-            "is_deprecated": false,
+            "is_deprecated": true,
             "is_experimental": true
           },
           "provenance": "source_v3",
@@ -363409,9 +363409,9 @@
             }
           ],
           "presentation": {
-            "description": null,
+            "description": "Convert text to uppercase.",
             "display_name": "Convert Text to Uppercase (DEPRECATED)",
-            "is_deprecated": false,
+            "is_deprecated": true,
             "is_experimental": true
           },
           "provenance": "source_v3",
@@ -385006,7 +385006,7 @@
             }
           ],
           "presentation": {
-            "description": null,
+            "description": "Truncate text to a maximum length.",
             "display_name": "Truncate Text",
             "is_deprecated": false,
             "is_experimental": true
@@ -446472,7 +446472,7 @@
   ],
   "input": {
     "path": "catalogs/backend-nodes.csv",
-    "sha256": "6aed8b3f991b3c08d8361dff1d89d5064c5784bfac0e2fc6cd0d02f8122ff8cd"
+    "sha256": "f240f070210764b8582eed36c50c2399d5e2dcfd0e6f5d5d51820b7259bc23a3"
   },
   "schema_version": 2,
   "source_snapshot": {

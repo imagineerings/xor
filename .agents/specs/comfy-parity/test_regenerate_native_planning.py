@@ -43,6 +43,9 @@ class ValidationGenerationTests(unittest.TestCase):
         tasks_by_id = {str(item["id"]): item for item in tasks}
         foundation_id = "comfy-parity-native-node-runtime-foundation"
         schema_id = "comfy-parity-native-node-schema-metadata-foundation"
+        inherited_v3_presentation_id = (
+            "comfy-parity-native-node-inherited-v3-presentation-catalog-correction"
+        )
         value_id = "comfy-parity-native-node-compute-value-foundation"
         latent_bundle_id = "comfy-parity-native-latent-bundle-foundation"
         asset_id = "comfy-parity-native-node-asset-effect-foundation"
@@ -80,16 +83,29 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 702)
+        self.assertEqual(len(tasks), 705)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
             self.assertTrue(tasks_by_id[identifier]["feature_scoped"])
         self.assertEqual(tasks_by_id[schema_id]["dependencies"], [foundation_id])
         self.assertEqual(
+            tasks_by_id[inherited_v3_presentation_id]["dependencies"], [schema_id]
+        )
+        self.assertTrue(tasks_by_id[inherited_v3_presentation_id]["locked"])
+        self.assertTrue(tasks_by_id[inherited_v3_presentation_id]["feature_scoped"])
+        self.assertIn(
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            tasks_by_id[inherited_v3_presentation_id]["writes"],
+        )
+        self.assertIn(
+            "COMFY-NODE-0542 and COMFY-NODE-0543",
+            tasks_by_id[inherited_v3_presentation_id]["done"],
+        )
+        self.assertEqual(
             tasks_by_id[value_id]["dependencies"],
             [
-                schema_id,
+                inherited_v3_presentation_id,
                 compute_id,
                 "comfy-parity-model-detection-any-of-key-selector-consolidation",
             ],
@@ -102,6 +118,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-native-family-execution-projection-binding-foundation",
             "comfy-parity-native-family-model-resource-foundation",
             "comfy-parity-native-audio-encoder-resource-foundation",
+            "comfy-parity-spandrel-source-snapshots-user-authority-gate",
             "comfy-parity-native-spandrel-image-model-contract-foundation",
             "comfy-parity-native-upscale-model-resource-foundation",
             "comfy-parity-native-latent-upscale-model-resource-foundation",
@@ -309,16 +326,29 @@ class ValidationGenerationTests(unittest.TestCase):
         ]:
             self.assertIn(phrase, tasks_by_id[audio_id]["done"])
         spandrel_id = "comfy-parity-native-spandrel-image-model-contract-foundation"
+        spandrel_gate_id = "comfy-parity-spandrel-source-snapshots-user-authority-gate"
+        spandrel_gate = tasks_by_id[spandrel_gate_id]
+        self.assertEqual(spandrel_gate["dependencies"], [audio_id])
+        self.assertEqual(tasks_by_id[spandrel_id]["dependencies"], [spandrel_gate_id])
+        self.assertTrue(spandrel_gate["locked"])
+        self.assertTrue(spandrel_gate["feature_scoped"])
+        self.assertEqual(spandrel_gate["writes"], [])
+        self.assertIn("user-approved immutable", spandrel_gate["outcome"])
+        self.assertIn("No symlink", spandrel_gate["done"])
         for required_read in [
             "projects/comfy/Spandrel",
             "projects/comfy/spandrel-extra-arches",
             ".agents/specs/comfy-parity/baseline.md",
             ".agents/specs/comfy-parity/regenerate_all.py",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ]:
             self.assertIn(required_read, tasks_by_id[spandrel_id]["reads"])
         for required_write in [
             ".agents/specs/comfy-parity/baseline.md",
             ".agents/specs/comfy-parity/regenerate_all.py",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "crates/comfy_test_support/tests/spandrel_image_model_contract.rs",
         ]:
             self.assertIn(required_write, tasks_by_id[spandrel_id]["writes"])
@@ -328,7 +358,8 @@ class ValidationGenerationTests(unittest.TestCase):
             "without importing Python",
             "exactly three optional-extra outcomes",
             "canonical regeneration pipeline",
-            "materially distinct equation families",
+            "one disjoint implementation leaf per materially distinct admitted equation family",
+            "comfy-parity-native-upscale-model-resource-foundation stable ID remains the final integration task",
         ]:
             self.assertIn(phrase, tasks_by_id[spandrel_id]["done"])
         self.assertNotIn(stored_payload, tasks_by_id[latent_upscale_id]["writes"])
@@ -1029,6 +1060,9 @@ class ValidationGenerationTests(unittest.TestCase):
         image_filter_id = "comfy-parity-native-nodes-image-filters-comfy-node-0045"
         image_transform_id = "comfy-parity-native-nodes-image-transform-comfy-node-0047"
         structured_transform_id = "comfy-parity-native-nodes-image-transform-comfy-node-0541"
+        audio_output_node_id = "comfy-parity-native-nodes-audio-comfy-node-0589"
+        audio_empty_segment_id = "comfy-parity-native-audio-empty-segment-foundation"
+        audio_output_codec_id = "comfy-parity-native-audio-output-codec-effect-foundation"
         shader_id = "comfy-parity-native-nodes-image-shader-comfy-node-0211"
         text_transform_id = "comfy-parity-native-nodes-text-comfy-node-0531"
         text_generation_id = "comfy-parity-native-nodes-text-comfy-node-0649"
@@ -2754,12 +2788,57 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertTrue(tasks_by_id[video_foundation_id]["locked"])
         self.assertIn(image_source_foundation_id, dependencies[image_filter_id])
+        self.assertIn(
+            "comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-fd729b8a5363",
+            dependencies[image_filter_id],
+        )
+        self.assertIn(
+            "crates/comfy_tensor/src/ops/random_number_generation_01.rs",
+            tasks_by_id[image_filter_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_tensor/src/ops/random_number_generation_02.rs",
+            tasks_by_id[image_filter_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+            tasks_by_id[image_filter_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            tasks_by_id[image_filter_id]["reads"],
+        )
         self.assertIn(image_source_foundation_id, dependencies[image_transform_id])
         self.assertIn(
             "crates/comfy_media/src/image_quantization.rs",
             tasks_by_id[image_source_foundation_id]["writes"],
         )
         self.assertIn(structured_link_foundation_id, dependencies[structured_transform_id])
+        self.assertIn(
+            inherited_v3_presentation_id, dependencies[structured_transform_id]
+        )
+        self.assertEqual(
+            tasks_by_id[audio_output_codec_id]["dependencies"],
+            [
+                audio_empty_segment_id,
+                video_foundation_id,
+                video_id,
+                detection_foundation_id,
+                detection_id,
+                media_text_foundation_id,
+                media_text_id,
+            ],
+        )
+        self.assertIn(audio_empty_segment_id, dependencies[audio_output_node_id])
+        self.assertIn(audio_output_codec_id, dependencies[audio_output_node_id])
+        self.assertIn(
+            "crates/comfy_runtime/src/native_audio_codec_service.rs",
+            tasks_by_id[audio_output_codec_id]["writes"],
+        )
+        self.assertIn(
+            "FLAC, libmp3lame V0/128k/320k, and Opus",
+            tasks_by_id[audio_output_codec_id]["done"],
+        )
         self.assertIn(
             "crates/comfy_runtime/src/prompt_compiler.rs",
             tasks_by_id[structured_link_foundation_id]["writes"],
@@ -2803,7 +2882,10 @@ class ValidationGenerationTests(unittest.TestCase):
         waves = planning.task_waves(tasks)
         self.assertEqual(waves[foundation_id], waves[compute_id] + 1)
         self.assertEqual(waves[schema_id], waves[foundation_id] + 1)
-        self.assertEqual(waves[value_id], waves[schema_id] + 1)
+        self.assertEqual(waves[inherited_v3_presentation_id], waves[schema_id] + 1)
+        self.assertEqual(
+            waves[value_id], waves[inherited_v3_presentation_id] + 1
+        )
         self.assertEqual(waves[latent_bundle_id], waves[value_id] + 1)
         self.assertEqual(waves[asset_id], waves[latent_bundle_id] + 1)
         self.assertEqual(

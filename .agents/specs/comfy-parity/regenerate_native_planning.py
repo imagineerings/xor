@@ -8705,6 +8705,40 @@ def native_node_schema_metadata_foundation_task(dependency: str) -> dict[str, ob
     )
 
 
+def native_node_inherited_v3_presentation_catalog_correction_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-node-inherited-v3-presentation-catalog-correction",
+        "Project inherited V3 node presentation overrides exactly",
+        [4, 6, 7, 16, 32, 41, 44],
+        [8, 20, 32, 34, 39, 41],
+        ["VAL-CATALOG-001", "VAL-NODE-001", "VAL-NODE-REGISTRY-001"],
+        "Correct the authoritative backend-node and schema-v2 catalogs so inherited V3 subclasses project their own presentation assignments instead of retaining those assignments only as provenance.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            ".agents/specs/comfy-parity/generate_node_contract_catalog.py",
+            ".agents/specs/comfy-parity/regenerate_all.py",
+            "crates/comfy_nodes/src/registry_generator.rs",
+        ],
+        [
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+            ".agents/specs/comfy-parity/catalogs/source-snapshot-manifest.json",
+            ".agents/specs/comfy-parity/generate_node_contract_catalog.py",
+            ".agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "COMFY-NODE-0542 and COMFY-NODE-0543 retain their source identifiers and experimental availability while backend display names exactly include `(DEPRECATED)` and portable schema presentation sets both `is_deprecated` and `is_experimental`. The generic inherited/class-override projection is source-ordered, limited to recognized node options, deterministic, and covered by catalog and registry validation without weakening descriptor equality.",
+        dependency,
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["4.1", "4.2", "4.3", "6.1", "6.2", "16.3", "32.1", "32.3", "41.2", "44.2"],
+    )
+
+
 def native_node_compute_value_foundation_task(dependency: str, compute_dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-node-compute-value-foundation",
@@ -9227,6 +9261,28 @@ def native_model_resource_precursor_tasks(
         ],
         "Pinned source-profile manifests and independent test-support-only reduced oracles preserve exact ordered prefix normalization and collision rejection, Wav2Vec2 marker precedence, 768/base versus 1024/large selection, Whisper Large V3 fallback, stereo channel mean, canonical 16 kHz resampling, post-resample audio_samples, Wav2Vec2 base and large convolution/normalization/transformer layer ordering, and Whisper trim-or-pad, torchaudio mel, log-floor, convolution, positional, transformer, and final-normalization behavior. Missing executable state or same-name shape, dtype, device, or stream mismatch fails atomically; unexpected nonexecuting state follows an explicit source-compatible retained-diagnostic policy rather than changing architecture selection. CPU F32 is the certified execution slice; zero-sample audio and uncertified placements fail typed before resampling or allocation. Semantic digest, alias-aware residency, reconstruction, bounded memory, cancellation, and OOM publish no partial encoder or AudioEncoderOutput. The authoritative ownership catalog records comfy_model::audio_encoder::NativeAudioEncoder as the sole execution/resource owner while resampling, mel/STFT, NativeModule, attention, tensor storage, AudioEncoderOutput, payload identity, and later handle/persistence owners remain delegated. Canonical handle publication, cache, persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
+    tasks.append(
+        task(
+            "comfy-parity-spandrel-source-snapshots-user-authority-gate",
+            "Admit user-supplied Spandrel source snapshots",
+            [1, 42],
+            [19, 20, 39, 41],
+            ["VAL-CATALOG-001"],
+            "Obtain user-approved immutable Spandrel and spandrel-extra-arches source trees, exact upstream release/tag/commit identities, and explicit code-license/model-use dispositions. This is an external user-authority gate: repository agents may inspect and fingerprint supplied trees but may not select a version, download a tree, accept license terms, or infer commercial-use authority.",
+            [
+                "projects/comfy/ComfyUI/requirements.txt",
+                "projects/comfy/ComfyUI/comfy_extras/nodes_upscale_model.py",
+                "projects/comfy/Spandrel",
+                "projects/comfy/spandrel-extra-arches",
+            ],
+            [],
+            "Both ignored paths contain user-approved immutable regular-file trees with explicit upstream identity and separately approved code-license/model-use dispositions. No symlink, special entry, nested Git metadata, inferred latest version, dependency installation, network fetch, Python import, model weight, or agent-authored legal approval can satisfy this gate.",
+            str(tasks[-1]["id"]),
+            locked=True,
+            feature_scoped=True,
+            criterion_ids=["1.3", "42.1", "42.2", "42.4"],
+        )
+    )
     append(
         "comfy-parity-native-spandrel-image-model-contract-foundation",
         "Pin the Spandrel image-model contract",
@@ -9238,6 +9294,8 @@ def native_model_resource_precursor_tasks(
             "projects/comfy/spandrel-extra-arches",
             ".agents/specs/comfy-parity/baseline.md",
             ".agents/specs/comfy-parity/regenerate_all.py",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ],
         [
             ".agents/specs/comfy-parity/generate_spandrel_image_model_contract.py",
@@ -9245,12 +9303,36 @@ def native_model_resource_precursor_tasks(
             ".agents/specs/comfy-parity/catalogs/spandrel-image-model-contract.json",
             ".agents/specs/comfy-parity/baseline.md",
             ".agents/specs/comfy-parity/regenerate_all.py",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "crates/comfy_test_support/fixtures/models/spandrel-image-model-contract",
             "crates/comfy_test_support/tests/spandrel_image_model_contract.rs",
         ],
-        "Both ignored source trees are user-supplied and have exact declared versions, included-file counts, baseline-algorithm tree fingerprints, and separately recorded code-license and model-use dispositions; missing, unversioned, or drifted trees fail before contract generation. Static extraction, without importing Python, records MAIN registry order and exactly three optional-extra outcomes: absent or import failure retains MAIN with a typed diagnostic, successful add appends EXTRA in source order, and add failure retains MAIN with a typed diagnostic. Every ordered entry has one origin and ordinal, exact architecture/source identity and hash, detection predicate and precedence, descriptor kind, normalized state schema, scale/channels, equation/dependency fingerprint, and support/license disposition; multi-input and other descriptor kinds remain explicit rejected rows. The generator is registered in the canonical regeneration pipeline before planning/master outputs, runs byte-identically twice, rejects missing, duplicate, ambiguous, reordered, unsupported, license-ineligible, or source-drifted rows, and emits JSON-only fixtures with no executable Python or weights. Task 380 must be split into source-derived architecture leaves before implementation if the admitted registry contains materially distinct equation families that cannot be owned coherently in one resource task.",
+        "Both ignored source trees are user-supplied and have exact declared versions, included-file counts, baseline-algorithm tree fingerprints, and separately recorded code-license and model-use dispositions; missing, unversioned, or drifted trees fail before contract generation. Static extraction, without importing Python, records MAIN registry order and exactly three optional-extra outcomes: absent or import failure retains MAIN with a typed diagnostic, successful add appends EXTRA in source order, and add failure retains MAIN with a typed diagnostic. Every ordered entry has one origin and ordinal, exact architecture/source identity and hash, detection predicate and precedence, descriptor kind, normalized state schema, scale/channels, equation/dependency fingerprint, and support/license disposition; multi-input and other descriptor kinds remain explicit rejected rows. The generator is registered in the canonical regeneration pipeline before planning/master outputs, runs byte-identically twice, rejects missing, duplicate, ambiguous, reordered, unsupported, license-ineligible, or source-drifted rows, and emits JSON-only fixtures with no executable Python or weights. The generated contract creates one shared upscale runtime-contract task and one disjoint implementation leaf per materially distinct admitted equation family; the existing comfy-parity-native-upscale-model-resource-foundation stable ID remains the final integration task and depends on every generated leaf plus the selector consolidation.",
         include_model_payload=False,
     )
+    tasks[-1]["requirements"] = [1, 7, 28, 31, 42, 44]
+    tasks[-1]["criterion_ids"] = [
+        "1.3",
+        "1.5",
+        "7.2",
+        "28.2",
+        "31.5",
+        "42.1",
+        "42.2",
+        "42.4",
+        "42.6",
+        "44.1",
+        "44.3",
+    ]
+    tasks[-1]["designs"] = [8, 19, 20, 39, 41]
+    tasks[-1]["validations"] = [
+        "VAL-CATALOG-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-MODEL-FAMILY-FOUNDATION-001",
+        "VAL-MODEL-DETECTION-001",
+        "VAL-MODEL-FAMILY-ROW-001",
+    ]
     append(
         "comfy-parity-native-upscale-model-resource-foundation",
         "Retain executable native image upscale models",
@@ -9427,6 +9509,7 @@ def native_model_resource_precursor_tasks(
         "comfy-parity-native-family-execution-projection-binding-foundation",
         "comfy-parity-native-family-model-resource-foundation",
         "comfy-parity-native-audio-encoder-resource-foundation",
+        "comfy-parity-spandrel-source-snapshots-user-authority-gate",
         "comfy-parity-native-spandrel-image-model-contract-foundation",
         "comfy-parity-native-upscale-model-resource-foundation",
         "comfy-parity-native-latent-upscale-model-resource-foundation",
@@ -9703,6 +9786,67 @@ def native_audio_empty_segment_foundation_task(dependency: str) -> dict[str, obj
         locked=True,
         feature_scoped=True,
         criterion_ids=["6.3", "7.2", "31.5", "34.2", "36.4", "37.3", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_media", "comfy_nodes", "comfy_runtime", "comfy_test_support"],
+    )
+
+
+def native_audio_output_codec_effect_foundation_task(
+    audio_dependency: str, codec_dependency: str
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-audio-output-codec-effect-foundation",
+        "Encode and publish native FLAC, MP3, and Opus audio outputs",
+        [4, 6, 7, 19, 28, 31, 32, 34, 36, 37, 41, 42, 44],
+        [8, 17, 18, 19, 20, 27, 28, 29, 30, 32, 34, 36, 39, 41],
+        [
+            "VAL-NODE-001",
+            "VAL-MEDIA-001",
+            "VAL-RECOVERY-005",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "Add one checked native audio codec/effect service for the source SaveAudioFLAC, SaveAudioMP3, and SaveAudioOpus nodes, reusing the retained codec boundary and canonical output committer rather than accepting pre-encoded bytes or leaf-local containers.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_audio.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_ui.py",
+            "crates/comfy_media/src/metadata.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/output_committer.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "Cargo.lock",
+            "crates/comfy_media/Cargo.toml",
+            "crates/comfy_media/src/audio.rs",
+            "crates/comfy_media/src/comfy_media.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/Cargo.toml",
+            "crates/comfy_runtime/src/native_audio_codec_service.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/audio/output-codec-effect-foundation",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "A sealed format and quality plan preserves per-batch FLAC, libmp3lame V0/128k/320k, and Opus 64/96/128/192/320k selection, source Opus sample-rate promotion and canonical resampling, mono/stereo admission, prompt and extra metadata suppression/inclusion, deterministic filename counters, bounded encode/drain/flush bytes, returned AUDIO alias identity, and ordered UI output. Independently decoded golden outputs prove headers, codec, sample rate, sample count, channel count, quality selection, and metadata. Cancellation, codec, size, effect, commit, retry, and restart failures leave zero partial files or UI state, and leaf nodes own no codec, container, metadata, path, counter, or publication implementation.",
+        [
+            audio_dependency,
+            codec_dependency,
+            "comfy-parity-native-nodes-video-comfy-node-0124",
+            "comfy-parity-native-detection-execution-foundation",
+            "comfy-parity-native-nodes-image-detection-comfy-node-0136",
+            "comfy-parity-native-media-text-rendering-foundation",
+            "comfy-parity-native-nodes-utilities-comfy-node-0077",
+        ],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.2", "7.2", "19.3", "28.2", "31.5", "32.2", "34.4", "36.2", "37.3", "41.2", "42.2", "44.3"],
         registered_source_edits=["comfy_media", "comfy_nodes", "comfy_runtime", "comfy_test_support"],
     )
 
@@ -15628,6 +15772,7 @@ def node_tasks(
     model_training_dependency: str,
     compile_policy_dependency: str,
     audio_empty_segment_dependency: str,
+    audio_output_codec_dependency: str,
     sampler_payload_dependency: str,
     sampling_profile_dependency: str,
     asset_effect_dependency: str,
@@ -15720,6 +15865,16 @@ def node_tasks(
                 task_dependencies.append(compile_policy_dependency)
             if {"COMFY-NODE-0762", "COMFY-NODE-0763"}.intersection(feature_ids):
                 task_dependencies.append(audio_empty_segment_dependency)
+            if "COMFY-NODE-0683" in feature_ids:
+                task_dependencies.append(audio_empty_segment_dependency)
+            if {"COMFY-NODE-0589", "COMFY-NODE-0590", "COMFY-NODE-0591"}.intersection(
+                feature_ids
+            ):
+                task_dependencies.extend([
+                    audio_output_codec_dependency,
+                    detection_dependency,
+                    media_text_dependency,
+                ])
             if category == "model/sampling":
                 task_dependencies.extend(
                     [sampler_payload_dependency, sampling_profile_dependency]
@@ -15798,6 +15953,11 @@ def node_tasks(
                         "crates/comfy_media/src/native_node_payload.rs",
                     ]
                 )
+            if audio_output_codec_dependency in task_dependencies:
+                task_reads.extend([
+                    "crates/comfy_media/src/audio.rs",
+                    "crates/comfy_runtime/src/native_audio_codec_service.rs",
+                ])
             if has_provider:
                 task_reads.append("crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs")
             if {"COMFY-NODE-0156", "COMFY-NODE-0224", "COMFY-NODE-0225"}.intersection(feature_ids):
@@ -15883,8 +16043,22 @@ def node_tasks(
                     "crates/comfy_runtime/src/native_execution_controller.rs",
                 ])
                 task_done += " Pillow-compatible quantization/cropping, NumPy legacy crop coordinates, and PreviewImage preparation delegate to the canonical image source-compatibility boundary with exact cancellation and effect rollback."
+            if "COMFY-NODE-0045" in feature_ids:
+                task_dependencies.append(
+                    "comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-fd729b8a5363"
+                )
+                task_reads.extend([
+                    "crates/comfy_tensor/src/ops/random_number_generation_01.rs",
+                    "crates/comfy_tensor/src/ops/random_number_generation_02.rs",
+                    "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+                    "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+                ])
+                task_done += " ImageNoise delegates seeded stream construction and Gaussian sampling to the canonical random-number-generation owners; Blur and Sharpen delegate reflective padding and convolution to the canonical tensor operations. The node leaf does not implement a second RNG, normal sampler, padding coordinate map, or convolution traversal."
             if "COMFY-NODE-0541" in feature_ids:
-                task_dependencies.append(structured_link_dependency)
+                task_dependencies.extend([
+                    "comfy-parity-native-node-inherited-v3-presentation-catalog-correction",
+                    structured_link_dependency,
+                ])
                 task_reads.extend([
                     "crates/comfy_runtime/src/prompt_compiler.rs",
                     "crates/comfy_runtime/src/executor.rs",
@@ -16657,8 +16831,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     node_schema_foundation = native_node_schema_metadata_foundation_task(
         str(node_runtime_foundation["id"])
     )
+    inherited_v3_presentation_catalog_correction = (
+        native_node_inherited_v3_presentation_catalog_correction_task(
+            str(node_schema_foundation["id"])
+        )
+    )
     node_compute_foundation = native_node_compute_value_foundation_task(
-        str(node_schema_foundation["id"]), compute_integration
+        str(inherited_v3_presentation_catalog_correction["id"]), compute_integration
     )
     latent_bundle_foundation = native_latent_bundle_foundation_task(
         str(node_compute_foundation["id"])
@@ -17136,6 +17315,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     video_foundation = native_video_execution_foundation_task(
         str(video_execution_precursors[-1]["id"])
     )
+    audio_output_codec_effect_foundation = (
+        native_audio_output_codec_effect_foundation_task(
+            str(audio_empty_segment_foundation["id"]), str(video_foundation["id"])
+        )
+    )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
     )
@@ -17156,6 +17340,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         str(model_training_foundation["id"]),
         str(compile_policy_bridge_foundation["id"]),
         str(audio_empty_segment_foundation["id"]),
+        str(audio_output_codec_effect_foundation["id"]),
         str(sampler_payload_algorithm_foundation["id"]),
         str(sampling_profile_guidance_foundation["id"]),
         str(node_asset_effect_foundation["id"]),
@@ -17199,6 +17384,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         + [
             node_runtime_foundation,
             node_schema_foundation,
+            inherited_v3_presentation_catalog_correction,
             node_compute_foundation,
             latent_bundle_foundation,
             node_asset_effect_foundation,
@@ -17321,6 +17507,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_component_h264_mp4_10bit_backing_foundation,
         *video_execution_precursors,
         video_foundation,
+        audio_output_codec_effect_foundation,
         detection_foundation,
         ]
         + nodes
