@@ -13,6 +13,8 @@ mod agent_panel;
 mod agent_registry_ui;
 mod buffer_codegen;
 #[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_agent_settings;
+#[cfg(feature = "multiplayer-tools")]
 pub mod collaborative_composer;
 #[cfg(feature = "multiplayer-tools")]
 pub mod collaborative_participants;
