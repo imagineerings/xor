@@ -172,6 +172,37 @@ class ValidationGenerationTests(unittest.TestCase):
             "CPU F32",
         ):
             self.assertIn(phrase, latent_upscale_task["done"])
+        background_removal_task = tasks_by_id[
+            "comfy-parity-native-background-removal-resource-foundation"
+        ]
+        self.assertEqual(
+            background_removal_task["dependencies"],
+            [
+                "comfy-parity-native-latent-upscale-model-resource-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        for path in (
+            "projects/comfy/ComfyUI/comfy/bg_removal_model.py",
+            "projects/comfy/ComfyUI/comfy/background_removal/birefnet.py",
+            "projects/comfy/ComfyUI/comfy/background_removal/birefnet.json",
+            "projects/comfy/ComfyUI/comfy/clip_model.py",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/external_tensor_kernel_02.rs",
+        ):
+            self.assertIn(path, background_removal_task["reads"])
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/models/background-removal-resource-foundation",
+            background_removal_task["writes"],
+        )
+        self.assertIn(
+            "comfy-parity-native-model-resource-execution-foundation",
+            background_removal_task["done"],
+        )
+        self.assertNotIn(
+            "residency, cache, persistence, and restart behavior",
+            background_removal_task["done"],
+        )
         self.assertIn(
             "crates/comfy_sampler/src/native_node_payload.rs", family_task["writes"]
         )
