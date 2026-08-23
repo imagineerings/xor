@@ -25,6 +25,7 @@ pub mod push_lease;
 pub mod reaction;
 pub mod read_state;
 pub mod reminder;
+pub mod review;
 pub mod scheduled_message;
 pub mod tenant;
 pub mod thread;
@@ -158,6 +159,13 @@ pub use reminder::{
     ReminderDueOutcome, ReminderError, ReminderHandled, ReminderHandledReason, ReminderHead,
     ReminderId, ReminderLifecycle, ReminderRecordFields, ReminderRetention, ReminderScope,
     ReminderTarget, ReminderTargetStatus,
+};
+pub use review::{
+    ApprovalApplicability, MergeEligibility, MergeReadiness, PatchRevision, PatchRevisionInput,
+    PatchRevisionNumber, Review, ReviewApproval, ReviewCommandOutcome, ReviewComment,
+    ReviewCommentAnchor, ReviewCommentBody, ReviewCommentInput, ReviewDecision,
+    ReviewDecisionInput, ReviewDiffSide, ReviewError, ReviewFilePath, ReviewHunkId, ReviewIdentity,
+    ReviewRecordFields,
 };
 pub use scheduled_message::{
     DueClaim, ScheduleCommandOutcome, ScheduleError, ScheduleMutation, ScheduleMutationKind,

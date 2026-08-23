@@ -2111,7 +2111,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 27. Complete review, CI and approval timeline integration
 
-  - [ ] 27.1. Define canonical review and approval records
+  - [x] 27.1. Define canonical review and approval records
     - Model patch revision, review comment, approval and merge readiness linked to repository/commit IDs.
     - _Requirements: 10.3, 10.4_
     - _Capability IDs: CAP-019, CAP-020_
@@ -2119,6 +2119,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/VISION_PROJECTS.md, crates/collaboration_domain/src/branch_activity.rs_
     - _Writes: crates/collaboration_domain/src/review.rs_
     - _Validation: state tests cover stale revision, superseded approval, comment anchor and merge eligibility_
+    - _Discovered contradiction (2026-08-23): the planned standalone domain file cannot compile or expose its canonical records without crate-root registration, and review mutations that affect Requirements 10.3/10.4 require living-documentation traceability. The narrow write expansion registers and re-exports the module from `collaboration_domain.rs` and records the state boundary in `design.md`; it adds no persistence, protocol verification, authorization, native diff owner or merge executor._
+    - _Evidence: 2026-08-23 — added a bounded, version-fenced review aggregate scoped to the exact generation-specific branch, repository and review identity. Sequential patch revisions retain base/head commits and author; inline comments retain validated relative file, content-derived hunk, diff side and nonempty line range against the exact revision-side commit; approval/change-request decisions retain their approver, revision and head. Stable record IDs make exact retries no-ops and conflicting reuse fail closed. A new revision supersedes every old approval, a later same-approver decision replaces only that current decision, and merge readiness deterministically returns the exact distinct current approval IDs while blocking insufficient approvals or live change requests and rejecting stale revisions/commits. The four focused state regressions passed, the complete `collaboration_domain` suite passed 135/135, and warning-denied all-target Clippy passed with dependencies excluded. Dependency, inventory, canonical specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 27.2. Define CI result and workflow-link records
     - Model check suites, runs, statuses and artifact links with bounded untrusted text.
