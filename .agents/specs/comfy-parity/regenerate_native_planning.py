@@ -9010,7 +9010,9 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_model/src/model_family.rs",
             "crates/comfy_model/src/families/auraflow_comfy_model_0064.rs",
             "crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs",
+            "crates/comfy_model/src/conditioning.rs",
             "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
             "crates/comfy_sampler/src/native_node_payload.rs",
             "crates/comfy_sampler/src/guidance.rs",
@@ -9023,11 +9025,13 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
             "crates/comfy_sampler/src/native_node_payload.rs",
             "crates/comfy_sampler/src/guidance.rs",
+            "crates/comfy_sampler/src/sampling_profile.rs",
+            "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
             "crates/comfy_sampler/src/comfy_sampler.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
         ],
-        "Source-derived AuraFlow and Qwen Image fixtures map into retained NativeFamilyModel resources and execute through the canonical SamplingProfile and GuidanceDenoiser boundaries with exact latent scaling, model time, positive and negative conditioning, CFG, and prediction interpretation. The canonical MODEL payload binds compatible family, latent, patch, conditioning, and execution identities, charges aliased tensor storage once, and survives cache, persistence, eviction, and reconstructive restart. Unsupported families return typed unavailable before sampling; wrong family, probe, state plan, dtype, device, patch, conditioning, control, OOM, cancellation, and stale handles fail atomically; the reduced SD15 fixture remains compatible through the generalized model boundary.",
+        "Source-derived AuraFlow and Qwen Image fixtures map into retained NativeFamilyModel resources and execute through the canonical SamplingProfile, profile-parameterized native-diffusion equations, and GuidanceDenoiser boundaries with exact latent scaling, model time, positive and negative conditioning, CFG, and prediction interpretation. The canonical MODEL payload binds compatible family, latent, patch, conditioning, and execution identities, charges aliased tensor storage once, and exposes stable semantic, resident, and in-memory reconstruction projections from family, profile, probe, state-plan, artifact, mapped-weight, and patch identities. Unsupported families return typed unavailable before sampling; wrong family, probe, state plan, dtype, device, patch, conditioning, control, OOM, and cancellation fail atomically, and the reduced SD15 fixture remains compatible through the generalized model boundary. Canonical handle publication, cache, persistence, eviction, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
     tasks.append(
         native_model_resource_precursor_task(
@@ -9081,8 +9085,9 @@ def native_model_resource_precursor_tasks(
                 "crates/comfy_model/src/families/auraflow_comfy_model_0064.rs",
                 "crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs",
                 "crates/comfy_test_support/tests/native_family_model_invocation.rs",
+                "crates/comfy_test_support/fixtures/models/native-family-denoiser-invocation-foundation/generate_oracle.py",
             ],
-            "Pinned-source raw F32 oracles independently produced from the development snapshot prove complete reduced AuraFlow and Qwen Image blocks rather than sensitivity micrographs. Aura preserves four latent channels, patch size two, eight register tokens, the 256-channel exponential timestep basis, width two with one head, one complete non-last double block and one complete single block, all modulation, Q/K/V/O attention, gates, residuals, SwiGLU MLPs, final modulation, and four-channel unpatchification. Qwen preserves sixteen latent channels, spatial patch size two, the 256-channel timestep basis, axes [16,56,56], theta 10000, one 128-wide head, one complete block, tokenwise modulation, Q/K RMSNorm, adjacent multiaxis RoPE, additive encoder mask, joint masked attention, both residual/FFN paths, final modulation, and two-by-two unpatchification. The invocation borrows ResolvedConditioningEntry and a family-tagged context; unsupported Qwen reference-latent or additional-timestep modes and matching checkpoint markers fail typed rather than being ignored. Family and latent identity, value kind, rank, dtype, device, stream, context, nonfinite time, cancellation, and a conservative peak over deduplicated original/current weights, conversions, patch buffers, retained and projected conditioning, 256-time basis, Q/K/V, quadratic attention, modulation, MLP, output, and unpatch workspaces are validated before execution. Independent latent, time, conditioning, and mask mutations change output; tiny-latent many-token conditioning and patched-original residency fixtures prove underbudget attempts fail atomically, and unsupported families never invoke the unary forward-checkpoint fallback.",
+            "A tracked pure-standard-library oracle generator verifies the pinned AuraFlow, Qwen Image, and attention source hashes before independently producing raw F32 values, Rust bit patterns, raw-output SHA-256 values, and Python/platform provenance. Its outputs prove complete reduced AuraFlow and Qwen Image blocks rather than sensitivity micrographs. Aura preserves four latent channels, patch size two, eight register tokens, the 256-channel exponential timestep basis, width two with one head, one complete non-last double block and one complete single block, all modulation, Q/K/V/O attention, gates, residuals, SwiGLU MLPs, final modulation, and four-channel unpatchification. Qwen preserves sixteen latent channels, spatial patch size two, the 256-channel timestep basis, axes [16,56,56], theta 10000, one 128-wide head, one complete block, tokenwise modulation, Q/K RMSNorm, adjacent multiaxis RoPE, additive encoder mask, joint masked attention, both residual/FFN paths, final modulation, and two-by-two unpatchification. The invocation borrows ResolvedConditioningEntry and a family-tagged context; unsupported Qwen reference-latent or additional-timestep modes and matching checkpoint markers fail typed rather than being ignored. Family and latent identity, value kind, rank, dtype, device, stream, context, nonfinite time, cancellation, and a conservative peak over deduplicated original/current weights, conversions, patch buffers, retained and projected conditioning, 256-time basis, Q/K/V, quadratic attention, modulation, MLP, output, and unpatch workspaces are validated before execution. Independent latent, time, conditioning, and mask mutations change output; tiny-latent many-token conditioning and patched-original residency fixtures prove underbudget attempts fail atomically, and unsupported families never invoke the unary forward-checkpoint fallback.",
             [],
         )
     )
@@ -19639,6 +19644,31 @@ def task_validation_commands(item: dict[str, object]) -> str:
         commands.append(f"./script/clippy -p {' -p '.join(packages)}")
     else:
         commands = ["python3 .agents/specs/comfy-parity/regenerate_all.py --check"]
+    if identifier == "comfy-parity-native-family-denoiser-invocation-foundation":
+        commands.extend([
+            "PYTHONDONTWRITEBYTECODE=1 python3 crates/comfy_test_support/fixtures/models/native-family-denoiser-invocation-foundation/generate_oracle.py",
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p comfy_test_support --test native_family_model_invocation -- --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-family-model-resource-foundation":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p comfy_test_support --test native_family_model_invocation -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_diffusion_foundation family_model -- --nocapture",
+            "cargo test --locked -p comfy_sampler sampling_profile -- --nocapture",
+            "cargo test --locked -p comfy_sampler guidance -- --nocapture",
+            "cargo test --locked -p comfy_runtime family_model -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
     if identifier == "comfy-parity-native-audio-encoder-resource-foundation":
         commands.extend([
             "cargo fmt --all -- --check",

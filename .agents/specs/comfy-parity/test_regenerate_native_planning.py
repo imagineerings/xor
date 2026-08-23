@@ -141,9 +141,26 @@ class ValidationGenerationTests(unittest.TestCase):
                 "crates/comfy_model/src/families/auraflow_comfy_model_0064.rs",
                 "crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs",
                 "crates/comfy_test_support/tests/native_family_model_invocation.rs",
+                "crates/comfy_test_support/fixtures/models/native-family-denoiser-invocation-foundation/generate_oracle.py",
             ],
         )
+        self.assertIn("tracked pure-standard-library oracle generator", family_invocation_task["done"])
         self.assertIn("unary forward-checkpoint fallback", family_invocation_task["done"])
+        for path in (
+            "crates/comfy_model/src/conditioning.rs",
+            "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
+        ):
+            self.assertIn(path, family_task["reads"])
+        for path in (
+            "crates/comfy_sampler/src/sampling_profile.rs",
+            "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
+        ):
+            self.assertIn(path, family_task["writes"])
+        self.assertIn(
+            "remain assigned to comfy-parity-native-model-resource-execution-foundation",
+            family_task["done"],
+        )
+        self.assertNotIn("stale handles fail atomically", family_task["done"])
         latent_upscale_task = tasks_by_id[
             "comfy-parity-native-latent-upscale-model-resource-foundation"
         ]
