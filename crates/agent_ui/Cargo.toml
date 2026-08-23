@@ -16,6 +16,7 @@ doctest = false
 multiplayer-tools = [
     "agent/multiplayer-tools",
     "dep:collaboration_domain",
+    "dep:nostr_compat",
     "git_ui/multiplayer-tools",
     "workspace/multiplayer-tools",
 ]
@@ -84,6 +85,7 @@ markdown.workspace = true
 menu.workspace = true
 multi_buffer.workspace = true
 notifications.workspace = true
+nostr_compat = { workspace = true, optional = true }
 ordered-float.workspace = true
 parking_lot.workspace = true
 paths.workspace = true

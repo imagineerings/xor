@@ -1,9 +1,17 @@
 pub mod activity_acp;
 pub mod activity_actions;
+#[cfg(feature = "multiplayer-tools")]
+pub mod activity_collaboration;
 pub mod activity_diff_link;
 #[cfg(feature = "multiplayer-tools")]
 pub mod activity_git;
+#[cfg(feature = "multiplayer-tools")]
+pub mod activity_observer;
+#[cfg(feature = "multiplayer-tools")]
+pub mod activity_platform;
 pub mod activity_projection;
+#[cfg(feature = "multiplayer-tools")]
+pub mod activity_reconciliation;
 pub mod activity_reducer;
 mod agent_configuration;
 pub mod agent_connection_store;
