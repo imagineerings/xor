@@ -80,7 +80,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 699)
+        self.assertEqual(len(tasks), 701)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -97,9 +97,11 @@ class ValidationGenerationTests(unittest.TestCase):
         model_resource_phases = [
             "comfy-parity-native-vae-resource-foundation",
             "comfy-parity-native-clip-resource-foundation",
+            "comfy-parity-native-multiaxis-rope-attention-foundation",
             "comfy-parity-native-family-denoiser-invocation-foundation",
             "comfy-parity-native-family-model-resource-foundation",
             "comfy-parity-native-audio-encoder-resource-foundation",
+            "comfy-parity-native-spandrel-image-model-contract-foundation",
             "comfy-parity-native-upscale-model-resource-foundation",
             "comfy-parity-native-latent-upscale-model-resource-foundation",
             "comfy-parity-native-background-removal-resource-foundation",
@@ -142,6 +144,34 @@ class ValidationGenerationTests(unittest.TestCase):
             ],
         )
         self.assertIn("unary forward-checkpoint fallback", family_invocation_task["done"])
+        latent_upscale_task = tasks_by_id[
+            "comfy-parity-native-latent-upscale-model-resource-foundation"
+        ]
+        for path in (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt_upsampler.py",
+            "projects/comfy/ComfyUI/comfy/ldm/hunyuan_video/upsampler.py",
+            "projects/comfy/ComfyUI/comfy/ldm/lightricks/latent_upsampler.py",
+            "crates/comfy_model/src/vae_video.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+        ):
+            self.assertIn(path, latent_upscale_task["reads"])
+        for path in (
+            "crates/comfy_model/src/latent_upscale_model.rs",
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_model/src/vae_video.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_test_support/fixtures/models/latent-upscale-model-resource-foundation",
+        ):
+            self.assertIn(path, latent_upscale_task["writes"])
+        for phrase in (
+            "Hunyuan 720p",
+            "Hunyuan 1080p",
+            "LTX",
+            "bislerp",
+            "noise_mask",
+            "CPU F32",
+        ):
+            self.assertIn(phrase, latent_upscale_task["done"])
         self.assertIn(
             "crates/comfy_sampler/src/native_node_payload.rs", family_task["writes"]
         )
@@ -337,7 +367,7 @@ class ValidationGenerationTests(unittest.TestCase):
             self.assertTrue(
                 set(dependencies[1:]).issubset(
                     {
-                        "comfy-parity-model-detection-any-of-key-selector-consolidation"
+                        "comfy-parity-model-detection-any-of-key-selector-consolidation",
                     }
                 )
             )

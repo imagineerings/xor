@@ -8965,6 +8965,8 @@ def native_model_resource_precursor_tasks(
         reads: list[str],
         writes: list[str],
         done: str,
+        *,
+        include_model_payload: bool = True,
     ) -> None:
         previous = str(tasks[-1]["id"]) if tasks else None
         dependencies = (
@@ -8982,7 +8984,11 @@ def native_model_resource_precursor_tasks(
                 title,
                 outcome,
                 reads,
-                list(dict.fromkeys(writes + common_model_writes)),
+                list(
+                    dict.fromkeys(
+                        writes + (common_model_writes if include_model_payload else [])
+                    )
+                ),
                 done,
                 dependencies,
             )
@@ -9025,9 +9031,29 @@ def native_model_resource_precursor_tasks(
     )
     tasks.append(
         native_model_resource_precursor_task(
+            "comfy-parity-native-multiaxis-rope-attention-foundation",
+            "Apply checked multiaxis rotary attention tables",
+            "Make the canonical attention owner construct and apply scalar or equal-length multiaxis rotary tables with explicit split-half and adjacent-pair layouts. Existing decoder callers delegate to this owner so Qwen Image can use exact three-axis adjacent-pair RoPE without a second frequency or application loop in a family resource.",
+            [
+                "projects/comfy/ComfyUI/comfy/ldm/qwen_image/model.py",
+                "projects/comfy/ComfyUI/comfy/ldm/flux/layers.py",
+                "projects/comfy/ComfyUI/comfy/ldm/flux/math.py",
+                "crates/comfy_model/src/attention.rs",
+                "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            ],
+            [
+                "crates/comfy_model/src/attention.rs",
+                "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            ],
+            "Scalar split-half fixtures remain byte- and numerically compatible for every decoder caller, while an independent Qwen oracle covers axes [16,56,56], theta 10000, adjacent-pair layout, and asymmetric three-axis positions. Section-sum mismatch, odd rotary width, unequal axis lengths, position/value length mismatch, index or allocation overflow, invalid dtype/device/stream, OOM, and cancellation fail typed without a partial tensor; repository scans find one frequency and application owner.",
+            [],
+        )
+    )
+    tasks.append(
+        native_model_resource_precursor_task(
             "comfy-parity-native-family-denoiser-invocation-foundation",
             "Execute source-exact native family denoisers",
-            "Add one model-side family denoiser invocation contract that admits scaled latent input, model time, canonical conditioning entries, and exact family context, then executes retained family weights without owning sigma equations, CFG, masks, regions, hooks, caches, handles, or publication. AuraFlow and Qwen Image form the first exact vertical slice; every unimplemented family fails typed rather than falling back to the unary checkpoint program.",
+            "Add one model-side family denoiser invocation contract that admits scaled latent input, F32 model time, canonical resolved conditioning entries, compatible family and latent identity, and a family-tagged context, then executes complete reduced AuraFlow and Qwen Image source blocks. It owns no sigma equations, CFG, regions, hooks, caches, handles, or publication; every unimplemented family fails typed rather than invoking the unary checkpoint program.",
             [
                 "projects/comfy/ComfyUI/comfy/model_base.py",
                 "projects/comfy/ComfyUI/comfy/model_sampling.py",
@@ -9035,10 +9061,20 @@ def native_model_resource_precursor_tasks(
                 "projects/comfy/ComfyUI/comfy/supported_models.py",
                 "projects/comfy/ComfyUI/comfy/ldm/aura/mmdit.py",
                 "projects/comfy/ComfyUI/comfy/ldm/qwen_image/model.py",
+                "projects/comfy/ComfyUI/comfy/ldm/flux/layers.py",
+                "projects/comfy/ComfyUI/comfy/ldm/flux/math.py",
+                "projects/comfy/ComfyUI/comfy/ldm/lightricks/model.py",
+                "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+                "crates/comfy_model/src/attention.rs",
+                "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+                "crates/comfy_model/src/native_ops.rs",
                 "crates/comfy_model/src/model_family.rs",
                 "crates/comfy_model/src/conditioning.rs",
+                "crates/comfy_model/src/families/auraflow_comfy_model_0064.rs",
+                "crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs",
                 "crates/comfy_sampler/src/guidance.rs",
                 "crates/comfy_sampler/src/sampling_profile.rs",
+                "crates/comfy_test_support/tests/native_family_model_invocation.rs",
             ],
             [
                 "crates/comfy_model/src/model_family.rs",
@@ -9046,7 +9082,7 @@ def native_model_resource_precursor_tasks(
                 "crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs",
                 "crates/comfy_test_support/tests/native_family_model_invocation.rs",
             ],
-            "Source-derived reduced AuraFlow and Qwen Image fixtures produce exact raw denoiser outputs from scaled latent, model time, and resolved conditioning inputs; independently changing latent, time, or conditioning changes output. Family and latent identity, value kind, rank, dtype, device, context, cancellation, and combined retained-weight plus activation budget are validated before execution, and unsupported families return typed unavailable without invoking the unary forward-checkpoint fallback. This task owns no sigma schedule, CFG, mask, region, hook, cache, handle, or publication behavior.",
+            "Pinned-source raw F32 oracles independently produced from the development snapshot prove complete reduced AuraFlow and Qwen Image blocks rather than sensitivity micrographs. Aura preserves four latent channels, patch size two, eight register tokens, the 256-channel exponential timestep basis, width two with one head, one complete non-last double block and one complete single block, all modulation, Q/K/V/O attention, gates, residuals, SwiGLU MLPs, final modulation, and four-channel unpatchification. Qwen preserves sixteen latent channels, spatial patch size two, the 256-channel timestep basis, axes [16,56,56], theta 10000, one 128-wide head, one complete block, tokenwise modulation, Q/K RMSNorm, adjacent multiaxis RoPE, additive encoder mask, joint masked attention, both residual/FFN paths, final modulation, and two-by-two unpatchification. The invocation borrows ResolvedConditioningEntry and a family-tagged context; unsupported Qwen reference-latent or additional-timestep modes and matching checkpoint markers fail typed rather than being ignored. Family and latent identity, value kind, rank, dtype, device, stream, context, nonfinite time, cancellation, and a conservative peak over deduplicated original/current weights, conversions, patch buffers, retained and projected conditioning, 256-time basis, Q/K/V, quadratic attention, modulation, MLP, output, and unpatch workspaces are validated before execution. Independent latent, time, conditioning, and mask mutations change output; tiny-latent many-token conditioning and patched-original residency fixtures prove underbudget attempts fail atomically, and unsupported families never invoke the unary forward-checkpoint fallback.",
             [],
         )
     )
@@ -9146,33 +9182,89 @@ def native_model_resource_precursor_tasks(
         "Validated pinned audio-encoder fixtures detect, load, retain, invoke, and reconstruct exact waveform layout, sample-rate handling, layered output tensors, semantic digest, and alias-aware residency. Unsupported architecture, invalid audio, malformed weights, OOM, and cancellation publish no encoder or output. Canonical handle publication, persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
     append(
+        "comfy-parity-native-spandrel-image-model-contract-foundation",
+        "Pin the Spandrel image-model contract",
+        "Replace ComfyUI's unversioned Spandrel dependency with one source-fingerprinted development oracle and a generated closed contract for the single-image architectures that UPSCALE_MODEL may admit. The contract owns architecture registry order, descriptor kind, state-key normalization, scale, model equations, and the disposition of optional spandrel-extra-arches; production Rust never imports or executes Python or Spandrel.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_upscale_model.py",
+            "projects/comfy/Spandrel",
+            "projects/comfy/spandrel-extra-arches",
+            ".agents/specs/comfy-parity/baseline.md",
+        ],
+        [
+            ".agents/specs/comfy-parity/generate_spandrel_image_model_contract.py",
+            ".agents/specs/comfy-parity/test_generate_spandrel_image_model_contract.py",
+            ".agents/specs/comfy-parity/catalogs/spandrel-image-model-contract.json",
+            "crates/comfy_test_support/fixtures/models/spandrel-image-model-contract",
+        ],
+        "An exact version, source tree fingerprint, registry order, optional-extra policy, descriptor kind, normalized state schema, scale, and source equation fingerprint exist for every admitted single-image architecture. Regeneration is deterministic and rejects unpinned, ambiguous, reordered, multi-input, unsupported, or source-drifted architectures; fixtures contain no executable Python and no architecture may be inferred from an unversioned package name.",
+        include_model_payload=False,
+    )
+    append(
         "comfy-parity-native-upscale-model-resource-foundation",
         "Retain executable native image upscale models",
-        "Implement a concrete architecture-validated UPSCALE_MODEL resource with bounded cancellable tiled inference, source scale identity, device lifecycle, and OOM tile fallback. The resource owns neural execution and never substitutes an image resize.",
+        "Implement the source-pinned single-image Spandrel contract as a concrete architecture-validated UPSCALE_MODEL resource with bounded cancellable tiled inference, source scale identity, device lifecycle, and typed resource-exhaustion tile fallback. The resource owns neural execution, reuses the canonical VAE tiler, and never substitutes an image resize.",
         [
+            "projects/comfy/ComfyUI/requirements.txt",
             "projects/comfy/ComfyUI/comfy_extras/nodes_upscale_model.py",
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            "projects/comfy/ComfyUI/comfy/utils.py",
+            "projects/comfy/Spandrel",
+            "projects/comfy/spandrel-extra-arches",
+            ".agents/specs/comfy-parity/catalogs/spandrel-image-model-contract.json",
             "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/vae_tiling.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_01.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs",
         ],
         [
             "crates/comfy_model/src/upscale_model.rs",
             "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/fixtures/models/upscale-model-resource-foundation",
         ],
-        "Pinned supported image-model fixtures load and execute exact scale, tile ordering, overlap, output clamp, fallback, digest, residency, cache, persistence, and restart behavior. Unsupported architecture, multi-input descriptors, malformed weights, OOM after bounded fallback, cancellation, and stale handles publish no model or image.",
+        "Source-pinned single-image fixtures detect, normalize, load, retain, reconstruct, and execute exact scale, BHWC-to-NCHW input, 512-pixel tiles with 32-pixel overlap, row-major batch order, canonical feathered stitching, intermediate dtype, BHWC F32 output clamp, semantic digest, alias-aware residency, cancellation, and final device release. Typed resource exhaustion alone retries 512 then 256 then 128; non-resource failure, cancellation, or exhaustion at 128 publishes no resource or image. Unsupported architecture, multi-input descriptor, malformed state, and uncertified device execution fail typed. Canonical handle publication, cache, persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
     append(
         "comfy-parity-native-latent-upscale-model-resource-foundation",
         "Retain executable native latent upscale models",
-        "Implement the source LATENT_UPSCALE_MODEL variants as concrete retained resources with exact latent normalization, resampling, shape, and model invocation behavior.",
+        "Implement concrete Hunyuan 720p, Hunyuan 1080p, and LTX LATENT_UPSCALE_MODEL resources, including exact loader precedence and state normalization, Hunyuan common-upscale planning and invocation, and LTX VAE-statistics invocation.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_hunyuan.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt_upsampler.py",
+            "projects/comfy/ComfyUI/comfy/ldm/hunyuan_video/upsampler.py",
+            "projects/comfy/ComfyUI/comfy/ldm/lightricks/latent_upsampler.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/model.py",
+            "projects/comfy/ComfyUI/comfy/ldm/hunyuan_video/vae_refiner.py",
+            "projects/comfy/ComfyUI/comfy/utils.py",
+            "projects/comfy/ComfyUI/comfy/model_management.py",
             "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_model/src/vae_video.rs",
+            "crates/comfy_tensor/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
         ],
         [
+            "crates/comfy_model/src/latent_upscale_model.rs",
+            "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_model/src/vae_video.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/fixtures/models/latent-upscale-model-resource-foundation",
         ],
-        "All pinned latent-upscale variants load, execute, and reconstruct exact normalization, output shape, semantic digest, and alias-aware residency. Unsupported variant, incompatible latent or VAE state, malformed weights, OOM, and cancellation publish no resource or latent. Canonical handle publication, persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
+        "Hunyuan 720p, Hunyuan 1080p, and LTX fixtures preserve loader precedence, exact marker and configuration parsing, first-only nin_shortcut key normalization, strict state admission, semantic identity, alias-aware residency, and reconstructive resource state on certified CPU F32 execution. Hunyuan invocation matches both-zero identity aliasing, ties-to-even aspect rounding, minimum 64, floor-to-16 target shape, nearest, bilinear, bicubic, area, and bislerp modes, optional center crop, rank-five folding, model invocation, and source field dropping. LTX invocation matches exact per-channel VAE unnormalize, model execution, VAE normalize, rational spatial and temporal scale behavior, guaranteed offload, metadata and batch preservation, and noise_mask removal. Cross-variant invocation, unknown or ambiguous marker, malformed configuration or weights, incompatible latent or VAE state, uncertified device, OOM, and cancellation publish no resource or latent. Canonical handle publication, cache, persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
     append(
         "comfy-parity-native-background-removal-resource-foundation",
@@ -9259,9 +9351,11 @@ def native_model_resource_precursor_tasks(
     ordered_ids = [
         "comfy-parity-native-vae-resource-foundation",
         "comfy-parity-native-clip-resource-foundation",
+        "comfy-parity-native-multiaxis-rope-attention-foundation",
         "comfy-parity-native-family-denoiser-invocation-foundation",
         "comfy-parity-native-family-model-resource-foundation",
         "comfy-parity-native-audio-encoder-resource-foundation",
+        "comfy-parity-native-spandrel-image-model-contract-foundation",
         "comfy-parity-native-upscale-model-resource-foundation",
         "comfy-parity-native-latent-upscale-model-resource-foundation",
         "comfy-parity-native-background-removal-resource-foundation",
