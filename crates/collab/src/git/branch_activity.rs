@@ -140,7 +140,7 @@ impl BranchChannelResolver for BranchChannelService {
         creator_principal_id: PrincipalId,
         authorization: &AuthorizationRequest<'_>,
     ) -> Result<AggregateId, BranchChannelResolutionError> {
-        self.bind(branch, creator_principal_id, authorization)
+        self.resolve_for_activity(branch, creator_principal_id, authorization)
             .await
             .map(|binding| binding.channel_id())
             .map_err(|error| match error {
