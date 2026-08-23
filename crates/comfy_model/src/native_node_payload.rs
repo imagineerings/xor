@@ -2727,7 +2727,7 @@ mod tests {
         let unique_storage_ids = parts
             .tensor_allocations()
             .iter()
-            .map(NativeModelTensorResidentAllocation::storage_id)
+            .map(|allocation| allocation.storage_id().get())
             .collect::<std::collections::BTreeSet<_>>();
         assert_eq!(unique_storage_ids.len(), parts.tensor_allocations().len());
         assert_eq!(parts.resident_bytes()?, payload.resident_bytes());
