@@ -9190,21 +9190,25 @@ def native_model_resource_precursor_tasks(
     append(
         "comfy-parity-native-spandrel-image-model-contract-foundation",
         "Pin the Spandrel image-model contract",
-        "Replace ComfyUI's unversioned Spandrel dependency with one source-fingerprinted development oracle and a generated closed contract for the single-image architectures that UPSCALE_MODEL may admit. The contract owns architecture registry order, descriptor kind, state-key normalization, scale, model equations, and the disposition of optional spandrel-extra-arches; production Rust never imports or executes Python or Spandrel.",
+        "Admit exact user-supplied Spandrel and spandrel-extra-arches source trees as source-fingerprinted development oracles, then generate one closed contract for the single-image architectures that UPSCALE_MODEL may admit. The contract owns architecture registry order, descriptor kind, state-key normalization, scale, model equations, licensing disposition, and every observed optional-extra state; production Rust never imports or executes Python or Spandrel.",
         [
             "projects/comfy/ComfyUI/requirements.txt",
             "projects/comfy/ComfyUI/comfy_extras/nodes_upscale_model.py",
             "projects/comfy/Spandrel",
             "projects/comfy/spandrel-extra-arches",
             ".agents/specs/comfy-parity/baseline.md",
+            ".agents/specs/comfy-parity/regenerate_all.py",
         ],
         [
             ".agents/specs/comfy-parity/generate_spandrel_image_model_contract.py",
             ".agents/specs/comfy-parity/test_generate_spandrel_image_model_contract.py",
             ".agents/specs/comfy-parity/catalogs/spandrel-image-model-contract.json",
+            ".agents/specs/comfy-parity/baseline.md",
+            ".agents/specs/comfy-parity/regenerate_all.py",
             "crates/comfy_test_support/fixtures/models/spandrel-image-model-contract",
+            "crates/comfy_test_support/tests/spandrel_image_model_contract.rs",
         ],
-        "An exact version, source tree fingerprint, registry order, optional-extra policy, descriptor kind, normalized state schema, scale, and source equation fingerprint exist for every admitted single-image architecture. Regeneration is deterministic and rejects unpinned, ambiguous, reordered, multi-input, unsupported, or source-drifted architectures; fixtures contain no executable Python and no architecture may be inferred from an unversioned package name.",
+        "Both ignored source trees are user-supplied and have exact declared versions, included-file counts, baseline-algorithm tree fingerprints, and separately recorded code-license and model-use dispositions; missing, unversioned, or drifted trees fail before contract generation. Static extraction, without importing Python, records MAIN registry order and exactly three optional-extra outcomes: absent or import failure retains MAIN with a typed diagnostic, successful add appends EXTRA in source order, and add failure retains MAIN with a typed diagnostic. Every ordered entry has one origin and ordinal, exact architecture/source identity and hash, detection predicate and precedence, descriptor kind, normalized state schema, scale/channels, equation/dependency fingerprint, and support/license disposition; multi-input and other descriptor kinds remain explicit rejected rows. The generator is registered in the canonical regeneration pipeline before planning/master outputs, runs byte-identically twice, rejects missing, duplicate, ambiguous, reordered, unsupported, license-ineligible, or source-drifted rows, and emits JSON-only fixtures with no executable Python or weights. Task 380 must be split into source-derived architecture leaves before implementation if the admitted registry contains materially distinct equation families that cannot be owned coherently in one resource task.",
         include_model_payload=False,
     )
     append(
@@ -19644,6 +19648,15 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-spandrel-image-model-contract-foundation":
+        commands.extend([
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_generate_spandrel_image_model_contract.py",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/generate_spandrel_image_model_contract.py --check",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test spandrel_image_model_contract",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
             "git diff --check",

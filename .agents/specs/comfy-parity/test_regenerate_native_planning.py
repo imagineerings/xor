@@ -255,6 +255,29 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy_model::audio_encoder::NativeAudioEncoder",
         ]:
             self.assertIn(phrase, tasks_by_id[audio_id]["done"])
+        spandrel_id = "comfy-parity-native-spandrel-image-model-contract-foundation"
+        for required_read in [
+            "projects/comfy/Spandrel",
+            "projects/comfy/spandrel-extra-arches",
+            ".agents/specs/comfy-parity/baseline.md",
+            ".agents/specs/comfy-parity/regenerate_all.py",
+        ]:
+            self.assertIn(required_read, tasks_by_id[spandrel_id]["reads"])
+        for required_write in [
+            ".agents/specs/comfy-parity/baseline.md",
+            ".agents/specs/comfy-parity/regenerate_all.py",
+            "crates/comfy_test_support/tests/spandrel_image_model_contract.rs",
+        ]:
+            self.assertIn(required_write, tasks_by_id[spandrel_id]["writes"])
+        for phrase in [
+            "user-supplied",
+            "code-license and model-use dispositions",
+            "without importing Python",
+            "exactly three optional-extra outcomes",
+            "canonical regeneration pipeline",
+            "materially distinct equation families",
+        ]:
+            self.assertIn(phrase, tasks_by_id[spandrel_id]["done"])
         self.assertNotIn(stored_payload, tasks_by_id[latent_upscale_id]["writes"])
         self.assertIn(stored_payload, tasks_by_id[execution_id]["reads"])
         self.assertIn(stored_payload, tasks_by_id[execution_id]["writes"])
