@@ -24548,6 +24548,7 @@ dependencies = [
  "mimalloc",
  "miniprofiler_ui",
  "node_runtime",
+ "nostr_compat",
  "notifications",
  "onboarding",
  "outline",
