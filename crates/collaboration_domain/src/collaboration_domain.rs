@@ -15,6 +15,7 @@ pub mod forum;
 pub mod identity_types;
 pub mod inbox;
 pub mod job;
+pub mod job_authorization;
 pub mod membership;
 pub mod message;
 pub mod message_marker;
@@ -116,6 +117,12 @@ pub use inbox::{
 pub use job::{
     Job, JobCommand, JobCommandKind, JobCommandOutcome, JobCommandType, JobError, JobIdentity,
     JobState, JobStateKind,
+};
+pub use job_authorization::{
+    JobAuthorizationDecision, JobAuthorizationDenial, JobAuthorizationRequest, JobDelegationGrant,
+    JobServiceGrant, JobTeamMembership, JobTeamRole, JobTransitionSet, MAX_ACTIVE_CHILD_JOBS,
+    MAX_ACTIVE_COMMUNITY_JOBS, MAX_JOB_DELEGATION_DEPTH, MAX_JOB_RESOURCE_IDS,
+    authorize_job_transition,
 };
 pub use membership::{
     InviteMembershipProjection, Membership, MembershipCommandOutcome, MembershipCreateFields,
