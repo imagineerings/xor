@@ -1,6 +1,7 @@
 use crate::{
     LatentFormatIdentity, MODEL_DESCRIPTOR_SCHEMA_VERSION, MemoryEstimatorDescriptor,
-    ModelComponentDescriptor, ModelDescriptor, ModelDescriptorError, TensorKeyRule,
+    ModelComponentDescriptor, ModelDescriptor, ModelDescriptorError, PatchGraph, PatchGraphError,
+    TensorKeyRule,
     attention::{
         AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionMask,
         AttentionMaskShape, AttentionRequest, RotaryFrequencyLayout, RotaryPairLayout,
@@ -12,7 +13,7 @@ use crate::{
 };
 use comfy_tensor::{
     CpuBackend, DType, DecodedScalar, DeviceId, ExecutionContext, Layout, MemoryFormatReference,
-    Scalar, Tensor, TensorError,
+    Scalar, StorageId, Tensor, TensorError,
     generated_comfy_operator_indirection_01::{
         OperatorIndirectionError, cast_to_with_context_exact_native,
         tensor_from_f32_with_context_exact_native, tensor_to_f32_with_context_exact_native,
@@ -5065,6 +5066,7 @@ impl ModelFamilyWeightBinding {
 #[derive(Clone, Debug)]
 pub struct MappedModelWeights {
     base_artifact_digest: String,
+    unpatched_cache_identity: String,
     cache_identity: String,
     binding: Option<Arc<ModelFamilyWeightBinding>>,
     unpatched_tensors: Arc<BTreeMap<String, Tensor>>,
@@ -5093,6 +5095,9 @@ impl MappedModelWeights {
     pub fn cache_identity(&self) -> &str {
         &self.cache_identity
     }
+    pub fn unpatched_cache_identity(&self) -> &str {
+        &self.unpatched_cache_identity
+    }
     pub fn binding(&self) -> Option<&ModelFamilyWeightBinding> {
         self.binding.as_deref()
     }
@@ -5104,6 +5109,10 @@ impl MappedModelWeights {
     }
     pub fn unexpected_keys(&self) -> &[String] {
         &self.unexpected_keys
+    }
+
+    pub fn is_unpatched(&self) -> bool {
+        Arc::ptr_eq(&self.unpatched_tensors, &self.tensors)
     }
 
     pub fn resident_owned_allocations(
@@ -5162,6 +5171,7 @@ impl MappedModelWeights {
     ) -> Self {
         let tensors = Arc::new(tensors);
         Self {
+            unpatched_cache_identity: base_artifact_digest.clone(),
             cache_identity: base_artifact_digest.clone(),
             base_artifact_digest,
             binding: None,
@@ -5191,6 +5201,7 @@ impl MappedModelWeights {
     ) -> Self {
         Self {
             base_artifact_digest: self.base_artifact_digest.clone(),
+            unpatched_cache_identity: self.unpatched_cache_identity.clone(),
             cache_identity: self.cache_identity.clone(),
             binding: self.binding.clone(),
             unpatched_tensors: self.unpatched_tensors.clone(),
@@ -5227,8 +5238,21 @@ impl MappedModelWeights {
         }
         digest.update(binding.source_ordinal.unwrap_or(u16::MAX).to_le_bytes());
         self.cache_identity = format!("{:x}", digest.finalize());
+        self.unpatched_cache_identity = self.cache_identity.clone();
         self.binding = Some(Arc::new(binding));
         Ok(self)
+    }
+
+    fn unpatched_for_reconstruction(&self) -> Self {
+        Self {
+            base_artifact_digest: self.base_artifact_digest.clone(),
+            unpatched_cache_identity: self.unpatched_cache_identity.clone(),
+            cache_identity: self.unpatched_cache_identity.clone(),
+            binding: self.binding.clone(),
+            unpatched_tensors: self.unpatched_tensors.clone(),
+            tensors: self.unpatched_tensors.clone(),
+            unexpected_keys: self.unexpected_keys.clone(),
+        }
     }
 }
 
@@ -5237,6 +5261,7 @@ fn mapped_weights_resource_owned_bytes(
 ) -> Result<u64, ModelFamilyError> {
     let bytes = mem::size_of::<MappedModelWeights>()
         .checked_add(weights.base_artifact_digest.capacity())
+        .and_then(|bytes| bytes.checked_add(weights.unpatched_cache_identity.capacity()))
         .and_then(|bytes| bytes.checked_add(weights.cache_identity.capacity()))
         .ok_or(ModelFamilyError::MemoryOverflow)?;
     u64::try_from(bytes).map_err(|_| ModelFamilyError::MemoryOverflow)
@@ -5529,6 +5554,10 @@ impl NativeFamilyModel {
         self.weights
             .binding()
             .and_then(ModelFamilyWeightBinding::execution_projection_state_digest)
+    }
+
+    pub const fn build_options(&self) -> NativeFamilyBuildOptions {
+        self.options
     }
 
     pub fn with_weights(&self, weights: MappedModelWeights) -> Result<Self, ModelFamilyError> {
@@ -8232,6 +8261,411 @@ fn execute_reduced_qwen_image(
     )
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum NativeFamilyModelResidentOwnerKind {
+    Resource,
+    MaterializedModel,
+    MappedWeights,
+    PatchGraph,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeFamilyModelResidentAllocation {
+    kind: NativeFamilyModelResidentOwnerKind,
+    address: usize,
+    resident_bytes: u64,
+}
+
+impl NativeFamilyModelResidentAllocation {
+    pub const fn kind(&self) -> NativeFamilyModelResidentOwnerKind {
+        self.kind
+    }
+
+    pub const fn address(&self) -> usize {
+        self.address
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeFamilyModelResource {
+    materialized_model: Arc<NativeFamilyModel>,
+    patch_graph: Arc<PatchGraph>,
+    conditioning_identity: ConditioningIdentity,
+    semantic_digest_sha256: String,
+}
+
+impl NativeFamilyModelResource {
+    pub fn materialize(
+        base_model: Arc<NativeFamilyModel>,
+        patch_graph: Arc<PatchGraph>,
+        conditioning_identity: ConditioningIdentity,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, ModelFamilyError> {
+        context.cancellation.check()?;
+        if !base_model.weights.is_unpatched() {
+            return Err(ModelFamilyError::FamilyResourceAlreadyPatched);
+        }
+        validate_family_resource_projection_binding(&base_model)?;
+        validate_family_resource_conditioning(&base_model, &conditioning_identity)?;
+        if patch_graph.identity().base_artifact_digest != base_model.weights.base_artifact_digest {
+            return Err(ModelFamilyError::FamilyResourcePatchMismatch);
+        }
+        let patched = patch_graph
+            .apply(backend, &base_model.weights, context)
+            .map_err(|error| match error {
+                PatchGraphError::Cancelled(error) => ModelFamilyError::Cancelled(error),
+                PatchGraphError::Tensor(TensorError::Cancelled) => {
+                    ModelFamilyError::Tensor(TensorError::Cancelled)
+                }
+                error => ModelFamilyError::FamilyResourcePatch(error.to_string()),
+            })?;
+        let materialized_model = Arc::new(base_model.with_weights(patched)?);
+        context.cancellation.check()?;
+        let semantic_digest_sha256 =
+            family_resource_digest(&materialized_model, &patch_graph, &conditioning_identity)?;
+        let resource = Self {
+            materialized_model,
+            patch_graph,
+            conditioning_identity,
+            semantic_digest_sha256,
+        };
+        resource.validate(context.cancellation)?;
+        let required = resource.resident_bytes()?;
+        let budget = resource.materialized_model.options.memory_budget_bytes;
+        if required > budget {
+            return Err(ModelFamilyError::OutOfMemory { required, budget });
+        }
+        context.cancellation.check()?;
+        Ok(resource)
+    }
+
+    pub fn model(&self) -> &Arc<NativeFamilyModel> {
+        &self.materialized_model
+    }
+
+    pub fn family_identity(&self) -> Result<ModelFamilyIdentity, ModelFamilyError> {
+        self.materialized_model.identity()
+    }
+
+    pub fn artifact_sha256(&self) -> &str {
+        self.materialized_model.weights.base_artifact_digest()
+    }
+
+    pub fn mapped_state_sha256(&self) -> &str {
+        self.materialized_model.weights.cache_identity()
+    }
+
+    pub fn patch_graph(&self) -> &Arc<PatchGraph> {
+        &self.patch_graph
+    }
+
+    pub fn conditioning_identity(&self) -> &ConditioningIdentity {
+        &self.conditioning_identity
+    }
+
+    pub fn semantic_digest_sha256(&self) -> &str {
+        &self.semantic_digest_sha256
+    }
+
+    pub fn invoke_denoiser(
+        &self,
+        backend: &CpuBackend,
+        invocation: NativeFamilyDenoiserInvocation<'_>,
+        family_context: &NativeFamilyDenoiserContext<'_>,
+    ) -> Result<Tensor, ModelFamilyError> {
+        self.validate(family_context.execution().cancellation)?;
+        let invocation_memory = self
+            .materialized_model
+            .denoiser_memory_estimate(invocation, family_context)?;
+        let required = self
+            .resident_bytes()?
+            .checked_add(invocation_memory.invocation_bytes)
+            .ok_or(ModelFamilyError::MemoryOverflow)?;
+        let budget = self.materialized_model.options.memory_budget_bytes;
+        if required > budget {
+            return Err(ModelFamilyError::OutOfMemory { required, budget });
+        }
+        family_context.execution().cancellation.check()?;
+        self.materialized_model
+            .invoke_denoiser(backend, invocation, family_context)
+    }
+
+    pub fn reconstruct_in_memory(
+        &self,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, ModelFamilyError> {
+        let base_model = Arc::new(
+            self.materialized_model.with_weights(
+                self.materialized_model
+                    .weights
+                    .unpatched_for_reconstruction(),
+            )?,
+        );
+        Self::materialize(
+            base_model,
+            self.patch_graph.clone(),
+            self.conditioning_identity.clone(),
+            backend,
+            context,
+        )
+    }
+
+    pub fn validate(&self, cancellation: &CancellationToken) -> Result<(), ModelFamilyError> {
+        cancellation.check()?;
+        validate_family_resource_projection_binding(&self.materialized_model)?;
+        if self.patch_graph.identity().base_artifact_digest != self.artifact_sha256()
+            || self.semantic_digest_sha256
+                != family_resource_digest(
+                    &self.materialized_model,
+                    &self.patch_graph,
+                    &self.conditioning_identity,
+                )?
+        {
+            return Err(ModelFamilyError::FamilyResourceProjectionChanged);
+        }
+        validate_family_resource_conditioning(
+            &self.materialized_model,
+            &self.conditioning_identity,
+        )?;
+        self.resident_owned_allocations()?;
+        self.resident_tensor_allocations()?;
+        cancellation.check()?;
+        Ok(())
+    }
+
+    pub fn resident_owned_allocations(
+        &self,
+    ) -> Result<Vec<NativeFamilyModelResidentAllocation>, ModelFamilyError> {
+        let mut allocations = Vec::new();
+        allocations
+            .try_reserve_exact(16)
+            .map_err(|_| ModelFamilyError::MemoryOverflow)?;
+        allocations.push(NativeFamilyModelResidentAllocation {
+            kind: NativeFamilyModelResidentOwnerKind::Resource,
+            address: self as *const Self as usize,
+            resident_bytes: native_family_resource_owned_bytes(self)?,
+        });
+        append_family_model_owned_allocations(
+            &mut allocations,
+            NativeFamilyModelResidentOwnerKind::MaterializedModel,
+            &self.materialized_model,
+        )?;
+        allocations.push(NativeFamilyModelResidentAllocation {
+            kind: NativeFamilyModelResidentOwnerKind::PatchGraph,
+            address: Arc::as_ptr(&self.patch_graph) as usize,
+            resident_bytes: self
+                .patch_graph
+                .resident_bytes()
+                .map_err(|error| ModelFamilyError::FamilyResourcePatch(error.to_string()))?,
+        });
+        let mut unique = BTreeMap::new();
+        for allocation in allocations {
+            let key = (allocation.kind, allocation.address);
+            if let Some(existing) = unique.insert(key, allocation)
+                && existing.resident_bytes != allocation.resident_bytes
+            {
+                return Err(ModelFamilyError::FamilyResourceAllocationChanged);
+            }
+        }
+        Ok(unique.into_values().collect())
+    }
+
+    pub fn resident_tensor_allocations(&self) -> Result<Vec<(StorageId, u64)>, ModelFamilyError> {
+        let mut allocations = BTreeMap::new();
+        for tensor in self
+            .materialized_model
+            .weights
+            .unpatched_tensors()
+            .values()
+            .chain(self.materialized_model.weights.tensors().values())
+        {
+            let storage_id = tensor.storage_id();
+            let resident_bytes = tensor.storage_byte_len();
+            if let Some((_, existing)) =
+                allocations.insert(storage_id.get(), (storage_id, resident_bytes))
+                && existing != resident_bytes
+            {
+                return Err(ModelFamilyError::FamilyResourceAllocationChanged);
+            }
+        }
+        Ok(allocations.into_values().collect())
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, ModelFamilyError> {
+        let owned = self.resident_owned_allocations()?.into_iter().try_fold(
+            0_u64,
+            |total, allocation| {
+                total
+                    .checked_add(allocation.resident_bytes)
+                    .ok_or(ModelFamilyError::MemoryOverflow)
+            },
+        )?;
+        self.resident_tensor_allocations()?.into_iter().try_fold(
+            owned,
+            |total, (_, resident_bytes)| {
+                total
+                    .checked_add(resident_bytes)
+                    .ok_or(ModelFamilyError::MemoryOverflow)
+            },
+        )
+    }
+}
+
+fn validate_family_resource_conditioning(
+    model: &NativeFamilyModel,
+    conditioning_identity: &ConditioningIdentity,
+) -> Result<(), ModelFamilyError> {
+    let family = model.identity()?;
+    if conditioning_identity.namespace() != "native-family-model"
+        || conditioning_identity.model_family() != &family
+        || conditioning_identity.latent_format().feature_id() != model.profile.latent_feature_id
+        || conditioning_identity.latent_format().identifier() != model.profile.latent_identifier
+    {
+        return Err(ModelFamilyError::FamilyResourceConditioningMismatch);
+    }
+    Ok(())
+}
+
+fn validate_family_resource_projection_binding(
+    model: &NativeFamilyModel,
+) -> Result<&ModelFamilyWeightBinding, ModelFamilyError> {
+    let source = model
+        .source
+        .ok_or(ModelFamilyError::FamilyResourceSourceBindingMissing)?;
+    let binding = model
+        .weights
+        .binding()
+        .ok_or(ModelFamilyError::FamilyResourceSourceBindingMissing)?;
+    if binding.probe_identity().is_none()
+        || binding.execution_projection_identity().is_none()
+        || binding.execution_projection_state_digest().is_none()
+        || binding.source_ordinal() != Some(source.0)
+        || binding.source_architecture() != Some(source.1)
+    {
+        return Err(ModelFamilyError::FamilyResourceSourceBindingMissing);
+    }
+    validate_weight_binding(
+        &model.weights,
+        model.definition,
+        &model.profile,
+        binding.state_plan_identity(),
+        binding.probe_identity(),
+        Some(source),
+        true,
+    )?;
+    Ok(binding)
+}
+
+fn append_family_model_owned_allocations(
+    allocations: &mut Vec<NativeFamilyModelResidentAllocation>,
+    kind: NativeFamilyModelResidentOwnerKind,
+    model: &Arc<NativeFamilyModel>,
+) -> Result<(), ModelFamilyError> {
+    allocations.push(NativeFamilyModelResidentAllocation {
+        kind,
+        address: Arc::as_ptr(model) as usize,
+        resident_bytes: u64::try_from(
+            mem::size_of::<NativeFamilyModel>()
+                .checked_sub(mem::size_of::<MappedModelWeights>())
+                .ok_or(ModelFamilyError::MemoryOverflow)?,
+        )
+        .map_err(|_| ModelFamilyError::MemoryOverflow)?,
+    });
+    for allocation in model.weights.resident_owned_allocations()? {
+        allocations.push(NativeFamilyModelResidentAllocation {
+            kind: NativeFamilyModelResidentOwnerKind::MappedWeights,
+            address: allocation.address(),
+            resident_bytes: allocation.resident_bytes(),
+        });
+    }
+    Ok(())
+}
+
+fn native_family_resource_owned_bytes(
+    resource: &NativeFamilyModelResource,
+) -> Result<u64, ModelFamilyError> {
+    let bytes = mem::size_of::<NativeFamilyModelResource>()
+        .checked_sub(mem::size_of::<ConditioningIdentity>())
+        .and_then(|bytes| bytes.checked_add(resource.semantic_digest_sha256.capacity()))
+        .ok_or(ModelFamilyError::MemoryOverflow)?;
+    u64::try_from(bytes)
+        .map_err(|_| ModelFamilyError::MemoryOverflow)?
+        .checked_add(
+            resource
+                .conditioning_identity
+                .resident_bytes()
+                .map_err(|error| ModelFamilyError::FamilyResourceConditioning(error.to_string()))?,
+        )
+        .ok_or(ModelFamilyError::MemoryOverflow)
+}
+
+fn family_resource_digest(
+    model: &NativeFamilyModel,
+    patch_graph: &PatchGraph,
+    conditioning_identity: &ConditioningIdentity,
+) -> Result<String, ModelFamilyError> {
+    let family = model.identity()?;
+    let binding = model
+        .weights
+        .binding()
+        .ok_or_else(|| ModelFamilyError::WeightBindingMismatch("family resource".to_owned()))?;
+    let patch = patch_graph.identity();
+    let conditioning_digest = conditioning_identity
+        .digest()
+        .map_err(|error| ModelFamilyError::FamilyResourceConditioning(error.to_string()))?;
+    let mut digest = Sha256::new();
+    digest.update(b"zed.comfy.native-family-model-resource.v1\0");
+    for value in [
+        family.feature_id(),
+        family.identifier(),
+        family.architecture_version(),
+        model.profile.latent_feature_id,
+        model.profile.latent_identifier,
+        model.weights.base_artifact_digest(),
+        model.weights.unpatched_cache_identity(),
+        model.weights.cache_identity(),
+        binding.profile_identity(),
+        binding.state_plan_identity(),
+        binding.probe_identity().unwrap_or("none"),
+        binding.execution_projection_identity().unwrap_or("none"),
+        binding
+            .execution_projection_state_digest()
+            .unwrap_or("none"),
+        &patch.ordered_digest,
+        &conditioning_digest,
+        "native-family-denoiser-v1",
+    ] {
+        let length = u64::try_from(value.len()).map_err(|_| ModelFamilyError::MemoryOverflow)?;
+        digest.update(length.to_le_bytes());
+        digest.update(value.as_bytes());
+    }
+    digest.update(
+        model
+            .source
+            .map(|source| source.0)
+            .unwrap_or(u16::MAX)
+            .to_le_bytes(),
+    );
+    let source_architecture = model.source.map(|source| source.1).unwrap_or("none");
+    digest.update(
+        u64::try_from(source_architecture.len())
+            .map_err(|_| ModelFamilyError::MemoryOverflow)?
+            .to_le_bytes(),
+    );
+    digest.update(source_architecture.as_bytes());
+    digest.update([model.options.dtype as u8, model.options.device as u8]);
+    digest.update(model.options.activation_elements.to_le_bytes());
+    digest.update(model.options.memory_budget_bytes.to_le_bytes());
+    digest.update([u8::from(model.options.allow_unexpected_weights)]);
+    Ok(format!("{:x}", digest.finalize()))
+}
+
 #[derive(Clone, Debug)]
 pub struct ModelForwardCheckpoint {
     pub name: String,
@@ -10280,6 +10714,22 @@ pub enum ModelFamilyError {
     UnexpectedKeys(Vec<String>),
     #[error("model family does not support dtype {0:?}")]
     UnsupportedDType(DType),
+    #[error("native family-model resource requires unpatched base weights")]
+    FamilyResourceAlreadyPatched,
+    #[error("native family-model resource requires a registry-resolved source and probe binding")]
+    FamilyResourceSourceBindingMissing,
+    #[error("native family-model patch does not belong to its base artifact")]
+    FamilyResourcePatchMismatch,
+    #[error("native family-model patch is invalid: {0}")]
+    FamilyResourcePatch(String),
+    #[error("native family-model conditioning does not match its family and latent format")]
+    FamilyResourceConditioningMismatch,
+    #[error("native family-model conditioning identity is invalid: {0}")]
+    FamilyResourceConditioning(String),
+    #[error("native family-model semantic projection changed")]
+    FamilyResourceProjectionChanged,
+    #[error("native family-model resident allocation changed")]
+    FamilyResourceAllocationChanged,
     #[error("model family does not support device {0:?}")]
     UnsupportedDevice(DeviceKind),
     #[error("native model-family backend is unavailable for {0:?}")]

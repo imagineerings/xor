@@ -12,7 +12,7 @@ use comfy_model::{
     },
 };
 use comfy_tensor::{
-    CpuBackend, ExecutionContext, NativeLatentBundle, NativeLatentBundleError,
+    CancellationToken, CpuBackend, ExecutionContext, NativeLatentBundle, NativeLatentBundleError,
     NativeLatentMetadataRetention, NativeLatentNoiseMask, NativeLatentSamples, Tensor,
     generated_native_diffusion::{NativeDiffusionTensorError, tensor_from_f32, tensor_to_f32},
 };
@@ -775,6 +775,53 @@ impl NativeConditioningPayload {
         })
     }
 
+    pub fn checked_family(
+        model: &NativeModelPayload,
+        patch_graph: Arc<PatchGraph>,
+        control: Option<NativeControlExecution>,
+    ) -> Result<Self, NativeDiffusionPayloadError> {
+        if control.is_some() {
+            return Err(NativeDiffusionPayloadError::FamilyControlUnsupported);
+        }
+        let resource = model
+            .native_family_model_resource()
+            .ok_or(NativeDiffusionPayloadError::RoleMismatch)?;
+        let cancellation = CancellationToken::default();
+        resource
+            .validate(&cancellation)
+            .map_err(|error| NativeDiffusionPayloadError::Invalid(error.to_string()))?;
+        if !Arc::ptr_eq(resource.patch_graph(), &patch_graph)
+            || resource.patch_graph().identity() != patch_graph.identity()
+        {
+            return Err(NativeDiffusionPayloadError::Invalid(
+                "family model and conditioning must share one checked patch graph".to_owned(),
+            ));
+        }
+        let identity = resource.conditioning_identity().clone();
+        let identity_digest = identity.digest()?;
+        let model_execution_digest = resource.semantic_digest_sha256().to_owned();
+        validate_sha256("model execution identity", &model_execution_digest)?;
+        let control_digest = sha256_tagged("zed.comfy.controlnet.absent.v1", []);
+        let execution_digest = sha256_tagged(
+            "zed.comfy.conditioning.execution.v1",
+            [
+                identity_digest.as_bytes(),
+                GUIDANCE_ADAPTER_ID.as_bytes(),
+                patch_graph.identity().ordered_digest.as_bytes(),
+                model_execution_digest.as_bytes(),
+                control_digest.as_bytes(),
+            ],
+        );
+        Ok(Self {
+            identity,
+            identity_digest,
+            patch_graph,
+            model_execution_digest,
+            control: None,
+            execution_digest,
+        })
+    }
+
     pub fn identity(&self) -> &ConditioningIdentity {
         &self.identity
     }
@@ -939,8 +986,8 @@ impl NativeDiffusionPayload {
         let model_resource = model
             .model()
             .ok_or(NativeDiffusionPayloadError::RoleMismatch)?;
-        if model_resource.patch_identity() != &conditioning.patch_graph().identity()
-            || model_resource.patch_execution_digest() != conditioning.model_execution_digest()
+        if model_resource.patch_identity() != conditioning.patch_graph().identity()
+            || model_resource.execution_digest() != conditioning.model_execution_digest()
         {
             return Err(NativeDiffusionPayloadError::Invalid(
                 "conditioning does not belong to the model payload".to_owned(),
@@ -1106,6 +1153,8 @@ pub enum NativeDiffusionPayloadError {
     RoleMismatch,
     #[error("native latent samples, masks, or generated noise have incompatible structure")]
     LatentStructureMismatch,
+    #[error("native family MODEL conditioning does not support ControlNet execution yet")]
+    FamilyControlUnsupported,
     #[error("native diffusion payload is invalid: {0}")]
     Invalid(String),
     #[error("native diffusion payload resident byte accounting overflowed")]
@@ -1143,11 +1192,18 @@ fn append_model_allocations(
         resident_bytes: parts.owned_bytes(),
     });
     allocations.extend(parts.backing_allocations().iter().map(|allocation| {
-        NativeDiffusionResidentAllocation {
-            id: NativeDiffusionResidentAllocationId::ModelBacking {
+        let id = if allocation.kind() == NativeModelBackingKind::NativeFamilyModelPatchGraph {
+            NativeDiffusionResidentAllocationId::PatchGraphArc {
+                address: allocation.address(),
+            }
+        } else {
+            NativeDiffusionResidentAllocationId::ModelBacking {
                 kind: allocation.kind(),
                 address: allocation.address(),
-            },
+            }
+        };
+        NativeDiffusionResidentAllocation {
+            id,
             resident_bytes: allocation.resident_bytes(),
         }
     }));

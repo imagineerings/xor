@@ -250,12 +250,37 @@ pub fn validate_euler_noise_generation_device(
 }
 
 pub fn sd15_model_time(sigma: f32) -> Result<f32, NativeDiffusionSamplerError> {
-    DiscreteSamplingProfile::sd15()?
+    model_time_for_profile(&DiscreteSamplingProfile::sd15()?, sigma)
+}
+
+pub fn model_time_for_profile(
+    profile: &impl SamplingProfile,
+    sigma: f32,
+) -> Result<f32, NativeDiffusionSamplerError> {
+    profile
         .model_time_for_sigma(sigma)
         .map_err(NativeDiffusionSamplerError::Profile)
 }
 
 pub fn sd15_interpret_prediction(
+    backend: &CpuBackend,
+    model_output: &Tensor,
+    model_input: &Tensor,
+    sigma: f32,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, NativeDiffusionSamplerError> {
+    interpret_prediction_for_profile(
+        &DiscreteSamplingProfile::sd15()?,
+        backend,
+        model_output,
+        model_input,
+        sigma,
+        context,
+    )
+}
+
+pub fn interpret_prediction_for_profile(
+    profile: &impl SamplingProfile,
     backend: &CpuBackend,
     model_output: &Tensor,
     model_input: &Tensor,
@@ -271,7 +296,7 @@ pub fn sd15_interpret_prediction(
     }
     let mut output = tensor_to_f32(backend, model_output, context)?;
     let input = tensor_to_f32(backend, model_input, context)?;
-    DiscreteSamplingProfile::sd15()?.interpret_prediction_in_place(&mut output, &input, sigma)?;
+    profile.interpret_prediction_in_place(&mut output, &input, sigma)?;
     tensor_from_f32(backend, model_output.descriptor().shape(), &output, context)
         .map_err(NativeDiffusionSamplerError::TensorKernel)
 }
@@ -285,12 +310,26 @@ pub fn checked_native_diffusion_plan(
     denoise: f32,
 ) -> Result<SamplingPlan, NativeDiffusionSamplerError> {
     let profile = DiscreteSamplingProfile::sd15()?;
+    checked_native_diffusion_plan_for_profile(
+        &profile, sampler, scheduler, seed, steps, guidance, denoise,
+    )
+}
+
+pub fn checked_native_diffusion_plan_for_profile(
+    profile: &impl SamplingProfile,
+    sampler: &str,
+    scheduler: &str,
+    seed: u64,
+    steps: u32,
+    guidance: f32,
+    denoise: f32,
+) -> Result<SamplingPlan, NativeDiffusionSamplerError> {
     let samplers = SamplerRegistry::foundational()?;
     let schedulers = SchedulerRegistry::foundational()?;
     let plan = SamplingPlan::new(
         sampler,
         scheduler,
-        SamplingProfileIdentity::sd15(),
+        profile.identity().clone(),
         seed,
         steps,
         guidance,
@@ -313,6 +352,31 @@ pub fn normal_sigmas(
     steps: usize,
     denoise: f32,
 ) -> Result<Vec<f32>, NativeDiffusionSamplerError> {
+    normal_sigmas_for_profile(
+        &DiscreteSamplingProfile::sd15()?,
+        backend,
+        context,
+        steps,
+        denoise,
+    )
+}
+
+pub fn normal_sigmas_for_profile(
+    profile: &impl SamplingProfile,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    steps: usize,
+    denoise: f32,
+) -> Result<Vec<f32>, NativeDiffusionSamplerError> {
+    if matches!(
+        profile.identity().as_str(),
+        crate::AURAFLOW_SAMPLING_PROFILE_ID | crate::QWEN_IMAGE_SAMPLING_PROFILE_ID
+    ) {
+        if denoise.to_bits() != 1.0_f32.to_bits() {
+            return Err(NativeDiffusionSamplerError::UnsupportedSlice);
+        }
+        return source_flow_normal_sigmas(profile, context, steps);
+    }
     let steps = u32::try_from(steps)
         .map_err(|_| NativeDiffusionSamplerError::Overflow("scheduler steps"))?;
     let request =
@@ -324,8 +388,7 @@ pub fn normal_sigmas(
             },
         )?;
     let registry = SchedulerRegistry::foundational()?;
-    let profile = DiscreteSamplingProfile::sd15()?;
-    normal_schedule(backend, context, &registry, &profile, &request).map_err(|error| match error {
+    normal_schedule(backend, context, &registry, profile, &request).map_err(|error| match error {
         SchedulerError::ZeroSteps => NativeDiffusionSamplerError::ZeroSteps,
         SchedulerError::InvalidDenoise(_) => NativeDiffusionSamplerError::InvalidDenoise,
         SchedulerError::Cancelled => NativeDiffusionSamplerError::Tensor(TensorError::Cancelled),
@@ -334,7 +397,61 @@ pub fn normal_sigmas(
     })
 }
 
+fn source_flow_normal_sigmas(
+    profile: &impl SamplingProfile,
+    context: &ExecutionContext<'_>,
+    steps: usize,
+) -> Result<Vec<f32>, NativeDiffusionSamplerError> {
+    if steps == 0 {
+        return Err(NativeDiffusionSamplerError::ZeroSteps);
+    }
+    let start = profile.model_time_for_sigma(profile.sigma_max())?;
+    let end = profile.model_time_for_sigma(profile.sigma_min())?;
+    let mut sigmas = Vec::new();
+    sigmas
+        .try_reserve_exact(
+            steps
+                .checked_add(1)
+                .ok_or(NativeDiffusionSamplerError::Overflow("normal flow schedule"))?,
+        )
+        .map_err(|_| NativeDiffusionSamplerError::Profile(SamplingProfileError::OutOfMemory(
+            "normal flow schedule",
+        )))?;
+    for index in 0..steps {
+        if index.is_multiple_of(256) {
+            context.check()?;
+        }
+        let fraction = if steps == 1 {
+            0.0
+        } else {
+            index as f32 / (steps - 1) as f32
+        };
+        let model_time = (end - start).mul_add(fraction, start);
+        sigmas.push(profile.sigma_for_model_time(model_time)?);
+    }
+    sigmas.push(0.0);
+    Ok(sigmas)
+}
+
 pub fn sample_euler(
+    backend: &CpuBackend,
+    initial: Tensor,
+    sigmas: &[f32],
+    context: &ExecutionContext<'_>,
+    denoiser: impl FnMut(&Tensor, f32, usize) -> Result<Tensor, String>,
+) -> Result<SamplingTrace, NativeDiffusionSamplerError> {
+    sample_euler_for_profile(
+        &DiscreteSamplingProfile::sd15()?,
+        backend,
+        initial,
+        sigmas,
+        context,
+        denoiser,
+    )
+}
+
+pub fn sample_euler_for_profile(
+    profile: &impl SamplingProfile,
     backend: &CpuBackend,
     initial: Tensor,
     sigmas: &[f32],
@@ -346,7 +463,6 @@ pub fn sample_euler(
     }
     let steps = u32::try_from(sigmas.len() - 1)
         .map_err(|_| NativeDiffusionSamplerError::Overflow("Euler steps"))?;
-    let profile = DiscreteSamplingProfile::sd15()?;
     let plan = SamplingPlan::new(
         EULER_SAMPLER_ID,
         NORMAL_SCHEDULER_ID,
@@ -764,6 +880,24 @@ pub fn scale_initial_noise(
     sigma: f32,
     context: &ExecutionContext<'_>,
 ) -> Result<Tensor, NativeDiffusionSamplerError> {
+    scale_initial_noise_for_profile(
+        &DiscreteSamplingProfile::sd15()?,
+        backend,
+        noise,
+        latent,
+        sigma,
+        context,
+    )
+}
+
+pub fn scale_initial_noise_for_profile(
+    profile: &impl SamplingProfile,
+    backend: &CpuBackend,
+    noise: &Tensor,
+    latent: &Tensor,
+    sigma: f32,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, NativeDiffusionSamplerError> {
     if noise.descriptor().shape() != latent.descriptor().shape() {
         return Err(NativeDiffusionSamplerError::DenoiserShape {
             step: 0,
@@ -771,7 +905,6 @@ pub fn scale_initial_noise(
             actual: format!("{:?}", noise.descriptor()),
         });
     }
-    let profile = DiscreteSamplingProfile::sd15()?;
     let mut noise_values = tensor_to_f32(backend, noise, context)?;
     let latent_values = tensor_to_f32(backend, latent, context)?;
     let max_denoise = profile.is_max_denoise(sigma)?;
@@ -790,7 +923,22 @@ pub fn scale_model_input(
     sigma: f32,
     context: &ExecutionContext<'_>,
 ) -> Result<Tensor, NativeDiffusionSamplerError> {
-    let profile = DiscreteSamplingProfile::sd15()?;
+    scale_model_input_for_profile(
+        &DiscreteSamplingProfile::sd15()?,
+        backend,
+        model_input,
+        sigma,
+        context,
+    )
+}
+
+pub fn scale_model_input_for_profile(
+    profile: &impl SamplingProfile,
+    backend: &CpuBackend,
+    model_input: &Tensor,
+    sigma: f32,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, NativeDiffusionSamplerError> {
     let mut values = tensor_to_f32(backend, model_input, context)?;
     profile.scale_model_input_in_place(&mut values, sigma)?;
     Ok(tensor_from_f32(
@@ -854,6 +1002,73 @@ mod tests {
     #[derive(Debug, Error)]
     #[error("fixture denoiser failed")]
     struct FixtureDenoiserError;
+
+    fn assert_close(actual: f32, expected: f32) {
+        assert!(
+            (actual - expected).abs() <= 1.0e-6,
+            "{actual} differs from {expected}",
+        );
+    }
+
+    #[test]
+    fn family_model_profiles_parameterize_schedule_input_time_and_prediction()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let cancellation = CancellationToken::default();
+        let context = execution_context(&backend, &authority, &cancellation)?;
+        for (profile, shift, flux) in [
+            (DiscreteSamplingProfile::auraflow()?, 1.73_f32, false),
+            (DiscreteSamplingProfile::qwen_image()?, 1.15_f32, true),
+        ] {
+            let sigmas = normal_sigmas_for_profile(&profile, &backend, &context, 3, 1.0)?;
+            assert_eq!(sigmas.len(), 4);
+            assert_close(sigmas[0], 1.0);
+            assert_eq!(sigmas[3], 0.0);
+            let source_shift = |time: f32| {
+                if flux {
+                    let exponential = shift.exp();
+                    exponential / (exponential + (time.recip() - 1.0))
+                } else {
+                    shift * time / (1.0 + (shift - 1.0) * time)
+                }
+            };
+            let source_grid_min = source_shift(if flux { 0.0001 } else { 0.001 });
+            assert_close(sigmas[2], source_shift(source_grid_min));
+            assert_close(sigmas[1], source_shift((1.0 + source_grid_min) * 0.5));
+            assert!(sigmas.windows(2).all(|pair| pair[0] > pair[1]));
+
+            let latent = tensor_from_f32(&backend, &[2], &[2.0, 3.0], &context)?;
+            let raw = tensor_from_f32(&backend, &[2], &[0.5, -1.0], &context)?;
+            let interpreted = interpret_prediction_for_profile(
+                &profile,
+                &backend,
+                &raw,
+                &latent,
+                0.25,
+                &context,
+            )?;
+            assert_eq!(&*tensor_to_f32(&backend, &interpreted, &context)?, &[1.875, 3.25]);
+            let scaled = scale_model_input_for_profile(
+                &profile,
+                &backend,
+                &latent,
+                0.5,
+                &context,
+            )?;
+            assert_eq!(&*tensor_to_f32(&backend, &scaled, &context)?, &[2.0, 3.0]);
+        }
+        assert!(matches!(
+            normal_sigmas_for_profile(
+                &DiscreteSamplingProfile::auraflow()?,
+                &backend,
+                &context,
+                3,
+                0.5,
+            ),
+            Err(NativeDiffusionSamplerError::UnsupportedSlice)
+        ));
+        Ok(())
+    }
 
     #[test]
     fn lotus_sdpose_sampling_is_direct_denoised_typed_and_rng_free()

@@ -20,6 +20,7 @@ use crate::{
     clip::{LoadedSd1Clip, NativeClipResidentOwnerKind, NativeClipResource, NativeTokenizer},
     clip_vision::NativeClipVision,
     generated_native_diffusion::{Sd1Tokenizer, Sd15TinyModel},
+    model_family::{NativeFamilyModelResidentOwnerKind, NativeFamilyModelResource},
 };
 const NATIVE_MODEL_RESOURCE_SCHEMA_VERSION: u16 = 1;
 const MAX_IDENTITY_BYTES: usize = 4_096;
@@ -259,6 +260,9 @@ enum NativeModelResource {
     Sd15Model {
         model: Arc<Sd15TinyModel>,
     },
+    NativeFamilyModel {
+        resource: Arc<NativeFamilyModelResource>,
+    },
     Sd1Clip {
         tokenizer: Arc<Sd1Tokenizer>,
         clip: Arc<LoadedSd1Clip>,
@@ -299,6 +303,10 @@ enum NativeModelResource {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum NativeModelBackingKind {
     Sd15Model,
+    NativeFamilyModelResource,
+    NativeFamilyModelMaterialized,
+    NativeFamilyModelMappedWeights,
+    NativeFamilyModelPatchGraph,
     Sd1Tokenizer,
     Sd1Clip,
     NativeVae,
@@ -347,6 +355,46 @@ impl NativeModelResidentAllocation {
 pub struct NativeModelTensorResidentAllocation {
     storage_id: StorageId,
     resident_bytes: u64,
+}
+
+#[derive(Clone, Copy)]
+pub enum NativeExecutableModel<'a> {
+    Sd15(&'a Sd15TinyModel),
+    Family(&'a NativeFamilyModelResource),
+}
+
+impl NativeExecutableModel<'_> {
+    pub fn sd15(&self) -> Option<&Sd15TinyModel> {
+        match self {
+            Self::Sd15(model) => Some(model),
+            Self::Family(_) => None,
+        }
+    }
+
+    pub fn is_family(&self) -> bool {
+        matches!(self, Self::Family(_))
+    }
+
+    pub fn patch_identity(&self) -> crate::PatchGraphIdentity {
+        match self {
+            Self::Sd15(model) => model.patch_identity().clone(),
+            Self::Family(resource) => resource.patch_graph().identity(),
+        }
+    }
+
+    pub fn execution_digest(&self) -> &str {
+        match self {
+            Self::Sd15(model) => model.patch_execution_digest(),
+            Self::Family(resource) => resource.semantic_digest_sha256(),
+        }
+    }
+
+    pub fn conditioning_identity(&self) -> Option<&crate::conditioning::ConditioningIdentity> {
+        match self {
+            Self::Sd15(_) => None,
+            Self::Family(resource) => Some(resource.conditioning_identity()),
+        }
+    }
 }
 
 impl NativeModelTensorResidentAllocation {
@@ -444,6 +492,38 @@ impl NativeModelPayload {
             identity,
             resident_bytes,
             resource: NativeModelResource::Sd15Model { model },
+        })
+    }
+
+    pub fn native_family_model(
+        resource: Arc<NativeFamilyModelResource>,
+    ) -> Result<Self, NativeModelPayloadError> {
+        let cancellation = CancellationToken::default();
+        resource
+            .validate(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let family = resource
+            .family_identity()
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::Model,
+            format!(
+                "{}:{}:{}",
+                family.feature_id(),
+                family.identifier(),
+                family.architecture_version()
+            ),
+            "zed-native-family-model-v1",
+            resource.artifact_sha256(),
+            resource.semantic_digest_sha256(),
+        )?;
+        let backing_bytes = resource
+            .resident_bytes()
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, backing_bytes)?,
+            identity,
+            resource: NativeModelResource::NativeFamilyModel { resource },
         })
     }
 
@@ -864,6 +944,47 @@ impl NativeModelPayload {
                     NativeModelPayloadError::ResourceAccounting(error.to_string())
                 })?,
             }],
+            NativeModelResource::NativeFamilyModel { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                resource
+                    .resident_owned_allocations()
+                    .map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?
+                    .into_iter()
+                    .map(|allocation| NativeModelResidentAllocation {
+                        kind: match allocation.kind() {
+                            NativeFamilyModelResidentOwnerKind::Resource => {
+                                NativeModelBackingKind::NativeFamilyModelResource
+                            }
+                            NativeFamilyModelResidentOwnerKind::MaterializedModel => {
+                                NativeModelBackingKind::NativeFamilyModelMaterialized
+                            }
+                            NativeFamilyModelResidentOwnerKind::MappedWeights => {
+                                NativeModelBackingKind::NativeFamilyModelMappedWeights
+                            }
+                            NativeFamilyModelResidentOwnerKind::PatchGraph => {
+                                NativeModelBackingKind::NativeFamilyModelPatchGraph
+                            }
+                        },
+                        address: allocation.address(),
+                        resident_bytes: allocation.resident_bytes(),
+                    })
+                    .collect()
+            }
             NativeModelResource::Sd1Clip { tokenizer, clip } => vec![
                 NativeModelResidentAllocation {
                     kind: NativeModelBackingKind::Sd1Tokenizer,
@@ -1167,9 +1288,14 @@ impl NativeModelPayload {
         Ok(parts)
     }
 
-    pub fn model(&self) -> Option<&Arc<Sd15TinyModel>> {
+    pub fn model(&self) -> Option<NativeExecutableModel<'_>> {
         match &self.resource {
-            NativeModelResource::Sd15Model { model } => Some(model),
+            NativeModelResource::Sd15Model { model } => {
+                Some(NativeExecutableModel::Sd15(model.as_ref()))
+            }
+            NativeModelResource::NativeFamilyModel { resource } => {
+                Some(NativeExecutableModel::Family(resource.as_ref()))
+            }
             NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::NativeStructuredVae { .. }
@@ -1184,12 +1310,20 @@ impl NativeModelPayload {
         }
     }
 
+    pub fn native_family_model_resource(&self) -> Option<&Arc<NativeFamilyModelResource>> {
+        match &self.resource {
+            NativeModelResource::NativeFamilyModel { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
     pub fn clip(&self) -> Option<(&Arc<Sd1Tokenizer>, &Arc<LoadedSd1Clip>)> {
         match &self.resource {
             NativeModelResource::Sd1Clip {
                 tokenizer, clip, ..
             } => Some((tokenizer, clip)),
             NativeModelResource::Sd15Model { .. }
+            | NativeModelResource::NativeFamilyModel { .. }
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::NativeStructuredVae { .. }
             | NativeModelResource::OpticalFlow { .. }
@@ -1207,6 +1341,7 @@ impl NativeModelPayload {
         match &self.resource {
             NativeModelResource::NativeVae { vae } => Some(vae),
             NativeModelResource::Sd15Model { .. }
+            | NativeModelResource::NativeFamilyModel { .. }
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeStructuredVae { .. }
             | NativeModelResource::OpticalFlow { .. }
@@ -1231,6 +1366,7 @@ impl NativeModelPayload {
         match &self.resource {
             NativeModelResource::OpticalFlow { raft } => Some(raft),
             NativeModelResource::Sd15Model { .. }
+            | NativeModelResource::NativeFamilyModel { .. }
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::NativeStructuredVae { .. }
@@ -1248,6 +1384,7 @@ impl NativeModelPayload {
         match &self.resource {
             NativeModelResource::ClipVision { clip_vision } => Some(clip_vision),
             NativeModelResource::Sd15Model { .. }
+            | NativeModelResource::NativeFamilyModel { .. }
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::NativeStructuredVae { .. }
@@ -1308,6 +1445,9 @@ impl NativeModelPayload {
     pub fn validate(&self) -> Result<(), NativeModelPayloadError> {
         let expected = match &self.resource {
             NativeModelResource::Sd15Model { model } => Self::sd15_model(model.clone())?,
+            NativeModelResource::NativeFamilyModel { resource } => {
+                Self::native_family_model(resource.clone())?
+            }
             NativeModelResource::Sd1Clip {
                 tokenizer, clip, ..
             } => Self::sd1_clip(tokenizer.clone(), clip.clone())?,

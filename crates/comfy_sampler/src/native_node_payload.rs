@@ -1,11 +1,15 @@
 use crate::{
     GuidanceDenoiser, GuidanceError, GuidanceHook, GuidanceOptions, GuidanceResult, NoiseError,
-    NoiseRequest, SamplerIdentity, SamplerRegistry, SamplingPlan, SamplingProfile, SamplingTrace,
-    execute_guidance,
+    NoiseRequest, SamplerIdentity, SamplerRegistry, SamplingPlan, SamplingProfile,
+    SamplingProfileError, SamplingTrace, execute_guidance,
     generated_native_diffusion::{NativeDiffusionSamplerError, sample_euler},
+    profile_for_model,
 };
-use comfy_model::conditioning::{ConditioningError, ConditioningSet};
-use comfy_model::{NativeModelPayload, NativeModelPayloadError, NativeModelResourceRole};
+use comfy_model::conditioning::{ConditioningError, ConditioningIdentity, ConditioningSet};
+use comfy_model::{
+    NativeModelPayload, NativeModelPayloadError, NativeModelResourceRole,
+    generated_native_diffusion::{sd15_latent_format_identity, sd15_model_family_identity},
+};
 use comfy_tensor::{
     CpuBackend, DType, DeviceId, ExecutionContext, RngCheckpoint, RngError, StorageId, Tensor,
     TensorError,
@@ -417,14 +421,21 @@ impl NativeGuiderPayload {
             return Err(NativeSamplerPayloadError::GuiderModelRoleMismatch);
         }
         model.validate()?;
+        let executable = model
+            .model()
+            .ok_or(NativeSamplerPayloadError::GuiderModelRoleMismatch)?;
+        let profile = profile_for_model(&model)?;
         let mut hasher = Sha256::new();
         hasher.update(b"zed.comfy.native-guider-payload.v1");
         hash_field(&mut hasher, model.identity().digest_sha256().as_bytes())?;
+        hash_field(&mut hasher, executable.execution_digest().as_bytes())?;
+        hash_field(&mut hasher, profile.identity().as_str().as_bytes())?;
         let mut resident_bytes = usize_to_u64(mem::size_of::<Self>())?;
         resident_bytes = checked_add(resident_bytes, model.resident_bytes())?;
         match &strategy {
             NativeGuiderStrategy::Basic { conditioning } => {
                 hasher.update(b"basic");
+                validate_conditioning_for_model(&model, conditioning.identity())?;
                 validate_conditioning_digest(conditioning)?;
                 hash_field(&mut hasher, conditioning.digest().as_bytes())?;
                 resident_bytes = checked_add(resident_bytes, conditioning.resident_bytes()?)?;
@@ -437,9 +448,8 @@ impl NativeGuiderPayload {
                 if !guidance.is_finite() || *guidance < 0.0 {
                     return Err(NativeSamplerPayloadError::InvalidGuidance(*guidance));
                 }
-                if positive.identity() != negative.identity() {
-                    return Err(NativeSamplerPayloadError::ConditioningIdentityMismatch);
-                }
+                validate_conditioning_for_model(&model, positive.identity())?;
+                validate_conditioning_for_model(&model, negative.identity())?;
                 validate_conditioning_digest(positive)?;
                 validate_conditioning_digest(negative)?;
                 hasher.update(b"cfg");
@@ -467,6 +477,32 @@ impl NativeGuiderPayload {
             resident_bytes,
         })
     }
+}
+
+fn validate_conditioning_for_model(
+    model: &NativeModelPayload,
+    conditioning: &ConditioningIdentity,
+) -> Result<(), NativeSamplerPayloadError> {
+    let (expected_family, expected_latent) = match model.native_family_model_resource() {
+        Some(resource) => (
+            resource
+                .family_identity()
+                .map_err(|error| NativeSamplerPayloadError::FamilyModel(error.to_string()))?,
+            resource.conditioning_identity().latent_format().clone(),
+        ),
+        None => (
+            sd15_model_family_identity()
+                .map_err(|error| NativeSamplerPayloadError::FamilyModel(error.to_string()))?,
+            sd15_latent_format_identity()
+                .map_err(|error| NativeSamplerPayloadError::FamilyModel(error.to_string()))?,
+        ),
+    };
+    if conditioning.model_family() != &expected_family
+        || conditioning.latent_format() != &expected_latent
+    {
+        return Err(NativeSamplerPayloadError::ConditioningIdentityMismatch);
+    }
+    Ok(())
 }
 
 impl NativeGuiderStrategy {
@@ -636,6 +672,10 @@ pub enum NativeSamplerPayloadError {
     Model(#[from] NativeModelPayloadError),
     #[error(transparent)]
     Conditioning(#[from] ConditioningError),
+    #[error(transparent)]
+    Profile(#[from] SamplingProfileError),
+    #[error("native family MODEL contract is invalid: {0}")]
+    FamilyModel(String),
     #[error("native sampler payload {0} is not a SHA-256 digest")]
     InvalidDigest(&'static str),
     #[error("native noise input must be a contiguous CPU f32 tensor with nonzero dimensions")]

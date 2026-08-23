@@ -1,7 +1,18 @@
-use crate::{SamplingPlan, SamplingProfile, SamplingProfileError};
+use crate::{
+    DiscreteSamplingProfile, SamplingPlan, SamplingProfile, SamplingProfileError,
+    generated_native_diffusion::{
+        NativeDiffusionSamplerError, interpret_prediction_for_profile, model_time_for_profile,
+        scale_model_input_for_profile,
+    },
+    profile_for_model,
+};
 use comfy_model::conditioning::{
     ConditioningError, ConditioningIdentity, ConditioningSet, ConditioningValue,
     ResolvedConditioningEntry,
+};
+use comfy_model::{
+    ModelFamilyError, NativeModelPayload,
+    model_family::{NativeFamilyDenoiserContext, NativeFamilyDenoiserInvocation},
 };
 use comfy_tensor::{
     CpuBackend, DType, DeviceId, ExecutionContext, Tensor, TensorError,
@@ -86,6 +97,124 @@ pub trait GuidanceDenoiser {
         evaluations: &[GuidanceEvaluation],
         context: &ExecutionContext<'_>,
     ) -> Result<Vec<Tensor>, GuidanceError>;
+}
+
+pub struct NativeFamilyGuidanceDenoiser<'a> {
+    model: &'a NativeModelPayload,
+    profile: DiscreteSamplingProfile,
+    backend: &'a CpuBackend,
+}
+
+impl<'a> NativeFamilyGuidanceDenoiser<'a> {
+    pub fn checked(
+        model: &'a NativeModelPayload,
+        backend: &'a CpuBackend,
+    ) -> Result<Self, GuidanceError> {
+        model
+            .validate()
+            .map_err(|error| GuidanceError::Invalid(error.to_string()))?;
+        if model.native_family_model_resource().is_none() {
+            return Err(GuidanceError::Invalid(
+                "native family guidance requires a retained family MODEL".to_owned(),
+            ));
+        }
+        Ok(Self {
+            profile: profile_for_model(model)?,
+            model,
+            backend,
+        })
+    }
+
+    pub fn profile(&self) -> &DiscreteSamplingProfile {
+        &self.profile
+    }
+}
+
+impl GuidanceDenoiser for NativeFamilyGuidanceDenoiser<'_> {
+    fn evaluate_batch(
+        &mut self,
+        evaluations: &[GuidanceEvaluation],
+        context: &ExecutionContext<'_>,
+    ) -> Result<Vec<Tensor>, GuidanceError> {
+        let resource = self.model.native_family_model_resource().ok_or_else(|| {
+            GuidanceError::Invalid(
+                "native family guidance lost its retained family MODEL".to_owned(),
+            )
+        })?;
+        let expected = resource.conditioning_identity();
+        let mut outputs = Vec::new();
+        outputs
+            .try_reserve_exact(evaluations.len())
+            .map_err(|_| GuidanceError::ShapeOverflow("family guidance outputs"))?;
+        for evaluation in evaluations {
+            context
+                .cancellation
+                .check()
+                .map_err(|_| GuidanceError::Cancelled)?;
+            if evaluation.conditioning_identity().model_family() != expected.model_family()
+                || evaluation.conditioning_identity().latent_format() != expected.latent_format()
+            {
+                return Err(GuidanceError::Invalid(
+                    "family guidance conditioning identity does not match the MODEL".to_owned(),
+                ));
+            }
+            if !matches!(
+                evaluation.entry().value(),
+                ConditioningValue::CrossAttention(_)
+            ) {
+                return Err(GuidanceError::Invalid(
+                    "family guidance requires cross-attention conditioning".to_owned(),
+                ));
+            }
+            let scaled_latent = scale_model_input_for_profile(
+                &self.profile,
+                self.backend,
+                evaluation.latent(),
+                evaluation.sigma(),
+                context,
+            )?;
+            let model_time = model_time_for_profile(&self.profile, evaluation.sigma())?;
+            let batch = scaled_latent
+                .descriptor()
+                .shape()
+                .first()
+                .copied()
+                .ok_or(GuidanceError::ShapeOverflow("family guidance batch"))?;
+            let batch = usize::try_from(batch)
+                .map_err(|_| GuidanceError::ShapeOverflow("family guidance batch"))?;
+            let mut model_times = Vec::new();
+            model_times
+                .try_reserve_exact(batch)
+                .map_err(|_| GuidanceError::ShapeOverflow("family guidance model time"))?;
+            model_times.resize(batch, model_time);
+            let batch = u64::try_from(batch)
+                .map_err(|_| GuidanceError::ShapeOverflow("family guidance batch"))?;
+            let model_time = tensor_from_f32(self.backend, &[batch], &model_times, context)?;
+            let family_context =
+                NativeFamilyDenoiserContext::checked(evaluation.conditioning_identity(), context)?;
+            let raw = resource.invoke_denoiser(
+                self.backend,
+                NativeFamilyDenoiserInvocation {
+                    scaled_latent: &scaled_latent,
+                    model_time: &model_time,
+                    conditioning: evaluation.entry(),
+                    attention_mask: None,
+                    reference_latents: &[],
+                    additional_timestep_condition: None,
+                },
+                &family_context,
+            )?;
+            outputs.push(interpret_prediction_for_profile(
+                &self.profile,
+                self.backend,
+                &raw,
+                evaluation.latent(),
+                evaluation.sigma(),
+                context,
+            )?);
+        }
+        Ok(outputs)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -201,6 +330,10 @@ pub enum GuidanceError {
     Elementwise(#[from] ElementwiseRuntimePartSixteenError),
     #[error(transparent)]
     NativeDiffusion(#[from] NativeDiffusionTensorError),
+    #[error(transparent)]
+    Sampler(#[from] NativeDiffusionSamplerError),
+    #[error(transparent)]
+    FamilyModel(#[from] ModelFamilyError),
     #[error("guidance execution was cancelled")]
     Cancelled,
     #[error("guidance contract is invalid: {0}")]
@@ -221,20 +354,7 @@ pub fn sampling_percent_for_sigma(
     profile: &dyn SamplingProfile,
     sigma: f32,
 ) -> Result<f64, GuidanceError> {
-    if sigma == 0.0 {
-        return Ok(1.0);
-    }
-    let model_time = profile.model_time_for_sigma(sigma)?;
-    let maximum_model_time = profile
-        .sigma_count()
-        .checked_sub(1)
-        .ok_or(GuidanceError::ShapeOverflow("sampling profile extent"))?;
-    if maximum_model_time == 0 {
-        return Err(GuidanceError::Invalid(
-            "sampling profile requires at least two sigma points".to_owned(),
-        ));
-    }
-    Ok((1.0 - f64::from(model_time) / maximum_model_time as f64).clamp(0.0, 1.0))
+    Ok(f64::from(profile.sampling_percent_for_sigma(sigma)?))
 }
 
 pub fn execute_guidance(
@@ -1755,6 +1875,52 @@ mod tests {
         );
         assert_eq!(session.next_step(), 0);
         assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn family_model_guidance_adapter_delegates_without_owning_cfg() -> TestResult {
+        let harness = Harness::new(1 << 20, 1 << 18)?;
+        let context = harness.context()?;
+        let profile = DiscreteSamplingProfile::auraflow()?;
+        let latent = harness.tensor(&[2], &[2.0, 3.0], &context)?;
+        let conditional_raw = harness.tensor(&[2], &[0.5, -1.0], &context)?;
+        let unconditional_raw = harness.tensor(&[2], &[-0.25, 0.25], &context)?;
+        let conditional = interpret_prediction_for_profile(
+            &profile,
+            &harness.backend,
+            &conditional_raw,
+            &latent,
+            0.25,
+            &context,
+        )?;
+        let unconditional = interpret_prediction_for_profile(
+            &profile,
+            &harness.backend,
+            &unconditional_raw,
+            &latent,
+            0.25,
+            &context,
+        )?;
+        let predictions = GuidancePredictions {
+            conditional,
+            unconditional: Some(unconditional),
+        };
+        let guided = default_cfg(&harness.backend, &predictions, 2.0, &context)?;
+        assert_eq!(
+            &*tensor_to_f32(&harness.backend, &guided, &context)?,
+            &[1.6875, 3.5625]
+        );
+        assert!(matches!(
+            GuidanceError::from(ModelFamilyError::OutOfMemory {
+                required: 2,
+                budget: 1,
+            }),
+            GuidanceError::FamilyModel(ModelFamilyError::OutOfMemory {
+                required: 2,
+                budget: 1,
+            })
+        ));
         Ok(())
     }
 }

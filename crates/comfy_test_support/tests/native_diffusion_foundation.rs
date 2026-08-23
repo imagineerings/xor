@@ -3,19 +3,39 @@ use comfy_model::clip::{NativeClipProfile, NativeClipResource, NativeTokenizer};
 use comfy_model::generated_native_diffusion::{
     Sd1Tokenizer, empty_sd15_latent, encode_sd15_prompt,
 };
+use comfy_model::model_family::{
+    NativeFamilyDenoiserContext, NativeFamilyDenoiserInvocation, NativeFamilyModelResource,
+};
+use comfy_model::{
+    LatentFormatIdentity, ModelFamilyError, NativeFamilyBuildOptions, NativeFamilyModel,
+    PatchGraph, PatchPayload, PatchTensor, PatchValueTransform, SemanticPatchOperation,
+    build_model_family,
+    conditioning::{
+        ConditioningEntry, ConditioningEntryOptions, ConditioningIdentity, ConditioningSet,
+        ConditioningValue,
+    },
+    generated_auraflow_comfy_model_0064 as aura, generated_qwenimage_comfy_model_0113 as qwen,
+    map_model_weights,
+};
 use comfy_model::{ModelTokenizerDescriptor, NativeModelPayload};
 use comfy_runtime::{NativeDiffusionBundle, NativeDiffusionProvider, Sd15GuidanceAdapter};
+use comfy_sampler::generated_native_diffusion::interpret_prediction_for_profile;
 use comfy_sampler::generated_native_diffusion::{
-    checked_native_diffusion_plan, normal_noise, normal_sigmas, sample_euler, scale_initial_noise,
-    scale_model_input, sd15_interpret_prediction, sd15_model_time,
+    checked_native_diffusion_plan, checked_native_diffusion_plan_for_profile, normal_noise,
+    normal_sigmas, normal_sigmas_for_profile, sample_euler, scale_initial_noise, scale_model_input,
+    sd15_interpret_prediction, sd15_model_time,
 };
-use comfy_sampler::{NativeDiffusionPayload, NoiseRequest};
+use comfy_sampler::{
+    GuidanceOptions, NativeConditioningPayload, NativeDiffusionPayload,
+    NativeFamilyGuidanceDenoiser, NativeGuiderPayload, NoiseRequest, profile_for_model,
+};
 use comfy_tensor::{
-    CancellationToken, CpuBackend, CpuWorkspaceAuthority, DeviceId, ExecutionContext,
-    RngCheckpoint, StreamId,
+    CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
+    RngCheckpoint, StreamId, Tensor,
     generated_native_diffusion::{tensor_from_f32, tensor_to_f32},
 };
 use comfy_test_support::{NativeDiffusionFixture, NativeDiffusionFixtureError};
+use comfy_types::DeviceKind;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
@@ -29,6 +49,846 @@ const MEMORY_LIMIT: u64 = 2 * 1024 * 1024 * 1024;
 const SEED: u64 = 0x0123_4567_89ab_cdef;
 const FIXTURE_PROMPT_ID: &str = "53494d00-0000-0000-0000-000000003702";
 const FIXTURE_KSAMPLER_NODE_ID: &str = "5";
+const FAMILY_ARTIFACT_DIGEST: &str =
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+fn family_patterned_values(key: &str, elements: usize) -> Vec<f32> {
+    let normalization = key.contains("norm_") || key.ends_with("txt_norm.weight");
+    let bias = key.ends_with(".bias");
+    let aura_mlp =
+        key.contains(".mlpC.") || key.contains(".mlpX.") || key.contains("single_layers.0.mlp.");
+    let scale = if aura_mlp { 0.5 } else { 0.000_75 };
+    (0..elements)
+        .map(|index| {
+            if normalization {
+                0.95 + (index % 7) as f32 * 0.01
+            } else if bias {
+                ((index % 11) as f32 - 5.0) * 0.002
+            } else {
+                ((index % 17) as f32 - 8.0) * scale
+            }
+        })
+        .collect()
+}
+
+fn family_tensor(
+    backend: &CpuBackend,
+    shape: &[u64],
+    key: &str,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, Box<dyn std::error::Error>> {
+    let elements = shape.iter().try_fold(1_usize, |total, dimension| {
+        total.checked_mul(usize::try_from(*dimension).ok()?)
+    });
+    let elements = elements.ok_or("family fixture tensor shape overflow")?;
+    Ok(tensor_from_f32(
+        backend,
+        shape,
+        &family_patterned_values(key, elements),
+        context,
+    )?)
+}
+
+fn family_weight_shape(
+    key: &str,
+    qwen_model: bool,
+) -> Result<Vec<u64>, Box<dyn std::error::Error>> {
+    let shape = if qwen_model {
+        match key {
+            "native.img_in.weight" => vec![128, 64],
+            "native.img_in.bias"
+            | "native.txt_in.bias"
+            | "native.time_text_embed.timestep_embedder.linear_1.bias"
+            | "native.time_text_embed.timestep_embedder.linear_2.bias" => vec![128],
+            "native.txt_norm.weight" => vec![3_584],
+            "native.txt_in.weight" => vec![128, 3_584],
+            "native.time_text_embed.timestep_embedder.linear_1.weight" => vec![128, 256],
+            "native.time_text_embed.timestep_embedder.linear_2.weight" => vec![128, 128],
+            key if key.ends_with("img_mod.1.weight") || key.ends_with("txt_mod.1.weight") => {
+                vec![768, 128]
+            }
+            key if key.ends_with("img_mod.1.bias") || key.ends_with("txt_mod.1.bias") => vec![768],
+            key if key.contains("attn.norm_") => vec![128],
+            key if key.contains("attn.") && key.ends_with(".weight") => vec![128, 128],
+            key if key.contains("attn.") && key.ends_with(".bias") => vec![128],
+            key if key.ends_with("mlp.net.0.proj.weight") => vec![512, 128],
+            key if key.ends_with("mlp.net.0.proj.bias") => vec![512],
+            key if key.ends_with("mlp.net.2.weight") => vec![128, 512],
+            key if key.ends_with("mlp.net.2.bias") => vec![128],
+            "native.norm_out.linear.weight" => vec![256, 128],
+            "native.norm_out.linear.bias" => vec![256],
+            "native.proj_out.weight" => vec![64, 128],
+            "native.proj_out.bias" => vec![64],
+            _ => return Err(format!("missing Qwen fixture shape for {key}").into()),
+        }
+    } else {
+        match key {
+            "native.init_x_linear.weight" => vec![2, 16],
+            "native.init_x_linear.bias" => vec![2],
+            "native.positional_encoding" => vec![1, 16, 2],
+            "native.register_tokens" => vec![1, 8, 2],
+            "native.cond_seq_linear.weight" => vec![2, 2_048],
+            "native.t_embedder.mlp.0.weight" => vec![2, 256],
+            "native.t_embedder.mlp.0.bias" | "native.t_embedder.mlp.2.bias" => vec![2],
+            "native.t_embedder.mlp.2.weight" => vec![2, 2],
+            "native.double_layers.0.modC.1.weight"
+            | "native.double_layers.0.modX.1.weight"
+            | "native.single_layers.0.modCX.1.weight" => vec![12, 2],
+            "native.double_layers.0.attn.w1q.weight"
+            | "native.double_layers.0.attn.w1k.weight"
+            | "native.double_layers.0.attn.w1v.weight"
+            | "native.double_layers.0.attn.w1o.weight"
+            | "native.double_layers.0.attn.w2q.weight"
+            | "native.double_layers.0.attn.w2k.weight"
+            | "native.double_layers.0.attn.w2v.weight"
+            | "native.double_layers.0.attn.w2o.weight"
+            | "native.single_layers.0.attn.w1q.weight"
+            | "native.single_layers.0.attn.w1k.weight"
+            | "native.single_layers.0.attn.w1v.weight"
+            | "native.single_layers.0.attn.w1o.weight" => vec![2, 2],
+            key if key.ends_with("c_fc1.weight") || key.ends_with("c_fc2.weight") => vec![256, 2],
+            key if key.ends_with("c_proj.weight") => vec![2, 256],
+            "native.modF.1.weight" => vec![4, 2],
+            "native.final_linear.weight" => vec![16, 2],
+            _ => return Err(format!("missing Aura fixture shape for {key}").into()),
+        }
+    };
+    Ok(shape)
+}
+
+fn family_fixture_model(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    qwen_model: bool,
+    source_bound: bool,
+) -> Result<NativeFamilyModel, Box<dyn std::error::Error>> {
+    if source_bound {
+        return task377::bound_model(backend, context, qwen_model, MEMORY_LIMIT);
+    }
+    let (definition, keys): (_, &[&str]) = if qwen_model {
+        (&qwen::MODEL_FAMILY, qwen::DENOISER_INVOCATION_REQUIRED_KEYS)
+    } else {
+        (&aura::MODEL_FAMILY, aura::DENOISER_INVOCATION_REQUIRED_KEYS)
+    };
+    let mut source = BTreeMap::new();
+    for key in keys {
+        let shape = family_weight_shape(key, qwen_model)?;
+        source.insert(
+            key.replacen("native.", "model.diffusion_model.", 1),
+            family_tensor(backend, &shape, key, context)?,
+        );
+    }
+    if qwen_model {
+        for key in [
+            "native.__reference_method__",
+            "native.__additional_timestep_condition__",
+        ] {
+            source.insert(
+                key.replacen("native.", "model.diffusion_model.", 1),
+                tensor_from_f32(backend, &[1], &[0.0], context)?,
+            );
+        }
+    }
+    let options = NativeFamilyBuildOptions {
+        dtype: DType::F32,
+        device: DeviceKind::Cpu,
+        activation_elements: 1,
+        memory_budget_bytes: MEMORY_LIMIT,
+        allow_unexpected_weights: true,
+    };
+    Ok(build_model_family(
+        definition,
+        map_model_weights(definition, FAMILY_ARTIFACT_DIGEST, source)?,
+        options,
+    )?)
+}
+
+fn family_identity(
+    model: &NativeFamilyModel,
+    namespace: &str,
+) -> Result<ConditioningIdentity, Box<dyn std::error::Error>> {
+    Ok(ConditioningIdentity::new(
+        namespace,
+        model.identity()?,
+        LatentFormatIdentity::new(
+            model.profile().latent_feature_id,
+            model.profile().latent_identifier,
+        )?,
+    )?)
+}
+
+fn family_conditioning(
+    identity: ConditioningIdentity,
+    tensor: Tensor,
+    name: &str,
+    cancellation: &CancellationToken,
+) -> Result<Arc<ConditioningSet>, Box<dyn std::error::Error>> {
+    Ok(Arc::new(ConditioningSet::checked(
+        identity,
+        vec![ConditioningEntry::checked(
+            name,
+            ConditioningValue::cross_attention(tensor)?,
+            ConditioningEntryOptions::default(),
+        )?],
+        cancellation,
+    )?))
+}
+
+fn tensor_f32_sha256(
+    backend: &CpuBackend,
+    tensor: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let mut digest = Sha256::new();
+    for value in tensor_to_f32(backend, tensor, context)?.iter() {
+        digest.update(value.to_le_bytes());
+    }
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn family_oracle() -> Result<Value, Box<dyn std::error::Error>> {
+    Ok(serde_json::from_str(include_str!(
+        "../fixtures/models/native-family-model-resource-foundation/provenance.json"
+    ))?)
+}
+
+fn decode_hex_nibble(value: u8) -> Result<u8, Box<dyn std::error::Error>> {
+    match value {
+        b'0'..=b'9' => Ok(value - b'0'),
+        b'a'..=b'f' => Ok(value - b'a' + 10),
+        b'A'..=b'F' => Ok(value - b'A' + 10),
+        _ => Err(format!("invalid family oracle hex nibble {value}").into()),
+    }
+}
+
+fn family_oracle_raw(
+    oracle: &Value,
+    family: &str,
+    branch: &str,
+) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+    let encoded = oracle
+        .pointer(&format!("/families/{family}/{branch}_raw_f32_le_hex"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("family oracle is missing {family}.{branch} raw values"))?;
+    if encoded.len() % 8 != 0 {
+        return Err("family oracle raw values are not complete F32 words".into());
+    }
+    encoded
+        .as_bytes()
+        .chunks_exact(8)
+        .map(|word| {
+            let mut bytes = [0_u8; 4];
+            for (index, pair) in word.chunks_exact(2).enumerate() {
+                bytes[index] = (decode_hex_nibble(pair[0])? << 4) | decode_hex_nibble(pair[1])?;
+            }
+            Ok(f32::from_le_bytes(bytes))
+        })
+        .collect()
+}
+
+fn assert_tensor_close(
+    backend: &CpuBackend,
+    actual: &Tensor,
+    expected: &[f32],
+    context: &ExecutionContext<'_>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let actual = tensor_to_f32(backend, actual, context)?;
+    assert_eq!(actual.len(), expected.len());
+    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
+        assert!(
+            (*actual - *expected).abs() <= 1.0e-6,
+            "family resource oracle diverged at {index}: {actual} != {expected}"
+        );
+    }
+    Ok(())
+}
+
+mod task377 {
+    include!("native_family_execution_projection.rs");
+
+    pub(super) fn bound_model(
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+        qwen_model: bool,
+        budget: u64,
+    ) -> Result<NativeFamilyModel, Box<dyn Error>> {
+        let registry =
+            ModelFamilyRegistry::checked_registrations(GENERATED_MODEL_FAMILY_REGISTRATIONS)?;
+        let probe = if qwen_model {
+            qwen_probe()?
+        } else {
+            aura_probe()?
+        };
+        bind(
+            &registry,
+            &probe,
+            projection_state(backend, context, qwen_model)?,
+            context,
+            budget,
+        )
+        .map_err(Into::into)
+    }
+
+    pub(super) fn assert_raw_oracle(
+        model: &NativeFamilyModel,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+        qwen_model: bool,
+    ) -> Result<(), Box<dyn Error>> {
+        task376::assert_bound_model_oracle(model, backend, context, qwen_model)
+    }
+}
+
+#[test]
+fn family_model_resource_transport_guidance_and_reconstruction_are_canonical()
+-> Result<(), Box<dyn std::error::Error>> {
+    let cancellation = CancellationToken::default();
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(MEMORY_LIMIT)?;
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority.authorize_workspace(MEMORY_LIMIT)?,
+        &cancellation,
+    );
+
+    let legacy = Arc::new(family_fixture_model(&backend, &context, false, false)?);
+    let legacy_patch = Arc::new(PatchGraph::checked_semantic(
+        FAMILY_ARTIFACT_DIGEST,
+        Vec::new(),
+    )?);
+    assert!(matches!(
+        NativeFamilyModelResource::materialize(
+            legacy.clone(),
+            legacy_patch,
+            family_identity(&legacy, "native-family-model")?,
+            &backend,
+            &context,
+        ),
+        Err(ModelFamilyError::FamilyResourceSourceBindingMissing)
+    ));
+
+    for qwen_model in [false, true] {
+        let base = Arc::new(family_fixture_model(&backend, &context, qwen_model, true)?);
+        let patch_graph = Arc::new(PatchGraph::checked_semantic(
+            FAMILY_ARTIFACT_DIGEST,
+            Vec::new(),
+        )?);
+        let identity = family_identity(&base, "native-family-model")?;
+        let resource = Arc::new(NativeFamilyModelResource::materialize(
+            base,
+            patch_graph.clone(),
+            identity,
+            &backend,
+            &context,
+        )?);
+        let reconstructed = resource.reconstruct_in_memory(&backend, &context)?;
+        assert_eq!(
+            reconstructed.semantic_digest_sha256(),
+            resource.semantic_digest_sha256()
+        );
+        assert_eq!(reconstructed.resident_bytes()?, resource.resident_bytes()?);
+        assert!(!Arc::ptr_eq(reconstructed.model(), resource.model()));
+
+        let model = Arc::new(NativeModelPayload::native_family_model(resource.clone())?);
+        let execution = Arc::new(NativeConditioningPayload::checked_family(
+            &model,
+            patch_graph,
+            None,
+        )?);
+        let diffusion = NativeDiffusionPayload::model(model.clone(), execution)?;
+        diffusion.validate()?;
+        assert!(
+            diffusion
+                .model_resources()
+                .is_some_and(|(stored, _)| Arc::ptr_eq(stored, &model))
+        );
+        assert!(model.resident_parts()?.resident_bytes()? > 0);
+        assert!(diffusion.resident_parts()?.resident_bytes()? > 0);
+    }
+
+    let base = Arc::new(family_fixture_model(&backend, &context, false, true)?);
+    let patch_graph = Arc::new(PatchGraph::checked_semantic(
+        FAMILY_ARTIFACT_DIGEST,
+        Vec::new(),
+    )?);
+    let resource = Arc::new(NativeFamilyModelResource::materialize(
+        base.clone(),
+        patch_graph,
+        family_identity(&base, "native-family-model")?,
+        &backend,
+        &context,
+    )?);
+    let model = Arc::new(NativeModelPayload::native_family_model(resource)?);
+    let latent = tensor_from_f32(
+        &backend,
+        &[1, 4, 3, 3],
+        &(0..36)
+            .map(|index| (index as f32 - 18.0) * 0.025)
+            .collect::<Vec<_>>(),
+        &context,
+    )?;
+    let positive = family_conditioning(
+        family_identity(&base, "aura-positive")?,
+        tensor_from_f32(
+            &backend,
+            &[1, 2, 2_048],
+            &family_patterned_values("positive", 2 * 2_048),
+            &context,
+        )?,
+        "positive",
+        &cancellation,
+    )?;
+    let negative = family_conditioning(
+        family_identity(&base, "aura-negative")?,
+        tensor_from_f32(
+            &backend,
+            &[1, 2, 2_048],
+            &family_patterned_values("negative.bias", 2 * 2_048),
+            &context,
+        )?,
+        "negative",
+        &cancellation,
+    )?;
+    let profile = profile_for_model(&model)?;
+    let plan =
+        checked_native_diffusion_plan_for_profile(&profile, "euler", "normal", 7, 4, 2.0, 1.0)?;
+    let guider = NativeGuiderPayload::cfg(model.clone(), positive, negative, 2.0)?;
+    let mut denoiser = NativeFamilyGuidanceDenoiser::checked(&model, &backend)?;
+    let guided = guider.execute(
+        &backend,
+        &latent,
+        0.5,
+        &profile,
+        &plan,
+        GuidanceOptions::default(),
+        &mut denoiser,
+        &mut [],
+        &context,
+    )?;
+    assert_eq!(guided.guided().descriptor(), latent.descriptor());
+    assert!(
+        tensor_to_f32(&backend, guided.guided(), &context)?
+            .iter()
+            .all(|value| value.is_finite())
+    );
+
+    let wrong_identity = ConditioningIdentity::new(
+        "wrong-family",
+        comfy_model::ModelFamilyIdentity::new("COMFY-MODEL-9999", "wrong", "v1")?,
+        family_identity(&base, "temporary")?.latent_format().clone(),
+    )?;
+    let wrong = family_conditioning(
+        wrong_identity,
+        tensor_from_f32(&backend, &[1, 2, 2_048], &[0.0; 4_096], &context)?,
+        "wrong",
+        &cancellation,
+    )?;
+    assert!(NativeGuiderPayload::basic(model, wrong).is_err());
+    Ok(())
+}
+
+#[test]
+fn family_model_resources_match_source_guidance_oracles() -> Result<(), Box<dyn std::error::Error>>
+{
+    let cancellation = CancellationToken::default();
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(MEMORY_LIMIT)?;
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority.authorize_workspace(MEMORY_LIMIT)?,
+        &cancellation,
+    );
+    let oracle = family_oracle()?;
+    let expected_generator_sha256 = oracle
+        .get("generator_sha256")
+        .and_then(Value::as_str)
+        .ok_or("family oracle is missing its generator digest")?;
+    let actual_generator_sha256 = format!(
+        "{:x}",
+        Sha256::digest(include_bytes!(
+            "../fixtures/models/native-family-model-resource-foundation/generate_oracle.py"
+        ))
+    );
+    assert_eq!(actual_generator_sha256, expected_generator_sha256);
+
+    for (family, qwen_model) in [("aura", false), ("qwen", true)] {
+        let base = Arc::new(task377::bound_model(
+            &backend,
+            &context,
+            qwen_model,
+            MEMORY_LIMIT,
+        )?);
+        task377::assert_raw_oracle(&base, &backend, &context, qwen_model)?;
+        let patch_graph = Arc::new(PatchGraph::checked_semantic(
+            FAMILY_ARTIFACT_DIGEST,
+            Vec::new(),
+        )?);
+        let resource = Arc::new(NativeFamilyModelResource::materialize(
+            base.clone(),
+            patch_graph,
+            family_identity(&base, "native-family-model")?,
+            &backend,
+            &context,
+        )?);
+        let model = Arc::new(NativeModelPayload::native_family_model(resource.clone())?);
+        let (latent_shape, conditioning_width, latent_values) = if qwen_model {
+            (
+                vec![1, 16, 1, 3, 3],
+                3_584,
+                (0..144)
+                    .map(|index| (index as f32 - 72.0) * 0.005)
+                    .collect::<Vec<_>>(),
+            )
+        } else {
+            (
+                vec![1, 4, 3, 3],
+                2_048,
+                (0..36)
+                    .map(|index| (index as f32 - 18.0) * 0.025)
+                    .collect::<Vec<_>>(),
+            )
+        };
+        let latent = tensor_from_f32(&backend, &latent_shape, &latent_values, &context)?;
+        let positive = family_conditioning(
+            family_identity(&base, &format!("{family}-positive"))?,
+            tensor_from_f32(
+                &backend,
+                &[1, 2, conditioning_width],
+                &family_patterned_values("positive", 2 * conditioning_width as usize),
+                &context,
+            )?,
+            "positive",
+            &cancellation,
+        )?;
+        let negative = family_conditioning(
+            family_identity(&base, &format!("{family}-negative"))?,
+            tensor_from_f32(
+                &backend,
+                &[1, 2, conditioning_width],
+                &family_patterned_values("negative.bias", 2 * conditioning_width as usize),
+                &context,
+            )?,
+            "negative",
+            &cancellation,
+        )?;
+        let model_time = tensor_from_f32(&backend, &[1], &[0.5], &context)?;
+        let mut raw = Vec::new();
+        for conditioning in [&positive, &negative] {
+            let resolved = conditioning.resolve(latent.descriptor(), &backend, &context)?;
+            let entry = resolved
+                .first()
+                .ok_or("family conditioning did not resolve")?;
+            let family_context =
+                NativeFamilyDenoiserContext::checked(conditioning.identity(), &context)?;
+            raw.push(resource.invoke_denoiser(
+                &backend,
+                NativeFamilyDenoiserInvocation {
+                    scaled_latent: &latent,
+                    model_time: &model_time,
+                    conditioning: entry,
+                    attention_mask: None,
+                    reference_latents: &[],
+                    additional_timestep_condition: None,
+                },
+                &family_context,
+            )?);
+        }
+        let expected_positive_raw = family_oracle_raw(&oracle, family, "positive")?;
+        let expected_negative_raw = family_oracle_raw(&oracle, family, "negative")?;
+        assert_tensor_close(&backend, &raw[0], &expected_positive_raw, &context)?;
+        assert_tensor_close(&backend, &raw[1], &expected_negative_raw, &context)?;
+        assert_ne!(
+            tensor_f32_sha256(&backend, &raw[0], &context)?,
+            tensor_f32_sha256(&backend, &raw[1], &context)?
+        );
+        let resolved_positive = positive.resolve(latent.descriptor(), &backend, &context)?;
+        let positive_entry = resolved_positive
+            .first()
+            .ok_or("family positive conditioning did not resolve")?;
+        let positive_context = NativeFamilyDenoiserContext::checked(positive.identity(), &context)?;
+        let changed_time = tensor_from_f32(&backend, &[1], &[0.25], &context)?;
+        let changed_time_raw = resource.invoke_denoiser(
+            &backend,
+            NativeFamilyDenoiserInvocation {
+                scaled_latent: &latent,
+                model_time: &changed_time,
+                conditioning: positive_entry,
+                attention_mask: None,
+                reference_latents: &[],
+                additional_timestep_condition: None,
+            },
+            &positive_context,
+        )?;
+        assert_ne!(
+            tensor_f32_sha256(&backend, &changed_time_raw, &context)?,
+            tensor_f32_sha256(&backend, &raw[0], &context)?
+        );
+        let mut changed_latent_values = latent_values.clone();
+        let first = changed_latent_values
+            .first_mut()
+            .ok_or("family latent fixture is empty")?;
+        *first += 0.125;
+        let changed_latent =
+            tensor_from_f32(&backend, &latent_shape, &changed_latent_values, &context)?;
+        let changed_latent_raw = resource.invoke_denoiser(
+            &backend,
+            NativeFamilyDenoiserInvocation {
+                scaled_latent: &changed_latent,
+                model_time: &model_time,
+                conditioning: positive_entry,
+                attention_mask: None,
+                reference_latents: &[],
+                additional_timestep_condition: None,
+            },
+            &positive_context,
+        )?;
+        assert_ne!(
+            tensor_f32_sha256(&backend, &changed_latent_raw, &context)?,
+            tensor_f32_sha256(&backend, &raw[0], &context)?
+        );
+
+        let profile = profile_for_model(&model)?;
+        let positive_interpreted =
+            interpret_prediction_for_profile(&profile, &backend, &raw[0], &latent, 0.5, &context)?;
+        let negative_interpreted =
+            interpret_prediction_for_profile(&profile, &backend, &raw[1], &latent, 0.5, &context)?;
+        let expected_positive_raw_tensor =
+            tensor_from_f32(&backend, &latent_shape, &expected_positive_raw, &context)?;
+        let expected_negative_raw_tensor =
+            tensor_from_f32(&backend, &latent_shape, &expected_negative_raw, &context)?;
+        let expected_positive_interpreted = interpret_prediction_for_profile(
+            &profile,
+            &backend,
+            &expected_positive_raw_tensor,
+            &latent,
+            0.5,
+            &context,
+        )?;
+        let expected_negative_interpreted = interpret_prediction_for_profile(
+            &profile,
+            &backend,
+            &expected_negative_raw_tensor,
+            &latent,
+            0.5,
+            &context,
+        )?;
+        assert_tensor_close(
+            &backend,
+            &positive_interpreted,
+            &tensor_to_f32(&backend, &expected_positive_interpreted, &context)?,
+            &context,
+        )?;
+        assert_tensor_close(
+            &backend,
+            &negative_interpreted,
+            &tensor_to_f32(&backend, &expected_negative_interpreted, &context)?,
+            &context,
+        )?;
+
+        let plan =
+            checked_native_diffusion_plan_for_profile(&profile, "euler", "normal", 7, 4, 2.0, 1.0)?;
+        let guider =
+            NativeGuiderPayload::cfg(model.clone(), positive.clone(), negative.clone(), 2.0)?;
+        let mut denoiser = NativeFamilyGuidanceDenoiser::checked(&model, &backend)?;
+        let guided = guider.execute(
+            &backend,
+            &latent,
+            0.5,
+            &profile,
+            &plan,
+            GuidanceOptions::default(),
+            &mut denoiser,
+            &mut [],
+            &context,
+        )?;
+        let expected_positive = tensor_to_f32(&backend, &expected_positive_interpreted, &context)?;
+        let expected_negative = tensor_to_f32(&backend, &expected_negative_interpreted, &context)?;
+        let expected_guided = expected_positive
+            .iter()
+            .zip(expected_negative.iter())
+            .map(|(positive, negative)| *negative + (*positive - *negative) * 2.0)
+            .collect::<Vec<_>>();
+        assert_tensor_close(&backend, guided.guided(), &expected_guided, &context)?;
+
+        let unit_plan =
+            checked_native_diffusion_plan_for_profile(&profile, "euler", "normal", 7, 4, 1.0, 1.0)?;
+        let unit_guider = NativeGuiderPayload::cfg(model.clone(), positive, negative, 1.0)?;
+        let mut unit_denoiser = NativeFamilyGuidanceDenoiser::checked(&model, &backend)?;
+        let unit_guided = unit_guider.execute(
+            &backend,
+            &latent,
+            0.5,
+            &profile,
+            &unit_plan,
+            GuidanceOptions::default(),
+            &mut unit_denoiser,
+            &mut [],
+            &context,
+        )?;
+        assert_tensor_close(
+            &backend,
+            unit_guided.guided(),
+            &tensor_to_f32(&backend, &expected_positive_interpreted, &context)?,
+            &context,
+        )?;
+
+        let sigmas = normal_sigmas_for_profile(&profile, &backend, &context, 4, 1.0)?;
+        let expected_sigma_bits = oracle
+            .pointer(&format!("/families/{family}/normal_sigmas_bits"))
+            .and_then(Value::as_array)
+            .ok_or("family oracle has no normal sigma bits")?
+            .iter()
+            .map(|value| {
+                value
+                    .as_u64()
+                    .and_then(|value| u32::try_from(value).ok())
+                    .ok_or("family oracle sigma bit is invalid")
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(
+            sigmas
+                .iter()
+                .map(|value| value.to_bits())
+                .collect::<Vec<_>>(),
+            expected_sigma_bits
+        );
+
+        let reconstructed = resource.reconstruct_in_memory(&backend, &context)?;
+        assert_eq!(
+            reconstructed.semantic_digest_sha256(),
+            resource.semantic_digest_sha256()
+        );
+        assert_eq!(reconstructed.resident_bytes()?, resource.resident_bytes()?);
+    }
+    Ok(())
+}
+
+#[test]
+fn family_model_resource_patch_budget_and_cancellation_fail_atomically()
+-> Result<(), Box<dyn std::error::Error>> {
+    let cancellation = CancellationToken::default();
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(MEMORY_LIMIT)?;
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority.authorize_workspace(MEMORY_LIMIT)?,
+        &cancellation,
+    );
+    let base = Arc::new(task377::bound_model(
+        &backend,
+        &context,
+        false,
+        MEMORY_LIMIT,
+    )?);
+    let identity = family_identity(&base, "native-family-model")?;
+    let empty = NativeFamilyModelResource::materialize(
+        base.clone(),
+        Arc::new(PatchGraph::checked_semantic(
+            FAMILY_ARTIFACT_DIGEST,
+            Vec::new(),
+        )?),
+        identity.clone(),
+        &backend,
+        &context,
+    )?;
+
+    let patch_graph = Arc::new(PatchGraph::checked_semantic(
+        FAMILY_ARTIFACT_DIGEST,
+        vec![SemanticPatchOperation {
+            identifier: "fixture-aura-input-bias".to_owned(),
+            target_key: "native.init_x_linear.bias".to_owned(),
+            expected_shape: vec![2],
+            strength: 1.0,
+            strength_model: 1.0,
+            slices: Vec::new(),
+            transform: PatchValueTransform::default(),
+            payload: PatchPayload::DenseDiff {
+                tensor: PatchTensor::checked(vec![2], vec![0.01, -0.01])?,
+                pad_weight: false,
+            },
+        }],
+    )?);
+    let patched = NativeFamilyModelResource::materialize(
+        base.clone(),
+        patch_graph,
+        identity.clone(),
+        &backend,
+        &context,
+    )?;
+    assert_ne!(
+        patched.semantic_digest_sha256(),
+        empty.semantic_digest_sha256()
+    );
+    assert_ne!(patched.mapped_state_sha256(), empty.mapped_state_sha256());
+    assert!(
+        patched.resident_tensor_allocations()?.len() > empty.resident_tensor_allocations()?.len()
+    );
+
+    let wrong_patch = Arc::new(PatchGraph::checked_semantic("f".repeat(64), Vec::new())?);
+    assert!(matches!(
+        NativeFamilyModelResource::materialize(
+            base.clone(),
+            wrong_patch,
+            identity.clone(),
+            &backend,
+            &context,
+        ),
+        Err(ModelFamilyError::FamilyResourcePatchMismatch)
+    ));
+    assert!(matches!(
+        NativeFamilyModelResource::materialize(
+            base.clone(),
+            Arc::new(PatchGraph::checked_semantic(
+                FAMILY_ARTIFACT_DIGEST,
+                Vec::new(),
+            )?),
+            family_identity(&base, "wrong-resource-namespace")?,
+            &backend,
+            &context,
+        ),
+        Err(ModelFamilyError::FamilyResourceConditioningMismatch)
+    ));
+
+    let required = empty.resident_bytes()?;
+    let low_budget_base = Arc::new(task377::bound_model(
+        &backend,
+        &context,
+        false,
+        required.saturating_sub(1),
+    )?);
+    assert!(matches!(
+        NativeFamilyModelResource::materialize(
+            low_budget_base,
+            Arc::new(PatchGraph::checked_semantic(
+                FAMILY_ARTIFACT_DIGEST,
+                Vec::new(),
+            )?),
+            identity.clone(),
+            &backend,
+            &context,
+        ),
+        Err(ModelFamilyError::OutOfMemory { .. })
+    ));
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority.authorize_workspace(MEMORY_LIMIT)?,
+        &cancelled,
+    );
+    assert!(matches!(
+        NativeFamilyModelResource::materialize(
+            base,
+            Arc::new(PatchGraph::checked_semantic(
+                FAMILY_ARTIFACT_DIGEST,
+                Vec::new(),
+            )?),
+            identity,
+            &backend,
+            &cancelled_context,
+        ),
+        Err(ModelFamilyError::Cancelled(_))
+    ));
+    Ok(())
+}
 
 #[test]
 fn native_clip_transport_preserves_schedule_state_and_restart_identity()

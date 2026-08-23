@@ -28,9 +28,9 @@ use comfy_media::{
 };
 use comfy_model::{
     AttentionError, ClipTextError, GemmaMultimodalFamily, GemmaMultimodalGenerationRequest,
-    LatentFormatError, ModelStoreError, MultimodalTextError, NativeDecoderTextEncoder,
-    NativeGemmaMultimodal, NativeModelPayload, NativeOpsError, NativePromptTokenizer,
-    NativeQwenMultimodal, NativeSdPoseModel, NativeTextGenerationRequest,
+    LatentFormatError, ModelFamilyError, ModelStoreError, MultimodalTextError,
+    NativeDecoderTextEncoder, NativeGemmaMultimodal, NativeModelPayload, NativeOpsError,
+    NativePromptTokenizer, NativeQwenMultimodal, NativeSdPoseModel, NativeTextGenerationRequest,
     NativeTextGenerationResult, NativeVae, PatchGraph, QuantizationError,
     QwenMultimodalGenerationRequest, VaeArchitectureError, VaeBoundaryKind, VaeError,
     VaeKernelProfile,
@@ -75,14 +75,17 @@ use comfy_sampler::{
     GuidanceEvaluation, GuidanceOptions, GuidanceResult, INITIAL_NOISE_PHASE_ID,
     NativeConditioningPayload as PortableConditioningPayload,
     NativeControlExecution as PortableControlExecution, NativeDiffusionPayload,
-    NativeLatentNoiseGeneration, NativeLatentSamplingInput, NativeNoisePayload, NoiseError,
+    NativeFamilyGuidanceDenoiser, NativeGuiderPayload, NativeLatentNoiseGeneration,
+    NativeLatentSamplingInput, NativeNoisePayload, NativeSamplerPayloadError, NoiseError,
     NoiseRequest, SamplingError, SamplingPlan, SamplingProfile, SamplingProfileError,
     SchedulerError, execute_guidance,
     generated_native_diffusion::{LotusSdPoseSamplingError, sample_lotus_sdpose_one_step_euler},
     generated_native_diffusion::{
-        NativeDiffusionSamplerError, checked_native_diffusion_plan, normal_sigmas, sample_euler,
-        scale_initial_noise, scale_model_input, sd15_interpret_prediction, sd15_model_time,
+        NativeDiffusionSamplerError, checked_native_diffusion_plan_for_profile,
+        normal_sigmas_for_profile, sample_euler_for_profile, scale_initial_noise_for_profile,
+        scale_model_input, sd15_interpret_prediction, sd15_model_time,
     },
+    profile_for_model,
 };
 #[cfg(test)]
 use comfy_tensor::TensorDescriptor;
@@ -673,6 +676,13 @@ fn map_guidance_runtime_error(error: GuidanceError) -> NativeImageRuntimeError {
         | GuidanceError::BatchMemoryLimit { .. } => {
             NativeImageRuntimeError::ResourceExhausted(error.to_string())
         }
+        GuidanceError::FamilyModel(ModelFamilyError::Cancelled(_))
+        | GuidanceError::FamilyModel(ModelFamilyError::Tensor(TensorError::Cancelled)) => {
+            NativeImageRuntimeError::Cancelled
+        }
+        GuidanceError::FamilyModel(ModelFamilyError::OutOfMemory { .. }) => {
+            NativeImageRuntimeError::ResourceExhausted(error.to_string())
+        }
         GuidanceError::Indexing(IndexingMaskingPartOneError::Cancelled)
         | GuidanceError::Elementwise(ElementwiseRuntimePartSixteenError::Cancelled) => {
             NativeImageRuntimeError::Cancelled
@@ -680,6 +690,20 @@ fn map_guidance_runtime_error(error: GuidanceError) -> NativeImageRuntimeError {
         GuidanceError::Indexing(IndexingMaskingPartOneError::Tensor(error))
         | GuidanceError::Elementwise(ElementwiseRuntimePartSixteenError::Tensor(error)) => {
             classified_runtime_error(error)
+        }
+        error => classified_runtime_error(error),
+    }
+}
+
+fn map_native_guider_runtime_error(error: NativeSamplerPayloadError) -> NativeImageRuntimeError {
+    match error {
+        NativeSamplerPayloadError::Guidance(error) => map_guidance_runtime_error(error),
+        NativeSamplerPayloadError::Tensor(TensorError::Cancelled) => {
+            NativeImageRuntimeError::Cancelled
+        }
+        NativeSamplerPayloadError::Tensor(error) => classified_runtime_error(error),
+        NativeSamplerPayloadError::Profile(SamplingProfileError::OutOfMemory(_)) => {
+            NativeImageRuntimeError::ResourceExhausted(error.to_string())
         }
         error => classified_runtime_error(error),
     }
@@ -3949,13 +3973,16 @@ impl NativeNode for KSamplerNode {
             let (model_payload, conditioning) = payload.model_resources().ok_or_else(|| {
                 invalid_diffusion_input("native MODEL handle has no canonical model resources")
             })?;
-            let model = model_payload.model().ok_or_else(|| {
-                invalid_diffusion_input("native MODEL handle has no canonical SD15 model")
+            let executable = model_payload.model().ok_or_else(|| {
+                invalid_diffusion_input("native MODEL handle has no canonical executable model")
             })?;
+            let profile = profile_for_model(model_payload)
+                .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
             let steps = u32::try_from(required_u64(&inputs, "steps")?)
                 .map_err(|_| invalid_diffusion_input("steps exceed u32"))?;
             let seed = required_u64(&inputs, "seed")?;
-            let plan = checked_native_diffusion_plan(
+            let plan = checked_native_diffusion_plan_for_profile(
+                &profile,
                 required_string(&inputs, "sampler_name")?,
                 required_string(&inputs, "scheduler")?,
                 seed,
@@ -3966,13 +3993,26 @@ impl NativeNode for KSamplerNode {
             .map_err(native_diffusion_sampler_failure)?;
             let positive = resolve_conditioning(&context, &inputs, "positive")?;
             let negative = resolve_conditioning(&context, &inputs, "negative")?;
+            let family_guider = if executable.is_family() {
+                Some(
+                    NativeGuiderPayload::cfg(
+                        model_payload.clone(),
+                        positive.value.clone(),
+                        negative.value.clone(),
+                        plan.guidance(),
+                    )
+                    .map_err(|error| invalid_diffusion_input(&error.to_string()))?,
+                )
+            } else {
+                None
+            };
             let latent = resolve_latent_bundle(&context, &inputs, "latent_image")?;
             let sampling_input = NativeLatentSamplingInput::checked(&latent, &tensor_context)
                 .map_err(classified_diffusion_failure)?;
             let latent_samples = sampling_input.samples().tensor().ok_or_else(|| {
-                invalid_diffusion_input("native SD15 KSampler requires a single latent tensor")
+                invalid_diffusion_input("native KSampler requires a single latent tensor")
             })?;
-            if latent_samples.descriptor().shape().len() != 4 {
+            if !executable.is_family() && latent_samples.descriptor().shape().len() != 4 {
                 return Err(invalid_diffusion_input(
                     "native SD15 KSampler requires a rank-four latent tensor",
                 ));
@@ -3982,7 +4022,8 @@ impl NativeNode for KSamplerNode {
                 context.node_id.0.clone(),
             )
             .map_err(noise_failure)?;
-            let sigmas = normal_sigmas(
+            let sigmas = normal_sigmas_for_profile(
+                &profile,
                 &self.state.backend,
                 &tensor_context,
                 usize::try_from(plan.steps())
@@ -4012,7 +4053,8 @@ impl NativeNode for KSamplerNode {
                 .first()
                 .copied()
                 .ok_or_else(|| invalid_diffusion_input("normal scheduler returned no sigmas"))?;
-            let initial = scale_initial_noise(
+            let initial = scale_initial_noise_for_profile(
+                &profile,
                 &self.state.backend,
                 &noise.noise,
                 latent_samples,
@@ -4020,15 +4062,30 @@ impl NativeNode for KSamplerNode {
                 &tensor_context,
             )
             .map_err(native_diffusion_sampler_failure)?;
-            let mut guidance = Sd15GuidanceAdapter::checked_prebound_conditioning_sets(
-                model,
-                conditioning,
-                &positive,
-                &negative,
-            )
-            .map_err(runtime_diffusion_failure)?;
+            let mut sd15_guidance = executable
+                .sd15()
+                .map(|model| {
+                    Sd15GuidanceAdapter::checked_prebound_conditioning_sets(
+                        model,
+                        conditioning,
+                        &positive.value,
+                        &negative.value,
+                    )
+                })
+                .transpose()
+                .map_err(runtime_diffusion_failure)?;
+            let mut family_guidance = if executable.is_family() {
+                Some(
+                    NativeFamilyGuidanceDenoiser::checked(model_payload, &self.state.backend)
+                        .map_err(map_guidance_runtime_error)
+                        .map_err(runtime_diffusion_failure)?,
+                )
+            } else {
+                None
+            };
             let mut typed_denoiser_failure = None;
-            let trace_result = sample_euler(
+            let trace_result = sample_euler_for_profile(
+                &profile,
                 &self.state.backend,
                 initial,
                 &sigmas,
@@ -4054,62 +4111,93 @@ impl NativeNode for KSamplerNode {
                             return Err(message);
                         }
                     };
-                    let model_input = match scale_model_input(
-                        &self.state.backend,
-                        &masked_latent,
-                        sigma,
-                        &tensor_context,
-                    ) {
-                        Ok(model_input) => model_input,
-                        Err(error) => {
-                            let message = error.to_string();
-                            typed_denoiser_failure = Some(native_diffusion_sampler_failure(error));
-                            return Err(message);
-                        }
-                    };
-                    let prediction = match guidance.execute(
-                        &self.state.backend,
-                        &model_input,
-                        sigma,
-                        &plan,
-                        &tensor_context,
-                    ) {
-                        Ok(prediction) => prediction,
-                        Err(error) => {
-                            let message = error.to_string();
-                            typed_denoiser_failure = Some(runtime_diffusion_failure(error));
-                            return Err(message);
-                        }
-                    };
-                    match sd15_interpret_prediction(
-                        &self.state.backend,
-                        prediction.guided(),
-                        &masked_latent,
-                        sigma,
-                        &tensor_context,
-                    ) {
-                        Ok(prediction) => match sampling_input.masked_denoised(
-                            &NativeLatentSamples::Tensor(prediction),
+                    let prediction = if let (Some(guider), Some(guidance)) =
+                        (family_guider.as_ref(), family_guidance.as_mut())
+                    {
+                        match guider.execute(
                             &self.state.backend,
+                            &masked_latent,
+                            sigma,
+                            &profile,
+                            &plan,
+                            GuidanceOptions::default(),
+                            guidance,
+                            &mut [],
                             &tensor_context,
                         ) {
-                            Ok(NativeLatentSamples::Tensor(prediction)) => Ok(prediction),
-                            Ok(NativeLatentSamples::AudioVideo { .. }) => {
-                                let message =
-                                    "native SD15 KSampler produced nested denoised samples"
-                                        .to_owned();
-                                typed_denoiser_failure = Some(invalid_diffusion_input(&message));
-                                Err(message)
-                            }
+                            Ok(prediction) => prediction.guided().clone(),
                             Err(error) => {
                                 let message = error.to_string();
-                                typed_denoiser_failure = Some(classified_diffusion_failure(error));
-                                Err(message)
+                                typed_denoiser_failure = Some(runtime_diffusion_failure(
+                                    map_native_guider_runtime_error(error),
+                                ));
+                                return Err(message);
                             }
-                        },
+                        }
+                    } else if let Some(guidance) = sd15_guidance.as_mut() {
+                        let model_input = match scale_model_input(
+                            &self.state.backend,
+                            &masked_latent,
+                            sigma,
+                            &tensor_context,
+                        ) {
+                            Ok(model_input) => model_input,
+                            Err(error) => {
+                                let message = error.to_string();
+                                typed_denoiser_failure =
+                                    Some(native_diffusion_sampler_failure(error));
+                                return Err(message);
+                            }
+                        };
+                        let prediction = match guidance.execute(
+                            &self.state.backend,
+                            &model_input,
+                            sigma,
+                            &plan,
+                            &tensor_context,
+                        ) {
+                            Ok(prediction) => prediction,
+                            Err(error) => {
+                                let message = error.to_string();
+                                typed_denoiser_failure = Some(runtime_diffusion_failure(error));
+                                return Err(message);
+                            }
+                        };
+                        match sd15_interpret_prediction(
+                            &self.state.backend,
+                            prediction.guided(),
+                            &masked_latent,
+                            sigma,
+                            &tensor_context,
+                        ) {
+                            Ok(prediction) => prediction,
+                            Err(error) => {
+                                let message = error.to_string();
+                                typed_denoiser_failure =
+                                    Some(native_diffusion_sampler_failure(error));
+                                return Err(message);
+                            }
+                        }
+                    } else {
+                        let message = "native KSampler lost its guidance adapter".to_owned();
+                        typed_denoiser_failure = Some(invalid_diffusion_input(&message));
+                        return Err(message);
+                    };
+                    match sampling_input.masked_denoised(
+                        &NativeLatentSamples::Tensor(prediction),
+                        &self.state.backend,
+                        &tensor_context,
+                    ) {
+                        Ok(NativeLatentSamples::Tensor(prediction)) => Ok(prediction),
+                        Ok(NativeLatentSamples::AudioVideo { .. }) => {
+                            let message =
+                                "native KSampler produced nested denoised samples".to_owned();
+                            typed_denoiser_failure = Some(invalid_diffusion_input(&message));
+                            Err(message)
+                        }
                         Err(error) => {
                             let message = error.to_string();
-                            typed_denoiser_failure = Some(native_diffusion_sampler_failure(error));
+                            typed_denoiser_failure = Some(classified_diffusion_failure(error));
                             Err(message)
                         }
                     }
@@ -8590,6 +8678,31 @@ mod tests {
         assert_eq!(error.kind, NodeFailureKind::Interrupted);
         assert!(error.retryable);
         Ok(())
+    }
+
+    #[test]
+    fn family_model_ksampler_dispatch_is_checked_and_atomic() {
+        assert!(matches!(
+            map_guidance_runtime_error(GuidanceError::FamilyModel(ModelFamilyError::Tensor(
+                TensorError::Cancelled,
+            ))),
+            NativeImageRuntimeError::Cancelled
+        ));
+        assert!(matches!(
+            map_guidance_runtime_error(GuidanceError::FamilyModel(ModelFamilyError::OutOfMemory {
+                required: 2,
+                budget: 1,
+            })),
+            NativeImageRuntimeError::ResourceExhausted(message)
+                if message.contains("requires 2 bytes") && message.contains("budget is 1")
+        ));
+        assert!(matches!(
+            map_native_guider_runtime_error(NativeSamplerPayloadError::Profile(
+                SamplingProfileError::UnsupportedModel("COMFY-MODEL-9999".to_owned()),
+            )),
+            NativeImageRuntimeError::Execution(message)
+                if message.contains("COMFY-MODEL-9999")
+        ));
     }
 
     #[test]
