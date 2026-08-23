@@ -13,7 +13,11 @@ path = "src/agent_ui.rs"
 doctest = false
 
 [features]
-multiplayer-tools = ["git_ui/multiplayer-tools", "workspace/multiplayer-tools"]
+multiplayer-tools = [
+    "dep:collaboration_domain",
+    "git_ui/multiplayer-tools",
+    "workspace/multiplayer-tools",
+]
 test-support = [
     "acp_thread/test-support",
     "eval_utils",
@@ -42,6 +46,7 @@ audio = { workspace = true, optional = true }
 base64.workspace = true
 buffer_diff.workspace = true
 chrono.workspace = true
+collaboration_domain = { workspace = true, optional = true }
 client.workspace = true
 cloud_api_types.workspace = true
 collections.workspace = true

@@ -13,7 +13,7 @@ name = "git_ui"
 path = "src/git_ui.rs"
 
 [features]
-multiplayer-tools = ["workspace/multiplayer-tools"]
+multiplayer-tools = ["dep:collaboration_domain", "workspace/multiplayer-tools"]
 test-support = ["multi_buffer/test-support", "remote_connection/test-support"]
 call = ["dep:call"]
 
@@ -26,6 +26,7 @@ buffer_diff.workspace = true
 call = { workspace = true, optional = true }
 client.workspace = true
 collections.workspace = true
+collaboration_domain = { workspace = true, optional = true }
 component.workspace = true
 db.workspace = true
 editor.workspace = true
@@ -94,6 +95,7 @@ search.workspace = true
 settings = { workspace = true, features = ["test-support"] }
 task.workspace = true
 unindent.workspace = true
+uuid.workspace = true
 workspace = { workspace = true, features = ["test-support"] }
 zlog.workspace = true
 

@@ -18,7 +18,9 @@ multiplayer-tools = [
     "dep:agent_ui",
     "dep:chrono",
     "dep:collaboration_domain",
+    "dep:git_ui",
     "agent_ui/multiplayer-tools",
+    "git_ui/multiplayer-tools",
 ]
 test-support = [
     "call/test-support",
@@ -48,6 +50,7 @@ editor.workspace = true
 futures.workspace = true
 fuzzy.workspace = true
 gpui.workspace = true
+git_ui = { workspace = true, optional = true }
 livekit_client.workspace = true
 menu.workspace = true
 notifications.workspace = true

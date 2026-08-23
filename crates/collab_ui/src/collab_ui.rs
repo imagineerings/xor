@@ -8,6 +8,8 @@ pub mod draft_store;
 #[cfg(feature = "multiplayer-tools")]
 pub mod forum;
 #[cfg(feature = "multiplayer-tools")]
+pub mod git_activity;
+#[cfg(feature = "multiplayer-tools")]
 pub mod inbox_pulse;
 #[cfg(feature = "multiplayer-tools")]
 pub mod message_reconciliation;
