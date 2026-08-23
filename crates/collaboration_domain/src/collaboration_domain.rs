@@ -1,5 +1,6 @@
 pub mod account_binding;
 pub mod admission_evidence;
+pub mod agent_config;
 pub mod authorization;
 pub mod branch_activity;
 pub mod channel;
@@ -41,6 +42,13 @@ pub use admission_evidence::{
     AdmissionEvidenceError, InviteAdmissionEvidence, InviteId, InviteRedemption, ReplayChallengeId,
     ReplayProtectionEvidence, ScopedTokenAdmission, ScopedTokenEvidence,
     VirtualAgentMembershipEvidence,
+};
+pub use agent_config::{
+    AgentProjectionError, AgentProjectionField, PrivateAgentCatalogProjectionSource,
+    PrivateAgentProjectionState, PrivateAgentReference, PrivatePersonaProjectionSource,
+    PrivateTeamMemberProjectionSource, PrivateTeamProjectionSource, PublicAgentCatalogProjection,
+    PublicEmbeddedPersonaProjection, PublicPersonaProjection, PublicTeamMemberProjection,
+    PublicTeamProjection, project_public_agent_catalog, validate_public_projection_fields,
 };
 pub use authorization::{
     AuthorizationAction, AuthorizationDecision, AuthorizationDenial, AuthorizationRequest,
