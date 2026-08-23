@@ -1,3 +1,4 @@
+pub mod branch_activity;
 pub mod branch_channel;
 pub mod object_store;
 pub mod repository_registry;
