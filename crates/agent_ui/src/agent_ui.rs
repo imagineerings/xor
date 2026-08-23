@@ -1,5 +1,7 @@
 pub mod activity_acp;
 pub mod activity_actions;
+#[cfg(feature = "multiplayer-tools")]
+pub mod activity_collaboration;
 pub mod activity_diff_link;
 #[cfg(feature = "multiplayer-tools")]
 pub mod activity_git;
