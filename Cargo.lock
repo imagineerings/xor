@@ -119,6 +119,7 @@ dependencies = [
  "markdown",
  "mime",
  "multi_buffer",
+ "nostr_compat",
  "parking_lot",
  "portable-pty",
  "project",
