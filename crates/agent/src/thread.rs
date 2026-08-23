@@ -7200,7 +7200,9 @@ mod tests {
                 id: "goal-satisfied-1".into(),
                 name: GRIND_SATISFACTION_TOOL_NAME.into(),
                 raw_input: json!({"summary": "All focused tests pass"}).to_string(),
-                input: json!({"summary": "All focused tests pass"}),
+                input: language_model::LanguageModelToolUseInput::Json(
+                    json!({"summary": "All focused tests pass"}),
+                ),
                 is_input_complete: true,
                 thought_signature: None,
             }),
