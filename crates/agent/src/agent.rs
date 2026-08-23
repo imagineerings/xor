@@ -1,3 +1,4 @@
+pub mod collaboration_mention;
 pub mod collaboration_session;
 mod db;
 mod legacy_thread;

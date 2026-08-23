@@ -315,6 +315,21 @@ impl CollaborationSessionRegistry {
         }
     }
 
+    pub fn active_session_for_lease(
+        &self,
+        lease: &CollaborationSessionLease,
+    ) -> Result<&acp::SessionId, CollaborationSessionError> {
+        let entry = self
+            .entries
+            .get(&lease.identity)
+            .ok_or(CollaborationSessionError::LeaseNotCurrent)?;
+        validate_lease(entry, lease)?;
+        match &entry.state {
+            CollaborationSessionState::Creating => Err(CollaborationSessionError::SessionNotActive),
+            CollaborationSessionState::Active(session_id) => Ok(session_id),
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.entries.len()
     }

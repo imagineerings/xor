@@ -279,6 +279,7 @@ dependencies = [
  "clock",
  "cloud_api_types",
  "cloud_llm_client",
+ "collaboration_domain",
  "collections",
  "context_server",
  "ctor",
