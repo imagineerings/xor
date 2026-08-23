@@ -9019,6 +9019,7 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_sampler/src/sampling_profile.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_test_support/tests/native_family_model_invocation.rs",
+            "crates/comfy_test_support/tests/native_family_execution_projection.rs",
         ],
         [
             "crates/comfy_model/src/model_family.rs",
@@ -9030,8 +9031,9 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_sampler/src/comfy_sampler.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
+            "crates/comfy_test_support/fixtures/models/native-family-model-resource-foundation",
         ],
-        "Source-derived AuraFlow and Qwen Image fixtures map into retained NativeFamilyModel resources and execute through the canonical SamplingProfile, profile-parameterized native-diffusion equations, and GuidanceDenoiser boundaries with exact latent scaling, model time, positive and negative conditioning, CFG, and prediction interpretation. The canonical MODEL payload binds compatible family, latent, patch, conditioning, and execution identities, charges aliased tensor storage once, and exposes stable semantic, resident, and in-memory reconstruction projections from family, profile, probe, state-plan, artifact, mapped-weight, and patch identities. Unsupported families return typed unavailable before sampling; wrong family, probe, state plan, dtype, device, patch, conditioning, control, OOM, and cancellation fail atomically, and the reduced SD15 fixture remains compatible through the generalized model boundary. Canonical handle publication, cache, persistence, eviction, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
+        "Authoritatively resolved AuraFlow and Qwen Image fixtures bind through the approved execution-projection identity into retained NativeFamilyModel resources and execute through the canonical SamplingProfile, profile-parameterized native-diffusion equations, and GuidanceDenoiser boundaries. A tracked pure-standard-library oracle verifies pinned source hashes and records both families' raw positive and negative outputs, per-branch prediction interpretation, CFG results, and normal-schedule sigmas so exact latent scaling, model time, positive and negative conditioning, CFG, and interpretation ordering are independently reproducible. The canonical MODEL payload binds compatible family, latent, patch, conditioning, execution, and projection identities, charges aliased tensor storage once, and exposes stable semantic, resident, and in-memory reconstruction projections from family, profile, probe, state-plan, artifact, mapped-weight, projection, and patch identities. Latent, time, positive, negative, and CFG mutations change the expected output. Unsupported families return typed unavailable before noise or sampler allocation; wrong family, latent, profile, probe, state plan, projection, dtype, device, stream, patch, conditioning, control, OOM, and cancellation fail atomically, and the reduced SD15 fixture remains compatible through the generalized model boundary. Canonical handle publication, cache, persistence, eviction, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
     tasks.append(
         native_model_resource_precursor_task(
@@ -9088,6 +9090,34 @@ def native_model_resource_precursor_tasks(
                 "crates/comfy_test_support/fixtures/models/native-family-denoiser-invocation-foundation/generate_oracle.py",
             ],
             "A tracked pure-standard-library oracle generator verifies the pinned AuraFlow, Qwen Image, and attention source hashes before independently producing raw F32 values, Rust bit patterns, raw-output SHA-256 values, and Python/platform provenance. Its outputs prove complete reduced AuraFlow and Qwen Image blocks rather than sensitivity micrographs. Aura preserves four latent channels, patch size two, eight register tokens, the 256-channel exponential timestep basis, width two with one head, one complete non-last double block and one complete single block, all modulation, Q/K/V/O attention, gates, residuals, SwiGLU MLPs, final modulation, and four-channel unpatchification. Qwen preserves sixteen latent channels, spatial patch size two, the 256-channel timestep basis, axes [16,56,56], theta 10000, one 128-wide head, one complete block, tokenwise modulation, Q/K RMSNorm, adjacent multiaxis RoPE, additive encoder mask, joint masked attention, both residual/FFN paths, final modulation, and two-by-two unpatchification. The invocation borrows ResolvedConditioningEntry and a family-tagged context; unsupported Qwen reference-latent or additional-timestep modes and matching checkpoint markers fail typed rather than being ignored. Family and latent identity, value kind, rank, dtype, device, stream, context, nonfinite time, cancellation, and a conservative peak over deduplicated original/current weights, conversions, patch buffers, retained and projected conditioning, 256-time basis, Q/K/V, quadratic attention, modulation, MLP, output, and unpatch workspaces are validated before execution. Independent latent, time, conditioning, and mask mutations change output; tiny-latent many-token conditioning and patched-original residency fixtures prove underbudget attempts fail atomically, and unsupported families never invoke the unary forward-checkpoint fallback.",
+            [],
+        )
+    )
+    tasks.append(
+        native_model_resource_precursor_task(
+            "comfy-parity-native-family-execution-projection-binding-foundation",
+            "Bind resolved family models to reduced execution projections",
+            "Add one checked ModelFamily-owned binding from an authoritative ResolvedModelFamily contract to the explicitly reduced AuraFlow or Qwen Image denoiser execution projection. Preserve the production family profile, source ordinal, architecture, probe, state-plan, and artifact identities while binding separately supplied reduced mapped state through a projection identity and digest; never relabel reduced tensors as production-mapped state or weaken the production Qwen width contract.",
+            [
+                "projects/comfy/ComfyUI/comfy/supported_models.py",
+                "projects/comfy/ComfyUI/comfy/model_detection.py",
+                "projects/comfy/ComfyUI/comfy/ldm/aura/mmdit.py",
+                "projects/comfy/ComfyUI/comfy/ldm/qwen_image/model.py",
+                "crates/comfy_model/src/model_family.rs",
+                "crates/comfy_model/src/qwen_image_family.rs",
+                "crates/comfy_model/src/families/auraflow_comfy_model_0064.rs",
+                "crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs",
+                "crates/comfy_test_support/tests/native_family_model_invocation.rs",
+                "crates/comfy_test_support/fixtures/models/native-family-denoiser-invocation-foundation/generate_oracle.py",
+            ],
+            [
+                "crates/comfy_model/src/model_family.rs",
+                "crates/comfy_model/src/families/auraflow_comfy_model_0064.rs",
+                "crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs",
+                "crates/comfy_test_support/tests/native_family_execution_projection.rs",
+                "crates/comfy_test_support/fixtures/models/native-family-execution-projection-foundation",
+            ],
+            "Production-shaped AuraFlow and Qwen Image metadata resolve through the authoritative registry with their exact profile, source ordinal, architecture, probe, and state-plan identities; Qwen production admission retains its 3072-wide contract. Row-owned immutable execution-projection descriptors then bind deterministic reduced mapped tensors to those resolved identities, and ModelFamilyWeightBinding, cache identity, residency, and reconstruction include the exact projection identity and projected-state digest. The resulting reduced resources reproduce the tracked Task 376 AuraFlow and Qwen Image raw-output oracles. Legacy or probe-less models, reduced state passed to the production mapper, full production state mislabeled as reduced, wrong family/profile/probe/state-plan/artifact/projection identity or digest, malformed markers or shapes, dtype/device mismatch, OOM, and cancellation fail atomically. The projection owns no parser, artifact store, sampler, guidance, handle, cache service, persistence, or production full-model execution claim.",
             [],
         )
     )
@@ -9389,6 +9419,7 @@ def native_model_resource_precursor_tasks(
         "comfy-parity-native-clip-resource-foundation",
         "comfy-parity-native-multiaxis-rope-attention-foundation",
         "comfy-parity-native-family-denoiser-invocation-foundation",
+        "comfy-parity-native-family-execution-projection-binding-foundation",
         "comfy-parity-native-family-model-resource-foundation",
         "comfy-parity-native-audio-encoder-resource-foundation",
         "comfy-parity-native-spandrel-image-model-contract-foundation",
@@ -19654,15 +19685,29 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
             "git diff --check",
         ])
+    if identifier == "comfy-parity-native-family-execution-projection-binding-foundation":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p comfy_test_support --test native_family_model_invocation -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_family_execution_projection -- --nocapture",
+            "cargo check --locked -p comfy_model -p comfy_test_support",
+            "./script/clippy -p comfy_model -p comfy_test_support",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
     if identifier == "comfy-parity-native-family-model-resource-foundation":
         commands.extend([
             "cargo fmt --all -- --check",
             "cargo test --locked -p comfy_test_support --test native_family_model_invocation -- --nocapture",
-            "cargo test --locked -p comfy_test_support --test native_diffusion_foundation family_model -- --nocapture",
-            "cargo test --locked -p comfy_sampler sampling_profile -- --nocapture",
-            "cargo test --locked -p comfy_sampler guidance -- --nocapture",
-            "cargo test --locked -p comfy_runtime family_model -- --nocapture",
-            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_family_execution_projection -- --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 crates/comfy_test_support/fixtures/models/native-family-model-resource-foundation/generate_oracle.py",
+            "cargo test --locked -p comfy_test_support --test native_diffusion_foundation family_model_resource -- --nocapture",
+            "cargo test --locked -p comfy_sampler --lib family_model_profiles_match_source_flow_equations_and_sd15_compatibility -- --exact --nocapture",
+            "cargo test --locked -p comfy_sampler --lib generated_native_diffusion::tests::family_model_profiles_parameterize_schedule_input_time_and_prediction -- --exact --nocapture",
+            "cargo test --locked -p comfy_sampler --lib guidance::tests::family_model_guidance_adapter_delegates_without_owning_cfg -- --exact --nocapture",
+            "cargo test --locked -p comfy_runtime family_model_ksampler_dispatch_is_checked_and_atomic -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",

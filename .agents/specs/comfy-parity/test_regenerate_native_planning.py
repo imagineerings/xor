@@ -80,7 +80,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 701)
+        self.assertEqual(len(tasks), 702)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -99,6 +99,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-native-clip-resource-foundation",
             "comfy-parity-native-multiaxis-rope-attention-foundation",
             "comfy-parity-native-family-denoiser-invocation-foundation",
+            "comfy-parity-native-family-execution-projection-binding-foundation",
             "comfy-parity-native-family-model-resource-foundation",
             "comfy-parity-native-audio-encoder-resource-foundation",
             "comfy-parity-native-spandrel-image-model-contract-foundation",
@@ -134,6 +135,9 @@ class ValidationGenerationTests(unittest.TestCase):
         family_invocation_task = tasks_by_id[
             "comfy-parity-native-family-denoiser-invocation-foundation"
         ]
+        family_projection_task = tasks_by_id[
+            "comfy-parity-native-family-execution-projection-binding-foundation"
+        ]
         self.assertEqual(
             family_invocation_task["writes"],
             [
@@ -146,6 +150,30 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn("tracked pure-standard-library oracle generator", family_invocation_task["done"])
         self.assertIn("unary forward-checkpoint fallback", family_invocation_task["done"])
+        self.assertEqual(
+            family_projection_task["writes"],
+            [
+                "crates/comfy_model/src/model_family.rs",
+                "crates/comfy_model/src/families/auraflow_comfy_model_0064.rs",
+                "crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs",
+                "crates/comfy_test_support/tests/native_family_execution_projection.rs",
+                "crates/comfy_test_support/fixtures/models/native-family-execution-projection-foundation",
+            ],
+        )
+        self.assertIn(
+            "Qwen production admission retains its 3072-wide contract",
+            family_projection_task["done"],
+        )
+        self.assertIn(
+            "execution-projection descriptors", family_projection_task["done"]
+        )
+        self.assertEqual(
+            family_task["dependencies"],
+            [
+                "comfy-parity-native-family-execution-projection-binding-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
         for path in (
             "crates/comfy_model/src/conditioning.rs",
             "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
@@ -154,8 +182,11 @@ class ValidationGenerationTests(unittest.TestCase):
         for path in (
             "crates/comfy_sampler/src/sampling_profile.rs",
             "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
+            "crates/comfy_test_support/fixtures/models/native-family-model-resource-foundation",
         ):
             self.assertIn(path, family_task["writes"])
+        self.assertIn("tracked pure-standard-library oracle", family_task["done"])
+        self.assertIn("projection identities", family_task["done"])
         self.assertIn(
             "remain assigned to comfy-parity-native-model-resource-execution-foundation",
             family_task["done"],
