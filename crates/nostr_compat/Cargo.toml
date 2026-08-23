@@ -10,6 +10,7 @@ layer = "protocol-compatibility"
 allowed-normal-dependencies = [
     "base64",
     "chrono",
+    "collaboration_domain",
     "hex",
     "nostr",
     "secp256k1",
@@ -30,6 +31,7 @@ workspace = true
 [dependencies]
 base64.workspace = true
 chrono.workspace = true
+collaboration_domain.workspace = true
 hex.workspace = true
 nostr = { workspace = true, features = ["nip44"] }
 serde.workspace = true
