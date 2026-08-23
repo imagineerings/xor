@@ -1,3 +1,4 @@
+pub mod agent_memory;
 pub mod agent_observer;
 pub mod buzz_nips;
 pub mod dm;
