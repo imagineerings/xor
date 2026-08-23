@@ -2192,7 +2192,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 28. Adapt Buzz channel and observer ingress to Zed ACP/MCP
 
-  - [ ] 28.1. Implement NIP-AO control and observer codecs
+  - [x] 28.1. Implement NIP-AO control and observer codecs
     - Parse encrypted control/observer frames, versions and privacy gates independently of ACP execution.
     - _Requirements: 5.3, 11.1, 12.1_
     - _Capability IDs: CAP-021, CAP-025_
@@ -2200,6 +2200,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/docs/nips/NIP-AO.md, projects/buzz/crates/buzz-acp/**_
     - _Writes: crates/nostr_compat/src/agent_observer.rs_
     - _Validation: golden codec tests cover versions, encryption, malformed frames and unauthorized observers_
+    - _Discovered contradiction (2026-08-23): Task 11.8 already owns the pure NIP-AO envelope and decrypted-payload codec, while Task 30.1 explicitly retains NIP-44 encryption, decryption and zeroization. This leaf therefore adds the missing authenticated ingress-policy adapter instead of duplicating either boundary. The planned standalone source file also requires the narrow crate-root module registration in `crates/nostr_compat/src/nostr_compat.rs` to compile and expose the codec. The Buzz checkout supplied outside this worktree was made visible through a temporary, untracked symlink only while running compile-time fixture and inventory checks; no Buzz source was written._
+    - _Evidence: 2026-08-23 — added a signed NIP-AO ingress adapter that accepts only exact kind-24200 tag shapes with canonical opaque NIP-44 v2 ciphertext, derives and checks telemetry/control direction, binds the authenticated recipient and caller-proven current agent owner, freshness-gates controls to ±300 seconds and authorizes only recipient-exact live filters. Caller-decrypted content is bounded and typed into the four known telemetry kinds or UUID-bound `cancel_turn`; malformed frames and payloads fail closed while future frames and telemetry kinds remain ignored without ACP execution. Four focused golden/privacy tests passed, including v2 version rejection, malformed and extra tags, wrong recipient, unauthorized owner, stale control, broad/history filters and forward-compatible unknown values. The complete `nostr_compat` suite passed 72/72 tests (68 unit plus four integration), and warning-denied release all-target/all-feature Clippy passed. Rust formatting, diff hygiene, collaboration dependency boundaries, Buzz inventory and canonical specification gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 28.2. Map collaboration threads to native ACP sessions
     - Resolve channel/thread/job identities to exactly one native session and preserve cancellation ownership.
