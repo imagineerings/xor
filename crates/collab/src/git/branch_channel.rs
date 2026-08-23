@@ -93,6 +93,7 @@ impl BranchChannelService {
         creator_principal_id: PrincipalId,
         authorization: &AuthorizationRequest<'_>,
     ) -> Result<BranchChannelBinding, BranchChannelError> {
+        let (key, proposed_channel) = prepare_binding(branch, creator_principal_id, authorization)?;
         let transaction = self
             .connection
             .as_ref()
@@ -101,8 +102,15 @@ impl BranchChannelService {
             .map_err(BranchChannelError::Unavailable)?;
         let result = async {
             set_tenant(&transaction, branch.fields().identity.community_id()).await?;
-            self.bind_in_transaction(&transaction, branch, creator_principal_id, authorization)
-                .await
+            self.bind_prepared_in_transaction(
+                &transaction,
+                branch,
+                &key,
+                &proposed_channel,
+                authorization.now_millis,
+                false,
+            )
+            .await
         }
         .await;
         finish_transaction(transaction, result).await
@@ -115,40 +123,63 @@ impl BranchChannelService {
         creator_principal_id: PrincipalId,
         authorization: &AuthorizationRequest<'_>,
     ) -> Result<BranchChannelBinding, BranchChannelError> {
-        if branch.fields().lifecycle_state != BranchLifecycleState::Active {
-            return Err(BranchChannelError::BranchUnavailable);
-        }
-        let key = branch_channel_key(&branch.fields().identity)?;
-        let proposed_channel = Channel::create(
-            ChannelCreateFields {
-                community_id: branch.fields().identity.community_id(),
-                channel_id: key.channel_id,
-                name: branch_channel_name(&branch.fields().identity, key.channel_id)?,
-                channel_type: ChannelType::Stream,
-                visibility: ChannelVisibility::Private,
-                description: Some(
-                    ChannelDescription::new(format!(
-                        "Branch conversation for {}",
-                        branch.fields().identity.branch_ref().as_str()
-                    ))
-                    .map_err(BranchChannelError::Domain)?,
-                ),
-                creator_principal_id,
-                ttl_seconds: None,
-                now_millis: authorization.now_millis,
-            },
-            authorization,
-        )?;
-        insert_channel(
+        let (key, proposed_channel) = prepare_binding(branch, creator_principal_id, authorization)?;
+        self.bind_prepared_in_transaction(
             transaction,
-            &proposed_channel,
+            branch,
             &key,
+            &proposed_channel,
             authorization.now_millis,
+            false,
         )
-        .await?;
+        .await
+    }
+
+    pub(super) async fn resolve_for_activity(
+        &self,
+        branch: &BranchCollaboration,
+        creator_principal_id: PrincipalId,
+        authorization: &AuthorizationRequest<'_>,
+    ) -> Result<BranchChannelBinding, BranchChannelError> {
+        let (key, proposed_channel) = prepare_binding(branch, creator_principal_id, authorization)?;
+        let transaction = self
+            .connection
+            .as_ref()
+            .begin()
+            .await
+            .map_err(BranchChannelError::Unavailable)?;
+        let result = async {
+            set_tenant(&transaction, branch.fields().identity.community_id()).await?;
+            self.bind_prepared_in_transaction(
+                &transaction,
+                branch,
+                &key,
+                &proposed_channel,
+                authorization.now_millis,
+                true,
+            )
+            .await
+        }
+        .await;
+        finish_transaction(transaction, result).await
+    }
+
+    async fn bind_prepared_in_transaction(
+        &self,
+        transaction: &DatabaseTransaction,
+        branch: &BranchCollaboration,
+        key: &BranchChannelKey,
+        proposed_channel: &Channel,
+        now_millis: u64,
+        allow_archived: bool,
+    ) -> Result<BranchChannelBinding, BranchChannelError> {
+        insert_channel(transaction, proposed_channel, key, now_millis).await?;
         let channel =
-            select_channel(transaction, branch.fields().identity.community_id(), &key).await?;
-        if channel.fields().lifecycle_state != ChannelLifecycleState::Active {
+            select_channel(transaction, branch.fields().identity.community_id(), key).await?;
+        if channel.fields().lifecycle_state != ChannelLifecycleState::Active
+            && !(allow_archived
+                && channel.fields().lifecycle_state == ChannelLifecycleState::Archived)
+        {
             return Err(BranchChannelError::BindingConflict);
         }
         Ok(BranchChannelBinding {
@@ -160,6 +191,38 @@ impl BranchChannelService {
     pub(super) fn connection(&self) -> &DatabaseConnection {
         self.connection.as_ref()
     }
+}
+
+fn prepare_binding(
+    branch: &BranchCollaboration,
+    creator_principal_id: PrincipalId,
+    authorization: &AuthorizationRequest<'_>,
+) -> Result<(BranchChannelKey, Channel), BranchChannelError> {
+    if branch.fields().lifecycle_state != BranchLifecycleState::Active {
+        return Err(BranchChannelError::BranchUnavailable);
+    }
+    let key = branch_channel_key(&branch.fields().identity)?;
+    let proposed_channel = Channel::create(
+        ChannelCreateFields {
+            community_id: branch.fields().identity.community_id(),
+            channel_id: key.channel_id,
+            name: branch_channel_name(&branch.fields().identity, key.channel_id)?,
+            channel_type: ChannelType::Stream,
+            visibility: ChannelVisibility::Private,
+            description: Some(
+                ChannelDescription::new(format!(
+                    "Branch conversation for {}",
+                    branch.fields().identity.branch_ref().as_str()
+                ))
+                .map_err(BranchChannelError::Domain)?,
+            ),
+            creator_principal_id,
+            ttl_seconds: None,
+            now_millis: authorization.now_millis,
+        },
+        authorization,
+    )?;
+    Ok((key, proposed_channel))
 }
 
 pub fn branch_channel_id(
