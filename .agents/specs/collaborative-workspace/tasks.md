@@ -2475,7 +2475,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 32. Enrich the semantic activity feed
 
-  - [ ] 32.1. Map NIP-AO observer events to ActivityItem
+  - [x] 32.1. Map NIP-AO observer events to ActivityItem
     - Convert supported observer states to existing semantic classes with generic fallback.
     - _Requirements: 12.1, 12.2_
     - _Capability IDs: CAP-025_
@@ -2483,6 +2483,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/agent_ui/src/activity_projection.rs, crates/nostr_compat/src/agent_observer.rs_
     - _Writes: crates/agent_ui/src/activity_observer.rs_
     - _Validation: fixture tests map every NIP-AO kind exactly once and redact raw encrypted content_
+    - _Discovered contradiction (2026-08-24): the planned standalone file cannot compile or become reachable because the typed NIP-AO ingress is Multiplayer-only and `agent_ui` had no `nostr_compat` dependency. The narrow correction registers the module and adds that dependency only to `agent_ui`'s existing non-default `multiplayer-tools` feature, updating lockfile metadata without adding a Standard edge. NIP-AO explicitly requires future telemetry/control kinds to be ignored, so the general D8 generic-fallback rule applies to recognized ACP read/write frames while unknown NIP-AO kinds remain absent. The mapper consumes only already-authorized decrypted ingress and cannot accept the encrypted event body or raw ACP transcript content._
+    - _Evidence: 2026-08-24 — added a Multiplayer-only NIP-AO projector for all four recognized telemetry kinds. Turn start and session resolution share one agent/session/turn activity identity and advance by monotonic observer sequence; closed end-turn, cancellation, limit, refusal and error reasons map to terminal outcomes while unknown reasons remain redacted and explicitly unknown. ACP read/write frames become generic running protocol activity without method, parameters, prompts, results or arbitrary payload values. Typed channel/session links and outer protocol-event details retain provenance; control and future frames remain ignored. Four focused release fixtures passed all-kind cardinality and serialized secret-sentinel redaction, start-to-resolution reduction, terminal reason semantics and control/future/mismatch handling. Multiplayer and Standard release library checks, focused and repository-standard all-target warning-denied Clippy, Rust formatting, diff hygiene and collaboration dependency boundaries passed. The Standard dependency-tree gate remains blocked before this leaf by existing unconditional `nostr_compat` through `acp_thread` and `collaboration_domain` through `project`/`agent`; this leaf's optional edge is inactive in that reverse tree._
 
   - [ ] 32.2. Map message, presence and job events to ActivityItem
     - Add human/agent message, reply, waiting, presence and delegated-work outcomes without duplicate transcript rows.

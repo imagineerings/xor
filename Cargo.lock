@@ -547,6 +547,7 @@ dependencies = [
  "menu",
  "multi_buffer",
  "node_runtime",
+ "nostr_compat",
  "notifications",
  "ordered-float 2.10.1",
  "parking_lot",
