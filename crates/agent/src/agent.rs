@@ -3,6 +3,7 @@ pub mod collaboration_mention;
 pub mod collaboration_session;
 mod db;
 mod legacy_thread;
+pub mod managed_agents;
 mod native_agent_server;
 pub mod outline;
 mod pattern_extraction;
@@ -18,6 +19,7 @@ mod tools;
 use context_server::ContextServerId;
 pub use db::*;
 use itertools::Itertools;
+pub use managed_agents::*;
 pub use native_agent_server::NativeAgentServer;
 pub use pattern_extraction::*;
 pub use sandboxing::{
