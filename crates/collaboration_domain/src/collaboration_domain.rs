@@ -5,6 +5,7 @@ pub mod branch_activity;
 pub mod channel;
 pub mod channel_invite;
 pub mod channel_metadata;
+pub mod ci_status;
 pub mod community;
 pub mod custom_emoji;
 pub mod dm;
@@ -25,6 +26,7 @@ pub mod push_lease;
 pub mod reaction;
 pub mod read_state;
 pub mod reminder;
+pub mod review;
 pub mod scheduled_message;
 pub mod tenant;
 pub mod thread;
@@ -65,6 +67,11 @@ pub use channel_metadata::{
     ChannelMetadata, ChannelMetadataError, ChannelMetadataOutcome, ChannelMetadataRecordFields,
     ChannelMetadataText, ChannelTemplate, ChannelTemplateBackend, ChannelTemplateReference,
     ChannelTemplateReferenceKind,
+};
+pub use ci_status::{
+    CiArtifactDigest, CiArtifactLink, CiCheckRun, CiCheckRunCompletionInput, CiCheckRunInput,
+    CiCheckStatus, CiCheckSuite, CiCheckSuiteIdentity, CiCheckSuiteRecordFields, CiExternalLink,
+    CiLabel, CiOutputText, CiStatusCommandOutcome, CiStatusError, CiWorkflowLink,
 };
 pub use community::{
     Community, CommunityCommandContext, CommunityCommandOutcome, CommunityCreateFields,
@@ -158,6 +165,13 @@ pub use reminder::{
     ReminderDueOutcome, ReminderError, ReminderHandled, ReminderHandledReason, ReminderHead,
     ReminderId, ReminderLifecycle, ReminderRecordFields, ReminderRetention, ReminderScope,
     ReminderTarget, ReminderTargetStatus,
+};
+pub use review::{
+    ApprovalApplicability, MergeEligibility, MergeReadiness, PatchRevision, PatchRevisionInput,
+    PatchRevisionNumber, Review, ReviewApproval, ReviewCommandOutcome, ReviewComment,
+    ReviewCommentAnchor, ReviewCommentBody, ReviewCommentInput, ReviewDecision,
+    ReviewDecisionInput, ReviewDiffSide, ReviewError, ReviewFilePath, ReviewHunkId, ReviewIdentity,
+    ReviewRecordFields,
 };
 pub use scheduled_message::{
     DueClaim, ScheduleCommandOutcome, ScheduleError, ScheduleMutation, ScheduleMutationKind,
