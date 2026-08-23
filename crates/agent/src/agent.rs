@@ -19,6 +19,8 @@ mod thread;
 mod thread_store;
 mod tool_permissions;
 mod tools;
+#[cfg(feature = "multiplayer-tools")]
+pub mod usage;
 
 use context_server::ContextServerId;
 pub use db::*;
@@ -40,6 +42,8 @@ pub use thread::*;
 pub use thread_store::*;
 pub use tool_permissions::*;
 pub use tools::*;
+#[cfg(feature = "multiplayer-tools")]
+pub use usage::*;
 
 use acp_thread::{
     AcpThread, AcpThreadEvent, AgentModelId, AgentModelSelector, AgentSessionInfo,
