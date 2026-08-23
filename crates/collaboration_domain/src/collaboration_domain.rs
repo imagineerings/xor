@@ -5,6 +5,7 @@ pub mod branch_activity;
 pub mod channel;
 pub mod channel_invite;
 pub mod channel_metadata;
+pub mod ci_status;
 pub mod community;
 pub mod custom_emoji;
 pub mod dm;
@@ -66,6 +67,11 @@ pub use channel_metadata::{
     ChannelMetadata, ChannelMetadataError, ChannelMetadataOutcome, ChannelMetadataRecordFields,
     ChannelMetadataText, ChannelTemplate, ChannelTemplateBackend, ChannelTemplateReference,
     ChannelTemplateReferenceKind,
+};
+pub use ci_status::{
+    CiArtifactDigest, CiArtifactLink, CiCheckRun, CiCheckRunCompletionInput, CiCheckRunInput,
+    CiCheckStatus, CiCheckSuite, CiCheckSuiteIdentity, CiCheckSuiteRecordFields, CiExternalLink,
+    CiLabel, CiOutputText, CiStatusCommandOutcome, CiStatusError, CiWorkflowLink,
 };
 pub use community::{
     Community, CommunityCommandContext, CommunityCommandOutcome, CommunityCreateFields,
