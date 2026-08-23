@@ -137,3 +137,8 @@ required-features = ["multiplayer-tools", "test-support"]
 name = "agent_usage_repository"
 path = "tests/agent_usage_repository.rs"
 required-features = ["multiplayer-tools", "test-support"]
+
+[[test]]
+name = "agent_state_conformance"
+path = "tests/agent_state_conformance.rs"
+required-features = ["multiplayer-tools", "test-support"]
