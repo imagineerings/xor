@@ -25,6 +25,51 @@ pub const SOURCE_SAMPLING_MULTIPLIER: f64 = 1.0;
 pub const SOURCE_SAMPLING_SHIFT: f64 = 1.73;
 pub const SOURCE_MEMORY_USAGE_FACTOR: f64 = 2.0;
 
+pub const DENOISER_INVOCATION_REQUIRED_KEYS: &[&str] = &[
+    "native.init_x_linear.weight",
+    "native.init_x_linear.bias",
+    "native.positional_encoding",
+    "native.register_tokens",
+    "native.cond_seq_linear.weight",
+    "native.t_embedder.mlp.0.weight",
+    "native.t_embedder.mlp.0.bias",
+    "native.t_embedder.mlp.2.weight",
+    "native.t_embedder.mlp.2.bias",
+    "native.double_layers.0.modC.1.weight",
+    "native.double_layers.0.modX.1.weight",
+    "native.double_layers.0.attn.w1q.weight",
+    "native.double_layers.0.attn.w1k.weight",
+    "native.double_layers.0.attn.w1v.weight",
+    "native.double_layers.0.attn.w1o.weight",
+    "native.double_layers.0.attn.w2q.weight",
+    "native.double_layers.0.attn.w2k.weight",
+    "native.double_layers.0.attn.w2v.weight",
+    "native.double_layers.0.attn.w2o.weight",
+    "native.double_layers.0.mlpC.c_fc1.weight",
+    "native.double_layers.0.mlpC.c_fc2.weight",
+    "native.double_layers.0.mlpC.c_proj.weight",
+    "native.double_layers.0.mlpX.c_fc1.weight",
+    "native.double_layers.0.mlpX.c_fc2.weight",
+    "native.double_layers.0.mlpX.c_proj.weight",
+    "native.single_layers.0.modCX.1.weight",
+    "native.single_layers.0.attn.w1q.weight",
+    "native.single_layers.0.attn.w1k.weight",
+    "native.single_layers.0.attn.w1v.weight",
+    "native.single_layers.0.attn.w1o.weight",
+    "native.single_layers.0.mlp.c_fc1.weight",
+    "native.single_layers.0.mlp.c_fc2.weight",
+    "native.single_layers.0.mlp.c_proj.weight",
+    "native.modF.1.weight",
+    "native.final_linear.weight",
+];
+pub const DENOISER_INVOCATION_LATENT_RANK: usize = 4;
+pub const DENOISER_INVOCATION_CHANNELS: usize = 4;
+pub const DENOISER_INVOCATION_WIDTH: usize = 2;
+pub const DENOISER_INVOCATION_CONTEXT_WIDTH: usize = SOURCE_CONDITIONING_DIMENSION as usize;
+pub const DENOISER_INVOCATION_PATCH_SIZE: usize = 2;
+pub const DENOISER_INVOCATION_REGISTER_TOKENS: usize = 8;
+pub const DENOISER_INVOCATION_MLP_WIDTH: usize = 256;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AuraFlowConfiguration {
     pub layout: ModelStateLayout,

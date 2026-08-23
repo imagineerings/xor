@@ -1,6 +1,13 @@
 use crate::{
     LatentFormatIdentity, MODEL_DESCRIPTOR_SCHEMA_VERSION, MemoryEstimatorDescriptor,
     ModelComponentDescriptor, ModelDescriptor, ModelDescriptorError, TensorKeyRule,
+    attention::{
+        AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionMask,
+        AttentionMaskShape, AttentionRequest, RotaryFrequencyLayout, RotaryPairLayout,
+        RotaryPositionSequence, RotaryPositions, RotaryScaling, RotaryTableRequest,
+        apply_rotary_table, precompute_rotary_table, scaled_dot_product_attention_with_context,
+    },
+    conditioning::{ConditioningIdentity, ConditioningValue, ResolvedConditioningEntry},
     native_ops::{NativeModule, NativeOpsError, conv1d_module_exact_native},
 };
 use comfy_tensor::{
@@ -4529,6 +4536,60 @@ fn checked_i64_u64(value: u64) -> Result<i64, ModelFamilyError> {
     i64::try_from(value).map_err(|_| ModelFamilyError::DimensionExpressionOverflow)
 }
 
+fn checked_usize(value: u64) -> Result<usize, ModelFamilyError> {
+    usize::try_from(value).map_err(|_| ModelFamilyError::ForwardShapeOverflow)
+}
+
+fn image_tokens_for_shape(
+    temporal: usize,
+    height: usize,
+    width: usize,
+) -> Result<usize, ModelFamilyError> {
+    temporal
+        .checked_mul(height.div_ceil(2))
+        .and_then(|value| value.checked_mul(width.div_ceil(2)))
+        .ok_or(ModelFamilyError::ForwardShapeOverflow)
+}
+
+fn validate_f32_tensor_finite(
+    tensor: &Tensor,
+    label: &str,
+    context: &ExecutionContext<'_>,
+) -> Result<(), ModelFamilyError> {
+    if tensor.descriptor().dtype() != DType::F32 {
+        return Err(ModelFamilyError::DenoiserTensorContract(
+            "checked scalar state must be F32".to_owned(),
+        ));
+    }
+    let bytes = tensor.contiguous_bytes()?;
+    for (index, encoded) in bytes.chunks_exact(mem::size_of::<f32>()).enumerate() {
+        if index.is_multiple_of(256) {
+            context.cancellation.check()?;
+        }
+        let encoded = <[u8; 4]>::try_from(encoded).map_err(|_| {
+            ModelFamilyError::DenoiserTensorContract("F32 tensor storage is invalid".to_owned())
+        })?;
+        if !f32::from_le_bytes(encoded).is_finite() {
+            return Err(ModelFamilyError::DenoiserTensorContract(format!(
+                "{label} must contain only finite values"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn decode_f32_scalar(tensor: &Tensor, label: &str) -> Result<f32, ModelFamilyError> {
+    if tensor.descriptor().dtype() != DType::F32 || tensor.descriptor().shape() != [1] {
+        return Err(ModelFamilyError::DenoiserTensorContract(format!(
+            "{label} must be one F32 scalar"
+        )));
+    }
+    let encoded = <[u8; 4]>::try_from(tensor.contiguous_bytes()?).map_err(|_| {
+        ModelFamilyError::DenoiserTensorContract(format!("{label} storage is invalid"))
+    })?;
+    Ok(f32::from_le_bytes(encoded))
+}
+
 fn validate_state_key(value: &str) -> Result<(), ModelFamilyError> {
     if value.is_empty()
         || value.len() > MAX_IDENTITY_BYTES
@@ -4938,6 +4999,67 @@ pub struct ModelMemoryEstimate {
     pub total_bytes: u64,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct NativeFamilyDenoiserInvocation<'a> {
+    pub scaled_latent: &'a Tensor,
+    pub model_time: &'a Tensor,
+    pub conditioning: &'a ResolvedConditioningEntry,
+    pub attention_mask: Option<&'a Tensor>,
+    pub reference_latents: &'a [Tensor],
+    pub additional_timestep_condition: Option<&'a Tensor>,
+}
+
+#[derive(Clone, Copy)]
+pub struct NativeFamilyDenoiserContext<'a> {
+    conditioning_identity: &'a ConditioningIdentity,
+    execution: &'a ExecutionContext<'a>,
+}
+
+impl<'a> NativeFamilyDenoiserContext<'a> {
+    pub fn checked(
+        conditioning_identity: &'a ConditioningIdentity,
+        execution: &'a ExecutionContext<'a>,
+    ) -> Result<Self, ModelFamilyError> {
+        execution.cancellation.check()?;
+        Ok(Self {
+            conditioning_identity,
+            execution,
+        })
+    }
+
+    pub fn conditioning_identity(&self) -> &ConditioningIdentity {
+        self.conditioning_identity
+    }
+
+    pub fn execution(&self) -> &ExecutionContext<'_> {
+        self.execution
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeFamilyDenoiserMemoryEstimate {
+    pub retained_weight_bytes: u64,
+    pub invocation_bytes: u64,
+    pub total_bytes: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NativeFamilyDenoiserKind {
+    AuraFlow,
+    QwenImage,
+}
+
+struct ValidatedFamilyDenoiserContract<'a> {
+    kind: NativeFamilyDenoiserKind,
+    required_weights: &'static [&'static str],
+    conditioning: &'a Tensor,
+    batch: usize,
+    conditioning_tokens: usize,
+    temporal: usize,
+    height: usize,
+    width: usize,
+}
+
 #[derive(Clone, Debug)]
 pub struct NativeFamilyModel {
     definition: &'static ModelFamilyDefinition,
@@ -4976,6 +5098,659 @@ impl NativeFamilyModel {
             weights,
             self.options,
         )
+    }
+
+    pub fn denoiser_memory_estimate(
+        &self,
+        invocation: NativeFamilyDenoiserInvocation<'_>,
+        family_context: &NativeFamilyDenoiserContext<'_>,
+    ) -> Result<NativeFamilyDenoiserMemoryEstimate, ModelFamilyError> {
+        let contract = self.validate_denoiser_invocation(invocation, family_context)?;
+        let retained_owner_bytes = self
+            .weights
+            .resident_owned_allocations()?
+            .into_iter()
+            .try_fold(0_u64, |total, allocation| {
+                total
+                    .checked_add(allocation.resident_bytes())
+                    .ok_or(ModelFamilyError::MemoryOverflow)
+            })?;
+        let mut storages = BTreeSet::new();
+        let retained_tensor_bytes = self
+            .weights
+            .unpatched_tensors()
+            .values()
+            .chain(self.weights.tensors().values())
+            .try_fold(0_u64, |total, tensor| {
+                if !storages.insert(tensor.storage_id().get()) {
+                    return Ok(total);
+                }
+                total
+                    .checked_add(tensor.storage_byte_len())
+                    .ok_or(ModelFamilyError::MemoryOverflow)
+            })?;
+        let retained_weight_bytes = retained_owner_bytes
+            .checked_add(retained_tensor_bytes)
+            .ok_or(ModelFamilyError::MemoryOverflow)?;
+        let converted_weight_elements =
+            contract
+                .required_weights
+                .iter()
+                .try_fold(0_u64, |total, key| {
+                    total
+                        .checked_add(self.denoiser_weight(key)?.descriptor().element_count()?)
+                        .ok_or(ModelFamilyError::MemoryOverflow)
+                })?;
+        let image_tokens_per_batch = contract
+            .temporal
+            .checked_mul(contract.height.div_ceil(2))
+            .and_then(|value| value.checked_mul(contract.width.div_ceil(2)))
+            .ok_or(ModelFamilyError::ForwardShapeOverflow)?;
+        let (hidden_width, register_tokens, mlp_width) = match contract.kind {
+            NativeFamilyDenoiserKind::AuraFlow => (
+                crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_WIDTH,
+                crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_REGISTER_TOKENS,
+                crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_MLP_WIDTH,
+            ),
+            NativeFamilyDenoiserKind::QwenImage => (
+                crate::generated_qwenimage_comfy_model_0113::DENOISER_INVOCATION_HEAD_WIDTH,
+                0,
+                crate::generated_qwenimage_comfy_model_0113::DENOISER_INVOCATION_MLP_WIDTH,
+            ),
+        };
+        let tokens_per_batch = image_tokens_per_batch
+            .checked_add(contract.conditioning_tokens)
+            .and_then(|value| value.checked_add(register_tokens))
+            .ok_or(ModelFamilyError::MemoryOverflow)?;
+        let token_hidden = u64::try_from(contract.batch)
+            .ok()
+            .and_then(|batch| batch.checked_mul(u64::try_from(tokens_per_batch).ok()?))
+            .and_then(|tokens| tokens.checked_mul(u64::try_from(hidden_width).ok()?))
+            .ok_or(ModelFamilyError::MemoryOverflow)?;
+        let token_mlp = u64::try_from(contract.batch)
+            .ok()
+            .and_then(|batch| batch.checked_mul(u64::try_from(tokens_per_batch).ok()?))
+            .and_then(|tokens| tokens.checked_mul(u64::try_from(mlp_width).ok()?))
+            .ok_or(ModelFamilyError::MemoryOverflow)?;
+        let attention_scores = u64::try_from(contract.batch)
+            .ok()
+            .and_then(|batch| batch.checked_mul(u64::try_from(tokens_per_batch).ok()?))
+            .and_then(|value| value.checked_mul(u64::try_from(tokens_per_batch).ok()?))
+            .ok_or(ModelFamilyError::MemoryOverflow)?;
+        let conditioning_elements = contract.conditioning.descriptor().element_count()?;
+        let latent_elements = invocation.scaled_latent.descriptor().element_count()?;
+        let attention_mask_elements = invocation
+            .attention_mask
+            .map(|mask| mask.descriptor().element_count())
+            .transpose()?
+            .unwrap_or(0);
+        let activation_elements = converted_weight_elements
+            .checked_add(
+                conditioning_elements
+                    .checked_mul(2)
+                    .ok_or(ModelFamilyError::MemoryOverflow)?,
+            )
+            .and_then(|value| value.checked_add(latent_elements.checked_mul(3)?))
+            .and_then(|value| value.checked_add(token_hidden.checked_mul(18)?))
+            .and_then(|value| value.checked_add(token_mlp.checked_mul(4)?))
+            .and_then(|value| value.checked_add(attention_scores.checked_mul(2)?))
+            .and_then(|value| value.checked_add(256_u64.checked_mul(contract.batch as u64)?))
+            .and_then(|value| value.checked_add(attention_mask_elements.checked_mul(2)?))
+            .ok_or(ModelFamilyError::MemoryOverflow)?;
+        let invocation_bytes = activation_elements
+            .checked_mul(mem::size_of::<f32>() as u64)
+            .and_then(|value| {
+                value.checked_add(mem::size_of::<NativeFamilyDenoiserInvocation<'_>>() as u64)
+            })
+            .and_then(|value| {
+                value.checked_add(mem::size_of::<NativeFamilyDenoiserContext<'_>>() as u64)
+            })
+            .and_then(|value| value.checked_add(mem::size_of::<ResolvedConditioningEntry>() as u64))
+            .ok_or(ModelFamilyError::MemoryOverflow)?;
+        let total_bytes = retained_weight_bytes
+            .checked_add(invocation_bytes)
+            .ok_or(ModelFamilyError::MemoryOverflow)?;
+        Ok(NativeFamilyDenoiserMemoryEstimate {
+            retained_weight_bytes,
+            invocation_bytes,
+            total_bytes,
+        })
+    }
+
+    pub fn invoke_denoiser(
+        &self,
+        backend: &CpuBackend,
+        invocation: NativeFamilyDenoiserInvocation<'_>,
+        family_context: &NativeFamilyDenoiserContext<'_>,
+    ) -> Result<Tensor, ModelFamilyError> {
+        let context = family_context.execution();
+        context.cancellation.check()?;
+        let contract = self.validate_denoiser_invocation(invocation, family_context)?;
+        let memory = self.denoiser_memory_estimate(invocation, family_context)?;
+        if memory.total_bytes > self.options.memory_budget_bytes {
+            return Err(ModelFamilyError::OutOfMemory {
+                required: memory.total_bytes,
+                budget: self.options.memory_budget_bytes,
+            });
+        }
+        context.cancellation.check()?;
+        match contract.kind {
+            NativeFamilyDenoiserKind::AuraFlow => {
+                self.invoke_auraflow_denoiser(backend, invocation, &contract, context)
+            }
+            NativeFamilyDenoiserKind::QwenImage => {
+                self.invoke_qwen_image_denoiser(backend, invocation, &contract, context)
+            }
+        }
+    }
+
+    fn validate_denoiser_invocation<'a>(
+        &self,
+        invocation: NativeFamilyDenoiserInvocation<'a>,
+        family_context: &NativeFamilyDenoiserContext<'_>,
+    ) -> Result<ValidatedFamilyDenoiserContract<'a>, ModelFamilyError> {
+        let context = family_context.execution();
+        if self.options.device != DeviceKind::Cpu {
+            return Err(ModelFamilyError::BackendUnavailable(self.options.device));
+        }
+        if self.options.dtype != DType::F32 {
+            return Err(ModelFamilyError::DenoiserUnavailable(
+                "the closed reduced family-denoiser executors admit F32 model state only"
+                    .to_owned(),
+            ));
+        }
+        let model_identity = self.identity()?;
+        if family_context.conditioning_identity().model_family() != &model_identity {
+            return Err(ModelFamilyError::DenoiserConditioningIdentity(
+                "conditioning model family does not match the retained denoiser".to_owned(),
+            ));
+        }
+        let latent_identity = LatentFormatIdentity::new(
+            self.profile.latent_feature_id,
+            self.profile.latent_identifier,
+        )
+        .map_err(|error| ModelFamilyError::InvalidLatentIdentity(error.to_string()))?;
+        if family_context.conditioning_identity().latent_format() != &latent_identity {
+            return Err(ModelFamilyError::DenoiserConditioningIdentity(
+                "conditioning latent format does not match the retained denoiser".to_owned(),
+            ));
+        }
+        let conditioning = match invocation.conditioning.value() {
+            ConditioningValue::CrossAttention(tensor) => tensor,
+            _ => {
+                return Err(ModelFamilyError::DenoiserConditioningValue(
+                    "family denoisers require resolved cross-attention conditioning".to_owned(),
+                ));
+            }
+        };
+        let (kind, required_weights, latent_rank, channels, context_width) =
+            match self.definition.feature_id {
+                crate::generated_auraflow_comfy_model_0064::MODEL_FAMILY_FEATURE_ID => (
+                    NativeFamilyDenoiserKind::AuraFlow,
+                    crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_REQUIRED_KEYS,
+                    crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_LATENT_RANK,
+                    crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_CHANNELS,
+                    crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_CONTEXT_WIDTH,
+                ),
+                crate::generated_qwenimage_comfy_model_0113::MODEL_FAMILY_FEATURE_ID => (
+                    NativeFamilyDenoiserKind::QwenImage,
+                    crate::generated_qwenimage_comfy_model_0113::DENOISER_INVOCATION_REQUIRED_KEYS,
+                    crate::generated_qwenimage_comfy_model_0113::DENOISER_INVOCATION_LATENT_RANK,
+                    crate::generated_qwenimage_comfy_model_0113::DENOISER_INVOCATION_CHANNELS,
+                    crate::generated_qwenimage_comfy_model_0113::DENOISER_INVOCATION_CONTEXT_WIDTH,
+                ),
+                _ => {
+                    return Err(ModelFamilyError::DenoiserUnavailable(
+                        self.definition.feature_id.to_owned(),
+                    ));
+                }
+            };
+        if !invocation.reference_latents.is_empty()
+            || invocation.additional_timestep_condition.is_some()
+        {
+            return Err(ModelFamilyError::DenoiserUnavailable(
+                "reference latents and additional timestep conditioning are not admitted by the closed reduced executors".to_owned(),
+            ));
+        }
+        if kind == NativeFamilyDenoiserKind::AuraFlow && invocation.attention_mask.is_some() {
+            return Err(ModelFamilyError::DenoiserTensorContract(
+                "AuraFlow does not consume an encoder attention mask".to_owned(),
+            ));
+        }
+        for (label, tensor, dtype) in [
+            (
+                "scaled latent",
+                invocation.scaled_latent,
+                self.options.dtype,
+            ),
+            (
+                "cross-attention conditioning",
+                conditioning,
+                self.options.dtype,
+            ),
+            ("model time", invocation.model_time, DType::F32),
+        ] {
+            if tensor.descriptor().dtype() != dtype {
+                return Err(ModelFamilyError::DenoiserTensorContract(format!(
+                    "{label} dtype must be {dtype:?}, got {:?}",
+                    tensor.descriptor().dtype()
+                )));
+            }
+            if tensor.descriptor().device().kind() != self.options.device
+                || tensor.descriptor().stream() != context.stream
+            {
+                return Err(ModelFamilyError::DenoiserTensorContract(format!(
+                    "{label} device and stream must match the execution context"
+                )));
+            }
+        }
+        let latent_shape = invocation.scaled_latent.descriptor().shape();
+        if latent_shape.len() != latent_rank
+            || latent_shape.contains(&0)
+            || latent_shape.get(1).copied() != Some(channels as u64)
+        {
+            return Err(ModelFamilyError::DenoiserTensorContract(format!(
+                "{} latent must have rank {latent_rank}, {channels} channels, and nonzero dimensions",
+                self.definition.identifier
+            )));
+        }
+        let batch = checked_usize(latent_shape[0])?;
+        let (temporal, height, width) = if latent_rank == 4 {
+            (
+                1,
+                checked_usize(latent_shape[2])?,
+                checked_usize(latent_shape[3])?,
+            )
+        } else {
+            (
+                checked_usize(latent_shape[2])?,
+                checked_usize(latent_shape[3])?,
+                checked_usize(latent_shape[4])?,
+            )
+        };
+        if invocation.model_time.descriptor().shape() != [batch as u64] {
+            return Err(ModelFamilyError::DenoiserTensorContract(
+                "model time must contain one F32 value per latent batch item".to_owned(),
+            ));
+        }
+        validate_f32_tensor_finite(invocation.model_time, "model time", context)?;
+        let conditioning_shape = conditioning.descriptor().shape();
+        if conditioning_shape.len() != 3
+            || conditioning_shape[0] != batch as u64
+            || conditioning_shape[1] == 0
+            || conditioning_shape[2] != context_width as u64
+        {
+            return Err(ModelFamilyError::DenoiserTensorContract(format!(
+                "cross-attention conditioning must have shape [batch, tokens, {context_width}]"
+            )));
+        }
+        if let Some(mask) = invocation.attention_mask {
+            if kind != NativeFamilyDenoiserKind::QwenImage
+                || mask.descriptor().dtype() != DType::F32
+                || mask.descriptor().device().kind() != self.options.device
+                || mask.descriptor().stream() != context.stream
+                || mask.descriptor().shape() != [batch as u64, conditioning_shape[1]]
+            {
+                return Err(ModelFamilyError::DenoiserTensorContract(
+                    "Qwen Image attention mask must be F32 [batch, text_tokens] on the execution stream".to_owned(),
+                ));
+            }
+        }
+        if kind == NativeFamilyDenoiserKind::QwenImage {
+            if self
+                .weights
+                .tensors()
+                .contains_key("native.__index_timestep_zero__")
+                || self
+                    .weights
+                    .tensors()
+                    .contains_key("native.time_text_embed.addition_t_embedding.weight")
+            {
+                return Err(ModelFamilyError::DenoiserUnavailable(
+                    "Qwen Image timestep-zero reference or additional-timestep learned state is outside this closed executor".to_owned(),
+                ));
+            }
+            for (key, label) in [
+                ("native.__reference_method__", "Qwen Image reference method"),
+                (
+                    "native.__additional_timestep_condition__",
+                    "Qwen Image additional timestep marker",
+                ),
+            ] {
+                let marker = self.denoiser_weight(key)?;
+                if marker.descriptor().device().kind() != self.options.device
+                    || marker.descriptor().stream() != context.stream
+                    || decode_f32_scalar(marker, label)? != 0.0
+                {
+                    return Err(ModelFamilyError::DenoiserUnavailable(format!(
+                        "{label} must select the source index/no-additional-condition path"
+                    )));
+                }
+            }
+        }
+        for key in required_weights.iter().copied() {
+            let weight = self.denoiser_weight(key)?;
+            if weight.descriptor().dtype() != self.options.dtype
+                || weight.descriptor().device().kind() != self.options.device
+                || weight.descriptor().stream() != context.stream
+            {
+                return Err(ModelFamilyError::DenoiserTensorContract(format!(
+                    "invocation weight {key} must match model dtype, device, and execution stream"
+                )));
+            }
+        }
+        self.validate_denoiser_weight_shapes(
+            kind,
+            image_tokens_for_shape(temporal, height, width)?,
+        )?;
+        Ok(ValidatedFamilyDenoiserContract {
+            kind,
+            required_weights,
+            conditioning,
+            batch,
+            conditioning_tokens: checked_usize(conditioning_shape[1])?,
+            temporal,
+            height,
+            width,
+        })
+    }
+
+    fn denoiser_weight(&self, key: &str) -> Result<&Tensor, ModelFamilyError> {
+        self.weights.tensors().get(key).ok_or_else(|| {
+            ModelFamilyError::DenoiserUnavailable(format!(
+                "{} is missing invocation weight {key}",
+                self.definition.feature_id
+            ))
+        })
+    }
+
+    fn validate_denoiser_weight_shapes(
+        &self,
+        kind: NativeFamilyDenoiserKind,
+        _image_tokens: usize,
+    ) -> Result<(), ModelFamilyError> {
+        let aura_width = crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_WIDTH;
+        let aura_context =
+            crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_CONTEXT_WIDTH;
+        let aura_mlp = crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_MLP_WIDTH;
+        let qwen_width =
+            crate::generated_qwenimage_comfy_model_0113::DENOISER_INVOCATION_HEAD_WIDTH;
+        let qwen_context =
+            crate::generated_qwenimage_comfy_model_0113::DENOISER_INVOCATION_CONTEXT_WIDTH;
+        let qwen_mlp = crate::generated_qwenimage_comfy_model_0113::DENOISER_INVOCATION_MLP_WIDTH;
+        let mut expected = Vec::new();
+        match kind {
+            NativeFamilyDenoiserKind::AuraFlow => {
+                expected.extend([
+                    ("native.init_x_linear.weight", vec![aura_width, 16]),
+                    ("native.init_x_linear.bias", vec![aura_width]),
+                    ("native.register_tokens", vec![1, 8, aura_width]),
+                    (
+                        "native.cond_seq_linear.weight",
+                        vec![aura_width, aura_context],
+                    ),
+                    ("native.t_embedder.mlp.0.weight", vec![aura_width, 256]),
+                    ("native.t_embedder.mlp.0.bias", vec![aura_width]),
+                    (
+                        "native.t_embedder.mlp.2.weight",
+                        vec![aura_width, aura_width],
+                    ),
+                    ("native.t_embedder.mlp.2.bias", vec![aura_width]),
+                ]);
+                for key in [
+                    "native.double_layers.0.modC.1.weight",
+                    "native.double_layers.0.modX.1.weight",
+                    "native.single_layers.0.modCX.1.weight",
+                ] {
+                    expected.push((key, vec![6 * aura_width, aura_width]));
+                }
+                for key in [
+                    "native.double_layers.0.attn.w1q.weight",
+                    "native.double_layers.0.attn.w1k.weight",
+                    "native.double_layers.0.attn.w1v.weight",
+                    "native.double_layers.0.attn.w1o.weight",
+                    "native.double_layers.0.attn.w2q.weight",
+                    "native.double_layers.0.attn.w2k.weight",
+                    "native.double_layers.0.attn.w2v.weight",
+                    "native.double_layers.0.attn.w2o.weight",
+                    "native.single_layers.0.attn.w1q.weight",
+                    "native.single_layers.0.attn.w1k.weight",
+                    "native.single_layers.0.attn.w1v.weight",
+                    "native.single_layers.0.attn.w1o.weight",
+                ] {
+                    expected.push((key, vec![aura_width, aura_width]));
+                }
+                for prefix in [
+                    "native.double_layers.0.mlpC",
+                    "native.double_layers.0.mlpX",
+                    "native.single_layers.0.mlp",
+                ] {
+                    expected.push((
+                        match prefix {
+                            "native.double_layers.0.mlpC" => {
+                                "native.double_layers.0.mlpC.c_fc1.weight"
+                            }
+                            "native.double_layers.0.mlpX" => {
+                                "native.double_layers.0.mlpX.c_fc1.weight"
+                            }
+                            _ => "native.single_layers.0.mlp.c_fc1.weight",
+                        },
+                        vec![aura_mlp, aura_width],
+                    ));
+                    expected.push((
+                        match prefix {
+                            "native.double_layers.0.mlpC" => {
+                                "native.double_layers.0.mlpC.c_fc2.weight"
+                            }
+                            "native.double_layers.0.mlpX" => {
+                                "native.double_layers.0.mlpX.c_fc2.weight"
+                            }
+                            _ => "native.single_layers.0.mlp.c_fc2.weight",
+                        },
+                        vec![aura_mlp, aura_width],
+                    ));
+                    expected.push((
+                        match prefix {
+                            "native.double_layers.0.mlpC" => {
+                                "native.double_layers.0.mlpC.c_proj.weight"
+                            }
+                            "native.double_layers.0.mlpX" => {
+                                "native.double_layers.0.mlpX.c_proj.weight"
+                            }
+                            _ => "native.single_layers.0.mlp.c_proj.weight",
+                        },
+                        vec![aura_width, aura_mlp],
+                    ));
+                }
+                expected.push(("native.modF.1.weight", vec![2 * aura_width, aura_width]));
+                expected.push(("native.final_linear.weight", vec![16, aura_width]));
+                let positional_shape = self
+                    .denoiser_weight("native.positional_encoding")?
+                    .descriptor()
+                    .shape();
+                if positional_shape.len() != 3
+                    || positional_shape[0] != 1
+                    || positional_shape[2] != aura_width as u64
+                {
+                    return Err(ModelFamilyError::DenoiserTensorContract(
+                        "AuraFlow positional encoding must have shape [1, square_max_sequence, 2]"
+                            .to_owned(),
+                    ));
+                }
+                let maximum_sequence = checked_usize(positional_shape[1])?;
+                let side = (maximum_sequence as f64).sqrt().round() as usize;
+                if side.checked_mul(side) != Some(maximum_sequence) || side == 0 {
+                    return Err(ModelFamilyError::DenoiserTensorContract(
+                        "AuraFlow positional encoding sequence must reshape to a nonzero square"
+                            .to_owned(),
+                    ));
+                }
+            }
+            NativeFamilyDenoiserKind::QwenImage => {
+                expected.extend([
+                    ("native.img_in.weight", vec![qwen_width, 64]),
+                    ("native.img_in.bias", vec![qwen_width]),
+                    ("native.txt_norm.weight", vec![qwen_context]),
+                    ("native.txt_in.weight", vec![qwen_width, qwen_context]),
+                    ("native.txt_in.bias", vec![qwen_width]),
+                    (
+                        "native.time_text_embed.timestep_embedder.linear_1.weight",
+                        vec![qwen_width, 256],
+                    ),
+                    (
+                        "native.time_text_embed.timestep_embedder.linear_1.bias",
+                        vec![qwen_width],
+                    ),
+                    (
+                        "native.time_text_embed.timestep_embedder.linear_2.weight",
+                        vec![qwen_width, qwen_width],
+                    ),
+                    (
+                        "native.time_text_embed.timestep_embedder.linear_2.bias",
+                        vec![qwen_width],
+                    ),
+                ]);
+                for prefix in ["img", "txt"] {
+                    let (
+                        mod_weight,
+                        mod_bias,
+                        first_weight,
+                        first_bias,
+                        second_weight,
+                        second_bias,
+                    ) = if prefix == "img" {
+                        (
+                            "native.transformer_blocks.0.img_mod.1.weight",
+                            "native.transformer_blocks.0.img_mod.1.bias",
+                            "native.transformer_blocks.0.img_mlp.net.0.proj.weight",
+                            "native.transformer_blocks.0.img_mlp.net.0.proj.bias",
+                            "native.transformer_blocks.0.img_mlp.net.2.weight",
+                            "native.transformer_blocks.0.img_mlp.net.2.bias",
+                        )
+                    } else {
+                        (
+                            "native.transformer_blocks.0.txt_mod.1.weight",
+                            "native.transformer_blocks.0.txt_mod.1.bias",
+                            "native.transformer_blocks.0.txt_mlp.net.0.proj.weight",
+                            "native.transformer_blocks.0.txt_mlp.net.0.proj.bias",
+                            "native.transformer_blocks.0.txt_mlp.net.2.weight",
+                            "native.transformer_blocks.0.txt_mlp.net.2.bias",
+                        )
+                    };
+                    expected.extend([
+                        (mod_weight, vec![6 * qwen_width, qwen_width]),
+                        (mod_bias, vec![6 * qwen_width]),
+                        (first_weight, vec![qwen_mlp, qwen_width]),
+                        (first_bias, vec![qwen_mlp]),
+                        (second_weight, vec![qwen_width, qwen_mlp]),
+                        (second_bias, vec![qwen_width]),
+                    ]);
+                }
+                for key in [
+                    "native.transformer_blocks.0.attn.norm_q.weight",
+                    "native.transformer_blocks.0.attn.norm_k.weight",
+                    "native.transformer_blocks.0.attn.norm_added_q.weight",
+                    "native.transformer_blocks.0.attn.norm_added_k.weight",
+                ] {
+                    expected.push((key, vec![qwen_width]));
+                }
+                for key in [
+                    "native.transformer_blocks.0.attn.to_q.weight",
+                    "native.transformer_blocks.0.attn.to_k.weight",
+                    "native.transformer_blocks.0.attn.to_v.weight",
+                    "native.transformer_blocks.0.attn.add_q_proj.weight",
+                    "native.transformer_blocks.0.attn.add_k_proj.weight",
+                    "native.transformer_blocks.0.attn.add_v_proj.weight",
+                    "native.transformer_blocks.0.attn.to_out.0.weight",
+                    "native.transformer_blocks.0.attn.to_add_out.weight",
+                ] {
+                    expected.push((key, vec![qwen_width, qwen_width]));
+                }
+                for key in [
+                    "native.transformer_blocks.0.attn.to_q.bias",
+                    "native.transformer_blocks.0.attn.to_k.bias",
+                    "native.transformer_blocks.0.attn.to_v.bias",
+                    "native.transformer_blocks.0.attn.add_q_proj.bias",
+                    "native.transformer_blocks.0.attn.add_k_proj.bias",
+                    "native.transformer_blocks.0.attn.add_v_proj.bias",
+                    "native.transformer_blocks.0.attn.to_out.0.bias",
+                    "native.transformer_blocks.0.attn.to_add_out.bias",
+                ] {
+                    expected.push((key, vec![qwen_width]));
+                }
+                expected.extend([
+                    (
+                        "native.norm_out.linear.weight",
+                        vec![2 * qwen_width, qwen_width],
+                    ),
+                    ("native.norm_out.linear.bias", vec![2 * qwen_width]),
+                    ("native.proj_out.weight", vec![64, qwen_width]),
+                    ("native.proj_out.bias", vec![64]),
+                ]);
+            }
+        }
+        for (key, expected_shape) in expected {
+            let actual = self.denoiser_weight(key)?.descriptor().shape();
+            if actual
+                .iter()
+                .copied()
+                .ne(expected_shape.iter().map(|value| *value as u64))
+            {
+                return Err(ModelFamilyError::DenoiserTensorContract(format!(
+                    "invocation weight {key} has shape {actual:?}, expected {expected_shape:?}"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn invoke_auraflow_denoiser(
+        &self,
+        backend: &CpuBackend,
+        invocation: NativeFamilyDenoiserInvocation<'_>,
+        contract: &ValidatedFamilyDenoiserContract<'_>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, ModelFamilyError> {
+        let output = execute_reduced_auraflow(self, backend, invocation, contract, context)?;
+        Ok(tensor_from_f32_with_context_exact_native(
+            backend,
+            invocation.scaled_latent.descriptor().shape(),
+            &output,
+            self.options.dtype,
+            DeviceId::CPU,
+            context,
+        )?)
+    }
+
+    fn invoke_qwen_image_denoiser(
+        &self,
+        backend: &CpuBackend,
+        invocation: NativeFamilyDenoiserInvocation<'_>,
+        contract: &ValidatedFamilyDenoiserContract<'_>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, ModelFamilyError> {
+        let output = execute_reduced_qwen_image(self, backend, invocation, contract, context)?;
+        Ok(tensor_from_f32_with_context_exact_native(
+            backend,
+            invocation.scaled_latent.descriptor().shape(),
+            &output,
+            self.options.dtype,
+            DeviceId::CPU,
+            context,
+        )?)
+    }
+
+    fn denoiser_values(
+        &self,
+        backend: &CpuBackend,
+        key: &str,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Vec<f32>, ModelFamilyError> {
+        Ok(tensor_to_f32_with_context_exact_native(
+            backend,
+            self.denoiser_weight(key)?,
+            context,
+        )?)
     }
 
     pub fn forward_checkpoints(
@@ -5299,6 +6074,1714 @@ impl NativeFamilyModel {
             .get(key)
             .ok_or_else(|| ModelFamilyError::MissingProgramWeight(key.to_owned()))
     }
+}
+
+fn allocate_f32(length: usize) -> Result<Vec<f32>, ModelFamilyError> {
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(length)
+        .map_err(|_| ModelFamilyError::MemoryOverflow)?;
+    values.resize(length, 0.0);
+    Ok(values)
+}
+
+fn checked_f32_length(dimensions: &[usize]) -> Result<usize, ModelFamilyError> {
+    dimensions.iter().try_fold(1_usize, |total, dimension| {
+        total
+            .checked_mul(*dimension)
+            .ok_or(ModelFamilyError::ForwardShapeOverflow)
+    })
+}
+
+fn copy_f32(values: &[f32], context: &ExecutionContext<'_>) -> Result<Vec<f32>, ModelFamilyError> {
+    context.cancellation.check()?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(values.len())
+        .map_err(|_| ModelFamilyError::MemoryOverflow)?;
+    output.extend_from_slice(values);
+    context.cancellation.check()?;
+    Ok(output)
+}
+
+fn copy_f32_into(
+    target: &mut [f32],
+    source: &[f32],
+    context: &ExecutionContext<'_>,
+) -> Result<(), ModelFamilyError> {
+    if target.len() != source.len() {
+        return Err(ModelFamilyError::DenoiserTensorContract(
+            "copy shape is invalid".to_owned(),
+        ));
+    }
+    for (target, source) in target.chunks_mut(4_096).zip(source.chunks(4_096)) {
+        context.cancellation.check()?;
+        target.copy_from_slice(source);
+    }
+    Ok(())
+}
+
+fn map_f32(
+    values: &[f32],
+    operation: impl Fn(f32) -> f32,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    let mut output = allocate_f32(values.len())?;
+    for (index, (target, source)) in output.iter_mut().zip(values.iter().copied()).enumerate() {
+        if index.is_multiple_of(256) {
+            context.cancellation.check()?;
+        }
+        *target = operation(source);
+    }
+    context.cancellation.check()?;
+    Ok(output)
+}
+
+fn linear_rows(
+    input: &[f32],
+    input_width: usize,
+    output_width: usize,
+    weight: &[f32],
+    bias: Option<&[f32]>,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    if input_width == 0
+        || !input.len().is_multiple_of(input_width)
+        || weight.len()
+            != output_width
+                .checked_mul(input_width)
+                .ok_or(ModelFamilyError::ForwardShapeOverflow)?
+        || bias.is_some_and(|values| values.len() != output_width)
+    {
+        return Err(ModelFamilyError::DenoiserTensorContract(
+            "linear storage does not match its checked shape".to_owned(),
+        ));
+    }
+    let rows = input.len() / input_width;
+    let mut output = allocate_f32(
+        rows.checked_mul(output_width)
+            .ok_or(ModelFamilyError::ForwardShapeOverflow)?,
+    )?;
+    for row in 0..rows {
+        if row.is_multiple_of(32) {
+            context.cancellation.check()?;
+        }
+        for out in 0..output_width {
+            let mut value = bias.map_or(0.0, |values| values[out]);
+            for inside in 0..input_width {
+                value += input[row * input_width + inside] * weight[out * input_width + inside];
+            }
+            output[row * output_width + out] = value;
+        }
+    }
+    Ok(output)
+}
+
+fn layer_norm_rows(
+    values: &[f32],
+    width: usize,
+    epsilon: f32,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    if width == 0 || !values.len().is_multiple_of(width) {
+        return Err(ModelFamilyError::DenoiserTensorContract(
+            "layer norm shape is invalid".to_owned(),
+        ));
+    }
+    let mut output = allocate_f32(values.len())?;
+    for (row, (source, target)) in values
+        .chunks_exact(width)
+        .zip(output.chunks_exact_mut(width))
+        .enumerate()
+    {
+        if row.is_multiple_of(32) {
+            context.cancellation.check()?;
+        }
+        let mean = source.iter().copied().sum::<f32>() / width as f32;
+        let variance = source
+            .iter()
+            .map(|value| (*value - mean).powi(2))
+            .sum::<f32>()
+            / width as f32;
+        let inverse = (variance + epsilon).sqrt().recip();
+        for (target, source) in target.iter_mut().zip(source) {
+            *target = (*source - mean) * inverse;
+        }
+    }
+    Ok(output)
+}
+
+fn rms_norm_rows(
+    values: &[f32],
+    width: usize,
+    weight: &[f32],
+    epsilon: f32,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    if width == 0 || !values.len().is_multiple_of(width) || weight.len() != width {
+        return Err(ModelFamilyError::DenoiserTensorContract(
+            "RMS norm shape is invalid".to_owned(),
+        ));
+    }
+    let mut output = allocate_f32(values.len())?;
+    for (row, (source, target)) in values
+        .chunks_exact(width)
+        .zip(output.chunks_exact_mut(width))
+        .enumerate()
+    {
+        if row.is_multiple_of(32) {
+            context.cancellation.check()?;
+        }
+        let mean_square = source.iter().map(|value| value * value).sum::<f32>() / width as f32;
+        let inverse = (mean_square + epsilon).sqrt().recip();
+        for channel in 0..width {
+            target[channel] = source[channel] * inverse * weight[channel];
+        }
+    }
+    Ok(output)
+}
+
+fn silu(value: f32) -> f32 {
+    value / (1.0 + (-value).exp())
+}
+
+fn gelu_tanh(value: f32) -> f32 {
+    0.5 * value * (1.0 + (0.797_884_6 * (value + 0.044_715 * value.powi(3))).tanh())
+}
+
+fn modulate_rows(
+    values: &[f32],
+    batch: usize,
+    tokens: usize,
+    width: usize,
+    parameters: &[f32],
+    shift_offset: usize,
+    scale_offset: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    if values.len()
+        != batch
+            .checked_mul(tokens)
+            .and_then(|value| value.checked_mul(width))
+            .ok_or(ModelFamilyError::ForwardShapeOverflow)?
+    {
+        return Err(ModelFamilyError::DenoiserTensorContract(
+            "modulation shape is invalid".to_owned(),
+        ));
+    }
+    let parameter_width = parameters.len() / batch;
+    let mut output = allocate_f32(values.len())?;
+    for batch_index in 0..batch {
+        context.cancellation.check()?;
+        for token in 0..tokens {
+            for channel in 0..width {
+                let index = (batch_index * tokens + token) * width + channel;
+                let shift = parameters[batch_index * parameter_width + shift_offset + channel];
+                let scale = parameters[batch_index * parameter_width + scale_offset + channel];
+                output[index] = shift + values[index] * (1.0 + scale);
+            }
+        }
+    }
+    Ok(output)
+}
+
+fn gated_residual(
+    residual: &[f32],
+    update: &[f32],
+    batch: usize,
+    tokens: usize,
+    width: usize,
+    parameters: &[f32],
+    gate_offset: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    if residual.len() != update.len() {
+        return Err(ModelFamilyError::DenoiserTensorContract(
+            "gated residual shape is invalid".to_owned(),
+        ));
+    }
+    let parameter_width = parameters.len() / batch;
+    let mut output = allocate_f32(residual.len())?;
+    for batch_index in 0..batch {
+        context.cancellation.check()?;
+        for token in 0..tokens {
+            for channel in 0..width {
+                let index = (batch_index * tokens + token) * width + channel;
+                output[index] = residual[index]
+                    + parameters[batch_index * parameter_width + gate_offset + channel]
+                        * update[index];
+            }
+        }
+    }
+    Ok(output)
+}
+
+fn aura_mlp(
+    model: &NativeFamilyModel,
+    backend: &CpuBackend,
+    values: &[f32],
+    prefix: &str,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    let width = crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_WIDTH;
+    let hidden = crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_MLP_WIDTH;
+    let first = linear_rows(
+        values,
+        width,
+        hidden,
+        &model.denoiser_values(backend, &format!("{prefix}.c_fc1.weight"), context)?,
+        None,
+        context,
+    )?;
+    let second = linear_rows(
+        values,
+        width,
+        hidden,
+        &model.denoiser_values(backend, &format!("{prefix}.c_fc2.weight"), context)?,
+        None,
+        context,
+    )?;
+    let mut gated = allocate_f32(first.len())?;
+    for (index, ((target, first), second)) in gated.iter_mut().zip(first).zip(second).enumerate() {
+        if index.is_multiple_of(256) {
+            context.cancellation.check()?;
+        }
+        *target = silu(first) * second;
+    }
+    linear_rows(
+        &gated,
+        hidden,
+        width,
+        &model.denoiser_values(backend, &format!("{prefix}.c_proj.weight"), context)?,
+        None,
+        context,
+    )
+}
+
+fn joint_attention(
+    backend: &CpuBackend,
+    query: &[f32],
+    key: &[f32],
+    value: &[f32],
+    batch: usize,
+    tokens: usize,
+    head_dimension: usize,
+    mask: Option<AttentionMask<'_>>,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    let workspace_limit_bytes = tokens
+        .checked_mul(mem::size_of::<f32>())
+        .ok_or(ModelFamilyError::MemoryOverflow)?;
+    Ok(scaled_dot_product_attention_with_context(
+        backend,
+        AttentionRequest {
+            backend: AttentionBackend::PytorchSdp,
+            fallback: AttentionFallbackPolicy::AllowExactNative,
+            batch,
+            query_tokens: tokens,
+            key_tokens: tokens,
+            heads: 1,
+            head_dimension,
+            value_dimension: head_dimension,
+            scale: None,
+            workspace_limit_bytes,
+        },
+        query,
+        key,
+        value,
+        mask,
+        context,
+    )?
+    .values)
+}
+
+fn patchify_channels_first(
+    values: &[f32],
+    batch: usize,
+    channels: usize,
+    temporal: usize,
+    height: usize,
+    width: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    let patch_height = height.div_ceil(2);
+    let patch_width = width.div_ceil(2);
+    let tokens = image_tokens_for_shape(temporal, height, width)?;
+    let features = channels
+        .checked_mul(4)
+        .ok_or(ModelFamilyError::ForwardShapeOverflow)?;
+    let mut output = allocate_f32(
+        batch
+            .checked_mul(tokens)
+            .and_then(|value| value.checked_mul(features))
+            .ok_or(ModelFamilyError::ForwardShapeOverflow)?,
+    )?;
+    for batch_index in 0..batch {
+        for time in 0..temporal {
+            for patch_y in 0..patch_height {
+                for patch_x in 0..patch_width {
+                    context.cancellation.check()?;
+                    for channel in 0..channels {
+                        for local_y in 0..2 {
+                            for local_x in 0..2 {
+                                let token = (time * patch_height + patch_y) * patch_width + patch_x;
+                                let feature = (channel * 2 + local_y) * 2 + local_x;
+                                let source_y = patch_y * 2 + local_y;
+                                let source_x = patch_x * 2 + local_x;
+                                if source_y < height && source_x < width {
+                                    let source =
+                                        ((((batch_index * channels + channel) * temporal + time)
+                                            * height
+                                            + source_y)
+                                            * width)
+                                            + source_x;
+                                    output[(batch_index * tokens + token) * features + feature] =
+                                        values[source];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(output)
+}
+
+fn unpatchify_channels_first(
+    values: &[f32],
+    batch: usize,
+    channels: usize,
+    temporal: usize,
+    height: usize,
+    width: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    let tokens = image_tokens_for_shape(temporal, height, width)?;
+    let features = channels
+        .checked_mul(4)
+        .ok_or(ModelFamilyError::ForwardShapeOverflow)?;
+    if values.len()
+        != batch
+            .checked_mul(tokens)
+            .and_then(|value| value.checked_mul(features))
+            .ok_or(ModelFamilyError::ForwardShapeOverflow)?
+    {
+        return Err(ModelFamilyError::DenoiserTensorContract(
+            "unpatch input shape is invalid".to_owned(),
+        ));
+    }
+    let mut output = allocate_f32(
+        batch
+            .checked_mul(channels)
+            .and_then(|value| value.checked_mul(temporal))
+            .and_then(|value| value.checked_mul(height))
+            .and_then(|value| value.checked_mul(width))
+            .ok_or(ModelFamilyError::ForwardShapeOverflow)?,
+    )?;
+    let patch_height = height.div_ceil(2);
+    let patch_width = width.div_ceil(2);
+    for batch_index in 0..batch {
+        for time in 0..temporal {
+            for patch_y in 0..patch_height {
+                for patch_x in 0..patch_width {
+                    context.cancellation.check()?;
+                    for channel in 0..channels {
+                        for local_y in 0..2 {
+                            for local_x in 0..2 {
+                                let token = (time * patch_height + patch_y) * patch_width + patch_x;
+                                let feature = (channel * 2 + local_y) * 2 + local_x;
+                                let target_y = patch_y * 2 + local_y;
+                                let target_x = patch_x * 2 + local_x;
+                                if target_y < height && target_x < width {
+                                    let target =
+                                        ((((batch_index * channels + channel) * temporal + time)
+                                            * height
+                                            + target_y)
+                                            * width)
+                                            + target_x;
+                                    output[target] =
+                                        values[(batch_index * tokens + token) * features + feature];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(output)
+}
+
+fn timestep_embedding(
+    values: &[f32],
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    let mut output = allocate_f32(
+        values
+            .len()
+            .checked_mul(256)
+            .ok_or(ModelFamilyError::ForwardShapeOverflow)?,
+    )?;
+    for (batch, time) in values.iter().copied().enumerate() {
+        context.cancellation.check()?;
+        if !time.is_finite() {
+            return Err(ModelFamilyError::DenoiserTensorContract(
+                "model time must be finite".to_owned(),
+            ));
+        }
+        for frequency in 0..128 {
+            let omega = 1000.0 * (-10_000.0_f32.ln() * frequency as f32 / 128.0).exp();
+            output[batch * 256 + frequency] = (time * omega).cos();
+            output[batch * 256 + 128 + frequency] = (time * omega).sin();
+        }
+    }
+    Ok(output)
+}
+
+fn qwen_timestep_embedding(
+    values: &[f32],
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    let mut output = allocate_f32(
+        values
+            .len()
+            .checked_mul(256)
+            .ok_or(ModelFamilyError::ForwardShapeOverflow)?,
+    )?;
+    for (batch, time) in values.iter().copied().enumerate() {
+        context.cancellation.check()?;
+        if !time.is_finite() {
+            return Err(ModelFamilyError::DenoiserTensorContract(
+                "model time must be finite".to_owned(),
+            ));
+        }
+        for frequency in 0..128 {
+            let omega = (-10_000.0_f32.ln() * frequency as f32 / 128.0).exp();
+            let angle = (time * omega) * 1000.0;
+            output[batch * 256 + frequency] = angle.cos();
+            output[batch * 256 + 128 + frequency] = angle.sin();
+        }
+    }
+    Ok(output)
+}
+
+fn aura_positional_crop(
+    retained: &[f32],
+    patch_height: usize,
+    patch_width: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    const WIDTH: usize = 2;
+    if !retained.len().is_multiple_of(WIDTH) {
+        return Err(ModelFamilyError::DenoiserTensorContract(
+            "AuraFlow positional storage is invalid".to_owned(),
+        ));
+    }
+    let sequence = retained.len() / WIDTH;
+    let source_side = (sequence as f64).sqrt().round() as usize;
+    if source_side.checked_mul(source_side) != Some(sequence) {
+        return Err(ModelFamilyError::DenoiserTensorContract(
+            "AuraFlow positional storage is not square".to_owned(),
+        ));
+    }
+    let target_side = patch_height.max(patch_width);
+    let mut square = if target_side <= source_side {
+        copy_f32(retained, context)?
+    } else {
+        let mut resized = allocate_f32(
+            target_side
+                .checked_mul(target_side)
+                .and_then(|value| value.checked_mul(WIDTH))
+                .ok_or(ModelFamilyError::ForwardShapeOverflow)?,
+        )?;
+        for target_y in 0..target_side {
+            context.cancellation.check()?;
+            let source_y = ((target_y as f32 + 0.5) * source_side as f32 / target_side as f32
+                - 0.5)
+                .clamp(0.0, (source_side - 1) as f32);
+            let y0 = source_y.floor() as usize;
+            let y1 = (y0 + 1).min(source_side - 1);
+            let wy = source_y - y0 as f32;
+            for target_x in 0..target_side {
+                if target_x.is_multiple_of(256) {
+                    context.cancellation.check()?;
+                }
+                let source_x = ((target_x as f32 + 0.5) * source_side as f32 / target_side as f32
+                    - 0.5)
+                    .clamp(0.0, (source_side - 1) as f32);
+                let x0 = source_x.floor() as usize;
+                let x1 = (x0 + 1).min(source_side - 1);
+                let wx = source_x - x0 as f32;
+                for channel in 0..WIDTH {
+                    let top = retained[(y0 * source_side + x0) * WIDTH + channel] * (1.0 - wx)
+                        + retained[(y0 * source_side + x1) * WIDTH + channel] * wx;
+                    let bottom = retained[(y1 * source_side + x0) * WIDTH + channel] * (1.0 - wx)
+                        + retained[(y1 * source_side + x1) * WIDTH + channel] * wx;
+                    resized[(target_y * target_side + target_x) * WIDTH + channel] =
+                        top * (1.0 - wy) + bottom * wy;
+                }
+            }
+        }
+        resized
+    };
+    let square_side = if target_side <= source_side {
+        source_side
+    } else {
+        target_side
+    };
+    let start_y = (square_side - patch_height) / 2;
+    let start_x = (square_side - patch_width) / 2;
+    let mut cropped = allocate_f32(
+        patch_height
+            .checked_mul(patch_width)
+            .and_then(|value| value.checked_mul(WIDTH))
+            .ok_or(ModelFamilyError::ForwardShapeOverflow)?,
+    )?;
+    for row in 0..patch_height {
+        context.cancellation.check()?;
+        let source_start = ((start_y + row) * square_side + start_x) * WIDTH;
+        let target_start = row * patch_width * WIDTH;
+        copy_f32_into(
+            &mut cropped[target_start..target_start + patch_width * WIDTH],
+            &square[source_start..source_start + patch_width * WIDTH],
+            context,
+        )?;
+    }
+    square.clear();
+    Ok(cropped)
+}
+
+fn execute_reduced_auraflow(
+    model: &NativeFamilyModel,
+    backend: &CpuBackend,
+    invocation: NativeFamilyDenoiserInvocation<'_>,
+    contract: &ValidatedFamilyDenoiserContract<'_>,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    const WIDTH: usize = 2;
+    let image_token_count =
+        image_tokens_for_shape(contract.temporal, contract.height, contract.width)?;
+    let latent =
+        tensor_to_f32_with_context_exact_native(backend, invocation.scaled_latent, context)?;
+    let patches = patchify_channels_first(
+        &latent,
+        contract.batch,
+        4,
+        1,
+        contract.height,
+        contract.width,
+        context,
+    )?;
+    let mut image = linear_rows(
+        &patches,
+        16,
+        WIDTH,
+        &model.denoiser_values(backend, "native.init_x_linear.weight", context)?,
+        Some(&model.denoiser_values(backend, "native.init_x_linear.bias", context)?),
+        context,
+    )?;
+    let positions = aura_positional_crop(
+        &model.denoiser_values(backend, "native.positional_encoding", context)?,
+        contract.height.div_ceil(2),
+        contract.width.div_ceil(2),
+        context,
+    )?;
+    for batch in 0..contract.batch {
+        for token in 0..image_token_count {
+            if token.is_multiple_of(256) {
+                context.cancellation.check()?;
+            }
+            for channel in 0..WIDTH {
+                image[(batch * image_token_count + token) * WIDTH + channel] +=
+                    positions[token * WIDTH + channel];
+            }
+        }
+    }
+    let conditioning =
+        tensor_to_f32_with_context_exact_native(backend, contract.conditioning, context)?;
+    let projected_text = linear_rows(
+        &conditioning,
+        crate::generated_auraflow_comfy_model_0064::DENOISER_INVOCATION_CONTEXT_WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.cond_seq_linear.weight", context)?,
+        None,
+        context,
+    )?;
+    let register = model.denoiser_values(backend, "native.register_tokens", context)?;
+    let text_tokens = contract.conditioning_tokens + 8;
+    let mut text = allocate_f32(
+        contract
+            .batch
+            .checked_mul(text_tokens)
+            .and_then(|value| value.checked_mul(WIDTH))
+            .ok_or(ModelFamilyError::ForwardShapeOverflow)?,
+    )?;
+    for batch in 0..contract.batch {
+        copy_f32_into(
+            &mut text
+                [(batch * text_tokens * WIDTH)..(batch * text_tokens * WIDTH + register.len())],
+            &register,
+            context,
+        )?;
+        let source = &projected_text[(batch * contract.conditioning_tokens * WIDTH)
+            ..((batch + 1) * contract.conditioning_tokens * WIDTH)];
+        let start = batch * text_tokens * WIDTH + register.len();
+        copy_f32_into(&mut text[start..start + source.len()], source, context)?;
+    }
+    let model_time =
+        tensor_to_f32_with_context_exact_native(backend, invocation.model_time, context)?;
+    let time_basis = timestep_embedding(&model_time, context)?;
+    let time_first = linear_rows(
+        &time_basis,
+        256,
+        WIDTH,
+        &model.denoiser_values(backend, "native.t_embedder.mlp.0.weight", context)?,
+        Some(&model.denoiser_values(backend, "native.t_embedder.mlp.0.bias", context)?),
+        context,
+    )?;
+    let time_first = map_f32(&time_first, silu, context)?;
+    let time = linear_rows(
+        &time_first,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.t_embedder.mlp.2.weight", context)?,
+        Some(&model.denoiser_values(backend, "native.t_embedder.mlp.2.bias", context)?),
+        context,
+    )?;
+    let time_silu = map_f32(&time, silu, context)?;
+    let text_mod = linear_rows(
+        &time_silu,
+        WIDTH,
+        6 * WIDTH,
+        &model.denoiser_values(backend, "native.double_layers.0.modC.1.weight", context)?,
+        None,
+        context,
+    )?;
+    let image_mod = linear_rows(
+        &time_silu,
+        WIDTH,
+        6 * WIDTH,
+        &model.denoiser_values(backend, "native.double_layers.0.modX.1.weight", context)?,
+        None,
+        context,
+    )?;
+    let text_residual = copy_f32(&text, context)?;
+    let image_residual = copy_f32(&image, context)?;
+    let text_normalized = layer_norm_rows(&text, WIDTH, 1.0e-5, context)?;
+    let image_normalized = layer_norm_rows(&image, WIDTH, 1.0e-5, context)?;
+    let text_attention_input = modulate_rows(
+        &text_normalized,
+        contract.batch,
+        text_tokens,
+        WIDTH,
+        &text_mod,
+        0,
+        WIDTH,
+        context,
+    )?;
+    let image_attention_input = modulate_rows(
+        &image_normalized,
+        contract.batch,
+        image_token_count,
+        WIDTH,
+        &image_mod,
+        0,
+        WIDTH,
+        context,
+    )?;
+    let text_query = linear_rows(
+        &text_attention_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.double_layers.0.attn.w1q.weight", context)?,
+        None,
+        context,
+    )?;
+    let text_key = linear_rows(
+        &text_attention_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.double_layers.0.attn.w1k.weight", context)?,
+        None,
+        context,
+    )?;
+    let text_value = linear_rows(
+        &text_attention_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.double_layers.0.attn.w1v.weight", context)?,
+        None,
+        context,
+    )?;
+    let image_query = linear_rows(
+        &image_attention_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.double_layers.0.attn.w2q.weight", context)?,
+        None,
+        context,
+    )?;
+    let image_key = linear_rows(
+        &image_attention_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.double_layers.0.attn.w2k.weight", context)?,
+        None,
+        context,
+    )?;
+    let image_value = linear_rows(
+        &image_attention_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.double_layers.0.attn.w2v.weight", context)?,
+        None,
+        context,
+    )?;
+    let joint_tokens = text_tokens + image_token_count;
+    let joint_length = checked_f32_length(&[contract.batch, joint_tokens, WIDTH])?;
+    let mut query = allocate_f32(joint_length)?;
+    let mut key = allocate_f32(joint_length)?;
+    let mut value = allocate_f32(joint_length)?;
+    for batch in 0..contract.batch {
+        for (target, text_source, image_source) in [
+            (&mut query, &text_query, &image_query),
+            (&mut key, &text_key, &image_key),
+            (&mut value, &text_value, &image_value),
+        ] {
+            let target_start = batch * joint_tokens * WIDTH;
+            let text_source =
+                &text_source[batch * text_tokens * WIDTH..(batch + 1) * text_tokens * WIDTH];
+            let image_source = &image_source
+                [batch * image_token_count * WIDTH..(batch + 1) * image_token_count * WIDTH];
+            copy_f32_into(
+                &mut target[target_start..target_start + text_source.len()],
+                text_source,
+                context,
+            )?;
+            copy_f32_into(
+                &mut target[target_start + text_source.len()
+                    ..target_start + text_source.len() + image_source.len()],
+                image_source,
+                context,
+            )?;
+        }
+    }
+    let query = layer_norm_rows(&query, WIDTH, 1.0e-5, context)?;
+    let key = layer_norm_rows(&key, WIDTH, 1.0e-5, context)?;
+    let attention = joint_attention(
+        backend,
+        &query,
+        &key,
+        &value,
+        contract.batch,
+        joint_tokens,
+        WIDTH,
+        None,
+        context,
+    )?;
+    let mut text_attention =
+        allocate_f32(checked_f32_length(&[contract.batch, text_tokens, WIDTH])?)?;
+    let mut image_attention = allocate_f32(checked_f32_length(&[
+        contract.batch,
+        image_token_count,
+        WIDTH,
+    ])?)?;
+    for batch in 0..contract.batch {
+        let source = &attention[batch * joint_tokens * WIDTH..(batch + 1) * joint_tokens * WIDTH];
+        copy_f32_into(
+            &mut text_attention[batch * text_tokens * WIDTH..(batch + 1) * text_tokens * WIDTH],
+            &source[..text_tokens * WIDTH],
+            context,
+        )?;
+        copy_f32_into(
+            &mut image_attention
+                [batch * image_token_count * WIDTH..(batch + 1) * image_token_count * WIDTH],
+            &source[text_tokens * WIDTH..],
+            context,
+        )?;
+    }
+    text_attention = linear_rows(
+        &text_attention,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.double_layers.0.attn.w1o.weight", context)?,
+        None,
+        context,
+    )?;
+    image_attention = linear_rows(
+        &image_attention,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.double_layers.0.attn.w2o.weight", context)?,
+        None,
+        context,
+    )?;
+    text = gated_residual(
+        &text_residual,
+        &text_attention,
+        contract.batch,
+        text_tokens,
+        WIDTH,
+        &text_mod,
+        2 * WIDTH,
+        context,
+    )?;
+    image = gated_residual(
+        &image_residual,
+        &image_attention,
+        contract.batch,
+        image_token_count,
+        WIDTH,
+        &image_mod,
+        2 * WIDTH,
+        context,
+    )?;
+    text = layer_norm_rows(&text, WIDTH, 1.0e-5, context)?;
+    image = layer_norm_rows(&image, WIDTH, 1.0e-5, context)?;
+    let text_mlp_input = modulate_rows(
+        &text,
+        contract.batch,
+        text_tokens,
+        WIDTH,
+        &text_mod,
+        3 * WIDTH,
+        4 * WIDTH,
+        context,
+    )?;
+    let image_mlp_input = modulate_rows(
+        &image,
+        contract.batch,
+        image_token_count,
+        WIDTH,
+        &image_mod,
+        3 * WIDTH,
+        4 * WIDTH,
+        context,
+    )?;
+    let text_mlp = aura_mlp(
+        model,
+        backend,
+        &text_mlp_input,
+        "native.double_layers.0.mlpC",
+        context,
+    )?;
+    let image_mlp = aura_mlp(
+        model,
+        backend,
+        &image_mlp_input,
+        "native.double_layers.0.mlpX",
+        context,
+    )?;
+    text = gated_residual(
+        &text_residual,
+        &text_mlp,
+        contract.batch,
+        text_tokens,
+        WIDTH,
+        &text_mod,
+        5 * WIDTH,
+        context,
+    )?;
+    image = gated_residual(
+        &image_residual,
+        &image_mlp,
+        contract.batch,
+        image_token_count,
+        WIDTH,
+        &image_mod,
+        5 * WIDTH,
+        context,
+    )?;
+    let mut combined = allocate_f32(joint_length)?;
+    for batch in 0..contract.batch {
+        let start = batch * joint_tokens * WIDTH;
+        copy_f32_into(
+            &mut combined[start..start + text_tokens * WIDTH],
+            &text[batch * text_tokens * WIDTH..(batch + 1) * text_tokens * WIDTH],
+            context,
+        )?;
+        copy_f32_into(
+            &mut combined[start + text_tokens * WIDTH..(batch + 1) * joint_tokens * WIDTH],
+            &image[batch * image_token_count * WIDTH..(batch + 1) * image_token_count * WIDTH],
+            context,
+        )?;
+    }
+    let combined_residual = copy_f32(&combined, context)?;
+    let single_mod = linear_rows(
+        &time_silu,
+        WIDTH,
+        6 * WIDTH,
+        &model.denoiser_values(backend, "native.single_layers.0.modCX.1.weight", context)?,
+        None,
+        context,
+    )?;
+    let single_input = modulate_rows(
+        &layer_norm_rows(&combined, WIDTH, 1.0e-5, context)?,
+        contract.batch,
+        joint_tokens,
+        WIDTH,
+        &single_mod,
+        0,
+        WIDTH,
+        context,
+    )?;
+    let single_query = linear_rows(
+        &single_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.single_layers.0.attn.w1q.weight", context)?,
+        None,
+        context,
+    )?;
+    let single_key = linear_rows(
+        &single_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.single_layers.0.attn.w1k.weight", context)?,
+        None,
+        context,
+    )?;
+    let single_value = linear_rows(
+        &single_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.single_layers.0.attn.w1v.weight", context)?,
+        None,
+        context,
+    )?;
+    let single_attention = joint_attention(
+        backend,
+        &single_query,
+        &single_key,
+        &single_value,
+        contract.batch,
+        joint_tokens,
+        WIDTH,
+        None,
+        context,
+    )?;
+    let single_attention = linear_rows(
+        &single_attention,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.single_layers.0.attn.w1o.weight", context)?,
+        None,
+        context,
+    )?;
+    combined = gated_residual(
+        &combined_residual,
+        &single_attention,
+        contract.batch,
+        joint_tokens,
+        WIDTH,
+        &single_mod,
+        2 * WIDTH,
+        context,
+    )?;
+    combined = layer_norm_rows(&combined, WIDTH, 1.0e-5, context)?;
+    let single_mlp_input = modulate_rows(
+        &combined,
+        contract.batch,
+        joint_tokens,
+        WIDTH,
+        &single_mod,
+        3 * WIDTH,
+        4 * WIDTH,
+        context,
+    )?;
+    let single_mlp = aura_mlp(
+        model,
+        backend,
+        &single_mlp_input,
+        "native.single_layers.0.mlp",
+        context,
+    )?;
+    combined = gated_residual(
+        &combined_residual,
+        &single_mlp,
+        contract.batch,
+        joint_tokens,
+        WIDTH,
+        &single_mod,
+        5 * WIDTH,
+        context,
+    )?;
+    let mut image = allocate_f32(checked_f32_length(&[
+        contract.batch,
+        image_token_count,
+        WIDTH,
+    ])?)?;
+    for batch in 0..contract.batch {
+        let source_start = (batch * joint_tokens + text_tokens) * WIDTH;
+        copy_f32_into(
+            &mut image[batch * image_token_count * WIDTH..(batch + 1) * image_token_count * WIDTH],
+            &combined[source_start..source_start + image_token_count * WIDTH],
+            context,
+        )?;
+    }
+    let final_mod = linear_rows(
+        &time_silu,
+        WIDTH,
+        2 * WIDTH,
+        &model.denoiser_values(backend, "native.modF.1.weight", context)?,
+        None,
+        context,
+    )?;
+    let image = modulate_rows(
+        &image,
+        contract.batch,
+        image_token_count,
+        WIDTH,
+        &final_mod,
+        0,
+        WIDTH,
+        context,
+    )?;
+    let patches = linear_rows(
+        &image,
+        WIDTH,
+        16,
+        &model.denoiser_values(backend, "native.final_linear.weight", context)?,
+        None,
+        context,
+    )?;
+    unpatchify_channels_first(
+        &patches,
+        contract.batch,
+        4,
+        1,
+        contract.height,
+        contract.width,
+        context,
+    )
+}
+
+fn qwen_feed_forward(
+    model: &NativeFamilyModel,
+    backend: &CpuBackend,
+    values: &[f32],
+    stream: &str,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    const WIDTH: usize = 128;
+    const HIDDEN: usize = 512;
+    let prefix = format!("native.transformer_blocks.0.{stream}_mlp");
+    let first = linear_rows(
+        values,
+        WIDTH,
+        HIDDEN,
+        &model.denoiser_values(backend, &format!("{prefix}.net.0.proj.weight"), context)?,
+        Some(&model.denoiser_values(backend, &format!("{prefix}.net.0.proj.bias"), context)?),
+        context,
+    )?;
+    let mut activated = allocate_f32(first.len())?;
+    for (index, (target, source)) in activated.iter_mut().zip(first).enumerate() {
+        if index.is_multiple_of(256) {
+            context.cancellation.check()?;
+        }
+        *target = gelu_tanh(source);
+    }
+    linear_rows(
+        &activated,
+        HIDDEN,
+        WIDTH,
+        &model.denoiser_values(backend, &format!("{prefix}.net.2.weight"), context)?,
+        Some(&model.denoiser_values(backend, &format!("{prefix}.net.2.bias"), context)?),
+        context,
+    )
+}
+
+fn qwen_rotary_positions(
+    text_tokens: usize,
+    temporal: usize,
+    height: usize,
+    width: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<[Vec<f32>; 3], ModelFamilyError> {
+    let patch_height = height.div_ceil(2);
+    let patch_width = width.div_ceil(2);
+    let image_tokens = image_tokens_for_shape(temporal, height, width)?;
+    let total = text_tokens
+        .checked_add(image_tokens)
+        .ok_or(ModelFamilyError::ForwardShapeOverflow)?;
+    let mut axes = [
+        allocate_f32(total)?,
+        allocate_f32(total)?,
+        allocate_f32(total)?,
+    ];
+    let text_start = (patch_height / 2).max(patch_width / 2);
+    for token in 0..text_tokens {
+        if token.is_multiple_of(256) {
+            context.cancellation.check()?;
+        }
+        let position = (text_start + token) as f32;
+        axes[0][token] = position;
+        axes[1][token] = position;
+        axes[2][token] = position;
+    }
+    for time in 0..temporal {
+        for row in 0..patch_height {
+            for column in 0..patch_width {
+                if column.is_multiple_of(256) {
+                    context.cancellation.check()?;
+                }
+                let token = text_tokens + (time * patch_height + row) * patch_width + column;
+                axes[0][token] = if temporal > 1 { time as f32 } else { 0.0 };
+                axes[1][token] = row as f32 - (patch_height / 2) as f32;
+                axes[2][token] = column as f32 - (patch_width / 2) as f32;
+            }
+        }
+    }
+    Ok(axes)
+}
+
+fn execute_reduced_qwen_image(
+    model: &NativeFamilyModel,
+    backend: &CpuBackend,
+    invocation: NativeFamilyDenoiserInvocation<'_>,
+    contract: &ValidatedFamilyDenoiserContract<'_>,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, ModelFamilyError> {
+    const WIDTH: usize = 128;
+    const CONTEXT_WIDTH: usize = 3_584;
+    let image_tokens = image_tokens_for_shape(contract.temporal, contract.height, contract.width)?;
+    let latent =
+        tensor_to_f32_with_context_exact_native(backend, invocation.scaled_latent, context)?;
+    let patches = patchify_channels_first(
+        &latent,
+        contract.batch,
+        16,
+        contract.temporal,
+        contract.height,
+        contract.width,
+        context,
+    )?;
+    let mut image = linear_rows(
+        &patches,
+        64,
+        WIDTH,
+        &model.denoiser_values(backend, "native.img_in.weight", context)?,
+        Some(&model.denoiser_values(backend, "native.img_in.bias", context)?),
+        context,
+    )?;
+    let conditioning =
+        tensor_to_f32_with_context_exact_native(backend, contract.conditioning, context)?;
+    let conditioning = rms_norm_rows(
+        &conditioning,
+        CONTEXT_WIDTH,
+        &model.denoiser_values(backend, "native.txt_norm.weight", context)?,
+        1.0e-6,
+        context,
+    )?;
+    let mut text = linear_rows(
+        &conditioning,
+        CONTEXT_WIDTH,
+        WIDTH,
+        &model.denoiser_values(backend, "native.txt_in.weight", context)?,
+        Some(&model.denoiser_values(backend, "native.txt_in.bias", context)?),
+        context,
+    )?;
+    let model_time =
+        tensor_to_f32_with_context_exact_native(backend, invocation.model_time, context)?;
+    let time_basis = qwen_timestep_embedding(&model_time, context)?;
+    let time_first = linear_rows(
+        &time_basis,
+        256,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.time_text_embed.timestep_embedder.linear_1.weight",
+            context,
+        )?,
+        Some(&model.denoiser_values(
+            backend,
+            "native.time_text_embed.timestep_embedder.linear_1.bias",
+            context,
+        )?),
+        context,
+    )?;
+    let mut time_activated = allocate_f32(time_first.len())?;
+    for (index, (target, source)) in time_activated.iter_mut().zip(time_first).enumerate() {
+        if index.is_multiple_of(256) {
+            context.cancellation.check()?;
+        }
+        *target = silu(source);
+    }
+    let time = linear_rows(
+        &time_activated,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.time_text_embed.timestep_embedder.linear_2.weight",
+            context,
+        )?,
+        Some(&model.denoiser_values(
+            backend,
+            "native.time_text_embed.timestep_embedder.linear_2.bias",
+            context,
+        )?),
+        context,
+    )?;
+    let time_silu = map_f32(&time, silu, context)?;
+    let image_mod = linear_rows(
+        &time_silu,
+        WIDTH,
+        6 * WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.img_mod.1.weight",
+            context,
+        )?,
+        Some(&model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.img_mod.1.bias",
+            context,
+        )?),
+        context,
+    )?;
+    let text_mod = linear_rows(
+        &time_silu,
+        WIDTH,
+        6 * WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.txt_mod.1.weight",
+            context,
+        )?,
+        Some(&model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.txt_mod.1.bias",
+            context,
+        )?),
+        context,
+    )?;
+    let image_residual = copy_f32(&image, context)?;
+    let text_residual = copy_f32(&text, context)?;
+    let image_input = modulate_rows(
+        &layer_norm_rows(&image, WIDTH, 1.0e-6, context)?,
+        contract.batch,
+        image_tokens,
+        WIDTH,
+        &image_mod,
+        0,
+        WIDTH,
+        context,
+    )?;
+    let text_input = modulate_rows(
+        &layer_norm_rows(&text, WIDTH, 1.0e-6, context)?,
+        contract.batch,
+        contract.conditioning_tokens,
+        WIDTH,
+        &text_mod,
+        0,
+        WIDTH,
+        context,
+    )?;
+    let image_query = linear_rows(
+        &image_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.to_q.weight",
+            context,
+        )?,
+        Some(&model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.to_q.bias",
+            context,
+        )?),
+        context,
+    )?;
+    let image_key = linear_rows(
+        &image_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.to_k.weight",
+            context,
+        )?,
+        Some(&model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.to_k.bias",
+            context,
+        )?),
+        context,
+    )?;
+    let image_value = linear_rows(
+        &image_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.to_v.weight",
+            context,
+        )?,
+        Some(&model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.to_v.bias",
+            context,
+        )?),
+        context,
+    )?;
+    let text_query = linear_rows(
+        &text_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.add_q_proj.weight",
+            context,
+        )?,
+        Some(&model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.add_q_proj.bias",
+            context,
+        )?),
+        context,
+    )?;
+    let text_key = linear_rows(
+        &text_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.add_k_proj.weight",
+            context,
+        )?,
+        Some(&model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.add_k_proj.bias",
+            context,
+        )?),
+        context,
+    )?;
+    let text_value = linear_rows(
+        &text_input,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.add_v_proj.weight",
+            context,
+        )?,
+        Some(&model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.add_v_proj.bias",
+            context,
+        )?),
+        context,
+    )?;
+    let image_query = rms_norm_rows(
+        &image_query,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.norm_q.weight",
+            context,
+        )?,
+        1.0e-6,
+        context,
+    )?;
+    let image_key = rms_norm_rows(
+        &image_key,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.norm_k.weight",
+            context,
+        )?,
+        1.0e-6,
+        context,
+    )?;
+    let text_query = rms_norm_rows(
+        &text_query,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.norm_added_q.weight",
+            context,
+        )?,
+        1.0e-6,
+        context,
+    )?;
+    let text_key = rms_norm_rows(
+        &text_key,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.norm_added_k.weight",
+            context,
+        )?,
+        1.0e-6,
+        context,
+    )?;
+    let total_tokens = contract.conditioning_tokens + image_tokens;
+    let joint_length = checked_f32_length(&[contract.batch, total_tokens, WIDTH])?;
+    let mut query = allocate_f32(joint_length)?;
+    let mut key = allocate_f32(joint_length)?;
+    let mut value = allocate_f32(joint_length)?;
+    for batch in 0..contract.batch {
+        for (target, text_source, image_source) in [
+            (&mut query, &text_query, &image_query),
+            (&mut key, &text_key, &image_key),
+            (&mut value, &text_value, &image_value),
+        ] {
+            let start = batch * total_tokens * WIDTH;
+            let text_source = &text_source[batch * contract.conditioning_tokens * WIDTH
+                ..(batch + 1) * contract.conditioning_tokens * WIDTH];
+            let image_source =
+                &image_source[batch * image_tokens * WIDTH..(batch + 1) * image_tokens * WIDTH];
+            copy_f32_into(
+                &mut target[start..start + text_source.len()],
+                text_source,
+                context,
+            )?;
+            copy_f32_into(
+                &mut target
+                    [start + text_source.len()..start + text_source.len() + image_source.len()],
+                image_source,
+                context,
+            )?;
+        }
+    }
+    let axes = qwen_rotary_positions(
+        contract.conditioning_tokens,
+        contract.temporal,
+        contract.height,
+        contract.width,
+        context,
+    )?;
+    let axis_sequences = [
+        RotaryPositionSequence::Float(&axes[0]),
+        RotaryPositionSequence::Float(&axes[1]),
+        RotaryPositionSequence::Float(&axes[2]),
+    ];
+    let table = precompute_rotary_table(
+        RotaryTableRequest {
+            positions: RotaryPositions::Multiaxis(&axis_sequences),
+            axis_dimensions: &[16, 56, 56],
+            rotary_dimension: WIDTH,
+            theta: 10_000.0,
+            scaling: RotaryScaling::None,
+            frequency_layout: RotaryFrequencyLayout::ResetPerAxis,
+        },
+        context.cancellation,
+    )?;
+    let query = apply_rotary_table(
+        &query,
+        contract.batch,
+        total_tokens,
+        1,
+        WIDTH,
+        &table,
+        RotaryPairLayout::Adjacent,
+        context.cancellation,
+    )?;
+    let key = apply_rotary_table(
+        &key,
+        contract.batch,
+        total_tokens,
+        1,
+        WIDTH,
+        &table,
+        RotaryPairLayout::Adjacent,
+        context.cancellation,
+    )?;
+    let mask_values = invocation
+        .attention_mask
+        .map(|mask| tensor_to_f32_with_context_exact_native(backend, mask, context))
+        .transpose()?;
+    let mut expanded_mask = None;
+    if let Some(mask) = mask_values.as_deref() {
+        let mut values = allocate_f32(checked_f32_length(&[
+            contract.batch,
+            total_tokens,
+            total_tokens,
+        ])?)?;
+        for batch in 0..contract.batch {
+            for query_token in 0..total_tokens {
+                for key_token in 0..contract.conditioning_tokens {
+                    if key_token.is_multiple_of(256) {
+                        context.cancellation.check()?;
+                    }
+                    values[(batch * total_tokens + query_token) * total_tokens + key_token] =
+                        mask[batch * contract.conditioning_tokens + key_token];
+                }
+            }
+        }
+        expanded_mask = Some(values);
+    }
+    let attention_mask = expanded_mask
+        .as_deref()
+        .map(|values| AttentionMask::Additive {
+            values,
+            shape: AttentionMaskShape::BatchQueryByKey,
+        });
+    let attention = joint_attention(
+        backend,
+        &query,
+        &key,
+        &value,
+        contract.batch,
+        total_tokens,
+        WIDTH,
+        attention_mask,
+        context,
+    )?;
+    let mut text_attention = allocate_f32(checked_f32_length(&[
+        contract.batch,
+        contract.conditioning_tokens,
+        WIDTH,
+    ])?)?;
+    let mut image_attention =
+        allocate_f32(checked_f32_length(&[contract.batch, image_tokens, WIDTH])?)?;
+    for batch in 0..contract.batch {
+        let source = &attention[batch * total_tokens * WIDTH..(batch + 1) * total_tokens * WIDTH];
+        copy_f32_into(
+            &mut text_attention[batch * contract.conditioning_tokens * WIDTH
+                ..(batch + 1) * contract.conditioning_tokens * WIDTH],
+            &source[..contract.conditioning_tokens * WIDTH],
+            context,
+        )?;
+        copy_f32_into(
+            &mut image_attention[batch * image_tokens * WIDTH..(batch + 1) * image_tokens * WIDTH],
+            &source[contract.conditioning_tokens * WIDTH..],
+            context,
+        )?;
+    }
+    image_attention = linear_rows(
+        &image_attention,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.to_out.0.weight",
+            context,
+        )?,
+        Some(&model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.to_out.0.bias",
+            context,
+        )?),
+        context,
+    )?;
+    text_attention = linear_rows(
+        &text_attention,
+        WIDTH,
+        WIDTH,
+        &model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.to_add_out.weight",
+            context,
+        )?,
+        Some(&model.denoiser_values(
+            backend,
+            "native.transformer_blocks.0.attn.to_add_out.bias",
+            context,
+        )?),
+        context,
+    )?;
+    image = gated_residual(
+        &image_residual,
+        &image_attention,
+        contract.batch,
+        image_tokens,
+        WIDTH,
+        &image_mod,
+        2 * WIDTH,
+        context,
+    )?;
+    text = gated_residual(
+        &text_residual,
+        &text_attention,
+        contract.batch,
+        contract.conditioning_tokens,
+        WIDTH,
+        &text_mod,
+        2 * WIDTH,
+        context,
+    )?;
+    let image_second = modulate_rows(
+        &layer_norm_rows(&image, WIDTH, 1.0e-6, context)?,
+        contract.batch,
+        image_tokens,
+        WIDTH,
+        &image_mod,
+        3 * WIDTH,
+        4 * WIDTH,
+        context,
+    )?;
+    let text_second = modulate_rows(
+        &layer_norm_rows(&text, WIDTH, 1.0e-6, context)?,
+        contract.batch,
+        contract.conditioning_tokens,
+        WIDTH,
+        &text_mod,
+        3 * WIDTH,
+        4 * WIDTH,
+        context,
+    )?;
+    let image_mlp = qwen_feed_forward(model, backend, &image_second, "img", context)?;
+    let text_mlp = qwen_feed_forward(model, backend, &text_second, "txt", context)?;
+    image = gated_residual(
+        &image,
+        &image_mlp,
+        contract.batch,
+        image_tokens,
+        WIDTH,
+        &image_mod,
+        5 * WIDTH,
+        context,
+    )?;
+    let _text = gated_residual(
+        &text,
+        &text_mlp,
+        contract.batch,
+        contract.conditioning_tokens,
+        WIDTH,
+        &text_mod,
+        5 * WIDTH,
+        context,
+    )?;
+    let final_mod = linear_rows(
+        &time_silu,
+        WIDTH,
+        2 * WIDTH,
+        &model.denoiser_values(backend, "native.norm_out.linear.weight", context)?,
+        Some(&model.denoiser_values(backend, "native.norm_out.linear.bias", context)?),
+        context,
+    )?;
+    let image = modulate_rows(
+        &layer_norm_rows(&image, WIDTH, 1.0e-6, context)?,
+        contract.batch,
+        image_tokens,
+        WIDTH,
+        &final_mod,
+        WIDTH,
+        0,
+        context,
+    )?;
+    let patches = linear_rows(
+        &image,
+        WIDTH,
+        64,
+        &model.denoiser_values(backend, "native.proj_out.weight", context)?,
+        Some(&model.denoiser_values(backend, "native.proj_out.bias", context)?),
+        context,
+    )?;
+    unpatchify_channels_first(
+        &patches,
+        contract.batch,
+        16,
+        contract.temporal,
+        contract.height,
+        contract.width,
+        context,
+    )
 }
 
 #[derive(Clone, Debug)]
@@ -7362,12 +9845,22 @@ pub enum ModelFamilyError {
     MemoryOverflow,
     #[error("model requires {required} bytes but budget is {budget} bytes")]
     OutOfMemory { required: u64, budget: u64 },
+    #[error("native family denoiser is unavailable: {0}")]
+    DenoiserUnavailable(String),
+    #[error("native family denoiser conditioning identity mismatch: {0}")]
+    DenoiserConditioningIdentity(String),
+    #[error("native family denoiser conditioning value is invalid: {0}")]
+    DenoiserConditioningValue(String),
+    #[error("native family denoiser tensor contract is invalid: {0}")]
+    DenoiserTensorContract(String),
     #[error("model forward shape arithmetic overflowed")]
     ForwardShapeOverflow,
     #[error(transparent)]
     Descriptor(#[from] ModelDescriptorError),
     #[error(transparent)]
     Tensor(#[from] TensorError),
+    #[error(transparent)]
+    Attention(#[from] AttentionError),
     #[error(transparent)]
     TensorOperation(#[from] OperatorIndirectionError),
     #[error(transparent)]

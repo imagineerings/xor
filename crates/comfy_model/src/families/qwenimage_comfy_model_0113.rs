@@ -6,9 +6,10 @@ use crate::{
     ModelStateLayout, ModelStateTarget, ModelStateTransformOperation, ModelStateTransformPlan,
     ModelUnmatchedKeyDisposition, ModelWeightRule, qwen_image_configuration_for_probe,
     qwen_image_family::{
-        QWEN_IMAGE_CLIP_TARGET, QWEN_IMAGE_COMPONENT_STATE_SCHEMAS, QWEN_IMAGE_COMPONENTS,
-        QWEN_IMAGE_MEMORY_ESTIMATOR, QWEN_IMAGE_MODEL_REQUIRED_KEYS, QWEN_IMAGE_SUPPORTED_DEVICES,
-        QWEN_IMAGE_SUPPORTED_DTYPES, QwenImageConfiguration, QwenImageReferenceMethod,
+        QWEN_IMAGE_CLIP_TARGET, QWEN_IMAGE_COMPONENTS, QWEN_IMAGE_COMPONENT_STATE_SCHEMAS,
+        QWEN_IMAGE_MEMORY_ESTIMATOR, QWEN_IMAGE_MODEL_REQUIRED_KEYS,
+        QWEN_IMAGE_SUPPORTED_DEVICES, QWEN_IMAGE_SUPPORTED_DTYPES, QwenImageConfiguration,
+        QwenImageReferenceMethod,
     },
 };
 use comfy_tensor::{DType, Scalar};
@@ -27,6 +28,60 @@ pub const MODEL_FAMILY_CATALOG_ROW_SHA256: &str =
 pub const MODEL_FAMILY_SAMPLING_MULTIPLIER: f64 = 1.0;
 pub const MODEL_FAMILY_SAMPLING_SHIFT: f64 = 1.15;
 pub const MODEL_FAMILY_MEMORY_USAGE_FACTOR: f64 = 1.8;
+
+pub const DENOISER_INVOCATION_REQUIRED_KEYS: &[&str] = &[
+    "native.img_in.weight",
+    "native.img_in.bias",
+    "native.txt_norm.weight",
+    "native.txt_in.weight",
+    "native.txt_in.bias",
+    "native.time_text_embed.timestep_embedder.linear_1.weight",
+    "native.time_text_embed.timestep_embedder.linear_1.bias",
+    "native.time_text_embed.timestep_embedder.linear_2.weight",
+    "native.time_text_embed.timestep_embedder.linear_2.bias",
+    "native.transformer_blocks.0.img_mod.1.weight",
+    "native.transformer_blocks.0.img_mod.1.bias",
+    "native.transformer_blocks.0.txt_mod.1.weight",
+    "native.transformer_blocks.0.txt_mod.1.bias",
+    "native.transformer_blocks.0.attn.norm_q.weight",
+    "native.transformer_blocks.0.attn.norm_k.weight",
+    "native.transformer_blocks.0.attn.norm_added_q.weight",
+    "native.transformer_blocks.0.attn.norm_added_k.weight",
+    "native.transformer_blocks.0.attn.to_q.weight",
+    "native.transformer_blocks.0.attn.to_q.bias",
+    "native.transformer_blocks.0.attn.to_k.weight",
+    "native.transformer_blocks.0.attn.to_k.bias",
+    "native.transformer_blocks.0.attn.to_v.weight",
+    "native.transformer_blocks.0.attn.to_v.bias",
+    "native.transformer_blocks.0.attn.add_q_proj.weight",
+    "native.transformer_blocks.0.attn.add_q_proj.bias",
+    "native.transformer_blocks.0.attn.add_k_proj.weight",
+    "native.transformer_blocks.0.attn.add_k_proj.bias",
+    "native.transformer_blocks.0.attn.add_v_proj.weight",
+    "native.transformer_blocks.0.attn.add_v_proj.bias",
+    "native.transformer_blocks.0.attn.to_out.0.weight",
+    "native.transformer_blocks.0.attn.to_out.0.bias",
+    "native.transformer_blocks.0.attn.to_add_out.weight",
+    "native.transformer_blocks.0.attn.to_add_out.bias",
+    "native.transformer_blocks.0.img_mlp.net.0.proj.weight",
+    "native.transformer_blocks.0.img_mlp.net.0.proj.bias",
+    "native.transformer_blocks.0.img_mlp.net.2.weight",
+    "native.transformer_blocks.0.img_mlp.net.2.bias",
+    "native.transformer_blocks.0.txt_mlp.net.0.proj.weight",
+    "native.transformer_blocks.0.txt_mlp.net.0.proj.bias",
+    "native.transformer_blocks.0.txt_mlp.net.2.weight",
+    "native.transformer_blocks.0.txt_mlp.net.2.bias",
+    "native.norm_out.linear.weight",
+    "native.norm_out.linear.bias",
+    "native.proj_out.weight",
+    "native.proj_out.bias",
+];
+pub const DENOISER_INVOCATION_LATENT_RANK: usize = 5;
+pub const DENOISER_INVOCATION_CHANNELS: usize = 16;
+pub const DENOISER_INVOCATION_CONTEXT_WIDTH: usize = 3_584;
+pub const DENOISER_INVOCATION_HEAD_WIDTH: usize = 128;
+pub const DENOISER_INVOCATION_MLP_WIDTH: usize = 512;
+pub const DENOISER_INVOCATION_PATCH_SIZE: usize = 2;
 
 const DETECTION_RULES: &[ModelDetectionRule] = &[
     ModelDetectionRule::AnyKeyPresent {
