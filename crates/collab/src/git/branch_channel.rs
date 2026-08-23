@@ -29,7 +29,7 @@ INSERT INTO public.collaboration_channels (
 )
 ON CONFLICT (community_id, channel_id) DO NOTHING
 "#;
-const SELECT_CHANNEL_SQL: &str = r#"
+pub(super) const SELECT_CHANNEL_SQL: &str = r#"
 SELECT community_id, channel_id, name, channel_type, visibility, lifecycle_state,
        description, creator_principal_id, channel_version::bigint AS channel_version,
        ttl_seconds IS NOT NULL AS has_ttl,
@@ -41,11 +41,11 @@ WHERE community_id = $1 AND channel_id = $2
 "#;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct BranchChannelKey {
-    channel_id: AggregateId,
-    source_record_id: String,
-    source_version: String,
-    integrity_value: String,
+pub(super) struct BranchChannelKey {
+    pub(super) channel_id: AggregateId,
+    pub(super) source_record_id: String,
+    pub(super) source_version: String,
+    pub(super) integrity_value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -75,16 +75,42 @@ pub struct BranchChannelService {
 
 impl BranchChannelService {
     pub fn new(connection: DatabaseConnection) -> Result<Self, BranchChannelError> {
+        Self::from_shared(Arc::new(connection))
+    }
+
+    pub(super) fn from_shared(
+        connection: Arc<DatabaseConnection>,
+    ) -> Result<Self, BranchChannelError> {
         if connection.get_database_backend() != DbBackend::Postgres {
             return Err(BranchChannelError::UnsupportedBackend);
         }
-        Ok(Self {
-            connection: Arc::new(connection),
-        })
+        Ok(Self { connection })
     }
 
     pub async fn bind(
         &self,
+        branch: &BranchCollaboration,
+        creator_principal_id: PrincipalId,
+        authorization: &AuthorizationRequest<'_>,
+    ) -> Result<BranchChannelBinding, BranchChannelError> {
+        let transaction = self
+            .connection
+            .as_ref()
+            .begin()
+            .await
+            .map_err(BranchChannelError::Unavailable)?;
+        let result = async {
+            set_tenant(&transaction, branch.fields().identity.community_id()).await?;
+            self.bind_in_transaction(&transaction, branch, creator_principal_id, authorization)
+                .await
+        }
+        .await;
+        finish_transaction(transaction, result).await
+    }
+
+    pub(super) async fn bind_in_transaction(
+        &self,
+        transaction: &DatabaseTransaction,
         branch: &BranchCollaboration,
         creator_principal_id: PrincipalId,
         authorization: &AuthorizationRequest<'_>,
@@ -113,34 +139,26 @@ impl BranchChannelService {
             },
             authorization,
         )?;
-
-        let transaction = self
-            .connection
-            .as_ref()
-            .begin()
-            .await
-            .map_err(BranchChannelError::Unavailable)?;
-        let result = async {
-            set_tenant(&transaction, branch.fields().identity.community_id()).await?;
-            insert_channel(
-                &transaction,
-                &proposed_channel,
-                &key,
-                authorization.now_millis,
-            )
-            .await?;
-            let channel =
-                select_channel(&transaction, branch.fields().identity.community_id(), &key).await?;
-            if channel.fields().lifecycle_state != ChannelLifecycleState::Active {
-                return Err(BranchChannelError::BindingConflict);
-            }
-            Ok(BranchChannelBinding {
-                branch: branch.fields().identity.clone(),
-                channel,
-            })
+        insert_channel(
+            transaction,
+            &proposed_channel,
+            &key,
+            authorization.now_millis,
+        )
+        .await?;
+        let channel =
+            select_channel(transaction, branch.fields().identity.community_id(), &key).await?;
+        if channel.fields().lifecycle_state != ChannelLifecycleState::Active {
+            return Err(BranchChannelError::BindingConflict);
         }
-        .await;
-        finish_transaction(transaction, result).await
+        Ok(BranchChannelBinding {
+            branch: branch.fields().identity.clone(),
+            channel,
+        })
+    }
+
+    pub(super) fn connection(&self) -> &DatabaseConnection {
+        self.connection.as_ref()
     }
 }
 
@@ -150,7 +168,7 @@ pub fn branch_channel_id(
     branch_channel_key(identity).map(|key| key.channel_id)
 }
 
-fn branch_channel_key(
+pub(super) fn branch_channel_key(
     identity: &BranchCollaborationIdentity,
 ) -> Result<BranchChannelKey, BranchChannelError> {
     let branch = identity.branch_ref().as_str().as_bytes();
@@ -250,7 +268,7 @@ async fn select_channel(
     channel_from_row(&row, community_id, key)
 }
 
-fn channel_from_row(
+pub(super) fn channel_from_row(
     row: &QueryResult,
     expected_community_id: CommunityId,
     key: &BranchChannelKey,
