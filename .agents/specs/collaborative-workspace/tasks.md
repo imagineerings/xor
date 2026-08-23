@@ -2328,7 +2328,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 30. Consolidate engrams, snapshots, archives and metrics
 
-  - [ ] 30.1. Implement NIP-AE engram coordinate and encryption codecs
+  - [x] 30.1. Implement NIP-AE engram coordinate and encryption codecs
     - Preserve encrypted coordinates, relay scope and owner-read privacy independently of storage.
     - _Requirements: 5.3, 11.3_
     - _Capability IDs: CAP-024_
@@ -2336,6 +2336,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/docs/nips/NIP-AE.md, projects/buzz/desktop/src/features/agent-memory/**_
     - _Writes: crates/nostr_compat/src/agent_memory.rs_
     - _Validation: codec tests cover round trip, wrong owner, rotation and malformed coordinate_
+    - _Discovered contradiction (2026-08-23): the standalone codec requires narrow registration in `crates/nostr_compat/src/nostr_compat.rs`, and interoperable NIP-44 v2 encryption must use the workspace-pinned `nostr` implementation with its `nip44` feature, requiring the direct dependency allowlist, `crates/nostr_compat/Cargo.toml` and `Cargo.lock` to advance together. The crate's existing compile-time Buzz conformance fixtures also require a temporary worktree-local `projects/buzz` symlink to the separately supplied source root during tests; the link is not committed and no Buzz file is changed._
+    - _Evidence: 2026-08-23 — added exact canonical `30174:<agent>:<blinded-d>` coordinates with explicit owner scope, agent-only NIP-44 v2 encryption and symmetric agent/owner decryption that derives and verifies the supplied reader identity before ciphertext work. Decrypted bodies re-enter strict Task 11.8 parsing and blinded-slug validation; ciphertext and error diagnostics expose no plaintext or wire payload. Added bounded NIP-65 write-relay/fallback resolution with canonical WebSocket equality, retained advertised connection URLs and an explicit old/new union for safe head republication during relay rotation. Four focused tests passed owner/agent round trip, wrong-owner denial and redaction, owner-plus-relay rotation, malformed coordinates and unusable relay scope; the complete `nostr_compat` library suite passed 72/72. Repository-standard warning-denied release/all-target/all-feature Clippy, dependency boundaries, Rust formatting and diff hygiene passed; Buzz inventory and canonical specification gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 30.2. Implement canonical encrypted memory storage
     - Persist engram metadata/ciphertext and retention state without service-side plaintext access.

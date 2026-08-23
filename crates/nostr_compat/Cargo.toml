@@ -11,6 +11,7 @@ allowed-normal-dependencies = [
     "base64",
     "chrono",
     "hex",
+    "nostr",
     "secp256k1",
     "serde",
     "serde_json",
@@ -30,6 +31,7 @@ workspace = true
 base64.workspace = true
 chrono.workspace = true
 hex.workspace = true
+nostr = { workspace = true, features = ["nip44"] }
 serde.workspace = true
 serde_json.workspace = true
 secp256k1.workspace = true

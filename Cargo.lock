@@ -12552,6 +12552,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "hex",
+ "nostr",
  "proptest",
  "secp256k1",
  "serde",
