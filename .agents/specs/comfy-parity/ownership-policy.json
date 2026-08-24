@@ -14883,13 +14883,20 @@
       "owner_files": [
         "crates/comfy_runtime/src/native_video_codec_abi.rs",
         "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json",
-        "crates/comfy_runtime/abi/video-codec/verify-bindings.c"
+        "crates/comfy_runtime/abi/video-codec/verify-bindings.c",
+        "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-general-video-v1.json",
+        "crates/comfy_runtime/abi/video-codec/verify-general-video-bindings.c"
       ],
       "owner_symbols": [
         "video_codec_library_contracts",
         "video_codec_symbol_version_namespace",
+        "general_video_codec_library_contracts",
         "AvRational",
-        "AvChannelLayout"
+        "AvChannelLayout",
+        "AvCodecParametersGeneralProjection",
+        "AvStreamGeneralProjection",
+        "AvFormatContextGeneralProjection",
+        "AvFrameGeneralProjection"
       ],
       "allowed_adapters": [
         "comfy_runtime::trust consumes only the exact library, ABI-major, and symbol-name projection when verifying catalogs and issuing certificates",
@@ -14922,11 +14929,43 @@
           "qualified": "comfy_runtime::native_video_codec_abi::AvChannelLayout",
           "role": "abi_boundary",
           "symbol": "AvChannelLayout"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::general_video_codec_library_contracts",
+          "role": "canonical_signed_abi_declaration",
+          "symbol": "general_video_codec_library_contracts",
+          "pattern": "^pub\\(crate\\) fn general_video_codec_library_contracts\\("
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::AvCodecParametersGeneralProjection",
+          "role": "abi_boundary",
+          "symbol": "AvCodecParametersGeneralProjection"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::AvStreamGeneralProjection",
+          "role": "abi_boundary",
+          "symbol": "AvStreamGeneralProjection"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::AvFormatContextGeneralProjection",
+          "role": "abi_boundary",
+          "symbol": "AvFormatContextGeneralProjection"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::AvFrameGeneralProjection",
+          "role": "abi_boundary",
+          "symbol": "AvFrameGeneralProjection"
         }
       ],
       "call_symbols": [
         "video_codec_library_contracts",
-        "video_codec_symbol_version_namespace"
+        "video_codec_symbol_version_namespace",
+        "general_video_codec_library_contracts"
       ],
       "required_mappings": [
         {
@@ -14958,6 +14997,31 @@
           "name": "video-codec-reviewed-abi-fixture-forbids-runtime-and-codec-claims",
           "path": "crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json",
           "pattern": "official-source-reviewed-declaration-only-abi[\\s\\S]*reviewed_typed_c_declarations[\\s\\S]*native_library_loaded_by_this_leaf[\\s\\S]*runtime_symbol_address_resolved[\\s\\S]*encoder_availability_probed[\\s\\S]*codec_execution"
+        },
+        {
+          "name": "general-video-abi-extends-frozen-five-library-contract-with-six-library-seventy-eight-symbol-review",
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "pattern": "video_codec_library_contracts[\\s\\S]*general_video_codec_library_extensions[\\s\\S]*general_video_codec_library_contracts[\\s\\S]*general_video_abi_is_supplementary_six_library_contract[\\s\\S]*general_symbol_count[\\s\\S]*78"
+        },
+        {
+          "name": "general-video-abi-c-verifier-proves-layouts-constants-and-supplemental-signatures",
+          "path": "crates/comfy_runtime/abi/video-codec/verify-general-video-bindings.c",
+          "pattern": "_Static_assert\\(sizeof\\(AVCodecParameters\\)[\\s\\S]*_Static_assert\\(sizeof\\(AVFrame\\)[\\s\\S]*avcodec_flush_buffers[\\s\\S]*avformat_seek_file[\\s\\S]*av_frame_get_side_data[\\s\\S]*swr_get_delay[\\s\\S]*avfilter_graph_alloc[\\s\\S]*av_buffersink_get_frame"
+        },
+        {
+          "name": "general-video-abi-manifest-pins-source-compiler-history-and-denies-availability",
+          "path": "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-general-video-v1.json",
+          "pattern": "official_release_signature_verified[\\s\\S]*reviewed_typed_declarations[\\s\\S]*installed_ffmpeg_package[\\s\\S]*loadable_native_library[\\s\\S]*certified_native_ffi[\\s\\S]*codec_available[\\s\\S]*executable[\\s\\S]*publication"
+        },
+        {
+          "name": "general-video-trust-review-is-declaration-only-and-cannot-certify",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "ReviewedGeneralVideoCodecDeclarations[\\s\\S]*review_general_video_codec_declarations[\\s\\S]*general_video_codec_abi_is_exact_and_declaration_only[\\s\\S]*NativeFfiRegistry::default[\\s\\S]*TrustError::UncertifiedFfi"
+        },
+        {
+          "name": "general-video-fixture-freezes-source-oracle-and-zero-availability-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-general-video-abi/manifest.json",
+          "pattern": "official-source-reviewed-declaration-only-general-video-abi[\\s\\S]*general_abi_manifest_sha256[\\s\\S]*warning_denied_c_verifier_sha256[\\s\\S]*certified_native_ffi[\\s\\S]*codec_available[\\s\\S]*publication"
         }
       ],
       "known_open_reasons": [],
@@ -14966,11 +15030,13 @@
         "comfy-parity-native-video-codec-reviewed-abi-foundation",
         "comfy-parity-native-video-codec-callable-symbol-certification-foundation",
         "comfy-parity-native-video-codec-symbol-binding-foundation",
-        "comfy-parity-native-video-codec-data-plane-abi-foundation"
+        "comfy-parity-native-video-codec-data-plane-abi-foundation",
+        "comfy-parity-native-video-codec-general-abi-foundation"
       ],
       "production_consumers": [
         "native video codec trust catalog",
-        "retained FFmpeg typed symbol binding"
+        "retained FFmpeg typed symbol binding",
+        "future general video demux, decode, seek, remux, AAC, and filter adapters"
       ],
       "requirements": [
         "Requirement 28",
@@ -14991,7 +15057,7 @@
         "VAL-NATIVE-BOUNDARY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "One private source-verified ABI module owns exact FFmpeg 7.1 declarations and public by-value layouts for the reviewed x86_64 GNU boundary. Trust consumes its symbol projection, while the loader and later callable adapter remain separate unsafe owners. Declaration evidence alone cannot claim runtime availability or codec behavior."
+      "decision_reason": "One private source-verified ABI module owns the frozen five-library FFmpeg 7.1 contract and a separate additive six-library general-video declaration set with exact x86_64 GNU projections. Trust reviews declaration bytes without issuing NativeFfiRegistry certificates, while the loader and later callable adapter remain separate unsafe owners. Declaration evidence alone cannot claim installation, loadability, certification, availability, execution, allocation, or publication."
     },
     {
       "concern": "native_video_reviewed_codec_data_plane_abi_layouts",

@@ -13880,7 +13880,7 @@ def native_video_execution_precursor_tasks(
             ".agents/specs/comfy-parity/regenerate_native_planning.py",
             ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ],
-        "Official FFmpeg 7.1 header and archive fingerprints plus warning-denied C verification prove every required symbol, version namespace, checked struct prefix, seek/remux/decode/AAC/filter declaration, and retained-library dependency. Existing codec identities remain frozen; absent, mismatched, or incomplete declarations fail before any library load, and the task makes no codec-availability claim.",
+        "Official FFmpeg 7.1 archive and detached-signature fingerprints, exact direct-header hashes, the pinned GCC 15.2 x86_64-linux-gnu oracle, and warning-denied C11 verification prove a separate six-library, seventy-eight-symbol general-video declaration contract. The frozen five-library, fifty-four-symbol codec ABI and every historical manifest hash remain byte-exact. Checked full projections cover AVCodecParameters, AVStream, AVFormatContext, and AVFrame without changing historical prefix types; supplemental declarations cover bounded seek, remux, decode, rotation, AAC resampling, alignment, pixel description, and libavfilter buffer/filter graphs. ReviewedGeneralVideoCodecDeclarations is explicitly declaration-only: every library remains UncertifiedFfi under NativeFfiRegistry, absent, mismatched, or incomplete declarations fail before any library load, and installed, loadable, certified, available, executable, allocation, execution, and publication claims are all false.",
         ["28.2", "31.5", "31.6", "34.4", "36.4", "41.3", "44.3"],
         ["comfy_runtime", "comfy_test_support"],
     )
@@ -20942,6 +20942,18 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "cargo test --locked -p comfy_tensor --test spatial_functional_kernel_01 -- --nocapture",
             "cargo test --locked -p comfy_test_support --test native_node_family_e2e -- --nocapture",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-video-codec-general-abi-foundation":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p comfy_runtime general_video_codec_abi --lib -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task555_general_video_codec_declarations_001 -- --exact --nocapture",
+            "cargo check --locked -p comfy_runtime -p comfy_test_support",
+            "./script/clippy -p comfy_runtime -p comfy_test_support",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",

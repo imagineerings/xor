@@ -1772,6 +1772,24 @@ class ValidationGenerationTests(unittest.TestCase):
                 "comfy-parity-native-video-codec-general-abi-foundation"
             ]["dependencies"],
         )
+        general_video_abi = tasks_by_id[
+            "comfy-parity-native-video-codec-general-abi-foundation"
+        ]
+        self.assertIn("six-library, seventy-eight-symbol", general_video_abi["done"])
+        self.assertIn("five-library, fifty-four-symbol", general_video_abi["done"])
+        self.assertIn("ReviewedGeneralVideoCodecDeclarations", general_video_abi["done"])
+        self.assertIn("UncertifiedFfi", general_video_abi["done"])
+        general_video_commands = planning.task_validation_commands(general_video_abi)
+        for command in (
+            "cargo test --locked -p comfy_runtime general_video_codec_abi --lib -- --nocapture",
+            "val_ownership_task555_general_video_codec_declarations_001",
+            "cargo check --locked -p comfy_runtime -p comfy_test_support",
+            "./script/clippy -p comfy_runtime -p comfy_test_support",
+            "regenerate_all.py --check-twice",
+            "validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ):
+            self.assertIn(command, general_video_commands)
         codec_certification = tasks_by_id[video_codec_ffi_certification_foundation_id]
         self.assertIn("crates/comfy_runtime/src/trust.rs", codec_certification["writes"])
         self.assertIn("VAL-RUNTIME-TRUST-001", codec_certification["validations"])

@@ -14453,6 +14453,191 @@ fn val_ownership_native_video_codec_reviewed_abi_001() -> Result<(), Box<dyn std
 }
 
 #[test]
+fn val_ownership_task555_general_video_codec_declarations_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    fn assert_root_export<T>() {}
+
+    assert_root_export::<comfy_runtime::ReviewedGeneralVideoCodecDeclarations>();
+    assert_root_export::<comfy_runtime::ReviewedGeneralVideoCodecLibraryRequirement>();
+
+    let root = repository_root()?;
+    let abi_path = root.join("crates/comfy_runtime/src/native_video_codec_abi.rs");
+    let trust_path = root.join("crates/comfy_runtime/src/trust.rs");
+    let manifest_path = root
+        .join("crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-general-video-v1.json");
+    let verifier_path =
+        root.join("crates/comfy_runtime/abi/video-codec/verify-general-video-bindings.c");
+    let fixture_path =
+        root.join("crates/comfy_test_support/fixtures/video/codec-general-video-abi/manifest.json");
+    assert_eq!(
+        file_sha256(&manifest_path)?,
+        "772b01d7db041e0da57dd7d5a09e1b5ae267804b934b2b533ce1fc62e521089d"
+    );
+    assert_eq!(
+        file_sha256(&verifier_path)?,
+        "aac6a120eeff8d3df4d2a90461dc4958210925873dcac1006c52429b4da07024"
+    );
+    assert_eq!(
+        file_sha256(&fixture_path)?,
+        "ad0fe02a88ce8c25f7747eadc3cca93d6444bd403341691e3defceca9447d8ae"
+    );
+
+    let abi = fs::read_to_string(&abi_path)?;
+    for required in [
+        "pub(crate) fn video_codec_library_contracts()",
+        "pub(crate) fn general_video_codec_library_contracts()",
+        "GENERAL_VIDEO_AVFILTER_SYMBOLS",
+        "AvCodecParametersGeneralProjection",
+        "AvStreamGeneralProjection",
+        "AvFormatContextGeneralProjection",
+        "AvFrameGeneralProjection",
+        "general_video_abi_is_supplementary_six_library_contract",
+    ] {
+        assert!(abi.contains(required), "general video ABI lacks {required}");
+    }
+    assert!(!abi.contains("pub fn general_video_codec_library_contracts"));
+
+    let trust = fs::read_to_string(&trust_path)?;
+    for required in [
+        "pub struct ReviewedGeneralVideoCodecDeclarations",
+        "pub fn review_general_video_codec_declarations(",
+        "general_video_codec_abi_is_exact_and_declaration_only",
+        "NativeFfiRegistry::default()",
+        "TrustError::UncertifiedFfi",
+    ] {
+        assert!(
+            trust.contains(required),
+            "general video declaration review lacks {required}"
+        );
+    }
+    for forbidden in [
+        "VerifiedGeneralVideoCodecAbi",
+        "verify_general_video_codec_abi",
+        "GENERAL_VIDEO_CODEC_ABI_MANIFEST).authorize",
+    ] {
+        assert!(
+            !trust.contains(forbidden),
+            "general video declarations expose authority-shaped {forbidden}"
+        );
+    }
+
+    let manifest: serde_json::Value = serde_json::from_str(&fs::read_to_string(&manifest_path)?)?;
+    assert_eq!(manifest["contract"]["historical_library_count"], 5);
+    assert_eq!(manifest["contract"]["historical_symbol_count"], 54);
+    assert_eq!(manifest["contract"]["required_library_count"], 6);
+    assert_eq!(manifest["contract"]["supplemental_symbol_count"], 24);
+    assert_eq!(manifest["contract"]["general_symbol_count"], 78);
+    assert_eq!(manifest["libraries"]["avfilter"]["abi_major"], 10);
+    assert_eq!(
+        manifest["libraries"]["avfilter"]["symbol_version_namespace"],
+        "LIBAVFILTER_10"
+    );
+    for claim in [
+        "installed_ffmpeg_package",
+        "loadable_native_library",
+        "certified_native_ffi",
+        "native_library_loaded",
+        "runtime_symbol_address_resolved",
+        "runtime_version_checked",
+        "codec_availability_probed",
+        "codec_available",
+        "executable",
+        "codec_execution",
+        "media_allocation",
+        "publication",
+    ] {
+        assert_eq!(
+            manifest["claims"][claim], false,
+            "claim {claim} is not false"
+        );
+    }
+
+    let fixture: serde_json::Value = serde_json::from_str(&fs::read_to_string(&fixture_path)?)?;
+    for (field, source_path) in [
+        (
+            "nodes_video_sha256",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+        ),
+        (
+            "video_input_types_sha256",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+        ),
+        (
+            "video_input_impl_sha256",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+        ),
+    ] {
+        assert_eq!(
+            fixture["source"][field].as_str(),
+            Some(file_sha256(&root.join(source_path))?.as_str()),
+            "fixture source fingerprint drifted for {source_path}"
+        );
+    }
+    assert_eq!(
+        fixture["oracle"]["general_abi_manifest_sha256"],
+        file_sha256(&manifest_path)?
+    );
+    assert_eq!(
+        fixture["oracle"]["warning_denied_c_verifier_sha256"],
+        file_sha256(&verifier_path)?
+    );
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy["concerns"]
+        .as_array()
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern["concern"] == "native_video_reviewed_codec_abi_declarations"
+            })
+        })
+        .ok_or("missing reviewed video ABI concern")?;
+    assert_eq!(
+        concern["canonical_owner"],
+        "comfy_runtime::native_video_codec_abi"
+    );
+    assert!(
+        concern["definitions"]
+            .as_array()
+            .is_some_and(|definitions| {
+                definitions.iter().any(|definition| {
+                    definition["symbol"] == "general_video_codec_library_contracts"
+                        && definition["role"] == "canonical_signed_abi_declaration"
+                })
+            })
+    );
+    assert!(
+        concern["consolidation_tasks"]
+            .as_array()
+            .is_some_and(|tasks| {
+                tasks
+                    .iter()
+                    .any(|task| task == "comfy-parity-native-video-codec-general-abi-foundation")
+            })
+    );
+    for mapping in [
+        "general-video-abi-extends-frozen-five-library-contract-with-six-library-seventy-eight-symbol-review",
+        "general-video-abi-c-verifier-proves-layouts-constants-and-supplemental-signatures",
+        "general-video-abi-manifest-pins-source-compiler-history-and-denies-availability",
+        "general-video-trust-review-is-declaration-only-and-cannot-certify",
+        "general-video-fixture-freezes-source-oracle-and-zero-availability-claims",
+    ] {
+        assert!(
+            concern["required_mappings"]
+                .as_array()
+                .is_some_and(|mappings| {
+                    mappings
+                        .iter()
+                        .any(|candidate| candidate["name"] == mapping)
+                }),
+            "missing general video ownership mapping {mapping}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_video_codec_callable_symbol_certification_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
