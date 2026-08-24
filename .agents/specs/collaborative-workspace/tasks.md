@@ -3192,14 +3192,16 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 41. Port relay mesh and shared-compute scheduling
 
-  - [ ] 41.1. Port fenced mesh wire and membership protocol
+  - [x] 41.1. Port fenced mesh wire and membership protocol
     - Implement ADR-006-approved version, community membership, peer identity and replay rules over Iroh.
     - _Requirements: 5.1, 16.3, 19.2_
     - _Capability IDs: CAP-035_
     - _Depends on: 2.6, 4.8, 13.3_
     - _Reads: .agents/specs/collaborative-workspace/decisions/adr-006-shared-compute.md, projects/buzz/crates/buzz-relay-mesh/**_
-    - _Writes: crates/remote/src/mesh/protocol.rs_
+    - _Writes: Cargo.lock, Cargo.toml, crates/remote/Cargo.toml, crates/remote/src/{remote,mesh}.rs, crates/remote/src/mesh/protocol.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
     - _Validation: protocol tests cover version, replay, revoked membership, partition and malformed gossip_
+    - _Discovered contradiction (2026-08-25): the planned isolated protocol file cannot compile or expose `remote::mesh` without a descriptive parent module and crate-root registration, and implementing the approved boundary with canonical tenant/membership identities plus actual Iroh endpoint/address/signature types requires the corresponding `collaboration_domain`, `iroh-base`, `postcard` and UUID dependency/lock wiring. The narrow correction adds only that mechanical reachability and protocol graph. It does not construct a listener, enable relay mesh/shared compute, grant membership/session ownership, schedule work or own canonical membership/session persistence._
+    - _Evidence: 2026-08-25 — added the `zed/mesh/1` versioned postcard wire and a tenant-first per-stream admission state machine over real Iroh endpoint, address, transport and Ed25519 signature types. Deployment-root attestations bind owner/community/endpoint/transports, exact membership and boot/record generations and expiry; every accepted frame rechecks the transport peer plus canonical active membership/runtime, while session hello and data recheck the exact canonical session fence. First-frame Hello, closed control/session roles, pre-decode 1 MiB control and 16 MiB stream ceilings, explicit approved transports, 45-second maximum lifetimes, a bounded nonce replay window shared across peer streams and strictly newer bounded gossip fail closed. Revoked peers cannot authenticate, signed revocation tombstones remain removal-only hints, and partitioned canonical authority rejects without consuming the nonce so exact recovery retry is safe. Six focused protocol tests passed unsupported wire/gossip versions, cross-stream replay, revoked/cross-tenant membership, partition/recovery, malformed/duplicate/stale gossip and stale session fencing; the full 47-test `remote` library suite passed. Repository-prescribed release/all-target/all-feature Clippy for `remote` passed with warnings denied. Canonical spec, full inventory, collaboration dependency-boundary, Rust formatting and diff-hygiene gates passed._
 
   - [ ] 41.2. Implement compute advertisements and expiry
     - Validate approved capabilities/resources and fence stale advertisements without granting execution.

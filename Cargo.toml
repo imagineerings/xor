@@ -731,6 +731,7 @@ imara-diff = "0.2.0"
 indexmap = { version = "2.7.0", features = ["serde"] }
 indoc = "2"
 inventory = "0.3.19"
+iroh-base = { version = "1.0.2", default-features = false, features = ["key"] }
 itertools = "0.14.0"
 json_dotpath = "1.1"
 jsonschema = "0.37.0"
