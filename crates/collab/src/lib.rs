@@ -9,6 +9,7 @@ pub mod env;
 pub mod executor;
 pub mod freshness;
 pub mod git;
+pub mod huddle;
 pub mod identity;
 pub mod jobs;
 pub mod media;
