@@ -93,7 +93,7 @@ impl TransformKind {
 
     const fn display_name(self) -> &'static str {
         match self {
-            Self::CenterCrop => "CenterCropImages",
+            Self::CenterCrop => "Crop Image (Center)",
             Self::CropByBBoxes => "Crop By Bounding Boxes",
             Self::Crop => "Crop Image (DEPRECATED)",
             Self::CropV2 => "Crop Image",
@@ -101,7 +101,7 @@ impl TransformKind {
             Self::PadForOutpaint => "Pad Image for Outpainting",
             Self::Rotate => "Rotate Image",
             Self::Stitch => "Stitch Images",
-            Self::RandomCrop => "RandomCropImages",
+            Self::RandomCrop => "Crop Image (Random)",
             Self::ResizeAndPad => "Resize And Pad Image",
         }
     }
@@ -612,10 +612,10 @@ fn execute_crop(
             .and_then(|frame| frame.first())
             .ok_or_else(|| invalid_inputs("crop_region must contain one bounding box"))?;
         (
-            truncating_u64(bounding_box.x(), "crop x")?,
-            truncating_u64(bounding_box.y(), "crop y")?,
-            truncating_u64(bounding_box.width(), "crop width")?,
-            truncating_u64(bounding_box.height(), "crop height")?,
+            integral_u64(bounding_box.x(), "crop x")?,
+            integral_u64(bounding_box.y(), "crop y")?,
+            integral_u64(bounding_box.width(), "crop width")?,
+            integral_u64(bounding_box.height(), "crop height")?,
         )
     } else {
         (
@@ -1029,7 +1029,10 @@ fn resize_and_pad(
             execution,
         )
         .map_err(tensor_failure)?;
-    let mut values = vec![fill; element_count(batch, target_height, target_width, channels)?];
+    let mut values = filled_values(
+        element_count(batch, target_height, target_width, channels)?,
+        fill,
+    )?;
     let x_offset = (target_width - new_width) / 2;
     let y_offset = (target_height - new_height) / 2;
     paste_image(
@@ -1046,6 +1049,7 @@ fn resize_and_pad(
         0,
         y_offset,
         x_offset,
+        execution,
     )?;
     ImageTensor::from_f32(
         backend,
@@ -1079,12 +1083,10 @@ fn pad_for_outpaint(
         .checked_add(top)
         .and_then(|value| value.checked_add(bottom))
         .ok_or_else(|| invalid_inputs("outpaint height overflowed"))?;
-    if output_width > MAX_RESOLUTION || output_height > MAX_RESOLUTION {
-        return Err(invalid_inputs(
-            "outpaint dimensions exceed the native resolution limit",
-        ));
-    }
-    let mut image_values = vec![0.5; element_count(batch, output_height, output_width, channels)?];
+    let mut image_values = filled_values(
+        element_count(batch, output_height, output_width, channels)?,
+        0.5,
+    )?;
     paste_image(
         &mut image_values,
         batch,
@@ -1099,8 +1101,9 @@ fn pad_for_outpaint(
         0,
         top,
         left,
+        execution,
     )?;
-    let mut mask_values = vec![1.0; element_count(1, output_height, output_width, 1)?];
+    let mut mask_values = filled_values(element_count(1, output_height, output_width, 1)?, 1.0)?;
     for y in 0..height {
         execution.check().map_err(tensor_failure)?;
         for x in 0..width {
@@ -1267,12 +1270,10 @@ fn stitch_images(
             .and_then(|value| value.checked_add(spacing_width))
             .ok_or_else(|| invalid_inputs("stitched image height overflowed"))?
     };
-    if output_width > MAX_RESOLUTION || output_height > MAX_RESOLUTION {
-        return Err(invalid_inputs(
-            "stitched image exceeds the native resolution limit",
-        ));
-    }
-    let mut output = vec![0.0; element_count(batch, output_height, output_width, channels)?];
+    let mut output = filled_values(
+        element_count(batch, output_height, output_width, channels)?,
+        0.0,
+    )?;
     let (leading, trailing) = if matches!(direction, "left" | "up") {
         (&second, &first)
     } else {
@@ -1293,6 +1294,7 @@ fn stitch_images(
         0,
         0,
         0,
+        execution,
     )?;
     if spacing_width > 0 {
         fill_spacing(
@@ -1309,6 +1311,7 @@ fn stitch_images(
             },
             spacing_width,
             spacing_color,
+            execution,
         )?;
     }
     let (_, trailing_height, trailing_width, _) = trailing.dimensions().map_err(native_failure)?;
@@ -1331,6 +1334,7 @@ fn stitch_images(
         0,
         trailing_y,
         trailing_x,
+        execution,
     )?;
     ImageTensor::from_f32(
         backend,
@@ -1399,7 +1403,10 @@ fn crop_by_bboxes(
                         output_height,
                         output_width,
                         channels,
-                        &vec![0.0; element_count(1, output_height, output_width, channels)?],
+                        &filled_values(
+                            element_count(1, output_height, output_width, channels)?,
+                            0.0,
+                        )?,
                     )
                     .map_err(native_failure)?,
                 );
@@ -1499,7 +1506,11 @@ fn concatenate_batches(
         batch = batch
             .checked_add(image_batch)
             .ok_or_else(|| native_failure("crop batch size overflowed"))?;
-        values.extend_from_slice(image.as_f32_slice().map_err(native_failure)?);
+        let image_values = image.as_f32_slice().map_err(native_failure)?;
+        values
+            .try_reserve(image_values.len())
+            .map_err(native_failure)?;
+        values.extend_from_slice(image_values);
     }
     ImageTensor::from_f32(backend, execution, batch, height, width, channels, &values)
         .map_err(native_failure)
@@ -1586,7 +1597,10 @@ fn center_pad(
     if width > target_width || height > target_height {
         return Err(native_failure("center padding cannot shrink an image"));
     }
-    let mut values = vec![fill; element_count(batch, target_height, target_width, channels)?];
+    let mut values = filled_values(
+        element_count(batch, target_height, target_width, channels)?,
+        fill,
+    )?;
     paste_image(
         &mut values,
         batch,
@@ -1601,6 +1615,7 @@ fn center_pad(
         0,
         (target_height - height) / 2,
         (target_width - width) / 2,
+        execution,
     )?;
     ImageTensor::from_f32(
         backend,
@@ -1629,16 +1644,18 @@ fn paste_image(
     batch_offset: u64,
     y_offset: u64,
     x_offset: u64,
+    execution: &comfy_tensor::ExecutionContext<'_>,
 ) -> Result<(), NativeNodeFailure> {
-    if batch_offset + source_batch > output_batch
-        || y_offset + source_height > output_height
-        || x_offset + source_width > output_width
+    if batch_offset.checked_add(source_batch).is_none_or(|end| end > output_batch)
+        || y_offset.checked_add(source_height).is_none_or(|end| end > output_height)
+        || x_offset.checked_add(source_width).is_none_or(|end| end > output_width)
         || source_channels != output_channels
     {
         return Err(native_failure("image paste exceeds destination bounds"));
     }
     for batch in 0..source_batch {
         for y in 0..source_height {
+            execution.check().map_err(tensor_failure)?;
             for x in 0..source_width {
                 for channel in 0..source_channels {
                     let value = value_at(
@@ -1682,14 +1699,19 @@ fn fill_spacing(
     offset: u64,
     spacing_width: u64,
     color: [f32; 3],
+    execution: &comfy_tensor::ExecutionContext<'_>,
 ) -> Result<(), NativeNodeFailure> {
+    let spacing_end = offset
+        .checked_add(spacing_width)
+        .ok_or_else(|| native_failure("spacing range overflowed"))?;
     for batch_index in 0..batch {
         let (y_range, x_range) = if horizontal {
-            (0..height, offset..offset + spacing_width)
+            (0..height, offset..spacing_end)
         } else {
-            (offset..offset + spacing_width, 0..width)
+            (offset..spacing_end, 0..width)
         };
         for y in y_range {
+            execution.check().map_err(tensor_failure)?;
             for x in x_range.clone() {
                 for channel in 0..channels {
                     let value = if channel < 3 {
@@ -1735,7 +1757,12 @@ fn fit_dimensions(
     } else {
         scaled_height as u64
     };
-    Ok((new_width.max(1), new_height.max(1)))
+    if new_width == 0 || new_height == 0 {
+        return Err(invalid_inputs(
+            "fitted image dimensions truncate to zero",
+        ));
+    }
+    Ok((new_width, new_height))
 }
 
 fn resize_mode(value: &str) -> Result<ResizeMode, NativeNodeFailure> {
@@ -2147,6 +2174,13 @@ fn truncating_u64(value: f64, name: &str) -> Result<u64, NativeNodeFailure> {
     Ok(value as u64)
 }
 
+fn integral_u64(value: f64, name: &str) -> Result<u64, NativeNodeFailure> {
+    if value.fract() != 0.0 {
+        return Err(invalid_inputs(format!("{name} must be an integer")));
+    }
+    truncating_u64(value, name)
+}
+
 fn truncating_i64(value: f64, name: &str) -> Result<i64, NativeNodeFailure> {
     if !value.is_finite() {
         return Err(invalid_inputs(format!(
@@ -2204,6 +2238,15 @@ fn element_count(
         .and_then(|value| value.checked_mul(channels))
         .and_then(|value| usize::try_from(value).ok())
         .ok_or_else(|| native_failure("IMAGE element count overflowed"))
+}
+
+fn filled_values(element_count: usize, value: f32) -> Result<Vec<f32>, NativeNodeFailure> {
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(element_count)
+        .map_err(native_failure)?;
+    values.resize(element_count, value);
+    Ok(values)
 }
 
 fn check_cancellation(
@@ -2362,15 +2405,59 @@ mod tests {
             .map(|kind| kind.feature_id())
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
-        for binding in bindings {
-            binding.validate()?;
+        for binding in &bindings {
+            let NativeNodeBinding::Executable { descriptor, .. } = binding else {
+                return Err("image transform binding was not executable".into());
+            };
+            descriptor.validate_exact_schema_v2()?;
+            assert_eq!(descriptor.cache, NativeCachePolicy::InputIdentity);
+            assert_eq!(
+                descriptor.effect,
+                if descriptor.class_type == "ImageCropV2" {
+                    NativeEffectClass::WritesArtifact
+                } else {
+                    NativeEffectClass::Pure
+                }
+            );
+            assert!(!descriptor.output_node);
+            assert!(descriptor.inputs.iter().all(|input| !input.lazy));
+            assert!(descriptor.outputs.iter().all(|output| !output.is_list));
         }
         let fixture = fixture()?;
         assert_eq!(
-            fixture["task_id"],
+            fixture["stable_task_id"],
             "comfy-parity-native-nodes-image-transform-comfy-node-0047"
         );
-        assert_eq!(fixture["nodes"].as_array().map(Vec::len), Some(10));
+        let nodes = fixture["nodes"]
+            .as_array()
+            .ok_or("fixture nodes were not an array")?;
+        assert_eq!(nodes.len(), 10);
+        let expected_hashes = [
+            ("COMFY-NODE-0047", "f5258e4d133be01f4db12430bc814bdc25d7b937fede545fa8cdd1852740a190"),
+            ("COMFY-NODE-0125", "08f10e4d60924fdc5002b2ea82d180c8dd71a2fcd4cb8b54df611dbdfce3366d"),
+            ("COMFY-NODE-0247", "6a2e83dfcd98423d8dc1476248f77284f22dd087638c3a815840cd22042392c7"),
+            ("COMFY-NODE-0248", "7bff80a167cec29a7737dc1ef26114d0821c49ef4130cc531c6612a26c3a9ec9"),
+            ("COMFY-NODE-0250", "2950156b24562cc8da1f756574b9fe191c717d8edc336b5da0656af48f47dcf0"),
+            ("COMFY-NODE-0258", "ed9bce1af997ce50cdea6eb3de0646a734819fbe2e07ca62e2e70db226d0f17b"),
+            ("COMFY-NODE-0261", "7fed131da61d51f061bb20166431244379e86922b5daf75c3a6dbcb6a6cfd4bd"),
+            ("COMFY-NODE-0267", "124c054e8bed03d8702e4336a20bda8f0c6cfe628f6c83b4d2a9788c2cd9409a"),
+            ("COMFY-NODE-0504", "b27066e5da7a4aa80840fa172d2410d5609e92f02bd5244494c467da0ee8a2a6"),
+            ("COMFY-NODE-0540", "e4472818dee17ff8bd42e25a996169499dac94f0b0fcee0d81277dada677ffbf"),
+        ];
+        for (node, (feature_id, definition_hash)) in nodes.iter().zip(expected_hashes) {
+            assert_eq!(node["feature_id"], feature_id);
+            assert_eq!(node["catalog_definition_sha256"], definition_hash);
+        }
+        assert_eq!(
+            bindings[0].presentation().display_name,
+            "Crop Image (Center)"
+        );
+        assert_eq!(
+            bindings[8].presentation().display_name,
+            "Crop Image (Random)"
+        );
+        let encoded = serde_json::to_vec(&fixture)?;
+        assert_eq!(serde_json::from_slice::<Value>(&encoded)?, fixture);
         Ok(())
     }
 
@@ -2433,6 +2520,8 @@ mod tests {
         let bounding_box = NativeBoundingBox::checked(-2.0, -1.0, 3.0, 4.0, None, None)?;
         assert_eq!(bounding_union(&[bounding_box])?, (-2, -1, 1, 3));
         assert_eq!(fit_dimensions(2, 4, 3, 5, true)?, (2, 5));
+        assert!(fit_dimensions(16_384, 1, 1, 1, false).is_err());
+        assert!(integral_u64(1.5, "crop x").is_err());
         Ok(())
     }
 
