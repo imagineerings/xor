@@ -28,6 +28,7 @@ PIPELINE = [
     "../../../crates/comfy_model/scripts/generate_model_family_catalog.py",
     "generate_conditioning_catalog.py",
     "generate_node_contract_catalog.py",
+    "generate_provider_component_catalog.py",
     "generate_shell_catalog.py",
     "generate_frontend_extension_catalog.py",
     "regenerate_native_zed_evidence.py",
