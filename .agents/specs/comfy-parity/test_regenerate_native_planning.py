@@ -464,6 +464,12 @@ class ValidationGenerationTests(unittest.TestCase):
             ".agents/specs/comfy-parity/catalogs/source-snapshot-manifest.json",
             provider_catalog["writes"],
         )
+        for derived_path in [
+            ".agents/specs/comfy-parity/catalogs/features.csv",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/parity-matrix.md",
+        ]:
+            self.assertIn(derived_path, provider_catalog["writes"])
         for previous, current in zip(provider_shared_ids, provider_shared_ids[1:]):
             self.assertEqual(tasks_by_id[current]["dependencies"], [previous])
         for identifier in provider_vendor_ids:
