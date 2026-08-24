@@ -22,6 +22,7 @@ multiplayer-tools = [
     "git_ui/multiplayer-tools",
     "onboarding/multiplayer-tools",
     "sidebar/multiplayer-tools",
+    "tasks_ui/multiplayer-tools",
     "zed_credentials_provider/multiplayer-tools",
     "workspace/multiplayer-tools",
 ]
