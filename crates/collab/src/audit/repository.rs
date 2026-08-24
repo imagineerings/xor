@@ -223,6 +223,28 @@ impl AuditRepository {
         finish_transaction(transaction, result).await
     }
 
+    pub async fn load_operation(
+        &self,
+        tenant: &TenantContext,
+        operation_id: OperationId,
+    ) -> Result<Option<AuditEntry>, AuditRepositoryError> {
+        if operation_id.as_uuid().is_nil() {
+            return Err(AuditRepositoryError::InvalidInput);
+        }
+        let transaction = self.begin().await?;
+        let result = async {
+            set_tenant(&transaction, tenant.community_id()).await?;
+            transaction
+                .query_one(operation_statement(tenant.community_id(), operation_id))
+                .await
+                .map_err(AuditRepositoryError::Unavailable)?
+                .map(|row| entry_from_row(&row, tenant.community_id(), None))
+                .transpose()
+        }
+        .await;
+        finish_transaction(transaction, result).await
+    }
+
     pub async fn append(
         &self,
         tenant: &TenantContext,
@@ -589,6 +611,16 @@ fn segment_statement(community_id: CommunityId, from_sequence: u64, limit: u32) 
             from_sequence.to_string().into(),
             i64::from(limit).into(),
         ],
+    )
+}
+
+fn operation_statement(community_id: CommunityId, operation_id: OperationId) -> Statement {
+    Statement::from_sql_and_values(
+        DatabaseBackend::Postgres,
+        format!(
+            "{SELECT_SEGMENT_SQL}{ENTRY_COLUMNS}\nFROM public.collaboration_audit_entries\nWHERE community_id = $1 AND operation_id = $2"
+        ),
+        vec![community_id.as_uuid().into(), operation_id.as_uuid().into()],
     )
 }
 
