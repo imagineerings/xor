@@ -7077,7 +7077,7 @@ mod tests {
             &cancellation,
         )?;
         assert!(matches!(
-            preflight_activation(source.claim(&context, &cancellation)?, manifest.clone()),
+            preflight_activation(source.claim(&context, &cancellation)?, manifest),
             Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
         ));
 
