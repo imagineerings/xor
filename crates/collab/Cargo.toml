@@ -84,6 +84,7 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json", "re
 util.workspace = true
 uuid.workspace = true
 url.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 agent = { workspace = true, features = ["test-support"] }
@@ -153,4 +154,3 @@ workspace = { workspace = true, features = ["test-support"] }
 worktree = { workspace = true, features = ["test-support"] }
 zed_actions.workspace = true
 zlog.workspace = true
-zeroize.workspace = true
