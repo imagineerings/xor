@@ -16363,6 +16363,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sha2 0.10.9",
  "smol",
  "telemetry",
  "tempfile",
@@ -16370,6 +16371,7 @@ dependencies = [
  "urlencoding",
  "util",
  "which 6.0.3",
+ "windows 0.61.3",
 ]
 
 [[package]]

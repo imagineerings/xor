@@ -3,6 +3,10 @@ use std::{
     fmt, io,
     path::{Path, PathBuf},
     process::{ExitStatus, Stdio},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 
@@ -70,6 +74,21 @@ pub enum AgentProviderResponse {
     Deploy(AgentProviderDeployment),
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct AgentProviderCancellation {
+    cancelled: Arc<AtomicBool>,
+}
+
+impl AgentProviderCancellation {
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Release);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Acquire)
+    }
+}
+
 #[derive(Debug)]
 pub enum AgentProviderProtocolError {
     InvalidRequest {
@@ -90,6 +109,9 @@ pub enum AgentProviderProtocolError {
     },
     Cleanup {
         source: anyhow::Error,
+    },
+    Cancelled {
+        operation: AgentProviderOperation,
     },
     TimedOut {
         operation: AgentProviderOperation,
@@ -144,6 +166,9 @@ impl fmt::Display for AgentProviderProtocolError {
             }
             Self::Wait { source } => write!(formatter, "failed to wait for provider: {source}"),
             Self::Cleanup { source } => write!(formatter, "failed to stop provider: {source}"),
+            Self::Cancelled { operation } => {
+                write!(formatter, "provider {} was cancelled", operation.name())
+            }
             Self::TimedOut { operation, timeout } => write!(
                 formatter,
                 "provider {} timed out after {} seconds",
@@ -237,12 +262,32 @@ pub async fn invoke_agent_provider(
     request: &Value,
     background_executor: &gpui::BackgroundExecutor,
 ) -> Result<AgentProviderResponse, AgentProviderProtocolError> {
+    invoke_agent_provider_cancellable(
+        candidate,
+        work_directory,
+        operation,
+        request,
+        &AgentProviderCancellation::default(),
+        background_executor,
+    )
+    .await
+}
+
+pub async fn invoke_agent_provider_cancellable(
+    candidate: &AgentProviderCandidate,
+    work_directory: &Path,
+    operation: AgentProviderOperation,
+    request: &Value,
+    cancellation: &AgentProviderCancellation,
+    background_executor: &gpui::BackgroundExecutor,
+) -> Result<AgentProviderResponse, AgentProviderProtocolError> {
     invoke_agent_provider_with_limits(
         candidate,
         work_directory,
         operation,
         request,
         InvocationLimits::for_operation(operation),
+        cancellation,
         background_executor,
     )
     .await
@@ -254,8 +299,12 @@ async fn invoke_agent_provider_with_limits(
     operation: AgentProviderOperation,
     request: &Value,
     limits: InvocationLimits,
+    cancellation: &AgentProviderCancellation,
     background_executor: &gpui::BackgroundExecutor,
 ) -> Result<AgentProviderResponse, AgentProviderProtocolError> {
+    if cancellation.is_cancelled() {
+        return Err(AgentProviderProtocolError::Cancelled { operation });
+    }
     validate_request(operation, request)?;
     let mut request_bytes =
         serde_json::to_vec(request).map_err(|_| AgentProviderProtocolError::InvalidRequest {
@@ -356,6 +405,9 @@ async fn invoke_agent_provider_with_limits(
         if let (Some(exit_status), Some(stdout), Some(stderr)) =
             (exit_status, stdout_bytes.as_ref(), stderr_bytes.as_ref())
         {
+            child
+                .kill()
+                .map_err(|source| AgentProviderProtocolError::Cleanup { source })?;
             drop(stdout_task);
             drop(stderr_task);
             return parse_agent_provider_response(
@@ -366,6 +418,11 @@ async fn invoke_agent_provider_with_limits(
                 stderr,
                 &redactor,
             );
+        }
+
+        if cancellation.is_cancelled() {
+            stop_provider(&mut child).await?;
+            return Err(AgentProviderProtocolError::Cancelled { operation });
         }
 
         let now = background_executor.now();
@@ -905,6 +962,7 @@ mod tests {
                 pipe_drain_timeout: Duration::from_millis(100),
                 ..InvocationLimits::for_operation(AgentProviderOperation::Info)
             },
+            &AgentProviderCancellation::default(),
             &background_executor,
         )
         .await
@@ -932,6 +990,7 @@ mod tests {
                 timeout: Duration::from_secs(1),
                 pipe_drain_timeout: Duration::from_millis(100),
             },
+            &AgentProviderCancellation::default(),
             &background_executor,
         )
         .await
@@ -954,6 +1013,7 @@ mod tests {
                 pipe_drain_timeout: Duration::from_millis(100),
                 ..InvocationLimits::for_operation(AgentProviderOperation::Deploy)
             },
+            &AgentProviderCancellation::default(),
             &background_executor,
         )
         .await
@@ -985,6 +1045,7 @@ mod tests {
                 timeout: Duration::from_millis(100),
                 pipe_drain_timeout: Duration::from_millis(50),
             },
+            &AgentProviderCancellation::default(),
             &background_executor,
         )
         .await
