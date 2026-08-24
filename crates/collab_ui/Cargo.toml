@@ -20,6 +20,9 @@ multiplayer-tools = [
     "dep:chrono",
     "dep:collaboration_domain",
     "dep:git_ui",
+    "dep:nostr_compat",
+    "dep:qrcode",
+    "dep:zeroize",
     "agent_ui/multiplayer-tools",
     "git_ui/multiplayer-tools",
 ]
@@ -55,9 +58,11 @@ gpui.workspace = true
 git_ui = { workspace = true, optional = true }
 livekit_client.workspace = true
 menu.workspace = true
+nostr_compat = { workspace = true, optional = true }
 notifications.workspace = true
 picker.workspace = true
 project.workspace = true
+qrcode = { workspace = true, optional = true }
 release_channel.workspace = true
 rpc.workspace = true
 serde.workspace = true
@@ -74,10 +79,12 @@ ui.workspace = true
 util.workspace = true
 workspace.workspace = true
 zed_actions.workspace = true
+zeroize = { workspace = true, optional = true }
 
 [dev-dependencies]
 call = { workspace = true, features = ["test-support"] }
 client = { workspace = true, features = ["test-support"] }
+collab.workspace = true
 collections = { workspace = true, features = ["test-support"] }
 db = { workspace = true, features = ["test-support"] }
 editor = { workspace = true, features = ["test-support"] }

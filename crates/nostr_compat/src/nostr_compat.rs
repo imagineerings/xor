@@ -10,6 +10,7 @@ pub mod head;
 pub mod jobs;
 pub mod nip34_collaboration;
 pub mod nip34_repository;
+pub mod pairing;
 pub mod verification;
 
 pub use event::{CanonicalEvent, EventCodecError, EventId, PublicKey};

@@ -10,6 +10,8 @@ pub mod forum;
 #[cfg(feature = "multiplayer-tools")]
 pub mod git_activity;
 #[cfg(feature = "multiplayer-tools")]
+pub mod huddle;
+#[cfg(feature = "multiplayer-tools")]
 pub mod huddle_controls;
 #[cfg(feature = "multiplayer-tools")]
 pub mod inbox_pulse;
@@ -20,6 +22,8 @@ pub mod message_timeline;
 #[cfg(feature = "multiplayer-tools")]
 pub mod moderation;
 pub mod notifications;
+#[cfg(feature = "multiplayer-tools")]
+pub mod pairing;
 mod panel_settings;
 
 use std::{rc::Rc, sync::Arc};

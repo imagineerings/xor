@@ -15,6 +15,7 @@ multiplayer-tools = [
     "dep:getrandom",
     "dep:hex",
     "dep:nostr",
+    "dep:nostr_compat",
     "dep:secp256k1",
     "dep:sha2",
     "dep:thiserror",
@@ -35,6 +36,7 @@ getrandom = { workspace = true, optional = true }
 gpui.workspace = true
 hex = { workspace = true, optional = true }
 nostr = { workspace = true, optional = true }
+nostr_compat = { workspace = true, optional = true }
 paths.workspace = true
 release_channel.workspace = true
 secp256k1 = { workspace = true, optional = true }
