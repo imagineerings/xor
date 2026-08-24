@@ -18,6 +18,7 @@ allowed-normal-dependencies = [
     "serde_json",
     "sha2",
     "thiserror",
+    "url",
     "uuid",
 ]
 forbidden-capabilities = ["gpui", "storage", "transport"]
@@ -39,6 +40,7 @@ serde_json.workspace = true
 secp256k1.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
+url.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]

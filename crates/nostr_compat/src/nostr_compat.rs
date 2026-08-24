@@ -1,5 +1,6 @@
 pub mod agent_memory;
 pub mod agent_observer;
+pub mod blossom;
 pub mod buzz_nips;
 pub mod dm;
 pub mod event;
