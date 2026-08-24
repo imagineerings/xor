@@ -3722,6 +3722,7 @@ version = "0.1.0"
 dependencies = [
  "agent_ui",
  "anyhow",
+ "audio",
  "call",
  "channel",
  "chrono",
