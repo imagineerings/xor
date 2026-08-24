@@ -29,6 +29,7 @@ path = "tests/integration/collab_tests.rs"
 anyhow.workspace = true
 async-trait.workspace = true
 base64.workspace = true
+bytes.workspace = true
 async-tungstenite = { workspace = true, features = ["tokio", "tokio-rustls-manual-roots" ] }
 aws-config = { version = "1.1.5" }
 aws-sdk-kinesis = "1.51.0"
@@ -48,6 +49,7 @@ futures.workspace = true
 flate2.workspace = true
 gpui.workspace = true
 hex.workspace = true
+hmac.workspace = true
 http_client.workspace = true
 livekit_api.workspace = true
 log.workspace = true
