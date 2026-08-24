@@ -1,6 +1,7 @@
 pub mod descriptor;
 pub mod execution;
 pub mod object_info;
+pub mod provider_contracts;
 pub mod registry_generator;
 pub mod slice_registry;
 pub mod source_type;
@@ -49,6 +50,13 @@ pub use execution::{
 pub use object_info::{
     OBJECT_INFO_SCHEMA_VERSION, ObjectInfoInputSchema, ObjectInfoNode, ObjectInfoOutputSchema,
     ObjectInfoRegistry,
+};
+pub use provider_contracts::{
+    PROVIDER_COMPONENT_CONTRACT_CATALOG, PROVIDER_COMPONENT_CONTRACT_CATALOG_SHA256,
+    PROVIDER_NAMESPACE_COUNT, PROVIDER_NODE_CONTRACT_COUNT, ProviderContractError,
+    ProviderNamespaceProjection, ProviderNodeContract, authoritative_provider_namespace,
+    authoritative_provider_namespace_projection, project_authoritative_provider_bindings,
+    validate_provider_component_catalog,
 };
 pub use registry_generator::{
     INACTIVE_NODE_CATALOG, NODE_CONTRACT_CATALOG, NodeRegistry, NodeRegistryError,
