@@ -2689,7 +2689,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Writes: crates/collab/tests/workflow_recovery.rs_
     - _Validation: workflow E2E covers cron/webhook/event, approval race, retry, crash, restart and redacted failure_
 
-  - [ ] 34.9. Implement the workflow repository
+  - [x] 34.9. Implement the workflow repository
     - Read/write versioned definitions, runs, steps, retries and waiting approvals with idempotency.
     - _Requirements: 2.2, 13.1, 13.2_
     - _Capability IDs: CAP-005, CAP-027_
@@ -2697,6 +2697,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/collab/migrations/collaboration_workflows.sql, crates/collaboration_workflow/src/definition.rs_
     - _Writes: crates/collab/src/workflows/repository.rs_
     - _Validation: repository tests cover definition version, run restart, duplicate trigger, approval wait and tenant fence_
+    - _Discovered contradiction (2026-08-24): security boundary WF-06 assigns fenced worker leases to Task 34.9, but the planned Task 34.2 schema and this leaf's write set contain no lease table. Rewriting the already-published migration would invalidate SQLx checksums, so the narrow correction adds one forward-only reversible run-lease migration and its checksum/schema regression. Repository reconstruction also exposed that the Task 34.1 authored YAML shape was not a valid persisted round trip: the flattened step timeout and approval timeout serialized under the same key, and omitted empty secret maps were required on deserialize. The correction gives the approval duration a distinct canonical `approval_timeout_secs` key and adds a validated canonical JSON entry point; authored YAML compatibility is unchanged and direct deserialization still passes through the same bounds._
+    - _Evidence: 2026-08-24 — added the tenant-scoped WorkflowRepository with immutable sequential definition publication, expected-revision heads, exact canonical JSON/SHA-256 reconstruction, atomic trigger/run/ordered-step creation, exact trigger replay, durable run/step/retry reconstruction, closed lease-fenced step checkpoints and provenance-bound retry idempotency. A forward reversible migration adds one active run lease per tenant/run, monotonically increasing generations, admitted run version, worker identity, heartbeat/expiry/recovery bounds and forced restrictive RLS. Seven focused release tests pass definition version reconstruction, exact duplicate trigger behavior, approval-wait restart, retry replay, stale-lease rejection, pre-I/O tenant rejection and reversible lease checksums/schema. The complete workflow parser suite passes 8/8 including canonical storage round trip; warning-denied release Clippy passes for both workflow repository and workflow-domain targets. Final dependency, inventory, specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
 - [ ] 35. Port audit chains and usage accounting
 

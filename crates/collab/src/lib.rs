@@ -19,6 +19,7 @@ pub mod rpc;
 pub mod search;
 pub mod services;
 pub mod tenant_admission;
+pub mod workflows;
 
 use anyhow::Context as _;
 use aws_config::{BehaviorVersion, Region};
