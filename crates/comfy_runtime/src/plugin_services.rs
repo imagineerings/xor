@@ -13,12 +13,27 @@ use comfy_model::{
     LoadedModel, ModelFormat, ModelFormatError, ModelLoadAccounting, ModelStore, ModelStoreError,
 };
 use comfy_nodes::NativeSchemaValue;
-use comfy_plugin_sdk::ProviderResultReceiptSet;
+use comfy_plugin_sdk::{
+    ProviderCostRequestV2, ProviderCostResponseV2, ProviderHeaderV2, ProviderHttpMethodV2,
+    ProviderInvocationContextV2, ProviderProgressV2, ProviderRequestChunkV2, ProviderRequestHeadV2,
+    ProviderResponseChunkV2, ProviderResponseFrameEventV2, ProviderResponseFrameV2,
+    ProviderResponseHeadV2, ProviderResultReceiptSet, ProviderStreamHandleV2,
+    ProviderStreamTerminalV2, ProviderStreamValidatorV2, ProviderStreamingContractError,
+    ProviderUploadRequestV2, ProviderUploadValidatorV2, ProviderWaitOutcomeV2,
+    ProviderWaitRequestV2,
+};
 use comfy_tensor::{
     CancellationToken, RetryRngPolicy, RngAlgorithm, RngCheckpoint, RngProfileVersion, RngStream,
     RngStreamAddress, RngTransaction,
 };
-use comfy_types::{AttemptId, NodeId, ProfileId, PromptId};
+use comfy_types::{
+    AttemptId, NodeId, ProfileId, PromptId, WorkerProviderCostRequest, WorkerProviderCostResponse,
+    WorkerProviderHeader, WorkerProviderHttpMethod, WorkerProviderInvocationContext,
+    WorkerProviderProgress, WorkerProviderRequestChunk, WorkerProviderRequestHead,
+    WorkerProviderResponseChunk, WorkerProviderResponseFrameEvent, WorkerProviderStreamHandle,
+    WorkerProviderTerminal, WorkerProviderUploadRequest, WorkerProviderWaitOutcome,
+    WorkerProviderWaitRequest,
+};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -28,13 +43,19 @@ use crate::{
     AssetError, AssetNamespace, AssetOperation, AuthorizedProviderRequest, Capability,
     PluginAuthorization, ProviderCostAcceptance, ProviderCostAcceptanceIssuer,
     ProviderCostAcceptanceScope, ProviderCostAcceptanceVerifier, ProviderCostNonce,
-    ProviderInvocationIdentity, ProviderMaterializationError, ProviderPolicy, ProviderPriceBound,
-    ProviderResultReceiptAuthority, ProviderResultReceiptSession, ResolvedProviderResult, SecretId,
-    SecretValue, SharedAssetService,
+    ProviderInvocationIdentity, ProviderManifestAuthorizationV2, ProviderMaterializationError,
+    ProviderPolicy, ProviderPriceBound, ProviderResultReceiptAuthority,
+    ProviderResultReceiptSession, ProviderRuntimeReceiptIdentityV2, ProviderRuntimeReceiptIssuerV2,
+    ProviderRuntimeReceiptV2, ResolvedProviderResult, SecretId, SecretValue, SharedAssetService,
+    WorkerRegistryDeploymentPlan,
 };
 
 pub const MAX_PLUGIN_SERVICE_REQUEST_BYTES: u64 = 16 * 1024 * 1024;
 pub const MAX_PLUGIN_SERVICE_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
+pub const MAX_PROVIDER_RUNTIME_SESSIONS: usize = 256;
+const MAX_PROVIDER_RUNTIME_IDENTITY_BYTES: usize = 1_024;
+const MAX_PROVIDER_RUNTIME_RETRY_AFTER_SECONDS: u64 = 86_400;
+const PROVIDER_PROGRESS_MINIMUM_INTERVAL: Duration = Duration::from_millis(50);
 const MAX_PLUGIN_SERVICE_IDENTITY_BYTES: usize = 1_024;
 const MAX_CONSUMED_PROVIDER_COST_NONCES: usize = 65_536;
 const RNG_DEADLINE_CHECK_CHUNK_BYTES: usize = 64 * 1024;
@@ -132,6 +153,2583 @@ pub trait NativeProviderInvocationAuthority: Send + Sync {
         &self,
         scope: NativeProviderInvocationScope,
     ) -> Result<PluginCapabilityInvocation, PluginServiceError>;
+}
+
+pub struct ProviderRuntimeActivationGrant {
+    host_context: Option<WorkerProviderInvocationContext>,
+    service_identity: Option<Arc<()>>,
+    claim: Option<Arc<AtomicBool>>,
+    cancellation: Option<CancellationToken>,
+    profile_id: String,
+    principal_id: String,
+    prompt_id: String,
+    prompt_sha256: String,
+    attempt_id: String,
+    node_id: String,
+    request_ordinal: u32,
+    registry_generation: u64,
+    registry_digest_sha256: String,
+    component_generation: u64,
+    component_digest_sha256: String,
+    provider_manifest_sha256: String,
+    authorization_generation_sha256: String,
+    binding_generation: u64,
+    binding_set_sha256: String,
+    compiled_plan_sha256: String,
+}
+
+impl fmt::Debug for ProviderRuntimeActivationGrant {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ProviderRuntimeActivationGrant([SEALED])")
+    }
+}
+
+struct ProviderRuntimeActivationGrantTable {
+    session_generations: BTreeMap<uuid::Uuid, u64>,
+    grants: BTreeMap<(uuid::Uuid, u64, u64), (u32, Option<ProviderRuntimeActivationGrant>)>,
+}
+
+struct ProviderRuntimeStreamState {
+    service_identity: Arc<()>,
+    owner: ProviderRuntimeStreamOwner,
+    grants: ProviderRuntimeActivationGrantTable,
+    activation_claims: BTreeMap<(uuid::Uuid, u64, u64, u32), Arc<AtomicBool>>,
+    invocation_bindings: BTreeMap<(uuid::Uuid, u64, u64, u32), u64>,
+    handles: BTreeMap<WorkerProviderStreamHandle, ProviderStreamHandleV2>,
+    main_handles: BTreeSet<WorkerProviderStreamHandle>,
+    upload_parents: BTreeMap<WorkerProviderStreamHandle, WorkerProviderStreamHandle>,
+    cancellations: BTreeMap<WorkerProviderStreamHandle, CancellationToken>,
+    next_slots: BTreeMap<(uuid::Uuid, u64, u64, u32), u32>,
+    next_internal_invocation: u64,
+}
+
+impl ProviderRuntimeStreamState {
+    fn new() -> Self {
+        Self {
+            service_identity: Arc::new(()),
+            owner: ProviderRuntimeStreamOwner::new(),
+            grants: ProviderRuntimeActivationGrantTable {
+                session_generations: BTreeMap::new(),
+                grants: BTreeMap::new(),
+            },
+            activation_claims: BTreeMap::new(),
+            invocation_bindings: BTreeMap::new(),
+            handles: BTreeMap::new(),
+            main_handles: BTreeSet::new(),
+            upload_parents: BTreeMap::new(),
+            cancellations: BTreeMap::new(),
+            next_slots: BTreeMap::new(),
+            next_internal_invocation: 0,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct ProviderRuntimeStreamService {
+    state: Arc<Mutex<ProviderRuntimeStreamState>>,
+}
+
+impl ProviderRuntimeStreamService {
+    pub(crate) fn new() -> Self {
+        Self {
+            state: Arc::new(Mutex::new(ProviderRuntimeStreamState::new())),
+        }
+    }
+
+    pub fn activation_grants(&self) -> ProviderRuntimeActivationGrantSource {
+        ProviderRuntimeActivationGrantSource {
+            state: self.state.clone(),
+        }
+    }
+
+    pub fn claim_activation(
+        &self,
+        context: &WorkerProviderInvocationContext,
+        cancellation: &CancellationToken,
+    ) -> Result<ProviderRuntimeActivationGrant, PluginServiceError> {
+        self.activation_grants().claim(context, cancellation)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn register_activation(
+        &self,
+        context: &WorkerProviderInvocationContext,
+        grant: ProviderRuntimeActivationGrant,
+        cancellation: &CancellationToken,
+    ) -> Result<(), PluginServiceError> {
+        self.activation_grants()
+            .insert(context, grant, cancellation)
+    }
+}
+
+impl fmt::Debug for ProviderRuntimeStreamService {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ProviderRuntimeStreamService([SEALED])")
+    }
+}
+
+#[derive(Clone)]
+pub struct ProviderRuntimeActivationGrantSource {
+    state: Arc<Mutex<ProviderRuntimeStreamState>>,
+}
+
+impl ProviderRuntimeActivationGrantSource {
+    #[cfg(test)]
+    fn new() -> Self {
+        ProviderRuntimeStreamService::new().activation_grants()
+    }
+
+    pub fn claim(
+        &self,
+        context: &WorkerProviderInvocationContext,
+        cancellation: &CancellationToken,
+    ) -> Result<ProviderRuntimeActivationGrant, PluginServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        validate_worker_provider_context(context)?;
+        let mut state = self.state.lock();
+        let table = &mut state.grants;
+        let key = (
+            context.session_id,
+            context.session_generation,
+            context.invocation,
+        );
+        let Some(current_session_generation) =
+            table.session_generations.get(&context.session_id).copied()
+        else {
+            return Err(PluginServiceError::ProviderRuntimeForeignSession);
+        };
+        if current_session_generation != context.session_generation {
+            return Err(PluginServiceError::ProviderRuntimeStaleSession);
+        }
+        let Some((generation, grant)) = table.grants.get_mut(&key) else {
+            return Err(PluginServiceError::ProviderRuntimeForeignInvocation);
+        };
+        if *generation != context.generation {
+            return Err(PluginServiceError::ProviderRuntimeStaleInvocation);
+        }
+        if grant.is_none() {
+            return Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::RevokedHandle,
+            ));
+        }
+        grant
+            .as_ref()
+            .and_then(|grant| grant.cancellation.as_ref())
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let mut grant = grant
+            .take()
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+        let claim = Arc::new(AtomicBool::new(true));
+        state.activation_claims.insert(
+            (
+                context.session_id,
+                context.session_generation,
+                context.invocation,
+                context.generation,
+            ),
+            claim.clone(),
+        );
+        grant.host_context = Some(context.clone());
+        grant.service_identity = Some(state.service_identity.clone());
+        grant.claim = Some(claim);
+        Ok(grant)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn insert(
+        &self,
+        context: &WorkerProviderInvocationContext,
+        mut grant: ProviderRuntimeActivationGrant,
+        cancellation: &CancellationToken,
+    ) -> Result<(), PluginServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        validate_worker_provider_context(context)?;
+        grant.cancellation = Some(cancellation.clone());
+        let mut state = self.state.lock();
+        let key = (
+            context.session_id,
+            context.session_generation,
+            context.invocation,
+        );
+        if let Some(current_generation) = state
+            .grants
+            .session_generations
+            .get(&context.session_id)
+            .copied()
+        {
+            if context.session_generation < current_generation {
+                return Err(PluginServiceError::ProviderRuntimeStaleSession);
+            }
+            if context.session_generation > current_generation {
+                revoke_replaced_host_context(&mut state, context, true);
+                state
+                    .grants
+                    .grants
+                    .retain(|(session_id, _, _), _| *session_id != context.session_id);
+                state
+                    .grants
+                    .session_generations
+                    .insert(context.session_id, context.session_generation);
+            }
+        } else {
+            if state.grants.grants.len() >= MAX_PROVIDER_RUNTIME_SESSIONS {
+                return Err(PluginServiceError::ProviderSessionUnavailable);
+            }
+            state
+                .grants
+                .session_generations
+                .insert(context.session_id, context.session_generation);
+        }
+        if !state.grants.grants.contains_key(&key)
+            && state.grants.grants.len() >= MAX_PROVIDER_RUNTIME_SESSIONS
+        {
+            return Err(PluginServiceError::ProviderSessionUnavailable);
+        }
+        if state
+            .grants
+            .grants
+            .get(&key)
+            .is_some_and(|(generation, _)| *generation >= context.generation)
+        {
+            return Err(PluginServiceError::ProviderRuntimeStaleInvocation);
+        }
+        if state.grants.grants.contains_key(&key) {
+            revoke_replaced_host_context(&mut state, context, false);
+        }
+        state
+            .grants
+            .grants
+            .insert(key, (context.generation, Some(grant)));
+        Ok(())
+    }
+}
+
+impl fmt::Debug for ProviderRuntimeActivationGrantSource {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ProviderRuntimeActivationGrantSource([SEALED])")
+    }
+}
+
+impl ProviderRuntimeActivationGrant {
+    #[allow(clippy::too_many_arguments, dead_code)]
+    pub(crate) fn checked_from_active_deployment(
+        profile_id: impl Into<String>,
+        principal_id: impl Into<String>,
+        prompt_id: impl Into<String>,
+        prompt_sha256: impl Into<String>,
+        attempt_id: impl Into<String>,
+        node_id: impl Into<String>,
+        request_ordinal: u32,
+        worker_deployment: &WorkerRegistryDeploymentPlan,
+        component_generation: u64,
+        component_digest_sha256: impl Into<String>,
+        provider_manifest_sha256: impl Into<String>,
+        authorization_generation_sha256: impl Into<String>,
+        binding_generation: u64,
+        binding_set_sha256: impl Into<String>,
+        compiled_plan_sha256: impl Into<String>,
+    ) -> Result<Self, PluginServiceError> {
+        let profile_id = profile_id.into();
+        let principal_id = principal_id.into();
+        let prompt_id = prompt_id.into();
+        let prompt_sha256 = prompt_sha256.into();
+        let attempt_id = attempt_id.into();
+        let node_id = node_id.into();
+        let registry_generation = worker_deployment.begin().generation().get();
+        let registry_digest_sha256 = worker_deployment
+            .begin()
+            .registry_digest_sha256()
+            .as_str()
+            .to_owned();
+        let component_digest_sha256 = component_digest_sha256.into();
+        let provider_manifest_sha256 = provider_manifest_sha256.into();
+        let authorization_generation_sha256 = authorization_generation_sha256.into();
+        let binding_set_sha256 = binding_set_sha256.into();
+        let compiled_plan_sha256 = compiled_plan_sha256.into();
+        if component_generation == 0
+            || binding_generation == 0
+            || [
+                profile_id.as_str(),
+                principal_id.as_str(),
+                prompt_id.as_str(),
+                attempt_id.as_str(),
+                node_id.as_str(),
+            ]
+            .into_iter()
+            .any(|value| !valid_provider_runtime_identity(value))
+            || [
+                prompt_sha256.as_str(),
+                registry_digest_sha256.as_str(),
+                component_digest_sha256.as_str(),
+                provider_manifest_sha256.as_str(),
+                authorization_generation_sha256.as_str(),
+                binding_set_sha256.as_str(),
+                compiled_plan_sha256.as_str(),
+            ]
+            .into_iter()
+            .any(|value| !is_lower_sha256(value))
+        {
+            return Err(PluginServiceError::ProviderRuntimeAuthorityDenied);
+        }
+        Ok(Self {
+            host_context: None,
+            service_identity: None,
+            claim: None,
+            cancellation: None,
+            profile_id,
+            principal_id,
+            prompt_id,
+            prompt_sha256,
+            attempt_id,
+            node_id,
+            request_ordinal,
+            registry_generation,
+            registry_digest_sha256,
+            component_generation,
+            component_digest_sha256,
+            provider_manifest_sha256,
+            authorization_generation_sha256,
+            binding_generation,
+            binding_set_sha256,
+            compiled_plan_sha256,
+        })
+    }
+
+    pub fn bind(
+        self,
+        manifest_authorization: ProviderManifestAuthorizationV2,
+        request_head: &ProviderRequestHeadV2,
+        provider_policy: &ProviderPolicy,
+    ) -> Result<ProviderRuntimeAuthorityInput, PluginServiceError> {
+        let claim = self.claim.clone();
+        let result = ProviderRuntimeAuthorityInput::checked_from_activation_grant(
+            self,
+            manifest_authorization,
+            request_head,
+            provider_policy,
+        );
+        if result.is_err()
+            && let Some(claim) = claim
+        {
+            claim.store(false, Ordering::Release);
+        }
+        result
+    }
+}
+
+pub struct ProviderRuntimeAuthorityInput {
+    service_identity: Arc<()>,
+    claim: Arc<AtomicBool>,
+    cancellation: CancellationToken,
+    host_context: WorkerProviderInvocationContext,
+    profile_id: String,
+    principal_id: String,
+    prompt_id: String,
+    prompt_sha256: String,
+    attempt_id: String,
+    node_id: String,
+    request_ordinal: u32,
+    registry_generation: u64,
+    registry_digest_sha256: String,
+    component_generation: u64,
+    component_digest_sha256: String,
+    authorization_generation_sha256: String,
+    binding_generation: u64,
+    binding_set_sha256: String,
+    compiled_plan_sha256: String,
+    provider: String,
+    request: AuthorizedProviderRequest,
+    request_head: ProviderRequestHeadV2,
+    request_head_sha256: String,
+    provider_manifest_sha256: String,
+    manifest_authorization: ProviderManifestAuthorizationV2,
+}
+
+impl ProviderRuntimeAuthorityInput {
+    fn checked_from_activation_grant(
+        grant: ProviderRuntimeActivationGrant,
+        manifest_authorization: ProviderManifestAuthorizationV2,
+        request_head: &ProviderRequestHeadV2,
+        provider_policy: &ProviderPolicy,
+    ) -> Result<Self, PluginServiceError> {
+        let host_context = grant
+            .host_context
+            .clone()
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        let service_identity = grant
+            .service_identity
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        let claim = grant
+            .claim
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        let cancellation = grant
+            .cancellation
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        request_head
+            .validate_for_contract(manifest_authorization.streaming_contract())
+            .map_err(map_provider_streaming_error)?;
+        let binding = manifest_authorization.provider_binding();
+        if binding.bindings_sha256 != grant.binding_set_sha256
+            || !binding
+                .bindings
+                .iter()
+                .any(|binding| binding.node_id == grant.node_id)
+        {
+            return Err(PluginServiceError::ProviderRuntimeAuthorityDenied);
+        }
+        let provider = binding.implementation_namespace.clone();
+        let authorization = manifest_authorization.authorization();
+        let provider_manifest_sha256 =
+            encode_lower_hex(manifest_authorization.outer_signing_payload_sha256());
+        if authorization.plugin_id() != provider
+            || authorization.digest_sha256() != grant.component_digest_sha256
+            || provider_manifest_sha256 != grant.provider_manifest_sha256
+        {
+            return Err(PluginServiceError::ProviderRuntimeAuthorityDenied);
+        }
+        authorization
+            .capabilities()
+            .require(&Capability::ProviderNetwork {
+                provider: provider.clone(),
+                endpoint: request_head.endpoint.clone(),
+            })
+            .map_err(|_| PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        let secret_id = request_head
+            .secret_id
+            .as_deref()
+            .map(SecretId::new)
+            .transpose()
+            .map_err(|_| PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        if let Some(secret_id) = &secret_id {
+            authorization
+                .capabilities()
+                .require(&Capability::Secret {
+                    secret_id: secret_id.as_str().to_owned(),
+                })
+                .map_err(|_| PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        }
+        let request = provider_policy
+            .authorize(
+                &grant.profile_id,
+                authorization.plugin_id(),
+                &provider,
+                &request_head.endpoint,
+                secret_id.as_ref(),
+            )
+            .map_err(|_| PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        let request_head_sha256 = format!(
+            "{:x}",
+            Sha256::digest(
+                request_head
+                    .canonical_bytes(manifest_authorization.streaming_contract())
+                    .map_err(map_provider_streaming_error)?
+            )
+        );
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        Ok(Self {
+            service_identity,
+            claim,
+            cancellation,
+            host_context,
+            profile_id: grant.profile_id,
+            principal_id: grant.principal_id,
+            prompt_id: grant.prompt_id,
+            prompt_sha256: grant.prompt_sha256,
+            attempt_id: grant.attempt_id,
+            node_id: grant.node_id,
+            request_ordinal: grant.request_ordinal,
+            registry_generation: grant.registry_generation,
+            registry_digest_sha256: grant.registry_digest_sha256,
+            component_generation: grant.component_generation,
+            component_digest_sha256: grant.component_digest_sha256,
+            authorization_generation_sha256: grant.authorization_generation_sha256,
+            binding_generation: grant.binding_generation,
+            binding_set_sha256: grant.binding_set_sha256,
+            compiled_plan_sha256: grant.compiled_plan_sha256,
+            provider,
+            request,
+            request_head: request_head.clone(),
+            request_head_sha256,
+            provider_manifest_sha256,
+            manifest_authorization,
+        })
+    }
+
+    fn streaming_contract(&self) -> &comfy_plugin_sdk::ProviderStreamingContractV2 {
+        self.manifest_authorization.streaming_contract()
+    }
+
+    fn idempotency_identity_sha256(&self) -> String {
+        let mut digest = Sha256::new();
+        digest.update(b"zed-comfy-provider-runtime-authority-v2\0");
+        for value in [
+            self.profile_id.as_str(),
+            self.principal_id.as_str(),
+            self.prompt_id.as_str(),
+            self.prompt_sha256.as_str(),
+            self.attempt_id.as_str(),
+            self.node_id.as_str(),
+            self.registry_digest_sha256.as_str(),
+            self.component_digest_sha256.as_str(),
+            self.authorization_generation_sha256.as_str(),
+            self.binding_set_sha256.as_str(),
+            self.compiled_plan_sha256.as_str(),
+            self.provider.as_str(),
+            self.request.endpoint(),
+            self.request_head_sha256.as_str(),
+            self.provider_manifest_sha256.as_str(),
+        ] {
+            digest.update((value.len() as u64).to_le_bytes());
+            digest.update(value.as_bytes());
+        }
+        digest.update(self.registry_generation.to_le_bytes());
+        digest.update(self.component_generation.to_le_bytes());
+        digest.update(self.binding_generation.to_le_bytes());
+        digest.update(self.request_ordinal.to_le_bytes());
+        format!("{:x}", digest.finalize())
+    }
+}
+
+impl fmt::Debug for ProviderRuntimeAuthorityInput {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ProviderRuntimeAuthorityInput")
+            .field("provider", &self.provider)
+            .field("node_id", &self.node_id)
+            .field("request_head_sha256", &self.request_head_sha256)
+            .field("provider_manifest_sha256", &self.provider_manifest_sha256)
+            .finish_non_exhaustive()
+    }
+}
+
+struct ProviderRuntimeStreamingSession {
+    authority: ProviderRuntimeAuthorityInput,
+    validator: ProviderStreamValidatorV2,
+    request_body_digest: Sha256,
+    request_finished: bool,
+    response_status: Option<u16>,
+    response_headers_sha256: Option<String>,
+    ordered_chunks_digest: Sha256,
+    terminal_receipt_sha256: Option<String>,
+    accepted_cost_microunits: u64,
+    upload_validators: BTreeMap<ProviderStreamHandleV2, ProviderUploadValidatorV2>,
+    ordered_uploads: Vec<ProviderRuntimeUploadIdentity>,
+    last_published_progress: Option<(Instant, u64, u64)>,
+    retry_after_seconds: Option<u64>,
+    completed: bool,
+    actuation_proposal: Option<ProviderRuntimeActuationProposal>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ProviderRuntimeUploadIdentity {
+    handle: ProviderStreamHandleV2,
+    port_id: String,
+    media_type: String,
+    byte_length: u64,
+    content_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderRuntimeActuationProposal {
+    request: AuthorizedProviderRequest,
+    request_head: ProviderRequestHeadV2,
+    request_head_sha256: String,
+    request_body_sha256: String,
+    ordered_uploads_sha256: String,
+    accepted_cost_microunits: u64,
+    idempotency_identity_sha256: String,
+}
+
+impl ProviderRuntimeActuationProposal {
+    pub fn request(&self) -> &AuthorizedProviderRequest {
+        &self.request
+    }
+
+    pub fn request_head(&self) -> &ProviderRequestHeadV2 {
+        &self.request_head
+    }
+
+    pub fn request_head_sha256(&self) -> &str {
+        &self.request_head_sha256
+    }
+
+    pub fn request_body_sha256(&self) -> &str {
+        &self.request_body_sha256
+    }
+
+    pub fn ordered_uploads_sha256(&self) -> &str {
+        &self.ordered_uploads_sha256
+    }
+
+    pub fn accepted_cost_microunits(&self) -> u64 {
+        self.accepted_cost_microunits
+    }
+
+    pub fn idempotency_identity_sha256(&self) -> &str {
+        &self.idempotency_identity_sha256
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderRuntimeProgressProjection {
+    pub handle: WorkerProviderStreamHandle,
+    pub sequence: u64,
+    pub completed: u64,
+    pub total: u64,
+    pub message: Option<String>,
+}
+
+struct ProviderRuntimeProgressUpdate {
+    sequence: u64,
+    completed: u64,
+    total: u64,
+    message: Option<String>,
+}
+
+enum ProviderRuntimeWaitUpdate {
+    None,
+    Head {
+        status: u16,
+        headers_sha256: String,
+        retry_after_seconds: Option<u64>,
+    },
+    Chunk(Sha256),
+    Terminal {
+        receipt_sha256: String,
+        completed: bool,
+    },
+}
+
+struct ProviderRuntimeStreamOwner {
+    legacy_sessions: BTreeMap<String, PluginCapabilityInvocation>,
+    streaming_sessions: BTreeMap<ProviderStreamHandleV2, ProviderRuntimeStreamingSession>,
+    streaming_upload_parents: BTreeMap<ProviderStreamHandleV2, ProviderStreamHandleV2>,
+    consumed_streaming_cost_nonces: BTreeMap<ProviderCostNonce, Instant>,
+}
+
+impl ProviderRuntimeStreamOwner {
+    pub(crate) fn new() -> Self {
+        Self {
+            legacy_sessions: BTreeMap::new(),
+            streaming_sessions: BTreeMap::new(),
+            streaming_upload_parents: BTreeMap::new(),
+            consumed_streaming_cost_nonces: BTreeMap::new(),
+        }
+    }
+
+    fn begin_streaming(
+        &mut self,
+        authority: ProviderRuntimeAuthorityInput,
+        context: ProviderInvocationContextV2,
+        handle: ProviderStreamHandleV2,
+        cancellation: &CancellationToken,
+    ) -> Result<(), PluginServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        if self.legacy_sessions.len() + self.streaming_sessions.len()
+            >= MAX_PROVIDER_RUNTIME_SESSIONS
+            || self.streaming_sessions.contains_key(&handle)
+            || self.streaming_upload_parents.contains_key(&handle)
+        {
+            return Err(PluginServiceError::ProviderSessionUnavailable);
+        }
+        let validator = ProviderStreamValidatorV2::checked(
+            authority.streaming_contract().clone(),
+            context,
+            handle,
+            &authority.request_head,
+        )
+        .map_err(map_provider_streaming_error)?;
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        self.streaming_sessions.insert(
+            handle,
+            ProviderRuntimeStreamingSession {
+                authority,
+                validator,
+                request_body_digest: Sha256::new(),
+                request_finished: false,
+                response_status: None,
+                response_headers_sha256: None,
+                ordered_chunks_digest: ordered_chunks_digest(),
+                terminal_receipt_sha256: None,
+                accepted_cost_microunits: 0,
+                upload_validators: BTreeMap::new(),
+                ordered_uploads: Vec::new(),
+                last_published_progress: None,
+                retry_after_seconds: None,
+                completed: false,
+                actuation_proposal: None,
+            },
+        );
+        Ok(())
+    }
+
+    fn write_streaming_request_chunk(
+        &mut self,
+        chunk: &ProviderRequestChunkV2,
+        cancellation: &CancellationToken,
+    ) -> Result<(), PluginServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let session = self.streaming_session_mut(chunk.handle)?;
+        if session.actuation_proposal.is_some() {
+            return Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidOrder,
+            ));
+        }
+        session
+            .validator
+            .write_request_chunk(chunk)
+            .map_err(map_provider_streaming_error)?;
+        session.request_body_digest.update(&chunk.bytes);
+        session.request_finished = chunk.end;
+        Ok(())
+    }
+
+    fn accept_streaming_wait(
+        &mut self,
+        request: &ProviderWaitRequestV2,
+        outcome: ProviderWaitOutcomeV2,
+        cancellation: &CancellationToken,
+    ) -> Result<(), PluginServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let retry_after_seconds = retry_after_seconds(&outcome)?;
+        let revoke_after_accept = matches!(&outcome, ProviderWaitOutcomeV2::Cancelled)
+            || matches!(
+                &outcome,
+                ProviderWaitOutcomeV2::Frame(comfy_plugin_sdk::ProviderResponseFrameV2 {
+                    event: ProviderResponseFrameEventV2::Terminal(
+                        comfy_plugin_sdk::ProviderStreamTerminalV2::Failed { .. }
+                            | comfy_plugin_sdk::ProviderStreamTerminalV2::Cancelled
+                    ),
+                    ..
+                })
+            );
+        {
+            let session = self.streaming_session_mut(request.handle)?;
+            if matches!(
+                &outcome,
+                ProviderWaitOutcomeV2::Frame(comfy_plugin_sdk::ProviderResponseFrameV2 {
+                    event: ProviderResponseFrameEventV2::Head(_),
+                    ..
+                })
+            ) && session.actuation_proposal.is_none()
+            {
+                return Err(PluginServiceError::ProviderStreamingContract(
+                    ProviderStreamingContractError::InvalidOrder,
+                ));
+            }
+            let update = match &outcome {
+                ProviderWaitOutcomeV2::Frame(frame) => match &frame.event {
+                    ProviderResponseFrameEventV2::Head(head) => ProviderRuntimeWaitUpdate::Head {
+                        status: head.status,
+                        headers_sha256: ordered_headers_sha256(&head.headers),
+                        retry_after_seconds,
+                    },
+                    ProviderResponseFrameEventV2::Chunk(chunk) => {
+                        ProviderRuntimeWaitUpdate::Chunk(updated_ordered_chunks_digest(
+                            &session.ordered_chunks_digest,
+                            frame.sequence,
+                            chunk,
+                        ))
+                    }
+                    ProviderResponseFrameEventV2::Terminal(terminal) => {
+                        ProviderRuntimeWaitUpdate::Terminal {
+                            receipt_sha256: terminal_event_sha256(terminal)?,
+                            completed: matches!(
+                                terminal,
+                                comfy_plugin_sdk::ProviderStreamTerminalV2::Completed { .. }
+                            ),
+                        }
+                    }
+                },
+                ProviderWaitOutcomeV2::TimedOut | ProviderWaitOutcomeV2::Cancelled => {
+                    ProviderRuntimeWaitUpdate::None
+                }
+            };
+            session
+                .validator
+                .accept_wait(request, outcome)
+                .map_err(map_provider_streaming_error)?;
+            match update {
+                ProviderRuntimeWaitUpdate::None => {}
+                ProviderRuntimeWaitUpdate::Head {
+                    status,
+                    headers_sha256,
+                    retry_after_seconds,
+                } => {
+                    session.response_status = Some(status);
+                    session.response_headers_sha256 = Some(headers_sha256);
+                    session.retry_after_seconds = retry_after_seconds;
+                }
+                ProviderRuntimeWaitUpdate::Terminal {
+                    receipt_sha256,
+                    completed,
+                } => {
+                    session.terminal_receipt_sha256 = Some(receipt_sha256);
+                    session.completed = completed;
+                }
+                ProviderRuntimeWaitUpdate::Chunk(updated) => {
+                    session.ordered_chunks_digest = updated;
+                }
+            }
+        }
+        if revoke_after_accept {
+            self.remove_streaming_session(request.handle);
+        }
+        Ok(())
+    }
+
+    fn start_streaming_upload(
+        &mut self,
+        request: &ProviderUploadRequestV2,
+        upload_handle: ProviderStreamHandleV2,
+        cancellation: &CancellationToken,
+    ) -> Result<(), PluginServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        self.streaming_session_mut(request.handle)?;
+        if self.streaming_sessions.contains_key(&upload_handle)
+            || self.streaming_upload_parents.contains_key(&upload_handle)
+        {
+            return Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidUpload,
+            ));
+        }
+        let session = self.streaming_session_mut(request.handle)?;
+        if session.actuation_proposal.is_some() {
+            return Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidOrder,
+            ));
+        }
+        let upload = session
+            .validator
+            .start_upload(request, upload_handle)
+            .map_err(map_provider_streaming_error)?;
+        session.upload_validators.insert(upload_handle, upload);
+        session.ordered_uploads.push(ProviderRuntimeUploadIdentity {
+            handle: upload_handle,
+            port_id: request.port_id.clone(),
+            media_type: request.media_type.clone(),
+            byte_length: request.byte_length,
+            content_sha256: request.content_sha256.clone(),
+        });
+        self.streaming_upload_parents
+            .insert(upload_handle, request.handle);
+        Ok(())
+    }
+
+    fn write_streaming_upload_chunk(
+        &mut self,
+        chunk: &ProviderRequestChunkV2,
+        cancellation: &CancellationToken,
+    ) -> Result<(), PluginServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let parent = *self
+            .streaming_upload_parents
+            .get(&chunk.handle)
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+        self.streaming_sessions
+            .get_mut(&parent)
+            .and_then(|session| session.upload_validators.get_mut(&chunk.handle))
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?
+            .write_chunk(chunk)
+            .map_err(map_provider_streaming_error)
+    }
+
+    fn accept_streaming_cost(
+        &mut self,
+        request: &ProviderCostRequestV2,
+        cost_request_sha256: String,
+        authorization: ProviderCostAuthorization,
+        verifier: &ProviderCostAcceptanceVerifier,
+        now: Instant,
+        cancellation: &CancellationToken,
+    ) -> Result<ProviderCostResponseV2, PluginServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let session = self
+            .streaming_sessions
+            .get(&request.handle)
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+        if session.actuation_proposal.is_some()
+            || !session.request_finished
+            || session
+                .upload_validators
+                .values()
+                .any(|upload| !upload.is_terminal())
+            || request.currency != authorization.price_bound().currency_code()
+            || request.maximum_microunits != authorization.price_bound().maximum_microunits()
+        {
+            return Err(PluginServiceError::ProviderCostAcceptanceDenied);
+        }
+        let expected_scope = provider_streaming_cost_scope_with_request_sha256(
+            session,
+            cost_request_sha256,
+            authorization.price_bound().clone(),
+        )?;
+        let verified = verifier
+            .verify(authorization.acceptance(), &expected_scope, now)
+            .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)?;
+        if verified.nonce() != authorization.nonce() {
+            return Err(PluginServiceError::ProviderCostAcceptanceDenied);
+        }
+        self.consumed_streaming_cost_nonces
+            .retain(|_, expires_at| *expires_at > now);
+        if self
+            .consumed_streaming_cost_nonces
+            .contains_key(&verified.nonce())
+        {
+            return Err(PluginServiceError::ProviderCostAcceptanceReused);
+        }
+        if self.consumed_streaming_cost_nonces.len() >= MAX_CONSUMED_PROVIDER_COST_NONCES {
+            return Err(PluginServiceError::ProviderCostAcceptanceDenied);
+        }
+        let accepted_cost_microunits = session
+            .accepted_cost_microunits
+            .checked_add(request.maximum_microunits)
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        let response = ProviderCostResponseV2 {
+            accepted: true,
+            approved_microunits: request.maximum_microunits,
+            receipt: authorization
+                .acceptance()
+                .receipt_bytes()
+                .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)?,
+        };
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        if let Some(previous_expiration) = self
+            .consumed_streaming_cost_nonces
+            .insert(verified.nonce(), verified.expires_at())
+        {
+            self.consumed_streaming_cost_nonces
+                .insert(verified.nonce(), previous_expiration);
+            return Err(PluginServiceError::ProviderCostAcceptanceReused);
+        }
+        let validation = self
+            .streaming_session_mut(request.handle)?
+            .validator
+            .accept_cost_request(request, &response)
+            .map_err(map_provider_streaming_error);
+        if let Err(error) = validation {
+            self.consumed_streaming_cost_nonces
+                .remove(&verified.nonce());
+            return Err(error);
+        }
+        self.streaming_session_mut(request.handle)?
+            .accepted_cost_microunits = accepted_cost_microunits;
+        Ok(response)
+    }
+
+    fn deny_streaming_cost(
+        &mut self,
+        request: &ProviderCostRequestV2,
+        cancellation: &CancellationToken,
+    ) -> Result<ProviderCostResponseV2, PluginServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let response = ProviderCostResponseV2 {
+            accepted: false,
+            approved_microunits: 0,
+            receipt: Vec::new(),
+        };
+        let session = self.streaming_session_mut(request.handle)?;
+        if session.actuation_proposal.is_some() {
+            return Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidOrder,
+            ));
+        }
+        session
+            .validator
+            .accept_cost_request(request, &response)
+            .map_err(map_provider_streaming_error)?;
+        Ok(response)
+    }
+
+    fn report_streaming_progress(
+        &mut self,
+        progress: &ProviderProgressV2,
+        now: Instant,
+        cancellation: &CancellationToken,
+    ) -> Result<Option<ProviderRuntimeProgressUpdate>, PluginServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let message = progress
+            .message
+            .as_ref()
+            .map(|message| {
+                let mut copy = String::new();
+                copy.try_reserve_exact(message.len())
+                    .map_err(|_| PluginServiceError::ResponseAllocationFailed)?;
+                copy.push_str(message);
+                Ok(copy)
+            })
+            .transpose()?;
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let session = self.streaming_session_mut(progress.handle)?;
+        session
+            .validator
+            .accept_progress(progress)
+            .map_err(map_provider_streaming_error)?;
+        let publish = session
+            .last_published_progress
+            .is_none_or(|(last, completed, total)| {
+                progress.completed == progress.total
+                    || progress.total != total
+                    || progress.completed > completed
+                        && now.saturating_duration_since(last) >= PROVIDER_PROGRESS_MINIMUM_INTERVAL
+            });
+        if !publish {
+            return Ok(None);
+        }
+        session.last_published_progress = Some((now, progress.completed, progress.total));
+        Ok(Some(ProviderRuntimeProgressUpdate {
+            sequence: progress.sequence,
+            completed: progress.completed,
+            total: progress.total,
+            message,
+        }))
+    }
+
+    fn prepare_streaming_actuation(
+        &mut self,
+        handle: ProviderStreamHandleV2,
+        canonical_ordered_uploads_sha256: Option<&str>,
+        cancellation: &CancellationToken,
+    ) -> Result<ProviderRuntimeActuationProposal, PluginServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let session = self.streaming_session_mut(handle)?;
+        if let Some(proposal) = &session.actuation_proposal {
+            return Ok(proposal.clone());
+        }
+        if !session.request_finished
+            || session
+                .upload_validators
+                .values()
+                .any(|upload| !upload.is_terminal())
+            || session.response_status.is_some()
+            || session.validator.is_terminal()
+        {
+            return Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidOrder,
+            ));
+        }
+        let request_body_sha256 = request_body_sha256(session);
+        let internal_ordered_uploads_sha256 = ordered_uploads_sha256(session)?;
+        let ordered_uploads_sha256 = canonical_ordered_uploads_sha256
+            .unwrap_or(&internal_ordered_uploads_sha256)
+            .to_owned();
+        let idempotency_identity_sha256 = provider_runtime_mutation_identity_sha256(
+            &session.authority,
+            &request_body_sha256,
+            &ordered_uploads_sha256,
+            session.accepted_cost_microunits,
+        );
+        let request = session
+            .authority
+            .request
+            .clone()
+            .with_idempotency_key_sha256(idempotency_identity_sha256.clone())
+            .map_err(|_| PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let proposal = ProviderRuntimeActuationProposal {
+            request,
+            request_head: session.authority.request_head.clone(),
+            request_head_sha256: session.authority.request_head_sha256.clone(),
+            request_body_sha256,
+            ordered_uploads_sha256,
+            accepted_cost_microunits: session.accepted_cost_microunits,
+            idempotency_identity_sha256,
+        };
+        session.actuation_proposal = Some(proposal.clone());
+        Ok(proposal)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn finish_streaming(
+        &mut self,
+        handle: ProviderStreamHandleV2,
+        issuer: &ProviderRuntimeReceiptIssuerV2,
+        issued_at: Instant,
+        expires_at: Instant,
+        nonce: [u8; 32],
+        cancellation: &CancellationToken,
+    ) -> Result<ProviderRuntimeReceiptV2, PluginServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let session = self
+            .streaming_sessions
+            .get(&handle)
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+        if !session.validator.is_terminal() || !session.completed {
+            return Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidTerminal,
+            ));
+        }
+        let proposal = session
+            .actuation_proposal
+            .as_ref()
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        let authority = &session.authority;
+        let ordered_chunks_sha256 =
+            format!("{:x}", session.ordered_chunks_digest.clone().finalize());
+        let identity = ProviderRuntimeReceiptIdentityV2 {
+            provider: authority.provider.clone(),
+            method: authority.request_head.method,
+            endpoint: proposal.request.endpoint().to_owned(),
+            ordered_headers_sha256: ordered_headers_sha256(&authority.request_head.headers),
+            secret_id: proposal
+                .request
+                .secret_id()
+                .map(|secret| secret.as_str().to_owned()),
+            request_head_sha256: proposal.request_head_sha256.clone(),
+            request_body_sha256: proposal.request_body_sha256.clone(),
+            provider_manifest_sha256: authority.provider_manifest_sha256.clone(),
+            component_generation: authority.component_generation,
+            component_digest_sha256: authority.component_digest_sha256.clone(),
+            binding_generation: authority.binding_generation,
+            binding_set_sha256: authority.binding_set_sha256.clone(),
+            accepted_cost_microunits: proposal.accepted_cost_microunits,
+            request_ordinal: authority.request_ordinal,
+            response_status: session
+                .response_status
+                .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?,
+            response_headers_sha256: session
+                .response_headers_sha256
+                .clone()
+                .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?,
+            ordered_uploads_sha256: proposal.ordered_uploads_sha256.clone(),
+            ordered_chunks_sha256,
+            terminal_receipt_sha256: session
+                .terminal_receipt_sha256
+                .clone()
+                .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?,
+            idempotency_identity_sha256: proposal.idempotency_identity_sha256.clone(),
+        };
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let receipt = issuer
+            .issue(identity, issued_at, expires_at, nonce)
+            .map_err(|_| PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        self.remove_streaming_session(handle);
+        Ok(receipt)
+    }
+
+    fn streaming_retry_after_seconds(
+        &self,
+        handle: ProviderStreamHandleV2,
+    ) -> Result<Option<u64>, PluginServiceError> {
+        self.streaming_sessions
+            .get(&handle)
+            .map(|session| session.retry_after_seconds)
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)
+    }
+
+    fn streaming_session_mut(
+        &mut self,
+        handle: ProviderStreamHandleV2,
+    ) -> Result<&mut ProviderRuntimeStreamingSession, PluginServiceError> {
+        self.streaming_sessions
+            .get_mut(&handle)
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)
+    }
+
+    fn remove_streaming_session(
+        &mut self,
+        handle: ProviderStreamHandleV2,
+    ) -> Option<ProviderRuntimeStreamingSession> {
+        let mut session = self.streaming_sessions.remove(&handle)?;
+        session.validator.revoke();
+        for upload in &session.ordered_uploads {
+            self.streaming_upload_parents.remove(&upload.handle);
+        }
+        Some(session)
+    }
+
+    fn revoke_streaming(&mut self, handle: ProviderStreamHandleV2) {
+        self.remove_streaming_session(handle);
+    }
+
+    fn begin_legacy(
+        &mut self,
+        authority: &dyn NativeProviderInvocationAuthority,
+        scope: NativeProviderInvocationScope,
+    ) -> Result<(), PluginServiceError> {
+        if !valid_provider_runtime_identity(&scope.start.session_id)
+            || self.legacy_sessions.len() + self.streaming_sessions.len()
+                >= MAX_PROVIDER_RUNTIME_SESSIONS
+            || self.legacy_sessions.contains_key(&scope.start.session_id)
+        {
+            return Err(PluginServiceError::ProviderSessionUnavailable);
+        }
+        let session_id = scope.start.session_id.clone();
+        let invocation = authority.begin(scope)?;
+        self.legacy_sessions.insert(session_id, invocation);
+        Ok(())
+    }
+
+    fn call_legacy(
+        &mut self,
+        session_id: &str,
+        request: PluginServiceWireRequest,
+    ) -> Result<PluginServiceWireResponse, PluginServiceError> {
+        if !valid_provider_runtime_identity(session_id) {
+            return Err(PluginServiceError::ProviderSessionUnavailable);
+        }
+        let invocation = self
+            .legacy_sessions
+            .get_mut(session_id)
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+        Ok(invocation.handle_wire_request(request))
+    }
+
+    fn resolve_legacy(
+        &mut self,
+        session_id: &str,
+        receipt_set: &ProviderResultReceiptSet,
+    ) -> Result<Vec<Vec<u8>>, PluginServiceError> {
+        if !valid_provider_runtime_identity(session_id) {
+            return Err(PluginServiceError::ProviderSessionUnavailable);
+        }
+        self.legacy_sessions
+            .get_mut(session_id)
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?
+            .resolve_provider_result_receipt_set(receipt_set)
+            .map(|results| {
+                results
+                    .into_iter()
+                    .map(ResolvedProviderResult::into_response)
+                    .collect()
+            })
+    }
+
+    fn finish_legacy(&mut self, session_id: &str) -> Result<(), PluginServiceError> {
+        if !valid_provider_runtime_identity(session_id) {
+            return Err(PluginServiceError::ProviderSessionUnavailable);
+        }
+        self.legacy_sessions
+            .remove(session_id)
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?
+            .finish()
+    }
+
+    fn abort_legacy(&mut self, session_id: &str) {
+        if !valid_provider_runtime_identity(session_id) {
+            return;
+        }
+        if let Some(invocation) = self.legacy_sessions.remove(session_id) {
+            invocation.abort();
+        }
+    }
+
+    fn revoke_all(&mut self) {
+        for (_, invocation) in std::mem::take(&mut self.legacy_sessions) {
+            invocation.abort();
+        }
+        for (_, mut session) in std::mem::take(&mut self.streaming_sessions) {
+            session.validator.revoke();
+        }
+        self.streaming_upload_parents.clear();
+    }
+
+    #[cfg(test)]
+    fn is_empty(&self) -> bool {
+        self.legacy_sessions.is_empty()
+            && self.streaming_sessions.is_empty()
+            && self.streaming_upload_parents.is_empty()
+    }
+}
+
+impl ProviderRuntimeStreamService {
+    pub fn start_request(
+        &self,
+        authority: ProviderRuntimeAuthorityInput,
+        request_head: WorkerProviderRequestHead,
+    ) -> Result<WorkerProviderStreamHandle, PluginServiceError> {
+        let context = authority.host_context.clone();
+        validate_worker_provider_context(&context)?;
+        let key = worker_provider_context_key(&context);
+        let mut state = self.state.lock();
+        if !Arc::ptr_eq(&authority.service_identity, &state.service_identity) {
+            return Err(PluginServiceError::ProviderRuntimeAuthorityDenied);
+        }
+        let Some(active_claim) = state.activation_claims.get(&key) else {
+            return Err(classify_inactive_authority(&state, &context));
+        };
+        if !Arc::ptr_eq(active_claim, &authority.claim)
+            || authority
+                .claim
+                .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire)
+                .is_err()
+        {
+            return Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::RevokedHandle,
+            ));
+        }
+        state.activation_claims.remove(&key);
+        let cancellation = authority.cancellation.clone();
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        if !worker_request_head_matches(&request_head, &authority.request_head) {
+            return Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidRequestAuthority,
+            ));
+        }
+        if state.invocation_bindings.contains_key(&key) {
+            return Err(PluginServiceError::ProviderRuntimeStaleInvocation);
+        }
+        let internal_invocation = state
+            .next_internal_invocation
+            .checked_add(1)
+            .filter(|invocation| *invocation != 0)
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+        let slot = state.next_slots.get(&key).copied().unwrap_or(1);
+        let next_slot = slot
+            .checked_add(1)
+            .filter(|slot| *slot != 0)
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+        let worker_handle = worker_provider_handle(&context, slot);
+        let sdk_context = ProviderInvocationContextV2 {
+            invocation: internal_invocation,
+            generation: context.generation,
+        };
+        let sdk_handle = ProviderStreamHandleV2 {
+            invocation: internal_invocation,
+            slot,
+            generation: context.generation,
+        };
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        state
+            .owner
+            .begin_streaming(authority, sdk_context, sdk_handle, &cancellation)?;
+        state.next_internal_invocation = internal_invocation;
+        state.invocation_bindings.insert(key, internal_invocation);
+        state.next_slots.insert(key, next_slot);
+        state.handles.insert(worker_handle, sdk_handle);
+        state.main_handles.insert(worker_handle);
+        state.cancellations.insert(worker_handle, cancellation);
+        Ok(worker_handle)
+    }
+
+    pub fn write_request_chunk(
+        &self,
+        chunk: WorkerProviderRequestChunk,
+    ) -> Result<(), PluginServiceError> {
+        let mut state = self.state.lock();
+        let worker_handle = chunk.handle;
+        let (sdk_handle, main_handle) = resolve_worker_handle(&state, worker_handle, Some(true))?;
+        let cancellation = active_stream_cancellation(&mut state, main_handle)?;
+        let chunk = provider_request_chunk(chunk, sdk_handle);
+        let result = state
+            .owner
+            .write_streaming_request_chunk(&chunk, &cancellation);
+        finish_worker_operation(&mut state, main_handle, result)
+    }
+
+    pub fn accept_wait(
+        &self,
+        request: WorkerProviderWaitRequest,
+        outcome: WorkerProviderWaitOutcome,
+    ) -> Result<(), PluginServiceError> {
+        let mut state = self.state.lock();
+        let (_, main_handle) = resolve_worker_handle(&state, request.handle, Some(true))?;
+        let cancellation = active_stream_cancellation(&mut state, main_handle)?;
+        let sdk_request_handle = state
+            .handles
+            .get(&request.handle)
+            .copied()
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+        let request = ProviderWaitRequestV2 {
+            handle: sdk_request_handle,
+            after_sequence: request.after_sequence,
+            timeout_milliseconds: request.timeout_milliseconds,
+        };
+        let revoke_after_accept = worker_wait_outcome_is_noncompleted_terminal(&outcome);
+        let outcome = provider_wait_outcome(&state, outcome)?;
+        let result = state
+            .owner
+            .accept_streaming_wait(&request, outcome, &cancellation);
+        if result.is_ok() && revoke_after_accept {
+            remove_worker_stream(&mut state, main_handle);
+        }
+        finish_worker_operation(&mut state, main_handle, result)
+    }
+
+    pub fn start_upload(
+        &self,
+        request: WorkerProviderUploadRequest,
+    ) -> Result<WorkerProviderStreamHandle, PluginServiceError> {
+        let mut state = self.state.lock();
+        let (_, main_handle) = resolve_worker_handle(&state, request.handle, Some(true))?;
+        let cancellation = active_stream_cancellation(&mut state, main_handle)?;
+        let sdk_parent = state
+            .handles
+            .get(&main_handle)
+            .copied()
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+        let context = worker_provider_context_from_handle(main_handle);
+        let key = worker_provider_context_key(&context);
+        let slot = state.next_slots.get(&key).copied().unwrap_or(1);
+        let next_slot = slot
+            .checked_add(1)
+            .filter(|slot| *slot != 0)
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+        let worker_upload = worker_provider_handle(&context, slot);
+        if state.handles.contains_key(&worker_upload) {
+            return Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidUpload,
+            ));
+        }
+        let sdk_upload = ProviderStreamHandleV2 {
+            invocation: sdk_parent.invocation,
+            slot,
+            generation: sdk_parent.generation,
+        };
+        let request = ProviderUploadRequestV2 {
+            handle: sdk_parent,
+            port_id: request.port_id,
+            media_type: request.media_type,
+            byte_length: request.byte_length,
+            content_sha256: request.content_sha256,
+        };
+        state
+            .owner
+            .start_streaming_upload(&request, sdk_upload, &cancellation)?;
+        state.next_slots.insert(key, next_slot);
+        state.handles.insert(worker_upload, sdk_upload);
+        state.upload_parents.insert(worker_upload, main_handle);
+        Ok(worker_upload)
+    }
+
+    pub fn write_upload_chunk(
+        &self,
+        chunk: WorkerProviderRequestChunk,
+    ) -> Result<(), PluginServiceError> {
+        let mut state = self.state.lock();
+        let worker_handle = chunk.handle;
+        let (sdk_handle, main_handle) = resolve_worker_handle(&state, worker_handle, Some(false))?;
+        let cancellation = active_stream_cancellation(&mut state, main_handle)?;
+        let chunk = provider_request_chunk(chunk, sdk_handle);
+        let result = state
+            .owner
+            .write_streaming_upload_chunk(&chunk, &cancellation);
+        finish_worker_operation(&mut state, main_handle, result)
+    }
+
+    pub fn accept_streaming_cost(
+        &self,
+        request: WorkerProviderCostRequest,
+        authorization: ProviderCostAuthorization,
+        verifier: &ProviderCostAcceptanceVerifier,
+        now: Instant,
+    ) -> Result<WorkerProviderCostResponse, PluginServiceError> {
+        let mut state = self.state.lock();
+        let (sdk_handle, main_handle) = resolve_worker_handle(&state, request.handle, Some(true))?;
+        let cancellation = active_stream_cancellation(&mut state, main_handle)?;
+        let request = provider_cost_request(request, sdk_handle);
+        let cost_request_sha256 =
+            worker_provider_cost_request_sha256(&state, main_handle, &request)?;
+        let result = state.owner.accept_streaming_cost(
+            &request,
+            cost_request_sha256,
+            authorization,
+            verifier,
+            now,
+            &cancellation,
+        );
+        match result {
+            Ok(response) => Ok(worker_cost_response(response)),
+            Err(error) => {
+                revoke_if_cancelled(&mut state, main_handle, &error);
+                Err(error)
+            }
+        }
+    }
+
+    pub fn prepare_cost_acceptance(
+        &self,
+        request: &WorkerProviderCostRequest,
+        price_bound: ProviderPriceBound,
+    ) -> Result<ProviderCostAcceptanceScope, PluginServiceError> {
+        let mut state = self.state.lock();
+        let (sdk_handle, main_handle) = resolve_worker_handle(&state, request.handle, Some(true))?;
+        active_stream_cancellation(&mut state, main_handle)?;
+        let sdk_request = ProviderCostRequestV2 {
+            handle: sdk_handle,
+            operation: request.operation.clone(),
+            currency: request.currency.clone(),
+            maximum_microunits: request.maximum_microunits,
+        };
+        let session = state
+            .owner
+            .streaming_sessions
+            .get(&sdk_handle)
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+        if session.actuation_proposal.is_some()
+            || !session.request_finished
+            || session
+                .upload_validators
+                .values()
+                .any(|upload| !upload.is_terminal())
+            || request.currency != price_bound.currency_code()
+            || request.maximum_microunits != price_bound.maximum_microunits()
+        {
+            return Err(PluginServiceError::ProviderCostAcceptanceDenied);
+        }
+        let cost_request_sha256 =
+            worker_provider_cost_request_sha256(&state, main_handle, &sdk_request)?;
+        provider_streaming_cost_scope_with_request_sha256(session, cost_request_sha256, price_bound)
+    }
+
+    pub fn deny_streaming_cost(
+        &self,
+        request: WorkerProviderCostRequest,
+    ) -> Result<WorkerProviderCostResponse, PluginServiceError> {
+        let mut state = self.state.lock();
+        let (sdk_handle, main_handle) = resolve_worker_handle(&state, request.handle, Some(true))?;
+        let cancellation = active_stream_cancellation(&mut state, main_handle)?;
+        let request = provider_cost_request(request, sdk_handle);
+        let result = state.owner.deny_streaming_cost(&request, &cancellation);
+        match result {
+            Ok(response) => Ok(worker_cost_response(response)),
+            Err(error) => {
+                revoke_if_cancelled(&mut state, main_handle, &error);
+                Err(error)
+            }
+        }
+    }
+
+    pub fn report_progress(
+        &self,
+        progress: WorkerProviderProgress,
+        now: Instant,
+    ) -> Result<Option<ProviderRuntimeProgressProjection>, PluginServiceError> {
+        let mut state = self.state.lock();
+        let worker_handle = progress.handle;
+        let (sdk_handle, main_handle) = resolve_worker_handle(&state, worker_handle, Some(true))?;
+        let cancellation = active_stream_cancellation(&mut state, main_handle)?;
+        let progress = ProviderProgressV2 {
+            handle: sdk_handle,
+            sequence: progress.sequence,
+            completed: progress.completed,
+            total: progress.total,
+            message: progress.message,
+        };
+        let result = state
+            .owner
+            .report_streaming_progress(&progress, now, &cancellation);
+        match result {
+            Ok(Some(update)) => Ok(Some(ProviderRuntimeProgressProjection {
+                handle: worker_handle,
+                sequence: update.sequence,
+                completed: update.completed,
+                total: update.total,
+                message: update.message,
+            })),
+            Ok(None) => Ok(None),
+            Err(error) => {
+                revoke_if_cancelled(&mut state, main_handle, &error);
+                Err(error)
+            }
+        }
+    }
+
+    pub fn prepare_streaming_actuation(
+        &self,
+        handle: WorkerProviderStreamHandle,
+    ) -> Result<ProviderRuntimeActuationProposal, PluginServiceError> {
+        let mut state = self.state.lock();
+        let (sdk_handle, main_handle) = resolve_worker_handle(&state, handle, Some(true))?;
+        let cancellation = active_stream_cancellation(&mut state, main_handle)?;
+        let ordered_uploads_sha256 = worker_ordered_uploads_sha256(&state, main_handle)?;
+        let result = state.owner.prepare_streaming_actuation(
+            sdk_handle,
+            Some(&ordered_uploads_sha256),
+            &cancellation,
+        );
+        if let Err(error) = &result {
+            revoke_if_cancelled(&mut state, main_handle, error);
+        }
+        result
+    }
+
+    pub fn finish_streaming(
+        &self,
+        handle: WorkerProviderStreamHandle,
+        issuer: &ProviderRuntimeReceiptIssuerV2,
+        issued_at: Instant,
+        expires_at: Instant,
+        nonce: [u8; 32],
+    ) -> Result<ProviderRuntimeReceiptV2, PluginServiceError> {
+        let mut state = self.state.lock();
+        let (sdk_handle, main_handle) = resolve_worker_handle(&state, handle, Some(true))?;
+        let cancellation = active_stream_cancellation(&mut state, main_handle)?;
+        let result = state.owner.finish_streaming(
+            sdk_handle,
+            issuer,
+            issued_at,
+            expires_at,
+            nonce,
+            &cancellation,
+        );
+        match result {
+            Ok(receipt) => {
+                remove_worker_stream(&mut state, main_handle);
+                Ok(receipt)
+            }
+            Err(error) => {
+                revoke_if_cancelled(&mut state, main_handle, &error);
+                Err(error)
+            }
+        }
+    }
+
+    pub fn retry_after_seconds(
+        &self,
+        handle: WorkerProviderStreamHandle,
+    ) -> Result<Option<u64>, PluginServiceError> {
+        let mut state = self.state.lock();
+        let (sdk_handle, main_handle) = resolve_worker_handle(&state, handle, Some(true))?;
+        active_stream_cancellation(&mut state, main_handle)?;
+        state.owner.streaming_retry_after_seconds(sdk_handle)
+    }
+
+    pub fn check_cancelled(
+        &self,
+        handle: WorkerProviderStreamHandle,
+    ) -> Result<(), PluginServiceError> {
+        let mut state = self.state.lock();
+        let (_, main_handle) = resolve_worker_handle(&state, handle, None)?;
+        active_stream_cancellation(&mut state, main_handle).map(|_| ())
+    }
+
+    pub fn revoke_stream(&self, handle: WorkerProviderStreamHandle) {
+        let mut state = self.state.lock();
+        if let Ok((_, main_handle)) = resolve_worker_handle(&state, handle, None) {
+            revoke_worker_stream(&mut state, main_handle);
+        }
+    }
+
+    pub fn revoke_invocation(
+        &self,
+        context: &WorkerProviderInvocationContext,
+    ) -> Result<(), PluginServiceError> {
+        validate_worker_provider_context(context)?;
+        let mut state = self.state.lock();
+        let main_handles = state
+            .main_handles
+            .iter()
+            .copied()
+            .filter(|handle| worker_handle_matches_context(*handle, context))
+            .collect::<Vec<_>>();
+        for main_handle in main_handles {
+            revoke_worker_stream(&mut state, main_handle);
+        }
+        let grant_key = (
+            context.session_id,
+            context.session_generation,
+            context.invocation,
+        );
+        if let Some((generation, grant)) = state.grants.grants.get_mut(&grant_key)
+            && *generation == context.generation
+        {
+            *grant = None;
+        }
+        let claim_key = worker_provider_context_key(context);
+        if let Some(claim) = state.activation_claims.remove(&claim_key) {
+            claim.store(false, Ordering::Release);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn begin_legacy(
+        &self,
+        authority: &dyn NativeProviderInvocationAuthority,
+        scope: NativeProviderInvocationScope,
+    ) -> Result<(), PluginServiceError> {
+        self.state.lock().owner.begin_legacy(authority, scope)
+    }
+
+    pub(crate) fn call_legacy(
+        &self,
+        session_id: &str,
+        request: PluginServiceWireRequest,
+    ) -> Result<PluginServiceWireResponse, PluginServiceError> {
+        self.state.lock().owner.call_legacy(session_id, request)
+    }
+
+    pub(crate) fn resolve_legacy(
+        &self,
+        session_id: &str,
+        receipt_set: &ProviderResultReceiptSet,
+    ) -> Result<Vec<Vec<u8>>, PluginServiceError> {
+        self.state
+            .lock()
+            .owner
+            .resolve_legacy(session_id, receipt_set)
+    }
+
+    pub(crate) fn finish_legacy(&self, session_id: &str) -> Result<(), PluginServiceError> {
+        self.state.lock().owner.finish_legacy(session_id)
+    }
+
+    pub(crate) fn abort_legacy(&self, session_id: &str) {
+        self.state.lock().owner.abort_legacy(session_id);
+    }
+
+    pub fn revoke_all(&self) {
+        let mut state = self.state.lock();
+        state.owner.revoke_all();
+        state.grants.grants.clear();
+        state.grants.session_generations.clear();
+        for (_, claim) in std::mem::take(&mut state.activation_claims) {
+            claim.store(false, Ordering::Release);
+        }
+        state.invocation_bindings.clear();
+        state.handles.clear();
+        state.main_handles.clear();
+        state.upload_parents.clear();
+        state.cancellations.clear();
+        state.next_slots.clear();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn is_empty(&self) -> bool {
+        let state = self.state.lock();
+        state.owner.is_empty()
+            && state.grants.grants.is_empty()
+            && state.grants.session_generations.is_empty()
+            && state.activation_claims.is_empty()
+            && state.invocation_bindings.is_empty()
+            && state.handles.is_empty()
+            && state.main_handles.is_empty()
+            && state.upload_parents.is_empty()
+            && state.cancellations.is_empty()
+            && state.next_slots.is_empty()
+    }
+}
+
+fn worker_provider_context_key(
+    context: &WorkerProviderInvocationContext,
+) -> (uuid::Uuid, u64, u64, u32) {
+    (
+        context.session_id,
+        context.session_generation,
+        context.invocation,
+        context.generation,
+    )
+}
+
+fn worker_provider_context_from_handle(
+    handle: WorkerProviderStreamHandle,
+) -> WorkerProviderInvocationContext {
+    WorkerProviderInvocationContext {
+        session_id: handle.session_id,
+        session_generation: handle.session_generation,
+        invocation: handle.invocation,
+        generation: handle.generation,
+    }
+}
+
+fn worker_provider_handle(
+    context: &WorkerProviderInvocationContext,
+    slot: u32,
+) -> WorkerProviderStreamHandle {
+    WorkerProviderStreamHandle {
+        session_id: context.session_id,
+        session_generation: context.session_generation,
+        invocation: context.invocation,
+        slot,
+        generation: context.generation,
+    }
+}
+
+fn worker_handle_matches_context(
+    handle: WorkerProviderStreamHandle,
+    context: &WorkerProviderInvocationContext,
+) -> bool {
+    handle.session_id == context.session_id
+        && handle.session_generation == context.session_generation
+        && handle.invocation == context.invocation
+        && handle.generation == context.generation
+}
+
+fn resolve_worker_handle(
+    state: &ProviderRuntimeStreamState,
+    handle: WorkerProviderStreamHandle,
+    main: Option<bool>,
+) -> Result<(ProviderStreamHandleV2, WorkerProviderStreamHandle), PluginServiceError> {
+    validate_worker_provider_context(&worker_provider_context_from_handle(handle))?;
+    if handle.slot == 0 {
+        return Err(PluginServiceError::ProviderStreamingContract(
+            ProviderStreamingContractError::InvalidHandle,
+        ));
+    }
+    if let Some(sdk_handle) = state.handles.get(&handle).copied() {
+        let is_main = state.main_handles.contains(&handle);
+        if main.is_some_and(|expected| expected != is_main) {
+            return Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::ForeignHandle,
+            ));
+        }
+        let main_handle = if is_main {
+            handle
+        } else {
+            *state
+                .upload_parents
+                .get(&handle)
+                .ok_or(PluginServiceError::ProviderSessionUnavailable)?
+        };
+        return Ok((sdk_handle, main_handle));
+    }
+    Err(classify_missing_worker_handle(state, handle))
+}
+
+fn classify_missing_worker_handle(
+    state: &ProviderRuntimeStreamState,
+    handle: WorkerProviderStreamHandle,
+) -> PluginServiceError {
+    let Some(session_generation) = state
+        .grants
+        .session_generations
+        .get(&handle.session_id)
+        .copied()
+        .or_else(|| {
+            state
+                .invocation_bindings
+                .keys()
+                .find_map(|(session_id, generation, _, _)| {
+                    (*session_id == handle.session_id).then_some(*generation)
+                })
+        })
+    else {
+        return PluginServiceError::ProviderRuntimeForeignSession;
+    };
+    if session_generation != handle.session_generation {
+        return PluginServiceError::ProviderRuntimeStaleSession;
+    }
+    let invocation_exists =
+        state
+            .invocation_bindings
+            .keys()
+            .any(|(session_id, generation, invocation, _)| {
+                *session_id == handle.session_id
+                    && *generation == handle.session_generation
+                    && *invocation == handle.invocation
+            })
+            || state
+                .grants
+                .grants
+                .keys()
+                .any(|(session_id, generation, invocation)| {
+                    *session_id == handle.session_id
+                        && *generation == handle.session_generation
+                        && *invocation == handle.invocation
+                });
+    if !invocation_exists {
+        return PluginServiceError::ProviderRuntimeForeignInvocation;
+    }
+    let key = (
+        handle.session_id,
+        handle.session_generation,
+        handle.invocation,
+        handle.generation,
+    );
+    let current_invocation_generation = state
+        .grants
+        .grants
+        .get(&(
+            handle.session_id,
+            handle.session_generation,
+            handle.invocation,
+        ))
+        .map(|(generation, _)| *generation);
+    if !state.invocation_bindings.contains_key(&key) {
+        if current_invocation_generation == Some(handle.generation) {
+            return PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidHandle,
+            );
+        }
+        return PluginServiceError::ProviderRuntimeStaleInvocation;
+    }
+    if state
+        .next_slots
+        .get(&key)
+        .is_none_or(|next_slot| handle.slot >= *next_slot)
+    {
+        return PluginServiceError::ProviderStreamingContract(
+            ProviderStreamingContractError::InvalidHandle,
+        );
+    }
+    PluginServiceError::ProviderStreamingContract(ProviderStreamingContractError::RevokedHandle)
+}
+
+fn classify_inactive_authority(
+    state: &ProviderRuntimeStreamState,
+    context: &WorkerProviderInvocationContext,
+) -> PluginServiceError {
+    let Some(session_generation) = state
+        .grants
+        .session_generations
+        .get(&context.session_id)
+        .copied()
+    else {
+        return PluginServiceError::ProviderRuntimeForeignSession;
+    };
+    if session_generation != context.session_generation {
+        return PluginServiceError::ProviderRuntimeStaleSession;
+    }
+    let Some((generation, _)) = state.grants.grants.get(&(
+        context.session_id,
+        context.session_generation,
+        context.invocation,
+    )) else {
+        return PluginServiceError::ProviderRuntimeForeignInvocation;
+    };
+    if *generation != context.generation {
+        return PluginServiceError::ProviderRuntimeStaleInvocation;
+    }
+    PluginServiceError::ProviderStreamingContract(ProviderStreamingContractError::RevokedHandle)
+}
+
+fn active_stream_cancellation(
+    state: &mut ProviderRuntimeStreamState,
+    main_handle: WorkerProviderStreamHandle,
+) -> Result<CancellationToken, PluginServiceError> {
+    let cancellation = state
+        .cancellations
+        .get(&main_handle)
+        .cloned()
+        .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+    if cancellation.check().is_err() {
+        revoke_worker_stream(state, main_handle);
+        return Err(PluginServiceError::Cancelled);
+    }
+    Ok(cancellation)
+}
+
+fn finish_worker_operation(
+    state: &mut ProviderRuntimeStreamState,
+    main_handle: WorkerProviderStreamHandle,
+    result: Result<(), PluginServiceError>,
+) -> Result<(), PluginServiceError> {
+    if let Err(error) = &result {
+        revoke_if_cancelled(state, main_handle, error);
+    }
+    result
+}
+
+fn revoke_if_cancelled(
+    state: &mut ProviderRuntimeStreamState,
+    main_handle: WorkerProviderStreamHandle,
+    error: &PluginServiceError,
+) {
+    if matches!(error, PluginServiceError::Cancelled) {
+        revoke_worker_stream(state, main_handle);
+    }
+}
+
+fn remove_worker_stream(
+    state: &mut ProviderRuntimeStreamState,
+    main_handle: WorkerProviderStreamHandle,
+) {
+    state.handles.remove(&main_handle);
+    state.main_handles.remove(&main_handle);
+    state.cancellations.remove(&main_handle);
+    let uploads = state
+        .upload_parents
+        .iter()
+        .filter_map(|(upload, parent)| (*parent == main_handle).then_some(*upload))
+        .collect::<Vec<_>>();
+    for upload in uploads {
+        state.upload_parents.remove(&upload);
+        state.handles.remove(&upload);
+    }
+}
+
+fn revoke_worker_stream(
+    state: &mut ProviderRuntimeStreamState,
+    main_handle: WorkerProviderStreamHandle,
+) {
+    if let Some(sdk_handle) = state.handles.get(&main_handle).copied() {
+        state.owner.revoke_streaming(sdk_handle);
+    }
+    remove_worker_stream(state, main_handle);
+}
+
+fn provider_request_chunk(
+    chunk: WorkerProviderRequestChunk,
+    handle: ProviderStreamHandleV2,
+) -> ProviderRequestChunkV2 {
+    ProviderRequestChunkV2 {
+        handle,
+        sequence: chunk.sequence,
+        bytes: chunk.bytes,
+        end: chunk.end,
+    }
+}
+
+fn worker_request_head_matches(
+    worker: &WorkerProviderRequestHead,
+    sdk: &ProviderRequestHeadV2,
+) -> bool {
+    worker.endpoint == sdk.endpoint
+        && worker.secret_id == sdk.secret_id
+        && provider_http_method(worker.method) == sdk.method
+        && worker.declared_body_bytes == sdk.declared_body_bytes
+        && worker.headers.len() == sdk.headers.len()
+        && worker
+            .headers
+            .iter()
+            .zip(&sdk.headers)
+            .all(|(worker, sdk)| worker.name == sdk.name && worker.value == sdk.value)
+}
+
+fn provider_cost_request(
+    request: WorkerProviderCostRequest,
+    handle: ProviderStreamHandleV2,
+) -> ProviderCostRequestV2 {
+    ProviderCostRequestV2 {
+        handle,
+        operation: request.operation,
+        currency: request.currency,
+        maximum_microunits: request.maximum_microunits,
+    }
+}
+
+fn worker_cost_response(response: ProviderCostResponseV2) -> WorkerProviderCostResponse {
+    WorkerProviderCostResponse {
+        accepted: response.accepted,
+        approved_microunits: response.approved_microunits,
+        receipt: response.receipt,
+    }
+}
+
+fn provider_wait_outcome(
+    state: &ProviderRuntimeStreamState,
+    outcome: WorkerProviderWaitOutcome,
+) -> Result<ProviderWaitOutcomeV2, PluginServiceError> {
+    match outcome {
+        WorkerProviderWaitOutcome::Frame(frame) => {
+            let (handle, _) = resolve_worker_handle(state, frame.handle, Some(true))?;
+            Ok(ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+                handle,
+                sequence: frame.sequence,
+                event: provider_response_event(frame.event)?,
+            }))
+        }
+        WorkerProviderWaitOutcome::TimedOut => Ok(ProviderWaitOutcomeV2::TimedOut),
+        WorkerProviderWaitOutcome::Cancelled => Ok(ProviderWaitOutcomeV2::Cancelled),
+    }
+}
+
+fn provider_response_event(
+    event: WorkerProviderResponseFrameEvent,
+) -> Result<ProviderResponseFrameEventV2, PluginServiceError> {
+    Ok(match event {
+        WorkerProviderResponseFrameEvent::Head(head) => {
+            let mut headers = Vec::new();
+            headers
+                .try_reserve_exact(head.headers.len())
+                .map_err(|_| PluginServiceError::ResponseAllocationFailed)?;
+            headers.extend(head.headers.into_iter().map(provider_header));
+            ProviderResponseFrameEventV2::Head(ProviderResponseHeadV2 {
+                status: head.status,
+                headers,
+            })
+        }
+        WorkerProviderResponseFrameEvent::Chunk(chunk) => {
+            ProviderResponseFrameEventV2::Chunk(match chunk {
+                WorkerProviderResponseChunk::Binary(bytes) => {
+                    ProviderResponseChunkV2::Binary(bytes)
+                }
+                WorkerProviderResponseChunk::Text(text) => ProviderResponseChunkV2::Text(text),
+                WorkerProviderResponseChunk::NdjsonLine(line) => {
+                    ProviderResponseChunkV2::NdjsonLine(line)
+                }
+            })
+        }
+        WorkerProviderResponseFrameEvent::Terminal(terminal) => {
+            ProviderResponseFrameEventV2::Terminal(match terminal {
+                WorkerProviderTerminal::Completed(receipt) => {
+                    ProviderStreamTerminalV2::Completed { receipt }
+                }
+                WorkerProviderTerminal::Failed { code, message } => {
+                    ProviderStreamTerminalV2::Failed { code, message }
+                }
+                WorkerProviderTerminal::Cancelled => ProviderStreamTerminalV2::Cancelled,
+            })
+        }
+    })
+}
+
+fn provider_header(header: WorkerProviderHeader) -> ProviderHeaderV2 {
+    ProviderHeaderV2 {
+        name: header.name,
+        value: header.value,
+    }
+}
+
+fn provider_http_method(method: WorkerProviderHttpMethod) -> ProviderHttpMethodV2 {
+    match method {
+        WorkerProviderHttpMethod::Delete => ProviderHttpMethodV2::Delete,
+        WorkerProviderHttpMethod::Get => ProviderHttpMethodV2::Get,
+        WorkerProviderHttpMethod::Head => ProviderHttpMethodV2::Head,
+        WorkerProviderHttpMethod::Options => ProviderHttpMethodV2::Options,
+        WorkerProviderHttpMethod::Patch => ProviderHttpMethodV2::Patch,
+        WorkerProviderHttpMethod::Post => ProviderHttpMethodV2::Post,
+        WorkerProviderHttpMethod::Put => ProviderHttpMethodV2::Put,
+    }
+}
+
+fn worker_wait_outcome_is_noncompleted_terminal(outcome: &WorkerProviderWaitOutcome) -> bool {
+    matches!(outcome, WorkerProviderWaitOutcome::Cancelled)
+        || matches!(
+            outcome,
+            WorkerProviderWaitOutcome::Frame(comfy_types::WorkerProviderResponseFrame {
+                event: WorkerProviderResponseFrameEvent::Terminal(
+                    WorkerProviderTerminal::Failed { .. } | WorkerProviderTerminal::Cancelled
+                ),
+                ..
+            })
+        )
+}
+
+#[allow(dead_code)]
+fn revoke_replaced_host_context(
+    state: &mut ProviderRuntimeStreamState,
+    context: &WorkerProviderInvocationContext,
+    session_replaced: bool,
+) {
+    let replaced_claims = state
+        .activation_claims
+        .keys()
+        .copied()
+        .filter(|(session_id, session_generation, invocation, generation)| {
+            *session_id == context.session_id
+                && (session_replaced && *session_generation < context.session_generation
+                    || !session_replaced
+                        && *session_generation == context.session_generation
+                        && *invocation == context.invocation
+                        && *generation < context.generation)
+        })
+        .collect::<Vec<_>>();
+    for key in replaced_claims {
+        if let Some(claim) = state.activation_claims.remove(&key) {
+            claim.store(false, Ordering::Release);
+        }
+    }
+    let replaced_main_handles = state
+        .main_handles
+        .iter()
+        .copied()
+        .filter(|handle| {
+            handle.session_id == context.session_id
+                && (session_replaced && handle.session_generation < context.session_generation
+                    || !session_replaced
+                        && handle.session_generation == context.session_generation
+                        && handle.invocation == context.invocation
+                        && handle.generation < context.generation)
+        })
+        .collect::<Vec<_>>();
+    for main_handle in replaced_main_handles {
+        if let Some(handle) = state.handles.remove(&main_handle) {
+            state.owner.revoke_streaming(handle);
+        }
+        state.main_handles.remove(&main_handle);
+        state.cancellations.remove(&main_handle);
+        let uploads = state
+            .upload_parents
+            .iter()
+            .filter_map(|(upload, parent)| (*parent == main_handle).then_some(*upload))
+            .collect::<Vec<_>>();
+        for upload in uploads {
+            state.upload_parents.remove(&upload);
+            state.handles.remove(&upload);
+        }
+    }
+    state.invocation_bindings.retain(
+        |(session_id, session_generation, invocation, generation), _| {
+            !(*session_id == context.session_id
+                && (session_replaced && *session_generation < context.session_generation
+                    || !session_replaced
+                        && *session_generation == context.session_generation
+                        && *invocation == context.invocation
+                        && *generation < context.generation))
+        },
+    );
+    state.next_slots.retain(
+        |(session_id, session_generation, invocation, generation), _| {
+            !(*session_id == context.session_id
+                && (session_replaced && *session_generation < context.session_generation
+                    || !session_replaced
+                        && *session_generation == context.session_generation
+                        && *invocation == context.invocation
+                        && *generation < context.generation))
+        },
+    );
+}
+
+fn provider_streaming_cost_request_sha256(
+    worker_handle: WorkerProviderStreamHandle,
+    request_body_sha256: &str,
+    request: &ProviderCostRequestV2,
+) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"zed-comfy-provider-streaming-cost-request-v2\0");
+    digest.update(worker_handle.session_id.as_bytes());
+    digest.update(worker_handle.session_generation.to_le_bytes());
+    digest.update(worker_handle.invocation.to_le_bytes());
+    digest.update(worker_handle.slot.to_le_bytes());
+    digest.update(worker_handle.generation.to_le_bytes());
+    for value in [
+        request_body_sha256,
+        request.operation.as_str(),
+        request.currency.as_str(),
+    ] {
+        digest.update((value.len() as u64).to_le_bytes());
+        digest.update(value.as_bytes());
+    }
+    digest.update(request.maximum_microunits.to_le_bytes());
+    format!("{:x}", digest.finalize())
+}
+
+fn provider_streaming_cost_scope_with_request_sha256(
+    session: &ProviderRuntimeStreamingSession,
+    cost_request_sha256: String,
+    price_bound: ProviderPriceBound,
+) -> Result<ProviderCostAcceptanceScope, PluginServiceError> {
+    let plugin_authorization = session.authority.manifest_authorization.authorization();
+    ProviderCostAcceptanceScope::new(
+        session.authority.principal_id.as_str(),
+        session.authority.profile_id.as_str(),
+        session.authority.prompt_id.as_str(),
+        session.authority.prompt_sha256.as_str(),
+        session.authority.attempt_id.as_str(),
+        session.authority.node_id.as_str(),
+        session.authority.request_ordinal,
+        cost_request_sha256,
+        plugin_authorization.plugin_id(),
+        plugin_authorization.digest_sha256(),
+        session.authority.binding_set_sha256.as_str(),
+        session.authority.provider.as_str(),
+        session.authority.request.endpoint(),
+        price_bound,
+    )
+    .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)
+}
+
+fn worker_provider_cost_request_sha256(
+    state: &ProviderRuntimeStreamState,
+    main_handle: WorkerProviderStreamHandle,
+    request: &ProviderCostRequestV2,
+) -> Result<String, PluginServiceError> {
+    let sdk_main = state
+        .handles
+        .get(&main_handle)
+        .copied()
+        .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+    let session = state
+        .owner
+        .streaming_sessions
+        .get(&sdk_main)
+        .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+    let ordered_uploads_sha256 = worker_ordered_uploads_sha256(state, main_handle)?;
+    let mut request_identity = Sha256::new();
+    request_identity.update(b"zed-comfy-provider-worker-streaming-request-v2\0");
+    request_identity.update(request_body_sha256(session).as_bytes());
+    request_identity.update(ordered_uploads_sha256.as_bytes());
+    Ok(provider_streaming_cost_request_sha256(
+        main_handle,
+        &format!("{:x}", request_identity.finalize()),
+        request,
+    ))
+}
+
+fn worker_ordered_uploads_sha256(
+    state: &ProviderRuntimeStreamState,
+    main_handle: WorkerProviderStreamHandle,
+) -> Result<String, PluginServiceError> {
+    let sdk_main = state
+        .handles
+        .get(&main_handle)
+        .copied()
+        .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+    let session = state
+        .owner
+        .streaming_sessions
+        .get(&sdk_main)
+        .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+    if session
+        .upload_validators
+        .values()
+        .any(|upload| !upload.is_terminal())
+    {
+        return Err(PluginServiceError::ProviderStreamingContract(
+            ProviderStreamingContractError::InvalidUpload,
+        ));
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"zed-comfy-provider-semantic-ordered-uploads-v2\0");
+    digest.update((session.ordered_uploads.len() as u64).to_le_bytes());
+    for (ordinal, upload) in session.ordered_uploads.iter().enumerate() {
+        state
+            .handles
+            .iter()
+            .find_map(|(worker, sdk)| {
+                (*sdk == upload.handle && state.upload_parents.get(worker) == Some(&main_handle))
+                    .then_some(())
+            })
+            .ok_or(PluginServiceError::ProviderSessionUnavailable)?;
+        digest.update((ordinal as u64).to_le_bytes());
+        for value in [
+            upload.port_id.as_str(),
+            upload.media_type.as_str(),
+            upload.content_sha256.as_str(),
+        ] {
+            digest.update((value.len() as u64).to_le_bytes());
+            digest.update(value.as_bytes());
+        }
+        digest.update(upload.byte_length.to_le_bytes());
+    }
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn valid_provider_runtime_identity(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= MAX_PROVIDER_RUNTIME_IDENTITY_BYTES
+        && value == value.trim()
+        && !value.chars().any(char::is_control)
+}
+
+fn validate_worker_provider_context(
+    context: &WorkerProviderInvocationContext,
+) -> Result<(), PluginServiceError> {
+    if context.session_id.is_nil()
+        || context.session_generation == 0
+        || context.invocation == 0
+        || context.generation == 0
+    {
+        return Err(PluginServiceError::ProviderRuntimeAuthorityDenied);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn is_lower_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+}
+
+fn encode_lower_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(bytes.len().saturating_mul(2));
+    for byte in bytes {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    encoded
+}
+
+fn map_provider_streaming_error(error: ProviderStreamingContractError) -> PluginServiceError {
+    PluginServiceError::ProviderStreamingContract(error)
+}
+
+fn ordered_headers_sha256(headers: &[ProviderHeaderV2]) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"zed-comfy-provider-ordered-headers-v2\0");
+    digest.update((headers.len() as u64).to_le_bytes());
+    for header in headers {
+        digest.update((header.name.len() as u64).to_le_bytes());
+        digest.update(header.name.as_bytes());
+        digest.update((header.value.len() as u64).to_le_bytes());
+        digest.update(header.value.as_bytes());
+    }
+    format!("{:x}", digest.finalize())
+}
+
+fn request_body_sha256(session: &ProviderRuntimeStreamingSession) -> String {
+    format!("{:x}", session.request_body_digest.clone().finalize())
+}
+
+fn ordered_uploads_sha256(
+    session: &ProviderRuntimeStreamingSession,
+) -> Result<String, PluginServiceError> {
+    if session
+        .upload_validators
+        .values()
+        .any(|upload| !upload.is_terminal())
+    {
+        return Err(PluginServiceError::ProviderStreamingContract(
+            ProviderStreamingContractError::InvalidUpload,
+        ));
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"zed-comfy-provider-ordered-uploads-v2\0");
+    digest.update((session.ordered_uploads.len() as u64).to_le_bytes());
+    for upload in &session.ordered_uploads {
+        digest.update(upload.handle.invocation.to_le_bytes());
+        digest.update(upload.handle.slot.to_le_bytes());
+        digest.update(upload.handle.generation.to_le_bytes());
+        for value in [
+            upload.port_id.as_str(),
+            upload.media_type.as_str(),
+            upload.content_sha256.as_str(),
+        ] {
+            digest.update((value.len() as u64).to_le_bytes());
+            digest.update(value.as_bytes());
+        }
+        digest.update(upload.byte_length.to_le_bytes());
+    }
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn ordered_chunks_digest() -> Sha256 {
+    let mut digest = Sha256::new();
+    digest.update(b"zed-comfy-provider-ordered-response-chunks-v2\0");
+    digest
+}
+
+fn updated_ordered_chunks_digest(
+    current: &Sha256,
+    sequence: u64,
+    chunk: &comfy_plugin_sdk::ProviderResponseChunkV2,
+) -> Sha256 {
+    let (tag, bytes): (u8, &[u8]) = match chunk {
+        comfy_plugin_sdk::ProviderResponseChunkV2::Binary(bytes) => (0, bytes),
+        comfy_plugin_sdk::ProviderResponseChunkV2::Text(text) => (1, text.as_bytes()),
+        comfy_plugin_sdk::ProviderResponseChunkV2::NdjsonLine(line) => (2, line.as_bytes()),
+    };
+    let mut digest = current.clone();
+    digest.update(sequence.to_le_bytes());
+    digest.update([tag]);
+    digest.update((bytes.len() as u64).to_le_bytes());
+    digest.update(bytes);
+    digest
+}
+
+fn terminal_event_sha256(
+    terminal: &comfy_plugin_sdk::ProviderStreamTerminalV2,
+) -> Result<String, PluginServiceError> {
+    if let comfy_plugin_sdk::ProviderStreamTerminalV2::Completed { receipt } = terminal {
+        return Ok(provider_terminal_completed_receipt_sha256(receipt));
+    }
+    let encoded = serde_json::to_vec(terminal)
+        .map_err(|_| PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+    let mut digest = Sha256::new();
+    digest.update(b"zed-comfy-provider-terminal-event-v2\0");
+    digest.update((encoded.len() as u64).to_le_bytes());
+    digest.update(encoded);
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+pub(crate) fn provider_terminal_completed_receipt_sha256(receipt: &[u8]) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"zed-comfy-provider-terminal-completed-receipt-v2\0");
+    digest.update((receipt.len() as u64).to_le_bytes());
+    digest.update(receipt);
+    format!("{:x}", digest.finalize())
+}
+
+fn retry_after_seconds(outcome: &ProviderWaitOutcomeV2) -> Result<Option<u64>, PluginServiceError> {
+    let ProviderWaitOutcomeV2::Frame(frame) = outcome else {
+        return Ok(None);
+    };
+    let ProviderResponseFrameEventV2::Head(head) = &frame.event else {
+        return Ok(None);
+    };
+    let values = head
+        .headers
+        .iter()
+        .filter(|header| header.name.eq_ignore_ascii_case("retry-after"))
+        .map(|header| header.value.as_str())
+        .collect::<Vec<_>>();
+    match values.as_slice() {
+        [] => Ok(None),
+        [value]
+            if !value.is_empty()
+                && value.bytes().all(|byte| byte.is_ascii_digit())
+                && (!value.starts_with('0') || *value == "0") =>
+        {
+            value
+                .parse::<u64>()
+                .ok()
+                .filter(|seconds| *seconds <= MAX_PROVIDER_RUNTIME_RETRY_AFTER_SECONDS)
+                .map(Some)
+                .ok_or(PluginServiceError::ProviderStreamingContract(
+                    ProviderStreamingContractError::InvalidHeaders,
+                ))
+        }
+        _ => Err(PluginServiceError::ProviderStreamingContract(
+            ProviderStreamingContractError::InvalidHeaders,
+        )),
+    }
+}
+
+fn provider_runtime_mutation_identity_sha256(
+    authority: &ProviderRuntimeAuthorityInput,
+    request_body_sha256: &str,
+    ordered_uploads_sha256: &str,
+    accepted_cost_microunits: u64,
+) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"zed-comfy-provider-runtime-mutation-v2\0");
+    digest.update(authority.idempotency_identity_sha256().as_bytes());
+    digest.update(request_body_sha256.as_bytes());
+    digest.update(ordered_uploads_sha256.as_bytes());
+    digest.update(authority.request_ordinal.to_le_bytes());
+    digest.update(accepted_cost_microunits.to_le_bytes());
+    format!("{:x}", digest.finalize())
+}
+
+impl Drop for ProviderRuntimeStreamOwner {
+    fn drop(&mut self) {
+        self.revoke_all();
+    }
 }
 
 pub struct ProviderCostAuthorizationRequest<'a> {
@@ -1958,6 +4556,20 @@ pub enum PluginServiceError {
     ProviderResultReceiptAuthorityRequired,
     #[error("provider result receipt authority is invalid or belongs to another invocation")]
     ProviderResultReceiptAuthorityDenied,
+    #[error("provider runtime stream session is unavailable, duplicated, or over quota")]
+    ProviderSessionUnavailable,
+    #[error("provider runtime authority is not bound to the verified activation")]
+    ProviderRuntimeAuthorityDenied,
+    #[error("provider runtime request belongs to a foreign host session")]
+    ProviderRuntimeForeignSession,
+    #[error("provider runtime request belongs to a stale host session generation")]
+    ProviderRuntimeStaleSession,
+    #[error("provider runtime request belongs to a foreign invocation")]
+    ProviderRuntimeForeignInvocation,
+    #[error("provider runtime request belongs to a stale invocation generation")]
+    ProviderRuntimeStaleInvocation,
+    #[error("provider streaming contract rejected the operation: {0}")]
+    ProviderStreamingContract(ProviderStreamingContractError),
     #[error("the authorized provider credential is unavailable")]
     CredentialUnavailable,
     #[error("{service} actuator failed: {message}")]
@@ -1991,7 +4603,14 @@ impl From<PluginServiceError> for PluginServiceWireFailure {
             | PluginServiceError::ProviderCostAcceptanceDenied
             | PluginServiceError::ProviderCostAcceptanceReused
             | PluginServiceError::ProviderResultReceiptAuthorityRequired
-            | PluginServiceError::ProviderResultReceiptAuthorityDenied => Self::ProviderDenied,
+            | PluginServiceError::ProviderResultReceiptAuthorityDenied
+            | PluginServiceError::ProviderSessionUnavailable
+            | PluginServiceError::ProviderRuntimeAuthorityDenied
+            | PluginServiceError::ProviderRuntimeForeignSession
+            | PluginServiceError::ProviderRuntimeStaleSession
+            | PluginServiceError::ProviderRuntimeForeignInvocation
+            | PluginServiceError::ProviderRuntimeStaleInvocation
+            | PluginServiceError::ProviderStreamingContract(_) => Self::ProviderDenied,
             PluginServiceError::ActuatorFailed { .. } => Self::ActuatorFailed,
             PluginServiceError::RandomnessStreamBusy | PluginServiceError::RandomnessFailed => {
                 Self::RandomnessFailed
@@ -2074,6 +4693,7 @@ fn map_asset_error(error: AssetError) -> PluginServiceError {
 
 fn map_provider_materialization_error(error: ProviderMaterializationError) -> PluginServiceError {
     match error {
+        ProviderMaterializationError::Cancelled => PluginServiceError::Cancelled,
         ProviderMaterializationError::ResponseTooLarge => PluginServiceError::ResponseTooLarge {
             maximum: MAX_PLUGIN_SERVICE_RESPONSE_BYTES,
         },
@@ -2141,8 +4761,15 @@ mod tests {
     use comfy_plugin_sdk::{
         ApiRequirement, ApiVersion, CachePolicy, CapabilityKind, CapabilityQuota,
         CapabilityRequest, DeterminismPolicy, ED25519_SIGNATURE_BYTES, EffectPolicy,
-        ManifestProvenance, ManifestSignature, PLUGIN_SIGNATURE_ALGORITHM, PluginManifest,
-        PluginNode, PluginSigningKey,
+        ManifestProvenance, ManifestSignature, PLUGIN_SIGNATURE_ALGORITHM,
+        PROVIDER_BINDING_SCHEMA_VERSION, PluginManifest, PluginNode, PluginSigningKey,
+        ProviderBindingClaim, ProviderBindingSet, ProviderHttpMethodV2,
+        ProviderResponseFrameEventV2, ProviderResponseFrameV2, ProviderResponseHeadV2,
+        ProviderStreamTerminalV2, ProviderStreamingContractV2,
+    };
+    use comfy_types::{
+        WorkerProviderInvocationContext, WorkerRegistryDeploymentBegin, WorkerRegistryGeneration,
+        WorkerSha256Digest,
     };
     use tempfile::TempDir;
     use uuid::Uuid;
@@ -3660,6 +6287,1592 @@ mod tests {
         let mut replay = broker.begin_invocation(invocation_context)?;
         assert_eq!(replay.random_bytes("noise", 8)?, expected);
         replay.finish()?;
+        Ok(())
+    }
+
+    fn provider_streaming_contract() -> ProviderStreamingContractV2 {
+        ProviderStreamingContractV2 {
+            methods: vec![ProviderHttpMethodV2::Post],
+            maximum_headers: 8,
+            maximum_header_bytes: 1_024,
+            maximum_request_body_bytes: 1_024,
+            maximum_response_body_bytes: 1_024,
+            maximum_chunk_bytes: 256,
+            maximum_ndjson_line_bytes: 256,
+            maximum_wait_milliseconds: 1_000,
+            maximum_uploads: 1,
+            maximum_upload_body_bytes: 1_024,
+            maximum_cost_requests: 1,
+            maximum_progress_total: 100,
+            uploads: true,
+            cost_requests: true,
+        }
+    }
+
+    fn provider_binding() -> Result<ProviderBindingSet, Box<dyn Error>> {
+        let mut binding = ProviderBindingSet {
+            schema_version: PROVIDER_BINDING_SCHEMA_VERSION,
+            implementation_namespace: "plugin.fixture".to_owned(),
+            bindings_sha256: "0".repeat(64),
+            bindings: vec![ProviderBindingClaim {
+                feature_id: "COMFY-NODE-0001".to_owned(),
+                node_id: "node.fixture".to_owned(),
+                contract_sha256: "3".repeat(64),
+                transport_schema: "zed:comfy-provider-transport@1".parse()?,
+                materializer_schema: "zed:comfy-provider-materializer@1".parse()?,
+            }],
+        };
+        binding.bindings_sha256 = binding.canonical_bindings_sha256()?;
+        Ok(binding)
+    }
+
+    fn empty_worker_registry_deployment() -> Result<WorkerRegistryDeploymentPlan, Box<dyn Error>> {
+        let begin = WorkerRegistryDeploymentBegin::new(
+            WorkerRegistryGeneration::new(7)?,
+            WorkerSha256Digest::new("a".repeat(64))?,
+            Vec::new(),
+        )?;
+        let verifier = crate::PluginAuthorizationSealer::from_seed(
+            [0x71; 32],
+            crate::PermissionPolicyGeneration::new(1)?,
+        )?
+        .verifier()?;
+        Ok(WorkerRegistryDeploymentPlan::new(
+            begin,
+            Vec::new(),
+            verifier,
+        )?)
+    }
+
+    fn activation_grant(
+        binding: &ProviderBindingSet,
+        outer_signing_payload_sha256: [u8; 32],
+    ) -> Result<ProviderRuntimeActivationGrant, Box<dyn Error>> {
+        Ok(
+            ProviderRuntimeActivationGrant::checked_from_active_deployment(
+                PROFILE_UUID.to_string(),
+                "principal-a",
+                PROMPT_UUID.to_string(),
+                PROMPT_SHA256,
+                ATTEMPT_UUID.to_string(),
+                "node.fixture",
+                REQUEST_ORDINAL,
+                &empty_worker_registry_deployment()?,
+                9,
+                DIGEST,
+                encode_lower_hex(&outer_signing_payload_sha256),
+                "b".repeat(64),
+                11,
+                binding.bindings_sha256.clone(),
+                "c".repeat(64),
+            )?,
+        )
+    }
+
+    fn bound_streaming_authority(
+        binding: &ProviderBindingSet,
+        outer_digest: [u8; 32],
+    ) -> Result<(ProviderRuntimeAuthorityInput, ProviderRequestHeadV2), Box<dyn Error>> {
+        let endpoint = "https://provider.invalid/v2";
+        let authorization = authorization(vec![capability(
+            CapabilityKind::NetworkProvider,
+            &format!("plugin.fixture|{endpoint}"),
+        )])?;
+        let manifest = ProviderManifestAuthorizationV2::fixture(
+            authorization,
+            outer_digest,
+            binding.clone(),
+            provider_streaming_contract(),
+        );
+        let policy = ProviderPolicy::new(
+            PROFILE_UUID.to_string(),
+            ProviderMode::Enabled,
+            [ProviderEndpoint::new("plugin.fixture", endpoint)?],
+            std::iter::empty(),
+        )?;
+        let head = ProviderRequestHeadV2 {
+            endpoint: endpoint.to_owned(),
+            secret_id: None,
+            method: ProviderHttpMethodV2::Post,
+            headers: Vec::new(),
+            declared_body_bytes: Some(0),
+        };
+        let service = ProviderRuntimeStreamService::new();
+        let source = service.activation_grants();
+        let context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x4120),
+            session_generation: 1,
+            invocation: 1,
+            generation: 1,
+        };
+        source.insert(
+            &context,
+            activation_grant(binding, outer_digest)?,
+            &CancellationToken::default(),
+        )?;
+        let authority = source
+            .claim(&context, &CancellationToken::default())?
+            .bind(manifest, &head, &policy)?;
+        Ok((authority, head))
+    }
+
+    fn bound_streaming_service(
+        context: &WorkerProviderInvocationContext,
+        cancellation: &CancellationToken,
+    ) -> Result<
+        (
+            ProviderRuntimeStreamService,
+            ProviderRuntimeAuthorityInput,
+            WorkerProviderRequestHead,
+        ),
+        Box<dyn Error>,
+    > {
+        bound_streaming_service_with_declared_body(context, cancellation, Some(0))
+    }
+
+    fn bound_streaming_service_with_declared_body(
+        context: &WorkerProviderInvocationContext,
+        cancellation: &CancellationToken,
+        declared_body_bytes: Option<u64>,
+    ) -> Result<
+        (
+            ProviderRuntimeStreamService,
+            ProviderRuntimeAuthorityInput,
+            WorkerProviderRequestHead,
+        ),
+        Box<dyn Error>,
+    > {
+        let endpoint = "https://provider.invalid/v2";
+        let binding = provider_binding()?;
+        let outer_digest = [0x81; 32];
+        let authorization = authorization(vec![capability(
+            CapabilityKind::NetworkProvider,
+            &format!("plugin.fixture|{endpoint}"),
+        )])?;
+        let manifest = ProviderManifestAuthorizationV2::fixture(
+            authorization,
+            outer_digest,
+            binding.clone(),
+            provider_streaming_contract(),
+        );
+        let policy = ProviderPolicy::new(
+            PROFILE_UUID.to_string(),
+            ProviderMode::Enabled,
+            [ProviderEndpoint::new("plugin.fixture", endpoint)?],
+            std::iter::empty(),
+        )?;
+        let sdk_head = ProviderRequestHeadV2 {
+            endpoint: endpoint.to_owned(),
+            secret_id: None,
+            method: ProviderHttpMethodV2::Post,
+            headers: vec![ProviderHeaderV2 {
+                name: "x-fixture".to_owned(),
+                value: "one".to_owned(),
+            }],
+            declared_body_bytes,
+        };
+        let worker_head = WorkerProviderRequestHead {
+            endpoint: endpoint.to_owned(),
+            secret_id: None,
+            method: WorkerProviderHttpMethod::Post,
+            headers: vec![WorkerProviderHeader {
+                name: "x-fixture".to_owned(),
+                value: "one".to_owned(),
+            }],
+            declared_body_bytes,
+        };
+        let service = ProviderRuntimeStreamService::new();
+        service.register_activation(
+            context,
+            activation_grant(&binding, outer_digest)?,
+            cancellation,
+        )?;
+        let authority = service
+            .claim_activation(context, cancellation)?
+            .bind(manifest, &sdk_head, &policy)?;
+        Ok((service, authority, worker_head))
+    }
+
+    fn started_streaming_service(
+        context: &WorkerProviderInvocationContext,
+        cancellation: &CancellationToken,
+    ) -> Result<(ProviderRuntimeStreamService, WorkerProviderStreamHandle), Box<dyn Error>> {
+        let (service, authority, head) = bound_streaming_service(context, cancellation)?;
+        let handle = service.start_request(authority, head)?;
+        service.write_request_chunk(WorkerProviderRequestChunk {
+            handle,
+            sequence: 0,
+            bytes: Vec::new(),
+            end: true,
+        })?;
+        Ok((service, handle))
+    }
+
+    fn complete_streaming_upload(
+        service: &ProviderRuntimeStreamService,
+        handle: WorkerProviderStreamHandle,
+        bytes: &[u8],
+    ) -> Result<WorkerProviderStreamHandle, Box<dyn Error>> {
+        let upload = service.start_upload(WorkerProviderUploadRequest {
+            handle,
+            port_id: "image.input".to_owned(),
+            media_type: "application/octet-stream".to_owned(),
+            byte_length: u64::try_from(bytes.len())?,
+            content_sha256: format!("{:x}", Sha256::digest(bytes)),
+        })?;
+        service.write_upload_chunk(WorkerProviderRequestChunk {
+            handle: upload,
+            sequence: 0,
+            bytes: bytes.to_vec(),
+            end: true,
+        })?;
+        Ok(upload)
+    }
+
+    fn prepared_mutation_proposal(
+        context: &WorkerProviderInvocationContext,
+        body: &[u8],
+        upload_port: &str,
+        upload_media_type: &str,
+        upload_bytes: &[u8],
+    ) -> Result<ProviderRuntimeActuationProposal, Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (service, authority, head) = bound_streaming_service_with_declared_body(
+            context,
+            &cancellation,
+            Some(u64::try_from(body.len())?),
+        )?;
+        let handle = service.start_request(authority, head)?;
+        service.write_request_chunk(WorkerProviderRequestChunk {
+            handle,
+            sequence: 0,
+            bytes: body.to_vec(),
+            end: true,
+        })?;
+        let upload = service.start_upload(WorkerProviderUploadRequest {
+            handle,
+            port_id: upload_port.to_owned(),
+            media_type: upload_media_type.to_owned(),
+            byte_length: u64::try_from(upload_bytes.len())?,
+            content_sha256: format!("{:x}", Sha256::digest(upload_bytes)),
+        })?;
+        service.write_upload_chunk(WorkerProviderRequestChunk {
+            handle: upload,
+            sequence: 0,
+            bytes: upload_bytes.to_vec(),
+            end: true,
+        })?;
+        Ok(service.prepare_streaming_actuation(handle)?)
+    }
+
+    fn prepared_cost_scope(
+        context: &WorkerProviderInvocationContext,
+        operation: &str,
+        currency: &str,
+        maximum_microunits: u64,
+    ) -> Result<ProviderCostAcceptanceScope, Box<dyn Error>> {
+        let (service, handle) = started_streaming_service(context, &CancellationToken::default())?;
+        complete_streaming_upload(&service, handle, b"priced-upload")?;
+        Ok(service.prepare_cost_acceptance(
+            &WorkerProviderCostRequest {
+                handle,
+                operation: operation.to_owned(),
+                currency: currency.to_owned(),
+                maximum_microunits,
+            },
+            ProviderPriceBound::new(currency, maximum_microunits)?,
+        )?)
+    }
+
+    #[test]
+    fn provider_runtime_activation_grants_are_host_scoped_one_shot_and_manifest_bound()
+    -> Result<(), Box<dyn Error>> {
+        let endpoint = "https://provider.invalid/v2";
+        let authorization = authorization(vec![capability(
+            CapabilityKind::NetworkProvider,
+            &format!("plugin.fixture|{endpoint}"),
+        )])?;
+        let binding = provider_binding()?;
+        let outer_digest = [0x41; 32];
+        let manifest = ProviderManifestAuthorizationV2::fixture(
+            authorization.clone(),
+            outer_digest,
+            binding.clone(),
+            provider_streaming_contract(),
+        );
+        let policy = ProviderPolicy::new(
+            PROFILE_UUID.to_string(),
+            ProviderMode::Enabled,
+            [ProviderEndpoint::new("plugin.fixture", endpoint)?],
+            std::iter::empty(),
+        )?;
+        let head = ProviderRequestHeadV2 {
+            endpoint: endpoint.to_owned(),
+            secret_id: None,
+            method: ProviderHttpMethodV2::Post,
+            headers: Vec::new(),
+            declared_body_bytes: Some(0),
+        };
+        let source = ProviderRuntimeActivationGrantSource::new();
+        let rightful = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x412),
+            session_generation: 4,
+            invocation: 7,
+            generation: 9,
+        };
+        source.insert(
+            &rightful,
+            activation_grant(&binding, outer_digest)?,
+            &CancellationToken::default(),
+        )?;
+        for (context, expected) in [
+            (
+                WorkerProviderInvocationContext {
+                    session_id: Uuid::from_u128(0x413),
+                    ..rightful.clone()
+                },
+                PluginServiceError::ProviderRuntimeForeignSession,
+            ),
+            (
+                WorkerProviderInvocationContext {
+                    session_generation: 5,
+                    ..rightful
+                },
+                PluginServiceError::ProviderRuntimeStaleSession,
+            ),
+            (
+                WorkerProviderInvocationContext {
+                    invocation: 8,
+                    ..rightful
+                },
+                PluginServiceError::ProviderRuntimeForeignInvocation,
+            ),
+            (
+                WorkerProviderInvocationContext {
+                    generation: 10,
+                    ..rightful
+                },
+                PluginServiceError::ProviderRuntimeStaleInvocation,
+            ),
+        ] {
+            assert_eq!(
+                source
+                    .claim(&context, &CancellationToken::default())
+                    .expect_err("foreign or stale claim must fail")
+                    .to_string(),
+                expected.to_string()
+            );
+        }
+        let grant = source.claim(&rightful, &CancellationToken::default())?;
+        let authority = grant.bind(manifest, &head, &policy)?;
+        assert_eq!(authority.request_head, head);
+        assert!(matches!(
+            source.claim(&rightful, &CancellationToken::default()),
+            Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::RevokedHandle
+            ))
+        ));
+
+        let replaced = ProviderRuntimeActivationGrantSource::new();
+        replaced.insert(
+            &rightful,
+            activation_grant(&binding, outer_digest)?,
+            &CancellationToken::default(),
+        )?;
+        let newer = WorkerProviderInvocationContext {
+            session_generation: rightful.session_generation + 1,
+            ..rightful
+        };
+        replaced.insert(
+            &newer,
+            activation_grant(&binding, outer_digest)?,
+            &CancellationToken::default(),
+        )?;
+        assert!(matches!(
+            replaced.claim(&rightful, &CancellationToken::default()),
+            Err(PluginServiceError::ProviderRuntimeStaleSession)
+        ));
+        assert!(
+            replaced
+                .claim(&newer, &CancellationToken::default())
+                .is_ok()
+        );
+
+        let changed_outer = ProviderManifestAuthorizationV2::fixture(
+            authorization.clone(),
+            [0x42; 32],
+            binding.clone(),
+            provider_streaming_contract(),
+        );
+        let changed_outer_source = ProviderRuntimeActivationGrantSource::new();
+        changed_outer_source.insert(
+            &rightful,
+            activation_grant(&binding, outer_digest)?,
+            &CancellationToken::default(),
+        )?;
+        assert!(matches!(
+            changed_outer_source
+                .claim(&rightful, &CancellationToken::default())?
+                .bind(changed_outer, &head, &policy),
+            Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
+        ));
+        let changed_inner = ProviderManifestAuthorizationV2::fixture(
+            authorization.fixture_with_digest_sha256("d".repeat(64)),
+            outer_digest,
+            binding.clone(),
+            provider_streaming_contract(),
+        );
+        let changed_inner_source = ProviderRuntimeActivationGrantSource::new();
+        changed_inner_source.insert(
+            &rightful,
+            activation_grant(&binding, outer_digest)?,
+            &CancellationToken::default(),
+        )?;
+        assert!(matches!(
+            changed_inner_source
+                .claim(&rightful, &CancellationToken::default())?
+                .bind(changed_inner, &head, &policy),
+            Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
+        ));
+
+        let cancelled = CancellationToken::default();
+        let cancelled_source = ProviderRuntimeActivationGrantSource::new();
+        cancelled_source.insert(
+            &rightful,
+            activation_grant(&binding, outer_digest)?,
+            &cancelled,
+        )?;
+        cancelled.cancel();
+        assert_eq!(
+            cancelled_source
+                .claim(&rightful, &CancellationToken::default())
+                .expect_err("cancelled claim must fail")
+                .to_string(),
+            PluginServiceError::Cancelled.to_string()
+        );
+        let bind_cancellation = CancellationToken::default();
+        let bind_cancelled_source = ProviderRuntimeActivationGrantSource::new();
+        bind_cancelled_source.insert(
+            &rightful,
+            activation_grant(&binding, outer_digest)?,
+            &bind_cancellation,
+        )?;
+        let bind_cancelled_grant =
+            bind_cancelled_source.claim(&rightful, &CancellationToken::default())?;
+        bind_cancellation.cancel();
+        assert!(matches!(
+            bind_cancelled_grant.bind(
+                ProviderManifestAuthorizationV2::fixture(
+                    authorization,
+                    outer_digest,
+                    binding,
+                    provider_streaming_contract(),
+                ),
+                &head,
+                &policy,
+            ),
+            Err(PluginServiceError::Cancelled)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn provider_runtime_activation_grant_capacity_and_cleanup_are_atomic()
+    -> Result<(), Box<dyn Error>> {
+        let binding = provider_binding()?;
+        let service = ProviderRuntimeStreamService::new();
+        let source = service.activation_grants();
+        let cancellation = CancellationToken::default();
+        for invocation in 1..=u64::try_from(MAX_PROVIDER_RUNTIME_SESSIONS)? {
+            source.insert(
+                &WorkerProviderInvocationContext {
+                    session_id: Uuid::from_u128(0x500 + u128::from(invocation)),
+                    session_generation: 1,
+                    invocation,
+                    generation: 1,
+                },
+                activation_grant(&binding, [0x51; 32])?,
+                &cancellation,
+            )?;
+        }
+        let overflow = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x999),
+            session_generation: 1,
+            invocation: 999,
+            generation: 1,
+        };
+        assert!(matches!(
+            source.insert(
+                &overflow,
+                activation_grant(&binding, [0x51; 32])?,
+                &cancellation,
+            ),
+            Err(PluginServiceError::ProviderSessionUnavailable)
+        ));
+        let first = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x501),
+            session_generation: 1,
+            invocation: 1,
+            generation: 1,
+        };
+        assert!(source.claim(&first, &cancellation).is_ok());
+        service.revoke_all();
+        assert!(matches!(
+            source.claim(
+                &WorkerProviderInvocationContext {
+                    session_id: Uuid::from_u128(0x502),
+                    session_generation: 1,
+                    invocation: 2,
+                    generation: 1,
+                },
+                &cancellation,
+            ),
+            Err(PluginServiceError::ProviderRuntimeForeignSession)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn provider_runtime_service_owns_one_grant_and_legacy_state_table() -> Result<(), Box<dyn Error>>
+    {
+        let service = ProviderRuntimeStreamService::new();
+        let clone = service.clone();
+        let source = service.activation_grants();
+        let context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x412_900),
+            session_generation: 3,
+            invocation: 7,
+            generation: 11,
+        };
+        let binding = provider_binding()?;
+        service.register_activation(
+            &context,
+            activation_grant(&binding, [0x61; 32])?,
+            &CancellationToken::default(),
+        )?;
+        assert!(
+            clone
+                .claim_activation(&context, &CancellationToken::default())
+                .is_ok()
+        );
+        assert!(matches!(
+            source.claim(&context, &CancellationToken::default()),
+            Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::RevokedHandle
+            ))
+        ));
+
+        let old_main = WorkerProviderStreamHandle {
+            session_id: context.session_id,
+            session_generation: context.session_generation,
+            invocation: context.invocation,
+            slot: 1,
+            generation: context.generation,
+        };
+        let old_upload = WorkerProviderStreamHandle {
+            slot: 2,
+            ..old_main
+        };
+        let (old_authority, _) = bound_streaming_authority(&binding, [0x61; 32])?;
+        {
+            let mut state = service.state.lock();
+            let key = (
+                context.session_id,
+                context.session_generation,
+                context.invocation,
+                context.generation,
+            );
+            state.invocation_bindings.insert(key, 71);
+            state.next_slots.insert(key, 2);
+            state.handles.insert(
+                old_main,
+                ProviderStreamHandleV2 {
+                    invocation: 71,
+                    slot: 1,
+                    generation: context.generation,
+                },
+            );
+            state.owner.begin_streaming(
+                old_authority,
+                ProviderInvocationContextV2 {
+                    invocation: 71,
+                    generation: context.generation,
+                },
+                ProviderStreamHandleV2 {
+                    invocation: 71,
+                    slot: 1,
+                    generation: context.generation,
+                },
+                &CancellationToken::default(),
+            )?;
+            state.handles.insert(
+                old_upload,
+                ProviderStreamHandleV2 {
+                    invocation: 71,
+                    slot: 2,
+                    generation: context.generation,
+                },
+            );
+            state.main_handles.insert(old_main);
+            state.upload_parents.insert(old_upload, old_main);
+        }
+        let replacement = WorkerProviderInvocationContext {
+            session_generation: context.session_generation + 1,
+            generation: context.generation + 1,
+            ..context
+        };
+        service.register_activation(
+            &replacement,
+            activation_grant(&binding, [0x61; 32])?,
+            &CancellationToken::default(),
+        )?;
+        {
+            let state = service.state.lock();
+            assert!(!state.handles.contains_key(&old_main));
+            assert!(!state.handles.contains_key(&old_upload));
+            assert!(!state.main_handles.contains(&old_main));
+            assert!(!state.upload_parents.contains_key(&old_upload));
+            assert!(state.invocation_bindings.is_empty());
+            assert!(state.next_slots.is_empty());
+            assert!(state.owner.is_empty());
+        }
+        assert!(matches!(
+            clone.claim_activation(&context, &CancellationToken::default()),
+            Err(PluginServiceError::ProviderRuntimeStaleSession)
+        ));
+        let replacement_main = WorkerProviderStreamHandle {
+            session_id: replacement.session_id,
+            session_generation: replacement.session_generation,
+            invocation: replacement.invocation,
+            slot: 1,
+            generation: replacement.generation,
+        };
+        let (replacement_authority, _) = bound_streaming_authority(&binding, [0x61; 32])?;
+        {
+            let mut state = service.state.lock();
+            let key = (
+                replacement.session_id,
+                replacement.session_generation,
+                replacement.invocation,
+                replacement.generation,
+            );
+            state.invocation_bindings.insert(key, 72);
+            state.next_slots.insert(key, 1);
+            state.handles.insert(
+                replacement_main,
+                ProviderStreamHandleV2 {
+                    invocation: 72,
+                    slot: 1,
+                    generation: replacement.generation,
+                },
+            );
+            state.main_handles.insert(replacement_main);
+            state.owner.begin_streaming(
+                replacement_authority,
+                ProviderInvocationContextV2 {
+                    invocation: 72,
+                    generation: replacement.generation,
+                },
+                ProviderStreamHandleV2 {
+                    invocation: 72,
+                    slot: 1,
+                    generation: replacement.generation,
+                },
+                &CancellationToken::default(),
+            )?;
+        }
+        let newer_invocation_generation = WorkerProviderInvocationContext {
+            generation: replacement.generation + 1,
+            ..replacement
+        };
+        service.register_activation(
+            &newer_invocation_generation,
+            activation_grant(&binding, [0x61; 32])?,
+            &CancellationToken::default(),
+        )?;
+        {
+            let state = service.state.lock();
+            assert!(!state.handles.contains_key(&replacement_main));
+            assert!(!state.main_handles.contains(&replacement_main));
+            assert!(state.invocation_bindings.is_empty());
+            assert!(state.next_slots.is_empty());
+            assert!(state.owner.is_empty());
+        }
+        assert!(matches!(
+            clone.claim_activation(&replacement, &CancellationToken::default()),
+            Err(PluginServiceError::ProviderRuntimeStaleInvocation)
+        ));
+        assert!(
+            clone
+                .claim_activation(&newer_invocation_generation, &CancellationToken::default())
+                .is_ok()
+        );
+        service.revoke_all();
+        assert!(clone.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn provider_runtime_stream_service_maps_worker_frames_without_actuation()
+    -> Result<(), Box<dyn Error>> {
+        let context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x412_aa01),
+            session_generation: 2,
+            invocation: 3,
+            generation: 4,
+        };
+        let cancellation = CancellationToken::default();
+        let (service, authority, head) = bound_streaming_service(&context, &cancellation)?;
+        let handle = service.start_request(authority, head)?;
+        assert_eq!(handle.session_id, context.session_id);
+        assert_eq!(handle.session_generation, context.session_generation);
+        assert_eq!(handle.invocation, context.invocation);
+        assert_eq!(handle.generation, context.generation);
+        assert_ne!(handle.slot, 0);
+
+        service.write_request_chunk(WorkerProviderRequestChunk {
+            handle,
+            sequence: 0,
+            bytes: Vec::new(),
+            end: true,
+        })?;
+        let upload_bytes = b"upload".to_vec();
+        let upload = service.start_upload(WorkerProviderUploadRequest {
+            handle,
+            port_id: "image.input".to_owned(),
+            media_type: "application/octet-stream".to_owned(),
+            byte_length: u64::try_from(upload_bytes.len())?,
+            content_sha256: format!("{:x}", Sha256::digest(&upload_bytes)),
+        })?;
+        assert_ne!(upload.slot, handle.slot);
+        service.write_upload_chunk(WorkerProviderRequestChunk {
+            handle: upload,
+            sequence: 0,
+            bytes: upload_bytes,
+            end: true,
+        })?;
+
+        let proposal = service.prepare_streaming_actuation(handle)?;
+        assert_eq!(proposal.request_head().method, ProviderHttpMethodV2::Post);
+        assert_eq!(proposal.request_head().headers.len(), 1);
+        assert_eq!(proposal.accepted_cost_microunits(), 0);
+        service.accept_wait(
+            WorkerProviderWaitRequest {
+                handle,
+                after_sequence: None,
+                timeout_milliseconds: 100,
+            },
+            WorkerProviderWaitOutcome::Frame(comfy_types::WorkerProviderResponseFrame {
+                handle,
+                sequence: 0,
+                event: WorkerProviderResponseFrameEvent::Head(
+                    comfy_types::WorkerProviderResponseHead {
+                        status: 200,
+                        headers: Vec::new(),
+                    },
+                ),
+            }),
+        )?;
+        let progress = service
+            .report_progress(
+                WorkerProviderProgress {
+                    handle,
+                    sequence: 0,
+                    completed: 1,
+                    total: 1,
+                    message: Some("done".to_owned()),
+                },
+                Instant::now(),
+            )?
+            .ok_or("final progress must be projected")?;
+        assert_eq!(progress.handle, handle);
+        assert_eq!(progress.message.as_deref(), Some("done"));
+        service.accept_wait(
+            WorkerProviderWaitRequest {
+                handle,
+                after_sequence: Some(0),
+                timeout_milliseconds: 100,
+            },
+            WorkerProviderWaitOutcome::Frame(comfy_types::WorkerProviderResponseFrame {
+                handle,
+                sequence: 1,
+                event: WorkerProviderResponseFrameEvent::Terminal(
+                    WorkerProviderTerminal::Completed(b"terminal-receipt".to_vec()),
+                ),
+            }),
+        )?;
+        let origin = Instant::now();
+        let issuer = ProviderRuntimeReceiptIssuerV2::from_seed([0x82; 32], origin)?;
+        let receipt = service.finish_streaming(
+            handle,
+            &issuer,
+            origin,
+            origin + Duration::from_secs(30),
+            [0x83; 32],
+        )?;
+        assert_eq!(
+            receipt.identity().terminal_receipt_sha256,
+            provider_terminal_completed_receipt_sha256(b"terminal-receipt")
+        );
+        assert!(matches!(
+            service.check_cancelled(handle),
+            Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::RevokedHandle
+            ))
+        ));
+        assert!(matches!(
+            service.check_cancelled(upload),
+            Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::RevokedHandle
+            ))
+        ));
+        assert!(matches!(
+            service.check_cancelled(WorkerProviderStreamHandle {
+                slot: upload.slot + 1,
+                ..handle
+            }),
+            Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidHandle
+            ))
+        ));
+        let state = service.state.lock();
+        assert!(state.owner.is_empty());
+        assert!(state.handles.is_empty());
+        assert!(state.main_handles.is_empty());
+        assert!(state.upload_parents.is_empty());
+        assert!(state.cancellations.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn provider_runtime_stream_service_consumes_only_current_canonical_activation()
+    -> Result<(), Box<dyn Error>> {
+        let binding = provider_binding()?;
+        let context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x412_aa02),
+            session_generation: 5,
+            invocation: 7,
+            generation: 9,
+        };
+
+        let cancelled = CancellationToken::default();
+        let (service, authority, head) = bound_streaming_service(&context, &cancelled)?;
+        cancelled.cancel();
+        assert_eq!(
+            service.start_request(authority, head),
+            Err(PluginServiceError::Cancelled)
+        );
+        assert!(service.state.lock().owner.is_empty());
+
+        let cancellation = CancellationToken::default();
+        let (service, authority, head) = bound_streaming_service(&context, &cancellation)?;
+        let newer_session = WorkerProviderInvocationContext {
+            session_generation: context.session_generation + 1,
+            ..context
+        };
+        service.register_activation(
+            &newer_session,
+            activation_grant(&binding, [0x81; 32])?,
+            &CancellationToken::default(),
+        )?;
+        assert_eq!(
+            service.start_request(authority, head),
+            Err(PluginServiceError::ProviderRuntimeStaleSession)
+        );
+        assert!(service.state.lock().owner.is_empty());
+
+        let (service, authority, head) =
+            bound_streaming_service(&context, &CancellationToken::default())?;
+        let newer_invocation = WorkerProviderInvocationContext {
+            generation: context.generation + 1,
+            ..context
+        };
+        service.register_activation(
+            &newer_invocation,
+            activation_grant(&binding, [0x81; 32])?,
+            &CancellationToken::default(),
+        )?;
+        assert_eq!(
+            service.start_request(authority, head),
+            Err(PluginServiceError::ProviderRuntimeStaleInvocation)
+        );
+        assert!(service.state.lock().owner.is_empty());
+
+        let (service, authority, head) =
+            bound_streaming_service(&context, &CancellationToken::default())?;
+        service.revoke_invocation(&context)?;
+        assert!(matches!(
+            service.start_request(authority, head),
+            Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::RevokedHandle
+            ))
+        ));
+        assert!(service.state.lock().owner.is_empty());
+
+        let (service, authority, mut head) =
+            bound_streaming_service(&context, &CancellationToken::default())?;
+        head.headers[0].value = "changed".to_owned();
+        assert!(matches!(
+            service.start_request(authority, head),
+            Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidRequestAuthority
+            ))
+        ));
+        assert!(service.state.lock().owner.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn provider_runtime_stream_service_verifies_cost_offline_before_sealing_proposal()
+    -> Result<(), Box<dyn Error>> {
+        let context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x412_aa03),
+            session_generation: 1,
+            invocation: 2,
+            generation: 3,
+        };
+        let cancellation = CancellationToken::default();
+        let (service, authority, head) = bound_streaming_service(&context, &cancellation)?;
+        let handle = service.start_request(authority, head)?;
+        service.write_request_chunk(WorkerProviderRequestChunk {
+            handle,
+            sequence: 0,
+            bytes: Vec::new(),
+            end: true,
+        })?;
+        complete_streaming_upload(&service, handle, b"priced-upload")?;
+        let request = WorkerProviderCostRequest {
+            handle,
+            operation: "provider.cost".to_owned(),
+            currency: "USD".to_owned(),
+            maximum_microunits: 5,
+        };
+        let price = ProviderPriceBound::new("USD", 5)?;
+        let nonce = ProviderCostNonce::new([0x84; 32])?;
+        let now = Instant::now();
+        let issuer = ProviderCostAcceptanceIssuer::from_seed([0x85; 32], now)?;
+        let scope = service.prepare_cost_acceptance(&request, price.clone())?;
+        let acceptance = issuer.issue(scope.clone(), now, now + Duration::from_secs(30), nonce)?;
+        let replay = issuer.issue(scope.clone(), now, now + Duration::from_secs(30), nonce)?;
+        let verifier = issuer.verifier()?;
+        let response = service.accept_streaming_cost(
+            request.clone(),
+            ProviderCostAuthorization::new(price.clone(), nonce, acceptance)?,
+            &verifier,
+            now,
+        )?;
+        assert!(response.accepted);
+        assert_eq!(response.approved_microunits, 5);
+        assert!(!response.receipt.is_empty());
+        assert_eq!(
+            service.accept_streaming_cost(
+                request.clone(),
+                ProviderCostAuthorization::new(ProviderPriceBound::new("USD", 5)?, nonce, replay,)?,
+                &verifier,
+                now,
+            ),
+            Err(PluginServiceError::ProviderCostAcceptanceReused)
+        );
+        let proposal = service.prepare_streaming_actuation(handle)?;
+        assert_eq!(proposal.accepted_cost_microunits(), 5);
+        assert!(matches!(
+            service.deny_streaming_cost(request.clone()),
+            Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidOrder
+            ))
+        ));
+        assert!(service.check_cancelled(handle).is_ok());
+        service.revoke_stream(handle);
+        assert!(service.state.lock().owner.is_empty());
+
+        let (reordered_service, reordered_authority, reordered_head) =
+            bound_streaming_service(&context, &CancellationToken::default())?;
+        reordered_service.state.lock().next_internal_invocation = 100;
+        let reordered_handle =
+            reordered_service.start_request(reordered_authority, reordered_head)?;
+        reordered_service.write_request_chunk(WorkerProviderRequestChunk {
+            handle: reordered_handle,
+            sequence: 0,
+            bytes: Vec::new(),
+            end: true,
+        })?;
+        complete_streaming_upload(&reordered_service, reordered_handle, b"priced-upload")?;
+        let reordered_request = WorkerProviderCostRequest {
+            handle: reordered_handle,
+            ..request.clone()
+        };
+        let reordered_scope =
+            reordered_service.prepare_cost_acceptance(&reordered_request, price.clone())?;
+        assert_eq!(reordered_scope, scope);
+        let reordered_nonce = ProviderCostNonce::new([0x86; 32])?;
+        let reordered_acceptance = issuer.issue(
+            reordered_scope,
+            now,
+            now + Duration::from_secs(30),
+            reordered_nonce,
+        )?;
+        reordered_service.accept_streaming_cost(
+            reordered_request,
+            ProviderCostAuthorization::new(price.clone(), reordered_nonce, reordered_acceptance)?,
+            &verifier,
+            now,
+        )?;
+        let reordered_proposal = reordered_service.prepare_streaming_actuation(reordered_handle)?;
+        assert_eq!(
+            reordered_proposal.ordered_uploads_sha256(),
+            proposal.ordered_uploads_sha256()
+        );
+        assert_eq!(
+            reordered_proposal.idempotency_identity_sha256(),
+            proposal.idempotency_identity_sha256()
+        );
+
+        let changed_context = WorkerProviderInvocationContext {
+            generation: context.generation + 1,
+            ..context
+        };
+        let (changed_service, changed_handle) =
+            started_streaming_service(&changed_context, &CancellationToken::default())?;
+        complete_streaming_upload(&changed_service, changed_handle, b"priced-upload")?;
+        let changed_request = WorkerProviderCostRequest {
+            handle: changed_handle,
+            ..request
+        };
+        let changed_scope =
+            changed_service.prepare_cost_acceptance(&changed_request, price.clone())?;
+        assert_ne!(changed_scope, scope);
+        let changed_nonce = ProviderCostNonce::new([0x87; 32])?;
+        let stale_acceptance =
+            issuer.issue(scope, now, now + Duration::from_secs(30), changed_nonce)?;
+        assert_eq!(
+            changed_service.accept_streaming_cost(
+                changed_request,
+                ProviderCostAuthorization::new(price, changed_nonce, stale_acceptance)?,
+                &verifier,
+                now,
+            ),
+            Err(PluginServiceError::ProviderCostAcceptanceDenied)
+        );
+
+        let denial_context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x412_aa04),
+            ..context
+        };
+        let (denial_service, denial_handle) =
+            started_streaming_service(&denial_context, &CancellationToken::default())?;
+        let denied = denial_service.deny_streaming_cost(WorkerProviderCostRequest {
+            handle: denial_handle,
+            operation: "provider.cost".to_owned(),
+            currency: "USD".to_owned(),
+            maximum_microunits: 5,
+        })?;
+        assert_eq!(denied.approved_microunits, 0);
+        assert!(!denied.accepted);
+        assert!(denied.receipt.is_empty());
+        assert_eq!(
+            denial_service
+                .prepare_streaming_actuation(denial_handle)?
+                .accepted_cost_microunits(),
+            0
+        );
+        assert!(
+            denial_service
+                .state
+                .lock()
+                .owner
+                .consumed_streaming_cost_nonces
+                .is_empty()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn provider_runtime_service_identities_bind_body_upload_and_cost_mutations()
+    -> Result<(), Box<dyn Error>> {
+        let context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x412_aa05),
+            session_generation: 1,
+            invocation: 2,
+            generation: 3,
+        };
+        let baseline = prepared_mutation_proposal(
+            &context,
+            b"request-a",
+            "image.input",
+            "application/octet-stream",
+            b"upload-a",
+        )?;
+        for proposal in [
+            prepared_mutation_proposal(
+                &context,
+                b"request-b",
+                "image.input",
+                "application/octet-stream",
+                b"upload-a",
+            )?,
+            prepared_mutation_proposal(
+                &context,
+                b"request-a",
+                "image.reference",
+                "application/octet-stream",
+                b"upload-a",
+            )?,
+            prepared_mutation_proposal(
+                &context,
+                b"request-a",
+                "image.input",
+                "application/json",
+                b"upload-a",
+            )?,
+            prepared_mutation_proposal(
+                &context,
+                b"request-a",
+                "image.input",
+                "application/octet-stream",
+                b"upload-b",
+            )?,
+        ] {
+            assert_ne!(
+                proposal.idempotency_identity_sha256(),
+                baseline.idempotency_identity_sha256()
+            );
+        }
+
+        let baseline_scope = prepared_cost_scope(&context, "provider.cost", "USD", 5)?;
+        for scope in [
+            prepared_cost_scope(&context, "provider.cost.alt", "USD", 5)?,
+            prepared_cost_scope(&context, "provider.cost", "EUR", 5)?,
+            prepared_cost_scope(&context, "provider.cost", "USD", 6)?,
+        ] {
+            assert_ne!(scope, baseline_scope);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn provider_runtime_stream_service_preserves_retry_progress_and_terminal_state()
+    -> Result<(), Box<dyn Error>> {
+        for (index, invalid_headers) in [
+            vec![
+                WorkerProviderHeader {
+                    name: "retry-after".to_owned(),
+                    value: "1".to_owned(),
+                },
+                WorkerProviderHeader {
+                    name: "Retry-After".to_owned(),
+                    value: "2".to_owned(),
+                },
+            ],
+            vec![WorkerProviderHeader {
+                name: "retry-after".to_owned(),
+                value: "seconds".to_owned(),
+            }],
+            vec![WorkerProviderHeader {
+                name: "retry-after".to_owned(),
+                value: "01".to_owned(),
+            }],
+            vec![WorkerProviderHeader {
+                name: "retry-after".to_owned(),
+                value: "86401".to_owned(),
+            }],
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let context = WorkerProviderInvocationContext {
+                session_id: Uuid::from_u128(0x412_bb00 + u128::try_from(index)?),
+                session_generation: 1,
+                invocation: 1,
+                generation: 1,
+            };
+            let (service, handle) =
+                started_streaming_service(&context, &CancellationToken::default())?;
+            service.prepare_streaming_actuation(handle)?;
+            let wait = WorkerProviderWaitRequest {
+                handle,
+                after_sequence: None,
+                timeout_milliseconds: 100,
+            };
+            assert!(matches!(
+                service.accept_wait(
+                    wait,
+                    WorkerProviderWaitOutcome::Frame(comfy_types::WorkerProviderResponseFrame {
+                        handle,
+                        sequence: 0,
+                        event: WorkerProviderResponseFrameEvent::Head(
+                            comfy_types::WorkerProviderResponseHead {
+                                status: 429,
+                                headers: invalid_headers,
+                            },
+                        ),
+                    }),
+                ),
+                Err(PluginServiceError::ProviderStreamingContract(
+                    ProviderStreamingContractError::InvalidHeaders
+                ))
+            ));
+            assert_eq!(service.retry_after_seconds(handle)?, None);
+            service.accept_wait(
+                wait,
+                WorkerProviderWaitOutcome::Frame(comfy_types::WorkerProviderResponseFrame {
+                    handle,
+                    sequence: 0,
+                    event: WorkerProviderResponseFrameEvent::Head(
+                        comfy_types::WorkerProviderResponseHead {
+                            status: 429,
+                            headers: vec![WorkerProviderHeader {
+                                name: "Retry-After".to_owned(),
+                                value: "120".to_owned(),
+                            }],
+                        },
+                    ),
+                }),
+            )?;
+            assert_eq!(service.retry_after_seconds(handle)?, Some(120));
+            service.revoke_stream(handle);
+        }
+
+        let progress_context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x412_bb10),
+            session_generation: 1,
+            invocation: 1,
+            generation: 1,
+        };
+        let (progress_service, progress_handle) =
+            started_streaming_service(&progress_context, &CancellationToken::default())?;
+        progress_service.prepare_streaming_actuation(progress_handle)?;
+        progress_service.accept_wait(
+            WorkerProviderWaitRequest {
+                handle: progress_handle,
+                after_sequence: None,
+                timeout_milliseconds: 100,
+            },
+            WorkerProviderWaitOutcome::Frame(comfy_types::WorkerProviderResponseFrame {
+                handle: progress_handle,
+                sequence: 0,
+                event: WorkerProviderResponseFrameEvent::Head(
+                    comfy_types::WorkerProviderResponseHead {
+                        status: 200,
+                        headers: Vec::new(),
+                    },
+                ),
+            }),
+        )?;
+        let progress_origin = Instant::now();
+        assert!(
+            progress_service
+                .report_progress(
+                    WorkerProviderProgress {
+                        handle: progress_handle,
+                        sequence: 0,
+                        completed: 1,
+                        total: 10,
+                        message: None,
+                    },
+                    progress_origin,
+                )?
+                .is_some()
+        );
+        assert!(
+            progress_service
+                .report_progress(
+                    WorkerProviderProgress {
+                        handle: progress_handle,
+                        sequence: 1,
+                        completed: 2,
+                        total: 10,
+                        message: None,
+                    },
+                    progress_origin + Duration::from_millis(10),
+                )?
+                .is_none()
+        );
+        assert!(
+            progress_service
+                .report_progress(
+                    WorkerProviderProgress {
+                        handle: progress_handle,
+                        sequence: 2,
+                        completed: 10,
+                        total: 10,
+                        message: Some("complete".to_owned()),
+                    },
+                    progress_origin + Duration::from_millis(20),
+                )?
+                .is_some()
+        );
+        assert!(matches!(
+            progress_service.report_progress(
+                WorkerProviderProgress {
+                    handle: progress_handle,
+                    sequence: 2,
+                    completed: 10,
+                    total: 10,
+                    message: None,
+                },
+                progress_origin + Duration::from_millis(60),
+            ),
+            Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidProgress
+            ))
+        ));
+
+        let cancellation = CancellationToken::default();
+        let cancelled_context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x412_bb11),
+            ..progress_context
+        };
+        let (cancelled_service, cancelled_handle) =
+            started_streaming_service(&cancelled_context, &cancellation)?;
+        complete_streaming_upload(&cancelled_service, cancelled_handle, b"cancelled")?;
+        cancellation.cancel();
+        assert_eq!(
+            cancelled_service.check_cancelled(cancelled_handle),
+            Err(PluginServiceError::Cancelled)
+        );
+        {
+            let state = cancelled_service.state.lock();
+            assert!(state.owner.is_empty());
+            assert!(state.handles.is_empty());
+            assert!(state.upload_parents.is_empty());
+            assert!(state.cancellations.is_empty());
+        }
+
+        for (index, terminal) in [
+            WorkerProviderTerminal::Failed {
+                code: "fixture.failed".to_owned(),
+                message: "failed".to_owned(),
+            },
+            WorkerProviderTerminal::Cancelled,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let context = WorkerProviderInvocationContext {
+                session_id: Uuid::from_u128(0x412_bb20 + u128::try_from(index)?),
+                ..progress_context.clone()
+            };
+            let (service, handle) =
+                started_streaming_service(&context, &CancellationToken::default())?;
+            let upload = complete_streaming_upload(&service, handle, b"terminal")?;
+            service.prepare_streaming_actuation(handle)?;
+            service.accept_wait(
+                WorkerProviderWaitRequest {
+                    handle,
+                    after_sequence: None,
+                    timeout_milliseconds: 100,
+                },
+                WorkerProviderWaitOutcome::Frame(comfy_types::WorkerProviderResponseFrame {
+                    handle,
+                    sequence: 0,
+                    event: WorkerProviderResponseFrameEvent::Head(
+                        comfy_types::WorkerProviderResponseHead {
+                            status: 500,
+                            headers: Vec::new(),
+                        },
+                    ),
+                }),
+            )?;
+            service.accept_wait(
+                WorkerProviderWaitRequest {
+                    handle,
+                    after_sequence: Some(0),
+                    timeout_milliseconds: 100,
+                },
+                WorkerProviderWaitOutcome::Frame(comfy_types::WorkerProviderResponseFrame {
+                    handle,
+                    sequence: 1,
+                    event: WorkerProviderResponseFrameEvent::Terminal(terminal),
+                }),
+            )?;
+            assert!(matches!(
+                service.check_cancelled(handle),
+                Err(PluginServiceError::ProviderStreamingContract(
+                    ProviderStreamingContractError::RevokedHandle
+                ))
+            ));
+            assert!(matches!(
+                service.check_cancelled(upload),
+                Err(PluginServiceError::ProviderStreamingContract(
+                    ProviderStreamingContractError::RevokedHandle
+                ))
+            ));
+            let state = service.state.lock();
+            assert!(state.owner.is_empty());
+            assert!(state.handles.is_empty());
+            assert!(state.upload_parents.is_empty());
+            assert!(state.cancellations.is_empty());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn provider_runtime_stream_owner_is_transactional_progressive_and_receipt_bound()
+    -> Result<(), Box<dyn Error>> {
+        let binding = provider_binding()?;
+        let (authority, head) = bound_streaming_authority(&binding, [0x61; 32])?;
+        let handle = ProviderStreamHandleV2 {
+            invocation: 10,
+            slot: 1,
+            generation: 2,
+        };
+        let cancellation = CancellationToken::default();
+        let mut owner = ProviderRuntimeStreamOwner::new();
+        owner.begin_streaming(
+            authority,
+            ProviderInvocationContextV2 {
+                invocation: 10,
+                generation: 2,
+            },
+            handle,
+            &cancellation,
+        )?;
+        owner.write_streaming_request_chunk(
+            &ProviderRequestChunkV2 {
+                handle,
+                sequence: 0,
+                bytes: Vec::new(),
+                end: true,
+            },
+            &cancellation,
+        )?;
+        let wait = ProviderWaitRequestV2 {
+            handle,
+            after_sequence: None,
+            timeout_milliseconds: 100,
+        };
+        let response_head = ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+            handle,
+            sequence: 0,
+            event: ProviderResponseFrameEventV2::Head(ProviderResponseHeadV2 {
+                status: 200,
+                headers: Vec::new(),
+            }),
+        });
+        assert!(matches!(
+            owner.accept_streaming_wait(&wait, response_head.clone(), &cancellation),
+            Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidOrder
+            ))
+        ));
+        let proposal = owner.prepare_streaming_actuation(handle, None, &cancellation)?;
+        assert_eq!(proposal.request_head(), &head);
+        assert_eq!(
+            proposal.request().idempotency_key_sha256(),
+            Some(proposal.idempotency_identity_sha256())
+        );
+        owner.accept_streaming_wait(&wait, response_head, &cancellation)?;
+        let progress = ProviderProgressV2 {
+            handle,
+            sequence: 0,
+            completed: 1,
+            total: 2,
+            message: Some("working".to_owned()),
+        };
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        assert!(matches!(
+            owner.report_streaming_progress(&progress, Instant::now(), &cancelled),
+            Err(PluginServiceError::Cancelled)
+        ));
+        assert!(
+            owner
+                .report_streaming_progress(&progress, Instant::now(), &cancellation)?
+                .is_some()
+        );
+        owner.accept_streaming_wait(
+            &ProviderWaitRequestV2 {
+                after_sequence: Some(0),
+                ..wait
+            },
+            ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+                handle,
+                sequence: 1,
+                event: ProviderResponseFrameEventV2::Terminal(
+                    ProviderStreamTerminalV2::Completed {
+                        receipt: b"terminal-receipt".to_vec(),
+                    },
+                ),
+            }),
+            &cancellation,
+        )?;
+        let origin = Instant::now();
+        let issuer = ProviderRuntimeReceiptIssuerV2::from_seed([0x62; 32], origin)?;
+        let receipt = owner.finish_streaming(
+            handle,
+            &issuer,
+            origin,
+            origin + Duration::from_secs(30),
+            [0x63; 32],
+            &cancellation,
+        )?;
+        assert_eq!(
+            receipt.identity().terminal_receipt_sha256,
+            provider_terminal_completed_receipt_sha256(b"terminal-receipt")
+        );
+        assert!(owner.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn provider_runtime_failed_and_cancelled_terminals_release_capacity()
+    -> Result<(), Box<dyn Error>> {
+        let binding = provider_binding()?;
+        let cancellation = CancellationToken::default();
+        let mut owner = ProviderRuntimeStreamOwner::new();
+        for invocation in 1..=64_u64 {
+            let (authority, _) = bound_streaming_authority(&binding, [0x71; 32])?;
+            let handle = ProviderStreamHandleV2 {
+                invocation,
+                slot: 1,
+                generation: 1,
+            };
+            owner.begin_streaming(
+                authority,
+                ProviderInvocationContextV2 {
+                    invocation,
+                    generation: 1,
+                },
+                handle,
+                &cancellation,
+            )?;
+            let outcome = if invocation % 2 == 0 {
+                ProviderWaitOutcomeV2::Cancelled
+            } else {
+                ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+                    handle,
+                    sequence: 0,
+                    event: ProviderResponseFrameEventV2::Terminal(
+                        ProviderStreamTerminalV2::Failed {
+                            code: "provider.failed".to_owned(),
+                            message: "failed".to_owned(),
+                        },
+                    ),
+                })
+            };
+            owner.accept_streaming_wait(
+                &ProviderWaitRequestV2 {
+                    handle,
+                    after_sequence: None,
+                    timeout_milliseconds: 100,
+                },
+                outcome,
+                &cancellation,
+            )?;
+            assert!(matches!(
+                owner.write_streaming_request_chunk(
+                    &ProviderRequestChunkV2 {
+                        handle,
+                        sequence: 0,
+                        bytes: Vec::new(),
+                        end: true,
+                    },
+                    &cancellation,
+                ),
+                Err(PluginServiceError::ProviderSessionUnavailable)
+            ));
+        }
+        assert!(owner.is_empty());
         Ok(())
     }
 }

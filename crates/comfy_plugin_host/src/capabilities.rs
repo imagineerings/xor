@@ -715,12 +715,17 @@ fn map_broker_error(
         | PluginServiceError::ProviderCostAcceptanceDenied
         | PluginServiceError::ProviderCostAcceptanceReused
         | PluginServiceError::ProviderResultReceiptAuthorityRequired
-        | PluginServiceError::ProviderResultReceiptAuthorityDenied => {
-            InvocationError::CapabilityDenied {
-                kind: CapabilityKind::NetworkProvider,
-                scope: scope.to_owned(),
-            }
-        }
+        | PluginServiceError::ProviderResultReceiptAuthorityDenied
+        | PluginServiceError::ProviderSessionUnavailable
+        | PluginServiceError::ProviderRuntimeAuthorityDenied
+        | PluginServiceError::ProviderRuntimeForeignSession
+        | PluginServiceError::ProviderRuntimeStaleSession
+        | PluginServiceError::ProviderRuntimeForeignInvocation
+        | PluginServiceError::ProviderRuntimeStaleInvocation
+        | PluginServiceError::ProviderStreamingContract(_) => InvocationError::CapabilityDenied {
+            kind: CapabilityKind::NetworkProvider,
+            scope: scope.to_owned(),
+        },
         PluginServiceError::InvocationFinished | PluginServiceError::InvocationFailed => {
             InvocationError::RevokedHandle
         }
@@ -1771,6 +1776,7 @@ fn sanitize_log(message: &str, secret_identifiers: &BTreeSet<String>) -> String 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use comfy_plugin_sdk::ProviderStreamingContractError;
     use comfy_runtime::{
         AssetQuery, AssetRoots, AttemptId, ProfileId, PromptId, authorize_native_output_committer,
         authorize_native_plugin_asset_broker,
@@ -2698,5 +2704,25 @@ mod tests {
                 limit: "response-byte".to_owned(),
             }
         );
+
+        for error in [
+            PluginServiceError::ProviderSessionUnavailable,
+            PluginServiceError::ProviderRuntimeAuthorityDenied,
+            PluginServiceError::ProviderRuntimeForeignSession,
+            PluginServiceError::ProviderRuntimeStaleSession,
+            PluginServiceError::ProviderRuntimeForeignInvocation,
+            PluginServiceError::ProviderRuntimeStaleInvocation,
+            PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::InvalidContract,
+            ),
+        ] {
+            assert_eq!(
+                map_broker_error(error, CapabilityKind::NetworkProvider, "provider|/endpoint"),
+                InvocationError::CapabilityDenied {
+                    kind: CapabilityKind::NetworkProvider,
+                    scope: "provider|/endpoint".to_owned(),
+                }
+            );
+        }
     }
 }

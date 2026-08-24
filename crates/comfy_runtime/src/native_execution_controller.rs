@@ -10,13 +10,13 @@ use crate::{
     NativeProviderInvocationAuthority, NativeProviderInvocationScope, NativeProviderWorkerRequest,
     NativeProviderWorkerResponse, NodeContext, NodeFailure, NodeFailureKind, NodeOutcome,
     OutputCommitError, OutputCommitReceipt, OutputCommitter, OutputExecutionScope, OutputMediaKind,
-    OutputProposal, PluginCapabilityInvocation, PluginServiceWireFailure, PluginServiceWireRequest,
-    PreparedEffect, PreparedEffectRequest, PreparedOutput, ProfileId, PromptCompileError,
-    RuntimeCachePolicy, RuntimeNodeDescriptor, RuntimeOutputDescriptor, RuntimeSupervisor,
-    RuntimeSupervisorError, SharedAssetService, SharedExecutionPresentationService,
-    SharedOutputCommitter, WorkerLaunchConfig, WorkerRegistryDeploymentPlan,
-    WorkflowFormatDocument, authorize_native_input_reader, authorize_native_output_committer,
-    graph_to_prompt,
+    OutputProposal, PluginServiceWireFailure, PluginServiceWireRequest, PreparedEffect,
+    PreparedEffectRequest, PreparedOutput, ProfileId, PromptCompileError,
+    ProviderRuntimeActivationGrantSource, ProviderRuntimeStreamService, RuntimeCachePolicy,
+    RuntimeNodeDescriptor, RuntimeOutputDescriptor, RuntimeSupervisor, RuntimeSupervisorError,
+    SharedAssetService, SharedExecutionPresentationService, SharedOutputCommitter,
+    WorkerLaunchConfig, WorkerRegistryDeploymentPlan, WorkflowFormatDocument,
+    authorize_native_input_reader, authorize_native_output_committer, graph_to_prompt,
 };
 use chrono::{Local, Utc};
 #[cfg(test)]
@@ -6296,6 +6296,7 @@ impl NativeExecutionControllerConfig {
 pub struct NativeExecutionController {
     profile_id: ProfileId,
     provider_registry: Option<NativeProviderRegistryPin>,
+    provider_streams: ProviderRuntimeStreamService,
     commands: async_channel::Sender<PreparedNativeCommand>,
     runner: Mutex<Option<thread::JoinHandle<()>>>,
 }
@@ -6340,11 +6341,17 @@ impl NativeExecutionController {
             .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
         let (commands, receiver) = async_channel::bounded(NATIVE_CONTROLLER_CAPACITY);
         let profile_id = config.worker.profile_id;
+        let provider_streams = ProviderRuntimeStreamService::new();
+        let runner_provider_streams = provider_streams.clone();
         let runner = thread::Builder::new()
             .name("native-image-controller".to_owned())
             .spawn(move || {
                 if let Err(error) = smol::block_on(run_native_controller(
-                    config, event_bus, receiver, supervisor,
+                    config,
+                    event_bus,
+                    receiver,
+                    supervisor,
+                    runner_provider_streams,
                 )) {
                     eprintln!("native image execution controller stopped: {error}");
                 }
@@ -6353,9 +6360,18 @@ impl NativeExecutionController {
         Ok(Arc::new(Self {
             profile_id,
             provider_registry,
+            provider_streams,
             commands,
             runner: Mutex::new(Some(runner)),
         }))
+    }
+
+    pub fn provider_runtime_activation_grants(&self) -> ProviderRuntimeActivationGrantSource {
+        self.provider_streams.activation_grants()
+    }
+
+    pub fn provider_runtime_stream_service(&self) -> ProviderRuntimeStreamService {
+        self.provider_streams.clone()
     }
 
     fn shutdown_and_join(&self) -> Result<(), ExecutionFailure> {
@@ -6483,7 +6499,7 @@ struct NativeControllerState {
     output_committer: SharedOutputCommitter,
     input_authorization: AuthorizedCapabilities,
     output_authorization: AuthorizedCapabilities,
-    provider_sessions: BTreeMap<String, PluginCapabilityInvocation>,
+    provider_streams: ProviderRuntimeStreamService,
 }
 
 enum ControllerInput {
@@ -6496,6 +6512,7 @@ async fn run_native_controller(
     event_bus: ExecutionEventBus,
     commands: async_channel::Receiver<PreparedNativeCommand>,
     supervisor: RuntimeSupervisor,
+    provider_streams: ProviderRuntimeStreamService,
 ) -> Result<(), NativeImageRuntimeError> {
     let roots = config.roots()?;
     let output_committer = config.output_committer.clone();
@@ -6511,7 +6528,7 @@ async fn run_native_controller(
         output_committer,
         input_authorization,
         output_authorization,
-        provider_sessions: BTreeMap::new(),
+        provider_streams,
     };
     state.reconcile_committed_output_receipts().await?;
     loop {
@@ -7308,7 +7325,6 @@ impl NativeControllerState {
                 })?;
                 if start.compiled_plan_sha256 != active.compiled_plan_sha256
                     || !active.provider_node_ids.contains(&start.node_id)
-                    || self.provider_sessions.contains_key(&start.session_id)
                 {
                     return Err(NativeImageRuntimeError::WorkerEvent(
                         "provider session identity is stale or invalid".to_owned(),
@@ -7323,17 +7339,19 @@ impl NativeControllerState {
                             "provider invocation authority is unavailable".to_owned(),
                         )
                     })?;
-                let invocation = authority
-                    .begin(NativeProviderInvocationScope {
-                        profile_id: active.profile_id,
-                        prompt_id: active.prompt_id,
-                        attempt_id: active.attempt_id,
-                        node_id: comfy_types::NodeId(start.node_id.clone()),
-                        cancellation: active.cancellation.clone(),
-                        start: start.clone(),
-                    })
+                self.provider_streams
+                    .begin_legacy(
+                        authority.as_ref(),
+                        NativeProviderInvocationScope {
+                            profile_id: active.profile_id,
+                            prompt_id: active.prompt_id,
+                            attempt_id: active.attempt_id,
+                            node_id: comfy_types::NodeId(start.node_id.clone()),
+                            cancellation: active.cancellation.clone(),
+                            start,
+                        },
+                    )
                     .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
-                self.provider_sessions.insert(start.session_id, invocation);
                 Ok(NativeProviderWorkerResponse::Begun)
             }
             NativeProviderWorkerRequest::Call {
@@ -7342,12 +7360,10 @@ impl NativeControllerState {
             } => {
                 let request = PluginServiceWireRequest::from_bytes(&request)
                     .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
-                let invocation = self.provider_sessions.get_mut(&session_id).ok_or_else(|| {
-                    NativeImageRuntimeError::WorkerEvent(
-                        "provider capability session is unavailable".to_owned(),
-                    )
-                })?;
-                let response = invocation.handle_wire_request(request);
+                let response = self
+                    .provider_streams
+                    .call_legacy(&session_id, request)
+                    .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
                 let response = response
                     .to_bytes(MAX_PLUGIN_SERVICE_RESPONSE_BYTES)
                     .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
@@ -7359,43 +7375,27 @@ impl NativeControllerState {
             } => {
                 let receipt_set = ProviderResultReceiptSet::from_bytes(&receipt_set)
                     .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
-                let invocation = self.provider_sessions.get_mut(&session_id).ok_or_else(|| {
-                    NativeImageRuntimeError::WorkerEvent(
-                        "provider receipt session is unavailable".to_owned(),
-                    )
-                })?;
-                let resolved = invocation
-                    .resolve_provider_result_receipt_set(&receipt_set)
-                    .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?
-                    .into_iter()
-                    .map(|result| result.response().to_vec())
-                    .collect();
+                let resolved = self
+                    .provider_streams
+                    .resolve_legacy(&session_id, &receipt_set)
+                    .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
                 Ok(NativeProviderWorkerResponse::Resolved(resolved))
             }
             NativeProviderWorkerRequest::Finish { session_id } => {
-                let invocation = self.provider_sessions.remove(&session_id).ok_or_else(|| {
-                    NativeImageRuntimeError::WorkerEvent(
-                        "provider capability session is unavailable".to_owned(),
-                    )
-                })?;
-                invocation
-                    .finish()
+                self.provider_streams
+                    .finish_legacy(&session_id)
                     .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
                 Ok(NativeProviderWorkerResponse::Finished)
             }
             NativeProviderWorkerRequest::Abort { session_id } => {
-                if let Some(invocation) = self.provider_sessions.remove(&session_id) {
-                    invocation.abort();
-                }
+                self.provider_streams.abort_legacy(&session_id);
                 Ok(NativeProviderWorkerResponse::Aborted)
             }
         }
     }
 
     fn abort_provider_sessions(&mut self) {
-        for (_, invocation) in std::mem::take(&mut self.provider_sessions) {
-            invocation.abort();
-        }
+        self.provider_streams.revoke_all();
     }
 
     fn publish_worker_progress(
@@ -10236,7 +10236,7 @@ mod tests {
             output_committer,
             input_authorization,
             output_authorization,
-            provider_sessions: BTreeMap::new(),
+            provider_streams: ProviderRuntimeStreamService::new(),
         };
         let before = presentation.snapshot(profile_id)?;
         smol::block_on(state.apply_command(ExecutionControlCommand {
@@ -10452,7 +10452,7 @@ mod tests {
                 active: None,
                 input_authorization: authorize_native_input_reader(&roots.profile_id)?,
                 output_authorization: authorization,
-                provider_sessions: BTreeMap::new(),
+                provider_streams: ProviderRuntimeStreamService::new(),
             };
 
             assert!(state.reconcile_committed_output_receipts().await.is_err());
@@ -10580,7 +10580,7 @@ mod tests {
             output_committer,
             input_authorization,
             output_authorization,
-            provider_sessions: BTreeMap::new(),
+            provider_streams: ProviderRuntimeStreamService::new(),
         };
 
         smol::block_on(state.recover_worker(RuntimeSupervisorError::ChannelClosed))?;
@@ -10697,7 +10697,7 @@ mod tests {
             }),
             input_authorization: authorize_native_input_reader(&roots.profile_id)?,
             output_authorization: authorize_native_output_committer(&roots.profile_id)?,
-            provider_sessions: BTreeMap::new(),
+            provider_streams: ProviderRuntimeStreamService::new(),
         };
         let event = NativeImageWorkerEvent::Failed {
             message: "untrusted worker cancellation observation".to_owned(),
@@ -10785,7 +10785,7 @@ mod tests {
                 output_proposals: BTreeMap::new(),
                 output_proposal_bytes: 0,
             }),
-            provider_sessions: BTreeMap::new(),
+            provider_streams: ProviderRuntimeStreamService::new(),
         };
         let envelope = comfy_types::WorkerEnvelope {
             version: comfy_types::WORKER_PROTOCOL_VERSION,
@@ -10806,7 +10806,7 @@ mod tests {
         let error = smol::block_on(state.apply_worker_event(envelope))
             .expect_err("a stale provider capability envelope must fail closed");
         assert!(error.to_string().contains("stale attempt identity"));
-        assert!(state.provider_sessions.is_empty());
+        assert!(state.provider_streams.is_empty());
         assert!(state.active.is_some());
         Ok(())
     }

@@ -10,9 +10,13 @@ use comfy_media::{
     NativeFile3DRole, NativeVideoBitDepth, NativeVideoPayload,
 };
 use comfy_nodes::{NativeHandleKind, NativeHandleType, NativeNodeContext, NativeStoredPayload};
-use comfy_plugin_sdk::{CanonicalTypeId, ProviderResultReceiptSet, ValueFamily};
+use comfy_plugin_sdk::{
+    CanonicalTypeId, ProviderInvocationResultV2, ProviderResultReceiptSet, TypeRegistry,
+    ValueFamily,
+};
 use comfy_tensor::{
-    DType, DeviceId, ImageTensor, NativeTensorPayload, NativeTensorRole, Tensor, TensorDescriptor,
+    CancellationToken, DType, DeviceId, ImageTensor, NativeTensorPayload, NativeTensorRole, Tensor,
+    TensorDescriptor,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -36,6 +40,8 @@ const MAX_PROVIDER_TRANSPORT_IDENTITY_BYTES: usize = 1_024;
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum ProviderMaterializationError {
+    #[error("provider materialization was cancelled")]
+    Cancelled,
     #[error("provider transport schema is not supported by the native materializer")]
     UnsupportedTransportSchema,
     #[error("provider materializer schema is not supported by the native materializer")]
@@ -953,6 +959,81 @@ impl ProviderTransportResponse {
     }
 }
 
+pub fn materialize_provider_invocation_result_v2(
+    result: &ProviderInvocationResultV2,
+    verified_receipt: &crate::VerifiedProviderRuntimeReceiptV2,
+    registry: &TypeRegistry,
+    cancellation: &CancellationToken,
+) -> Result<ProviderTransportResponse, ProviderMaterializationError> {
+    cancellation
+        .check()
+        .map_err(|_| ProviderMaterializationError::Cancelled)?;
+    let aggregate_bytes = result.outputs.iter().try_fold(0usize, |total, output| {
+        total
+            .checked_add(output.port_id.len())
+            .and_then(|total| total.checked_add(output.value.type_id.to_string().len()))
+            .and_then(|total| total.checked_add(output.value.abi_bytes.len()))
+            .and_then(|total| total.checked_add(64))
+            .ok_or(ProviderMaterializationError::InvalidTransportProjection)
+    })?;
+    if aggregate_bytes > MAX_PROVIDER_MATERIALIZATION_RESPONSE_BYTES {
+        return Err(ProviderMaterializationError::InvalidTransportProjection);
+    }
+    result
+        .validate(registry)
+        .map_err(|_| ProviderMaterializationError::InvalidTransportProjection)?;
+    cancellation
+        .check()
+        .map_err(|_| ProviderMaterializationError::Cancelled)?;
+    if crate::provider_terminal_completed_receipt_sha256(&result.receipt)
+        != verified_receipt.identity().terminal_receipt_sha256
+    {
+        return Err(ProviderMaterializationError::InvalidTransportProjection);
+    }
+    let mut ports = Vec::new();
+    ports
+        .try_reserve_exact(result.outputs.len())
+        .map_err(|_| ProviderMaterializationError::InvalidTransportProjection)?;
+    for output in &result.outputs {
+        cancellation
+            .check()
+            .map_err(|_| ProviderMaterializationError::Cancelled)?;
+        let type_id_source = output.value.type_id.to_string();
+        let mut type_id = String::new();
+        type_id
+            .try_reserve_exact(type_id_source.len())
+            .map_err(|_| ProviderMaterializationError::InvalidTransportProjection)?;
+        type_id.push_str(&type_id_source);
+        let mut abi_bytes = Vec::new();
+        abi_bytes
+            .try_reserve_exact(output.value.abi_bytes.len())
+            .map_err(|_| ProviderMaterializationError::InvalidTransportProjection)?;
+        cancellation
+            .check()
+            .map_err(|_| ProviderMaterializationError::Cancelled)?;
+        abi_bytes.extend_from_slice(&output.value.abi_bytes);
+        let value = ProviderTransportValue::checked(type_id, output.value.family, abi_bytes)?;
+        let mut port_id = String::new();
+        port_id
+            .try_reserve_exact(output.port_id.len())
+            .map_err(|_| ProviderMaterializationError::InvalidTransportProjection)?;
+        port_id.push_str(&output.port_id);
+        let mut values = Vec::new();
+        values
+            .try_reserve_exact(1)
+            .map_err(|_| ProviderMaterializationError::InvalidTransportProjection)?;
+        values.push(value);
+        cancellation
+            .check()
+            .map_err(|_| ProviderMaterializationError::Cancelled)?;
+        ports.push(ProviderTransportPort::checked(port_id, true, values)?);
+    }
+    cancellation
+        .check()
+        .map_err(|_| ProviderMaterializationError::Cancelled)?;
+    ProviderTransportResponse::checked("zed:comfy-provider-invocation-result@2", ports)
+}
+
 fn validate_transport_projection(
     projection: &ProviderTransportProjection,
 ) -> Result<(), ProviderMaterializationError> {
@@ -1352,7 +1433,10 @@ impl ProviderResultReceiptSession {
 mod tests {
     use super::*;
     use comfy_nodes::{NativeNodeComputeSession, NativeNodeServiceIdentity, NativeNodeServices};
-    use comfy_plugin_sdk::{PluginValue, ScalarValue, TypeRegistry};
+    use comfy_plugin_sdk::{
+        PluginValue, ProviderEncodedValueV2, ProviderHttpMethodV2, ProviderMaterializedOutputV2,
+        ScalarValue, TypeRegistry,
+    };
     use comfy_tensor::{CpuWorkspaceAuthority, StreamId};
     use comfy_types::{AttemptId, CancellationToken, NodeId, PromptId};
     use std::time::Duration;
@@ -1436,6 +1520,92 @@ mod tests {
                 )?,]
             )
             .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn provider_v2_materialization_requires_the_exact_verified_terminal_receipt()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let terminal_receipt = b"terminal-receipt".to_vec();
+        let identity = crate::ProviderRuntimeReceiptIdentityV2 {
+            provider: "plugin.fixture".to_owned(),
+            method: ProviderHttpMethodV2::Post,
+            endpoint: "https://provider.invalid/v2".to_owned(),
+            ordered_headers_sha256: "1".repeat(64),
+            secret_id: None,
+            request_head_sha256: "2".repeat(64),
+            request_body_sha256: "3".repeat(64),
+            provider_manifest_sha256: "4".repeat(64),
+            component_generation: 1,
+            component_digest_sha256: "5".repeat(64),
+            binding_generation: 1,
+            binding_set_sha256: "6".repeat(64),
+            accepted_cost_microunits: 0,
+            request_ordinal: 1,
+            response_status: 200,
+            response_headers_sha256: "7".repeat(64),
+            ordered_uploads_sha256: "8".repeat(64),
+            ordered_chunks_sha256: "9".repeat(64),
+            terminal_receipt_sha256: crate::provider_terminal_completed_receipt_sha256(
+                &terminal_receipt,
+            ),
+            idempotency_identity_sha256: "a".repeat(64),
+        };
+        let origin = Instant::now();
+        let issuer = crate::ProviderRuntimeReceiptIssuerV2::from_seed([0x81; 32], origin)?;
+        let receipt = issuer.issue(
+            identity.clone(),
+            origin,
+            origin + Duration::from_secs(30),
+            [0x82; 32],
+        )?;
+        let verified =
+            issuer
+                .verifier()?
+                .verify(&receipt, &identity, origin + Duration::from_secs(1))?;
+        let registry = TypeRegistry::built_in()?;
+        let type_id: CanonicalTypeId = "comfy:string@1".parse()?;
+        let value = PluginValue::scalar(
+            type_id.clone(),
+            ScalarValue::String("result".to_owned()),
+            &registry,
+        )?;
+        let result = ProviderInvocationResultV2 {
+            outputs: vec![ProviderMaterializedOutputV2 {
+                port_id: "result".to_owned(),
+                value: ProviderEncodedValueV2 {
+                    type_id,
+                    family: value.family(),
+                    abi_bytes: value.abi_bytes()?,
+                },
+            }],
+            receipt: terminal_receipt,
+        };
+        let response = materialize_provider_invocation_result_v2(
+            &result,
+            &verified,
+            &registry,
+            &CancellationToken::default(),
+        )?;
+        assert_eq!(response.ports().len(), 1);
+
+        let mut mutated = result.clone();
+        mutated.receipt[0] ^= 1;
+        assert_eq!(
+            materialize_provider_invocation_result_v2(
+                &mutated,
+                &verified,
+                &registry,
+                &CancellationToken::default(),
+            ),
+            Err(ProviderMaterializationError::InvalidTransportProjection)
+        );
+        let cancellation = CancellationToken::default();
+        cancellation.cancel();
+        assert_eq!(
+            materialize_provider_invocation_result_v2(&result, &verified, &registry, &cancellation,),
+            Err(ProviderMaterializationError::Cancelled)
         );
         Ok(())
     }

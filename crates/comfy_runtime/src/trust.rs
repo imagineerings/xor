@@ -30,7 +30,8 @@ use zeroize::Zeroizing;
 use comfy_model::ArtifactRoot;
 use comfy_plugin_sdk::{
     ED25519_PUBLIC_KEY_BYTES, ED25519_SIGNATURE_BYTES, PLUGIN_SIGNATURE_ALGORITHM,
-    PluginContractError, PluginManifest, TypeRegistry,
+    PluginContractError, PluginManifest, ProviderBindingSet, ProviderHttpMethodV2,
+    ProviderPluginManifestV2, ProviderStreamingContractV2, TypeRegistry,
 };
 use comfy_tensor::CancellationToken;
 use comfy_types::CancellationError;
@@ -51,6 +52,9 @@ pub const CUDART_LIBRARY_ID: &str = "nvidia-cudart";
 const PLUGIN_AUTHORIZATION_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-plugin-authorization-v2\0";
 const PROVIDER_COST_ACCEPTANCE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-provider-cost-acceptance-v2\0";
 const PROVIDER_RESULT_RECEIPT_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-provider-result-receipt-v1\0";
+const PROVIDER_RUNTIME_RECEIPT_SIGNATURE_DOMAIN_V2: &[u8] =
+    b"zed-comfy-provider-runtime-receipt-v2\0";
+pub const PROVIDER_RUNTIME_RECEIPT_VERSION_V2: u16 = 2;
 const MAX_PROVIDER_COST_ACCEPTANCE_LIFETIME: Duration = Duration::from_secs(24 * 60 * 60);
 pub const MAX_PROVIDER_RESULT_RECEIPT_LIFETIME: Duration = Duration::from_secs(24 * 60 * 60);
 pub const MAX_PROVIDER_RESULT_RECEIPT_BYTES: usize = 32 * 1024;
@@ -1613,6 +1617,78 @@ impl PluginTrustPolicy {
             capabilities,
         })
     }
+
+    pub fn authorize_provider_manifest_v2(
+        &self,
+        manifest: &ProviderPluginManifestV2,
+        permissions: &PermissionPolicy,
+    ) -> Result<ProviderManifestAuthorizationV2, TrustError> {
+        let registry = TypeRegistry::built_in().map_err(PluginContractError::from)?;
+        manifest.validate(&registry)?;
+        let signing_payload = manifest.signing_payload()?;
+        let verification_key = self
+            .keys
+            .get(&manifest.signature.key_id)
+            .ok_or_else(|| TrustError::UnknownVerificationKey(manifest.signature.key_id.clone()))?;
+        let signature = decode_hex_exact::<ED25519_SIGNATURE_BYTES>(&manifest.signature.value)
+            .ok_or(TrustError::InvalidPluginSignature)?;
+        UnparsedPublicKey::new(&ED25519, verification_key.public_key)
+            .verify(&signing_payload, &signature)
+            .map_err(|_| TrustError::InvalidPluginSignature)?;
+        let authorization = self.authorize_manifest(&manifest.manifest, permissions)?;
+        let provider_binding = manifest
+            .manifest
+            .provider_binding
+            .clone()
+            .ok_or(PluginContractError::InvalidProviderBindingSet)?;
+        Ok(ProviderManifestAuthorizationV2 {
+            authorization,
+            outer_signing_payload_sha256: Sha256::digest(signing_payload).into(),
+            provider_binding,
+            streaming: manifest.streaming.clone(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderManifestAuthorizationV2 {
+    authorization: PluginAuthorization,
+    outer_signing_payload_sha256: [u8; 32],
+    provider_binding: ProviderBindingSet,
+    streaming: ProviderStreamingContractV2,
+}
+
+impl ProviderManifestAuthorizationV2 {
+    #[cfg(test)]
+    pub(crate) fn fixture(
+        authorization: PluginAuthorization,
+        outer_signing_payload_sha256: [u8; 32],
+        provider_binding: ProviderBindingSet,
+        streaming: ProviderStreamingContractV2,
+    ) -> Self {
+        Self {
+            authorization,
+            outer_signing_payload_sha256,
+            provider_binding,
+            streaming,
+        }
+    }
+
+    pub fn authorization(&self) -> &PluginAuthorization {
+        &self.authorization
+    }
+
+    pub fn outer_signing_payload_sha256(&self) -> &[u8; 32] {
+        &self.outer_signing_payload_sha256
+    }
+
+    pub fn provider_binding(&self) -> &ProviderBindingSet {
+        &self.provider_binding
+    }
+
+    pub fn streaming_contract(&self) -> &ProviderStreamingContractV2 {
+        &self.streaming
+    }
 }
 
 fn validate_plugin_manifest(manifest: &PluginManifest) -> Result<(), TrustError> {
@@ -1771,6 +1847,13 @@ impl PluginAuthorizationVerifier {
 }
 
 impl PluginAuthorization {
+    #[cfg(test)]
+    pub(crate) fn fixture_with_digest_sha256(&self, digest_sha256: impl Into<String>) -> Self {
+        let mut fixture = self.clone();
+        fixture.digest_sha256 = digest_sha256.into();
+        fixture
+    }
+
     pub fn plugin_id(&self) -> &str {
         &self.plugin_id
     }
@@ -2519,6 +2602,61 @@ impl ProviderCostAcceptance {
     pub fn nonce(&self) -> ProviderCostNonce {
         self.claims.nonce
     }
+
+    pub fn receipt_bytes(&self) -> Result<Vec<u8>, TrustError> {
+        let identity = self.claims.scope.identity();
+        let bytes = serde_json::to_vec(&ProviderCostAcceptanceReceiptWire {
+            version: 1,
+            principal_id: identity.principal_id().to_owned(),
+            profile_id: identity.profile_id().to_owned(),
+            prompt_id: identity.prompt_id().to_owned(),
+            prompt_sha256: identity.prompt_sha256().to_owned(),
+            attempt_id: identity.attempt_id().to_owned(),
+            node_id: identity.node_id().to_owned(),
+            request_ordinal: identity.request_ordinal(),
+            request_sha256: identity.request_sha256().to_owned(),
+            plugin_id: identity.plugin_id().to_owned(),
+            plugin_digest_sha256: identity.plugin_digest_sha256().to_owned(),
+            provider_binding_sha256: identity.provider_binding_sha256().to_owned(),
+            provider: identity.provider().to_owned(),
+            endpoint: identity.endpoint().to_owned(),
+            currency_code: self.claims.scope.price_bound().currency_code().to_owned(),
+            maximum_microunits: self.claims.scope.price_bound().maximum_microunits(),
+            issued_at_milliseconds: self.claims.issued_at_milliseconds,
+            expires_at_milliseconds: self.claims.expires_at_milliseconds,
+            nonce: encode_hex(self.claims.nonce.as_bytes()),
+            signature: encode_hex(&self.signature),
+        })
+        .map_err(|_| TrustError::InvalidProviderCostAcceptance)?;
+        if bytes.is_empty() || bytes.len() > MAX_PROVIDER_RESULT_RECEIPT_BYTES {
+            return Err(TrustError::InvalidProviderCostAcceptance);
+        }
+        Ok(bytes)
+    }
+}
+
+#[derive(Serialize)]
+struct ProviderCostAcceptanceReceiptWire {
+    version: u16,
+    principal_id: String,
+    profile_id: String,
+    prompt_id: String,
+    prompt_sha256: String,
+    attempt_id: String,
+    node_id: String,
+    request_ordinal: u32,
+    request_sha256: String,
+    plugin_id: String,
+    plugin_digest_sha256: String,
+    provider_binding_sha256: String,
+    provider: String,
+    endpoint: String,
+    currency_code: String,
+    maximum_microunits: u64,
+    issued_at_milliseconds: u64,
+    expires_at_milliseconds: u64,
+    nonce: String,
+    signature: String,
 }
 
 impl fmt::Debug for ProviderCostAcceptance {
@@ -2958,6 +3096,261 @@ impl ProviderResultReceiptVerifier {
             expires_at,
         })
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderRuntimeReceiptIdentityV2 {
+    pub provider: String,
+    pub method: ProviderHttpMethodV2,
+    pub endpoint: String,
+    pub ordered_headers_sha256: String,
+    pub secret_id: Option<String>,
+    pub request_head_sha256: String,
+    pub request_body_sha256: String,
+    pub provider_manifest_sha256: String,
+    pub component_generation: u64,
+    pub component_digest_sha256: String,
+    pub binding_generation: u64,
+    pub binding_set_sha256: String,
+    pub accepted_cost_microunits: u64,
+    pub request_ordinal: u32,
+    pub response_status: u16,
+    pub response_headers_sha256: String,
+    pub ordered_uploads_sha256: String,
+    pub ordered_chunks_sha256: String,
+    pub terminal_receipt_sha256: String,
+    pub idempotency_identity_sha256: String,
+}
+
+impl ProviderRuntimeReceiptIdentityV2 {
+    pub fn validate(&self) -> Result<(), TrustError> {
+        if !valid_ascii_identifier(&self.provider, 256)
+            || ProviderEndpoint::new(&self.provider, &self.endpoint).is_err()
+            || self
+                .secret_id
+                .as_deref()
+                .is_some_and(|value| SecretId::new(value).is_err())
+            || self.component_generation == 0
+            || self.binding_generation == 0
+            || !(200..=599).contains(&self.response_status)
+            || [
+                self.ordered_headers_sha256.as_str(),
+                self.request_head_sha256.as_str(),
+                self.request_body_sha256.as_str(),
+                self.provider_manifest_sha256.as_str(),
+                self.component_digest_sha256.as_str(),
+                self.binding_set_sha256.as_str(),
+                self.response_headers_sha256.as_str(),
+                self.ordered_uploads_sha256.as_str(),
+                self.ordered_chunks_sha256.as_str(),
+                self.terminal_receipt_sha256.as_str(),
+                self.idempotency_identity_sha256.as_str(),
+            ]
+            .into_iter()
+            .any(|value| validate_sha256(value).is_err())
+        {
+            return Err(TrustError::InvalidProviderRuntimeReceipt);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ProviderRuntimeReceiptClaimsV2 {
+    version: u16,
+    identity: ProviderRuntimeReceiptIdentityV2,
+    issued_at_milliseconds: u64,
+    expires_at_milliseconds: u64,
+    nonce: String,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ProviderRuntimeReceiptWireV2 {
+    claims: ProviderRuntimeReceiptClaimsV2,
+    signature: String,
+}
+
+pub struct ProviderRuntimeReceiptV2 {
+    claims: ProviderRuntimeReceiptClaimsV2,
+    signature: [u8; ED25519_SIGNATURE_BYTES],
+}
+
+impl ProviderRuntimeReceiptV2 {
+    pub fn identity(&self) -> &ProviderRuntimeReceiptIdentityV2 {
+        &self.claims.identity
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>, TrustError> {
+        let bytes = serde_json::to_vec(&ProviderRuntimeReceiptWireV2 {
+            claims: self.claims.clone(),
+            signature: encode_hex(&self.signature),
+        })
+        .map_err(|_| TrustError::InvalidProviderRuntimeReceipt)?;
+        if bytes.is_empty() || bytes.len() > MAX_PROVIDER_RESULT_RECEIPT_BYTES {
+            return Err(TrustError::ProviderResultReceiptTooLarge);
+        }
+        Ok(bytes)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, TrustError> {
+        if bytes.is_empty() || bytes.len() > MAX_PROVIDER_RESULT_RECEIPT_BYTES {
+            return Err(TrustError::ProviderResultReceiptTooLarge);
+        }
+        let wire: ProviderRuntimeReceiptWireV2 =
+            serde_json::from_slice(bytes).map_err(|_| TrustError::InvalidProviderRuntimeReceipt)?;
+        if wire.claims.version != PROVIDER_RUNTIME_RECEIPT_VERSION_V2
+            || wire.claims.nonce.len() != 64
+        {
+            return Err(TrustError::InvalidProviderRuntimeReceipt);
+        }
+        wire.claims.identity.validate()?;
+        decode_hex_exact::<32>(&wire.claims.nonce)
+            .filter(|nonce| nonce.iter().any(|byte| *byte != 0))
+            .ok_or(TrustError::InvalidProviderRuntimeReceipt)?;
+        let signature = decode_hex_exact::<ED25519_SIGNATURE_BYTES>(&wire.signature)
+            .ok_or(TrustError::InvalidProviderRuntimeReceipt)?;
+        Ok(Self {
+            claims: wire.claims,
+            signature,
+        })
+    }
+}
+
+impl fmt::Debug for ProviderRuntimeReceiptV2 {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ProviderRuntimeReceiptV2([SEALED])")
+    }
+}
+
+pub struct ProviderRuntimeReceiptIssuerV2 {
+    seed: Zeroizing<[u8; 32]>,
+    clock_origin: Instant,
+}
+
+impl ProviderRuntimeReceiptIssuerV2 {
+    pub fn from_seed(seed: [u8; 32], clock_origin: Instant) -> Result<Self, TrustError> {
+        Ed25519KeyPair::from_seed_unchecked(&seed)
+            .map_err(|_| TrustError::ProviderResultReceiptSealingUnavailable)?;
+        Ok(Self {
+            seed: Zeroizing::new(seed),
+            clock_origin,
+        })
+    }
+
+    pub fn verifier(&self) -> Result<ProviderRuntimeReceiptVerifierV2, TrustError> {
+        let key_pair = Ed25519KeyPair::from_seed_unchecked(self.seed.as_ref())
+            .map_err(|_| TrustError::ProviderResultReceiptSealingUnavailable)?;
+        Ok(ProviderRuntimeReceiptVerifierV2 {
+            public_key: key_pair
+                .public_key()
+                .as_ref()
+                .try_into()
+                .map_err(|_| TrustError::ProviderResultReceiptSealingUnavailable)?,
+            clock_origin: self.clock_origin,
+        })
+    }
+
+    pub fn issue(
+        &self,
+        identity: ProviderRuntimeReceiptIdentityV2,
+        issued_at: Instant,
+        expires_at: Instant,
+        nonce: [u8; 32],
+    ) -> Result<ProviderRuntimeReceiptV2, TrustError> {
+        identity.validate()?;
+        if nonce.iter().all(|byte| *byte == 0)
+            || expires_at <= issued_at
+            || expires_at
+                .checked_duration_since(issued_at)
+                .is_none_or(|duration| duration > MAX_PROVIDER_RESULT_RECEIPT_LIFETIME)
+        {
+            return Err(TrustError::InvalidProviderRuntimeReceipt);
+        }
+        let claims = ProviderRuntimeReceiptClaimsV2 {
+            version: PROVIDER_RUNTIME_RECEIPT_VERSION_V2,
+            identity,
+            issued_at_milliseconds: provider_result_milliseconds(self.clock_origin, issued_at)?,
+            expires_at_milliseconds: provider_result_milliseconds(self.clock_origin, expires_at)?,
+            nonce: encode_hex(&nonce),
+        };
+        let key_pair = Ed25519KeyPair::from_seed_unchecked(self.seed.as_ref())
+            .map_err(|_| TrustError::ProviderResultReceiptSealingUnavailable)?;
+        let signature = key_pair
+            .sign(&provider_runtime_receipt_signing_payload_v2(&claims)?)
+            .as_ref()
+            .try_into()
+            .map_err(|_| TrustError::ProviderResultReceiptSealingUnavailable)?;
+        Ok(ProviderRuntimeReceiptV2 { claims, signature })
+    }
+}
+
+pub struct ProviderRuntimeReceiptVerifierV2 {
+    public_key: [u8; ED25519_PUBLIC_KEY_BYTES],
+    clock_origin: Instant,
+}
+
+pub struct VerifiedProviderRuntimeReceiptV2 {
+    identity: ProviderRuntimeReceiptIdentityV2,
+    bytes: Vec<u8>,
+}
+
+impl VerifiedProviderRuntimeReceiptV2 {
+    pub fn identity(&self) -> &ProviderRuntimeReceiptIdentityV2 {
+        &self.identity
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+
+impl fmt::Debug for VerifiedProviderRuntimeReceiptV2 {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("VerifiedProviderRuntimeReceiptV2([SEALED])")
+    }
+}
+
+impl ProviderRuntimeReceiptVerifierV2 {
+    pub fn verify(
+        &self,
+        receipt: &ProviderRuntimeReceiptV2,
+        expected: &ProviderRuntimeReceiptIdentityV2,
+        now: Instant,
+    ) -> Result<VerifiedProviderRuntimeReceiptV2, TrustError> {
+        expected.validate()?;
+        UnparsedPublicKey::new(&ED25519, self.public_key)
+            .verify(
+                &provider_runtime_receipt_signing_payload_v2(&receipt.claims)?,
+                &receipt.signature,
+            )
+            .map_err(|_| TrustError::InvalidProviderRuntimeReceipt)?;
+        let now = provider_result_milliseconds(self.clock_origin, now)?;
+        if receipt.claims.identity != *expected
+            || now < receipt.claims.issued_at_milliseconds
+            || now >= receipt.claims.expires_at_milliseconds
+        {
+            return Err(TrustError::InvalidProviderRuntimeReceipt);
+        }
+        Ok(VerifiedProviderRuntimeReceiptV2 {
+            identity: receipt.claims.identity.clone(),
+            bytes: receipt.to_bytes()?,
+        })
+    }
+}
+
+fn provider_runtime_receipt_signing_payload_v2(
+    claims: &ProviderRuntimeReceiptClaimsV2,
+) -> Result<[u8; 32], TrustError> {
+    let claims =
+        serde_json::to_vec(claims).map_err(|_| TrustError::InvalidProviderRuntimeReceipt)?;
+    let mut digest = Sha256::new();
+    digest.update(PROVIDER_RUNTIME_RECEIPT_SIGNATURE_DOMAIN_V2);
+    digest.update((claims.len() as u64).to_le_bytes());
+    digest.update(claims);
+    Ok(digest.finalize().into())
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -5025,6 +5418,8 @@ pub enum TrustError {
     InvalidProviderInvocationIdentity,
     #[error("provider result receipt is invalid or does not match the invocation")]
     InvalidProviderResultReceipt,
+    #[error("provider runtime receipt is invalid, expired, or bound to another stream")]
+    InvalidProviderRuntimeReceipt,
     #[error("provider result receipt has expired")]
     ExpiredProviderResultReceipt,
     #[error("provider result receipt exceeds its bounded wire size")]
@@ -5384,7 +5779,10 @@ mod tests {
     use comfy_plugin_sdk::{
         ApiRequirement, ApiVersion, CachePolicy, CapabilityKind, CapabilityQuota,
         CapabilityRequest, DeterminismPolicy, EffectPolicy, ManifestProvenance, ManifestSignature,
-        PluginManifest, PluginNode, PluginSigningKey,
+        PROVIDER_BINDING_API_FEATURE, PROVIDER_BINDING_SCHEMA_VERSION, PROVIDER_COMPONENT_WORLD_V2,
+        PROVIDER_MANIFEST_SCHEMA_VERSION_V2, PROVIDER_STREAMING_API_FEATURE_V2, PluginManifest,
+        PluginNode, PluginSigningKey, ProviderBindingClaim, ProviderBindingSet,
+        ProviderHttpMethodV2, ProviderPluginManifestV2, ProviderStreamingContractV2,
     };
     use serde_json::json;
 
@@ -7400,6 +7798,64 @@ mod tests {
         Ok(manifest)
     }
 
+    fn signed_provider_plugin_v2() -> Result<ProviderPluginManifestV2, Box<dyn std::error::Error>> {
+        let endpoint = "https://provider.invalid/v2";
+        let mut manifest = signed_plugin(vec![capability(
+            CapabilityKind::NetworkProvider,
+            &format!("plugin.fixture|{endpoint}"),
+        )])?;
+        manifest.api.required_features.extend([
+            PROVIDER_BINDING_API_FEATURE.to_owned(),
+            PROVIDER_STREAMING_API_FEATURE_V2.to_owned(),
+        ]);
+        manifest.nodes[0].determinism = DeterminismPolicy::External;
+        manifest.nodes[0].cache = CachePolicy::Never;
+        manifest.nodes[0].effects = EffectPolicy::Provider;
+        let mut binding = ProviderBindingSet {
+            schema_version: PROVIDER_BINDING_SCHEMA_VERSION,
+            implementation_namespace: manifest.identifier.clone(),
+            bindings_sha256: "0".repeat(64),
+            bindings: vec![ProviderBindingClaim {
+                feature_id: "COMFY-NODE-0001".to_owned(),
+                node_id: manifest.nodes[0].id.clone(),
+                contract_sha256: "3".repeat(64),
+                transport_schema: "zed:comfy-provider-transport@1".parse()?,
+                materializer_schema: "zed:comfy-provider-materializer@1".parse()?,
+            }],
+        };
+        binding.bindings_sha256 = binding.canonical_bindings_sha256()?;
+        manifest.provider_binding = Some(binding);
+        manifest.signature.value = signing_key()?.sign_manifest(&manifest)?;
+        let mut provider = ProviderPluginManifestV2 {
+            schema_version: PROVIDER_MANIFEST_SCHEMA_VERSION_V2,
+            component_world: PROVIDER_COMPONENT_WORLD_V2.to_owned(),
+            manifest,
+            streaming: ProviderStreamingContractV2 {
+                methods: vec![ProviderHttpMethodV2::Post],
+                maximum_headers: 8,
+                maximum_header_bytes: 1_024,
+                maximum_request_body_bytes: 1_024,
+                maximum_response_body_bytes: 1_024,
+                maximum_chunk_bytes: 256,
+                maximum_ndjson_line_bytes: 256,
+                maximum_wait_milliseconds: 1_000,
+                maximum_uploads: 0,
+                maximum_upload_body_bytes: 0,
+                maximum_cost_requests: 0,
+                maximum_progress_total: 100,
+                uploads: false,
+                cost_requests: false,
+            },
+            signature: ManifestSignature {
+                algorithm: PLUGIN_SIGNATURE_ALGORITHM.to_owned(),
+                key_id: signing_key()?.key_id().to_owned(),
+                value: "0".repeat(ED25519_SIGNATURE_BYTES * 2),
+            },
+        };
+        provider.signature.value = signing_key()?.sign_provider_manifest_v2(&provider)?;
+        Ok(provider)
+    }
+
     fn trust_policy() -> Result<PluginTrustPolicy, TrustError> {
         let signing_key = signing_key()?;
         PluginTrustPolicy::new([PluginVerificationKey::new(
@@ -7453,6 +7909,62 @@ mod tests {
                 }
             ])))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn provider_v2_trust_requires_valid_inner_and_outer_signatures()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let endpoint = "https://provider.invalid/v2";
+        let permissions = permission_policy(CapabilitySet::new([Capability::ProviderNetwork {
+            provider: "plugin.fixture".to_owned(),
+            endpoint: endpoint.to_owned(),
+        }]))?;
+        let trust = trust_policy()?;
+        let manifest = signed_provider_plugin_v2()?;
+        let authorized = trust.authorize_provider_manifest_v2(&manifest, &permissions)?;
+
+        let mut changed_streaming = manifest.clone();
+        changed_streaming.streaming.maximum_response_body_bytes += 1;
+        assert_eq!(
+            trust.authorize_provider_manifest_v2(&changed_streaming, &permissions),
+            Err(TrustError::InvalidPluginSignature)
+        );
+
+        let mut invalid_inner = manifest.clone();
+        let replacement = if invalid_inner.manifest.signature.value.starts_with('f') {
+            "e"
+        } else {
+            "f"
+        };
+        invalid_inner
+            .manifest
+            .signature
+            .value
+            .replace_range(0..1, replacement);
+        invalid_inner.signature.value = signing_key()?.sign_provider_manifest_v2(&invalid_inner)?;
+        assert_eq!(
+            trust.authorize_provider_manifest_v2(&invalid_inner, &permissions),
+            Err(TrustError::InvalidPluginSignature)
+        );
+
+        let mut unknown_outer_key = manifest.clone();
+        unknown_outer_key.signature.key_id = "unknown.key".to_owned();
+        assert!(matches!(
+            trust.authorize_provider_manifest_v2(&unknown_outer_key, &permissions),
+            Err(TrustError::UnknownVerificationKey(key)) if key == "unknown.key"
+        ));
+
+        let mut resigned_streaming = manifest;
+        resigned_streaming.streaming.maximum_response_body_bytes += 1;
+        resigned_streaming.signature.value =
+            signing_key()?.sign_provider_manifest_v2(&resigned_streaming)?;
+        let resigned = trust.authorize_provider_manifest_v2(&resigned_streaming, &permissions)?;
+        assert_ne!(
+            authorized.outer_signing_payload_sha256(),
+            resigned.outer_signing_payload_sha256()
+        );
+        assert_eq!(authorized.provider_binding(), resigned.provider_binding());
         Ok(())
     }
 
