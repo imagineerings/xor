@@ -3124,7 +3124,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 40. Port pairing into canonical credential storage
 
-  - [ ] 40.1. Port NIP-AB pairing cryptography and session codec
+  - [x] 40.1. Port NIP-AB pairing cryptography and session codec
     - Implement QR/session, expiry, replay and encrypted transfer primitives independently of transport/storage.
     - _Requirements: 5.1, 16.1_
     - _Capability IDs: CAP-033_
@@ -3132,6 +3132,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-core/src/pairing/**, projects/buzz/docs/nips/NIP-AB.md_
     - _Writes: crates/nostr_compat/src/pairing.rs_
     - _Validation: vectors cover round trip, wrong secret, expiry, replay, corrupted QR and version mismatch_
+    - _Discovered contradiction (2026-08-24): the planned Buzz documentation path does not exist; its authoritative NIP-AB document is colocated at `projects/buzz/crates/buzz-core/src/pairing/NIP-AB.md`. The planned single-file write also omits module registration and secret-zeroization dependency metadata. The narrow correction reads the colocated specification, registers the module, adds `zeroize` to the protocol boundary allowlist/manifest and records the existing workspace package edge; no transport, storage or credential authority is introduced._
+    - _Evidence: 2026-08-24 — added a pure NIP-AB v1 source/target state machine and bounded QR/encrypted-frame codec. QR admission requires a lowercase x-only public key, nonzero 32-byte secret, at most four unique credential-free `ws`/`wss` relays, 2,048-byte total bound and explicit/default version 1. Fixed-vector HKDF derives Buzz's exact session ID; secp256k1 ECDH plus the QR secret derives the six-digit SAS and source/target-ordered transcript hash, and NIP-44 v2 encrypts every offer, SAS confirmation, ≤64 KiB payload, completion and abort body. Caller-provided nonzero frame IDs and timestamps keep the codec deterministic and transport-free. Exact 120-second expiry, recipient/peer/future-time/ciphertext checks, bounded processed-frame replay fencing, strict role/state transitions and terminal states fail closed without advancing on wrong secret, version, transcript, order or duplicate input. QR/session/ECDH/received payload bytes are zeroized, while custom diagnostics omit session secrets, ciphertext and payload. Six focused tests pass the named encrypted round trip plus fixed derivation vector, wrong secret, exact expiry, public replay path, corrupt QR matrix and QR/offer version mismatch; warning-denied all-target `nostr_compat` Clippy passes. Formatting, diff, dependency, inventory and canonical specification gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 40.2. Implement the ephemeral pairing relay
     - Relay bounded opaque session frames with expiry and no durable identity authority.
