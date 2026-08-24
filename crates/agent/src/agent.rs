@@ -11,6 +11,7 @@ pub mod memory;
 mod native_agent_server;
 pub mod outline;
 mod pattern_extraction;
+pub mod remote_provider_config;
 mod sandboxing;
 #[cfg(feature = "multiplayer-tools")]
 pub mod snapshot;

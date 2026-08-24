@@ -723,6 +723,13 @@ struct AgentProviderRedactor {
 impl AgentProviderRedactor {
     fn from_request(request: &Value) -> Self {
         let mut secrets = BTreeSet::new();
+        for pointer in ["/agent/private_key_nsec", "/agent/auth_tag"] {
+            if let Some(value) = request.pointer(pointer).and_then(Value::as_str)
+                && value.len() >= 4
+            {
+                secrets.insert(value.to_owned());
+            }
+        }
         for pointer in [
             "/agent/env_vars",
             "/agent/launch/env",
@@ -904,6 +911,8 @@ mod tests {
         let request = json!({
             "op": "deploy",
             "agent": {
+                "private_key_nsec": "raw-identity-secret",
+                "auth_tag": "authorization-secret",
                 "env_vars": {"API_TOKEN": "long-env-secret"},
                 "launch": {
                     "env": {"OTHER": "overlapping-secret-value"},
@@ -912,7 +921,7 @@ mod tests {
             }
         });
         let redactor = AgentProviderRedactor::from_request(&request);
-        let stdout = br#"{"ok":false,"error":"long-env-secret nsec1private sprt_tok_hidden overlapping-secret-value"}"#;
+        let stdout = br#"{"ok":false,"error":"raw-identity-secret authorization-secret long-env-secret nsec1private sprt_tok_hidden overlapping-secret-value"}"#;
         let error = parse_agent_provider_response(
             &candidate,
             AgentProviderOperation::Deploy,
@@ -923,6 +932,8 @@ mod tests {
         )
         .expect_err("provider failure should remain a failure");
         let diagnostic = error.to_string();
+        assert!(!diagnostic.contains("raw-identity-secret"));
+        assert!(!diagnostic.contains("authorization-secret"));
         assert!(!diagnostic.contains("long-env-secret"));
         assert!(!diagnostic.contains("nsec1private"));
         assert!(!diagnostic.contains("sprt_tok_hidden"));
