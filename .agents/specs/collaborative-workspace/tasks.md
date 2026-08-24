@@ -2713,7 +2713,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 35. Port audit chains and usage accounting
 
-  - [ ] 35.1. Implement canonical audit-entry hashing
+  - [x] 35.1. Implement canonical audit-entry hashing
     - Canonicalize redacted entries and link per-community hashes under a single writer invariant.
     - _Requirements: 13.4, 19.2_
     - _Capability IDs: CAP-028_
@@ -2721,6 +2721,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-audit/**, projects/buzz/crates/buzz-datastore-tracing/**_
     - _Writes: crates/collaboration_domain/src/audit.rs_
     - _Validation: hash vectors cover canonical ordering, redaction, mutation detection and chain bridge_
+    - _Discovered contradiction (2026-08-24): the planned single-file write cannot expose the new domain owner or compile its SHA-256 implementation without registering the module, dependency and lockfile. The narrow correction adds only the crate-root module/re-exports, the existing workspace `sha2` dependency and its audited domain allowlist entry; it adds no storage, transport, GPUI or second audit owner._
+    - _Evidence: 2026-08-24 — added a domain-separated SHA-256 audit preimage binding community, sequence, stable operation ID, bounded action, optional canonical principal, closed outcome, millisecond timestamp, sorted typed fields and a distinct genesis/native/imported predecessor. Field constructors and validated deserializers enforce unique canonical ordering, bounded values and structural redaction for sensitive field classes; identifiers remain redacted in diagnostics and arbitrary payload strings are not representable. Explicit Buzz-v1 head bridges preserve imported sequence/head identity for the next canonical entry, while stored entries must reproduce their hash before they can advance the chain. Five focused tests pass the pinned 32-byte vector, reordered input, constructor/deserializer redaction, canonical mutations, corrupt-entry fencing, imported-head mutation and ambiguous/bounded input cases. The complete collaboration-domain suite passes 158/158, warning-denied release/all-target Clippy passes, and the collaboration dependency boundary reports a clean domain-only graph. Formatting, diff hygiene and canonical specification validation are recorded in the enclosing checkpoint commit._
 
   - [ ] 35.2. Add audit-chain persistence schema
     - Create immutable entry, per-community head and export-cursor tables.
