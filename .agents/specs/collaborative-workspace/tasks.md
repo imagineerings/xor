@@ -2781,7 +2781,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 36. Port moderation and administration
 
-  - [ ] 36.1. Define report, mute, ban and timeout state machines
+  - [x] 36.1. Define report, mute, ban and timeout state machines
     - Model personal mute separately from role-gated reports, bans, timeouts and resolution.
     - _Requirements: 15.1, 15.4_
     - _Capability IDs: CAP-029_
@@ -2789,6 +2789,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/VISION_MODERATION.md, projects/buzz/crates/buzz-db/src/moderation.rs_
     - _Writes: crates/collaboration_domain/src/moderation.rs_
     - _Validation: state tests cover report, resolve, timeout expiry, ban, personal mute and stale actor_
+    - _Discovered contradiction (2026-08-24): the planned single-file write cannot register the new domain module or keep the canonical design and task evidence synchronized. The narrow correction also updates `crates/collaboration_domain/src/collaboration_domain.rs` and this specification pack; it adds no persistence, enforcement adapter, audit writer, archive behavior or notice delivery owned by later leaves._
+    - _Evidence: 2026-08-24 — added separate report, community-restriction and personal-mute aggregates. Reports accept only current scoped members, closed reasons and typed event/principal/blob targets; optional private context is bounded and redacted from diagnostics, resolution is owner/admin-only and exact retries are idempotent. Ban and timeout transitions retain stable operation/actor/time attribution and contiguous versions while remaining independently active, so timeout expiry cannot hide a permanent ban. Current target versions, owner protection and administrator peer protection fail closed. Personal mutes are member-owned state and cannot create or alter community restrictions. Rehydration validates report, restriction and mute histories. Five focused state tests cover report filing/resolution/retry/redaction, timeout expiry plus ban independence, protected targets, personal-mute separation and stale actor/target membership. The complete domain suite passed 163/163 and warning-denied release Clippy passed. Formatting, diff hygiene, collaboration dependency boundaries, the 352-leaf inventory gate and canonical feature-spec validation passed._
 
   - [ ] 36.2. Persist moderation and archive records
     - Add tenant-fenced reports, actions, resolutions and identity/community archive state with provenance.
