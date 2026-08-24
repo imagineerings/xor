@@ -9636,14 +9636,18 @@ def native_model_transform_foundation_task(
         "Clone, merge, patch, and export executable native models",
         [4, 6, 7, 18, 26, 31, 34, 35, 37, 38, 41, 44],
         [8, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
-        ["VAL-MODEL-FAMILY-001", "VAL-SAMPLER-001", "VAL-NODE-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
-        "Create one canonical immutable model transformation boundary over retained family resources. It supports keyed state enumeration, source prefix-routed two-model merges, LoRA and hypernetwork application, exact MODEL/CLIP/VAE/LoRA safetensors export, and a serializable execution-hook graph for CFG, post-CFG, attention, context-window, output-block, sampling-profile, ROPE, model-function, and diffusion wrappers. Rebinding returns a new NativeDiffusionPayload while preserving compatible conditioning and patch identities; family leaves only project parameters into this owner.",
+        ["VAL-MODEL-FAMILY-001", "VAL-CLIP-001", "VAL-PATCH-001", "VAL-SAMPLER-001", "VAL-NODE-001", "VAL-MEMORY-001", "VAL-CANCEL-001", "VAL-RECOVERY-005", "VAL-OWNERSHIP-001"],
+        "Create one canonical immutable model transformation boundary over retained family resources. It supports keyed state enumeration, source prefix-routed two-model merges, explicit scale-only MODEL and CLIP operations, LoRA and hypernetwork application, exact MODEL/CLIP/VAE/LoRA safetensors export, and a serializable execution-hook graph for CFG, post-CFG, attention, context-window, output-block, sampling-profile, ROPE, model-function, and diffusion wrappers. Rebinding returns a new NativeDiffusionPayload while preserving compatible conditioning and patch identities; family leaves only project parameters into this owner.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_model_merging.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_model_merging_model_specific.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_model_advanced.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_context_windows.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_attention_multiply.py",
+            "projects/comfy/ComfyUI/comfy/model_patcher.py",
+            "projects/comfy/ComfyUI/comfy/lora.py",
             "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/clip.rs",
             "crates/comfy_model/src/patch_graph.rs",
             "crates/comfy_model/src/patches.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
@@ -9651,6 +9655,7 @@ def native_model_transform_foundation_task(
         ],
         [
             "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/clip.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/patch_graph.rs",
             "crates/comfy_model/src/patches.rs",
@@ -9668,7 +9673,7 @@ def native_model_transform_foundation_task(
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
         ],
-        "Source-derived fixtures prove exact longest-prefix merge ratios, simple and subtract merges, adapter bypass behavior, wrapper and hook ordering, attempt-scoped RNG, context windows, CFG and sampling replacements, and byte-exact safetensors exports with metadata. Transforms preserve family, conditioning, allocation, patch, cache, and persistence identities and are cancellable and atomic; invalid cross-family merges, unavailable keys, incompatible hooks, OOM, cancellation, export failure, and restart publish no model or effect. Repository scans find no leaf-owned patch engine, hook graph, state exporter, or clone/rebind implementation.",
+        "Source-derived fixtures prove exact longest-prefix merge ratios, simple and subtract merges, adapter bypass behavior, wrapper and hook ordering, attempt-scoped RNG, context windows, CFG and sampling replacements, and byte-exact safetensors exports with metadata. Exact keyed MODEL and CLIP enumeration supports ordered suffix and contains/exclude selectors and source `strength_patch=0` plus `strength_model=scale` as an explicit scale-only operation with zero patch-tensor residency. Immutable rebinding covers every source-reachable CLIP-role payload or rejects it typed, preserves existing ordered patch graphs and compatible conditioning, and binds selector, match set, order, scale, alias-aware residency, cache, persistence, and restart identity. Transforms preserve family, conditioning, allocation, patch, cache, and persistence identities and are cancellable and atomic; invalid cross-family merges, unavailable keys, incompatible hooks, OOM, cancellation, export failure, and restart publish no model or effect. Repository scans find no leaf-owned patch engine, hook graph, state exporter, keyed state enumerator, or clone/rebind implementation.",
         [dependency, model_dependency],
         locked=True,
         feature_scoped=True,
@@ -16443,6 +16448,13 @@ def node_tasks(
                     sampler_payload_dependency,
                     sampling_profile_dependency,
                 ])
+            if {
+                "COMFY-NODE-0057",
+                "COMFY-NODE-0704",
+                "COMFY-NODE-0706",
+                "COMFY-NODE-0707",
+            }.intersection(feature_ids):
+                task_dependencies.append(model_transform_dependency)
             if "COMFY-NODE-0160" in feature_ids:
                 task_dependencies.extend([
                     asset_directory_snapshot_dependency,
@@ -16593,6 +16605,29 @@ def node_tasks(
                     "VAL-OWNERSHIP-001",
                 ])
                 task_done += " Differential mask, Flux stateful KV/input cleanup, FreSca, Mahiro, PerpNeg, SAG, and deprecated CFG hooks delegate to the persistent canonical model-transform and guidance owners; regular and alternative Euler CFG++ delegate to the canonical sampler algorithm owner; LoraSave delegates keyed MODEL/CLIP diff extraction and atomic safetensors preparation to the retained model-transform/output owners. The leaf owns only exact parameter projection, LatentBlend tensor choreography, descriptors, and fixtures."
+            if {
+                "COMFY-NODE-0057",
+                "COMFY-NODE-0704",
+                "COMFY-NODE-0706",
+                "COMFY-NODE-0707",
+            }.intersection(feature_ids):
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_attention_multiply.py",
+                    "projects/comfy/ComfyUI/comfy/model_patcher.py",
+                    "projects/comfy/ComfyUI/comfy/lora.py",
+                    "crates/comfy_model/src/model_family.rs",
+                    "crates/comfy_model/src/clip.rs",
+                ])
+                task_validations.extend([
+                    "VAL-MODEL-FAMILY-001",
+                    "VAL-CLIP-001",
+                    "VAL-PATCH-001",
+                    "VAL-CANCEL-001",
+                    "VAL-MEMORY-001",
+                    "VAL-RECOVERY-005",
+                    "VAL-OWNERSHIP-001",
+                ])
+                task_done += " AttentionMultiply, CLIPAttentionMultiply, and UNetTemporalAttentionMultiply delegate exact keyed MODEL and CLIP cloning and rebinding to the canonical model-transform owner. The owner preserves the existing ordered patch graph and immutable input, expresses source `strength_patch=0` plus `strength_model=scale` as an explicit scale-only operation with zero patch-tensor residency, and binds selector, match set, order, scale, cache, persistence, restart, cancellation, and atomic failure identity. Every source-reachable CLIP-role payload is transformed exactly or rejected typed; the leaf may not narrow support to NativeClipResource or implement a second keyed state enumerator."
             if "COMFY-NODE-0680" in feature_ids:
                 task_reads.extend([
                     "projects/comfy/ComfyUI/comfy_extras/nodes_torch_compile.py",

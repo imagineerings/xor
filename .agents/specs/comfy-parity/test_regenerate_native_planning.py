@@ -4020,6 +4020,9 @@ class ValidationGenerationTests(unittest.TestCase):
         image_part_two_id = "comfy-parity-native-nodes-image-comfy-node-0586"
         experimental_hooks_id = "comfy-parity-native-nodes-experimental-comfy-node-0133"
         experimental_compile_id = "comfy-parity-native-nodes-experimental-comfy-node-0680"
+        attention_multiply_id = (
+            "comfy-parity-native-nodes-experimental-attention-experiments-comfy-node-0057"
+        )
         model_transform_id = "comfy-parity-native-model-transform-foundation"
         sampler_payload_id = "comfy-parity-native-sampler-payload-algorithm-foundation"
         sampling_profile_id = "comfy-parity-native-sampling-profile-guidance-foundation"
@@ -4092,6 +4095,58 @@ class ValidationGenerationTests(unittest.TestCase):
         ):
             self.assertIn(source, tasks_by_id[experimental_hooks_id]["reads"])
         self.assertIn("Euler CFG++", tasks_by_id[experimental_hooks_id]["done"])
+        self.assertIn(
+            model_transform_id, tasks_by_id[attention_multiply_id]["dependencies"]
+        )
+        model_transform = tasks_by_id[model_transform_id]
+        for source in (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_attention_multiply.py",
+            "projects/comfy/ComfyUI/comfy/model_patcher.py",
+            "projects/comfy/ComfyUI/comfy/lora.py",
+            "crates/comfy_model/src/clip.rs",
+        ):
+            self.assertIn(source, model_transform["reads"])
+        self.assertIn("crates/comfy_model/src/clip.rs", model_transform["writes"])
+        for validation in (
+            "VAL-CLIP-001",
+            "VAL-PATCH-001",
+            "VAL-MEMORY-001",
+            "VAL-RECOVERY-005",
+        ):
+            self.assertIn(validation, model_transform["validations"])
+        for contract in (
+            "explicit scale-only operation",
+            "zero patch-tensor residency",
+            "every source-reachable CLIP-role payload",
+            "selector, match set, order, scale",
+        ):
+            self.assertIn(contract, model_transform["done"])
+        for source in (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_attention_multiply.py",
+            "projects/comfy/ComfyUI/comfy/model_patcher.py",
+            "projects/comfy/ComfyUI/comfy/lora.py",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/patch_graph.rs",
+            "crates/comfy_model/src/clip.rs",
+        ):
+            self.assertIn(source, tasks_by_id[attention_multiply_id]["reads"])
+        self.assertIn(
+            "explicit scale-only operation",
+            tasks_by_id[attention_multiply_id]["done"],
+        )
+        self.assertIn(
+            "Every source-reachable CLIP-role payload",
+            tasks_by_id[attention_multiply_id]["done"],
+        )
+        self.assertIn(
+            "may not narrow support to NativeClipResource",
+            tasks_by_id[attention_multiply_id]["done"],
+        )
+        for validation in ("VAL-CLIP-001", "VAL-PATCH-001"):
+            self.assertIn(
+                validation, tasks_by_id[attention_multiply_id]["validations"]
+            )
         self.assertIn(compile_bridge_id, tasks_by_id[experimental_compile_id]["dependencies"])
         self.assertIn(
             "projects/comfy/ComfyUI/comfy_extras/nodes_torch_compile.py",
