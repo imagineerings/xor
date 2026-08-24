@@ -9760,34 +9760,36 @@ def native_compile_policy_bridge_foundation_task(
     )
 
 
-def native_audio_empty_segment_foundation_task(dependency: str) -> dict[str, object]:
+def native_audio_empty_segment_foundation_task(
+    dependency: str, audio_encoder_dependency: str
+) -> dict[str, object]:
     return task(
         "comfy-parity-native-audio-empty-segment-foundation",
         "Represent source-valid zero-sample native audio segments",
         [4, 6, 7, 31, 34, 36, 37, 38, 41, 44],
         [8, 20, 25, 26, 29, 31, 32, 33, 34, 39, 41],
         ["VAL-NODE-001", "VAL-MEMORY-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
-        "Extend the canonical audio payload to admit source-valid waveform tensors whose sample axis is zero while preserving nonzero batch and channel axes, sample rate, semantic digest, residency, persistence, and downstream safety. Every audio consumer must either process the empty segment exactly or return a typed source-compatible unsupported-domain failure before indexing or allocation.",
+        "Extend the canonical audio payload to admit finite contiguous F32 waveform tensors whose sample axis is zero and source-valid sample rates from 1 through 384000 while preserving nonzero batch and channel axes, semantic digest, residency, persistence, and downstream safety. Every audio consumer must either process that expanded domain exactly or return a typed source-compatible unsupported-domain failure before indexing or allocation.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_wandancer.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_audio.py",
             "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_model/src/audio_encoder.rs",
             "crates/comfy_nodes/src/stored_payload.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
         ],
         [
             "crates/comfy_media/src/native_node_payload.rs",
-            "crates/comfy_media/src/comfy_media.rs",
-            "crates/comfy_nodes/src/stored_payload.rs",
-            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_model/src/audio_encoder.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "A canonical one-second waveform sliced beyond its duration produces shape [1,1,0], round-trips through handles, persistence, cache, restart, and list outputs, and is accepted by safe downstream nodes without panic. Zero batch or channel axes, invalid rates, malformed storage, stale handles, OOM, and cancellation still fail atomically; digests distinguish empty segments by full descriptor and rate, and no padded one-sample substitute is introduced.",
-        dependency,
+        "EmptyAudio duration zero and a canonical one-second waveform sliced beyond its duration produce shape [1,1,0]; sample rates 1, 192000, and the canonical carrier cap 384000 are retained exactly. Those payloads round-trip through handles, persistence, cache, restart, and list outputs and are accepted by safe downstream nodes without panic. Zero batch or channel axes, rate zero or above 384000, nonfinite nonempty or malformed storage, stale handles, OOM, and cancellation still fail atomically; digests and residency distinguish empty segments by full descriptor, channels, and rate, and no padded one-sample substitute is introduced. Every existing consumer is audited: safe consumers process empty payloads, while NativeAudioEncoder::encode retains its source-specific stricter pre-resample sample-count and rate admission as a typed invocation failure rather than narrowing the canonical AUDIO carrier.",
+        [dependency, audio_encoder_dependency],
         locked=True,
         feature_scoped=True,
         criterion_ids=["6.3", "7.2", "31.5", "34.2", "36.4", "37.3", "38.3", "41.2", "44.3"],
-        registered_source_edits=["comfy_media", "comfy_nodes", "comfy_runtime", "comfy_test_support"],
+        registered_source_edits=["comfy_media", "comfy_model", "comfy_test_support"],
     )
 
 
@@ -9796,7 +9798,7 @@ def native_audio_output_codec_effect_foundation_task(
 ) -> dict[str, object]:
     return task(
         "comfy-parity-native-audio-output-codec-effect-foundation",
-        "Encode and publish native FLAC, MP3, and Opus audio outputs",
+        "Decode, encode, and publish native audio assets",
         [4, 6, 7, 19, 28, 31, 32, 34, 36, 37, 41, 42, 44],
         [8, 17, 18, 19, 20, 27, 28, 29, 30, 32, 34, 36, 39, 41],
         [
@@ -9807,25 +9809,27 @@ def native_audio_output_codec_effect_foundation_task(
             "VAL-MEMORY-001",
             "VAL-OWNERSHIP-001",
         ],
-        "Add one checked native audio codec/effect service for the source SaveAudioFLAC, SaveAudioMP3, and SaveAudioOpus nodes, reusing the retained codec boundary and canonical output committer rather than accepting pre-encoded bytes or leaf-local containers.",
+        "Extend one checked retained native audio codec/effect service with source-exact first-audio-stream decoding for LoadAudio and RecordAudio and FLAC, MP3, and Opus encoding for preview and save nodes, reusing the retained codec actor and canonical output committer rather than accepting pre-encoded bytes or leaf-local containers.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_audio.py",
             "projects/comfy/ComfyUI/comfy_api/latest/_ui.py",
             "crates/comfy_media/src/metadata.rs",
             "crates/comfy_media/src/native_node_payload.rs",
             "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
             "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/executor.rs",
             "crates/comfy_runtime/src/output_committer.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
         ],
         [
-            "Cargo.lock",
-            "crates/comfy_media/Cargo.toml",
             "crates/comfy_media/src/audio.rs",
             "crates/comfy_media/src/comfy_media.rs",
             "crates/comfy_nodes/src/execution.rs",
-            "crates/comfy_runtime/Cargo.toml",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
             "crates/comfy_runtime/src/native_audio_codec_service.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
             "crates/comfy_runtime/src/executor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_runtime/src/comfy_runtime.rs",
@@ -9835,7 +9839,7 @@ def native_audio_output_codec_effect_foundation_task(
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
         ],
-        "A sealed format and quality plan preserves per-batch FLAC, libmp3lame V0/128k/320k, and Opus 64/96/128/192/320k selection, source Opus sample-rate promotion and canonical resampling, mono/stereo admission, prompt and extra metadata suppression/inclusion, deterministic filename counters, bounded encode/drain/flush bytes, returned AUDIO alias identity, and ordered UI output. Independently decoded golden outputs prove headers, codec, sample rate, sample count, channel count, quality selection, and metadata. Cancellation, codec, size, effect, commit, retry, and restart failures leave zero partial files or UI state, and leaf nodes own no codec, container, metadata, path, counter, or publication implementation.",
+        "Bounded path-free verified bytes and their content digest select the first audio stream, decode every frame in order, preserve planar or interleaved channel orientation, convert float samples exactly and signed 16-bit or signed 32-bit PCM by the source scale, and publish canonical CPU F32 [1,C,T] AUDIO with the decoded sample rate. Hermetic audio and video-container fixtures prove stream precedence, multi-frame concatenation, channel layout, rate, sample count, and digest; no-stream, no-frame, malformed, unsupported, truncated, oversize, OOM, cancellation, service-unavailable, and restart failures publish nothing. The same sealed service preserves per-batch FLAC, libmp3lame V0/128k/320k, and Opus 64/96/128/192/320k selection, FLAC preview/output namespace, source Opus sample-rate promotion and canonical resampling, mono/stereo admission, prompt and extra metadata suppression/inclusion, deterministic filename counters, bounded encode/drain/flush bytes, returned AUDIO alias identity, ordered UI output, and transactional rollback/retry/restart. Node leaves own no codec, container, filesystem path, metadata, counter, or publication implementation.",
         [
             audio_dependency,
             codec_dependency,
@@ -15876,6 +15880,11 @@ def node_tasks(
                     detection_dependency,
                     media_text_dependency,
                 ])
+            if "COMFY-NODE-0009" in feature_ids:
+                task_dependencies.extend([
+                    audio_empty_segment_dependency,
+                    audio_output_codec_dependency,
+                ])
             if category == "model/sampling":
                 task_dependencies.extend(
                     [sampler_payload_dependency, sampling_profile_dependency]
@@ -15979,6 +15988,8 @@ def node_tasks(
                 f"crates/comfy_test_support/fixtures/nodes/{slug(category)}-{anchor}",
             ]
             task_done = f"Every exactly assigned feature row ({exact_assignments}) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed."
+            if "COMFY-NODE-0009" in feature_ids:
+                task_done += " LoadAudio and RecordAudio delegate verified-byte first-stream decoding to the retained input codec service; PreviewAudio and SaveAudio delegate FLAC encoding, metadata, effects, and publication to the retained output codec service; EmptyAudio preserves duration-zero and 1-through-192000-Hz payloads. The leaf owns only schemas, checked choreography, and tensor composition."
             task_validations = ["VAL-NODE-001", "VAL-NODE-002", "VAL-NODE-CLOSURE-001"]
             task_designs = [8, 20, 25, 29, 30, 31, 32, 33, 34, 39, 40]
             task_locked = False
@@ -16884,8 +16895,14 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         str(sampling_profile_guidance_foundation["id"]),
         str(model_transform_foundation["id"]),
     )
+    audio_encoder_resource_foundation = next(
+        item
+        for item in model_resource_precursors
+        if item["id"] == "comfy-parity-native-audio-encoder-resource-foundation"
+    )
     audio_empty_segment_foundation = native_audio_empty_segment_foundation_task(
-        str(compile_policy_bridge_foundation["id"])
+        str(compile_policy_bridge_foundation["id"]),
+        str(audio_encoder_resource_foundation["id"])
     )
     node_provider_foundation = native_node_provider_invocation_foundation_task(
         str(audio_empty_segment_foundation["id"])

@@ -1064,6 +1064,7 @@ class ValidationGenerationTests(unittest.TestCase):
         image_filter_id = "comfy-parity-native-nodes-image-filters-comfy-node-0045"
         image_transform_id = "comfy-parity-native-nodes-image-transform-comfy-node-0047"
         structured_transform_id = "comfy-parity-native-nodes-image-transform-comfy-node-0541"
+        audio_core_node_id = "comfy-parity-native-nodes-audio-comfy-node-0009"
         audio_output_node_id = "comfy-parity-native-nodes-audio-comfy-node-0589"
         audio_empty_segment_id = "comfy-parity-native-audio-empty-segment-foundation"
         audio_output_codec_id = "comfy-parity-native-audio-output-codec-effect-foundation"
@@ -2833,11 +2834,54 @@ class ValidationGenerationTests(unittest.TestCase):
                 media_text_id,
             ],
         )
+        self.assertEqual(
+            tasks_by_id[audio_empty_segment_id]["dependencies"],
+            [
+                "comfy-parity-native-compile-policy-bridge-foundation",
+                "comfy-parity-native-audio-encoder-resource-foundation",
+            ],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/audio_encoder.rs",
+            tasks_by_id[audio_empty_segment_id]["writes"],
+        )
+        self.assertIn("1 through 384000", tasks_by_id[audio_empty_segment_id]["outcome"])
+        self.assertIn("[1,1,0]", tasks_by_id[audio_empty_segment_id]["done"])
+        self.assertIn(audio_empty_segment_id, dependencies[audio_core_node_id])
+        self.assertIn(audio_output_codec_id, dependencies[audio_core_node_id])
+        self.assertLess(
+            tasks.index(tasks_by_id[audio_empty_segment_id]),
+            tasks.index(tasks_by_id[audio_output_codec_id]),
+        )
+        self.assertLess(
+            tasks.index(tasks_by_id[audio_output_codec_id]),
+            tasks.index(tasks_by_id[audio_core_node_id]),
+        )
+        self.assertIn(
+            "crates/comfy_media/src/audio.rs",
+            tasks_by_id[audio_core_node_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_runtime/src/native_audio_codec_service.rs",
+            tasks_by_id[audio_core_node_id]["reads"],
+        )
+        self.assertIn(
+            "first-stream decoding",
+            tasks_by_id[audio_core_node_id]["done"],
+        )
         self.assertIn(audio_empty_segment_id, dependencies[audio_output_node_id])
         self.assertIn(audio_output_codec_id, dependencies[audio_output_node_id])
         self.assertIn(
             "crates/comfy_runtime/src/native_audio_codec_service.rs",
             tasks_by_id[audio_output_codec_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            tasks_by_id[audio_output_codec_id]["writes"],
+        )
+        self.assertIn(
+            "first audio stream",
+            tasks_by_id[audio_output_codec_id]["done"],
         )
         self.assertIn(
             "FLAC, libmp3lame V0/128k/320k, and Opus",
