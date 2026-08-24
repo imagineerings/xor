@@ -3,6 +3,9 @@
 
 mod bindings;
 
+#[cfg(feature = "collaboration")]
+pub mod collaboration;
+
 #[cfg(target_os = "macos")]
 pub mod core_media {
     #![allow(non_snake_case)]
@@ -33,16 +36,17 @@ pub mod core_media {
     impl_CFTypeDescription!(CMSampleBuffer);
 
     impl CMSampleBuffer {
-        pub fn attachments(&self) -> Vec<CFDictionary<CFString>> {
+        pub fn attachments(&self) -> Result<Vec<CFDictionary<CFString>>> {
             unsafe {
                 let attachments =
                     CMSampleBufferGetSampleAttachmentsArray(self.as_concrete_TypeRef(), true);
-                CFArray::<CFDictionary>::wrap_under_get_rule(attachments)
+                anyhow::ensure!(!attachments.is_null(), "sample attachments are unavailable");
+                Ok(CFArray::<CFDictionary>::wrap_under_get_rule(attachments)
                     .into_iter()
                     .map(|attachments| {
                         CFDictionary::wrap_under_get_rule(attachments.as_concrete_TypeRef())
                     })
-                    .collect()
+                    .collect())
             }
         }
 
@@ -77,19 +81,19 @@ pub mod core_media {
             }
         }
 
-        pub fn format_description(&self) -> CMFormatDescription {
+        pub fn format_description(&self) -> Result<CMFormatDescription> {
             unsafe {
-                CMFormatDescription::wrap_under_get_rule(CMSampleBufferGetFormatDescription(
-                    self.as_concrete_TypeRef(),
-                ))
+                let description = CMSampleBufferGetFormatDescription(self.as_concrete_TypeRef());
+                anyhow::ensure!(!description.is_null(), "sample format is unavailable");
+                Ok(CMFormatDescription::wrap_under_get_rule(description))
             }
         }
 
-        pub fn data(&self) -> CMBlockBuffer {
+        pub fn data(&self) -> Result<CMBlockBuffer> {
             unsafe {
-                CMBlockBuffer::wrap_under_get_rule(CMSampleBufferGetDataBuffer(
-                    self.as_concrete_TypeRef(),
-                ))
+                let data = CMSampleBufferGetDataBuffer(self.as_concrete_TypeRef());
+                anyhow::ensure!(!data.is_null(), "sample data is unavailable");
+                Ok(CMBlockBuffer::wrap_under_get_rule(data))
             }
         }
     }
@@ -124,7 +128,7 @@ pub mod core_media {
     impl_CFTypeDescription!(CMFormatDescription);
 
     impl CMFormatDescription {
-        pub fn h264_parameter_set_count(&self) -> usize {
+        pub fn h264_parameter_set_count(&self) -> Result<usize> {
             unsafe {
                 let mut count = 0;
                 let result = CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
@@ -135,8 +139,8 @@ pub mod core_media {
                     &mut count,
                     ptr::null_mut(),
                 );
-                assert_eq!(result, 0);
-                count
+                anyhow::ensure!(result == 0, "error getting parameter set count: {result}");
+                Ok(count)
             }
         }
 
@@ -153,6 +157,10 @@ pub mod core_media {
                     ptr::null_mut(),
                 );
                 anyhow::ensure!(result == 0, "error getting parameter set, code: {result}");
+                if len == 0 {
+                    return Ok(&[]);
+                }
+                anyhow::ensure!(!bytes.is_null(), "parameter set bytes are unavailable");
                 Ok(std::slice::from_raw_parts(bytes, len))
             }
         }
@@ -180,7 +188,7 @@ pub mod core_media {
     impl_CFTypeDescription!(CMBlockBuffer);
 
     impl CMBlockBuffer {
-        pub fn bytes(&self) -> &[u8] {
+        pub fn bytes(&self) -> Result<&[u8]> {
             unsafe {
                 let mut bytes = ptr::null();
                 let mut len = 0;
@@ -191,8 +199,12 @@ pub mod core_media {
                     &mut len,
                     &mut bytes,
                 );
-                assert!(result == 0, "could not get block buffer data");
-                std::slice::from_raw_parts(bytes, len)
+                anyhow::ensure!(result == 0, "could not get block buffer data: {result}");
+                if len == 0 {
+                    return Ok(&[]);
+                }
+                anyhow::ensure!(!bytes.is_null(), "block buffer data is unavailable");
+                Ok(std::slice::from_raw_parts(bytes, len))
             }
         }
     }
@@ -267,6 +279,7 @@ pub mod core_video {
                 result == kCVReturnSuccess,
                 "could not create texture cache, code: {result}"
             );
+            anyhow::ensure!(!this.is_null(), "texture cache is unavailable");
             unsafe { Ok(CVMetalTextureCache::wrap_under_create_rule(this)) }
         }
 
@@ -282,6 +295,8 @@ pub mod core_video {
             height: usize,
             plane_index: usize,
         ) -> Result<CVMetalTexture> {
+            anyhow::ensure!(!source.is_null(), "source image is unavailable");
+            anyhow::ensure!(width > 0 && height > 0, "texture dimensions are invalid");
             let mut this = ptr::null();
             let result = unsafe {
                 CVMetalTextureCacheCreateTextureFromImage(
@@ -300,6 +315,7 @@ pub mod core_video {
                 result == kCVReturnSuccess,
                 "could not create texture, code: {result}"
             );
+            anyhow::ensure!(!this.is_null(), "created texture is unavailable");
             unsafe { Ok(CVMetalTexture::wrap_under_create_rule(this)) }
         }
     }
@@ -336,10 +352,11 @@ pub mod core_video {
     impl_CFTypeDescription!(CVMetalTexture);
 
     impl CVMetalTexture {
-        pub fn as_texture_ref(&self) -> &metal::TextureRef {
+        pub fn as_texture_ref(&self) -> Result<&metal::TextureRef> {
             unsafe {
                 let texture = CVMetalTextureGetTexture(self.as_concrete_TypeRef());
-                metal::TextureRef::from_ptr(texture as *mut _)
+                anyhow::ensure!(!texture.is_null(), "Metal texture is unavailable");
+                Ok(metal::TextureRef::from_ptr(texture as *mut _))
             }
         }
     }
