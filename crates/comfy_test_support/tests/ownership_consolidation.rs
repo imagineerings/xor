@@ -19464,3 +19464,244 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
     );
     Ok(())
 }
+
+#[test]
+fn val_ownership_latent_upscale_model_resource_foundation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    fn assert_root_export<T>() {}
+
+    assert_root_export::<comfy_model::NativeLatentUpscaleModelResource>();
+    assert_root_export::<comfy_model::NativeVae>();
+    assert_root_export::<comfy_tensor::NativeLatentBundle>();
+
+    let root = repository_root()?;
+    let model_root = fs::read_to_string(root.join("crates/comfy_model/src/comfy_model.rs"))?;
+    let resource = fs::read_to_string(root.join("crates/comfy_model/src/latent_upscale_model.rs"))?;
+    let payload = fs::read_to_string(root.join("crates/comfy_model/src/native_node_payload.rs"))?;
+    assert!(model_root.contains("pub use latent_upscale_model::"));
+    for required in [
+        "pub struct NativeLatentUpscaleModelResource",
+        "pub fn from_checkpoint(",
+        "pub fn invoke_hunyuan_720p(",
+        "pub fn invoke_hunyuan_1080p(",
+        "pub fn invoke_hunyuan_bundle(",
+        "pub fn invoke_ltx(",
+        "pub fn invoke_ltx_bundle(",
+        "HUNYUAN_720_MARKER",
+        "HUNYUAN_1080_MARKER",
+        "LTX_MARKER",
+    ] {
+        assert!(
+            resource.contains(required),
+            "latent upscale owner lacks {required}"
+        );
+    }
+    for required in [
+        "NativeModelResource::LatentUpscaleModel",
+        "NativeModelResourceRole::LatentUpscaleModel",
+        "NativeModelBackingKind::NativeLatentUpscaleModel",
+        "zed-native-latent-upscale-model-v1",
+        "pub fn latent_upscale_model_resource",
+    ] {
+        assert!(
+            payload.contains(required),
+            "latent upscale payload lacks {required}"
+        );
+    }
+
+    let sources = rust_sources(&root)?
+        .into_iter()
+        .map(|path| fs::read_to_string(&path).map(|source| (path, source)))
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(
+        production_source_occurrences(&sources, "pub struct NativeLatentUpscaleModelResource")
+            .len(),
+        1,
+        "there must be exactly one production latent-upscale resource owner"
+    );
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_latent_upscale_model_resource")
+            })
+        })
+        .ok_or("latent-upscale resource ownership concern is missing")?;
+    assert_eq!(
+        concern
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some("comfy_model::latent_upscale_model::NativeLatentUpscaleModelResource")
+    );
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-latent-upscale-model-resource-foundation")
+            }))
+    );
+    let mapping_names = concern
+        .get("required_mappings")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("latent-upscale concern has no mappings")?
+        .iter()
+        .filter_map(|mapping| mapping.get("name")?.as_str())
+        .collect::<BTreeSet<_>>();
+    for required in [
+        "latent-upscale-loader-preserves-source-precedence-and-strict-state",
+        "latent-upscale-resource-binds-three-graphs-and-source-invocation",
+        "latent-upscale-payload-seals-role-identity-and-residency",
+        "latent-upscale-fixture-is-source-pinned-and-independent",
+        "latent-upscale-ownership-remains-distinct-from-vae-latent-and-handle-lifecycle",
+    ] {
+        assert!(
+            mapping_names.contains(required),
+            "ownership mappings lack {required}"
+        );
+    }
+    let adapters = concern
+        .get("allowed_adapters")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("latent-upscale concern has no adapters")?
+        .iter()
+        .filter_map(serde_json::Value::as_str)
+        .collect::<Vec<_>>()
+        .join("\n");
+    for required in [
+        "NativeVae",
+        "NativeModelPayload",
+        "NativeStoredModelPayload",
+        "NativeHandleStore",
+        "comfy-parity-native-model-resource-execution-foundation",
+    ] {
+        assert!(
+            adapters.contains(required),
+            "ownership boundary lacks {required}"
+        );
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/models/latent-upscale-model-resource-foundation/manifest.json",
+    ))?;
+    for required in [
+        "loader_precedence",
+        "720-integrated-residual-order",
+        "1080-repeat-rms-shortcut-order",
+        "pixel-shuffle-dimension-three",
+        "ltx-vae-statistics-order",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "latent-upscale fixture lacks {required}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn val_ownership_task415_provider_input_host_reuses_canonical_v1_abi()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("plugin_manifest_abi")
+            })
+        })
+        .ok_or("plugin manifest ABI ownership concern is missing")?;
+    assert!(
+        concern
+            .get("owner_files")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|files| files.iter().any(|path| {
+                path.as_str() == Some("crates/comfy_plugin_sdk/wit/comfy-plugin.wit")
+            }))
+    );
+    assert!(
+        concern
+            .get("definitions")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|definitions| definitions.iter().any(|definition| {
+                definition
+                    .get("qualified")
+                    .and_then(serde_json::Value::as_str)
+                    == Some("zed:comfy-plugin/types@1.0.0")
+                    && definition.get("role").and_then(serde_json::Value::as_str)
+                        == Some("canonical_interface")
+            }))
+    );
+    assert!(
+        concern
+            .get("required_mappings")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|mappings| mappings.iter().any(|mapping| {
+                mapping.get("name").and_then(serde_json::Value::as_str)
+                    == Some("provider-v2-input-host-imports-only-canonical-v1-types")
+            }))
+    );
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some(
+                        "comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair",
+                    )
+            }))
+    );
+
+    let v1 = fs::read(root.join("crates/comfy_plugin_sdk/wit/comfy-plugin.wit"))?;
+    let dependency = fs::read(
+        root.join("crates/comfy_plugin_sdk/wit/provider-v2/deps/comfy-plugin/comfy-plugin.wit"),
+    )?;
+    assert_eq!(v1, dependency);
+    let provider_v2 = fs::read_to_string(
+        root.join("crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit"),
+    )?;
+    let input_host = provider_v2
+        .split_once("interface invocation-input-host {")
+        .and_then(|(_, remainder)| remainder.split_once("\n}"))
+        .map(|(interface, _)| interface)
+        .ok_or("provider-v2 invocation-input-host is missing")?;
+    for required in [
+        "use zed:comfy-plugin/types@1.0.0.{encoded-value, input-state, invocation-error, value-handle};",
+        "get-input-state: func",
+        "read-scalar-input: func",
+        "take-input: func",
+        "read-handle: func",
+        "check-cancelled: func",
+    ] {
+        assert!(input_host.contains(required), "input host lacks {required}");
+    }
+    assert_eq!(input_host.matches(": func(").count(), 5);
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let row = catalog
+        .lines()
+        .find(|line| line.starts_with("plugin_manifest_abi,"))
+        .ok_or("plugin manifest ABI ownership catalog row is missing")?;
+    for required in [
+        "crates/comfy_plugin_sdk/wit/comfy-plugin.wit",
+        "authoritative_owner_confirmed",
+    ] {
+        assert!(row.contains(required), "ownership row lacks {required}");
+    }
+    Ok(())
+}

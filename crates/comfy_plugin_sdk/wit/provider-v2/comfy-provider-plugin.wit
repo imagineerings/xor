@@ -194,6 +194,16 @@ interface provider-streaming-host {
     check-cancelled: func(handle: stream-handle) -> result<_, stream-error>;
 }
 
+interface invocation-input-host {
+    use zed:comfy-plugin/types@1.0.0.{encoded-value, input-state, invocation-error, value-handle};
+
+    get-input-state: func(port-id: string) -> result<input-state, invocation-error>;
+    read-scalar-input: func(port-id: string, index: u32) -> result<encoded-value, invocation-error>;
+    take-input: func(port-id: string, index: u32) -> result<value-handle, invocation-error>;
+    read-handle: func(handle: value-handle) -> result<encoded-value, invocation-error>;
+    check-cancelled: func() -> result<_, invocation-error>;
+}
+
 interface provider-node {
     use types.{invocation-context, invocation-result, manifest-v2, stream-error};
 
@@ -202,6 +212,7 @@ interface provider-node {
 }
 
 world comfy-provider-plugin {
+    import invocation-input-host;
     import provider-streaming-host;
     export provider-node;
 }

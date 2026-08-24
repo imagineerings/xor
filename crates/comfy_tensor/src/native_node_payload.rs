@@ -1,6 +1,8 @@
 #[cfg(feature = "cpu")]
 use crate::ImageTensor;
-use crate::{DType, DeviceId, Tensor, TensorDescriptor, TensorError, ViewAccess};
+use crate::{
+    CancellationToken, DType, DeviceId, Tensor, TensorDescriptor, TensorError, ViewAccess,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, mem};
@@ -1244,6 +1246,27 @@ fn latent_tensor_digest(
     descriptor: &TensorDescriptor,
     bytes: &[u8],
 ) -> Result<String, NativeLatentBundleError> {
+    latent_tensor_digest_with_cancellation(descriptor, bytes, None)
+}
+
+fn latent_tensor_digest_with_cancellation(
+    descriptor: &TensorDescriptor,
+    bytes: &[u8],
+    cancellation: Option<&CancellationToken>,
+) -> Result<String, NativeLatentBundleError> {
+    latent_tensor_digest_with_check(descriptor, bytes, || {
+        if let Some(cancellation) = cancellation {
+            cancellation.check()?;
+        }
+        Ok(())
+    })
+}
+
+fn latent_tensor_digest_with_check(
+    descriptor: &TensorDescriptor,
+    bytes: &[u8],
+    mut check: impl FnMut() -> Result<(), comfy_types::CancellationError>,
+) -> Result<String, NativeLatentBundleError> {
     let expected = descriptor.byte_len()?;
     let actual = u64::try_from(bytes.len()).map_err(|_| TensorError::ShapeOverflow)?;
     if expected != actual {
@@ -1260,7 +1283,11 @@ fn latent_tensor_digest(
     for dimension in descriptor.shape() {
         hasher.update(dimension.to_le_bytes());
     }
-    hasher.update(bytes);
+    for chunk in bytes.chunks(64 * 1024) {
+        check()?;
+        hasher.update(chunk);
+    }
+    check()?;
     Ok(format!("{:x}", hasher.finalize()))
 }
 
@@ -1277,18 +1304,20 @@ fn latent_bundle_digest(
         NativeLatentSamples::Tensor(tensor) => {
             hasher.update([1]);
             context.check()?;
-            hasher.update(latent_tensor_digest(
+            hasher.update(latent_tensor_digest_with_cancellation(
                 tensor.descriptor(),
                 tensor.contiguous_bytes()?,
+                Some(context.cancellation),
             )?);
         }
         NativeLatentSamples::AudioVideo { video, audio } => {
             hasher.update([2]);
             for tensor in [video, audio] {
                 context.check()?;
-                hasher.update(latent_tensor_digest(
+                hasher.update(latent_tensor_digest_with_cancellation(
                     tensor.descriptor(),
                     tensor.contiguous_bytes()?,
+                    Some(context.cancellation),
                 )?);
             }
         }
@@ -1298,18 +1327,20 @@ fn latent_bundle_digest(
         Some(NativeLatentNoiseMask::Tensor(tensor)) => {
             hasher.update([1]);
             context.check()?;
-            hasher.update(latent_tensor_digest(
+            hasher.update(latent_tensor_digest_with_cancellation(
                 tensor.descriptor(),
                 tensor.contiguous_bytes()?,
+                Some(context.cancellation),
             )?);
         }
         Some(NativeLatentNoiseMask::AudioVideo { video, audio }) => {
             hasher.update([2]);
             for tensor in [video, audio] {
                 context.check()?;
-                hasher.update(latent_tensor_digest(
+                hasher.update(latent_tensor_digest_with_cancellation(
                     tensor.descriptor(),
                     tensor.contiguous_bytes()?,
+                    Some(context.cancellation),
                 )?);
             }
         }
@@ -1434,6 +1465,12 @@ pub enum NativeLatentBundleError {
     ResidentAllocationChanged,
     #[error("native latent projection no longer matches its retained payload")]
     ProjectionChanged,
+}
+
+impl From<comfy_types::CancellationError> for NativeLatentBundleError {
+    fn from(_: comfy_types::CancellationError) -> Self {
+        Self::Tensor(TensorError::Cancelled)
+    }
 }
 
 pub fn native_tensor_digest(
@@ -1711,6 +1748,35 @@ mod tests {
             ));
             Ok(())
         })
+    }
+
+    #[test]
+    fn latent_tensor_digest_checks_cancellation_between_bounded_chunks()
+    -> Result<(), Box<dyn Error>> {
+        let descriptor = TensorDescriptor::contiguous(
+            vec![1, 1, 1, 32_769],
+            DType::F32,
+            DeviceId::CPU,
+            StreamId::DEFAULT,
+        )?;
+        let byte_length = usize::try_from(descriptor.byte_len()?)?;
+        let bytes = vec![0_u8; byte_length];
+        let mut checks = 0_usize;
+        let error = latent_tensor_digest_with_check(&descriptor, &bytes, || {
+            checks = checks.saturating_add(1);
+            if checks == 2 {
+                Err(comfy_types::CancellationError)
+            } else {
+                Ok(())
+            }
+        })
+        .expect_err("the second digest chunk must observe cancellation");
+        assert!(matches!(
+            error,
+            NativeLatentBundleError::Tensor(TensorError::Cancelled)
+        ));
+        assert_eq!(checks, 2);
+        Ok(())
     }
 
     #[test]

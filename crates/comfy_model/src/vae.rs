@@ -1992,6 +1992,12 @@ pub struct NativeVae {
     kernel: NativeVaeKernel,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LtxLatentStatisticsDirection {
+    Normalize,
+    Unnormalize,
+}
+
 #[derive(Clone, Debug)]
 pub struct NativeStructuredVae {
     descriptor: VaeDescriptor,
@@ -2270,6 +2276,58 @@ impl NativeVae {
 
     pub fn descriptor(&self) -> &VaeDescriptor {
         &self.descriptor
+    }
+
+    pub fn apply_ltx_latent_statistics(
+        &self,
+        backend: &dyn TensorBackend,
+        input: &Tensor,
+        direction: LtxLatentStatisticsDirection,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, VaeError> {
+        context.check()?;
+        if !matches!(
+            self.descriptor.identity().profile(),
+            VaeKernelProfile::LtxVideoV0 { .. }
+                | VaeKernelProfile::LtxVideoV1 { .. }
+                | VaeKernelProfile::LtxVideoV2 { .. }
+        ) {
+            return Err(VaeError::KernelProfileMismatch);
+        }
+        if !matches!(input.descriptor().shape(), [batch, 128, frames, height, width]
+            if *batch > 0 && *frames > 0 && *height > 0 && *width > 0)
+        {
+            return Err(VaeError::InvalidShape {
+                expected: vec![1, 128, 1, 1, 1],
+                actual: input.descriptor().shape().to_vec(),
+            });
+        }
+        if input.descriptor().dtype() != DType::F32 {
+            return Err(VaeError::UnsupportedDType(input.descriptor().dtype()));
+        }
+        if input.descriptor().device() != DeviceId::CPU {
+            return Err(VaeError::ExecutionDeviceMismatch {
+                expected: DeviceId::CPU,
+                actual: input.descriptor().device(),
+            });
+        }
+        if input.descriptor().stream() != context.stream || !input.descriptor().is_contiguous()? {
+            return Err(VaeError::Tensor(TensorError::NonContiguousAccess));
+        }
+        let binding = match &self.kernel {
+            NativeVaeKernel::Native { binding, .. } => binding,
+            #[cfg(test)]
+            NativeVaeKernel::BlockAverageNearest | NativeVaeKernel::Sd15Reduced(_) => {
+                return Err(VaeError::KernelProfileMismatch);
+            }
+        };
+        crate::vae_video::ltx_latent_statistics(
+            binding.module(),
+            backend,
+            input,
+            matches!(direction, LtxLatentStatisticsDirection::Normalize),
+            context,
+        )
     }
 
     pub fn execution_digest(&self) -> String {
@@ -4329,6 +4387,48 @@ mod tests {
         Ok(backend.upload_f32(descriptor, values, context)?.0)
     }
 
+    fn ltx_statistics_vae(
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+        means: &[f32; 128],
+        standard_deviations: &[f32; 128],
+    ) -> Result<NativeVae, Box<dyn Error>> {
+        let artifact = artifact('9')?;
+        let descriptor = checked_descriptor(
+            &artifact,
+            ModelFamilyIdentity::new("COMFY-MODEL-0103", "LTXV", "ltxv-transformer-v1")?,
+            crate::LTXV_LATENT_FORMAT,
+            "comfy.ldm.lightricks.vae.VideoVAE.v1",
+            VaeKernelProfile::LtxVideoV1 {
+                configuration_sha256: None,
+            },
+            3,
+            [-1.0, 1.0],
+        )?;
+        let mean = upload(backend, vec![128], means, context)?;
+        let standard_deviation = upload(backend, vec![128], standard_deviations, context)?;
+        let module = NativeModule::module_dict(
+            "ltx-statistics-test",
+            vec![
+                NativeModule::buffer("per_channel_statistics.mean-of-means", mean)?,
+                NativeModule::buffer("per_channel_statistics.std-of-means", standard_deviation)?,
+            ],
+        )?;
+        let binding =
+            VaeModelBinding::checked_transport_fixture(&descriptor, module, context.cancellation)?;
+        let functions = VaeKernelFunctions::checked(
+            descriptor.identity().architecture().clone(),
+            native_test_encode,
+            native_test_decode,
+        );
+        Ok(NativeVae::checked_kernel(
+            descriptor,
+            crate::LTXV_LATENT_FORMAT,
+            binding,
+            functions,
+        )?)
+    }
+
     fn values(tensor: &Tensor) -> Result<Vec<f32>, Box<dyn Error>> {
         let bytes = tensor.contiguous_bytes()?;
         let mut result = Vec::with_capacity(bytes.len() / 4);
@@ -5658,6 +5758,186 @@ mod tests {
                 dtype: DType::F16,
             })
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn latent_upscale_model_ltx_statistics_are_typed_source_exact_and_atomic()
+    -> Result<(), Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority, context) = backend_and_context(&cancellation, 8 << 20)?;
+        let mut means = [0.0_f32; 128];
+        means[..4].copy_from_slice(&[10.0, -2.0, 1.0, 0.0]);
+        let mut standard_deviations = [1.0_f32; 128];
+        standard_deviations[..4].copy_from_slice(&[2.0, 4.0, 0.5, 8.0]);
+        let vae = ltx_statistics_vae(&backend, &context, &means, &standard_deviations)?;
+        let mut input_values = [0.0_f32; 128];
+        input_values[..4].copy_from_slice(&[-1.0, 0.5, 2.0, 4.0]);
+        let input = upload(&backend, vec![1, 128, 1, 1, 1], &input_values, &context)?;
+        let input_version = input.mutation_version();
+        let unnormalized = vae.apply_ltx_latent_statistics(
+            &backend,
+            &input,
+            LtxLatentStatisticsDirection::Unnormalize,
+            &context,
+        )?;
+        assert_eq!(&values(&unnormalized)?[..4], &[8.0, 0.0, 2.0, 32.0]);
+
+        let mut model_raw = [0.0_f32; 128];
+        model_raw[..4].copy_from_slice(&[12.0, 2.0, 1.5, 16.0]);
+        let model_raw = upload(&backend, vec![1, 128, 1, 1, 1], &model_raw, &context)?;
+        let normalized = vae.apply_ltx_latent_statistics(
+            &backend,
+            &model_raw,
+            LtxLatentStatisticsDirection::Normalize,
+            &context,
+        )?;
+        assert_eq!(&values(&normalized)?[..4], &[1.0, 1.0, 1.0, 2.0]);
+        assert_eq!(input.mutation_version(), input_version);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: context.stream,
+            scratch: authority.authorize_workspace(1 << 20)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            vae.apply_ltx_latent_statistics(
+                &backend,
+                &input,
+                LtxLatentStatisticsDirection::Unnormalize,
+                &cancelled_context,
+            ),
+            Err(VaeError::Tensor(TensorError::Cancelled))
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+
+        let (small_backend, small_authority) = CpuWorkspaceAuthority::create_backend(2_048)?;
+        let small_context = small_backend.execution_context(
+            StreamId::DEFAULT,
+            small_authority.authorize_workspace(2_048)?,
+            &cancellation,
+        );
+        let small_vae =
+            ltx_statistics_vae(&small_backend, &small_context, &means, &standard_deviations)?;
+        let small_input = upload(
+            &small_backend,
+            vec![1, 128, 1, 1, 1],
+            &input_values,
+            &small_context,
+        )?;
+        let tiny_error = small_vae
+            .apply_ltx_latent_statistics(
+                &small_backend,
+                &small_input,
+                LtxLatentStatisticsDirection::Unnormalize,
+                &small_context,
+            )
+            .expect_err("tiny LTX statistics workspace must fail");
+        assert!(
+            matches!(
+                tiny_error,
+                VaeError::Tensor(TensorError::AllocationFailed { .. }) | VaeError::NativeOps(_)
+            ),
+            "unexpected tiny-workspace error: {tiny_error:?}"
+        );
+        assert_eq!(small_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn latent_upscale_model_ltx_bundle_executes_statistics_graph_and_field_projection()
+    -> Result<(), Box<dyn Error>> {
+        use comfy_tensor::{NativeLatentBundle, NativeLatentMetadata};
+
+        let memory = 64 << 20;
+        let cancellation = CancellationToken::default();
+        let (backend, _authority, context) = backend_and_context(&cancellation, memory)?;
+        let means = [0.0_f32; 128];
+        let standard_deviations = [1.0_f32; 128];
+        let vae = ltx_statistics_vae(&backend, &context, &means, &standard_deviations)?;
+        let mut ordered_state = Vec::new();
+        let mut add = |name: &str, shape: Vec<u64>, fill: f32| -> Result<(), Box<dyn Error>> {
+            let count = shape.iter().try_fold(1_usize, |count, dimension| {
+                count.checked_mul(usize::try_from(*dimension).ok()?)
+            });
+            let count = count.ok_or("LTX bundle fixture shape overflowed")?;
+            ordered_state.push((
+                name.to_owned(),
+                upload(&backend, shape, &vec![fill; count], &context)?,
+            ));
+            Ok(())
+        };
+        add("initial_conv.weight", vec![32, 128, 3, 3], 0.0)?;
+        add("initial_conv.bias", vec![32], 0.0)?;
+        add("initial_norm.weight", vec![32], 1.0)?;
+        add("initial_norm.bias", vec![32], 0.0)?;
+        for family in ["res_blocks", "post_upsample_res_blocks"] {
+            for convolution in ["conv1", "conv2"] {
+                add(
+                    &format!("{family}.0.{convolution}.weight"),
+                    vec![32, 32, 3, 3],
+                    0.0,
+                )?;
+                add(&format!("{family}.0.{convolution}.bias"), vec![32], 0.0)?;
+            }
+            for normalization in ["norm1", "norm2"] {
+                add(&format!("{family}.0.{normalization}.weight"), vec![32], 1.0)?;
+                add(&format!("{family}.0.{normalization}.bias"), vec![32], 0.0)?;
+            }
+        }
+        add("upsampler.0.weight", vec![128, 32, 3, 3], 0.0)?;
+        add("upsampler.0.bias", vec![128], 0.0)?;
+        add("final_conv.weight", vec![128, 32, 3, 3], 0.0)?;
+        add("final_conv.bias", vec![128], 0.0)?;
+        let configuration = serde_json::json!({
+            "in_channels": 128,
+            "mid_channels": 32,
+            "num_blocks_per_stage": 1,
+            "dims": 2,
+            "spatial_upsample": true,
+            "temporal_upsample": false,
+            "spatial_scale": 7.25,
+            "rational_resampler": false
+        });
+        let resource = crate::NativeLatentUpscaleModelResource::from_checkpoint(
+            crate::NativeLatentUpscaleCheckpoint {
+                artifact_sha256: "7".repeat(64),
+                metadata: BTreeMap::from([(
+                    "config".to_owned(),
+                    serde_json::to_string(&configuration)?,
+                )]),
+                ordered_state,
+                memory_budget_bytes: memory,
+            },
+            &context,
+        )?;
+        let samples = upload(
+            &backend,
+            vec![1, 128, 1, 2, 2],
+            &vec![0.25; 128 * 4],
+            &context,
+        )?;
+        let noise_mask = upload(&backend, vec![1, 1, 1, 2, 2], &[1.0; 4], &context)?;
+        let metadata = NativeLatentMetadata::checked(None, Some(48_000), Some(8), Some(4))?;
+        let input = NativeLatentBundle::single(
+            samples,
+            Some(noise_mask),
+            Some(vec![17]),
+            metadata.clone(),
+            &context,
+        )?;
+        let output = resource.invoke_ltx_bundle(&backend, &input, &vae, &context)?;
+        let comfy_tensor::NativeLatentSamples::Tensor(output_samples) = output.samples() else {
+            return Err("LTX bundle produced nested samples".into());
+        };
+        assert_eq!(output_samples.descriptor().shape(), &[1, 128, 1, 4, 4]);
+        assert_eq!(output.batch_indices(), Some(&[17][..]));
+        assert_eq!(output.metadata(), &metadata);
+        assert!(output.noise_mask().is_none());
+        assert_eq!(context.scratch.in_use_bytes(), 0);
         Ok(())
     }
 

@@ -226,27 +226,80 @@ class ValidationGenerationTests(unittest.TestCase):
             "projects/comfy/ComfyUI/comfy_extras/nodes_lt_upsampler.py",
             "projects/comfy/ComfyUI/comfy/ldm/hunyuan_video/upsampler.py",
             "projects/comfy/ComfyUI/comfy/ldm/lightricks/latent_upsampler.py",
+            "projects/comfy/ComfyUI/comfy/ldm/lightricks/vae/causal_video_autoencoder.py",
             "crates/comfy_model/src/vae_video.rs",
+            "crates/comfy_tensor/src/native_node_payload.rs",
             "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_tensor/src/ops/neural_network_functional_01.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/indexing_masking_01.rs",
+            "crates/comfy_tensor/src/ops/reduction_02.rs",
+            "crates/comfy_tensor/src/ops/storage_dtype_device_01.rs",
+            "crates/comfy_tensor/src/ops/tensor_creation_01.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_02.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_05.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_08.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_13.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_18.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_21.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_22.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ):
             self.assertIn(path, latent_upscale_task["reads"])
         for path in (
             "crates/comfy_model/src/latent_upscale_model.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/vae.rs",
             "crates/comfy_model/src/vae_video.rs",
             "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_test_support/src/bin/generate_latent_upscale_model_fixture.rs",
             "crates/comfy_test_support/fixtures/models/latent-upscale-model-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ):
             self.assertIn(path, latent_upscale_task["writes"])
         for phrase in (
             "Hunyuan 720p",
             "Hunyuan 1080p",
             "LTX",
+            "720p before 1080p before LTX",
+            "past-only temporal and replicate spatial padding",
+            "x + conv3(SiLU(conv2(SiLU(conv1(x)))))",
+            "exactly three ordered ResnetBlocks",
+            "normalize(x,dim=1)*sqrt(C)*gamma",
+            "PixelShuffleND",
+            "[1, 4, 6, 4, 1]",
+            "Independent reduced raw-output oracles",
+            "NativeLatentUpscaleModelResource alone owns",
+            "conservative phase-memory OOM",
             "bislerp",
+            "nearest-exact (distinct from nearest)",
+            "identity aliasing of the original latent bundle",
+            "fresh CPU-F32 samples-only bundle",
+            "zero norm, coincident, antipodal, and rounding-sensitive",
             "noise_mask",
             "CPU F32",
         ):
             self.assertIn(phrase, latent_upscale_task["done"])
+        latent_commands = planning.task_validation_commands(latent_upscale_task)
+        for command in (
+            "cargo run --locked -p comfy_test_support --bin generate_latent_upscale_model_fixture -- --check",
+            "cargo test --locked -p comfy_model latent_upscale_model -- --nocapture",
+            "cargo test --locked -p comfy_tensor --test spatial_functional_kernel_01 -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_node_family_e2e -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ):
+            self.assertIn(command, latent_commands)
         background_removal_task = tasks_by_id[
             "comfy-parity-native-background-removal-resource-foundation"
         ]
@@ -670,6 +723,11 @@ class ValidationGenerationTests(unittest.TestCase):
                 "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
             ],
         )
+        self.assertIn(
+            "crates/comfy_types/src/worker_protocol.rs",
+            provider_input_host["reads"],
+        )
+        self.assertIn("comfy_types", provider_input_host["validation_packages"])
         self.assertIn(
             "crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json",
             provider_input_host["reads"],

@@ -9705,6 +9705,115 @@
       "decision_reason": "to_tensor_with_context_exact_native is the one bounded native HWC-U8 to CHW-F32 conversion owner. It borrows bytes, validates exact dimensions, delegates allocation to CpuBackend, retains no image state, and never imports PIL or executes Python."
     },
     {
+      "concern": "native_latent_upscale_model_resource",
+      "canonical_owner": "comfy_model::latent_upscale_model::NativeLatentUpscaleModelResource",
+      "owner_files": [
+        "crates/comfy_model/src/latent_upscale_model.rs",
+        "crates/comfy_model/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeLatentUpscaleModelResource",
+        "NativeLatentUpscaleModelResource::from_checkpoint",
+        "NativeLatentUpscaleModelResource::invoke_hunyuan_bundle",
+        "NativeLatentUpscaleModelResource::invoke_ltx_bundle",
+        "NativeModelPayload::latent_upscale_model"
+      ],
+      "allowed_adapters": [
+        "Canonical comfy_tensor convolution, resize, shape, normalization, arithmetic, latent-bundle, workspace, and cancellation owners retain their domains; this resource supplies only checked source graph state and ordering",
+        "NativeVae remains the sole per-channel LTX statistics owner and exposes only the checked normalize or unnormalize operation",
+        "NativeModelPayload seals LATENT_UPSCALE_MODEL identity and alias-aware residency without owning graph selection or equations",
+        "NativeStoredModelPayload and NativeHandleStore do not publish LATENT_UPSCALE_MODEL in this task; handle, cache, persistence, restart, eviction, lease, and stale-generation ownership remain assigned to comfy-parity-native-model-resource-execution-foundation"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/latent_upscale_model.rs",
+          "qualified": "comfy_model::latent_upscale_model::NativeLatentUpscaleModelResource",
+          "role": "canonical",
+          "symbol": "NativeLatentUpscaleModelResource",
+          "pattern": "^pub struct NativeLatentUpscaleModelResource \\{"
+        }
+      ],
+      "call_symbols": [
+        "NativeLatentUpscaleModelResource::from_checkpoint",
+        "NativeLatentUpscaleModelResource::invoke_hunyuan_bundle",
+        "NativeLatentUpscaleModelResource::invoke_ltx_bundle",
+        "NativeModelPayload::latent_upscale_model",
+        "latent_upscale_model_resource"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "latent-upscale-loader-preserves-source-precedence-and-strict-state",
+          "path": "crates/comfy_model/src/latent_upscale_model.rs",
+          "pattern": "HUNYUAN_720_MARKER[\\s\\S]*HUNYUAN_1080_MARKER[\\s\\S]*LTX_MARKER[\\s\\S]*normalize_1080_shortcuts[\\s\\S]*validate_strict_state"
+        },
+        {
+          "name": "latent-upscale-resource-binds-three-graphs-and-source-invocation",
+          "path": "crates/comfy_model/src/latent_upscale_model.rs",
+          "pattern": "pub struct NativeLatentUpscaleModelResource[\\s\\S]*pub fn invoke_hunyuan_720p[\\s\\S]*pub fn invoke_hunyuan_1080p[\\s\\S]*pub fn invoke_hunyuan_bundle[\\s\\S]*pub fn invoke_ltx[\\s\\S]*pub fn invoke_ltx_bundle"
+        },
+        {
+          "name": "latent-upscale-payload-seals-role-identity-and-residency",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "pub fn latent_upscale_model\\([\\s\\S]*NativeModelResourceRole::LatentUpscaleModel[\\s\\S]*zed-native-latent-upscale-model-v1[\\s\\S]*NativeModelResource::LatentUpscaleModel[\\s\\S]*NativeModelBackingKind::NativeLatentUpscaleModel[\\s\\S]*pub fn latent_upscale_model_resource"
+        },
+        {
+          "name": "latent-upscale-fixture-is-source-pinned-and-independent",
+          "path": "crates/comfy_test_support/fixtures/models/latent-upscale-model-resource-foundation/manifest.json",
+          "pattern": "720-integrated-residual-order[\\s\\S]*1080-repeat-rms-shortcut-order[\\s\\S]*pixel-shuffle-dimension-three[\\s\\S]*ltx-vae-statistics-order[\\s\\S]*loader_precedence"
+        },
+        {
+          "name": "latent-upscale-ownership-remains-distinct-from-vae-latent-and-handle-lifecycle",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "val_ownership_latent_upscale_model_resource_foundation_001[\\s\\S]*NativeLatentUpscaleModelResource[\\s\\S]*NativeVae[\\s\\S]*NativeLatentBundle[\\s\\S]*comfy-parity-native-model-resource-execution-foundation"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-latent-upscale-model-resource-foundation"
+      ],
+      "production_consumers": [
+        "native Hunyuan and LTX latent-upscale node leaves",
+        "future canonical LATENT_UPSCALE_MODEL handle publication and recovery"
+      ],
+      "requirements": [
+        "Requirement 6",
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 26",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 37",
+        "Requirement 38",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeLatentUpscaleModelResource is the sole immutable retained and execution owner for Hunyuan 720p, Hunyuan 1080p, and LTX LATENT_UPSCALE_MODEL graphs. It binds strict normalized state, source profile, artifact and semantic identity, checked invocation, and StorageId-deduplicated residency while delegating tensor operations, VAE statistics, latent bundles, backend workspace, and cancellation to existing owners. NativeModelPayload is only the sealed role identity/residency adapter; handle publication and lifecycle remain separate."
+    },
+    {
       "concern": "native_library_image_capture_and_sealing",
       "canonical_owner": "comfy_runtime::trust native-library image capture and sealing",
       "owner_files": [
@@ -20061,7 +20170,8 @@
       "concern": "plugin_manifest_abi",
       "canonical_owner": "comfy_plugin_sdk versioned WIT and Rust ABI DTOs mapped to comfy_runtime domain types",
       "owner_files": [
-        "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs"
+        "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
+        "crates/comfy_plugin_sdk/wit/comfy-plugin.wit"
       ],
       "owner_symbols": [
         "CapabilityKind",
@@ -20083,6 +20193,13 @@
         "ABI quotas map to host invocation limits without owning authorization"
       ],
       "definitions": [
+        {
+          "path": "crates/comfy_plugin_sdk/wit/comfy-plugin.wit",
+          "qualified": "zed:comfy-plugin/types@1.0.0",
+          "role": "canonical_interface",
+          "symbol": "zed_comfy_plugin_types_v1",
+          "pattern": "^interface types \\{"
+        },
         {
           "path": "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
           "qualified": "comfy_plugin_sdk::CapabilityKind",
@@ -20193,12 +20310,18 @@
           "name": "sdk-node-dto-maps-through-verified-registry-adapter",
           "path": "crates/comfy_plugin_host/src/registry_adapter.rs",
           "pattern": "PluginNode[\\s\\S]*(?:NativeNodeRegistry|NodeRegistry)"
+        },
+        {
+          "name": "provider-v2-input-host-imports-only-canonical-v1-types",
+          "path": "crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit",
+          "pattern": "interface invocation-input-host[\\s\\S]*use zed:comfy-plugin/types@1\\.0\\.0\\.\\{encoded-value, input-state, invocation-error, value-handle\\};[\\s\\S]*get-input-state[\\s\\S]*read-scalar-input[\\s\\S]*take-input[\\s\\S]*read-handle[\\s\\S]*check-cancelled"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-extension-host-plugin-adapter",
-        "comfy-parity-artifact-owner-consolidation"
+        "comfy-parity-artifact-owner-consolidation",
+        "comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair"
       ],
       "production_consumers": [
         "comfy_plugin_host component adapter",

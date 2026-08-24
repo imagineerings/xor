@@ -6455,7 +6455,7 @@ fn ltx_repeat_channels(
     concatenate_dimension(backend, &inputs, 1, context)
 }
 
-fn ltx_latent_statistics(
+pub(crate) fn ltx_latent_statistics(
     module: &NativeModule,
     backend: &dyn TensorBackend,
     input: &Tensor,
@@ -6489,6 +6489,44 @@ fn ltx_latent_statistics(
         )?;
         binary_tensor(backend, BinaryOperation::Add, &scaled, &mean, context)
     }
+}
+
+#[cfg(feature = "test-support")]
+pub fn ltx_latent_statistics_test_support(
+    backend: &dyn TensorBackend,
+    input: &Tensor,
+    mean: &[f32; 128],
+    standard_deviation: &[f32; 128],
+    normalize: bool,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, VaeError> {
+    context.check()?;
+    let mean = tensor_from_f32_with_backend_exact_native(
+        backend,
+        &[128],
+        mean,
+        DType::F32,
+        input.descriptor().device(),
+        context,
+    )
+    .map_err(NativeOpsError::from)?;
+    let standard_deviation = tensor_from_f32_with_backend_exact_native(
+        backend,
+        &[128],
+        standard_deviation,
+        DType::F32,
+        input.descriptor().device(),
+        context,
+    )
+    .map_err(NativeOpsError::from)?;
+    let module = NativeModule::module_dict(
+        "ltx-statistics-test-support",
+        vec![
+            NativeModule::buffer("per_channel_statistics.mean-of-means", mean)?,
+            NativeModule::buffer("per_channel_statistics.std-of-means", standard_deviation)?,
+        ],
+    )?;
+    ltx_latent_statistics(&module, backend, input, normalize, context)
 }
 
 fn ltx_buffer<'a>(module: &'a NativeModule, name: &str) -> Result<&'a Tensor, VaeError> {

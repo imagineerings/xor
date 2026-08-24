@@ -1,12 +1,13 @@
 use comfy_media::{PngLimits, encode_png_frame};
 use comfy_model::{
     NATIVE_UPSCALE_ADMITTED_ARCHITECTURE_COUNT, NATIVE_UPSCALE_ARCHITECTURE_COUNT,
-    NATIVE_UPSCALE_CONTRACT_SHA256, NativeFrameInterpolationModel, NativeModelPayload,
-    NativeSdPoseHeatmapHead, NativeSdPoseModel, NativeSdPoseSd2Denoiser,
-    NativeUpscaleContractError, NativeUpscaleModelError, NativeUpscaleModelResource,
-    NativeUpscaleStateDictionaryLayout, NativeUpscaleUnavailableReason,
-    SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration, compiled_native_upscale_contract,
-    sdpose_heatmap_head_weight_manifest, sdpose_sd2_weight_manifest,
+    NATIVE_UPSCALE_CONTRACT_SHA256, NativeFrameInterpolationModel, NativeLatentUpscaleCheckpoint,
+    NativeLatentUpscaleModelResource, NativeModelPayload, NativeSdPoseHeatmapHead,
+    NativeSdPoseModel, NativeSdPoseSd2Denoiser, NativeUpscaleContractError,
+    NativeUpscaleModelError, NativeUpscaleModelResource, NativeUpscaleStateDictionaryLayout,
+    NativeUpscaleUnavailableReason, SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration,
+    compiled_native_upscale_contract, sdpose_heatmap_head_weight_manifest,
+    sdpose_sd2_weight_manifest,
 };
 use comfy_nodes::{
     NativePreparedEffectKind, NativeStoredModelPayload, NativeStructuredValue,
@@ -26,12 +27,19 @@ use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, ExecutionContext, ImageTensor,
     NativeTensorPayload, NativeTensorRole, StreamId, Tensor, TensorBackend,
     generated_comfy_operator_indirection_01::tensor_from_f32_with_context_exact_native,
+    generated_neural_network_functional_01::pixel_shuffle_tensor_with_context_exact_native,
+    generated_spatial_functional_kernel_01::{
+        InterpolateConfiguration, InterpolateMode, bislerp_tensor_with_context_exact_native,
+        interpolate_tensor_with_context_exact_native,
+        pixel_shuffle_nd_tensor_with_context_exact_native,
+    },
 };
 use comfy_types::{AttemptId, NodeId, ProfileId, PromptId, WorkerId, WorkerMessage};
 use serde::Deserialize;
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     error::Error,
     fs,
     sync::Arc,
@@ -64,6 +72,24 @@ struct UpscaleModelResourceCase {
     state_keys: Vec<String>,
     architecture_id: String,
     diagnostic: String,
+}
+
+fn fixture_raw_bits(value: &serde_json::Value) -> Result<Vec<u32>, Box<dyn Error>> {
+    fn collect(value: &serde_json::Value, output: &mut Vec<u32>) -> Result<(), Box<dyn Error>> {
+        if let Some(array) = value.as_array() {
+            for value in array {
+                collect(value, output)?;
+            }
+            return Ok(());
+        }
+        output.push(u32::try_from(
+            value.as_u64().ok_or("fixture bit is not an integer")?,
+        )?);
+        Ok(())
+    }
+    let mut output = Vec::new();
+    collect(value, &mut output)?;
+    Ok(output)
 }
 
 fn sdpose_tensor(
@@ -258,6 +284,732 @@ fn native_upscale_model_resource_is_closed_and_source_specific() -> Result<(), B
         assert!(!resource_source.contains(forbidden));
     }
     assert!(!payload_source.contains("NativeModelResource::UpscaleModel"));
+    Ok(())
+}
+
+#[test]
+fn native_latent_upscale_model_fixture_oracles_are_complete_and_consumed()
+-> Result<(), Box<dyn Error>> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .ok_or("comfy_test_support has no repository root")?;
+    let fixture_path = root.join(
+        "crates/comfy_test_support/fixtures/models/latent-upscale-model-resource-foundation/manifest.json",
+    );
+    let fixture: serde_json::Value = serde_json::from_str(&fs::read_to_string(&fixture_path)?)?;
+    assert_eq!(
+        fixture
+            .get("oracle_domain")
+            .and_then(serde_json::Value::as_str),
+        Some("zed.comfy.latent-upscale-independent-source-equations.v1")
+    );
+    let generator_sha = fixture
+        .get("oracle_generator_sha256")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("latent-upscale generator SHA is missing")?;
+    let actual_generator_sha = format!(
+        "{:x}",
+        Sha256::digest(fs::read(root.join(
+            "crates/comfy_test_support/src/bin/generate_latent_upscale_model_fixture.rs"
+        ),)?)
+    );
+    assert_eq!(generator_sha, actual_generator_sha);
+
+    let cases = fixture
+        .get("cases")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("latent-upscale fixture cases are missing")?;
+    let identifiers = cases
+        .iter()
+        .filter_map(|case| case.get("id").and_then(serde_json::Value::as_str))
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        identifiers,
+        BTreeSet::from([
+            "720-integrated-residual-order",
+            "1080-repeat-rms-shortcut-order",
+            "pixel-shuffle-dimension-one",
+            "pixel-shuffle-dimension-two",
+            "pixel-shuffle-dimension-three",
+            "rational-blur-center-delta",
+            "nearest-exact-half-coordinate",
+            "bislerp-edge-cases",
+            "ltx-vae-statistics-order",
+        ])
+    );
+    for case in cases {
+        let identifier = case
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("latent-upscale fixture case lacks an id")?;
+        if identifier != "rational-blur-center-delta" {
+            assert!(
+                case.as_object()
+                    .is_some_and(|object| { object.keys().any(|key| key.ends_with("_bits")) }),
+                "latent-upscale case {identifier} lacks a raw-bit oracle"
+            );
+        }
+    }
+    let expected_720_bits = cases
+        .iter()
+        .find(|case| {
+            case.get("id").and_then(serde_json::Value::as_str)
+                == Some("720-integrated-residual-order")
+        })
+        .and_then(|case| case.get("expected_bits"))
+        .and_then(serde_json::Value::as_array)
+        .ok_or("720 raw oracle bits are missing")?
+        .iter()
+        .map(|value| value.as_u64().ok_or("720 raw oracle bit is invalid"))
+        .collect::<Result<Vec<_>, _>>()?;
+    let workspace_bytes = 1024 * 1024 * 1024;
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(workspace_bytes)?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority.authorize_workspace(workspace_bytes)?,
+        &cancellation,
+    );
+    let tensor = |shape: &[u64], values: &[f32]| {
+        tensor_from_f32_with_context_exact_native(
+            &backend,
+            shape,
+            values,
+            DType::F32,
+            backend.device(),
+            &context,
+        )
+    };
+    let case = |identifier: &str| -> Result<&serde_json::Value, Box<dyn Error>> {
+        cases
+            .iter()
+            .find(|case| case.get("id").and_then(serde_json::Value::as_str) == Some(identifier))
+            .ok_or_else(|| format!("missing latent-upscale case {identifier}").into())
+    };
+    let tensor_bits = |tensor: &Tensor| -> Result<Vec<u32>, Box<dyn Error>> {
+        Ok(comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+            &backend,
+            tensor,
+            &context,
+        )?
+        .iter()
+        .map(|value| value.to_bits())
+        .collect())
+    };
+    let mut identity = vec![0.0_f32; 27];
+    identity[22] = 1.0;
+    let mut ordered_state = Vec::new();
+    for prefix in [
+        "in_conv.conv",
+        "blocks.0.block.0.conv",
+        "blocks.0.block.2.conv",
+        "blocks.0.block.4.conv",
+        "out_conv.conv",
+    ] {
+        ordered_state.push((
+            format!("{prefix}.weight"),
+            tensor(&[1, 1, 3, 3, 3], &identity)?,
+        ));
+        ordered_state.push((format!("{prefix}.bias"), tensor(&[1], &[0.0])?));
+    }
+    let ordered_state_720 = ordered_state.clone();
+    let resource = NativeLatentUpscaleModelResource::from_checkpoint(
+        NativeLatentUpscaleCheckpoint {
+            artifact_sha256: "1".repeat(64),
+            metadata: BTreeMap::new(),
+            ordered_state,
+            memory_budget_bytes: workspace_bytes,
+        },
+        &context,
+    )?;
+    let input = tensor(&[1, 1, 3, 1, 1], &[-1.0, 0.0, 1.0])?;
+    let output = resource.invoke_hunyuan_720p(&backend, &input, &context)?;
+    let actual = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+        &backend,
+        &output,
+        &context,
+    )?;
+    assert_eq!(
+        actual
+            .iter()
+            .map(|value| u64::from(value.to_bits()))
+            .collect::<Vec<_>>(),
+        expected_720_bits
+    );
+    let mutated_720_input = resource.invoke_hunyuan_720p(
+        &backend,
+        &tensor(&[1, 1, 3, 1, 1], &[-1.0, 0.0, 2.0])?,
+        &context,
+    )?;
+    assert_ne!(
+        actual
+            .iter()
+            .map(|value| value.to_bits())
+            .collect::<Vec<_>>(),
+        tensor_bits(&mutated_720_input)?
+    );
+
+    let mut early_branch_state = ordered_state_720.clone();
+    let mut late_branch_state = ordered_state_720;
+    let mut half_identity = identity.clone();
+    half_identity[22] = 0.5;
+    for (state, key) in [
+        (&mut early_branch_state, "blocks.0.block.0.conv.weight"),
+        (&mut late_branch_state, "blocks.0.block.2.conv.weight"),
+    ] {
+        let (_, weight) = state
+            .iter_mut()
+            .find(|(candidate, _)| candidate == key)
+            .ok_or("720 branch weight is missing")?;
+        *weight = tensor(&[1, 1, 3, 3, 3], &half_identity)?;
+    }
+    let build_720 = |artifact: char, ordered_state| {
+        NativeLatentUpscaleModelResource::from_checkpoint(
+            NativeLatentUpscaleCheckpoint {
+                artifact_sha256: artifact.to_string().repeat(64),
+                metadata: BTreeMap::new(),
+                ordered_state,
+                memory_budget_bytes: workspace_bytes,
+            },
+            &context,
+        )
+    };
+    let early_branch = build_720('4', early_branch_state)?;
+    let late_branch = build_720('5', late_branch_state)?;
+    assert_ne!(
+        tensor_bits(&early_branch.invoke_hunyuan_720p(&backend, &input, &context)?)?,
+        tensor_bits(&late_branch.invoke_hunyuan_720p(&backend, &input, &context)?)?
+    );
+
+    let mut state_1080 = Vec::new();
+    let conv = |output_channels: usize, input_channels: usize, centers: &[(usize, f32)]| {
+        let mut values = vec![0.0_f32; output_channels * input_channels * 27];
+        for (index, value) in centers {
+            values[*index] = *value;
+        }
+        values
+    };
+    state_1080.push((
+        "conv_in.conv.weight".to_owned(),
+        tensor(&[2, 1, 3, 3, 3], &conv(2, 1, &[(22, 1.0), (49, 2.0)]))?,
+    ));
+    state_1080.push(("conv_in.conv.bias".to_owned(), tensor(&[2], &[0.0; 2])?));
+    let residual_branch_weights = [[0.5_f32, -0.25], [-0.75, 0.5], [0.25, 1.0]];
+    for (block, branch) in residual_branch_weights.iter().enumerate() {
+        for norm in ["norm1", "norm2"] {
+            state_1080.push((
+                format!("up.0.block.{block}.{norm}.gamma"),
+                tensor(&[2, 1, 1, 1], &[1.0, 1.0])?,
+            ));
+        }
+        state_1080.push((
+            format!("up.0.block.{block}.conv1.conv.weight"),
+            tensor(&[2, 2, 3, 3, 3], &conv(2, 2, &[(22, 1.0), (103, 1.0)]))?,
+        ));
+        state_1080.push((
+            format!("up.0.block.{block}.conv1.conv.bias"),
+            tensor(&[2], &[0.0; 2])?,
+        ));
+        state_1080.push((
+            format!("up.0.block.{block}.conv2.conv.weight"),
+            tensor(
+                &[2, 2, 3, 3, 3],
+                &conv(2, 2, &[(22, branch[0]), (103, branch[1])]),
+            )?,
+        ));
+        state_1080.push((
+            format!("up.0.block.{block}.conv2.conv.bias"),
+            tensor(&[2], &[0.0; 2])?,
+        ));
+    }
+    state_1080.push((
+        "norm_out.gamma".to_owned(),
+        tensor(&[2, 1, 1, 1], &[1.0, 1.0])?,
+    ));
+    state_1080.push((
+        "conv_out.conv.weight".to_owned(),
+        tensor(&[1, 2, 3, 3, 3], &conv(1, 2, &[(22, 1.0), (49, -1.0)]))?,
+    ));
+    state_1080.push(("conv_out.conv.bias".to_owned(), tensor(&[1], &[0.0])?));
+    let mut mutated_state_1080 = state_1080.clone();
+    let resource_1080 = NativeLatentUpscaleModelResource::from_checkpoint(
+        NativeLatentUpscaleCheckpoint {
+            artifact_sha256: "2".repeat(64),
+            metadata: BTreeMap::new(),
+            ordered_state: state_1080,
+            memory_budget_bytes: workspace_bytes,
+        },
+        &context,
+    )?;
+    let output_1080 = resource_1080.invoke_hunyuan_1080p(
+        &backend,
+        &tensor(&[1, 1, 1, 1, 1], &[1.0])?,
+        &context,
+    )?;
+    assert_eq!(
+        tensor_bits(&output_1080)?,
+        fixture_raw_bits(
+            case("1080-repeat-rms-shortcut-order")?
+                .get("expected_bits")
+                .ok_or("1080 bits")?
+        )?
+    );
+    let (_, branch_weight) = mutated_state_1080
+        .iter_mut()
+        .find(|(key, _)| key == "up.0.block.1.conv2.conv.weight")
+        .ok_or("ordered 1080 branch weight is missing")?;
+    *branch_weight = tensor(&[2, 2, 3, 3, 3], &conv(2, 2, &[(22, -0.5), (103, 0.75)]))?;
+    let mutated_resource_1080 = NativeLatentUpscaleModelResource::from_checkpoint(
+        NativeLatentUpscaleCheckpoint {
+            artifact_sha256: "6".repeat(64),
+            metadata: BTreeMap::new(),
+            ordered_state: mutated_state_1080,
+            memory_budget_bytes: workspace_bytes,
+        },
+        &context,
+    )?;
+    assert_ne!(
+        tensor_bits(&output_1080)?,
+        tensor_bits(&mutated_resource_1080.invoke_hunyuan_1080p(
+            &backend,
+            &tensor(&[1, 1, 1, 1, 1], &[1.0])?,
+            &context,
+        )?)?
+    );
+
+    let shuffle_one = pixel_shuffle_nd_tensor_with_context_exact_native(
+        &backend,
+        &tensor(&[1, 2, 2, 1, 1], &[10.0, 20.0, 11.0, 21.0])?,
+        1,
+        2,
+        &context,
+    )?;
+    assert_eq!(
+        tensor_bits(&shuffle_one)?,
+        fixture_raw_bits(
+            case("pixel-shuffle-dimension-one")?
+                .get("expected_frames_bits")
+                .ok_or("shuffle-one bits")?
+        )?
+    );
+    let mutated_shuffle_one = pixel_shuffle_nd_tensor_with_context_exact_native(
+        &backend,
+        &tensor(&[1, 2, 2, 1, 1], &[10.0, 20.0, 12.0, 21.0])?,
+        1,
+        2,
+        &context,
+    )?;
+    assert_ne!(
+        tensor_bits(&mutated_shuffle_one)?,
+        tensor_bits(&shuffle_one)?
+    );
+    let shuffle_two = pixel_shuffle_tensor_with_context_exact_native(
+        &backend,
+        &tensor(&[1, 4, 1, 1], &[1.0, 2.0, 3.0, 4.0])?,
+        2,
+        &context,
+    )?;
+    assert_eq!(
+        tensor_bits(&shuffle_two)?,
+        fixture_raw_bits(
+            case("pixel-shuffle-dimension-two")?
+                .get("expected_bits")
+                .ok_or("shuffle-two bits")?
+        )?
+    );
+    let mutated_shuffle_two = pixel_shuffle_tensor_with_context_exact_native(
+        &backend,
+        &tensor(&[1, 4, 1, 1], &[1.0, 2.0, 3.0, 5.0])?,
+        2,
+        &context,
+    )?;
+    assert_ne!(
+        tensor_bits(&mutated_shuffle_two)?,
+        tensor_bits(&shuffle_two)?
+    );
+    let shuffle_three = pixel_shuffle_nd_tensor_with_context_exact_native(
+        &backend,
+        &tensor(&[1, 8, 1, 1, 1], &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0])?,
+        3,
+        2,
+        &context,
+    )?;
+    assert_eq!(
+        tensor_bits(&shuffle_three)?,
+        fixture_raw_bits(
+            case("pixel-shuffle-dimension-three")?
+                .get("expected_bits")
+                .ok_or("shuffle-three bits")?
+        )?
+    );
+    let mutated_shuffle = pixel_shuffle_nd_tensor_with_context_exact_native(
+        &backend,
+        &tensor(&[1, 8, 1, 1, 1], &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0])?,
+        3,
+        2,
+        &context,
+    )?;
+    assert_ne!(tensor_bits(&mutated_shuffle)?, tensor_bits(&shuffle_three)?);
+
+    let nearest = interpolate_tensor_with_context_exact_native(
+        &backend,
+        &tensor(&[1, 1, 1, 2], &[0.0, 10.0])?,
+        &InterpolateConfiguration {
+            output_size: Some(vec![1, 3]),
+            scale_factor: None,
+            mode: InterpolateMode::NearestExact,
+            align_corners: None,
+            recompute_scale_factor: None,
+            antialias: false,
+        },
+        &context,
+    )?;
+    assert_eq!(
+        tensor_bits(&nearest)?,
+        fixture_raw_bits(
+            case("nearest-exact-half-coordinate")?
+                .get("expected_bits")
+                .ok_or("nearest bits")?
+        )?
+    );
+    let floor_nearest = interpolate_tensor_with_context_exact_native(
+        &backend,
+        &tensor(&[1, 1, 1, 2], &[0.0, 10.0])?,
+        &InterpolateConfiguration {
+            output_size: Some(vec![1, 3]),
+            scale_factor: None,
+            mode: InterpolateMode::Nearest,
+            align_corners: None,
+            recompute_scale_factor: None,
+            antialias: false,
+        },
+        &context,
+    )?;
+    assert_ne!(tensor_bits(&floor_nearest)?, tensor_bits(&nearest)?);
+    let mutated_nearest = interpolate_tensor_with_context_exact_native(
+        &backend,
+        &tensor(&[1, 1, 1, 2], &[0.0, 11.0])?,
+        &InterpolateConfiguration {
+            output_size: Some(vec![1, 3]),
+            scale_factor: None,
+            mode: InterpolateMode::NearestExact,
+            align_corners: None,
+            recompute_scale_factor: None,
+            antialias: false,
+        },
+        &context,
+    )?;
+    assert_ne!(tensor_bits(&mutated_nearest)?, tensor_bits(&nearest)?);
+
+    let bislerp_case = case("bislerp-edge-cases")?;
+    let pairs = bislerp_case
+        .get("pairs")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("bislerp pairs")?;
+    let expected = fixture_raw_bits(bislerp_case.get("expected_bits").ok_or("bislerp bits")?)?;
+    let targets = [(4_u64, 1_usize), (3, 1), (3, 1), (8, 3)];
+    let changed_ratio_targets = [(3_u64, 1_usize), (4, 1), (4, 1), (4, 1)];
+    let mut actual_bislerp = Vec::new();
+    for (pair_index, (pair, (target_width, sample))) in pairs.iter().zip(targets).enumerate() {
+        let left = pair
+            .get("left")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("bislerp left")?;
+        let right = pair
+            .get("right")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("bislerp right")?;
+        let values = [
+            left[0].as_f64().ok_or("left 0")? as f32,
+            right[0].as_f64().ok_or("right 0")? as f32,
+            left[1].as_f64().ok_or("left 1")? as f32,
+            right[1].as_f64().ok_or("right 1")? as f32,
+        ];
+        let output = bislerp_tensor_with_context_exact_native(
+            &backend,
+            &tensor(&[1, 2, 1, 2], &values)?,
+            target_width,
+            1,
+            &context,
+        )?;
+        let bits = tensor_bits(&output)?;
+        actual_bislerp.extend([bits[sample], bits[target_width as usize + sample]]);
+
+        let mut mutated_values = values;
+        mutated_values[3] += 0.125;
+        let mutated = bislerp_tensor_with_context_exact_native(
+            &backend,
+            &tensor(&[1, 2, 1, 2], &mutated_values)?,
+            target_width,
+            1,
+            &context,
+        )?;
+        let mutated_bits = tensor_bits(&mutated)?;
+        assert_ne!(
+            [bits[sample], bits[target_width as usize + sample]],
+            [
+                mutated_bits[sample],
+                mutated_bits[target_width as usize + sample]
+            ],
+            "bislerp pair {pair_index} did not discriminate a vector mutation"
+        );
+
+        let (changed_width, changed_sample) = changed_ratio_targets[pair_index];
+        let changed_ratio = bislerp_tensor_with_context_exact_native(
+            &backend,
+            &tensor(&[1, 2, 1, 2], &values)?,
+            changed_width,
+            1,
+            &context,
+        )?;
+        let changed_ratio_bits = tensor_bits(&changed_ratio)?;
+        let baseline_sample = [bits[sample], bits[target_width as usize + sample]];
+        let changed_sample = [
+            changed_ratio_bits[changed_sample],
+            changed_ratio_bits[changed_width as usize + changed_sample],
+        ];
+        if pair_index == 1 {
+            assert_eq!(baseline_sample, changed_sample);
+        } else {
+            assert_ne!(
+                baseline_sample, changed_sample,
+                "bislerp pair {pair_index} did not discriminate a ratio mutation"
+            );
+        }
+    }
+    assert_eq!(actual_bislerp, expected);
+
+    let blur_case = case("rational-blur-center-delta")?;
+    let blur_numerator = blur_case
+        .get("expected_numerator")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("blur numerator")?;
+    let blur_denominator = blur_case
+        .get("normalization_denominator")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("blur denominator")? as f32;
+    let mut blur_kernel = Vec::new();
+    for row in blur_numerator {
+        for value in row.as_array().ok_or("blur numerator row")? {
+            blur_kernel
+                .push(value.as_u64().ok_or("blur numerator value")? as f32 / blur_denominator);
+        }
+    }
+    let blur_axis = [1.0_f32, 4.0, 6.0, 4.0, 1.0];
+    let source_kernel = blur_axis
+        .iter()
+        .flat_map(|vertical| {
+            blur_axis
+                .iter()
+                .map(move |horizontal| vertical * horizontal / 256.0)
+        })
+        .collect::<Vec<_>>();
+    let config = serde_json::json!({
+        "_class_name": "LatentUpsampler",
+        "in_channels": 1,
+        "mid_channels": 32,
+        "num_blocks_per_stage": 1,
+        "dims": 3,
+        "spatial_upsample": true,
+        "temporal_upsample": false,
+        "spatial_scale": 1.5,
+        "rational_resampler": true,
+    });
+    let zeros = |length: usize| vec![0.0_f32; length];
+    let mut rational_state = vec![
+        (
+            "initial_conv.weight".to_owned(),
+            tensor(&[32, 1, 3, 3, 3], &zeros(32 * 27))?,
+        ),
+        ("initial_conv.bias".to_owned(), tensor(&[32], &zeros(32))?),
+        ("initial_norm.weight".to_owned(), tensor(&[32], &[1.0; 32])?),
+        ("initial_norm.bias".to_owned(), tensor(&[32], &zeros(32))?),
+        (
+            "upsampler.conv.weight".to_owned(),
+            tensor(&[288, 32, 3, 3], &zeros(288 * 32 * 9))?,
+        ),
+        (
+            "upsampler.conv.bias".to_owned(),
+            tensor(&[288], &zeros(288))?,
+        ),
+        (
+            "upsampler.blur_down.kernel".to_owned(),
+            tensor(&[1, 1, 5, 5], &source_kernel)?,
+        ),
+        (
+            "final_conv.weight".to_owned(),
+            tensor(&[1, 32, 3, 3, 3], &zeros(32 * 27))?,
+        ),
+        ("final_conv.bias".to_owned(), tensor(&[1], &[0.0])?),
+    ];
+    for family in ["res_blocks", "post_upsample_res_blocks"] {
+        for convolution in ["conv1", "conv2"] {
+            rational_state.push((
+                format!("{family}.0.{convolution}.weight"),
+                tensor(&[32, 32, 3, 3, 3], &zeros(32 * 32 * 27))?,
+            ));
+            rational_state.push((
+                format!("{family}.0.{convolution}.bias"),
+                tensor(&[32], &zeros(32))?,
+            ));
+        }
+        for normalization in ["norm1", "norm2"] {
+            rational_state.push((
+                format!("{family}.0.{normalization}.weight"),
+                tensor(&[32], &[1.0; 32])?,
+            ));
+            rational_state.push((
+                format!("{family}.0.{normalization}.bias"),
+                tensor(&[32], &zeros(32))?,
+            ));
+        }
+    }
+    let mut mutated_rational_state = rational_state.clone();
+    let rational_resource = NativeLatentUpscaleModelResource::from_checkpoint(
+        NativeLatentUpscaleCheckpoint {
+            artifact_sha256: "3".repeat(64),
+            metadata: BTreeMap::from([("config".to_owned(), serde_json::to_string(&config)?)]),
+            ordered_state: rational_state,
+            memory_budget_bytes: workspace_bytes,
+        },
+        &context,
+    )?;
+    let mut center_delta = vec![0.0_f32; 25];
+    center_delta[12] = 1.0;
+    let blurred = rational_resource.rational_blur_test_support(
+        &backend,
+        &tensor(&[1, 1, 5, 5], &center_delta)?,
+        2,
+        &context,
+    )?;
+    let blurred_values = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+        &backend,
+        &blurred,
+        &context,
+    )?;
+    assert_eq!(blurred_values, blur_kernel);
+    let mut mutated_kernel = source_kernel;
+    mutated_kernel[12] += 1.0 / 256.0;
+    let (_, kernel) = mutated_rational_state
+        .iter_mut()
+        .find(|(key, _)| key == "upsampler.blur_down.kernel")
+        .ok_or("rational blur kernel is missing")?;
+    *kernel = tensor(&[1, 1, 5, 5], &mutated_kernel)?;
+    let mutated_rational_resource = NativeLatentUpscaleModelResource::from_checkpoint(
+        NativeLatentUpscaleCheckpoint {
+            artifact_sha256: "7".repeat(64),
+            metadata: BTreeMap::from([("config".to_owned(), serde_json::to_string(&config)?)]),
+            ordered_state: mutated_rational_state,
+            memory_budget_bytes: workspace_bytes,
+        },
+        &context,
+    )?;
+    let mutated_blur = mutated_rational_resource.rational_blur_test_support(
+        &backend,
+        &tensor(&[1, 1, 5, 5], &center_delta)?,
+        2,
+        &context,
+    )?;
+    assert_ne!(tensor_bits(&mutated_blur)?, tensor_bits(&blurred)?);
+
+    let ltx_case = case("ltx-vae-statistics-order")?;
+    let fixture_floats = |field: &str| -> Result<[f32; 4], Box<dyn Error>> {
+        let values = ltx_case
+            .get(field)
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| format!("missing {field}"))?;
+        Ok([
+            values[0].as_f64().ok_or("fixture float 0")? as f32,
+            values[1].as_f64().ok_or("fixture float 1")? as f32,
+            values[2].as_f64().ok_or("fixture float 2")? as f32,
+            values[3].as_f64().ok_or("fixture float 3")? as f32,
+        ])
+    };
+    let mut means = [0.0_f32; 128];
+    means[..4].copy_from_slice(&fixture_floats("mean")?);
+    let mut standard_deviations = [1.0_f32; 128];
+    standard_deviations[..4].copy_from_slice(&fixture_floats("standard_deviation")?);
+    let mut ltx_input = [0.0_f32; 128];
+    ltx_input[..4].copy_from_slice(&fixture_floats("input")?);
+    let unnormalized = comfy_model::vae_video::ltx_latent_statistics_test_support(
+        &backend,
+        &tensor(&[1, 128, 1, 1, 1], &ltx_input)?,
+        &means,
+        &standard_deviations,
+        false,
+        &context,
+    )?;
+    assert_eq!(
+        &tensor_bits(&unnormalized)?[..4],
+        fixture_raw_bits(
+            ltx_case
+                .get("expected_unnormalized_bits")
+                .ok_or("unnormalized bits")?
+        )?
+        .as_slice()
+    );
+    let mut model_raw = [0.0_f32; 128];
+    model_raw[..4].copy_from_slice(&fixture_floats("model_raw")?);
+    let normalized = comfy_model::vae_video::ltx_latent_statistics_test_support(
+        &backend,
+        &tensor(&[1, 128, 1, 1, 1], &model_raw)?,
+        &means,
+        &standard_deviations,
+        true,
+        &context,
+    )?;
+    assert_eq!(
+        &tensor_bits(&normalized)?[..4],
+        fixture_raw_bits(
+            ltx_case
+                .get("expected_normalized_bits")
+                .ok_or("normalized bits")?
+        )?
+        .as_slice()
+    );
+    let mut mutated_means = means;
+    mutated_means[0] += 1.0;
+    let mean_mutation = comfy_model::vae_video::ltx_latent_statistics_test_support(
+        &backend,
+        &tensor(&[1, 128, 1, 1, 1], &ltx_input)?,
+        &mutated_means,
+        &standard_deviations,
+        false,
+        &context,
+    )?;
+    assert_ne!(
+        &tensor_bits(&mean_mutation)?[..4],
+        &tensor_bits(&unnormalized)?[..4]
+    );
+
+    let mut mutated_standard_deviations = standard_deviations;
+    mutated_standard_deviations[0] += 1.0;
+    let standard_deviation_mutation = comfy_model::vae_video::ltx_latent_statistics_test_support(
+        &backend,
+        &tensor(&[1, 128, 1, 1, 1], &model_raw)?,
+        &means,
+        &mutated_standard_deviations,
+        true,
+        &context,
+    )?;
+    assert_ne!(
+        &tensor_bits(&standard_deviation_mutation)?[..4],
+        &tensor_bits(&normalized)?[..4]
+    );
+
+    let reversed_order = comfy_model::vae_video::ltx_latent_statistics_test_support(
+        &backend,
+        &tensor(&[1, 128, 1, 1, 1], &ltx_input)?,
+        &means,
+        &standard_deviations,
+        true,
+        &context,
+    )?;
+    assert_ne!(
+        &tensor_bits(&reversed_order)?[..4],
+        &tensor_bits(&unnormalized)?[..4]
+    );
     Ok(())
 }
 

@@ -1,3 +1,5 @@
+#[cfg(feature = "cpu")]
+use crate::{CpuBackend, DType, DecodedScalar, NumericClass, Scalar, TensorDescriptor};
 use crate::{
     DeviceId, ExecutionContext, Tensor, TensorBackend, TensorError,
     generated_comfy_operator_indirection_01::{
@@ -6,6 +8,7 @@ use crate::{
         convolution_tensor_with_context_exact_native as canonical_convolution_tensor,
         convolution_vjp_with_context_exact_native as canonical_convolution_vjp,
         convolution_with_context_exact_native as canonical_convolution,
+        tensor_from_f32_with_context_exact_native,
     },
     generated_external_tensor_kernel_01::{
         ExternalTensorKernelPartOneError, NativeBilinearBoundary, NativeLinearBoundary,
@@ -19,8 +22,6 @@ use crate::{
         max_pool_2d_with_context_exact_native as canonical_max_pool_2d,
     },
 };
-#[cfg(feature = "cpu")]
-use crate::{CpuBackend, DType, DecodedScalar, NumericClass, Scalar, TensorDescriptor};
 use thiserror::Error;
 
 pub const AVG_POOL_1D_OPERATION_ID: &str = "COMFY-TENSOR-OP-5F86004D9BDA";
@@ -34,6 +35,8 @@ pub const CONV_TRANSPOSE_2D_OPERATION_ID: &str = "COMFY-TENSOR-OP-5A5F8349A130";
 pub const CONV_TRANSPOSE_3D_OPERATION_ID: &str = "COMFY-TENSOR-OP-5A6A586CC551";
 pub const GRID_SAMPLE_OPERATION_ID: &str = "COMFY-TENSOR-OP-A90AB43A3320";
 pub const INTERPOLATE_OPERATION_ID: &str = "COMFY-TENSOR-OP-B0F801006375";
+pub const BISLERP_OPERATION_ID: &str = "COMFY-TENSOR-OP-2E8A60F63A15";
+pub const PIXEL_SHUFFLE_ND_OPERATION_ID: &str = "COMFY-TENSOR-OP-02F93AD75026";
 pub const MAX_POOL_2D_OPERATION_ID: &str = "COMFY-TENSOR-OP-1F9D23F3B331";
 
 #[derive(Clone, Debug, Error, PartialEq)]
@@ -77,6 +80,22 @@ impl From<TensorError> for SpatialFunctionalKernelError {
 impl From<comfy_types::CancellationError> for SpatialFunctionalKernelError {
     fn from(_: comfy_types::CancellationError) -> Self {
         Self::Cancelled
+    }
+}
+
+fn canonical_tensor_owner_error(
+    operation: &'static str,
+    owner: &'static str,
+    error: OperatorIndirectionError,
+) -> SpatialFunctionalKernelError {
+    match error {
+        OperatorIndirectionError::Cancelled => SpatialFunctionalKernelError::Cancelled,
+        OperatorIndirectionError::Tensor(error) => error.into(),
+        error => SpatialFunctionalKernelError::CanonicalOwner {
+            operation,
+            owner,
+            reason: error.to_string(),
+        },
     }
 }
 
@@ -139,17 +158,9 @@ pub fn average_pool_2d_tensor_with_context_exact_native(
     context: &ExecutionContext<'_>,
 ) -> Result<Tensor, SpatialFunctionalKernelError> {
     context.check()?;
-    validate_real_tensor(
-        backend,
-        input,
-        "input",
-        AVG_POOL_2D_OPERATION_ID,
-        context,
-    )?;
-    let input_shape =
-        tensor_shape_to_usize(input, AVG_POOL_2D_OPERATION_ID, "input shape")?;
-    let input_values =
-        tensor_to_f32_workspace(backend, input, AVG_POOL_2D_OPERATION_ID, context)?;
+    validate_real_tensor(backend, input, "input", AVG_POOL_2D_OPERATION_ID, context)?;
+    let input_shape = tensor_shape_to_usize(input, AVG_POOL_2D_OPERATION_ID, "input shape")?;
+    let input_values = tensor_to_f32_workspace(backend, input, AVG_POOL_2D_OPERATION_ID, context)?;
     let geometry = checked_average_pool_geometry(
         AVG_POOL_2D_OPERATION_ID,
         2,
@@ -189,8 +200,7 @@ pub fn average_pool_2d_tensor_with_context_exact_native(
         .output_shape()
         .iter()
         .map(|value| {
-            u64::try_from(*value)
-                .map_err(|_| overflow(AVG_POOL_2D_OPERATION_ID, "output shape"))
+            u64::try_from(*value).map_err(|_| overflow(AVG_POOL_2D_OPERATION_ID, "output shape"))
         })
         .collect::<Result<Vec<_>, _>>()?;
     let descriptor = TensorDescriptor::contiguous(
@@ -276,7 +286,9 @@ pub fn average_pool_vjp_with_context_exact_native(
         operation,
         "output gradient",
         output_gradient.len(),
-        geometry.output_count().map_err(|error| pool_error(operation, error))?,
+        geometry
+            .output_count()
+            .map_err(|error| pool_error(operation, error))?,
     )?;
     let mut gradient = vec![0.0_f32; input.len()];
     geometry
@@ -354,9 +366,12 @@ fn average_pool_forward(
                 let source = input.get(input_index).copied().ok_or(
                     NeuralNetworkModuleError::ShapeOverflow("average-pool input index"),
                 )?;
-                let destination = values.get_mut(output_index).ok_or(
-                    NeuralNetworkModuleError::ShapeOverflow("average-pool output index"),
-                )?;
+                let destination =
+                    values
+                        .get_mut(output_index)
+                        .ok_or(NeuralNetworkModuleError::ShapeOverflow(
+                            "average-pool output index",
+                        ))?;
                 *destination = source.mul_add(scale, *destination);
                 Ok(())
             },
@@ -383,7 +398,10 @@ fn checked_average_pool_geometry(
             .as_ref()
             .is_some_and(|stride| stride.len() != spatial_dimensions)
     {
-        return invalid(operation, "pooling argument rank does not match the operation");
+        return invalid(
+            operation,
+            "pooling argument rank does not match the operation",
+        );
     }
     if configuration
         .padding
@@ -498,6 +516,29 @@ pub fn conv_2d_tensor_with_context_exact_native(
     convolution_tensor_forward(
         backend,
         CONV_2D_OPERATION_ID,
+        2,
+        false,
+        input,
+        weight,
+        bias,
+        configuration,
+        context,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn conv_3d_tensor_with_context_exact_native(
+    backend: &dyn TensorBackend,
+    input: &Tensor,
+    weight: &Tensor,
+    bias: Option<&Tensor>,
+    configuration: &ConvolutionConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, SpatialFunctionalKernelError> {
+    convolution_tensor_forward(
+        backend,
+        CONV_3D_OPERATION_ID,
+        3,
         false,
         input,
         weight,
@@ -519,6 +560,7 @@ pub fn conv_transpose_2d_tensor_with_context_exact_native(
     convolution_tensor_forward(
         backend,
         CONV_TRANSPOSE_2D_OPERATION_ID,
+        2,
         true,
         input,
         weight,
@@ -532,6 +574,7 @@ pub fn conv_transpose_2d_tensor_with_context_exact_native(
 fn convolution_tensor_forward(
     backend: &dyn TensorBackend,
     operation: &'static str,
+    spatial_dimensions: usize,
     transposed: bool,
     input: &Tensor,
     weight: &Tensor,
@@ -540,7 +583,7 @@ fn convolution_tensor_forward(
     context: &ExecutionContext<'_>,
 ) -> Result<Tensor, SpatialFunctionalKernelError> {
     context.check()?;
-    let geometry = convolution_geometry(operation, 2, transposed, configuration)?;
+    let geometry = convolution_geometry(operation, spatial_dimensions, transposed, configuration)?;
     canonical_convolution_tensor(backend, input, weight, bias, &geometry, context)
         .map_err(|error| convolution_error(operation, error))
 }
@@ -723,20 +766,8 @@ pub fn grid_sample_tensor_with_context_exact_native(
     context: &ExecutionContext<'_>,
 ) -> Result<Tensor, SpatialFunctionalKernelError> {
     context.check()?;
-    validate_real_tensor(
-        backend,
-        input,
-        "input",
-        GRID_SAMPLE_OPERATION_ID,
-        context,
-    )?;
-    validate_real_tensor(
-        backend,
-        grid,
-        "grid",
-        GRID_SAMPLE_OPERATION_ID,
-        context,
-    )?;
+    validate_real_tensor(backend, input, "input", GRID_SAMPLE_OPERATION_ID, context)?;
+    validate_real_tensor(backend, grid, "grid", GRID_SAMPLE_OPERATION_ID, context)?;
     if grid.descriptor().dtype() != DType::F32 {
         return Err(TensorError::DTypeMismatch {
             expected: DType::F32,
@@ -747,8 +778,7 @@ pub fn grid_sample_tensor_with_context_exact_native(
 
     let input_shape = tensor_shape_to_usize(input, GRID_SAMPLE_OPERATION_ID, "input shape")?;
     let grid_shape = tensor_shape_to_usize(grid, GRID_SAMPLE_OPERATION_ID, "grid shape")?;
-    let input_values =
-        tensor_to_f32_workspace(backend, input, GRID_SAMPLE_OPERATION_ID, context)?;
+    let input_values = tensor_to_f32_workspace(backend, input, GRID_SAMPLE_OPERATION_ID, context)?;
     let grid_values = tensor_to_f32_workspace(backend, grid, GRID_SAMPLE_OPERATION_ID, context)?;
     let geometry = GridGeometry::new(
         &input_values,
@@ -761,8 +791,7 @@ pub fn grid_sample_tensor_with_context_exact_native(
         .output_shape()
         .into_iter()
         .map(|value| {
-            u64::try_from(value)
-                .map_err(|_| overflow(GRID_SAMPLE_OPERATION_ID, "output shape"))
+            u64::try_from(value).map_err(|_| overflow(GRID_SAMPLE_OPERATION_ID, "output shape"))
         })
         .collect::<Result<Vec<_>, _>>()?;
     let descriptor = TensorDescriptor::contiguous(
@@ -779,28 +808,25 @@ pub fn grid_sample_tensor_with_context_exact_native(
     {
         let mut write = output.write()?;
         let output_bytes = write.bytes_mut()?;
-        geometry.for_each_output(
-            context,
-            |output_index, batch, channel, y, x, _, _| {
-                let value = geometry.sample(&input_values, batch, channel, y, x)?;
-                let start = output_index
-                    .checked_mul(byte_width)
-                    .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "output byte index"))?;
-                let end = start
-                    .checked_add(byte_width)
-                    .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "output byte range"))?;
-                let destination = output_bytes.get_mut(start..end).ok_or_else(|| {
-                    overflow(GRID_SAMPLE_OPERATION_ID, "output byte destination")
-                })?;
-                let encoded = dtype.encode_scalar(
-                    Scalar::Float(f64::from(value)),
-                    GRID_SAMPLE_OPERATION_ID,
-                    DeviceId::CPU,
-                )?;
-                destination.copy_from_slice(&encoded);
-                Ok(())
-            },
-        )?;
+        geometry.for_each_output(context, |output_index, batch, channel, y, x, _, _| {
+            let value = geometry.sample(&input_values, batch, channel, y, x)?;
+            let start = output_index
+                .checked_mul(byte_width)
+                .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "output byte index"))?;
+            let end = start
+                .checked_add(byte_width)
+                .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "output byte range"))?;
+            let destination = output_bytes
+                .get_mut(start..end)
+                .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "output byte destination"))?;
+            let encoded = dtype.encode_scalar(
+                Scalar::Float(f64::from(value)),
+                GRID_SAMPLE_OPERATION_ID,
+                DeviceId::CPU,
+            )?;
+            destination.copy_from_slice(&encoded);
+            Ok(())
+        })?;
     }
     let event = backend.record_event(context)?;
     backend.wait_event(event, context)?;
@@ -840,10 +866,7 @@ fn validate_real_tensor(
         tensor.descriptor().dtype(),
         DType::F16 | DType::Bf16 | DType::F32
     ) {
-        return invalid(
-            operation,
-            format!("{name} dtype must be F16, BF16, or F32"),
-        );
+        return invalid(operation, format!("{name} dtype must be F16, BF16, or F32"));
     }
     Ok(())
 }
@@ -858,9 +881,7 @@ fn tensor_shape_to_usize(
         .descriptor()
         .shape()
         .iter()
-        .map(|value| {
-            usize::try_from(*value).map_err(|_| overflow(operation, subject))
-        })
+        .map(|value| usize::try_from(*value).map_err(|_| overflow(operation, subject)))
         .collect()
 }
 
@@ -878,8 +899,8 @@ fn tensor_to_f32_workspace(
         if linear.is_multiple_of(64) {
             context.check()?;
         }
-        let linear = u64::try_from(linear)
-            .map_err(|_| overflow(operation, "tensor linear index"))?;
+        let linear =
+            u64::try_from(linear).map_err(|_| overflow(operation, "tensor linear index"))?;
         let value = match tensor
             .descriptor()
             .dtype()
@@ -887,10 +908,7 @@ fn tensor_to_f32_workspace(
         {
             DecodedScalar::Real(value) => value as f32,
             _ => {
-                return invalid(
-                    operation,
-                    "tensor spatial execution requires real values",
-                );
+                return invalid(operation, "tensor spatial execution requires real values");
             }
         };
         values.try_push(value)?;
@@ -924,11 +942,15 @@ pub fn grid_sample_vjp_with_context_exact_native(
         context,
         |output_index, batch, channel, y, x, coordinate_y_derivative, coordinate_x_derivative| {
             let gradient = output_gradient.get(output_index).copied().ok_or_else(|| {
-                overflow(GRID_SAMPLE_OPERATION_ID, "grid-sample output-gradient index")
+                overflow(
+                    GRID_SAMPLE_OPERATION_ID,
+                    "grid-sample output-gradient index",
+                )
             })?;
             let sampled = geometry.sample_with_derivatives(input, batch, channel, y, x)?;
             for sample in sampled.samples {
-                let index = geometry.input_index(batch, channel, sample.source_y, sample.source_x)?;
+                let index =
+                    geometry.input_index(batch, channel, sample.source_y, sample.source_x)?;
                 let destination = input_gradient.get_mut(index).ok_or_else(|| {
                     overflow(GRID_SAMPLE_OPERATION_ID, "grid-sample input-gradient index")
                 })?;
@@ -936,14 +958,20 @@ pub fn grid_sample_vjp_with_context_exact_native(
             }
             let grid_base = geometry.grid_base_index(batch, output_index)?;
             let x_destination = grid_gradient.get_mut(grid_base).ok_or_else(|| {
-                overflow(GRID_SAMPLE_OPERATION_ID, "grid-sample grid-gradient x index")
+                overflow(
+                    GRID_SAMPLE_OPERATION_ID,
+                    "grid-sample grid-gradient x index",
+                )
             })?;
             *x_destination += gradient * sampled.derivative_x * coordinate_x_derivative;
             let grid_y = grid_base
                 .checked_add(1)
                 .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "grid y index"))?;
             let y_destination = grid_gradient.get_mut(grid_y).ok_or_else(|| {
-                overflow(GRID_SAMPLE_OPERATION_ID, "grid-sample grid-gradient y index")
+                overflow(
+                    GRID_SAMPLE_OPERATION_ID,
+                    "grid-sample grid-gradient y index",
+                )
             })?;
             *y_destination += gradient * sampled.derivative_y * coordinate_y_derivative;
             Ok(())
@@ -990,7 +1018,8 @@ pub fn grid_sample_jvp_with_context_exact_native(
             let sampled = geometry.sample_with_derivatives(input, batch, channel, y, x)?;
             let mut value = 0.0_f32;
             for sample in sampled.samples {
-                let index = geometry.input_index(batch, channel, sample.source_y, sample.source_x)?;
+                let index =
+                    geometry.input_index(batch, channel, sample.source_y, sample.source_x)?;
                 let tangent = input_tangent.get(index).copied().ok_or_else(|| {
                     overflow(GRID_SAMPLE_OPERATION_ID, "grid-sample tangent index")
                 })?;
@@ -1110,7 +1139,15 @@ impl<'a> GridGeometry<'a> {
     fn for_each_output(
         &self,
         context: &ExecutionContext<'_>,
-        mut visit: impl FnMut(usize, usize, usize, f32, f32, f32, f32) -> Result<(), SpatialFunctionalKernelError>,
+        mut visit: impl FnMut(
+            usize,
+            usize,
+            usize,
+            f32,
+            f32,
+            f32,
+            f32,
+        ) -> Result<(), SpatialFunctionalKernelError>,
     ) -> Result<(), SpatialFunctionalKernelError> {
         for batch in 0..self.batch {
             for output_y in 0..self.output_height {
@@ -1119,23 +1156,22 @@ impl<'a> GridGeometry<'a> {
                         + output_x)
                         .checked_mul(2)
                         .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "grid index"))?;
-                    let normalized_x = self.grid.get(grid_index).copied().ok_or_else(|| {
-                        overflow(GRID_SAMPLE_OPERATION_ID, "grid x index")
-                    })?;
-                    let normalized_y = self.grid.get(grid_index + 1).copied().ok_or_else(|| {
-                        overflow(GRID_SAMPLE_OPERATION_ID, "grid y index")
-                    })?;
-                    let (y, y_derivative) = self.project_coordinate(
-                        normalized_y,
-                        self.input_height,
-                    )?;
-                    let (x, x_derivative) = self.project_coordinate(
-                        normalized_x,
-                        self.input_width,
-                    )?;
+                    let normalized_x = self
+                        .grid
+                        .get(grid_index)
+                        .copied()
+                        .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "grid x index"))?;
+                    let normalized_y = self
+                        .grid
+                        .get(grid_index + 1)
+                        .copied()
+                        .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "grid y index"))?;
+                    let (y, y_derivative) =
+                        self.project_coordinate(normalized_y, self.input_height)?;
+                    let (x, x_derivative) =
+                        self.project_coordinate(normalized_x, self.input_width)?;
                     for channel in 0..self.channels {
-                        let output_index = ((batch * self.channels + channel)
-                            * self.output_height
+                        let output_index = ((batch * self.channels + channel) * self.output_height
                             + output_y)
                             * self.output_width
                             + output_x;
@@ -1202,9 +1238,10 @@ impl<'a> GridGeometry<'a> {
             .into_iter()
             .try_fold(0.0_f32, |value, sample| {
                 let index = self.input_index(batch, channel, sample.source_y, sample.source_x)?;
-                let source = input.get(index).copied().ok_or_else(|| {
-                    overflow(GRID_SAMPLE_OPERATION_ID, "grid-sample input index")
-                })?;
+                let source = input
+                    .get(index)
+                    .copied()
+                    .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "grid-sample input index"))?;
                 Ok::<f32, SpatialFunctionalKernelError>(source.mul_add(sample.weight, value))
             })
     }
@@ -1292,9 +1329,7 @@ impl<'a> GridGeometry<'a> {
                     derivative_x,
                 })
             }
-            GridSampleMode::Bicubic => {
-                self.bicubic_samples(input, batch, channel, y, x)
-            }
+            GridSampleMode::Bicubic => self.bicubic_samples(input, batch, channel, y, x),
         }
     }
 
@@ -1324,7 +1359,8 @@ impl<'a> GridGeometry<'a> {
         let mut derivative_y = 0.0_f32;
         let mut derivative_x = 0.0_f32;
         for source_y in y_first..=y_last {
-            let (mapped_y, y_boundary_derivative) = self.map_cubic_source(source_y, self.input_height)?;
+            let (mapped_y, y_boundary_derivative) =
+                self.map_cubic_source(source_y, self.input_height)?;
             let y_distance = y - source_y as f32;
             let y_weight = cubic_weight(y_distance);
             let y_derivative = cubic_weight_derivative(y_distance);
@@ -1339,9 +1375,10 @@ impl<'a> GridGeometry<'a> {
                 let x_weight = cubic_weight(x_distance);
                 let x_derivative = cubic_weight_derivative(x_distance);
                 let index = self.input_index(batch, channel, source_y, source_x)?;
-                let value = input.get(index).copied().ok_or_else(|| {
-                    overflow(GRID_SAMPLE_OPERATION_ID, "bicubic source index")
-                })?;
+                let value = input
+                    .get(index)
+                    .copied()
+                    .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "bicubic source index"))?;
                 derivative_y = value.mul_add(
                     y_derivative * y_boundary_derivative * x_weight,
                     derivative_y,
@@ -1377,9 +1414,10 @@ impl<'a> GridGeometry<'a> {
                     Ok((None, 0.0))
                 } else {
                     Ok((
-                        Some(usize::try_from(source).map_err(|_| {
-                            overflow(GRID_SAMPLE_OPERATION_ID, "cubic source")
-                        })?),
+                        Some(
+                            usize::try_from(source)
+                                .map_err(|_| overflow(GRID_SAMPLE_OPERATION_ID, "cubic source"))?,
+                        ),
                         1.0,
                     ))
                 }
@@ -1473,17 +1511,9 @@ pub fn interpolate_tensor_with_context_exact_native(
     context: &ExecutionContext<'_>,
 ) -> Result<Tensor, SpatialFunctionalKernelError> {
     context.check()?;
-    validate_real_tensor(
-        backend,
-        input,
-        "input",
-        INTERPOLATE_OPERATION_ID,
-        context,
-    )?;
-    let input_shape =
-        tensor_shape_to_usize(input, INTERPOLATE_OPERATION_ID, "input shape")?;
-    let input_values =
-        tensor_to_f32_workspace(backend, input, INTERPOLATE_OPERATION_ID, context)?;
+    validate_real_tensor(backend, input, "input", INTERPOLATE_OPERATION_ID, context)?;
+    let input_shape = tensor_shape_to_usize(input, INTERPOLATE_OPERATION_ID, "input shape")?;
+    let input_values = tensor_to_f32_workspace(backend, input, INTERPOLATE_OPERATION_ID, context)?;
     let plan = InterpolatePlan::new(&input_values, &input_shape, configuration)?;
     let mut output_values = backend.workspace_vec(context, plan.output_count()?)?;
     for index in 0..plan.output_count()? {
@@ -1498,8 +1528,7 @@ pub fn interpolate_tensor_with_context_exact_native(
         .output_shape
         .iter()
         .map(|value| {
-            u64::try_from(*value)
-                .map_err(|_| overflow(INTERPOLATE_OPERATION_ID, "output shape"))
+            u64::try_from(*value).map_err(|_| overflow(INTERPOLATE_OPERATION_ID, "output shape"))
         })
         .collect::<Result<Vec<_>, _>>()?;
     let descriptor = TensorDescriptor::contiguous(
@@ -1543,6 +1572,400 @@ pub fn interpolate_tensor_with_context_exact_native(
     Ok(output)
 }
 
+#[cfg(feature = "cpu")]
+pub fn pixel_shuffle_nd_tensor_with_context_exact_native(
+    backend: &CpuBackend,
+    input: &Tensor,
+    dimensions: usize,
+    factor: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, SpatialFunctionalKernelError> {
+    context.check()?;
+    if !matches!(dimensions, 1 | 3) || factor == 0 {
+        return invalid(
+            PIXEL_SHUFFLE_ND_OPERATION_ID,
+            "dimensions must be one or three and factor must be nonzero",
+        );
+    }
+    validate_real_tensor(
+        backend,
+        input,
+        "input",
+        PIXEL_SHUFFLE_ND_OPERATION_ID,
+        context,
+    )?;
+    let [batch, input_channels, frames, height, width] = input.descriptor().shape() else {
+        return invalid(PIXEL_SHUFFLE_ND_OPERATION_ID, "input must have rank five");
+    };
+    let divisor = factor
+        .checked_pow(
+            u32::try_from(dimensions)
+                .map_err(|_| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "dimensions"))?,
+        )
+        .ok_or_else(|| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "channel divisor"))?;
+    let input_channels = usize::try_from(*input_channels)
+        .map_err(|_| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "input channels"))?;
+    let channels = input_channels
+        .checked_div(divisor)
+        .filter(|channels| channels.checked_mul(divisor) == Some(input_channels))
+        .ok_or_else(|| SpatialFunctionalKernelError::Invalid {
+            operation: PIXEL_SHUFFLE_ND_OPERATION_ID,
+            reason: "input channels are not divisible by the shuffle factor".to_owned(),
+        })?;
+    let batch =
+        usize::try_from(*batch).map_err(|_| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "batch"))?;
+    let frames =
+        usize::try_from(*frames).map_err(|_| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "frames"))?;
+    let height =
+        usize::try_from(*height).map_err(|_| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "height"))?;
+    let width =
+        usize::try_from(*width).map_err(|_| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "width"))?;
+    let output_frames = frames
+        .checked_mul(factor)
+        .ok_or_else(|| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "output frames"))?;
+    let spatial_factor = if dimensions == 3 { factor } else { 1 };
+    let output_height = height
+        .checked_mul(spatial_factor)
+        .ok_or_else(|| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "output height"))?;
+    let output_width = width
+        .checked_mul(spatial_factor)
+        .ok_or_else(|| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "output width"))?;
+    let output_count = [batch, channels, output_frames, output_height, output_width]
+        .into_iter()
+        .try_fold(1_usize, |product, value| {
+            product
+                .checked_mul(value)
+                .ok_or_else(|| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "output elements"))
+        })?;
+    let input_values =
+        tensor_to_f32_workspace(backend, input, PIXEL_SHUFFLE_ND_OPERATION_ID, context)?;
+    let mut output = backend.workspace_vec(context, output_count)?;
+    for index in 0..output_count {
+        if index.is_multiple_of(64) {
+            context.check()?;
+        }
+        output.try_push(0.0)?;
+    }
+    for batch_index in 0..batch {
+        for channel in 0..channels {
+            for frame in 0..frames {
+                for y in 0..height {
+                    for x in 0..width {
+                        if x.is_multiple_of(64) {
+                            context.check()?;
+                        }
+                        for temporal in 0..factor {
+                            for vertical in 0..spatial_factor {
+                                for horizontal in 0..spatial_factor {
+                                    let subchannel = channel
+                                        .checked_mul(factor)
+                                        .and_then(|value| value.checked_add(temporal))
+                                        .and_then(|value| value.checked_mul(spatial_factor))
+                                        .and_then(|value| value.checked_add(vertical))
+                                        .and_then(|value| value.checked_mul(spatial_factor))
+                                        .and_then(|value| value.checked_add(horizontal))
+                                        .ok_or_else(|| {
+                                            overflow(
+                                                PIXEL_SHUFFLE_ND_OPERATION_ID,
+                                                "source channel",
+                                            )
+                                        })?;
+                                    let source = ((((batch_index * input_channels + subchannel)
+                                        * frames
+                                        + frame)
+                                        * height
+                                        + y)
+                                        * width)
+                                        + x;
+                                    let destination = ((((batch_index * channels + channel)
+                                        * output_frames
+                                        + frame * factor
+                                        + temporal)
+                                        * output_height
+                                        + y * spatial_factor
+                                        + vertical)
+                                        * output_width)
+                                        + x * spatial_factor
+                                        + horizontal;
+                                    let value =
+                                        input_values.get(source).copied().ok_or_else(|| {
+                                            overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "source index")
+                                        })?;
+                                    let destination =
+                                        output.get_mut(destination).ok_or_else(|| {
+                                            overflow(
+                                                PIXEL_SHUFFLE_ND_OPERATION_ID,
+                                                "destination index",
+                                            )
+                                        })?;
+                                    *destination = value;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    tensor_from_f32_with_context_exact_native(
+        backend,
+        &[
+            u64::try_from(batch).map_err(|_| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "batch"))?,
+            u64::try_from(channels)
+                .map_err(|_| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "channels"))?,
+            u64::try_from(output_frames)
+                .map_err(|_| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "frames"))?,
+            u64::try_from(output_height)
+                .map_err(|_| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "height"))?,
+            u64::try_from(output_width)
+                .map_err(|_| overflow(PIXEL_SHUFFLE_ND_OPERATION_ID, "width"))?,
+        ],
+        &output,
+        input.descriptor().dtype(),
+        DeviceId::CPU,
+        context,
+    )
+    .map_err(|error| {
+        canonical_tensor_owner_error(
+            PIXEL_SHUFFLE_ND_OPERATION_ID,
+            "tensor_from_f32_with_context_exact_native",
+            error,
+        )
+    })
+}
+
+#[cfg(feature = "cpu")]
+pub fn bislerp_tensor_with_context_exact_native(
+    backend: &CpuBackend,
+    input: &Tensor,
+    target_width: u64,
+    target_height: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, SpatialFunctionalKernelError> {
+    context.check()?;
+    validate_real_tensor(backend, input, "input", BISLERP_OPERATION_ID, context)?;
+    let [batch, channels, height, width] = input.descriptor().shape() else {
+        return invalid(BISLERP_OPERATION_ID, "input must have rank four");
+    };
+    let batch = usize::try_from(*batch).map_err(|_| overflow(BISLERP_OPERATION_ID, "batch"))?;
+    let channels =
+        usize::try_from(*channels).map_err(|_| overflow(BISLERP_OPERATION_ID, "channels"))?;
+    let height = usize::try_from(*height).map_err(|_| overflow(BISLERP_OPERATION_ID, "height"))?;
+    let width = usize::try_from(*width).map_err(|_| overflow(BISLERP_OPERATION_ID, "width"))?;
+    let target_width = usize::try_from(target_width)
+        .map_err(|_| overflow(BISLERP_OPERATION_ID, "target width"))?;
+    let target_height = usize::try_from(target_height)
+        .map_err(|_| overflow(BISLERP_OPERATION_ID, "target height"))?;
+    if width == 0 || height == 0 || target_width == 0 || target_height == 0 {
+        return invalid(
+            BISLERP_OPERATION_ID,
+            "source and target dimensions must be nonzero",
+        );
+    }
+    let source = tensor_to_f32_workspace(backend, input, BISLERP_OPERATION_ID, context)?;
+    let horizontal_count = [batch, channels, height, target_width]
+        .into_iter()
+        .try_fold(1_usize, |product, value| {
+            product
+                .checked_mul(value)
+                .ok_or_else(|| overflow(BISLERP_OPERATION_ID, "horizontal elements"))
+        })?;
+    let output_count = [batch, channels, target_height, target_width]
+        .into_iter()
+        .try_fold(1_usize, |product, value| {
+            product
+                .checked_mul(value)
+                .ok_or_else(|| overflow(BISLERP_OPERATION_ID, "output elements"))
+        })?;
+    let mut horizontal = zeroed_workspace(backend, horizontal_count, context)?;
+    let mut left = zeroed_workspace(backend, channels, context)?;
+    let mut right = zeroed_workspace(backend, channels, context)?;
+    let mut mixed = zeroed_workspace(backend, channels, context)?;
+    for batch_index in 0..batch {
+        for y in 0..height {
+            for output_x in 0..target_width {
+                if output_x.is_multiple_of(64) {
+                    context.check()?;
+                }
+                let coordinate = bilinear_coordinate(width, target_width, output_x);
+                let x1 = coordinate.floor().max(0.0) as usize;
+                let x2 = (x1 + 1).min(width - 1);
+                let ratio = coordinate - x1 as f32;
+                for channel in 0..channels {
+                    let plane = (batch_index * channels + channel) * height + y;
+                    let left_index = plane * width + x1;
+                    let right_index = plane * width + x2;
+                    *left
+                        .get_mut(channel)
+                        .ok_or_else(|| overflow(BISLERP_OPERATION_ID, "left workspace index"))? =
+                        source
+                            .get(left_index)
+                            .copied()
+                            .ok_or_else(|| overflow(BISLERP_OPERATION_ID, "left source index"))?;
+                    *right
+                        .get_mut(channel)
+                        .ok_or_else(|| overflow(BISLERP_OPERATION_ID, "right workspace index"))? =
+                        source
+                            .get(right_index)
+                            .copied()
+                            .ok_or_else(|| overflow(BISLERP_OPERATION_ID, "right source index"))?;
+                }
+                source_slerp(&left, &right, ratio, &mut mixed);
+                for channel in 0..channels {
+                    let destination =
+                        ((batch_index * channels + channel) * height + y) * target_width + output_x;
+                    let value = mixed
+                        .get(channel)
+                        .copied()
+                        .ok_or_else(|| overflow(BISLERP_OPERATION_ID, "mixed workspace index"))?;
+                    *horizontal.get_mut(destination).ok_or_else(|| {
+                        overflow(BISLERP_OPERATION_ID, "horizontal destination index")
+                    })? = value;
+                }
+            }
+        }
+    }
+    let mut output = zeroed_workspace(backend, output_count, context)?;
+    for batch_index in 0..batch {
+        for output_y in 0..target_height {
+            let coordinate = bilinear_coordinate(height, target_height, output_y);
+            let y1 = coordinate.floor().max(0.0) as usize;
+            let y2 = (y1 + 1).min(height - 1);
+            let ratio = coordinate - y1 as f32;
+            for x in 0..target_width {
+                if x.is_multiple_of(64) {
+                    context.check()?;
+                }
+                for channel in 0..channels {
+                    let left_index =
+                        ((batch_index * channels + channel) * height + y1) * target_width + x;
+                    let right_index =
+                        ((batch_index * channels + channel) * height + y2) * target_width + x;
+                    *left
+                        .get_mut(channel)
+                        .ok_or_else(|| overflow(BISLERP_OPERATION_ID, "left workspace index"))? =
+                        horizontal.get(left_index).copied().ok_or_else(|| {
+                            overflow(BISLERP_OPERATION_ID, "horizontal left index")
+                        })?;
+                    *right
+                        .get_mut(channel)
+                        .ok_or_else(|| overflow(BISLERP_OPERATION_ID, "right workspace index"))? =
+                        horizontal.get(right_index).copied().ok_or_else(|| {
+                            overflow(BISLERP_OPERATION_ID, "horizontal right index")
+                        })?;
+                }
+                source_slerp(&left, &right, ratio, &mut mixed);
+                for channel in 0..channels {
+                    let destination = ((batch_index * channels + channel) * target_height
+                        + output_y)
+                        * target_width
+                        + x;
+                    let value = mixed
+                        .get(channel)
+                        .copied()
+                        .ok_or_else(|| overflow(BISLERP_OPERATION_ID, "mixed workspace index"))?;
+                    *output.get_mut(destination).ok_or_else(|| {
+                        overflow(BISLERP_OPERATION_ID, "output destination index")
+                    })? = value;
+                }
+            }
+        }
+    }
+    tensor_from_f32_with_context_exact_native(
+        backend,
+        &[
+            u64::try_from(batch).map_err(|_| overflow(BISLERP_OPERATION_ID, "batch"))?,
+            u64::try_from(channels).map_err(|_| overflow(BISLERP_OPERATION_ID, "channels"))?,
+            u64::try_from(target_height).map_err(|_| overflow(BISLERP_OPERATION_ID, "height"))?,
+            u64::try_from(target_width).map_err(|_| overflow(BISLERP_OPERATION_ID, "width"))?,
+        ],
+        &output,
+        input.descriptor().dtype(),
+        DeviceId::CPU,
+        context,
+    )
+    .map_err(|error| {
+        canonical_tensor_owner_error(
+            BISLERP_OPERATION_ID,
+            "tensor_from_f32_with_context_exact_native",
+            error,
+        )
+    })
+}
+
+#[cfg(feature = "cpu")]
+fn zeroed_workspace(
+    backend: &CpuBackend,
+    length: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<crate::CpuWorkspaceVec<f32>, SpatialFunctionalKernelError> {
+    let mut values = backend.workspace_vec(context, length)?;
+    for index in 0..length {
+        if index.is_multiple_of(64) {
+            context.check()?;
+        }
+        values.try_push(0.0)?;
+    }
+    Ok(values)
+}
+
+#[cfg(feature = "cpu")]
+fn bilinear_coordinate(source: usize, target: usize, index: usize) -> f32 {
+    (((index as f32 + 0.5) * source as f32 / target as f32) - 0.5)
+        .clamp(0.0, source.saturating_sub(1) as f32)
+}
+
+#[cfg(feature = "cpu")]
+fn source_slerp(left: &[f32], right: &[f32], ratio: f32, output: &mut [f32]) {
+    let left_norm = left.iter().map(|value| value * value).sum::<f32>().sqrt();
+    let right_norm = right.iter().map(|value| value * value).sum::<f32>().sqrt();
+    let dot = left
+        .iter()
+        .zip(right)
+        .map(|(left, right)| {
+            let left = if left_norm == 0.0 {
+                0.0
+            } else {
+                *left / left_norm
+            };
+            let right = if right_norm == 0.0 {
+                0.0
+            } else {
+                *right / right_norm
+            };
+            left * right
+        })
+        .sum::<f32>();
+    if dot > 1.0 - 1.0e-5 {
+        output.copy_from_slice(left);
+        return;
+    }
+    if dot < 1.0e-5 - 1.0 {
+        for ((output, left), right) in output.iter_mut().zip(left).zip(right) {
+            *output = *left * (1.0 - ratio) + *right * ratio;
+        }
+        return;
+    }
+    let omega = dot.acos();
+    let sine = omega.sin();
+    let length = left_norm * (1.0 - ratio) + right_norm * ratio;
+    for ((output, left), right) in output.iter_mut().zip(left).zip(right) {
+        let left = if left_norm == 0.0 {
+            0.0
+        } else {
+            *left / left_norm
+        };
+        let right = if right_norm == 0.0 {
+            0.0
+        } else {
+            *right / right_norm
+        };
+        let direction =
+            (((1.0 - ratio) * omega).sin() / sine) * left + ((ratio * omega).sin() / sine) * right;
+        *output = direction * length;
+    }
+}
+
 pub fn interpolate_vjp_with_context_exact_native(
     input: &[f32],
     input_shape: &[usize],
@@ -1563,7 +1986,10 @@ pub fn interpolate_vjp_with_context_exact_native(
     let mut input_gradient = vec![0.0_f32; input.len()];
     plan.for_each_connection(context, |input_index, output_index, weight| {
         let source = output_gradient.get(output_index).copied().ok_or_else(|| {
-            overflow(INTERPOLATE_OPERATION_ID, "interpolate output-gradient index")
+            overflow(
+                INTERPOLATE_OPERATION_ID,
+                "interpolate output-gradient index",
+            )
         })?;
         let destination = input_gradient.get_mut(input_index).ok_or_else(|| {
             overflow(INTERPOLATE_OPERATION_ID, "interpolate input-gradient index")
@@ -1628,9 +2054,9 @@ impl InterpolatePlan {
             InterpolateMode::Linear => Some(1),
             InterpolateMode::Bilinear | InterpolateMode::Bicubic => Some(2),
             InterpolateMode::Trilinear => Some(3),
-            InterpolateMode::Nearest
-            | InterpolateMode::NearestExact
-            | InterpolateMode::Area => None,
+            InterpolateMode::Nearest | InterpolateMode::NearestExact | InterpolateMode::Area => {
+                None
+            }
         };
         if expected_dimensions.is_some_and(|expected| expected != spatial_dimensions) {
             return invalid(
@@ -1644,8 +2070,7 @@ impl InterpolatePlan {
                 "exactly one of output_size and scale_factor is required",
             );
         }
-        if configuration.output_size.is_some()
-            && configuration.recompute_scale_factor == Some(true)
+        if configuration.output_size.is_some() && configuration.recompute_scale_factor == Some(true)
         {
             return invalid(
                 INTERPOLATE_OPERATION_ID,
@@ -1653,7 +2078,10 @@ impl InterpolatePlan {
             );
         }
         if configuration.antialias
-            && !matches!(configuration.mode, InterpolateMode::Bilinear | InterpolateMode::Bicubic)
+            && !matches!(
+                configuration.mode,
+                InterpolateMode::Bilinear | InterpolateMode::Bicubic
+            )
         {
             return invalid(
                 INTERPOLATE_OPERATION_ID,
@@ -1672,7 +2100,10 @@ impl InterpolatePlan {
         }
         let input_spatial = input_shape[2..].to_vec();
         if input_spatial.contains(&0) {
-            return invalid(INTERPOLATE_OPERATION_ID, "input dimensions must be non-zero");
+            return invalid(
+                INTERPOLATE_OPERATION_ID,
+                "input dimensions must be non-zero",
+            );
         }
         let output_spatial = resolve_output_spatial(&input_spatial, configuration)?;
         let mut output_shape = input_shape[..2].to_vec();
@@ -1682,7 +2113,8 @@ impl InterpolatePlan {
             .ok_or_else(|| overflow(INTERPOLATE_OPERATION_ID, "interpolate planes"))?;
         let mut axis_weights = Vec::with_capacity(spatial_dimensions);
         for axis in 0..spatial_dimensions {
-            let inverse_scale = inverse_scale(axis, &input_spatial, &output_spatial, configuration)?;
+            let inverse_scale =
+                inverse_scale(axis, &input_spatial, &output_spatial, configuration)?;
             let mut output_weights = Vec::with_capacity(output_spatial[axis]);
             for output_coordinate in 0..output_spatial[axis] {
                 output_weights.push(interpolation_axis_weights(
@@ -1739,12 +2171,13 @@ impl InterpolatePlan {
             self.output_count()?,
         )?;
         self.for_each_connection(context, |input_index, output_index, weight| {
-            let source = input.get(input_index).copied().ok_or_else(|| {
-                overflow(INTERPOLATE_OPERATION_ID, "interpolate input index")
-            })?;
-            let destination = output.get_mut(output_index).ok_or_else(|| {
-                overflow(INTERPOLATE_OPERATION_ID, "interpolate output index")
-            })?;
+            let source = input
+                .get(input_index)
+                .copied()
+                .ok_or_else(|| overflow(INTERPOLATE_OPERATION_ID, "interpolate input index"))?;
+            let destination = output
+                .get_mut(output_index)
+                .ok_or_else(|| overflow(INTERPOLATE_OPERATION_ID, "interpolate output index"))?;
             *destination = source.mul_add(weight, *destination);
             Ok(())
         })
@@ -1793,14 +2226,7 @@ impl InterpolatePlan {
                         .ok_or_else(|| overflow(INTERPOLATE_OPERATION_ID, "input index"))?;
                     visit(input_index, output_index, weight)
                 };
-                visit_axis_product(
-                    &weights,
-                    &self.input_spatial,
-                    0,
-                    0,
-                    1.0,
-                    &mut connection,
-                )?;
+                visit_axis_product(&weights, &self.input_spatial, 0, 0, 1.0, &mut connection)?;
             }
         }
         Ok(())
@@ -1866,7 +2292,9 @@ fn resolve_output_spatial(
         }
     })?;
     if scales.len() != input_spatial.len()
-        || scales.iter().any(|scale| !scale.is_finite() || *scale <= 0.0)
+        || scales
+            .iter()
+            .any(|scale| !scale.is_finite() || *scale <= 0.0)
     {
         return invalid(
             INTERPOLATE_OPERATION_ID,
@@ -1892,9 +2320,7 @@ fn inverse_scale(
     output_spatial: &[usize],
     configuration: &InterpolateConfiguration,
 ) -> Result<f32, SpatialFunctionalKernelError> {
-    if configuration.output_size.is_none()
-        && configuration.recompute_scale_factor != Some(true)
-    {
+    if configuration.output_size.is_none() && configuration.recompute_scale_factor != Some(true) {
         let scale = configuration
             .scale_factor
             .as_ref()
@@ -1935,12 +2361,7 @@ fn interpolation_axis_weights(
         InterpolateMode::Area => area_weights(input_extent, output_extent, output_coordinate),
         InterpolateMode::Linear | InterpolateMode::Bilinear | InterpolateMode::Trilinear => {
             if configuration.antialias && output_extent < input_extent {
-                antialias_weights(
-                    input_extent,
-                    output_coordinate,
-                    inverse_scale,
-                    false,
-                )
+                antialias_weights(input_extent, output_coordinate, inverse_scale, false)
             } else {
                 let coordinate = linear_source_coordinate(
                     input_extent,
@@ -2048,9 +2469,11 @@ fn antialias_weights(
     let mut combined = std::collections::BTreeMap::<usize, f32>::new();
     for source in first..=last {
         let mapped = source
-            .clamp(0, i64::try_from(input_extent.saturating_sub(1)).map_err(|_| {
-                overflow(INTERPOLATE_OPERATION_ID, "antialias input extent")
-            })?)
+            .clamp(
+                0,
+                i64::try_from(input_extent.saturating_sub(1))
+                    .map_err(|_| overflow(INTERPOLATE_OPERATION_ID, "antialias input extent"))?,
+            )
             .try_into()
             .map_err(|_| overflow(INTERPOLATE_OPERATION_ID, "antialias source"))?;
         let distance = (center - source as f32) / filter_scale;
@@ -2063,7 +2486,10 @@ fn antialias_weights(
     }
     let sum: f32 = combined.values().sum();
     if !sum.is_finite() || sum == 0.0 {
-        return invalid(INTERPOLATE_OPERATION_ID, "antialias kernel is not normalizable");
+        return invalid(
+            INTERPOLATE_OPERATION_ID,
+            "antialias kernel is not normalizable",
+        );
     }
     Ok(combined
         .into_iter()
@@ -2321,10 +2747,7 @@ fn invalid<T>(
     })
 }
 
-fn overflow(
-    operation: &'static str,
-    subject: &'static str,
-) -> SpatialFunctionalKernelError {
+fn overflow(operation: &'static str, subject: &'static str) -> SpatialFunctionalKernelError {
     SpatialFunctionalKernelError::ShapeOverflow { operation, subject }
 }
 
@@ -2384,23 +2807,107 @@ fn max_pool_error(error: NeuralNetworkModulePartThreeError) -> SpatialFunctional
 
 #[cfg(test)]
 mod validation_tests {
+    use super::{
+        PIXEL_SHUFFLE_ND_OPERATION_ID, SpatialFunctionalKernelError, canonical_tensor_owner_error,
+    };
+    use crate::{TensorError, generated_comfy_operator_indirection_01::OperatorIndirectionError};
     use std::collections::BTreeMap;
+
+    #[test]
+    fn latent_upscale_canonical_owner_preserves_typed_terminal_errors() {
+        let allocation = canonical_tensor_owner_error(
+            PIXEL_SHUFFLE_ND_OPERATION_ID,
+            "tensor_from_f32_with_context_exact_native",
+            OperatorIndirectionError::Tensor(TensorError::AllocationFailed {
+                requested: 4_096,
+                reason: "fixture allocation failure".to_owned(),
+            }),
+        );
+        assert!(matches!(
+            allocation,
+            SpatialFunctionalKernelError::Tensor(TensorError::AllocationFailed {
+                requested: 4_096,
+                ..
+            })
+        ));
+
+        let resource = canonical_tensor_owner_error(
+            PIXEL_SHUFFLE_ND_OPERATION_ID,
+            "tensor_from_f32_with_context_exact_native",
+            OperatorIndirectionError::Tensor(TensorError::ResourceLimitExceeded {
+                resource: "fixture-resource",
+                limit: 7,
+            }),
+        );
+        assert_eq!(
+            resource,
+            SpatialFunctionalKernelError::Tensor(TensorError::ResourceLimitExceeded {
+                resource: "fixture-resource",
+                limit: 7,
+            })
+        );
+
+        assert_eq!(
+            canonical_tensor_owner_error(
+                PIXEL_SHUFFLE_ND_OPERATION_ID,
+                "tensor_from_f32_with_context_exact_native",
+                OperatorIndirectionError::Cancelled,
+            ),
+            SpatialFunctionalKernelError::Cancelled
+        );
+    }
 
     #[test]
     fn writes_task_validation_artifacts() -> Result<(), Box<dyn std::error::Error>> {
         let fixture_digests = BTreeMap::from([
-            ("COMFY-TENSOR-OP-5F86004D9BDA", "e300fd6c3d44dc6c26a2b9ebce7d879ff05b58c8f86461735c94ecaafb2e0c43"),
-            ("COMFY-TENSOR-OP-60B322636602", "4c01d01f3c272c767fbaee9a09821094717c3585883c5016213151f2a5fe2141"),
-            ("COMFY-TENSOR-OP-6BFAEF690071", "2de2a5cebda2118130d79a7d091c86b97569a597458c5239ca9710ecfb46f9e5"),
-            ("COMFY-TENSOR-OP-DC56DB93077F", "a633a8091b768b8d651f89e018f51d6df7e56e90f0c0504ed77ec7bd39c953c6"),
-            ("COMFY-TENSOR-OP-A31AEBE72455", "d80f5de156590852947ac39e8c354dcbedc75c10ba6e388a3fc9619867f7c581"),
-            ("COMFY-TENSOR-OP-FE03423D60DA", "8c331012885263f0663991ea77a9a74af313da1acf81d681a0b10f6ab0bf0e81"),
-            ("COMFY-TENSOR-OP-341577A45D6B", "bfa415d86e6517288cdb1e8c6e9a9bd6c14c3036e99624d2734b3cbbd32cc82a"),
-            ("COMFY-TENSOR-OP-5A5F8349A130", "d338aabfead4178cc0c5fb9cd017e2cd56766cd4b73c63bee0320ea713871c9f"),
-            ("COMFY-TENSOR-OP-5A6A586CC551", "1256dec312ace287adec1ce100f8f1c096be98b0ec257bb23a43c9524f92e8a3"),
-            ("COMFY-TENSOR-OP-A90AB43A3320", "1183f698ac8f29b01c5f81b9a14a89826fcca8a5bc571bc3635bbfa9d556609b"),
-            ("COMFY-TENSOR-OP-B0F801006375", "22bdbfd653bd624574191ec8cdaf246912900ff31fd38277bae4d262ee5ec733"),
-            ("COMFY-TENSOR-OP-1F9D23F3B331", "d258cb0ca1560ea9d20ebcca802ce93ddb1e5aac56876d33bb86ea501379ac0c"),
+            (
+                "COMFY-TENSOR-OP-5F86004D9BDA",
+                "e300fd6c3d44dc6c26a2b9ebce7d879ff05b58c8f86461735c94ecaafb2e0c43",
+            ),
+            (
+                "COMFY-TENSOR-OP-60B322636602",
+                "4c01d01f3c272c767fbaee9a09821094717c3585883c5016213151f2a5fe2141",
+            ),
+            (
+                "COMFY-TENSOR-OP-6BFAEF690071",
+                "2de2a5cebda2118130d79a7d091c86b97569a597458c5239ca9710ecfb46f9e5",
+            ),
+            (
+                "COMFY-TENSOR-OP-DC56DB93077F",
+                "a633a8091b768b8d651f89e018f51d6df7e56e90f0c0504ed77ec7bd39c953c6",
+            ),
+            (
+                "COMFY-TENSOR-OP-A31AEBE72455",
+                "d80f5de156590852947ac39e8c354dcbedc75c10ba6e388a3fc9619867f7c581",
+            ),
+            (
+                "COMFY-TENSOR-OP-FE03423D60DA",
+                "8c331012885263f0663991ea77a9a74af313da1acf81d681a0b10f6ab0bf0e81",
+            ),
+            (
+                "COMFY-TENSOR-OP-341577A45D6B",
+                "bfa415d86e6517288cdb1e8c6e9a9bd6c14c3036e99624d2734b3cbbd32cc82a",
+            ),
+            (
+                "COMFY-TENSOR-OP-5A5F8349A130",
+                "d338aabfead4178cc0c5fb9cd017e2cd56766cd4b73c63bee0320ea713871c9f",
+            ),
+            (
+                "COMFY-TENSOR-OP-5A6A586CC551",
+                "1256dec312ace287adec1ce100f8f1c096be98b0ec257bb23a43c9524f92e8a3",
+            ),
+            (
+                "COMFY-TENSOR-OP-A90AB43A3320",
+                "1183f698ac8f29b01c5f81b9a14a89826fcca8a5bc571bc3635bbfa9d556609b",
+            ),
+            (
+                "COMFY-TENSOR-OP-B0F801006375",
+                "22bdbfd653bd624574191ec8cdaf246912900ff31fd38277bae4d262ee5ec733",
+            ),
+            (
+                "COMFY-TENSOR-OP-1F9D23F3B331",
+                "d258cb0ca1560ea9d20ebcca802ce93ddb1e5aac56876d33bb86ea501379ac0c",
+            ),
         ]);
         let cases = fixture_digests
             .keys()

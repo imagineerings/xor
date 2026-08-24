@@ -25,6 +25,7 @@ pub mod hunyuan_video_family;
 pub mod hunyuandit_family;
 pub mod kandinsky5_family;
 pub mod latent_format;
+pub mod latent_upscale_model;
 pub mod ltx_family;
 pub mod lumina_zimage_family;
 pub mod model_family;
@@ -332,6 +333,12 @@ pub use latent_format::{
     LatentTransform, PreviewReshape, empty_latent, process_latent_in, process_latent_out,
     project_latent_preview,
 };
+pub use latent_upscale_model::{
+    HUNYUAN_UPSAMPLER_SOURCE_SHA256, HunyuanLatentUpscaleCrop, HunyuanLatentUpscaleMode,
+    LTX_UPSAMPLER_SOURCE_SHA256, NODES_HUNYUAN_SOURCE_SHA256, NativeLatentUpscaleArchitecture,
+    NativeLatentUpscaleCheckpoint, NativeLatentUpscaleModelError, NativeLatentUpscaleModelResource,
+    NativeLtxUpscaleConfiguration,
+};
 pub use ltx_family::{
     LTX_AUDIO_MARKER, LTX_CLIP_CANDIDATES, LTX_CLIP_CONFIGURATION, LTX_CLIP_TARGET,
     LTX_COMMON_MAPPING, LTX_COMPONENT_STATE_SCHEMAS, LTX_COMPONENTS, LTX_DIFFUSERS_MARKER,
@@ -589,10 +596,11 @@ pub use upscale_model::{
 };
 pub use vae::validate_native_vae_backend_target;
 pub use vae::{
-    NativeStructuredVae, NativeVae, VAE_SCHEMA_VERSION, VaeArchitectureIdentity, VaeBoundary,
-    VaeBoundaryKind, VaeCanonicalCompatibility, VaeDescriptor, VaeError, VaeGaussianSplatBatch,
-    VaeIdentity, VaeKernelProfile, VaeOperation, VaeShapeField, VaeStructuredDecodeRequest,
-    VaeStructuredOutputKind, VaeStructuredResult, VaeTileAxisFormula, VaeTilePlan,
+    LtxLatentStatisticsDirection, NativeStructuredVae, NativeVae, VAE_SCHEMA_VERSION,
+    VaeArchitectureIdentity, VaeBoundary, VaeBoundaryKind, VaeCanonicalCompatibility,
+    VaeDescriptor, VaeError, VaeGaussianSplatBatch, VaeIdentity, VaeKernelProfile, VaeOperation,
+    VaeShapeField, VaeStructuredDecodeRequest, VaeStructuredOutputKind, VaeStructuredResult,
+    VaeTileAxisFormula, VaeTilePlan,
 };
 pub use vae_architecture::{
     VAE_AUTOMATIC_ROW_ID, VAE_DIFFUSERS_ROW_ID, VAE_DIFFUSERS_SENTINEL, VAE_SELECTOR_BRANCH_COUNT,

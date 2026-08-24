@@ -4935,6 +4935,111 @@ mod tests {
     }
 
     #[test]
+    fn provider_streaming_v2_imports_only_canonical_invocation_inputs() -> Result<(), Box<dyn Error>>
+    {
+        assert_eq!(
+            include_bytes!("../wit/comfy-plugin.wit"),
+            include_bytes!("../wit/provider-v2/deps/comfy-plugin/comfy-plugin.wit")
+        );
+        assert_eq!(
+            format!(
+                "{:x}",
+                Sha256::digest(include_bytes!("../wit/comfy-plugin.wit"))
+            ),
+            "51538d3720188321d54df2bc3947d334c52bbadff5610f2623ab2a8bc4616cad"
+        );
+        assert_eq!(
+            format!(
+                "{:x}",
+                Sha256::digest(include_bytes!("../schema/plugin-manifest-v1.schema.json"))
+            ),
+            "fc2be2425ab15f21f6b05a27086272fc95fd4dd5e27c4106a17a69d3351b5c7f"
+        );
+
+        let wit = include_str!("../wit/provider-v2/comfy-provider-plugin.wit");
+        let input_host = wit
+            .split_once("interface invocation-input-host {")
+            .and_then(|(_, remainder)| remainder.split_once("\n}"))
+            .map(|(interface, _)| interface)
+            .ok_or("provider-v2 invocation-input-host disappeared")?;
+        let canonical_use = "use zed:comfy-plugin/types@1.0.0.{encoded-value, input-state, invocation-error, value-handle};";
+        assert_eq!(input_host.matches(canonical_use).count(), 1);
+
+        let mut previous_position = 0;
+        for method in [
+            "get-input-state: func(port-id: string) -> result<input-state, invocation-error>",
+            "read-scalar-input: func(port-id: string, index: u32) -> result<encoded-value, invocation-error>",
+            "take-input: func(port-id: string, index: u32) -> result<value-handle, invocation-error>",
+            "read-handle: func(handle: value-handle) -> result<encoded-value, invocation-error>",
+            "check-cancelled: func() -> result<_, invocation-error>",
+        ] {
+            let position = input_host
+                .find(method)
+                .ok_or_else(|| format!("provider-v2 invocation input host lost `{method}`"))?;
+            assert!(position >= previous_position);
+            previous_position = position;
+        }
+        assert_eq!(input_host.matches(": func(").count(), 5);
+        for forbidden in [
+            "provider:",
+            "endpoint:",
+            "secret",
+            "start-request",
+            "provider-request",
+            "create-output-value",
+            "push-output",
+            "finish-output",
+            "filesystem-read",
+            "secret-exists",
+            "clock-now",
+            "random-bytes",
+            "model-open",
+            "output-begin",
+            "output-write",
+            "output-commit",
+            "log:",
+            "ui-set",
+            "route-respond",
+            "authorize",
+        ] {
+            assert!(
+                !input_host.contains(forbidden),
+                "provider-v2 input-only host exposed `{forbidden}`"
+            );
+        }
+
+        let world = wit
+            .split_once("world comfy-provider-plugin {")
+            .and_then(|(_, remainder)| remainder.split_once('}'))
+            .map(|(world, _)| world)
+            .ok_or("provider-v2 world disappeared")?;
+        assert_eq!(world.matches("import invocation-input-host;").count(), 1);
+        assert_eq!(world.matches("import provider-streaming-host;").count(), 1);
+        assert_eq!(world.matches("export ").count(), 1);
+        assert!(
+            world.find("import invocation-input-host;")
+                < world.find("import provider-streaming-host;")
+        );
+        assert!(world.contains("export provider-node;"));
+
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schema/plugin-manifest-v2.schema.json"))?;
+        for duplicate_authority in ["input_state", "value_handle", "invocation_error"] {
+            assert!(
+                schema["$defs"].get(duplicate_authority).is_none(),
+                "provider-v2 schema duplicated canonical `{duplicate_authority}` semantics"
+            );
+        }
+        let schema_source = include_str!("../schema/plugin-manifest-v2.schema.json");
+        assert_eq!(
+            schema_source.matches("#/$defs/encoded_value").count(),
+            1,
+            "provider-v2 encoded-value schema must remain output-only"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn provider_streaming_v2_request_authority_is_canonical_bounded_and_host_derived()
     -> Result<(), Box<dyn Error>> {
         let contract = provider_streaming_contract_fixture();

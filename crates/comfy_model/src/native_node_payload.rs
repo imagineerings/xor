@@ -14,9 +14,9 @@ use crate::{
     GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256, GEMMA3_MULTIMODAL_SOURCE_SHA256,
     GEMMA4_MULTIMODAL_SOURCE_SHA256, LLAMA_SOURCE_SHA256, NativeAudioEncoder,
     NativeDecoderTextEncoder, NativeFrameInterpolationModel, NativeGemmaMultimodal,
-    NativePromptTokenizer, NativeQwenMultimodal, NativeRaftLarge, NativeSdPoseModel,
-    NativeStructuredVae, NativeVae, QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256,
-    QWEN3VL_SOURCE_SHA256, QWEN35_SOURCE_SHA256,
+    NativeLatentUpscaleModelResource, NativePromptTokenizer, NativeQwenMultimodal, NativeRaftLarge,
+    NativeSdPoseModel, NativeStructuredVae, NativeVae, QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256,
+    QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256, QWEN35_SOURCE_SHA256,
     clip::{LoadedSd1Clip, NativeClipResidentOwnerKind, NativeClipResource, NativeTokenizer},
     clip_vision::NativeClipVision,
     generated_native_diffusion::{Sd1Tokenizer, Sd15TinyModel},
@@ -301,6 +301,9 @@ enum NativeModelResource {
     FrameInterpolation {
         resource: Arc<NativeFrameInterpolationModel>,
     },
+    LatentUpscaleModel {
+        resource: Arc<NativeLatentUpscaleModelResource>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -332,6 +335,7 @@ pub enum NativeModelBackingKind {
     NativeClipMappedWeights,
     NativeSdPoseModel,
     NativeFrameInterpolationModel,
+    NativeLatentUpscaleModel,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -946,6 +950,27 @@ impl NativeModelPayload {
         })
     }
 
+    pub fn latent_upscale_model(
+        resource: Arc<NativeLatentUpscaleModelResource>,
+    ) -> Result<Self, NativeModelPayloadError> {
+        let cancellation = CancellationToken::default();
+        resource
+            .validate(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::LatentUpscaleModel,
+            resource.identifier(),
+            "zed-native-latent-upscale-model-v1",
+            resource.artifact_sha256(),
+            resource.semantic_digest_sha256(),
+        )?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, resource.resident_bytes())?,
+            identity,
+            resource: NativeModelResource::LatentUpscaleModel { resource },
+        })
+    }
+
     pub fn identity(&self) -> &NativeModelResourceIdentity {
         &self.identity
     }
@@ -1321,6 +1346,29 @@ impl NativeModelPayload {
                     })?,
                 }]
             }
+            NativeModelResource::LatentUpscaleModel { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::NativeLatentUpscaleModel,
+                    address: Arc::as_ptr(resource) as usize,
+                    resident_bytes: resource.resident_owned_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                }]
+            }
         };
         let parts = NativeModelResidentParts {
             owned_bytes,
@@ -1354,7 +1402,8 @@ impl NativeModelPayload {
             | NativeModelResource::GemmaMultimodalClip { .. }
             | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
-            | NativeModelResource::FrameInterpolation { .. } => None,
+            | NativeModelResource::FrameInterpolation { .. }
+            | NativeModelResource::LatentUpscaleModel { .. } => None,
         }
     }
 
@@ -1382,7 +1431,8 @@ impl NativeModelPayload {
             | NativeModelResource::GemmaMultimodalClip { .. }
             | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
-            | NativeModelResource::FrameInterpolation { .. } => None,
+            | NativeModelResource::FrameInterpolation { .. }
+            | NativeModelResource::LatentUpscaleModel { .. } => None,
         }
     }
 
@@ -1401,7 +1451,8 @@ impl NativeModelPayload {
             | NativeModelResource::GemmaMultimodalClip { .. }
             | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
-            | NativeModelResource::FrameInterpolation { .. } => None,
+            | NativeModelResource::FrameInterpolation { .. }
+            | NativeModelResource::LatentUpscaleModel { .. } => None,
         }
     }
 
@@ -1434,7 +1485,8 @@ impl NativeModelPayload {
             | NativeModelResource::GemmaMultimodalClip { .. }
             | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
-            | NativeModelResource::FrameInterpolation { .. } => None,
+            | NativeModelResource::FrameInterpolation { .. }
+            | NativeModelResource::LatentUpscaleModel { .. } => None,
         }
     }
 
@@ -1453,7 +1505,8 @@ impl NativeModelPayload {
             | NativeModelResource::GemmaMultimodalClip { .. }
             | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
-            | NativeModelResource::FrameInterpolation { .. } => None,
+            | NativeModelResource::FrameInterpolation { .. }
+            | NativeModelResource::LatentUpscaleModel { .. } => None,
         }
     }
 
@@ -1497,6 +1550,13 @@ impl NativeModelPayload {
     pub fn frame_interpolation_resource(&self) -> Option<&Arc<NativeFrameInterpolationModel>> {
         match &self.resource {
             NativeModelResource::FrameInterpolation { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
+    pub fn latent_upscale_model_resource(&self) -> Option<&Arc<NativeLatentUpscaleModelResource>> {
+        match &self.resource {
+            NativeModelResource::LatentUpscaleModel { resource } => Some(resource),
             _ => None,
         }
     }
@@ -1549,6 +1609,9 @@ impl NativeModelPayload {
             }
             NativeModelResource::FrameInterpolation { resource } => {
                 Self::frame_interpolation(resource.clone())?
+            }
+            NativeModelResource::LatentUpscaleModel { resource } => {
+                Self::latent_upscale_model(resource.clone())?
             }
         };
         if self.identity() != expected.identity() || self.resident_bytes != expected.resident_bytes

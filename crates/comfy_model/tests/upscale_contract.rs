@@ -400,6 +400,7 @@ fn production_upscale_contract_has_no_oracle_execution_or_filesystem_boundary() 
 {
     let source = include_str!("../src/upscale_contract.rs");
     let manifest = include_str!("../Cargo.toml");
+    let source_tree = ["../../../pro", "jects/comfy"].concat();
     for forbidden in [
         "std::process",
         "std::fs",
@@ -408,11 +409,16 @@ fn production_upscale_contract_has_no_oracle_execution_or_filesystem_boundary() 
         "cpython",
         "resize-to-fit",
         "fallback architecture",
-        "include_bytes!(\"../../../projects/comfy",
-        "include_str!(\"../../../projects/comfy",
     ] {
         assert!(
             !source.contains(forbidden),
+            "production upscale contract contains forbidden boundary {forbidden}"
+        );
+    }
+    for macro_name in ["include_bytes!", "include_str!"] {
+        let forbidden = format!("{macro_name}(\"{source_tree}");
+        assert!(
+            !source.contains(&forbidden),
             "production upscale contract contains forbidden boundary {forbidden}"
         );
     }

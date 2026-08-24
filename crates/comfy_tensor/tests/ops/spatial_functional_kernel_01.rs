@@ -10,8 +10,9 @@ use comfy_tensor::{
         average_pool_2d_tensor_with_context_exact_native,
         average_pool_2d_with_context_exact_native, average_pool_3d_with_context_exact_native,
         average_pool_jvp_with_context_exact_native, average_pool_vjp_with_context_exact_native,
-        conv_1d_with_context_exact_native, conv_2d_tensor_with_context_exact_native,
-        conv_2d_with_context_exact_native, conv_3d_with_context_exact_native,
+        bislerp_tensor_with_context_exact_native, conv_1d_with_context_exact_native,
+        conv_2d_tensor_with_context_exact_native, conv_2d_with_context_exact_native,
+        conv_3d_tensor_with_context_exact_native, conv_3d_with_context_exact_native,
         conv_transpose_1d_with_context_exact_native,
         conv_transpose_2d_tensor_with_context_exact_native,
         conv_transpose_2d_with_context_exact_native, conv_transpose_3d_with_context_exact_native,
@@ -21,7 +22,7 @@ use comfy_tensor::{
         interpolate_jvp_with_context_exact_native, interpolate_tensor_with_context_exact_native,
         interpolate_vjp_with_context_exact_native, interpolate_with_context_exact_native,
         max_pool_2d_jvp_with_context_exact_native, max_pool_2d_vjp_with_context_exact_native,
-        max_pool_2d_with_context_exact_native,
+        max_pool_2d_with_context_exact_native, pixel_shuffle_nd_tensor_with_context_exact_native,
     },
 };
 use sha2::{Digest, Sha256};
@@ -31,6 +32,133 @@ struct TestBackend {
     backend: CpuBackend,
     authority: CpuWorkspaceAuthority,
     limit: u64,
+}
+
+#[test]
+fn latent_upscale_shuffle_and_bislerp_oracles_are_source_exact()
+-> Result<(), Box<dyn std::error::Error>> {
+    let backend = TestBackend::new()?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution(&cancellation)?;
+    let upload = |shape: Vec<u64>, values: &[f32]| {
+        let descriptor =
+            TensorDescriptor::contiguous(shape, DType::F32, DeviceId::CPU, context.stream)?;
+        Ok::<_, Box<dyn std::error::Error>>(backend.upload_f32(descriptor, values, &context)?.0)
+    };
+
+    let temporal = upload(vec![1, 2, 2, 1, 1], &[10.0, 20.0, 11.0, 21.0])?;
+    let temporal =
+        pixel_shuffle_nd_tensor_with_context_exact_native(&backend, &temporal, 1, 2, &context)?;
+    assert_eq!(temporal.descriptor().shape(), &[1, 1, 4, 1, 1]);
+    close(
+        &tensor_to_f32_with_context_exact_native(&backend, &temporal, &context)?,
+        &[10.0, 11.0, 20.0, 21.0],
+        0.0,
+    );
+
+    let spatiotemporal = upload(
+        vec![1, 8, 1, 1, 1],
+        &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+    )?;
+    let spatiotemporal = pixel_shuffle_nd_tensor_with_context_exact_native(
+        &backend,
+        &spatiotemporal,
+        3,
+        2,
+        &context,
+    )?;
+    assert_eq!(spatiotemporal.descriptor().shape(), &[1, 1, 2, 2, 2]);
+    close(
+        &tensor_to_f32_with_context_exact_native(&backend, &spatiotemporal, &context)?,
+        &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+        0.0,
+    );
+
+    let coincident = upload(vec![1, 2, 1, 2], &[3.0, 3.0, 4.0, 4.0])?;
+    let coincident =
+        bislerp_tensor_with_context_exact_native(&backend, &coincident, 3, 1, &context)?;
+    close(
+        &tensor_to_f32_with_context_exact_native(&backend, &coincident, &context)?,
+        &[3.0, 3.0, 3.0, 4.0, 4.0, 4.0],
+        0.0,
+    );
+
+    let antipodal = upload(vec![1, 2, 1, 2], &[1.0, -1.0, 0.0, 0.0])?;
+    let antipodal = bislerp_tensor_with_context_exact_native(&backend, &antipodal, 3, 1, &context)?;
+    close(
+        &tensor_to_f32_with_context_exact_native(&backend, &antipodal, &context)?,
+        &[1.0, 0.0, -1.0, 0.0, 0.0, 0.0],
+        0.0,
+    );
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn latent_upscale_shuffle_and_bislerp_preserve_typed_failures()
+-> Result<(), Box<dyn std::error::Error>> {
+    let backend = TestBackend::new()?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution(&cancellation)?;
+    let descriptor = TensorDescriptor::contiguous(
+        vec![1, 8, 1, 1, 1],
+        DType::F32,
+        DeviceId::CPU,
+        context.stream,
+    )?;
+    let input = backend.upload_f32(descriptor, &[0.0; 8], &context)?.0;
+    let image_descriptor =
+        TensorDescriptor::contiguous(vec![1, 2, 1, 2], DType::F32, DeviceId::CPU, context.stream)?;
+    let image = backend
+        .upload_f32(image_descriptor, &[1.0, -1.0, 0.0, 0.0], &context)?
+        .0;
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = backend.backend.execution_context(
+        StreamId::DEFAULT,
+        backend.authority.authorize_workspace(1024)?,
+        &cancelled,
+    );
+    assert!(matches!(
+        pixel_shuffle_nd_tensor_with_context_exact_native(
+            &backend,
+            &input,
+            3,
+            2,
+            &cancelled_context,
+        ),
+        Err(SpatialFunctionalKernelError::Cancelled)
+    ));
+    assert!(matches!(
+        bislerp_tensor_with_context_exact_native(&backend, &image, 3, 1, &cancelled_context),
+        Err(SpatialFunctionalKernelError::Cancelled)
+    ));
+
+    let constrained_context = backend.backend.execution_context(
+        StreamId::DEFAULT,
+        backend.authority.authorize_workspace(8)?,
+        &cancellation,
+    );
+    for error in [
+        pixel_shuffle_nd_tensor_with_context_exact_native(
+            &backend,
+            &input,
+            3,
+            2,
+            &constrained_context,
+        )
+        .expect_err("pixel shuffle must preserve a typed resource failure"),
+        bislerp_tensor_with_context_exact_native(&backend, &image, 3, 1, &constrained_context)
+            .expect_err("bislerp must preserve a typed resource failure"),
+    ] {
+        assert!(
+            matches!(error, SpatialFunctionalKernelError::Tensor(_)),
+            "typed tensor failure was stringified: {error:?}"
+        );
+    }
+    assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
+    Ok(())
 }
 
 impl TestBackend {
@@ -120,6 +248,35 @@ fn tensor_convolution_adapters_are_bounded_fresh_and_transpose_exact()
         0.0,
     );
     assert_ne!(output.storage_id(), input.storage_id());
+
+    let volume = upload(
+        vec![1, 1, 2, 2, 2],
+        &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+    )?;
+    let volume_weight = upload(vec![1, 1, 2, 2, 2], &[1.0; 8])?;
+    let volume_bias = upload(vec![1], &[0.25])?;
+    let volume_configuration = ConvolutionConfiguration {
+        stride: vec![1, 1, 1],
+        padding: vec![0, 0, 0],
+        dilation: vec![1, 1, 1],
+        groups: 1,
+        output_padding: vec![0, 0, 0],
+    };
+    let volume_output = conv_3d_tensor_with_context_exact_native(
+        &*backend,
+        &volume,
+        &volume_weight,
+        Some(&volume_bias),
+        &volume_configuration,
+        &context,
+    )?;
+    assert_eq!(volume_output.descriptor().shape(), &[1, 1, 1, 1, 1]);
+    close(
+        &tensor_to_f32_with_context_exact_native(&backend, &volume_output, &context)?,
+        &[36.25],
+        0.0,
+    );
+    assert_ne!(volume_output.storage_id(), volume.storage_id());
 
     let transpose_input = upload(vec![1, 1, 1, 1], &[2.0])?;
     let transpose_weight = upload(vec![1, 1, 2, 2], &[1.0, 2.0, 3.0, 4.0])?;
