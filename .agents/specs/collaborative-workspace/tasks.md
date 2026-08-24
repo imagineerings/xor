@@ -2746,7 +2746,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Discovered contradiction (2026-08-24): the planned single-file write cannot register the new audit module, and the requested moderation producer does not exist until Milestone 36. The narrow correction registers `audit::events` and defines one typed producer boundary for all five families; it does not generate replacement operation IDs, modify future moderation owners or pull producer-specific transactions into the audit layer._
     - _Evidence: 2026-08-24 — added a non-deserializable AuditEventRecorder boundary over the canonical chain repository. Every authentication, membership, moderation, workflow and migration variant carries the caller's non-nil stable operation ID and admitted community; successful authentication and all administrative variants require a same-community authenticated actor. Closed action, actor, authentication-method and failure-class tokens plus typed identifiers/counters leave no slot for credentials, request bodies, private content or raw error details. A focused integration test appends attributable success and denied failure as one valid two-entry chain and inspects the persisted statements for stable actions, operation IDs and safe failure classification. Three additional tests cover all five families, closed field shapes, cross-tenant actors, missing attribution and failure-class/outcome consistency. The combined canonical repository/event harness passes 8/8 tests and warning-denied all-target Clippy; `cargo check -p collab --lib`, formatting, diff hygiene and the collaboration dependency boundary pass. Canonical specification and inventory validation are recorded in the enclosing checkpoint commit._
 
-  - [ ] 35.4. Consolidate agent and workflow usage accounting
+  - [x] 35.4. Consolidate agent and workflow usage accounting
     - Aggregate canonical job/turn/workflow records by tenant while preserving private NIP-AM semantics.
     - _Requirements: 11.3, 13.4, 19.5_
     - _Capability IDs: CAP-024, CAP-027, CAP-028_
@@ -2754,8 +2754,10 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/agent/src/usage.rs, crates/collab/src/workflows/repository.rs_
     - _Writes: crates/collab/src/audit/usage.rs_
     - _Validation: usage tests cover retry deduplication, redaction, export and disabled client telemetry_
+    - _Discovered contradiction (2026-08-24): Collab cannot import the `agent` repository without reversing ownership, the leaf has no usage-schema write, and an efficient exact retry cannot scan an unbounded hash chain. The narrow correction projects only privacy-safe canonical usage into the existing audit chain, registers `audit::usage` and adds one tenant-indexed `AuditRepository::load_operation` read over Task 35.2's unique operation key. It does not decrypt, duplicate or replace the owner-local NIP-AM store and adds no telemetry emitter or second persistence authority._
+    - _Evidence: 2026-08-24 — added tenant-scoped AgentJob, AgentTurn and WorkflowRun accounting records that preserve producer operation identity and store only a domain-separated community/kind/source digest plus bounded operational counters. The private agent-turn shape has exactly one digest field: owner/agent keys, raw event ID, ciphertext, model, channel/session/turn identity, token counts and cost are unrepresentable. Exact pre-existing retries and simulated concurrent stale-head losers reconstruct through the indexed canonical operation read and return `AlreadyRecorded` without an insert; changed content under the same operation ID fails closed. Typed export verifies the shared chain, filters unrelated audit entries from its payload while retaining the scanned head for cursor advancement, and checked aggregation rejects overflow. Five focused tests pass retry/dedup/conflict, NIP-AM minimization and redacted diagnostics, mixed-chain export/aggregation, tenant/bounds fencing and overflow; the combined audit repository/event/usage harness passes 13/13 with warning-denied all-target Clippy. `cargo check -p collab --lib` passes through the registered crate root. Formatting, diff hygiene, dependency, inventory and canonical specification gates are recorded in the enclosing checkpoint commit._
 
-  - [ ] 35.5. Add audit verification, export and tamper tests
+  - [x] 35.5. Add audit verification, export and tamper tests
     - Verify full/segment chains, bridge imported heads and emit operator-safe diagnostics on corruption.
     - _Requirements: 13.4, 19.3, 20.1_
     - _Capability IDs: CAP-028, CAP-044_
@@ -2763,6 +2765,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/collab/src/audit/**, .agents/specs/collaborative-workspace/fixtures/migrations/**_
     - _Writes: crates/collab/tests/audit_chain.rs_
     - _Validation: `cargo test -p collab audit_chain` detects deletion, reorder, mutation and wrong imported head_
+    - _Discovered contradiction (2026-08-24): the planned migration-fixture directory contains desktop-store fixtures but no audit-chain bytes, while verifier corruption must bypass the append-only database guards to exercise stored-row reconstruction. The narrow correction builds deterministic canonical native/imported entries and mutates their mocked PostgreSQL rows through the public repository API; it adds no production verifier, alternate hash implementation or writable corruption hook._
+    - _Evidence: 2026-08-24 — added the auto-discovered `collab` audit-chain integration target. A valid three-entry native chain verifies both from genesis and from a mid-chain predecessor, and a loaded export cursor resumes at the exact following entry while preserving the terminal head. Independent negative cases remove the middle entry, reorder successors and mutate a hashed action; each is rejected by canonical reconstruction. An imported Buzz-v1 head verifies unchanged and fails after its source head is altered. The corruption error's public text excludes tenant, operation, hash and redacted field identifiers. All three integration tests pass in a lean package that compiles the checked-in target against the exact public repository/domain sources, and warning-denied all-target Clippy passes. Cargo metadata confirms the repository manifest discovers `crates/collab/tests/audit_chain.rs` as the `audit_chain` test target. Formatting, diff hygiene, dependency, inventory and canonical specification gates are recorded in the enclosing checkpoint commit._
 
   - [x] 35.6. Implement the audit-chain repository
     - Append one serialized per-community chain, read/export segments and reject stale or cross-tenant heads.
@@ -2777,7 +2781,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 36. Port moderation and administration
 
-  - [ ] 36.1. Define report, mute, ban and timeout state machines
+  - [x] 36.1. Define report, mute, ban and timeout state machines
     - Model personal mute separately from role-gated reports, bans, timeouts and resolution.
     - _Requirements: 15.1, 15.4_
     - _Capability IDs: CAP-029_
@@ -2785,6 +2789,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/VISION_MODERATION.md, projects/buzz/crates/buzz-db/src/moderation.rs_
     - _Writes: crates/collaboration_domain/src/moderation.rs_
     - _Validation: state tests cover report, resolve, timeout expiry, ban, personal mute and stale actor_
+    - _Discovered contradiction (2026-08-24): the planned single-file write cannot register the new domain module or keep the canonical design and task evidence synchronized. The narrow correction also updates `crates/collaboration_domain/src/collaboration_domain.rs` and this specification pack; it adds no persistence, enforcement adapter, audit writer, archive behavior or notice delivery owned by later leaves._
+    - _Evidence: 2026-08-24 — added separate report, community-restriction and personal-mute aggregates. Reports accept only current scoped members, closed reasons and typed event/principal/blob targets; optional private context is bounded and redacted from diagnostics, resolution is owner/admin-only and exact retries are idempotent. Ban and timeout transitions retain stable operation/actor/time attribution and contiguous versions while remaining independently active, so timeout expiry cannot hide a permanent ban. Current target versions, owner protection and administrator peer protection fail closed. Personal mutes are member-owned state and cannot create or alter community restrictions. Rehydration validates report, restriction and mute histories. Five focused state tests cover report filing/resolution/retry/redaction, timeout expiry plus ban independence, protected targets, personal-mute separation and stale actor/target membership. The complete domain suite passed 163/163 and warning-denied release Clippy passed. Formatting, diff hygiene, collaboration dependency boundaries, the 352-leaf inventory gate and canonical feature-spec validation passed._
 
   - [ ] 36.2. Persist moderation and archive records
     - Add tenant-fenced reports, actions, resolutions and identity/community archive state with provenance.

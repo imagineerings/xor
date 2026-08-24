@@ -20,6 +20,7 @@ pub mod job_authorization;
 pub mod membership;
 pub mod message;
 pub mod message_marker;
+pub mod moderation;
 pub mod notification_policy;
 pub mod presence;
 pub mod principal;
@@ -142,6 +143,14 @@ pub use message::{
 pub use message_marker::{
     MarkerCommandOutcome, MarkerError, MarkerMutation, MarkerMutationKind, MarkerRecordFields,
     MarkerView, MessageMarkers,
+};
+pub use moderation::{
+    BanState, ModerationCommandOutcome, ModerationCommandSource, ModerationError, ModerationReport,
+    ModerationReportContext, ModerationReportReason, ModerationReportRecordFields,
+    ModerationReportState, ModerationReportTarget, ModerationResolution,
+    ModerationResolutionRecord, ModerationRestriction, ModerationRestrictionRecordFields,
+    PersonalMute, PersonalMuteRecordFields, PersonalMuteState, PersonalMuteTransition,
+    RestrictionTransition, RestrictionTransitionKind, TimeoutState,
 };
 pub use notification_policy::{
     NotificationCandidate, NotificationDecision, NotificationDeliveryId,
