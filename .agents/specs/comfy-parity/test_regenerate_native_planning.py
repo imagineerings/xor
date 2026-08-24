@@ -448,6 +448,19 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_nodes/src/families/partner_three_d_02.rs",
             provider_projection["writes"],
         )
+        provider_streaming = tasks_by_id[
+            "comfy-parity-provider-streaming-component-abi-v2"
+        ]
+        self.assertIn(
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
+            provider_streaming["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
+            provider_streaming["writes"],
+        )
+        self.assertIn("comfy_plugin_host", provider_streaming["validation_packages"])
+        self.assertIn("exact frozen v1 WIT file", provider_streaming["done"])
         self.assertIn(
             "crates/comfy_nodes/src/families/partner_three_d_03.rs",
             provider_projection["writes"],

@@ -10331,6 +10331,7 @@ def provider_component_foundation_tasks(
         done: str,
         registered_source_edits: list[str],
         dependencies: list[str] | None = None,
+        validation_packages: list[str] | None = None,
     ) -> None:
         dependency = [str(shared[-1]["id"])] if shared else [
             provider_dependency,
@@ -10375,6 +10376,7 @@ def provider_component_foundation_tasks(
                     "44.3",
                 ],
                 registered_source_edits=registered_source_edits,
+                validation_packages=validation_packages,
             )
         )
 
@@ -10437,15 +10439,18 @@ def provider_component_foundation_tasks(
             "crates/comfy_plugin_sdk/wit/comfy-plugin.wit",
             "crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json",
             "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
         ],
         [
             "crates/comfy_plugin_sdk/wit/comfy-provider-plugin-v2.wit",
             "crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json",
             "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
             "crates/comfy_plugin_sdk/src/type_ids.rs",
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
         ],
-        "V1 fixtures remain byte-compatible. V2 DTOs enforce invocation-scoped generation-checked handles, method/header/body/chunk/line/aggregate bounds, ordered terminal state, upload and cost parity between WIT and JSON schema, cancellation-aware waits, and monotonic bounded progress without paths, secrets, native handles, or accepted-but-ignored fields.",
-        ["comfy_plugin_sdk"],
+        "V1 fixtures remain byte-compatible and the existing host bindgens resolve the exact frozen v1 WIT file without parsing the separately versioned v2 package. V2 DTOs enforce invocation-scoped generation-checked handles, method/header/body/chunk/line/aggregate bounds, ordered terminal state, upload and cost parity between WIT and JSON schema, cancellation-aware waits, and monotonic bounded progress without paths, secrets, native handles, or accepted-but-ignored fields.",
+        ["comfy_plugin_sdk", "comfy_plugin_host"],
+        validation_packages=["comfy_plugin_sdk", "comfy_plugin_host"],
     )
     append_shared(
         "comfy-parity-provider-worker-stream-protocol",
