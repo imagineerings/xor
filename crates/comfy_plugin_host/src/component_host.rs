@@ -9,8 +9,10 @@ use comfy_runtime::{
     NativeProviderRegistryPin, NodeContext, PermissionPolicy, PluginAuthorization,
     PluginAuthorizationSealer, PluginAuthorizationVerifier, PluginCapabilityBroker,
     PluginCapabilityInvocation, PluginServiceError, PluginServiceInvocationContext,
-    PluginTrustPolicy, ProviderCostAuthorizationAuthority, ProviderResultReceiptAuthority,
-    ProviderResultReceiptIssuer, WorkerRegistryDeploymentPlan,
+    PluginTrustPolicy, PreflightedProviderRuntimeActivationGrant,
+    ProviderCostAuthorizationAuthority, ProviderManifestAuthorizationV2,
+    ProviderResultReceiptAuthority, ProviderResultReceiptIssuer, ProviderRuntimeActivationGrant,
+    WorkerRegistryDeploymentPlan,
 };
 use comfy_types::{
     CancellationToken, MAX_WORKER_COMPONENT_CHUNK_BYTES,
@@ -34,6 +36,8 @@ pub const MAX_WORKER_PLUGIN_TIMEOUT_MILLISECONDS: u64 = 60_000;
 
 #[derive(Debug, Error)]
 pub enum ComponentHostError {
+    #[error("component invocation was cancelled")]
+    Cancelled,
     #[error("component host state is unavailable")]
     StateUnavailable,
     #[error("component manifest for extension `{extension_id}` is invalid: {message}")]
@@ -651,6 +655,120 @@ pub struct PreparedPluginInvocation {
     plugin: InstalledVerifiedPlugin,
     provider_price_badge: Option<NativeSchemaValue>,
     _lease: InvocationLease,
+}
+
+#[allow(dead_code)]
+struct PreflightedProviderComponentCapsule {
+    grant: PreflightedProviderRuntimeActivationGrant,
+    plugin: InstalledVerifiedPlugin,
+    generation: VerifiedComponentGeneration,
+    node_id: Arc<str>,
+    _lease: InvocationLease,
+}
+
+#[allow(dead_code)]
+impl PreflightedProviderComponentCapsule {
+    fn new(
+        host: &ComponentHost,
+        grant: ProviderRuntimeActivationGrant,
+        worker_start: &comfy_runtime::NativeProviderWorkerSessionStart,
+        manifest_authorization: ProviderManifestAuthorizationV2,
+    ) -> Result<Self, ComponentHostError> {
+        let plugin = host.installed_plugin(&worker_start.extension_id)?;
+        let lease = host.begin_invocation_lease(&plugin)?;
+        let generation = host.verified_generation()?;
+        let deployment = generation.worker_deployment_plan()?;
+        let node_id: Arc<str> = Arc::from(worker_start.node_id.as_str());
+        if !plugin
+            .manifest()
+            .nodes
+            .iter()
+            .any(|node| node.id == node_id.as_ref())
+        {
+            return Err(ComponentHostError::Plugin(PluginError::UndeclaredNode(
+                node_id.to_string(),
+            )));
+        }
+        let grant = grant
+            .preflight_installed_component(&deployment, worker_start, manifest_authorization)
+            .map_err(|error| match error {
+                PluginServiceError::Cancelled => ComponentHostError::Cancelled,
+                error => ComponentHostError::ExecutionBoundary(format!(
+                    "provider component activation preflight failed: {error}"
+                )),
+            })?;
+        Ok(Self {
+            grant,
+            plugin,
+            generation,
+            node_id,
+            _lease: lease,
+        })
+    }
+}
+
+#[cfg(test)]
+mod activation_preflight_tests {
+    #[test]
+    fn provider_component_capsule_is_the_only_preflight_callsite() {
+        let source = include_str!("component_host.rs");
+        let call = [".preflight_installed_", "component("].concat();
+        assert_eq!(source.matches(&call).count(), 1);
+        let fields = source
+            .split("struct PreflightedProviderComponentCapsule")
+            .nth(1)
+            .and_then(|source| {
+                source
+                    .split("impl PreflightedProviderComponentCapsule")
+                    .next()
+            })
+            .expect("private provider component capsule is missing");
+        for retained in ["grant:", "plugin:", "generation:", "node_id:", "_lease:"] {
+            assert!(fields.contains(retained));
+        }
+        assert!(!fields.contains("pub "));
+        let capsule = source
+            .split("impl PreflightedProviderComponentCapsule")
+            .nth(1)
+            .and_then(|source| source.split("impl PreparedPluginInvocation").next())
+            .expect("private provider component capsule implementation is missing");
+        assert!(capsule.contains("let plugin = host.installed_plugin"));
+        assert!(capsule.contains("let lease = host.begin_invocation_lease"));
+        assert!(capsule.contains("let generation = host.verified_generation"));
+        assert!(capsule.contains("let deployment = generation.worker_deployment_plan"));
+        assert!(capsule.contains("plugin.manifest().nodes.iter().any"));
+        assert!(capsule.contains(&call));
+        let ordered = [
+            "let plugin = host.installed_plugin",
+            "let lease = host.begin_invocation_lease",
+            "let generation = host.verified_generation",
+            "let deployment = generation.worker_deployment_plan",
+            "plugin.manifest().nodes.iter().any",
+            call.as_str(),
+            "Ok(Self",
+        ];
+        let mut previous = 0;
+        for marker in ordered {
+            let position = capsule
+                .find(marker)
+                .expect("capsule ordering marker is missing");
+            assert!(position >= previous);
+            previous = position;
+        }
+        for forbidden in [
+            "pub fn",
+            "begin_invocation(",
+            "get_input_state",
+            "read_scalar_input",
+            "take_input",
+            "read_handle",
+            "instantiate_component",
+            "create_node",
+            ".invoke(",
+        ] {
+            assert!(!capsule.contains(forbidden));
+        }
+    }
 }
 
 impl PreparedPluginInvocation {

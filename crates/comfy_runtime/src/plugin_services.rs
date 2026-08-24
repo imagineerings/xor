@@ -158,7 +158,7 @@ pub trait NativeProviderInvocationAuthority: Send + Sync {
 pub struct ProviderRuntimeActivationGrant {
     host_context: Option<WorkerProviderInvocationContext>,
     service_identity: Option<Arc<()>>,
-    claim: Option<Arc<AtomicBool>>,
+    claim: ProviderRuntimeClaimGuard,
     cancellation: Option<CancellationToken>,
     profile_id: String,
     principal_id: String,
@@ -178,9 +178,43 @@ pub struct ProviderRuntimeActivationGrant {
     compiled_plan_sha256: String,
 }
 
+#[derive(Default)]
+struct ProviderRuntimeClaimGuard {
+    claim: Option<Arc<AtomicBool>>,
+}
+
+impl ProviderRuntimeClaimGuard {
+    fn armed(claim: Arc<AtomicBool>) -> Self {
+        Self { claim: Some(claim) }
+    }
+
+    fn disarm(&mut self) -> Result<Arc<AtomicBool>, PluginServiceError> {
+        self.claim
+            .take()
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)
+    }
+}
+
+impl Drop for ProviderRuntimeClaimGuard {
+    fn drop(&mut self) {
+        revoke_provider_runtime_claim(self.claim.as_ref());
+    }
+}
+
+pub struct PreflightedProviderRuntimeActivationGrant {
+    grant: Option<ProviderRuntimeActivationGrant>,
+    manifest_authorization: Option<ProviderManifestAuthorizationV2>,
+}
+
 impl fmt::Debug for ProviderRuntimeActivationGrant {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("ProviderRuntimeActivationGrant([SEALED])")
+    }
+}
+
+impl fmt::Debug for PreflightedProviderRuntimeActivationGrant {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("PreflightedProviderRuntimeActivationGrant([SEALED])")
     }
 }
 
@@ -338,7 +372,7 @@ impl ProviderRuntimeActivationGrantSource {
         );
         grant.host_context = Some(context.clone());
         grant.service_identity = Some(state.service_identity.clone());
-        grant.claim = Some(claim);
+        grant.claim = ProviderRuntimeClaimGuard::armed(claim);
         Ok(grant)
     }
 
@@ -430,11 +464,9 @@ impl ProviderRuntimeActivationGrant {
         node_id: impl Into<String>,
         request_ordinal: u32,
         worker_deployment: &WorkerRegistryDeploymentPlan,
-        component_generation: u64,
         component_digest_sha256: impl Into<String>,
         provider_manifest_sha256: impl Into<String>,
         authorization_generation_sha256: impl Into<String>,
-        binding_generation: u64,
         binding_set_sha256: impl Into<String>,
         compiled_plan_sha256: impl Into<String>,
     ) -> Result<Self, PluginServiceError> {
@@ -450,22 +482,22 @@ impl ProviderRuntimeActivationGrant {
             .registry_digest_sha256()
             .as_str()
             .to_owned();
+        let component_generation = registry_generation;
+        let binding_generation = registry_generation;
         let component_digest_sha256 = component_digest_sha256.into();
         let provider_manifest_sha256 = provider_manifest_sha256.into();
         let authorization_generation_sha256 = authorization_generation_sha256.into();
         let binding_set_sha256 = binding_set_sha256.into();
         let compiled_plan_sha256 = compiled_plan_sha256.into();
-        if component_generation == 0
-            || binding_generation == 0
-            || [
-                profile_id.as_str(),
-                principal_id.as_str(),
-                prompt_id.as_str(),
-                attempt_id.as_str(),
-                node_id.as_str(),
-            ]
-            .into_iter()
-            .any(|value| !valid_provider_runtime_identity(value))
+        if [
+            profile_id.as_str(),
+            principal_id.as_str(),
+            prompt_id.as_str(),
+            attempt_id.as_str(),
+            node_id.as_str(),
+        ]
+        .into_iter()
+        .any(|value| !valid_provider_runtime_identity(value))
             || [
                 prompt_sha256.as_str(),
                 registry_digest_sha256.as_str(),
@@ -483,7 +515,7 @@ impl ProviderRuntimeActivationGrant {
         Ok(Self {
             host_context: None,
             service_identity: None,
-            claim: None,
+            claim: ProviderRuntimeClaimGuard::default(),
             cancellation: None,
             profile_id,
             principal_id,
@@ -504,25 +536,115 @@ impl ProviderRuntimeActivationGrant {
         })
     }
 
-    pub fn bind(
+    pub fn preflight_installed_component(
         self,
+        worker_deployment: &WorkerRegistryDeploymentPlan,
+        worker_invocation: &NativeProviderWorkerSessionStart,
         manifest_authorization: ProviderManifestAuthorizationV2,
+    ) -> Result<PreflightedProviderRuntimeActivationGrant, PluginServiceError> {
+        let result = self.preflight_installed_component_inner(
+            worker_deployment,
+            worker_invocation,
+            &manifest_authorization,
+        );
+        match result {
+            Ok(()) => Ok(PreflightedProviderRuntimeActivationGrant {
+                grant: Some(self),
+                manifest_authorization: Some(manifest_authorization),
+            }),
+            Err(error) => Err(error),
+        }
+    }
+
+    fn preflight_installed_component_inner(
+        &self,
+        worker_deployment: &WorkerRegistryDeploymentPlan,
+        worker_invocation: &NativeProviderWorkerSessionStart,
+        manifest_authorization: &ProviderManifestAuthorizationV2,
+    ) -> Result<(), PluginServiceError> {
+        let cancellation = self
+            .cancellation
+            .as_ref()
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)?;
+        let deployment = worker_deployment.begin();
+        let component = deployment
+            .components()
+            .iter()
+            .find(|component| component.extension_id() == worker_invocation.extension_id)
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        let authorization = manifest_authorization.authorization();
+        let binding = manifest_authorization.provider_binding();
+        let provider_manifest_sha256 =
+            encode_lower_hex(manifest_authorization.outer_signing_payload_sha256());
+        let generation = deployment.generation().get();
+        if worker_invocation.registry_generation != generation
+            || worker_invocation.registry_digest_sha256
+                != deployment.registry_digest_sha256().as_str()
+            || worker_invocation.extension_version != component.extension_version()
+            || worker_invocation.plugin_identifier != component.plugin_identifier()
+            || worker_invocation.plugin_version != component.plugin_version()
+            || worker_invocation.manifest_digest_sha256
+                != component.manifest_digest_sha256().as_str()
+            || worker_invocation.component_digest_sha256
+                != component.component_digest_sha256().as_str()
+            || worker_invocation.authorization_generation_sha256
+                != component.authorization_generation().as_str()
+            || self.registry_generation != generation
+            || self.registry_digest_sha256 != deployment.registry_digest_sha256().as_str()
+            || self.component_generation != generation
+            || self.component_digest_sha256 != component.component_digest_sha256().as_str()
+            || self.provider_manifest_sha256 != provider_manifest_sha256
+            || self.authorization_generation_sha256 != component.authorization_generation().as_str()
+            || self.binding_generation != generation
+            || self.binding_set_sha256 != binding.bindings_sha256
+            || self.binding_set_sha256 != worker_invocation.binding_set_sha256
+            || self.node_id != worker_invocation.node_id
+            || self.compiled_plan_sha256 != worker_invocation.compiled_plan_sha256
+            || authorization.plugin_id() != component.plugin_identifier()
+            || authorization.digest_sha256() != component.component_digest_sha256().as_str()
+            || binding.implementation_namespace != authorization.plugin_id()
+            || !binding
+                .bindings
+                .iter()
+                .any(|claim| claim.node_id == worker_invocation.node_id)
+        {
+            return Err(PluginServiceError::ProviderRuntimeAuthorityDenied);
+        }
+        cancellation
+            .check()
+            .map_err(|_| PluginServiceError::Cancelled)
+    }
+}
+
+impl PreflightedProviderRuntimeActivationGrant {
+    pub fn bind(
+        mut self,
         request_head: &ProviderRequestHeadV2,
         provider_policy: &ProviderPolicy,
     ) -> Result<ProviderRuntimeAuthorityInput, PluginServiceError> {
-        let claim = self.claim.clone();
-        let result = ProviderRuntimeAuthorityInput::checked_from_activation_grant(
-            self,
+        let grant = self
+            .grant
+            .take()
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        let manifest_authorization = self
+            .manifest_authorization
+            .take()
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        ProviderRuntimeAuthorityInput::checked_from_preflighted_activation_grant(
+            grant,
             manifest_authorization,
             request_head,
             provider_policy,
-        );
-        if result.is_err()
-            && let Some(claim) = claim
-        {
-            claim.store(false, Ordering::Release);
-        }
-        result
+        )
+    }
+}
+
+fn revoke_provider_runtime_claim(claim: Option<&Arc<AtomicBool>>) {
+    if let Some(claim) = claim {
+        claim.store(false, Ordering::Release);
     }
 }
 
@@ -555,8 +677,8 @@ pub struct ProviderRuntimeAuthorityInput {
 }
 
 impl ProviderRuntimeAuthorityInput {
-    fn checked_from_activation_grant(
-        grant: ProviderRuntimeActivationGrant,
+    fn checked_from_preflighted_activation_grant(
+        mut grant: ProviderRuntimeActivationGrant,
         manifest_authorization: ProviderManifestAuthorizationV2,
         request_head: &ProviderRequestHeadV2,
         provider_policy: &ProviderPolicy,
@@ -568,9 +690,6 @@ impl ProviderRuntimeAuthorityInput {
         let service_identity = grant
             .service_identity
             .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
-        let claim = grant
-            .claim
-            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
         let cancellation = grant
             .cancellation
             .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
@@ -581,22 +700,11 @@ impl ProviderRuntimeAuthorityInput {
             .validate_for_contract(manifest_authorization.streaming_contract())
             .map_err(map_provider_streaming_error)?;
         let binding = manifest_authorization.provider_binding();
-        if binding.bindings_sha256 != grant.binding_set_sha256
-            || !binding
-                .bindings
-                .iter()
-                .any(|binding| binding.node_id == grant.node_id)
-        {
-            return Err(PluginServiceError::ProviderRuntimeAuthorityDenied);
-        }
         let provider = binding.implementation_namespace.clone();
         let authorization = manifest_authorization.authorization();
         let provider_manifest_sha256 =
             encode_lower_hex(manifest_authorization.outer_signing_payload_sha256());
-        if authorization.plugin_id() != provider
-            || authorization.digest_sha256() != grant.component_digest_sha256
-            || provider_manifest_sha256 != grant.provider_manifest_sha256
-        {
+        if authorization.plugin_id() != provider {
             return Err(PluginServiceError::ProviderRuntimeAuthorityDenied);
         }
         authorization
@@ -640,6 +748,7 @@ impl ProviderRuntimeAuthorityInput {
         cancellation
             .check()
             .map_err(|_| PluginServiceError::Cancelled)?;
+        let claim = grant.claim.disarm()?;
         Ok(Self {
             service_identity,
             claim,
@@ -4768,7 +4877,8 @@ mod tests {
         ProviderStreamTerminalV2, ProviderStreamingContractV2,
     };
     use comfy_types::{
-        WorkerProviderInvocationContext, WorkerRegistryDeploymentBegin, WorkerRegistryGeneration,
+        WorkerComponentContent, WorkerComponentDescriptor, WorkerProviderInvocationContext,
+        WorkerRegistryDeploymentBegin, WorkerRegistryDeploymentChunk, WorkerRegistryGeneration,
         WorkerSha256Digest,
     };
     use tempfile::TempDir;
@@ -6326,27 +6436,92 @@ mod tests {
         Ok(binding)
     }
 
-    fn empty_worker_registry_deployment() -> Result<WorkerRegistryDeploymentPlan, Box<dyn Error>> {
+    fn worker_registry_deployment() -> Result<WorkerRegistryDeploymentPlan, Box<dyn Error>> {
+        worker_registry_deployment_at(7)
+    }
+
+    fn worker_registry_deployment_at(
+        generation: u64,
+    ) -> Result<WorkerRegistryDeploymentPlan, Box<dyn Error>> {
+        let generation = WorkerRegistryGeneration::new(generation)?;
+        let component = WorkerComponentDescriptor::new(
+            "fixture.extension",
+            "1.0.0",
+            "plugin.fixture",
+            "1.0.0",
+            WorkerSha256Digest::new("b".repeat(64))?,
+            WorkerSha256Digest::new("d".repeat(64))?,
+            WorkerSha256Digest::new(DIGEST)?,
+            1,
+            1,
+            1,
+        )?;
         let begin = WorkerRegistryDeploymentBegin::new(
-            WorkerRegistryGeneration::new(7)?,
+            generation,
             WorkerSha256Digest::new("a".repeat(64))?,
-            Vec::new(),
+            vec![component],
         )?;
         let verifier = crate::PluginAuthorizationSealer::from_seed(
             [0x71; 32],
             crate::PermissionPolicyGeneration::new(1)?,
         )?
         .verifier()?;
-        Ok(WorkerRegistryDeploymentPlan::new(
-            begin,
-            Vec::new(),
-            verifier,
-        )?)
+        let chunks = [
+            WorkerComponentContent::Manifest,
+            WorkerComponentContent::Authorization,
+            WorkerComponentContent::Component,
+        ]
+        .into_iter()
+        .map(|content| WorkerRegistryDeploymentChunk::new(generation, 0, content, 0, vec![1]))
+        .collect::<Result<Vec<_>, _>>()?;
+        Ok(WorkerRegistryDeploymentPlan::new(begin, chunks, verifier)?)
+    }
+
+    fn activation_start(
+        deployment: &WorkerRegistryDeploymentPlan,
+        binding: &ProviderBindingSet,
+    ) -> NativeProviderWorkerSessionStart {
+        let component = &deployment.begin().components()[0];
+        NativeProviderWorkerSessionStart {
+            session_id: "session.fixture".to_owned(),
+            registry_generation: deployment.begin().generation().get(),
+            registry_digest_sha256: deployment
+                .begin()
+                .registry_digest_sha256()
+                .as_str()
+                .to_owned(),
+            extension_id: component.extension_id().to_owned(),
+            extension_version: component.extension_version().to_owned(),
+            plugin_identifier: component.plugin_identifier().to_owned(),
+            plugin_version: component.plugin_version().to_owned(),
+            manifest_digest_sha256: component.manifest_digest_sha256().as_str().to_owned(),
+            component_digest_sha256: component.component_digest_sha256().as_str().to_owned(),
+            authorization_generation_sha256: component
+                .authorization_generation()
+                .as_str()
+                .to_owned(),
+            binding_set_sha256: binding.bindings_sha256.clone(),
+            node_id: "node.fixture".to_owned(),
+            compiled_plan_sha256: "c".repeat(64),
+            maximum_response_bytes: MAX_PLUGIN_SERVICE_RESPONSE_BYTES,
+        }
     }
 
     fn activation_grant(
         binding: &ProviderBindingSet,
         outer_signing_payload_sha256: [u8; 32],
+    ) -> Result<ProviderRuntimeActivationGrant, Box<dyn Error>> {
+        activation_grant_for_deployment(
+            binding,
+            outer_signing_payload_sha256,
+            &worker_registry_deployment()?,
+        )
+    }
+
+    fn activation_grant_for_deployment(
+        binding: &ProviderBindingSet,
+        outer_signing_payload_sha256: [u8; 32],
+        worker_deployment: &WorkerRegistryDeploymentPlan,
     ) -> Result<ProviderRuntimeActivationGrant, Box<dyn Error>> {
         Ok(
             ProviderRuntimeActivationGrant::checked_from_active_deployment(
@@ -6357,16 +6532,24 @@ mod tests {
                 ATTEMPT_UUID.to_string(),
                 "node.fixture",
                 REQUEST_ORDINAL,
-                &empty_worker_registry_deployment()?,
-                9,
+                worker_deployment,
                 DIGEST,
                 encode_lower_hex(&outer_signing_payload_sha256),
                 "b".repeat(64),
-                11,
                 binding.bindings_sha256.clone(),
                 "c".repeat(64),
             )?,
         )
+    }
+
+    fn preflight_activation(
+        grant: ProviderRuntimeActivationGrant,
+        manifest: ProviderManifestAuthorizationV2,
+    ) -> Result<PreflightedProviderRuntimeActivationGrant, PluginServiceError> {
+        let deployment = worker_registry_deployment()
+            .map_err(|_| PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        let start = activation_start(&deployment, manifest.provider_binding());
+        grant.preflight_installed_component(&deployment, &start, manifest)
     }
 
     fn bound_streaming_authority(
@@ -6410,9 +6593,8 @@ mod tests {
             activation_grant(binding, outer_digest)?,
             &CancellationToken::default(),
         )?;
-        let authority = source
-            .claim(&context, &CancellationToken::default())?
-            .bind(manifest, &head, &policy)?;
+        let authority = source.claim(&context, &CancellationToken::default())?;
+        let authority = preflight_activation(authority, manifest)?.bind(&head, &policy)?;
         Ok((authority, head))
     }
 
@@ -6487,9 +6669,8 @@ mod tests {
             activation_grant(&binding, outer_digest)?,
             cancellation,
         )?;
-        let authority = service
-            .claim_activation(context, cancellation)?
-            .bind(manifest, &sdk_head, &policy)?;
+        let authority = service.claim_activation(context, cancellation)?;
+        let authority = preflight_activation(authority, manifest)?.bind(&sdk_head, &policy)?;
         Ok((service, authority, worker_head))
     }
 
@@ -6664,7 +6845,7 @@ mod tests {
             );
         }
         let grant = source.claim(&rightful, &CancellationToken::default())?;
-        let authority = grant.bind(manifest, &head, &policy)?;
+        let authority = preflight_activation(grant, manifest)?.bind(&head, &policy)?;
         assert_eq!(authority.request_head, head);
         assert!(matches!(
             source.claim(&rightful, &CancellationToken::default()),
@@ -6711,9 +6892,10 @@ mod tests {
             &CancellationToken::default(),
         )?;
         assert!(matches!(
-            changed_outer_source
-                .claim(&rightful, &CancellationToken::default())?
-                .bind(changed_outer, &head, &policy),
+            preflight_activation(
+                changed_outer_source.claim(&rightful, &CancellationToken::default())?,
+                changed_outer,
+            ),
             Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
         ));
         let changed_inner = ProviderManifestAuthorizationV2::fixture(
@@ -6729,9 +6911,10 @@ mod tests {
             &CancellationToken::default(),
         )?;
         assert!(matches!(
-            changed_inner_source
-                .claim(&rightful, &CancellationToken::default())?
-                .bind(changed_inner, &head, &policy),
+            preflight_activation(
+                changed_inner_source.claim(&rightful, &CancellationToken::default())?,
+                changed_inner,
+            ),
             Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
         ));
 
@@ -6761,18 +6944,205 @@ mod tests {
             bind_cancelled_source.claim(&rightful, &CancellationToken::default())?;
         bind_cancellation.cancel();
         assert!(matches!(
-            bind_cancelled_grant.bind(
+            preflight_activation(
+                bind_cancelled_grant,
                 ProviderManifestAuthorizationV2::fixture(
                     authorization,
                     outer_digest,
                     binding,
                     provider_streaming_contract(),
                 ),
-                &head,
-                &policy,
             ),
             Err(PluginServiceError::Cancelled)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn provider_runtime_component_preflight_rejects_every_sealed_identity_mismatch()
+    -> Result<(), Box<dyn Error>> {
+        let endpoint = "https://provider.invalid/v2";
+        let authorization = authorization(vec![capability(
+            CapabilityKind::NetworkProvider,
+            &format!("plugin.fixture|{endpoint}"),
+        )])?;
+        let binding = provider_binding()?;
+        let outer_digest = [0x47; 32];
+        let manifest = ProviderManifestAuthorizationV2::fixture(
+            authorization.clone(),
+            outer_digest,
+            binding.clone(),
+            provider_streaming_contract(),
+        );
+        let context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x417),
+            session_generation: 1,
+            invocation: 1,
+            generation: 1,
+        };
+        let mutations: [fn(&mut ProviderRuntimeActivationGrant); 10] = [
+            |grant| grant.registry_generation += 1,
+            |grant| grant.registry_digest_sha256 = "0".repeat(64),
+            |grant| grant.component_generation += 1,
+            |grant| grant.component_digest_sha256 = "0".repeat(64),
+            |grant| grant.provider_manifest_sha256 = "0".repeat(64),
+            |grant| grant.authorization_generation_sha256 = "0".repeat(64),
+            |grant| grant.binding_generation += 1,
+            |grant| grant.binding_set_sha256 = "0".repeat(64),
+            |grant| grant.node_id = "node.changed".to_owned(),
+            |grant| grant.compiled_plan_sha256 = "0".repeat(64),
+        ];
+        for mutate in mutations {
+            let source = ProviderRuntimeActivationGrantSource::new();
+            let cancellation = CancellationToken::default();
+            let mut grant = activation_grant(&binding, outer_digest)?;
+            mutate(&mut grant);
+            source.insert(&context, grant, &cancellation)?;
+            let grant = source.claim(&context, &cancellation)?;
+            assert!(matches!(
+                preflight_activation(grant, manifest.clone()),
+                Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
+            ));
+            let claim_key = (
+                context.session_id,
+                context.session_generation,
+                context.invocation,
+                context.generation,
+            );
+            assert!(
+                !source
+                    .state
+                    .lock()
+                    .activation_claims
+                    .get(&claim_key)
+                    .ok_or("activation claim disappeared")?
+                    .load(Ordering::Acquire)
+            );
+            assert!(matches!(
+                source.claim(&context, &cancellation),
+                Err(PluginServiceError::ProviderStreamingContract(
+                    ProviderStreamingContractError::RevokedHandle
+                ))
+            ));
+        }
+
+        let start_mutations: [fn(&mut NativeProviderWorkerSessionStart); 12] = [
+            |start| start.registry_generation += 1,
+            |start| start.registry_digest_sha256 = "0".repeat(64),
+            |start| start.extension_id = "fixture.changed".to_owned(),
+            |start| start.extension_version = "2.0.0".to_owned(),
+            |start| start.plugin_identifier = "plugin.changed".to_owned(),
+            |start| start.plugin_version = "2.0.0".to_owned(),
+            |start| start.manifest_digest_sha256 = "0".repeat(64),
+            |start| start.component_digest_sha256 = "0".repeat(64),
+            |start| start.authorization_generation_sha256 = "0".repeat(64),
+            |start| start.binding_set_sha256 = "0".repeat(64),
+            |start| start.node_id = "node.changed".to_owned(),
+            |start| start.compiled_plan_sha256 = "0".repeat(64),
+        ];
+        for mutate in start_mutations {
+            let source = ProviderRuntimeActivationGrantSource::new();
+            let cancellation = CancellationToken::default();
+            source.insert(
+                &context,
+                activation_grant(&binding, outer_digest)?,
+                &cancellation,
+            )?;
+            let deployment = worker_registry_deployment()?;
+            let mut start = activation_start(&deployment, &binding);
+            mutate(&mut start);
+            let grant = source.claim(&context, &cancellation)?;
+            assert!(matches!(
+                grant.preflight_installed_component(&deployment, &start, manifest.clone()),
+                Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
+            ));
+            assert!(
+                !source
+                    .state
+                    .lock()
+                    .activation_claims
+                    .values()
+                    .next()
+                    .ok_or("activation claim disappeared")?
+                    .load(Ordering::Acquire)
+            );
+        }
+
+        let later_deployment = worker_registry_deployment_at(8)?;
+        let source = ProviderRuntimeActivationGrantSource::new();
+        let cancellation = CancellationToken::default();
+        source.insert(
+            &context,
+            activation_grant_for_deployment(&binding, outer_digest, &later_deployment)?,
+            &cancellation,
+        )?;
+        assert!(matches!(
+            preflight_activation(source.claim(&context, &cancellation)?, manifest.clone()),
+            Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
+        ));
+
+        let mut changed_binding = binding.clone();
+        changed_binding.bindings[0].node_id = "node.changed".to_owned();
+        changed_binding.bindings_sha256 = changed_binding.canonical_bindings_sha256()?;
+        let changed_binding_manifest = ProviderManifestAuthorizationV2::fixture(
+            authorization.clone(),
+            outer_digest,
+            changed_binding.clone(),
+            provider_streaming_contract(),
+        );
+        let source = ProviderRuntimeActivationGrantSource::new();
+        source.insert(
+            &context,
+            activation_grant(&changed_binding, outer_digest)?,
+            &CancellationToken::default(),
+        )?;
+        assert!(matches!(
+            preflight_activation(
+                source.claim(&context, &CancellationToken::default())?,
+                changed_binding_manifest,
+            ),
+            Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
+        ));
+
+        let mut changed_streaming = provider_streaming_contract();
+        changed_streaming.maximum_progress_total -= 1;
+        let changed_streaming_manifest = ProviderManifestAuthorizationV2::fixture(
+            authorization,
+            [0x48; 32],
+            binding.clone(),
+            changed_streaming,
+        );
+        let source = ProviderRuntimeActivationGrantSource::new();
+        source.insert(
+            &context,
+            activation_grant(&binding, outer_digest)?,
+            &CancellationToken::default(),
+        )?;
+        assert!(matches!(
+            preflight_activation(
+                source.claim(&context, &CancellationToken::default())?,
+                changed_streaming_manifest,
+            ),
+            Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
+        ));
+
+        let dropped_source = ProviderRuntimeActivationGrantSource::new();
+        dropped_source.insert(
+            &context,
+            activation_grant(&binding, outer_digest)?,
+            &CancellationToken::default(),
+        )?;
+        drop(dropped_source.claim(&context, &CancellationToken::default())?);
+        assert!(
+            !dropped_source
+                .state
+                .lock()
+                .activation_claims
+                .values()
+                .next()
+                .ok_or("dropped activation claim disappeared")?
+                .load(Ordering::Acquire)
+        );
         Ok(())
     }
 
