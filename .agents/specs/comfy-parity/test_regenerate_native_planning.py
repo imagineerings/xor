@@ -83,7 +83,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 708)
+        self.assertEqual(len(tasks), 713)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -2854,6 +2854,7 @@ class ValidationGenerationTests(unittest.TestCase):
                 detection_id,
                 media_text_foundation_id,
                 media_text_id,
+                "comfy-parity-native-nodes-image-comfy-node-0586",
             ],
         )
         self.assertEqual(
@@ -3749,6 +3750,103 @@ class ValidationGenerationTests(unittest.TestCase):
             "validate_spec.py .agents/specs/comfy-parity --require-complete",
         ]:
             self.assertIn(command, provider_commands)
+
+    def test_blocked_image_and_experimental_leaves_have_canonical_precursors(self) -> None:
+        tasks, _ = planning.all_tasks()
+        tasks_by_id = {str(item["id"]): item for item in tasks}
+        waves = planning.task_waves(tasks)
+
+        asset_snapshot_id = "comfy-parity-native-asset-directory-snapshot-foundation"
+        progress_text_id = "comfy-parity-native-node-progress-text-foundation"
+        visual_decode_id = "comfy-parity-native-visual-asset-decode-foundation"
+        image_output_id = "comfy-parity-native-image-output-codec-effect-foundation"
+        dataset_output_id = "comfy-parity-native-dataset-output-policy-foundation"
+        image_part_one_id = "comfy-parity-native-nodes-image-comfy-node-0160"
+        image_part_two_id = "comfy-parity-native-nodes-image-comfy-node-0586"
+        experimental_hooks_id = "comfy-parity-native-nodes-experimental-comfy-node-0133"
+        experimental_compile_id = "comfy-parity-native-nodes-experimental-comfy-node-0680"
+        model_transform_id = "comfy-parity-native-model-transform-foundation"
+        sampler_payload_id = "comfy-parity-native-sampler-payload-algorithm-foundation"
+        sampling_profile_id = "comfy-parity-native-sampling-profile-guidance-foundation"
+        compile_bridge_id = "comfy-parity-native-compile-policy-bridge-foundation"
+        structured_link_id = "comfy-parity-native-structured-input-link-foundation"
+
+        self.assertEqual(
+            tasks_by_id[progress_text_id]["dependencies"], [asset_snapshot_id]
+        )
+        self.assertIn(progress_text_id, tasks_by_id[visual_decode_id]["dependencies"])
+        self.assertEqual(
+            tasks_by_id[image_output_id]["dependencies"],
+            [visual_decode_id, image_part_one_id],
+        )
+        self.assertEqual(
+            tasks_by_id[dataset_output_id]["dependencies"], [image_output_id]
+        )
+        for identifier in (
+            asset_snapshot_id,
+            progress_text_id,
+            visual_decode_id,
+            image_output_id,
+            dataset_output_id,
+        ):
+            self.assertTrue(tasks_by_id[identifier]["locked"])
+            self.assertTrue(tasks_by_id[identifier]["feature_scoped"])
+        self.assertLess(waves[asset_snapshot_id], waves[progress_text_id])
+        self.assertLess(waves[progress_text_id], waves[visual_decode_id])
+        self.assertLess(waves[visual_decode_id], waves[image_part_one_id])
+        self.assertLess(waves[image_part_one_id], waves[image_output_id])
+        self.assertLess(waves[image_output_id], waves[dataset_output_id])
+        self.assertLess(waves[dataset_output_id], waves[image_part_two_id])
+
+        for dependency in (asset_snapshot_id, progress_text_id, visual_decode_id):
+            self.assertIn(dependency, tasks_by_id[image_part_one_id]["dependencies"])
+        for dependency in (
+            image_part_one_id,
+            image_output_id,
+            dataset_output_id,
+            structured_link_id,
+        ):
+            self.assertIn(dependency, tasks_by_id[image_part_two_id]["dependencies"])
+        for path in (
+            "crates/comfy_nodes/src/slices/native_image.rs",
+            "crates/comfy_nodes/src/slices/native_image.descriptors.json",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ):
+            self.assertIn(path, tasks_by_id[image_part_one_id]["writes"])
+            self.assertIn(path, tasks_by_id[image_part_two_id]["writes"])
+        self.assertIn(
+            "first-visual-stream", tasks_by_id[visual_decode_id]["done"]
+        )
+        self.assertIn("animated WebP", tasks_by_id[visual_decode_id]["done"])
+        self.assertIn("PNG 8/16-bit", tasks_by_id[image_output_id]["done"])
+        self.assertIn("paired PNG and TXT", tasks_by_id[dataset_output_id]["done"])
+        self.assertIn("exactly one executable binding", tasks_by_id[image_part_one_id]["done"])
+        self.assertIn("early SaveImage owner", tasks_by_id[image_part_two_id]["done"])
+
+        for dependency in (model_transform_id, sampler_payload_id, sampling_profile_id):
+            self.assertIn(dependency, tasks_by_id[experimental_hooks_id]["dependencies"])
+        for source in (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_differential_diffusion.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_flux.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_fresca.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lora_extract.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_mahiro.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_perpneg.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_advanced_samplers.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sag.py",
+        ):
+            self.assertIn(source, tasks_by_id[experimental_hooks_id]["reads"])
+        self.assertIn("Euler CFG++", tasks_by_id[experimental_hooks_id]["done"])
+        self.assertIn(compile_bridge_id, tasks_by_id[experimental_compile_id]["dependencies"])
+        self.assertIn(
+            "projects/comfy/ComfyUI/comfy_extras/nodes_torch_compile.py",
+            tasks_by_id[experimental_compile_id]["reads"],
+        )
+        self.assertIn(
+            "projects/comfy/ComfyUI/comfy_api/torch_helpers/torch_compile.py",
+            tasks_by_id[experimental_compile_id]["reads"],
+        )
+        self.assertIn("compile-policy bridge", tasks_by_id[experimental_compile_id]["done"])
 
     def test_catalog_pass_signal_is_command_only_and_other_artifact_classes_remain(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

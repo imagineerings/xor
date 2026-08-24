@@ -29,7 +29,7 @@ DECISIONS = [
     (8, "Make compiled and signed manifests authoritative", "`comfy_nodes::NodeRegistry` is the sole owner of bounded parsing, identity/feature collision validation, and immutable projection for the registered and inactive built-in node catalogs. A signature-verified `comfy_plugin_sdk::PluginNode` is the corresponding component-node metadata authority. `comfy_model::ModelRegistry` is the sole owner for the backend-model catalog, typed source fields, and ambiguous read-side lookup candidates. `ObjectInfoRegistry` and `EarlySliceRegistry` are checked projections from `NodeRegistry`; they do not reconstruct or validate a second contract. None of these read-side registries decides executable identity, accepts mutable plugin registration, loads models, or dispatches code. `comfy_runtime::NativeNodeRegistry` is the sole executable node binding and dispatch owner; its `RuntimeNodePresentation` is an atomic checked projection of exact signed component display/category/output-port metadata beside the executable descriptor, never a second metadata source. Runtime descriptors and API object-info are focused adapters from the applicable canonical catalog or signed manifest plus its exact compiled implementation binding; they may not invent metadata or validation. Only a compiled native implementation registered there or a signature-verified plugin projection from the Task 21 sealed adapter may become executable. Built-ins remain present when a namespaced plugin declares the same node identifier, and failed multi-node verified registration is atomic. Source object-info is a conformance wire format, never a production authority."),
     (9, "Represent execution attempts independently", "Prompt, attempt, worker, queue, history, cache, and output identities are distinct. The attempt reducer accepts only legal state transitions and strictly increasing native event sequences, rejects every event after a terminal state, and represents retry with a new attempt ID plus an explicit source-attempt reference so stale progress and late cancellation cannot mutate newer attempts. `AttemptEvent.sequence` is the sole canonical execution sequence; WebSocket delivery and reconnect sequence values are bounded wire projections and never become execution-state owners."),
     (10, "Serve HTTP and WebSocket compatibility natively", "A profile-scoped Rust compatibility host projects native commands, state, assets, queue, history, and event-bus transitions onto every cataloged HTTP and WebSocket contract. `NativeRuntimeHttpServices` is a focused adapter for the enabled prompt, queue, history, interrupt, jobs, health, system-statistics, object-info, model, and typed asset-root families; it uses the shared execution owner and an injected sealed native-API asset-read grant rather than owning state or constructing a plugin-broker grant; every later-owned family is advertised as an explicit unavailable capability before dispatch. `NativeRuntimeApiHost` installs that adapter, publishes queue status after acknowledged mutations, projects the same `ExecutionEventBus` into execution presentation and client-scoped WebSocket delivery, and rebuilds bounded reconnect status, active execution, progress, output, and terminal history from the shared presentation state. `NativeApiServer` alone owns the bounded TCP listener and its independent connection limit, constructs an actual rustls server stream whenever TLS is required, applies tungstenite frame/message limits before complete-message allocation, rejects ambiguous HTTP framing and security headers, preserves the encoded path until `NativeHttpRouter` decodes captured parameters exactly once, decodes query components through the same canonical decoder, and coordinates shutdown without an external server. After emitting a WebSocket close frame, the transport retains the connection until the peer acknowledges the close, reaches a bounded read timeout, or performs a recognized post-close teardown; concurrent ping/data frames cannot make a clean native shutdown surface as a connection reset. `ApiSecurityGate` alone decides exact-origin CORS, bearer authentication and authorization, bounded request/concurrency/rate policy, authenticated-principal-bound plugin identity/digest/capability grants through the injected profile `PermissionPolicy`, reverse-proxy policy, remote TLS policy, and preflight admission before dispatch. `security::IdempotencyLedger` is the sole mutation-transition owner; `ArtifactIdempotencySnapshotStore` delegates containment and atomic private replacement to `ArtifactRoot`, while `NativeApiHost` coordinates dispatch and canonical `ExecutionPresentationOwner` command-receipt reconciliation. Durable idempotency and operation records use SHA-256 namespaces over profile, authenticated principal, plugin identity, canonical operation, and request content; preparation is persisted before side effects, ambiguous or interrupted records cannot be evicted, terminal responses replay, and lost responses require reconciliation. `NativeWebSocketEventBus::ClientSession` is the sole live authenticated-session owner; WebSocket sessions reject duplicate live identities, namespace requested client IDs by authenticated principal, target source-compatible execution/preview/output/error events only to the initiating client, retain interruption broadcasts, bound active sequence/session state without evicting unresolved attempts, and retain visible bridge diagnostics without stopping later event delivery. GPUI never calls this host internally and the host never proxies to ComfyUI. <!-- impl: crates/comfy_api/src/comfy_api.rs#NativeRuntimeApiHost --> <!-- impl: crates/comfy_api/src/services.rs#NativeRuntimeHttpServices --> <!-- impl: crates/comfy_api/src/transport.rs#NativeApiServer --> <!-- impl: crates/comfy_api/src/http.rs#NativeHttpRouter --> <!-- impl: crates/comfy_api/src/websocket.rs#NativeWebSocketEventBus --> <!-- impl: crates/comfy_api/src/security.rs#ApiSecurityGate -->"),
-    (11, "Make native artifact namespaces authoritative", "ArtifactRoot and ArtifactIndex own path containment, checked parent creation, every-component link rejection, stable canonical-path root identity, capability-relative private reads/writes/removals/moves, enumeration, selected-root refresh, digests, availability transitions, verified handles, bounded private-state replacement, and the base restart snapshot for typed input, output, temporary, model, plugin, cache, and snapshot namespaces. Every root is revalidated when admitted to an index and before a capability parent is opened, and snapshots restore only through independently configured trusted roots; direct root/index domain deserialization cannot bypass that boundary. AssetRoots maps profile namespaces and multiple configured model roots to those canonical roots; AssetService applies the one runtime authorization decision and adds mutations, safe views, metadata, tags, and persisted enrichment over one injected profile-scoped handle without a second path validator, scanner, digest index, availability state, or physical file-operation owner. ModelStore receives that exact read-side index for each authorized parse/map/cache operation. OutputCommitter alone decides and journals prepare/final publication for the same AssetIdentity, delegates physical contained publication to ArtifactRoot, persists its journal through ArtifactRoot, registers the shared AssetService in the publication rollback hook before any reference is visible, and may enumerate only final-directory filenames to reserve the Comfy-compatible collision counter without storing an asset record, digest, or availability state. Verified final moves publish an already-opened, sealed, rehashed destination-side handle with reject-only semantics; Unix replacement fails closed and remains separate from ArtifactRoot's canonical atomic byte-write replacement. Temporary and output roots are authoritative single-writer namespaces, detected source-name replacement returns PartialMove, and the design makes no unsupported POSIX conditional-unlink or hostile same-UID cleanup claim. HTTP and plugin paths are checked DTO projections of those services. <!-- impl: crates/comfy_model/src/artifact_index.rs#ArtifactIndex --> <!-- impl: crates/comfy_runtime/src/assets.rs#AssetService --> <!-- impl: crates/comfy_runtime/src/output_committer.rs#OutputCommitter -->"),
+    (11, "Make native artifact namespaces authoritative", "ArtifactRoot and ArtifactIndex own path containment, checked parent creation, every-component link rejection, stable canonical-path root identity, capability-relative private reads/writes/removals/moves, enumeration, selected-root refresh, digests, availability transitions, verified handles, bounded private-state replacement, and the base restart snapshot for typed input, output, temporary, model, plugin, cache, and snapshot namespaces. Every root is revalidated when admitted to an index and before a capability parent is opened, and snapshots restore only through independently configured trusted roots; direct root/index domain deserialization cannot bypass that boundary. AssetRoots maps profile namespaces and multiple configured model roots to those canonical roots; AssetService applies the one runtime authorization decision and adds mutations, safe views, metadata, tags, and persisted enrichment over one injected profile-scoped handle without a second path validator, scanner, digest index, availability state, or physical file-operation owner. ModelStore receives that exact read-side index for each authorized parse/map/cache operation. OutputCommitter alone decides and journals prepare/final publication for the same AssetIdentity, delegates physical contained publication to ArtifactRoot, persists its journal through ArtifactRoot, registers the shared AssetService in the publication rollback hook before any reference is visible, and may enumerate only final-directory filenames to reserve the Comfy-compatible collision counter without storing an asset record, digest, or availability state. Verified final moves publish an already-opened, sealed, rehashed destination-side handle with reject-only semantics by default. A sealed cataloged output policy may authorize exact-name replacement or countered publication only for a source contract that requires it; OutputCommitter must journal the destination backup, every paired artifact, rollback, and restart reconciliation before any replacement is visible, and a node leaf cannot request arbitrary replacement. Unix replacement otherwise fails closed and remains separate from ArtifactRoot's canonical atomic byte-write replacement. Temporary and output roots are authoritative single-writer namespaces, detected source-name replacement returns PartialMove unless the sealed output policy authorizes and journals that exact transition, and the design makes no unsupported POSIX conditional-unlink or hostile same-UID cleanup claim. HTTP and plugin paths are checked DTO projections of those services. <!-- impl: crates/comfy_model/src/artifact_index.rs#ArtifactIndex --> <!-- impl: crates/comfy_runtime/src/assets.rs#AssetService --> <!-- impl: crates/comfy_runtime/src/output_committer.rs#OutputCommitter -->"),
     (12, "Replace Python and JavaScript extensions with Rust/WASM", "Curated native plugins use a versioned Rust source trait. Third-party plugins use a dedicated WASM Component Model host with WIT as the stable binary ABI, explicit ports, capability grants, resource bounds, and deterministic legacy mappings. `comfy_plugin_host::LegacyMappingResolver` is the sole legacy plugin-identity registry and precedence owner. It accepts only signature-authorized manifest candidates, bounds lossless legacy workflow payloads, and projects exact typed port aliases plus explicit old-widget, input rename/fixed-value, and output-index translations from the signed manifest sidecar. The additive sidecar fields do not change the existing WIT 1.0 `legacy-mapping` identity record. `comfy_plugin_sdk::UiContribution` is the sole signed frontend-contribution declaration, `ComponentHost` and `ExtensionStore` retain verification and lifecycle ownership, and Zed exposes only a live read-only installed-plugin adapter to `comfy_ui`. The generated 59-row frontend disposition ledger classifies every hook as declarative Rust/WASM, legacy identifier mapping, lossless placeholder, or named defer; unknown surfaces, malformed schemas, and every member of an ambiguous duplicate-identity set retain exact bounded payloads in accessible placeholders. Neither the adapter nor GPUI projection grants capabilities, dispatches actions, owns settings, persists extension state, or executes JavaScript, DOM, LiteGraph, browser, Python, or source-runtime code. An unresolved node remains a lossless placeholder until an explicit rewrite is accepted. The resolver never imports Python or creates a plugin/provider execution path."),
     (13, "Keep accounts and providers behind explicit adapters", "Authentication, secrets, cloud, paid APIs, tasks, costs, and entitlements remain provider-scoped and disabled without approved contracts. ProviderPolicy is the sole provider endpoint, profile, subject, and credential-scope authorization owner; a protocol actuator receives only its sealed AuthorizedProviderRequest and may perform transport-syntax conversion but cannot repeat URL-security or authorization decisions. Provider plugins cannot inherit ambient filesystem, network, model, or secret authority."),
     (14, "Snapshot before owned updates and verify before commit", "Application, backend, codec, model, compatibility-registry, and plugin updates are staged, integrity-checked, quiesced, verified, and atomically committed or rolled back from a documented snapshot boundary."),
@@ -14907,6 +14907,256 @@ def native_image_source_compatibility_foundation_task(dependency: str) -> dict[s
     )
 
 
+def native_asset_directory_snapshot_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-asset-directory-snapshot-foundation",
+        "Retain ordered path-free asset directory snapshots",
+        [7, 11, 18, 28, 31, 36, 37, 41, 44],
+        [8, 11, 17, 18, 20, 31, 36, 41],
+        [
+            "VAL-DOMAIN-008",
+            "VAL-MEDIA-001",
+            "VAL-CANCEL-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "Extend the sole authorized asset service with an immutable path-free directory snapshot that preserves source enumeration order, entry kind, nested repeat-folder identity, and caption-file references without exposing a host path or creating a second scanner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/persistence.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/assets/directory-snapshot-foundation",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "An authorized snapshot records exact one-level file and directory order, ordered nested entries, stable content references and digests, caption reads, and repeat-folder counts without BTreeSet reordering or raw paths. Change during enumeration or read, wrong root, stale identity, malformed caption, cancellation, exhaustion, cache retry, persistence, and restart fail or recover deterministically without publishing a partial snapshot.",
+        [dependency],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["7.4", "11.4", "18.1", "28.2", "31.5", "36.4", "37.5", "41.2", "44.1", "44.3"],
+        registered_source_edits=["comfy_nodes", "comfy_runtime"],
+    )
+
+
+def native_node_progress_text_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-node-progress-text-foundation",
+        "Project bounded node progress text through execution",
+        [7, 18, 25, 28, 30, 37, 40, 41, 44],
+        [9, 10, 15, 18, 20, 21, 33, 41],
+        [
+            "VAL-DOMAIN-004",
+            "VAL-NATIVE-API-001",
+            "VAL-GPUI-007",
+            "VAL-CANCEL-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "Add one bounded attempt- and node-scoped text progress event to the canonical execution owner, private-worker wire, API/WebSocket presentation, and GPUI projection so source nodes can publish live text without a leaf-owned event bus or an untracked side channel.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_images.py",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/queue_history.rs",
+            "crates/comfy_runtime/src/execution_presentation.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_api/src/websocket.rs",
+            "crates/comfy_ui/src/execution_model.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/queue_history.rs",
+            "crates/comfy_runtime/src/execution_presentation.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_api/src/websocket.rs",
+            "crates/comfy_ui/src/execution_model.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Source-compatible text progress is bound to the exact attempt, node, hidden unique identifier, and monotonic event sequence; bounded Unicode, replacement, clearing, reconnect, persistence, retry, stale-attempt, cancellation, worker loss, and terminal-state cases project identically through worker, reducer, API/WebSocket, and GPUI. Oversize, malformed, late, or cross-attempt text is rejected before mutation and no node leaf owns a competing progress channel.",
+        [dependency],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["7.4", "18.1", "25.2", "28.2", "30.4", "37.5", "40.3", "41.2", "44.1", "44.3"],
+        registered_source_edits=["comfy_nodes", "comfy_runtime", "comfy_api", "comfy_ui", "comfy_worker"],
+    )
+
+
+def native_visual_asset_decode_foundation_task(
+    dependency: str, image_dependency: str, video_dependency: str
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-visual-asset-decode-foundation",
+        "Decode sealed raster and visual-stream assets",
+        [7, 11, 18, 26, 28, 31, 36, 37, 41, 44],
+        [8, 11, 18, 25, 26, 28, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "Implement one injected path-free visual decode service over sealed asset bytes. It reuses the retained native video decoder for the first visual stream and owns bounded PNG, JPEG, static or animated WebP, EXIF orientation, RGB, raw alpha, and source frame filtering without putting codec logic in image-family leaves.",
+        [
+            "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_painter.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "crates/comfy_media/src/comfy_media.rs",
+            "crates/comfy_media/src/png.rs",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "Cargo.toml",
+            "Cargo.lock",
+            "crates/comfy_media/Cargo.toml",
+            "crates/comfy_media/src/image_codec.rs",
+            "crates/comfy_media/src/comfy_media.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_image_codec_service.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/media/visual-asset-decode-foundation",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Hermetic PNG, JPEG, static and animated WebP, EXIF, RGBA, audio-only video, and multi-stream video fixtures prove video-first first-visual-stream selection, Pillow-compatible fallback, same-size frame retention, RGB normalization, raw alpha, decoded order, dimensions, and semantic digests. Malformed, truncated, unsupported, no-frame, oversize, cancellation, exhaustion, service loss, cache retry, and restart publish no partial image or mask; no path, Python, subprocess, or second video decoder enters production.",
+        [dependency, image_dependency, video_dependency],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["7.4", "11.4", "18.1", "26.2", "28.2", "31.5", "36.4", "37.5", "41.2", "44.1", "44.3"],
+        registered_source_edits=["comfy_media", "comfy_nodes", "comfy_runtime"],
+    )
+
+
+def native_image_output_codec_effect_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-image-output-codec-effect-foundation",
+        "Encode and prepare native image output effects",
+        [7, 11, 18, 26, 28, 31, 36, 37, 41, 44],
+        [8, 11, 18, 25, 26, 28, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "Extend the canonical image codec and prepared-effect service with source-compatible APNG, animated WebP, PNG8/PNG16, EXR32, and SVG output plans while leaving naming, collision policy, journaling, publication, and UI projection to OutputCommitter.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_images.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_webcam.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_ui.py",
+            "crates/comfy_media/src/image_codec.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/output_committer.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "Cargo.toml",
+            "Cargo.lock",
+            "crates/comfy_media/Cargo.toml",
+            "crates/comfy_media/src/image_codec.rs",
+            "crates/comfy_media/src/comfy_media.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_image_codec_service.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/media/image-output-codec-effect-foundation",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Golden decode-verified outputs prove APNG timing, animated WebP lossless/lossy quality and method, PNG 8/16-bit depth, EXR float channels and chromaticity, SVG geometry and metadata, batch ordering, metadata suppression, bounded encode/flush, and returned image aliases. Unsupported configuration, malformed image, cancellation, exhaustion, codec failure, effect rejection, rollback, retry, and restart publish no partial bytes or UI entry, and the service owns no final filename or collision transition.",
+        [dependency],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["7.4", "11.4", "18.1", "26.2", "28.2", "31.5", "36.4", "37.5", "41.2", "44.1", "44.3"],
+        registered_source_edits=["comfy_media", "comfy_nodes", "comfy_runtime"],
+    )
+
+
+def native_dataset_output_policy_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-dataset-output-policy-foundation",
+        "Journal source-compatible dataset output policies",
+        [7, 11, 18, 28, 31, 36, 37, 41, 44],
+        [8, 11, 17, 18, 21, 31, 36, 41],
+        [
+            "VAL-DOMAIN-008",
+            "VAL-MEDIA-001",
+            "VAL-CANCEL-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "Add sealed cataloged dataset publication policies to OutputCommitter. Reject-only remains the default; exact source rows may select journaled overwrite or countered publication, including atomic paired image-and-caption output, without exposing replacement authority to node leaves.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
+            "projects/comfy/ComfyUI/nodes.py",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_runtime/src/output_committer.rs",
+            "crates/comfy_runtime/src/recovery.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_runtime/src/output_committer.rs",
+            "crates/comfy_runtime/src/recovery.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/assets/dataset-output-policy-foundation",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/filesystem_asset_recovery.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Cataloged source rows alone may request exact-name overwrite, reject, or deterministic counter allocation. Replacement journals a sealed destination backup before mutation; paired PNG and TXT either both commit and become visible or both restore across error, cancellation, process loss, retry, and restart. Wrong row, arbitrary destination, stale snapshot, collision race, backup failure, capacity exhaustion, or recovery ambiguity fails closed without an asset record or partial final file.",
+        [dependency],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["7.4", "11.4", "18.1", "28.2", "31.5", "36.4", "37.5", "41.2", "44.1", "44.3"],
+        registered_source_edits=["comfy_nodes", "comfy_runtime"],
+    )
+
+
 def native_structured_input_link_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-structured-input-link-foundation",
@@ -15970,6 +16220,11 @@ def node_tasks(
     sdpose_dependency: str,
     video_dependency: str,
     image_source_dependency: str,
+    asset_directory_snapshot_dependency: str,
+    node_progress_text_dependency: str,
+    visual_asset_decode_dependency: str,
+    image_output_codec_dependency: str,
+    dataset_output_policy_dependency: str,
     structured_link_dependency: str,
     shader_dependency: str,
     detection_dependency: str,
@@ -16069,6 +16324,25 @@ def node_tasks(
                 task_dependencies.extend([
                     diffusion_device_retarget_dependency,
                     multigpu_guidance_dependency,
+                ])
+            if "COMFY-NODE-0133" in feature_ids:
+                task_dependencies.extend([
+                    model_transform_dependency,
+                    sampler_payload_dependency,
+                    sampling_profile_dependency,
+                ])
+            if "COMFY-NODE-0160" in feature_ids:
+                task_dependencies.extend([
+                    asset_directory_snapshot_dependency,
+                    node_progress_text_dependency,
+                    visual_asset_decode_dependency,
+                ])
+            if "COMFY-NODE-0586" in feature_ids:
+                task_dependencies.extend([
+                    "comfy-parity-native-nodes-image-comfy-node-0160",
+                    image_output_codec_dependency,
+                    dataset_output_policy_dependency,
+                    structured_link_dependency,
                 ])
             if category == "model/sampling":
                 task_dependencies.extend(
@@ -16174,6 +16448,108 @@ def node_tasks(
             ]
             task_validations = ["VAL-NODE-001", "VAL-NODE-002", "VAL-NODE-CLOSURE-001"]
             task_done = f"Every exactly assigned feature row ({exact_assignments}) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed."
+            if "COMFY-NODE-0133" in feature_ids:
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_differential_diffusion.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_flux.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_fresca.py",
+                    "projects/comfy/ComfyUI/nodes.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_lora_extract.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_mahiro.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_perpneg.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_advanced_samplers.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_sag.py",
+                    "crates/comfy_model/src/hooks.rs",
+                    "crates/comfy_model/src/patch_graph.rs",
+                    "crates/comfy_sampler/src/guidance.rs",
+                    "crates/comfy_sampler/src/native_node_payload.rs",
+                    "crates/comfy_sampler/src/sampling_profile.rs",
+                ])
+                task_validations.extend([
+                    "VAL-MODEL-FAMILY-001",
+                    "VAL-SAMPLER-001",
+                    "VAL-SAMPLING-FOUNDATION-001",
+                    "VAL-TENSOR-001",
+                    "VAL-CANCEL-001",
+                    "VAL-MEMORY-001",
+                    "VAL-RECOVERY-005",
+                    "VAL-OWNERSHIP-001",
+                ])
+                task_done += " Differential mask, Flux stateful KV/input cleanup, FreSca, Mahiro, PerpNeg, SAG, and deprecated CFG hooks delegate to the persistent canonical model-transform and guidance owners; regular and alternative Euler CFG++ delegate to the canonical sampler algorithm owner; LoraSave delegates keyed MODEL/CLIP diff extraction and atomic safetensors preparation to the retained model-transform/output owners. The leaf owns only exact parameter projection, LatentBlend tensor choreography, descriptors, and fixtures."
+            if "COMFY-NODE-0680" in feature_ids:
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_torch_compile.py",
+                    "projects/comfy/ComfyUI/comfy_api/torch_helpers/torch_compile.py",
+                    "crates/comfy_runtime/src/executor.rs",
+                ])
+                task_validations.extend([
+                    "VAL-MODEL-FAMILY-001",
+                    "VAL-CANCEL-001",
+                    "VAL-RECOVERY-005",
+                    "VAL-OWNERSHIP-001",
+                ])
+                task_done += " TorchCompileModel delegates backend admission, disable-dynamic cloning, transformer-options guard filtering, compiled wrapper installation, cache identity, cancellation, persistence, and rebinding exclusively to the canonical compile-policy bridge. The leaf owns only exact schema, checked service invocation, and result projection."
+            if "COMFY-NODE-0160" in feature_ids:
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/nodes.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_images.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_image_compare.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_painter.py",
+                    "projects/comfy/ComfyUI/comfy_api/latest/_ui.py",
+                    "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+                    "crates/comfy_media/src/image_codec.rs",
+                    "crates/comfy_runtime/src/assets.rs",
+                    "crates/comfy_runtime/src/native_image_codec_service.rs",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                    "crates/comfy_nodes/src/slices/native_image.rs",
+                ])
+                task_writes.extend([
+                    "crates/comfy_nodes/src/slices/native_image.rs",
+                    "crates/comfy_nodes/src/slices/native_image.descriptors.json",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                    "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ])
+                task_validations.extend([
+                    "VAL-MEDIA-001",
+                    "VAL-DOMAIN-008",
+                    "VAL-NATIVE-E2E-001",
+                    "VAL-CANCEL-001",
+                    "VAL-MEMORY-001",
+                    "VAL-RECOVERY-005",
+                    "VAL-OWNERSHIP-001",
+                ])
+                task_done += " LoadImage, LoadImageMask, LoadImageOutput, Painter, and dataset loaders delegate sealed video-first and PNG/JPEG/WebP/animated/EXIF/RGBA decoding to the canonical visual service; dataset rows consume ordered path-free snapshots; GetImageSize emits bounded node-scoped text progress; PreviewImage delegates prepared effects. The early LoadImage and PreviewImage owners are reconciled atomically so generated family registration has exactly one executable binding."
+            if "COMFY-NODE-0586" in feature_ids:
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/nodes.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_images.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_webcam.py",
+                    "projects/comfy/ComfyUI/comfy_api/latest/_ui.py",
+                    "crates/comfy_media/src/image_codec.rs",
+                    "crates/comfy_runtime/src/output_committer.rs",
+                    "crates/comfy_runtime/src/native_image_codec_service.rs",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                    "crates/comfy_nodes/src/slices/native_image.rs",
+                    "crates/comfy_runtime/src/prompt_compiler.rs",
+                ])
+                task_writes.extend([
+                    "crates/comfy_nodes/src/slices/native_image.rs",
+                    "crates/comfy_nodes/src/slices/native_image.descriptors.json",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                    "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ])
+                task_validations.extend([
+                    "VAL-MEDIA-001",
+                    "VAL-DOMAIN-008",
+                    "VAL-NATIVE-E2E-001",
+                    "VAL-CANCEL-001",
+                    "VAL-MEMORY-001",
+                    "VAL-RECOVERY-005",
+                    "VAL-OWNERSHIP-001",
+                ])
+                task_done += " Animated PNG/WebP, PNG16, EXR, SVG, Webcam media, and ordinary SaveImage delegate encoding and prepared effects to the canonical image codec service; dataset writers use only the sealed journaled overwrite/counter policy and atomic image-caption publication; SaveImageAdvanced consumes canonical structured links. The early SaveImage owner is reconciled atomically, and no leaf owns a codec, path, collision counter, overwrite transition, output transaction, or duplicate binding."
             if "COMFY-NODE-0009" in feature_ids:
                 task_done += " LoadAudio and RecordAudio delegate verified-byte first-stream decoding to the retained input codec service; PreviewAudio and SaveAudio delegate FLAC encoding, metadata, effects, and publication to the retained output codec service; EmptyAudio preserves duration-zero and 1-through-192000-Hz payloads. The leaf owns only schemas, checked choreography, and tensor composition."
             if "COMFY-NODE-0454" in feature_ids:
@@ -17548,6 +17924,12 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(audio_empty_segment_foundation["id"]), str(video_foundation["id"])
         )
     )
+    audio_output_codec_effect_foundation["dependencies"] = list(
+        dict.fromkeys(
+            list(audio_output_codec_effect_foundation["dependencies"])
+            + ["comfy-parity-native-nodes-image-comfy-node-0586"]
+        )
+    )
     diffusion_device_retarget_foundation = (
         native_diffusion_device_retarget_foundation_task(
             str(model_accelerator_execution_foundation["id"]),
@@ -17567,6 +17949,42 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             list(detection_foundation["dependencies"])
             + ["comfy-parity-native-nodes-video-comfy-node-0124"]
         )
+    )
+    asset_directory_snapshot_foundation = (
+        native_asset_directory_snapshot_foundation_task(
+            str(detection_foundation["id"])
+        )
+    )
+    asset_directory_snapshot_foundation["dependencies"] = list(
+        dict.fromkeys(
+            list(asset_directory_snapshot_foundation["dependencies"])
+            + [
+                str(media_text_foundation["id"]),
+                "comfy-parity-native-nodes-utilities-comfy-node-0077",
+            ]
+        )
+    )
+    node_progress_text_foundation = native_node_progress_text_foundation_task(
+        str(asset_directory_snapshot_foundation["id"])
+    )
+    visual_asset_decode_foundation = native_visual_asset_decode_foundation_task(
+        str(node_progress_text_foundation["id"]),
+        str(image_source_foundation["id"]),
+        str(video_foundation["id"]),
+    )
+    image_output_codec_effect_foundation = (
+        native_image_output_codec_effect_foundation_task(
+            str(visual_asset_decode_foundation["id"])
+        )
+    )
+    image_output_codec_effect_foundation["dependencies"] = list(
+        dict.fromkeys(
+            list(image_output_codec_effect_foundation["dependencies"])
+            + ["comfy-parity-native-nodes-image-comfy-node-0160"]
+        )
+    )
+    dataset_output_policy_foundation = native_dataset_output_policy_foundation_task(
+        str(image_output_codec_effect_foundation["id"])
     )
     nodes, node_mapping = node_tasks(
         str(node_schema_foundation["id"]),
@@ -17594,6 +18012,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         str(sdpose_foundation["id"]),
         str(video_foundation["id"]),
         str(image_source_foundation["id"]),
+        str(asset_directory_snapshot_foundation["id"]),
+        str(node_progress_text_foundation["id"]),
+        str(visual_asset_decode_foundation["id"]),
+        str(image_output_codec_effect_foundation["id"]),
+        str(dataset_output_policy_foundation["id"]),
         str(structured_link_foundation["id"]),
         str(shader_foundation["id"]),
         str(detection_foundation["id"]),
@@ -17749,6 +18172,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_component_h264_mp4_10bit_backing_foundation,
         *video_execution_precursors,
         video_foundation,
+        asset_directory_snapshot_foundation,
+        node_progress_text_foundation,
+        visual_asset_decode_foundation,
+        image_output_codec_effect_foundation,
+        dataset_output_policy_foundation,
         audio_output_codec_effect_foundation,
         diffusion_device_retarget_foundation,
         multigpu_guidance_execution_foundation,
