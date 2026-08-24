@@ -9856,6 +9856,179 @@ def native_audio_output_codec_effect_foundation_task(
     )
 
 
+def native_model_accelerator_execution_foundation_task(
+    serialization_dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-model-accelerator-execution-foundation",
+        "Execute native model resources on certified accelerators",
+        [6, 7, 18, 28, 31, 34, 35, 36, 37, 38, 41, 44],
+        [8, 18, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
+        [
+            "VAL-DEVICE-001",
+            "VAL-MODEL-FAMILY-001",
+            "VAL-MEMORY-001",
+            "VAL-CANCEL-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "Extend the canonical NativeModule and model-family execution boundary so every MODEL, CLIP, and VAE profile advertised for a certified accelerator executes its complete equations through that actual TensorBackend. Profiles whose required operation set is not certified remain typed unavailable; no CPU execution may be relabeled as accelerator parity.",
+        [
+            ".agents/specs/comfy-parity/catalogs/backend-models.csv",
+            ".agents/specs/comfy-parity/catalogs/native-device-certification",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/clip.rs",
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_model/src/families",
+        ],
+        [
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/clip.rs",
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/src/families",
+            "crates/comfy_test_support/tests/native_model_accelerator_execution.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "For every admitted target, source-derived MODEL, CLIP, and VAE fixtures execute complete equations through the certified TensorBackend and match the declared dtype and numeric tolerances. Backend, target, device, dtype, stream, layout, and required-operation admission precedes transfer, cast, workspace reservation, or allocation. Transfer and cast bytes, semantic identity, alias-aware residency, OOM, and cancellation are exact and atomic. CPU-only or partially certified profiles reject typed before mutation, and repository scans prove there is no backend-local capability matrix, CPU fallback, relabeled output, second allocator, or second model-operation owner.",
+        [
+            serialization_dependency,
+            "comfy-parity-native-compute-breadth-integration",
+            "comfy-parity-native-module-backend-target-admission-consolidation",
+            "comfy-parity-native-memory-planner",
+        ],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.2", "18.1", "28.2", "31.5", "34.2", "35.2", "36.4", "37.5", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_model", "comfy_test_support"],
+    )
+
+
+def native_diffusion_device_retarget_foundation_task(
+    accelerator_dependency: str,
+    serialization_dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-diffusion-device-retarget-foundation",
+        "Retarget native diffusion resources through checked reconstruction",
+        [6, 7, 18, 28, 31, 34, 35, 36, 37, 38, 41, 44],
+        [8, 18, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
+        [
+            "VAL-DEVICE-001",
+            "VAL-MODEL-FAMILY-001",
+            "VAL-MEMORY-001",
+            "VAL-CANCEL-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "Add one runtime-injected, path-free native diffusion placement service that enumerates source-compatible targets and reconstructs immutable MODEL, CLIP, and VAE resources on an admitted target while preserving their artifact, patch, conditioning, execution, routing, residency, cache, and persistence identities.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_multigpu.py",
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            "projects/comfy/ComfyUI/comfy/model_patcher.py",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_worker/src/memory_modes.rs",
+        ],
+        [
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_worker/src/memory_modes.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_test_support/tests/native_diffusion_device_retarget.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "The injected placement service enumerates exact default, cpu, and available gpu:N targets, with VAE CPU exclusion matching source behavior. Reload descriptors reconstruct fresh immutable MODEL, CLIP, and VAE resources on the selected target, preserve and restore base load/offload routing, select only certified compute dtypes, and bind target and routing into semantic identity, residency, cache, persistence, and restart reconstruction. Unknown targets, nonreloadable resources, unsupported operations, device loss, stale state, OOM, and cancellation return typed results without mutation; the source-compatible unchanged-clone fallback carries an explicit diagnostic and cannot masquerade as a moved resource.",
+        [
+            accelerator_dependency,
+            serialization_dependency,
+            "comfy-parity-native-nodes-audio-comfy-node-0009",
+            "comfy-parity-native-model-resource-service-foundation",
+            "comfy-parity-native-model-resource-execution-foundation",
+            "comfy-parity-native-model-transform-foundation",
+            "comfy-parity-native-memory-planner",
+        ],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.2", "18.1", "28.2", "31.5", "34.2", "35.2", "36.4", "37.5", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_model", "comfy_sampler", "comfy_nodes", "comfy_runtime", "comfy_worker", "comfy_test_support"],
+    )
+
+
+def native_multigpu_guidance_execution_foundation_task(
+    retarget_dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-multigpu-guidance-execution-foundation",
+        "Execute canonical guidance across independent device clones",
+        [6, 7, 18, 28, 31, 34, 35, 36, 37, 38, 41, 44],
+        [8, 18, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
+        [
+            "VAL-DEVICE-001",
+            "VAL-SAMPLER-001",
+            "VAL-MEMORY-001",
+            "VAL-CANCEL-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "Add one canonical sampler-owned multi-device guidance payload and execution path over ordered independent MODEL clone resources. Runtime and worker adapters expose checked device sessions, while comfy_sampler alone owns work distribution, transfers, concurrent invocation, synchronization, aggregation, reuse, pruning, and cleanup.",
+        [
+            "projects/comfy/ComfyUI/comfy/multigpu.py",
+            "projects/comfy/ComfyUI/comfy/samplers.py",
+            "projects/comfy/ComfyUI/comfy/model_patcher.py",
+            "projects/comfy/ComfyUI/comfy/sampler_helpers.py",
+            "crates/comfy_sampler/src/guidance.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_worker/src/memory_modes.rs",
+        ],
+        [
+            "crates/comfy_sampler/src/guidance.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_worker/src/memory_modes.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_test_support/tests/native_multigpu_guidance.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "A canonical payload retains an ordered independent MODEL clone set keyed by DeviceId. Sampling uses source-compatible ceil-divided evaluation batches, per-device memory fit, checked input, conditioning, and time transfers, concurrent cancellable invocation, output-device transfer and fences, deterministic aggregation, cleanup, clone reuse, pruning, max_gpus, and collision handling. Combined residency, peak memory, cache, persistence, and restart identities include every clone and route. OOM, cancellation, device loss, transfer or fence failure, stale clone, and aggregation failure publish no partial guidance or retained clone mutation; no node or runtime adapter owns CFG equations or a second scheduler.",
+        [
+            retarget_dependency,
+            "comfy-parity-native-sampling-profile-guidance-foundation",
+            "comfy-parity-native-memory-planner",
+        ],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.2", "18.1", "28.2", "31.5", "34.2", "35.2", "36.4", "37.5", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_sampler", "comfy_runtime", "comfy_worker", "comfy_test_support"],
+    )
+
+
 def native_sampler_payload_algorithm_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-sampler-payload-algorithm-foundation",
@@ -15778,6 +15951,8 @@ def node_tasks(
     compile_policy_dependency: str,
     audio_empty_segment_dependency: str,
     audio_output_codec_dependency: str,
+    diffusion_device_retarget_dependency: str,
+    multigpu_guidance_dependency: str,
     sampler_payload_dependency: str,
     sampling_profile_dependency: str,
     asset_effect_dependency: str,
@@ -15885,6 +16060,11 @@ def node_tasks(
                     audio_empty_segment_dependency,
                     audio_output_codec_dependency,
                 ])
+            if "COMFY-NODE-0454" in feature_ids:
+                task_dependencies.extend([
+                    diffusion_device_retarget_dependency,
+                    multigpu_guidance_dependency,
+                ])
             if category == "model/sampling":
                 task_dependencies.extend(
                     [sampler_payload_dependency, sampling_profile_dependency]
@@ -15987,10 +16167,30 @@ def node_tasks(
                 f"crates/comfy_nodes/src/families/{module}",
                 f"crates/comfy_test_support/fixtures/nodes/{slug(category)}-{anchor}",
             ]
+            task_validations = ["VAL-NODE-001", "VAL-NODE-002", "VAL-NODE-CLOSURE-001"]
             task_done = f"Every exactly assigned feature row ({exact_assignments}) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed."
             if "COMFY-NODE-0009" in feature_ids:
                 task_done += " LoadAudio and RecordAudio delegate verified-byte first-stream decoding to the retained input codec service; PreviewAudio and SaveAudio delegate FLAC encoding, metadata, effects, and publication to the retained output codec service; EmptyAudio preserves duration-zero and 1-through-192000-Hz payloads. The leaf owns only schemas, checked choreography, and tensor composition."
-            task_validations = ["VAL-NODE-001", "VAL-NODE-002", "VAL-NODE-CLOSURE-001"]
+            if "COMFY-NODE-0454" in feature_ids:
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_multigpu.py",
+                    "projects/comfy/ComfyUI/comfy/multigpu.py",
+                    "projects/comfy/ComfyUI/comfy/model_management.py",
+                    "projects/comfy/ComfyUI/comfy/model_patcher.py",
+                    "projects/comfy/ComfyUI/comfy/samplers.py",
+                    "projects/comfy/ComfyUI/comfy/sampler_helpers.py",
+                    "crates/comfy_sampler/src/guidance.rs",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                    "crates/comfy_worker/src/supervisor.rs",
+                ])
+                task_validations.extend([
+                    "VAL-DEVICE-001",
+                    "VAL-SAMPLER-001",
+                    "VAL-MEMORY-001",
+                    "VAL-CANCEL-001",
+                    "VAL-OWNERSHIP-001",
+                ])
+                task_done += " SelectModelDevice, SelectCLIPDevice, and SelectVAEDevice delegate reload-backed reconstruction and routing identity to the canonical placement service; MultiGPU CFG Split delegates independent clone-set retention and guidance work distribution to the canonical sampler owner. The leaf owns only exact schemas, checked input choreography, portable fallback diagnostics, and result projection."
             task_designs = [8, 20, 25, 29, 30, 31, 32, 33, 34, 39, 40]
             task_locked = False
             if "COMFY-NODE-0002" in feature_ids:
@@ -16895,13 +17095,18 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         str(sampling_profile_guidance_foundation["id"]),
         str(model_transform_foundation["id"]),
     )
+    model_accelerator_execution_foundation = (
+        native_model_accelerator_execution_foundation_task(
+            str(compile_policy_bridge_foundation["id"])
+        )
+    )
     audio_encoder_resource_foundation = next(
         item
         for item in model_resource_precursors
         if item["id"] == "comfy-parity-native-audio-encoder-resource-foundation"
     )
     audio_empty_segment_foundation = native_audio_empty_segment_foundation_task(
-        str(compile_policy_bridge_foundation["id"]),
+        str(model_accelerator_execution_foundation["id"]),
         str(audio_encoder_resource_foundation["id"])
     )
     node_provider_foundation = native_node_provider_invocation_foundation_task(
@@ -17338,6 +17543,17 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(audio_empty_segment_foundation["id"]), str(video_foundation["id"])
         )
     )
+    diffusion_device_retarget_foundation = (
+        native_diffusion_device_retarget_foundation_task(
+            str(model_accelerator_execution_foundation["id"]),
+            str(audio_output_codec_effect_foundation["id"]),
+        )
+    )
+    multigpu_guidance_execution_foundation = (
+        native_multigpu_guidance_execution_foundation_task(
+            str(diffusion_device_retarget_foundation["id"])
+        )
+    )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
     )
@@ -17359,6 +17575,8 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         str(compile_policy_bridge_foundation["id"]),
         str(audio_empty_segment_foundation["id"]),
         str(audio_output_codec_effect_foundation["id"]),
+        str(diffusion_device_retarget_foundation["id"]),
+        str(multigpu_guidance_execution_foundation["id"]),
         str(sampler_payload_algorithm_foundation["id"]),
         str(sampling_profile_guidance_foundation["id"]),
         str(node_asset_effect_foundation["id"]),
@@ -17412,10 +17630,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             conditioning_control_foundation,
             model_transform_foundation,
             model_training_foundation,
-            compile_policy_bridge_foundation,
-            audio_empty_segment_foundation,
             sampler_payload_algorithm_foundation,
             sampling_profile_guidance_foundation,
+            compile_policy_bridge_foundation,
+            model_accelerator_execution_foundation,
+            audio_empty_segment_foundation,
             comfy_build_boundary,
             text_regex_foundation,
             text_transform_foundation,
@@ -17526,6 +17745,8 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         *video_execution_precursors,
         video_foundation,
         audio_output_codec_effect_foundation,
+        diffusion_device_retarget_foundation,
+        multigpu_guidance_execution_foundation,
         detection_foundation,
         ]
         + nodes

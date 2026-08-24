@@ -83,7 +83,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 705)
+        self.assertEqual(len(tasks), 708)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -1068,6 +1068,10 @@ class ValidationGenerationTests(unittest.TestCase):
         audio_output_node_id = "comfy-parity-native-nodes-audio-comfy-node-0589"
         audio_empty_segment_id = "comfy-parity-native-audio-empty-segment-foundation"
         audio_output_codec_id = "comfy-parity-native-audio-output-codec-effect-foundation"
+        model_accelerator_id = "comfy-parity-native-model-accelerator-execution-foundation"
+        diffusion_retarget_id = "comfy-parity-native-diffusion-device-retarget-foundation"
+        multigpu_guidance_id = "comfy-parity-native-multigpu-guidance-execution-foundation"
+        multigpu_node_id = "comfy-parity-native-nodes-advanced-multigpu-comfy-node-0454"
         shader_id = "comfy-parity-native-nodes-image-shader-comfy-node-0211"
         text_transform_id = "comfy-parity-native-nodes-text-comfy-node-0531"
         text_generation_id = "comfy-parity-native-nodes-text-comfy-node-0649"
@@ -2837,7 +2841,7 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(
             tasks_by_id[audio_empty_segment_id]["dependencies"],
             [
-                "comfy-parity-native-compile-policy-bridge-foundation",
+                model_accelerator_id,
                 "comfy-parity-native-audio-encoder-resource-foundation",
             ],
         )
@@ -2887,6 +2891,78 @@ class ValidationGenerationTests(unittest.TestCase):
             "FLAC, libmp3lame V0/128k/320k, and Opus",
             tasks_by_id[audio_output_codec_id]["done"],
         )
+        self.assertEqual(
+            tasks_by_id[model_accelerator_id]["dependencies"],
+            [
+                "comfy-parity-native-compile-policy-bridge-foundation",
+                "comfy-parity-native-compute-breadth-integration",
+                "comfy-parity-native-module-backend-target-admission-consolidation",
+                "comfy-parity-native-memory-planner",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        self.assertIn(
+            model_accelerator_id,
+            tasks_by_id[diffusion_retarget_id]["dependencies"],
+        )
+        self.assertIn(
+            "comfy-parity-native-model-resource-execution-foundation",
+            tasks_by_id[diffusion_retarget_id]["dependencies"],
+        )
+        self.assertIn(
+            audio_output_codec_id,
+            tasks_by_id[diffusion_retarget_id]["dependencies"],
+        )
+        self.assertIn(
+            audio_core_node_id,
+            tasks_by_id[diffusion_retarget_id]["dependencies"],
+        )
+        self.assertIn(
+            diffusion_retarget_id,
+            tasks_by_id[multigpu_guidance_id]["dependencies"],
+        )
+        self.assertIn(
+            "comfy-parity-native-sampling-profile-guidance-foundation",
+            tasks_by_id[multigpu_guidance_id]["dependencies"],
+        )
+        self.assertIn(diffusion_retarget_id, dependencies[multigpu_node_id])
+        self.assertIn(multigpu_guidance_id, dependencies[multigpu_node_id])
+        self.assertLess(
+            tasks.index(tasks_by_id[model_accelerator_id]),
+            tasks.index(tasks_by_id[diffusion_retarget_id]),
+        )
+        self.assertLess(
+            tasks.index(tasks_by_id[diffusion_retarget_id]),
+            tasks.index(tasks_by_id[multigpu_guidance_id]),
+        )
+        self.assertLess(
+            tasks.index(tasks_by_id[multigpu_guidance_id]),
+            tasks.index(tasks_by_id[multigpu_node_id]),
+        )
+        for source_path in [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_multigpu.py",
+            "projects/comfy/ComfyUI/comfy/multigpu.py",
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            "projects/comfy/ComfyUI/comfy/model_patcher.py",
+            "projects/comfy/ComfyUI/comfy/samplers.py",
+            "projects/comfy/ComfyUI/comfy/sampler_helpers.py",
+        ]:
+            self.assertIn(source_path, tasks_by_id[multigpu_node_id]["reads"])
+        self.assertEqual(
+            tasks_by_id[multigpu_node_id]["writes"],
+            [
+                "crates/comfy_nodes/src/families/advanced_multigpu_01.rs",
+                "crates/comfy_test_support/fixtures/nodes/advanced-multigpu-comfy-node-0454",
+            ],
+        )
+        for validation in [
+            "VAL-DEVICE-001",
+            "VAL-SAMPLER-001",
+            "VAL-MEMORY-001",
+            "VAL-CANCEL-001",
+            "VAL-OWNERSHIP-001",
+        ]:
+            self.assertIn(validation, tasks_by_id[multigpu_node_id]["validations"])
         self.assertIn(
             "crates/comfy_runtime/src/prompt_compiler.rs",
             tasks_by_id[structured_link_foundation_id]["writes"],
