@@ -1,4 +1,5 @@
 pub mod agent_provider_discovery;
+pub mod agent_provider_lifecycle;
 pub mod agent_provider_protocol;
 pub mod json_log;
 pub mod protocol;
