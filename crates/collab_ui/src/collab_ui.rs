@@ -22,6 +22,8 @@ pub mod message_timeline;
 #[cfg(feature = "multiplayer-tools")]
 pub mod moderation;
 pub mod notifications;
+#[cfg(feature = "multiplayer-tools")]
+pub mod pairing;
 mod panel_settings;
 
 use std::{rc::Rc, sync::Arc};

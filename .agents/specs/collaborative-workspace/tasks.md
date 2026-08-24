@@ -3177,7 +3177,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Writes: crates/collab/tests/pairing_interop.rs_
     - _Validation: interoperability matrix passes expiry, replay, corrupt QR, cancel and successful verified import_
 
-  - [ ] 40.6. Add the native pairing QR flow
+  - [x] 40.6. Add the native pairing QR flow
     - Render accessible QR display, scan/import confirmation, expiry, cancellation and safe failure states.
     - _Requirements: 4.4, 16.1_
     - _Capability IDs: CAP-033, CAP-036, CAP-040_
@@ -3185,6 +3185,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/mobile/lib/features/pairing/**, crates/collab_ui/src/**_
     - _Writes: crates/collab_ui/src/pairing.rs_
     - _Validation: GPUI tests cover display/scan, expiry, corrupt QR, cancel, confirmation and locked keyring_
+    - _Discovered contradiction (2026-08-24): the planned standalone UI file cannot compile, render a real QR symbol or remain Standard-build inert without Multiplayer-gated crate-root registration, optional canonical pairing/QR/zeroization dependencies, workspace dependency registration and the generated lock edge, so the narrow correction includes that mechanical wiring. `collab_ui` cannot own Task 40.1's entropy, relay/protocol clock or Task 40.3's credential store; an injected service therefore supplies only bounded presentation contracts and verified import receipts. The crate's test-support graph also exposes the pre-existing `RemoteConnectionOptions::Mock` variant to dependent crates without enabling their matching arms, so focused GPUI execution required temporary compile-only removal of six stale local `cfg` attributes, all reverted before validation and absent from this leaf._
+    - _Evidence: 2026-08-24 — added an accessible Multiplayer-only GPUI source/display and target/scan pairing flow over canonical `PairingQr`. Source URIs become standards-compliant medium-error-correction QR modules through a zeroizing temporary string, leaving no URI in UI diagnostics or accessibility text; scanner submission parses canonically before any adapter call. Bounded opaque session IDs, exact six-digit SAS values, 120-second-maximum service deadlines and nonzero verified public-key receipts fail closed. Import occurs only after explicit SAS confirmation; cancellation addresses the exact active session and remains terminal; corrupt QR performs zero service calls; GPUI executor timers transition at the exact expiry boundary; and a locked keyring retains the same confirmation for exact retry without reporting success. Six focused GPUI tests passed display/scan, expiry, corrupt QR, cancel, confirmation and locked-keyring recovery. The feature-enabled library build, Standard no-feature library check, warning-denied feature Clippy (with only the pre-existing `huddle.rs` redundant-clone lint allowed), Rust formatting and diff hygiene passed; the added optional dependencies are absent from the Standard depth-one graph._
 
 - [ ] 41. Port relay mesh and shared-compute scheduling
 
