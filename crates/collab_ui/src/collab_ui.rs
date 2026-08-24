@@ -15,6 +15,8 @@ pub mod inbox_pulse;
 pub mod message_reconciliation;
 #[cfg(feature = "multiplayer-tools")]
 pub mod message_timeline;
+#[cfg(feature = "multiplayer-tools")]
+pub mod moderation;
 pub mod notifications;
 mod panel_settings;
 
