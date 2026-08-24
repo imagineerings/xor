@@ -10251,7 +10251,7 @@ PROVIDER_VENDOR_SPECS: tuple[tuple[str, int, int, tuple[str, ...]], ...] = (
     ("sonilo", 2, 2, ()),
     ("topaz", 3, 9, ()),
     ("tripo", 12, 4, ()),
-    ("veo2", 3, 3, ()),
+    ("veo2", 3, 3, ("veo",)),
     ("vidu", 13, 7, ()),
     ("wan", 14, 5, ()),
     ("wavespeed", 2, 5, ()),

@@ -440,6 +440,9 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(
             sum(routes for _, _, routes, _ in planning.PROVIDER_VENDOR_SPECS), 217
         )
+        self.assertIn(
+            ("veo2", 3, 3, ("veo",)), planning.PROVIDER_VENDOR_SPECS
+        )
         self.assertEqual(
             sum(
                 contract["binding_disposition"] == "provider_required"

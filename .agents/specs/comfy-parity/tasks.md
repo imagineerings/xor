@@ -8775,7 +8775,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
 - [ ] 445. Implement the veo2 provider component
   - _id: comfy-parity-provider-component-veo2
-  - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.veo2`. Its exact generated claim set contains 3 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
+  - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.veo2`. Its exact generated claim set contains 3 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (veo), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
   - Wave: 266
   - _Wave: 266
   - Dependencies: comfy-parity-provider-hermetic-component-harness
