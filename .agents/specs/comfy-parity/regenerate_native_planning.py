@@ -10460,13 +10460,31 @@ def provider_component_foundation_tasks(
         [
             "crates/comfy_types/src/worker_protocol.rs",
             "crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit",
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_runtime/src/runtime_supervisor.rs",
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
         ],
         [
             "crates/comfy_types/src/worker_protocol.rs",
             "crates/comfy_types/src/comfy_types.rs",
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_runtime/src/runtime_supervisor.rs",
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
         ],
-        "Malformed lengths, out-of-order chunks, duplicate terminal frames, stale generations, foreign sessions, late progress, cancellation, and restart fail typed. Valid response-head/chunk/wait/progress sequences round-trip within cumulative bounds without buffering the complete provider response or changing prior protocol discriminants.",
-        ["comfy_types"],
+        "The private worker protocol advances from version 7 to version 8 before any new payload is decoded, preserves the exact raw discriminants of every pre-v8 WorkerMessage variant, and appends only typed provider stream messages. Existing worker, runtime, and fixture direction gates remain exhaustive and reject the new messages until the later canonical bridge task owns routing. Malformed lengths, out-of-order chunks, duplicate terminal frames, stale generations, foreign sessions, late progress, cancellation, and restart fail typed. Valid response-head/chunk/wait/progress sequences round-trip within cumulative bounds without buffering the complete provider response or carrying native handles, paths, secrets, or opaque accepted-but-ignored bytes.",
+        ["comfy_types", "comfy_worker", "comfy_runtime", "comfy_test_support"],
+        validation_packages=[
+            "comfy_types",
+            "comfy_worker",
+            "comfy_runtime",
+            "comfy_test_support",
+        ],
     )
     append_shared(
         "comfy-parity-provider-runtime-stream-progress-foundation",
@@ -18961,15 +18979,19 @@ def normalize_generated_spec_text(value: object) -> str:
             "all seven complete pinned headers",
             "all nine complete pinned headers, including hip_common.h and driver_types.h",
         )
-        .replace("Private worker protocol version 3", "Private worker protocol version 7")
+        .replace("Private worker protocol version 3", "Private worker protocol version 8")
         .replace(
-            "Private worker protocol version 7 carries",
-            "Private worker protocol version 7 uses operation-support schema 2, carries bounded native-device properties as a DTO mapped through canonical NativeDeviceProperties validation, preserves the protocol-6/schema-2 and v5/schema-1 discriminants, rejects a mismatched framed version before decoding a changed payload, and carries",
+            "Private worker protocol version 8 carries",
+            "Private worker protocol version 8 uses operation-support schema 2, carries bounded native-device properties as a DTO mapped through canonical NativeDeviceProperties validation, preserves the protocol-7, protocol-6/schema-2, and v5/schema-1 discriminants, rejects a mismatched framed version before decoding a changed payload, and carries",
         )
-        .replace("IPC protocol version 3 is", "IPC protocol version 7 is")
+        .replace("IPC protocol version 3 is", "IPC protocol version 8 is")
         .replace(
-            "IPC protocol version 7 is a little-endian u32 length prefix plus `postcard` payload,",
-            "IPC protocol version 7 is a little-endian u32 length prefix plus `postcard` payload; its decoder pre-reads and rejects the leading protocol version before deserializing a changed payload,",
+            "IPC protocol version 8 is a little-endian u32 length prefix plus `postcard` payload,",
+            "IPC protocol version 8 is a little-endian u32 length prefix plus `postcard` payload; its decoder pre-reads and rejects every non-8 framed version, including versions 7 and 6, before deserializing a changed payload,",
+        )
+        .replace(
+            "bounded typed registry-deployment rejection messages carry",
+            "bounded typed registry-deployment rejections and appended typed bounded provider response-head, chunk, wait, progress, cancellation, and terminal messages carry",
         )
     )
 

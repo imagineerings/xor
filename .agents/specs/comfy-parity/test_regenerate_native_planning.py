@@ -469,6 +469,29 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn("comfy_plugin_host", provider_streaming["validation_packages"])
         self.assertIn("compile-time host bindgen", provider_streaming["done"])
+        provider_worker_stream = tasks_by_id[
+            "comfy-parity-provider-worker-stream-protocol"
+        ]
+        for path in (
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_runtime/src/runtime_supervisor.rs",
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ):
+            self.assertIn(path, provider_worker_stream["reads"])
+            self.assertIn(path, provider_worker_stream["writes"])
+        for package in (
+            "comfy_types",
+            "comfy_worker",
+            "comfy_runtime",
+            "comfy_test_support",
+        ):
+            self.assertIn(package, provider_worker_stream["validation_packages"])
+        self.assertIn("version 7 to version 8", provider_worker_stream["done"])
+        self.assertIn("exact raw discriminants", provider_worker_stream["done"])
+        self.assertIn("reject the new messages", provider_worker_stream["done"])
         self.assertIn(
             "crates/comfy_nodes/src/families/partner_three_d_03.rs",
             provider_projection["writes"],
