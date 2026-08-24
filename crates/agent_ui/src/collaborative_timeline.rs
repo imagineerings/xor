@@ -1,16 +1,21 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
-use gpui::{AnyElement, Context, ListAlignment, ListState, Render, Role, Window, list, px};
-use ui::{Button, ButtonStyle, LabelSize, prelude::*};
+use gpui::{
+    AnyElement, Context, EventEmitter, ListAlignment, ListState, Render, Role, Window, list, px,
+};
+use ui::prelude::*;
 use workspace::collaborative_accessibility::TIMELINE_LABEL;
 
 use crate::{
-    activity_projection::{
-        ActivityDetailHandle, ActivityItem, ActivityItemId, ActivityLifecycle,
-        ActivitySemanticClass,
-    },
+    activity_projection::{ActivityItem, ActivityItemId},
     activity_reducer::{ActivityReducer, ActivityReduction, ActivityReductionError},
+    collaborative_activity_cards::{ActivityCardIntervention, CollaborativeActivityCard},
 };
+
+#[derive(Clone, Debug)]
+pub enum CollaborativeTimelineEvent {
+    InterventionRequested(ActivityCardIntervention),
+}
 
 pub struct CollaborativeTimeline {
     reducer: ActivityReducer,
@@ -93,90 +98,24 @@ impl CollaborativeTimeline {
         let Some(item) = self.items().get(index) else {
             return div().into_any_element();
         };
+        let item = item.clone();
         let item_id = item.id.clone();
         let is_expanded = self.is_detail_expanded(&item_id);
-        let has_details = item.details.is_some()
-            || matches!(
-                item.class,
-                ActivitySemanticClass::Generic | ActivitySemanticClass::Raw
-            );
-        let summary = semantic_summary(item);
-        let lifecycle = lifecycle_label(item.lifecycle);
-        let outcome = item.outcome.summary.clone();
-        let accessibility_label = activity_accessibility_label(item);
-        let detail = is_expanded.then(|| detail_summary(item));
-
-        v_flex()
-            .id(("collaborative-activity-row", index))
-            .role(Role::ListItem)
-            .aria_label(accessibility_label)
-            .w_full()
-            .px_4()
-            .py_2()
-            .gap_1()
-            .border_b_1()
-            .border_color(cx.theme().colors().border_variant)
-            .child(
-                h_flex()
-                    .w_full()
-                    .items_start()
-                    .justify_between()
-                    .gap_3()
-                    .child(
-                        v_flex()
-                            .min_w_0()
-                            .gap_0p5()
-                            .child(div().text_ui(cx).child(summary))
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(cx.theme().colors().text_muted)
-                                    .child(format!("{lifecycle} · {}", class_label(item.class))),
-                            ),
-                    )
-                    .when(has_details, |this| {
-                        this.child(
-                            Button::new(
-                                ("collaborative-activity-details", index),
-                                if is_expanded {
-                                    "Hide details"
-                                } else {
-                                    "Show details"
-                                },
-                            )
-                            .style(ButtonStyle::Subtle)
-                            .label_size(LabelSize::Small)
-                            .aria_expanded(is_expanded)
-                            .on_click(cx.listener(
-                                move |this, _, _window, cx| {
-                                    this.toggle_details(item_id.clone(), cx);
-                                },
-                            )),
-                        )
-                    }),
-            )
-            .when_some(outcome, |this, outcome| {
-                this.child(
-                    div()
-                        .text_sm()
-                        .text_color(cx.theme().colors().text_muted)
-                        .child(outcome),
-                )
-            })
-            .when_some(detail, |this, detail| {
-                this.child(
-                    div()
-                        .mt_1()
-                        .p_2()
-                        .rounded_sm()
-                        .bg(cx.theme().colors().editor_background)
-                        .border_1()
-                        .border_color(cx.theme().colors().border)
-                        .text_xs()
-                        .text_color(cx.theme().colors().text_muted)
-                        .child(detail),
-                )
-            })
+        let timeline = cx.entity();
+        let toggle_timeline = timeline.clone();
+        CollaborativeActivityCard::new(index, item, is_expanded)
+            .on_toggle(Arc::new(move |_window, cx| {
+                toggle_timeline.update(cx, |this, cx| {
+                    this.toggle_details(item_id.clone(), cx);
+                });
+            }))
+            .on_intervention(Arc::new(move |intervention, _window, cx| {
+                timeline.update(cx, |_this, cx| {
+                    cx.emit(CollaborativeTimelineEvent::InterventionRequested(
+                        intervention,
+                    ));
+                });
+            }))
             .into_any_element()
     }
 }
@@ -220,107 +159,31 @@ impl Render for CollaborativeTimeline {
     }
 }
 
-fn semantic_summary(item: &ActivityItem) -> String {
-    match item.class {
-        ActivitySemanticClass::Generic | ActivitySemanticClass::Raw => format!(
-            "{} reported an unsupported activity event",
-            item.actor.label
-        ),
-        ActivitySemanticClass::Suppressed => "Activity hidden by policy".into(),
-        _ => format!("{} {} {}", item.actor.label, item.verb, item.object.label),
-    }
-}
-
-fn class_label(class: ActivitySemanticClass) -> &'static str {
-    match class {
-        ActivitySemanticClass::Message => "Message",
-        ActivitySemanticClass::PlatformOperation => "Operation",
-        ActivitySemanticClass::FileEdit => "File edit",
-        ActivitySemanticClass::ShellCommand => "Command",
-        ActivitySemanticClass::Lifecycle => "Session",
-        ActivitySemanticClass::Thought => "Thought summary",
-        ActivitySemanticClass::Plan => "Plan",
-        ActivitySemanticClass::Permission => "Permission",
-        ActivitySemanticClass::Error => "Error",
-        ActivitySemanticClass::Generic => "Unsupported event",
-        ActivitySemanticClass::Raw => "Raw event",
-        ActivitySemanticClass::Suppressed => "Suppressed",
-    }
-}
-
-fn lifecycle_label(lifecycle: ActivityLifecycle) -> &'static str {
-    match lifecycle {
-        ActivityLifecycle::Pending => "Pending",
-        ActivityLifecycle::Running => "Running",
-        ActivityLifecycle::WaitingForUser => "Waiting for you",
-        ActivityLifecycle::Idle => "Idle",
-        ActivityLifecycle::Succeeded => "Completed",
-        ActivityLifecycle::Failed => "Failed",
-        ActivityLifecycle::Cancelled => "Cancelled",
-        ActivityLifecycle::TimedOut => "Timed out",
-        ActivityLifecycle::Disconnected => "Disconnected",
-        ActivityLifecycle::Suppressed => "Suppressed",
-    }
-}
-
-fn activity_accessibility_label(item: &ActivityItem) -> String {
-    let mut label = format!(
-        "{}. {}. {}",
-        semantic_summary(item),
-        class_label(item.class),
-        lifecycle_label(item.lifecycle)
-    );
-    if let Some(outcome) = &item.outcome.summary {
-        label.push_str(". ");
-        label.push_str(outcome);
-    }
-    label
-}
-
-fn detail_summary(item: &ActivityItem) -> String {
-    match &item.details {
-        Some(ActivityDetailHandle::AcpEntry {
-            session_id,
-            entry_id,
-        }) => format!("ACP session {session_id}, entry {entry_id}"),
-        Some(ActivityDetailHandle::NativeAction { action_id }) => {
-            format!("Native action {action_id}")
-        }
-        Some(ActivityDetailHandle::ProtocolEvent { event_id }) => {
-            format!("Protocol event {event_id}")
-        }
-        Some(ActivityDetailHandle::GitChange {
-            repository_id,
-            change_id,
-        }) => format!("Repository {repository_id}, change {change_id}"),
-        Some(ActivityDetailHandle::WorkflowRun { run_id, step_id }) => {
-            step_id.as_ref().map_or_else(
-                || format!("Workflow run {run_id}"),
-                |step_id| format!("Workflow run {run_id}, step {step_id}"),
-            )
-        }
-        Some(ActivityDetailHandle::RawSource { item_id }) => format!(
-            "Raw {:?} event {}",
-            item_id.source_kind(),
-            item_id.source_id()
-        ),
-        None => format!(
-            "Unsupported {:?} event {}",
-            item.id.source_kind(),
-            item.id.source_id()
-        ),
-    }
-}
+impl EventEmitter<CollaborativeTimelineEvent> for CollaborativeTimeline {}
 
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone as _, Utc};
 
     use super::*;
-    use crate::activity_projection::{
-        ActivityActor, ActivityActorKind, ActivityContext, ActivityObject, ActivityObjectKind,
-        ActivityOutcome, ActivityOutcomeStatus, ActivitySourceKind, ActivityVisibility,
+    use crate::{
+        activity_projection::{
+            ActivityActor, ActivityActorKind, ActivityContext, ActivityDetailHandle,
+            ActivityLifecycle, ActivityObject, ActivityObjectKind, ActivityOutcome,
+            ActivityOutcomeStatus, ActivitySemanticClass, ActivitySourceKind, ActivityVisibility,
+        },
+        collaborative_activity_cards::{ActivityCardPresentation, ActivityCardSource},
     };
+
+    fn presentation(item: &ActivityItem) -> ActivityCardPresentation {
+        ActivityCardPresentation::new(
+            item,
+            &[ActivityCardSource {
+                id: item.id.clone(),
+                provenance: None,
+            }],
+        )
+    }
 
     fn item(source_id: &str, class: ActivitySemanticClass) -> ActivityItem {
         let timestamp = Utc
@@ -402,7 +265,10 @@ mod tests {
         assert!(!timeline.is_detail_expanded(&item_id));
         assert_eq!(timeline.set_detail_expanded(&item_id, true), Some(0));
         assert!(timeline.is_detail_expanded(&item_id));
-        assert_eq!(detail_summary(&item), "ACP session session-1, entry edit-1");
+        assert_eq!(
+            presentation(&item).detail.as_deref(),
+            Some("ACP session session-1, entry edit-1")
+        );
         assert_eq!(timeline.set_detail_expanded(&item_id, false), Some(0));
         assert!(!timeline.is_detail_expanded(&item_id));
     }
@@ -411,7 +277,7 @@ mod tests {
     fn collaborative_timeline_accessibility_labels_running_and_failed_activity() {
         let running = item("running-1", ActivitySemanticClass::ShellCommand);
         assert_eq!(
-            activity_accessibility_label(&running),
+            presentation(&running).accessibility_label(),
             "Builder edited src/main.rs. Command. Running"
         );
 
@@ -419,7 +285,7 @@ mod tests {
         failed.lifecycle = ActivityLifecycle::Failed;
         failed.outcome.summary = Some("Command exited with status 1".into());
         assert_eq!(
-            activity_accessibility_label(&failed),
+            presentation(&failed).accessibility_label(),
             "Builder edited src/main.rs. Error. Failed. Command exited with status 1"
         );
     }
@@ -430,9 +296,12 @@ mod tests {
         unknown.details = None;
 
         assert_eq!(
-            semantic_summary(&unknown),
+            presentation(&unknown).summary,
             "Builder reported an unsupported activity event"
         );
-        assert_eq!(detail_summary(&unknown), "Unsupported Acp event future-1");
+        assert_eq!(
+            presentation(&unknown).detail.as_deref(),
+            Some("Unsupported Acp event future-1")
+        );
     }
 }
