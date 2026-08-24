@@ -24856,6 +24856,7 @@ dependencies = [
  "gpui",
  "hex",
  "nostr",
+ "nostr_compat",
  "paths",
  "release_channel",
  "secp256k1",
