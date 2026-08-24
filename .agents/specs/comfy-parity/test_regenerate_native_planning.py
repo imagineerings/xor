@@ -820,6 +820,14 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("raw grant no longer exposes bind", provider_activation_preflight["done"])
         self.assertIn("No public primitive-field evidence constructor", provider_activation_preflight["done"])
         self.assertIn("can be swapped", provider_activation_preflight["done"])
+        self.assertIn(
+            "Task419 owns the first executable capsule success",
+            provider_activation_preflight["done"],
+        )
+        self.assertIn(
+            "no public or feature-gated test authority factory",
+            provider_activation_preflight["done"],
+        )
         provider_component_stream = tasks_by_id[
             "comfy-parity-provider-component-host-stream-adapter"
         ]
