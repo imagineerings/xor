@@ -225,6 +225,11 @@ WHERE job.community_id = $1
   AND lease.endpoint_generation = job.endpoint_generation
   AND lease.capability_reference = job.capability_reference
 "#;
+const CANCEL_RETAINED_SOURCE_WAKES_SQL: &str = r#"
+DELETE FROM public.collaboration_push_wake_jobs
+WHERE community_id = $1
+  AND source_event_id = $2
+"#;
 
 pub const MAX_PUSH_CLAIM_BATCH: u32 = 100;
 pub const MAX_PUSH_CLAIM_MILLIS: u64 = 5 * 60 * 1_000;
@@ -470,6 +475,12 @@ impl PushWakeJobRequest {
 pub enum PushWakeEnqueueOutcome {
     Enqueued,
     Duplicate,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PushRetentionCancellationOutcome {
+    Cancelled(u64),
+    AlreadyClear,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -911,6 +922,38 @@ impl PushOutboxRepository {
             } else {
                 Err(PushOutboxError::ClaimLost)
             }
+        }
+        .await;
+        finish_transaction(transaction, result).await
+    }
+
+    pub async fn cancel_source_wakes_after_retention(
+        &self,
+        tenant: &TenantContext,
+        source_event_id: [u8; 32],
+    ) -> Result<PushRetentionCancellationOutcome, PushOutboxError> {
+        if source_event_id == [0; 32] {
+            return Err(PushOutboxError::InvalidRecord);
+        }
+        let transaction = self.begin().await?;
+        let result = async {
+            set_tenant(&transaction, tenant.community_id()).await?;
+            let cancelled = transaction
+                .execute(Statement::from_sql_and_values(
+                    DatabaseBackend::Postgres,
+                    CANCEL_RETAINED_SOURCE_WAKES_SQL,
+                    [
+                        tenant.community_id().as_uuid().into(),
+                        source_event_id.to_vec().into(),
+                    ],
+                ))
+                .await
+                .map_err(PushOutboxError::Unavailable)?;
+            Ok(if cancelled.rows_affected() == 0 {
+                PushRetentionCancellationOutcome::AlreadyClear
+            } else {
+                PushRetentionCancellationOutcome::Cancelled(cancelled.rows_affected())
+            })
         }
         .await;
         finish_transaction(transaction, result).await

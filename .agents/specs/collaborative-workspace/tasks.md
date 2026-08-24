@@ -2931,14 +2931,16 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Writes: crates/collab/tests/retention_deletion_faults.rs_
     - _Validation: isolated fault suite reaches one correct final state for every injected failure_
 
-  - [ ] 37.8. Converge Redis cache and push queues after retention
+  - [x] 37.8. Converge Redis cache and push queues after retention
     - Invalidate derived cache/presence keys and cancel obsolete wake jobs without treating either as authority.
     - _Requirements: 15.2, 17.4_
     - _Capability IDs: CAP-006, CAP-016, CAP-030_
     - _Depends on: 22.13, 37.2_
     - _Reads: crates/collab/src/{pubsub,push}/**, crates/collab/src/retention/worker.rs_
-    - _Writes: crates/collab/src/retention/cache_push_cleanup.rs_
+    - _Writes: crates/collab/src/retention/cache_push_cleanup.rs, crates/collab/src/retention.rs, crates/collab/src/push/outbox.rs, crates/collab/tests/retention_cache_push_cleanup.rs_
     - _Validation: cleanup tests cover unavailable Redis/gateway, retry, duplicate invalidation and final visibility_
+    - _Discovered contradiction (2026-08-24): Collab has no concrete Redis cache/presence client or canonical derived-key owner to bind directly, so this leaf keeps that integration behind one injected tenant-bound invalidation contract rather than inventing a second cache. The canonical push outbox is concrete, but its wake rows reference source events through a restrictive foreign key; marking obsolete rows terminal would still block authoritative event deletion, so retention physically removes only the exact tenant/source-derived jobs. The standalone planned module also requires module registration and a focused integration target to compile and prove these boundaries._
+    - _Evidence: 2026-08-24 — added a bounded tenant cleanup consumer whose validated checkpoint binds a monotonic version, exact opaque retention source position and converged count. Each item exposes only archive-only or deleted final visibility, invalidates cache plus presence before cancelling source-matched wake jobs, and advances by exact compare-and-set only after both non-authoritative targets converge. Redis and gateway failures preserve the prior checkpoint; retry treats repeated invalidation and an empty queue as converged. The concrete Postgres adapter installs tenant RLS and deletes dependent wake rows without payload handling. Five exact-source tests passed unavailable-cache, unavailable-push, retry, duplicate, final-visibility, cross-tenant/pre-I/O and concrete queue-cancellation scenarios; warning-denied Clippy passed on the same production and checked-in test sources. Rust formatting and diff hygiene passed; dependency, inventory and canonical specification gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 37.9. Clean retained media references and verified orphans
     - Remove expired attachment metadata and delete bytes only after content-reference verification.
