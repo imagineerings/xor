@@ -1161,7 +1161,9 @@ impl WorkflowRepository {
             )
             .await?
             .ok_or(WorkflowRepositoryError::NotFound)?;
-            if definition.lifecycle != WorkflowLifecycle::Active || !definition.definition.enabled()
+            if definition.lifecycle != WorkflowLifecycle::Active
+                || !definition.definition.enabled()
+                || definition.definition_version != definition.current_definition_version
             {
                 return Err(WorkflowRepositoryError::TransitionConflict);
             }

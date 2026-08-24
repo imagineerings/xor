@@ -674,6 +674,7 @@ dunce = "1.0"
 ec4rs = { version = "1.2", features = ["allow-empty-values"] }
 emojis = "0.6.1"
 env_logger = "0.11"
+evalexpr = "11"
 encoding_rs = "0.8"
 etagere = "0.2"
 exec = "0.3.1"
