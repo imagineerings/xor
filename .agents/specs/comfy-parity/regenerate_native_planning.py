@@ -9334,6 +9334,75 @@ def native_model_resource_precursor_tasks(
         "VAL-MODEL-DETECTION-001",
         "VAL-MODEL-FAMILY-ROW-001",
     ]
+    spandrel_contract_path = CATALOGS / "spandrel-image-model-contract.json"
+    if not spandrel_contract_path.is_file():
+        raise ValueError("missing generated Spandrel image-model contract")
+    spandrel_contract = json.loads(spandrel_contract_path.read_text(encoding="utf-8"))
+    if spandrel_contract.get("schema_version") != 1:
+        raise ValueError("unsupported Spandrel image-model contract schema")
+    task_projection = spandrel_contract.get("task_projection")
+    if not isinstance(task_projection, dict):
+        raise ValueError("Spandrel image-model contract has no task projection")
+    shared_upscale_task_id = task_projection.get("shared_runtime_contract_task_id")
+    if shared_upscale_task_id != "comfy-parity-native-upscale-runtime-contract-foundation":
+        raise ValueError("Spandrel image-model contract has an invalid shared task identity")
+    implementation_leaves = task_projection.get("implementation_leaves")
+    if not isinstance(implementation_leaves, list):
+        raise ValueError("Spandrel image-model contract implementation leaves must be a list")
+    append(
+        shared_upscale_task_id,
+        "Compile the source-pinned native upscale runtime contract",
+        "Compile the generated Spandrel catalog into one closed native runtime contract that owns ordered architecture detection, normalized state admission, descriptor-kind and scale/channel projection, equation-family identity, and fail-closed license/model-use availability. It contains no Python runtime, model weight, filesystem authority, or neural equation implementation.",
+        [
+            ".agents/specs/comfy-parity/catalogs/spandrel-image-model-contract.json",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/upscale_contract.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/upscale_contract.rs",
+        ],
+        "The compiled registry matches every generated ordinal, architecture identity, source and equation digest, detection predicate, descriptor disposition, state-key schema, scale/channel projection, dependency fingerprint, license disposition, and model-use disposition. Duplicate, missing, reordered, ambiguous, unsupported, unlicensed, source-drifted, or forged rows fail before allocation. A zero-admission catalog remains a valid closed unavailable contract and cannot be replaced by a generic resize or fallback architecture. Production dependency and binary scans prove there is no Python or Spandrel import, execution, source-path access, model weight, or live oracle requirement.",
+        include_model_payload=False,
+    )
+    generated_upscale_leaf_ids: list[str] = []
+    seen_equation_families: set[str] = set()
+    for leaf in implementation_leaves:
+        if not isinstance(leaf, dict):
+            raise ValueError("Spandrel implementation leaf must be an object")
+        equation_family_id = leaf.get("equation_family_id")
+        leaf_id = leaf.get("task_id")
+        if not isinstance(equation_family_id, str) or not isinstance(leaf_id, str):
+            raise ValueError("Spandrel implementation leaf identity must be a string")
+        if equation_family_id in seen_equation_families:
+            raise ValueError(f"duplicate Spandrel equation family {equation_family_id}")
+        if not re.fullmatch(r"spandrel-equation-[0-9a-f]{16}", equation_family_id):
+            raise ValueError(f"invalid Spandrel equation family {equation_family_id}")
+        if not re.fullmatch(r"comfy-parity-native-upscale-equation-[0-9a-f]{16}", leaf_id):
+            raise ValueError(f"invalid Spandrel equation task {leaf_id}")
+        seen_equation_families.add(equation_family_id)
+        generated_upscale_leaf_ids.append(leaf_id)
+        suffix = equation_family_id.removeprefix("spandrel-equation-")
+        append(
+            leaf_id,
+            f"Implement native upscale equation family {suffix}",
+            f"Implement only the admitted source-pinned `{equation_family_id}` neural equation family behind the shared native upscale runtime contract.",
+            [
+                ".agents/specs/comfy-parity/catalogs/spandrel-image-model-contract.json",
+                "crates/comfy_model/src/upscale_contract.rs",
+                "crates/comfy_model/src/native_ops.rs",
+                "crates/comfy_tensor/src/image_ops.rs",
+            ],
+            [
+                f"crates/comfy_model/src/upscale_equations/{suffix}.rs",
+                f"crates/comfy_model/tests/upscale_equations/{suffix}.rs",
+                f"crates/comfy_test_support/fixtures/models/spandrel-upscale-equation-{suffix}",
+            ],
+            f"Only catalog rows with equation_family_id `{equation_family_id}` are implemented. Exact shape, state, scale, channel, dependency, dtype, layout, cancellation, memory, and numeric fixtures pass through the shared contract; every other family and every rejected license/model-use row remains unavailable. The leaf owns no registry ordering, detection parser, model store, allocator, handle publication, Python adapter, source-tree access, or fallback resize.",
+            include_model_payload=False,
+        )
     append(
         "comfy-parity-native-upscale-model-resource-foundation",
         "Retain executable native image upscale models",
@@ -9363,6 +9432,21 @@ def native_model_resource_precursor_tasks(
         ],
         "Source-pinned single-image fixtures detect, normalize, load, retain, reconstruct, and execute exact scale, BHWC-to-NCHW input, 512-pixel tiles with 32-pixel overlap, row-major batch order, canonical feathered stitching, intermediate dtype, BHWC F32 output clamp, semantic digest, alias-aware residency, cancellation, and final device release. Typed resource exhaustion alone retries 512 then 256 then 128; non-resource failure, cancellation, or exhaustion at 128 publishes no resource or image. Unsupported architecture, multi-input descriptor, malformed state, and uncertified device execution fail typed. Canonical handle publication, cache, persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
+    if not generated_upscale_leaf_ids:
+        tasks[-1]["outcome"] = (
+            "Retain the zero-admission source-pinned Spandrel contract as a typed unavailable "
+            "UPSCALE_MODEL resource boundary. No native architecture may execute until a later "
+            "user-approved contract regeneration admits an individually licensed equation family."
+        )
+        tasks[-1]["done"] = (
+            "The exact zero-admission generated contract rejects every observed Spandrel and "
+            "extra-arches architecture before allocation, model parsing, handle publication, cache, "
+            "or execution, with the source-specific missing individual-license or reference-only "
+            "diagnostic. No image resize, generic neural fallback, Python import, source-tree access, "
+            "or model weight substitutes for an admitted equation family. Canonical handle publication, "
+            "cache, persistence, restart, and stale-generation behavior remain assigned to "
+            "comfy-parity-native-model-resource-execution-foundation."
+        )
     append(
         "comfy-parity-native-latent-upscale-model-resource-foundation",
         "Retain executable native latent upscale models",
@@ -9512,6 +9596,8 @@ def native_model_resource_precursor_tasks(
         "comfy-parity-native-audio-encoder-resource-foundation",
         "comfy-parity-spandrel-source-snapshots-user-authority-gate",
         "comfy-parity-native-spandrel-image-model-contract-foundation",
+        "comfy-parity-native-upscale-runtime-contract-foundation",
+        *generated_upscale_leaf_ids,
         "comfy-parity-native-upscale-model-resource-foundation",
         "comfy-parity-native-latent-upscale-model-resource-foundation",
         "comfy-parity-native-background-removal-resource-foundation",

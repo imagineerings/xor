@@ -83,7 +83,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 715)
+        self.assertEqual(len(tasks), 716)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -124,6 +124,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-native-audio-encoder-resource-foundation",
             "comfy-parity-spandrel-source-snapshots-user-authority-gate",
             "comfy-parity-native-spandrel-image-model-contract-foundation",
+            "comfy-parity-native-upscale-runtime-contract-foundation",
             "comfy-parity-native-upscale-model-resource-foundation",
             "comfy-parity-native-latent-upscale-model-resource-foundation",
             "comfy-parity-native-background-removal-resource-foundation",
@@ -331,9 +332,22 @@ class ValidationGenerationTests(unittest.TestCase):
             self.assertIn(phrase, tasks_by_id[audio_id]["done"])
         spandrel_id = "comfy-parity-native-spandrel-image-model-contract-foundation"
         spandrel_gate_id = "comfy-parity-spandrel-source-snapshots-user-authority-gate"
+        spandrel_runtime_id = "comfy-parity-native-upscale-runtime-contract-foundation"
+        upscale_resource_id = "comfy-parity-native-upscale-model-resource-foundation"
         spandrel_gate = tasks_by_id[spandrel_gate_id]
         self.assertEqual(spandrel_gate["dependencies"], [audio_id])
         self.assertEqual(tasks_by_id[spandrel_id]["dependencies"], [spandrel_gate_id])
+        self.assertEqual(
+            tasks_by_id[spandrel_runtime_id]["dependencies"],
+            [spandrel_id, "comfy-parity-model-detection-any-of-key-selector-consolidation"],
+        )
+        self.assertEqual(
+            tasks_by_id[upscale_resource_id]["dependencies"],
+            [
+                spandrel_runtime_id,
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
         self.assertTrue(spandrel_gate["locked"])
         self.assertTrue(spandrel_gate["feature_scoped"])
         self.assertEqual(spandrel_gate["writes"], [])
@@ -366,6 +380,32 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-native-upscale-model-resource-foundation stable ID remains the final integration task",
         ]:
             self.assertIn(phrase, tasks_by_id[spandrel_id]["done"])
+        self.assertEqual(
+            tasks_by_id[spandrel_runtime_id]["writes"],
+            [
+                "crates/comfy_model/src/upscale_contract.rs",
+                "crates/comfy_model/src/comfy_model.rs",
+                "crates/comfy_model/tests/upscale_contract.rs",
+            ],
+        )
+        for phrase in [
+            "every generated ordinal",
+            "license disposition",
+            "zero-admission catalog",
+            "no Python or Spandrel import",
+        ]:
+            self.assertIn(phrase, tasks_by_id[spandrel_runtime_id]["done"])
+        generated_upscale_leaves = [
+            identifier
+            for identifier in tasks_by_id
+            if identifier.startswith("comfy-parity-native-upscale-equation-")
+        ]
+        self.assertEqual(generated_upscale_leaves, [])
+        self.assertIn("zero-admission", tasks_by_id[upscale_resource_id]["outcome"])
+        self.assertIn(
+            "missing individual-license or reference-only",
+            tasks_by_id[upscale_resource_id]["done"],
+        )
         self.assertNotIn(stored_payload, tasks_by_id[latent_upscale_id]["writes"])
         self.assertIn(stored_payload, tasks_by_id[execution_id]["reads"])
         self.assertIn(stored_payload, tasks_by_id[execution_id]["writes"])

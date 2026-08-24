@@ -4,8 +4,10 @@
 
 This baseline fixes the source snapshots, evidence vocabulary, and discovery
 limits used by the Comfy-to-Zed parity specification. The source directories
-contain no Git metadata, so no commit SHA is asserted. Package versions and
-content-sensitive tree fingerprints are used instead.
+contain no nested Git metadata. Package versions and content-sensitive tree
+fingerprints are used throughout; a commit SHA is asserted only when the user
+supplied and approved that exact upstream identity independently of the clean
+source-distribution tree.
 
 ## Source snapshots
 
@@ -17,6 +19,8 @@ content-sensitive tree fingerprints are used instead.
 | comfy-cli | `projects/comfy/comfy-cli` | `0.0.0` in `pyproject.toml`, explicitly a CI placeholder and not a release identity | unavailable | 312 | `09d0b5f262bce3105f83777a310f1e391c4624f95142da5e3230626b68a276e6` |
 | Comfy documentation | `projects/comfy/docs` | no project version declared; locked tooling versions are recorded below | unavailable | 5,800 | `1f4c9c460b8f5b35e30eb4d2d64bc201a958f247ab21af6c68743cce28c33931` |
 | Comfy embedded docs | `projects/comfy/embedded-docs` | `0.5.7` in `pyproject.toml`; ComfyUI pins `comfyui-embedded-docs==0.5.6` | unavailable | 10,298 | `5aebf925cf36fe7b8df3c89466ad96ffa42110542a392ec6156b88fc807ec956` |
+| Spandrel | `projects/comfy/Spandrel` | `0.4.2`; user-approved tag `v0.4.2`, commit `724cca389f28c38e1050689d4862a452fd644484` | absent from the clean sdist tree; exact upstream identity supplied by the user | 180 | `e1870c42b314fddb290f4d5322a03743076d98d0c6d288fc73691e3013994bbb` |
+| spandrel-extra-arches | `projects/comfy/spandrel-extra-arches` | `0.2.0`; user-approved tag `v0.4.0`, commit `a1db3f5debbeeacbe02fb4114c69feee56ba5e21` | absent from the clean sdist tree; exact upstream identity supplied by the user | 52 | `7c0915d2e0df7db2131117087744fa5e73954dcad72aa785386d6bf8c1efb3aa` |
 | Zed target | repository root | `1.10.2` in `crates/zed/Cargo.toml` | unavailable | 3,310 fingerprint inputs, including 2,839 files under `crates/` | `99ceb40a1cc3359cde6e0865fe1b6138a06317d5fbd892f1595de10a96b07e9a` |
 
 The source-file coverage catalogs contain the reconciled production, test,
@@ -77,6 +81,11 @@ not change the target baseline.
 | comfy-cli declares Python 3.10+ and the package version is only a `0.0.0` CI placeholder | `projects/comfy/comfy-cli/pyproject.toml`; [evidence-comfy-cli.md](evidence-comfy-cli.md) |
 | docs declares no project release version; locked tooling includes Mint 4.2.585, Sharp 0.33.5, and Playwright MCP 1.0.12 | `projects/comfy/docs/package.json`; `projects/comfy/docs/pnpm-lock.yaml`; [evidence-documentation.md](evidence-documentation.md) |
 | embedded-docs declares 0.5.7 while this ComfyUI snapshot pins 0.5.6 | `projects/comfy/embedded-docs/pyproject.toml`; ComfyUI dependency declaration; `catalogs/docs-reconciliation.json` |
+| Spandrel 0.4.2 came from the official `spandrel-0.4.2.tar.gz` source distribution whose published and observed SHA-256 is `fefa4ea966c6a5b7721dcf24f3e2062a5a96a395c8bedcb570fb55971fdcbccb` | explicit user authority; official PyPI release metadata; `catalogs/spandrel-image-model-contract.json` |
+| spandrel-extra-arches 0.2.0 came from the official `spandrel_extra_arches-0.2.0.tar.gz` source distribution whose published and observed SHA-256 is `9216877ecabc9c97e001ad5d49c4f8d2b1f6c6f82d1e77c8e2b350c586b6e64a` | explicit user authority; official PyPI release metadata; `catalogs/spandrel-image-model-contract.json` |
+| Spandrel is a development oracle only; production Rust never imports or executes it, no model weights are approved, and model-use rights are evaluated independently | explicit user disposition; `catalogs/spandrel-image-model-contract.json` |
+| Extra architectures are reference-only by default; restrictive, copyleft-incompatible, non-commercial, ambiguous, or unverified rows fail closed | explicit user disposition; `catalogs/spandrel-image-model-contract.json` |
+| Both sdists omit the per-architecture license artifacts that their README says are included under each `__arch/` directory, so all 52 observed architecture rows remain rejected rather than receiving agent-authored legal approval | deterministic source audit; `catalogs/spandrel-image-model-contract.json` |
 | Zed package version is 1.10.2 | `crates/zed/Cargo.toml:5` |
 | No Comfy-specific target implementation exists | repository-wide search and direct architecture inspection outside `projects/comfy/**` and this pack found no Comfy workflow, node, tensor, model, sampler, worker, API-host, plugin, or GPUI implementation |
 

@@ -26,6 +26,7 @@ PIPELINE = [
     "generate_tensor_runtime_catalogs.py",
     "generate_tensor_operation_contracts.py",
     "../../../crates/comfy_model/scripts/generate_model_family_catalog.py",
+    "generate_spandrel_image_model_contract.py",
     "generate_conditioning_catalog.py",
     "generate_node_contract_catalog.py",
     "generate_provider_component_catalog.py",
@@ -52,6 +53,7 @@ GENERATED_EXTERNAL_OUTPUTS = [
     WORKSPACE / "crates/comfy_model/catalog/model-families-v1.json",
     WORKSPACE / "crates/comfy_test_support/fixtures/tensor_signatures/resolution-environment.json",
     WORKSPACE / "crates/comfy_test_support/fixtures/tensor_signatures/contracts",
+    WORKSPACE / "crates/comfy_test_support/fixtures/models/spandrel-image-model-contract",
 ]
 
 SNAPSHOT_INPUTS = [
