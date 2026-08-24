@@ -83,7 +83,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 713)
+        self.assertEqual(len(tasks), 714)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -414,6 +414,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-provider-contract-catalog-closure",
             "comfy-parity-provider-namespace-binding-projection",
             "comfy-parity-provider-streaming-component-abi-v2",
+            "comfy-parity-provider-streaming-component-abi-v2-request-authority-repair",
             "comfy-parity-provider-worker-stream-protocol",
             "comfy-parity-provider-runtime-stream-progress-foundation",
             "comfy-parity-provider-component-host-stream-adapter",
@@ -431,7 +432,7 @@ class ValidationGenerationTests(unittest.TestCase):
         provider_closure_id = (
             "comfy-parity-native-partner-provider-components-foundation"
         )
-        self.assertEqual(len(provider_shared_ids), 9)
+        self.assertEqual(len(provider_shared_ids), 10)
         self.assertEqual(len(provider_vendor_ids), 33)
         provider_projection = tasks_by_id[
             "comfy-parity-provider-namespace-binding-projection"
@@ -469,10 +470,43 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn("comfy_plugin_host", provider_streaming["validation_packages"])
         self.assertIn("compile-time host bindgen", provider_streaming["done"])
+        provider_request_authority = tasks_by_id[
+            "comfy-parity-provider-streaming-component-abi-v2-request-authority-repair"
+        ]
+        self.assertEqual(
+            provider_request_authority["dependencies"],
+            ["comfy-parity-provider-streaming-component-abi-v2"],
+        )
+        self.assertNotIn(
+            "crates/comfy_plugin_sdk/wit/comfy-plugin.wit",
+            provider_request_authority["writes"],
+        )
+        self.assertNotIn(
+            "crates/comfy_runtime/src/trust.rs", provider_request_authority["writes"]
+        )
+        self.assertNotIn(
+            "crates/comfy_plugin_sdk/src/type_ids.rs",
+            provider_request_authority["writes"],
+        )
+        self.assertNotIn(
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
+            provider_request_authority["writes"],
+        )
+        for field in ("endpoint", "secret-id"):
+            self.assertIn(field, provider_request_authority["done"])
+        self.assertIn("never from a component-supplied request", provider_request_authority["done"])
         provider_worker_stream = tasks_by_id[
             "comfy-parity-provider-worker-stream-protocol"
         ]
+        self.assertEqual(
+            provider_worker_stream["dependencies"],
+            [
+                "comfy-parity-provider-streaming-component-abi-v2-request-authority-repair"
+            ],
+        )
         for path in (
+            "crates/comfy_types/Cargo.toml",
+            "Cargo.lock",
             "crates/comfy_worker/src/supervisor.rs",
             "crates/comfy_runtime/src/runtime_supervisor.rs",
             "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
@@ -482,6 +516,8 @@ class ValidationGenerationTests(unittest.TestCase):
         ):
             self.assertIn(path, provider_worker_stream["reads"])
             self.assertIn(path, provider_worker_stream["writes"])
+        self.assertIn("Cargo.toml", provider_worker_stream["reads"])
+        self.assertNotIn("Cargo.toml", provider_worker_stream["writes"])
         for package in (
             "comfy_types",
             "comfy_worker",
@@ -492,6 +528,51 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("version 7 to version 8", provider_worker_stream["done"])
         self.assertIn("exact raw discriminants", provider_worker_stream["done"])
         self.assertIn("reject the new messages", provider_worker_stream["done"])
+        self.assertIn("endpoint, optional secret-id", provider_worker_stream["done"])
+        self.assertIn("no component-supplied provider identity", provider_worker_stream["done"])
+        self.assertIn("workspace SHA-256", provider_worker_stream["done"])
+        provider_runtime_stream = tasks_by_id[
+            "comfy-parity-provider-runtime-stream-progress-foundation"
+        ]
+        self.assertIn(
+            "crates/comfy_plugin_host/src/component_host.rs",
+            provider_runtime_stream["reads"],
+        )
+        for path in (
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(path, provider_runtime_stream["reads"])
+            self.assertIn(path, provider_runtime_stream["writes"])
+        for read_only_path in (
+            "crates/comfy_runtime/src/execution_presentation.rs",
+            "crates/comfy_runtime/src/queue_history.rs",
+            "crates/comfy_runtime/src/executor.rs",
+        ):
+            self.assertIn(read_only_path, provider_runtime_stream["reads"])
+            self.assertNotIn(read_only_path, provider_runtime_stream["writes"])
+        self.assertIn("ProviderRuntimeStreamOwner", provider_runtime_stream["done"])
+        self.assertIn("Begin, Call, Resolve, Finish, Abort", provider_runtime_stream["done"])
+        provider_component_stream = tasks_by_id[
+            "comfy-parity-provider-component-host-stream-adapter"
+        ]
+        self.assertIn(
+            "crates/comfy_runtime/src/plugin_services.rs",
+            provider_component_stream["reads"],
+        )
+        provider_worker_bridge = tasks_by_id[
+            "comfy-parity-provider-worker-stream-bridge"
+        ]
+        self.assertIn(
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            provider_worker_bridge["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            provider_worker_bridge["writes"],
+        )
         self.assertIn(
             "crates/comfy_nodes/src/families/partner_three_d_03.rs",
             provider_projection["writes"],

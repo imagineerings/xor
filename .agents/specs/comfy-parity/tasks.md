@@ -8014,8 +8014,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 403. Implement source-compatible native media text rendering
   - _id: comfy-parity-native-media-text-rendering-foundation
   - Outcome: One shared worker-safe media owner provides the exact pinned scalable default font, text measurement and wrapping, glyph rasterization, and RGBA alpha composition used by source image-preview nodes. Generated leaves supply checked text, layout, colors, and canonical image tensors but cannot embed a second font, bitmap alphabet, rasterizer, or host UI text path.
-  - Wave: 353
-  - _Wave: 353
+  - Wave: 354
+  - _Wave: 354
   - Dependencies: comfy-parity-native-nodes-image-detection-comfy-node-0136
   - _Blocked_by: comfy-parity-native-nodes-image-detection-comfy-node-0136
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_bounding_boxes.py, crates/comfy_media/Cargo.toml, crates/comfy_media/src/comfy_media.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_nodes/src/execution.rs
@@ -8149,51 +8149,69 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK409 PROVIDER STREAMING COMPONENT ABI V2 2026-08-24 PASS. Commit 5940ad3fa6 defines the typed generation-scoped v2 streaming contract across Rust, JSON Schema, and an independently resolvable WIT package while leaving the v1 WIT and schema byte-identical. The v2 package carries a standard dependency copy whose SHA-256 exactly matches frozen v1 `51538d3720188321d54df2bc3947d334c52bbadff5610f2623ab2a8bc4616cad`; the v1 schema remains `fc2be2425ab15f21f6b05a27086272fc95fd4dd5e27c4106a17a69d3351b5c7f`. Focused provider-streaming lifecycle, quota, generation, cancellation, typed-materialization, and WIT/JSON/Rust parity tests passed 4/4 from a clean target. The locked comfy_plugin_sdk/comfy_plugin_host check passed from a clean target in 4m41s and compiled both exact-file v1 bindgens plus the independent v2 package bindgen. Warning-denied all-target/all-feature release clippy passed for comfy_plugin_sdk; formatting, JSON parsing, spec regeneration tests 5/5, strict complete-spec validation, and diff checks passed. The complete SDK suite passed 21 tests and retained two unrelated pre-existing generated registry/catalog fingerprint failures in unchanged `type_ids.rs`; the host all-target attempt exhausted disk while compiling unrelated UI dependencies after the focused host bindgen check had already passed. Independent adversarial review found no remaining P0/P1 and verified the exact five authorized implementation paths, bounded HTTP/request/response/upload/cost/progress/terminal state machine, stale/foreign/revoked handle distinctions, atomic upload revocation/completion, canonical typed value decoding, no opaque path/secret/native-handle surface, and exact v1 compatibility. Validation ran on Darwin arm64 without provider credentials, network calls, or provider execution.
 
-- [ ] 410. Transport provider streams over the worker protocol
-  - _id: comfy-parity-provider-worker-stream-protocol
-  - Outcome: Extend the private worker protocol with bounded response heads, chunks, waits, progress, stream and session identities, preserving strict version rejection and keeping native handles, paths, and secret bytes outside the wire.
+- [ ] 410. Bind provider request target authority in the streaming component ABI
+  - _id: comfy-parity-provider-streaming-component-abi-v2-request-authority-repair
+  - Outcome: Amend only the separately versioned provider-v2 request head so every streamed request carries the exact endpoint and optional secret reference required by the canonical runtime authorization owner. The provider identity remains host-derived from the signed invocation and provider binding rather than component-supplied. Preserve the frozen v1 WIT, schema, and fixtures byte-for-byte and carry no secret bytes.
   - Wave: 260
   - _Wave: 260
   - Dependencies: comfy-parity-provider-streaming-component-abi-v2
   - _Blocked_by: comfy-parity-provider-streaming-component-abi-v2
-  - Reads: crates/comfy_types/src/worker_protocol.rs, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_worker/src/supervisor.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv
-  - _Reads: crates/comfy_types/src/worker_protocol.rs, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_worker/src/supervisor.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv
-  - Writes: crates/comfy_types/src/worker_protocol.rs, crates/comfy_types/src/comfy_types.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv
-  - _Writes: crates/comfy_types/src/worker_protocol.rs, crates/comfy_types/src/comfy_types.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv
+  - Reads: crates/comfy_plugin_sdk/wit/comfy-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_sdk/src/type_ids.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs, crates/comfy_runtime/src/trust.rs
+  - _Reads: crates/comfy_plugin_sdk/wit/comfy-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_sdk/src/type_ids.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs, crates/comfy_runtime/src/trust.rs
+  - Writes: crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
+  - _Writes: crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
+  - Requirements: 4.4, 6.4, 12.1, 12.2, 12.5, 18.1, 28.2, 32.2, 34.4, 37.5, 40.2, 41.3, 44.3
+  - _Requirements: 4.4, 6.4, 12.1, 12.2, 12.5, 18.1, 28.2, 32.2, 34.4, 37.5, 40.2, 41.3, 44.3
+  - Design: D8, D12, D13, D17, D18, D20, D21, D22, D29, D32, D34, D35, D39, D40, D41
+  - Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_sdk -p comfy_plugin_host; cargo test --locked -p comfy_plugin_sdk --all-targets; cargo test --locked -p comfy_plugin_host --all-targets; ./script/clippy -p comfy_plugin_sdk -p comfy_plugin_host
+  - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_sdk -p comfy_plugin_host; cargo test --locked -p comfy_plugin_sdk --all-targets; cargo test --locked -p comfy_plugin_host --all-targets; ./script/clippy -p comfy_plugin_sdk -p comfy_plugin_host
+  - Done when: Provider-v2 request-head contains, in canonical order, endpoint, optional secret-id, method, ordered headers, and optional declared-body-bytes. Rust ProviderRequestHeadV2 and JSON request_head carry the same fields as visible ASCII with endpoint at most 2,048 bytes and secret-id at most 1,024 bytes; required strings are non-empty, trimmed, and control-free. The canonical provider is derived only from the verified signed invocation and ProviderBindingSet, never from a component-supplied request field. comfy_runtime::ProviderPolicy, ProviderEndpoint, and SecretId remain the sole semantic provider, URL, credential-reference, and authorization owners. Canonical bytes bind every field in that order, every authority-field mutation changes the identity, and missing, extra, malformed, or non-ASCII fields fail before host actuation. V1 WIT and schema hashes remain exact, and no DTO contains secret bytes, filesystem paths, native handles, or a caller-supplied authorization decision.
+
+- [ ] 411. Transport provider streams over the worker protocol
+  - _id: comfy-parity-provider-worker-stream-protocol
+  - Outcome: Extend the private worker protocol with bounded response heads, chunks, waits, progress, stream and session identities, preserving strict version rejection and keeping native handles, paths, and secret bytes outside the wire.
+  - Wave: 261
+  - _Wave: 261
+  - Dependencies: comfy-parity-provider-streaming-component-abi-v2-request-authority-repair
+  - _Blocked_by: comfy-parity-provider-streaming-component-abi-v2-request-authority-repair
+  - Reads: crates/comfy_types/src/worker_protocol.rs, crates/comfy_types/Cargo.toml, Cargo.toml, Cargo.lock, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_worker/src/supervisor.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv
+  - _Reads: crates/comfy_types/src/worker_protocol.rs, crates/comfy_types/Cargo.toml, Cargo.toml, Cargo.lock, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_worker/src/supervisor.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv
+  - Writes: crates/comfy_types/src/worker_protocol.rs, crates/comfy_types/src/comfy_types.rs, crates/comfy_types/Cargo.toml, Cargo.lock, crates/comfy_worker/src/supervisor.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv
+  - _Writes: crates/comfy_types/src/worker_protocol.rs, crates/comfy_types/src/comfy_types.rs, crates/comfy_types/Cargo.toml, Cargo.lock, crates/comfy_worker/src/supervisor.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv
   - Requirements: 4.4, 6.4, 12.1, 12.2, 12.5, 18.1, 28.2, 32.2, 34.4, 37.5, 40.2, 41.3, 44.3
   - _Requirements: 4.4, 6.4, 12.1, 12.2, 12.5, 18.1, 28.2, 32.2, 34.4, 37.5, 40.2, 41.3, 44.3
   - Design: D8, D12, D13, D17, D18, D20, D21, D22, D29, D32, D34, D35, D39, D40, D41
   - Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_types -p comfy_worker -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_types --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_types -p comfy_worker -p comfy_runtime -p comfy_test_support
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_types -p comfy_worker -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_types --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_types -p comfy_worker -p comfy_runtime -p comfy_test_support
-  - Done when: The private worker protocol advances from version 7 to version 8 before any new payload is decoded, preserves the exact raw discriminants of every pre-v8 WorkerMessage variant, and appends only typed provider stream messages. Existing worker, runtime, and fixture direction gates remain exhaustive and reject the new messages until the later canonical bridge task owns routing. Malformed lengths, out-of-order chunks, duplicate terminal frames, stale generations, foreign sessions, late progress, cancellation, and restart fail typed. Valid response-head/chunk/wait/progress sequences round-trip within cumulative bounds without buffering the complete provider response or carrying native handles, paths, secrets, or opaque accepted-but-ignored bytes.
+  - Done when: The private worker protocol advances from version 7 to version 8 before any new payload is decoded, preserves the exact raw discriminants of every pre-v8 WorkerMessage variant, and appends only typed provider stream messages. The direct typed start-request transport preserves endpoint, optional secret-id reference, method, ordered headers, and optional declared-body length exactly, rejects every bound before routing, and carries no component-supplied provider identity. Upload digests reuse the workspace SHA-256 implementation rather than introducing another cryptographic owner. Existing worker, runtime, and fixture direction gates remain exhaustive and reject the new messages until the later canonical bridge task owns routing. Malformed lengths, out-of-order chunks, duplicate terminal frames, stale generations, foreign sessions, late progress, cancellation, and restart fail typed. Valid response-head/chunk/wait/progress sequences round-trip within cumulative bounds without buffering the complete provider response or carrying native handles, paths, secret bytes, or opaque accepted-but-ignored bytes.
 
-- [ ] 411. Own provider streams, receipts, and progress
+- [ ] 412. Own provider streams, receipts, and progress
   - _id: comfy-parity-provider-runtime-stream-progress-foundation
   - Outcome: Make the runtime the sole authorized provider stream/session owner. Bind provider, method, endpoint, headers, secret reference, body digest, component and binding generations, accepted cost, request ordinal, response head, chunk digest, and idempotency; project monotonic attempt-local progress without persisting it as an output or effect.
-  - Wave: 261
-  - _Wave: 261
+  - Wave: 262
+  - _Wave: 262
   - Dependencies: comfy-parity-provider-worker-stream-protocol
   - _Blocked_by: comfy-parity-provider-worker-stream-protocol
-  - Reads: crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_runtime/src/execution_presentation.rs, crates/comfy_runtime/src/queue_history.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/trust.rs
-  - _Reads: crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_runtime/src/execution_presentation.rs, crates/comfy_runtime/src/queue_history.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/trust.rs
-  - Writes: crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_runtime/src/execution_presentation.rs, crates/comfy_runtime/src/queue_history.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/comfy_runtime.rs
-  - _Writes: crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_runtime/src/execution_presentation.rs, crates/comfy_runtime/src/queue_history.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/comfy_runtime.rs
+  - Reads: crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_host/src/component_host.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_runtime/src/execution_presentation.rs, crates/comfy_runtime/src/queue_history.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/runtime_supervisor.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs
+  - _Reads: crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_host/src/component_host.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_runtime/src/execution_presentation.rs, crates/comfy_runtime/src/queue_history.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/runtime_supervisor.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs
+  - Writes: crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/comfy_runtime.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs
+  - _Writes: crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/comfy_runtime.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs
   - Requirements: 4.4, 6.4, 12.1, 12.2, 12.5, 18.1, 28.2, 32.2, 34.4, 37.5, 40.2, 41.3, 44.3
   - _Requirements: 4.4, 6.4, 12.1, 12.2, 12.5, 18.1, 28.2, 32.2, 34.4, 37.5, 40.2, 41.3, 44.3
   - Design: D8, D12, D13, D17, D18, D20, D21, D22, D29, D32, D34, D35, D39, D40, D41
-  - Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_runtime; cargo test --locked -p comfy_runtime --all-targets; ./script/clippy -p comfy_runtime
-  - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_runtime; cargo test --locked -p comfy_runtime --all-targets; ./script/clippy -p comfy_runtime
-  - Done when: Authorization precedes actuation, quotas are cumulative, Retry-After is bounded, progress is monotonic and rate-limited, and stale or late events are ignored with diagnostics. Denial, timeout, malformed/oversized streams, cancellation, digest mismatch, worker loss, and restart revoke the stream and receipts atomically; canonical typed materialization publishes all outputs or none.
+  - Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_runtime -p comfy_test_support
+  - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_runtime -p comfy_test_support
+  - Done when: The existing v1 capability and receipt lane remains byte-compatible but delegates session ownership through the same runtime table. V2 authorization derives provider only from the verified signed invocation and ProviderBindingSet, consumes the provider-v8 worker protocol's typed endpoint, optional secret-id reference, method, headers, and generation fields, and reuses the streaming component ABI's ProviderStreamValidatorV2; authorization and credential admission precede actuation. Runtime receipts use a separately domain-versioned v2 identity binding provider, method, endpoint, ordered headers, secret reference, request and body digest, component and binding generations, accepted cost, ordinal, response head, ordered chunk digest, and idempotency without changing v1 receipt bytes. Cumulative quotas, one bounded decimal-seconds Retry-After value, monotonic rate-limited attempt-local progress, bounded stale and late diagnostics, and atomic revocation are hermetically proven. The current native capability-envelope Begin, Call, Resolve, Finish, Abort, and every terminal cleanup delegate to the sole ProviderRuntimeStreamOwner. The worker protocol direction gates remain rejecting until comfy-parity-provider-worker-stream-bridge; that bridge alone routes direct protocol-v8 messages and must decode before actuation. Canonical typed materialization publishes all outputs or none.
 
-- [ ] 412. Adapt streaming providers through the component host
+- [ ] 413. Adapt streaming providers through the component host
   - _id: comfy-parity-provider-component-host-stream-adapter
   - Outcome: Adapt the v2 WIT to runtime-owned provider sessions with a per-invocation checked stream table and complete capability validation before actuation. Retain v1 compatibility and keep component-host state distinct from provider authorization, materialization, and durable execution state.
-  - Wave: 262
-  - _Wave: 262
+  - Wave: 263
+  - _Wave: 263
   - Dependencies: comfy-parity-provider-runtime-stream-progress-foundation
   - _Blocked_by: comfy-parity-provider-runtime-stream-progress-foundation
-  - Reads: crates/comfy_plugin_host/src/component_host.rs, crates/comfy_plugin_host/src/capabilities.rs, crates/comfy_plugin_host/src/private_worker.rs, crates/comfy_plugin_host/src/registry_adapter.rs
-  - _Reads: crates/comfy_plugin_host/src/component_host.rs, crates/comfy_plugin_host/src/capabilities.rs, crates/comfy_plugin_host/src/private_worker.rs, crates/comfy_plugin_host/src/registry_adapter.rs
+  - Reads: crates/comfy_plugin_host/src/component_host.rs, crates/comfy_plugin_host/src/capabilities.rs, crates/comfy_plugin_host/src/private_worker.rs, crates/comfy_plugin_host/src/registry_adapter.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs
+  - _Reads: crates/comfy_plugin_host/src/component_host.rs, crates/comfy_plugin_host/src/capabilities.rs, crates/comfy_plugin_host/src/private_worker.rs, crates/comfy_plugin_host/src/registry_adapter.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs
   - Writes: crates/comfy_plugin_host/src/capabilities.rs, crates/comfy_plugin_host/src/private_worker.rs, crates/comfy_plugin_host/src/component_host.rs, crates/comfy_plugin_host/src/registry_adapter.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs, crates/comfy_plugin_host/tests/component_contract.rs, crates/comfy_plugin_host/tests/fixtures/provider_component_source
   - _Writes: crates/comfy_plugin_host/src/capabilities.rs, crates/comfy_plugin_host/src/private_worker.rs, crates/comfy_plugin_host/src/component_host.rs, crates/comfy_plugin_host/src/registry_adapter.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs, crates/comfy_plugin_host/tests/component_contract.rs, crates/comfy_plugin_host/tests/fixtures/provider_component_source
   - Requirements: 4.4, 6.4, 12.1, 12.2, 12.5, 18.1, 28.2, 32.2, 34.4, 37.5, 40.2, 41.3, 44.3
@@ -8203,17 +8221,17 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host; cargo test --locked -p comfy_plugin_host --all-targets; ./script/clippy -p comfy_plugin_host
   - Done when: Component contract tests prove exact grant checks before every request/upload/cost/stream operation, generation-scoped handle revocation, bounded response streaming and progress, traps, cancellation, and atomic output proposals. Missing or extra manifest claims, undeclared operations, stale handles, and worker loss cannot actuate or publish.
 
-- [ ] 413. Bridge provider streams through the private worker
+- [ ] 414. Bridge provider streams through the private worker
   - _id: comfy-parity-provider-worker-stream-bridge
   - Outcome: Multiplex provider request, response, progress, cancellation, and terminal state over the private worker without requiring whole-response buffering. Revoke all attempt-local streams on cancellation, worker loss, replacement, or generation change.
-  - Wave: 263
-  - _Wave: 263
+  - Wave: 264
+  - _Wave: 264
   - Dependencies: comfy-parity-provider-component-host-stream-adapter
   - _Blocked_by: comfy-parity-provider-component-host-stream-adapter
-  - Reads: crates/comfy_worker/src/plugin_runtime.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_types/src/worker_protocol.rs
-  - _Reads: crates/comfy_worker/src/plugin_runtime.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_types/src/worker_protocol.rs
-  - Writes: crates/comfy_worker/src/plugin_runtime.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_worker/tests/ipc_framing.rs, crates/comfy_runtime/src/runtime_supervisor.rs
-  - _Writes: crates/comfy_worker/src/plugin_runtime.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_worker/tests/ipc_framing.rs, crates/comfy_runtime/src/runtime_supervisor.rs
+  - Reads: crates/comfy_worker/src/plugin_runtime.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/native_execution_controller.rs
+  - _Reads: crates/comfy_worker/src/plugin_runtime.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/native_execution_controller.rs
+  - Writes: crates/comfy_worker/src/plugin_runtime.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_worker/tests/ipc_framing.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_runtime/src/native_execution_controller.rs
+  - _Writes: crates/comfy_worker/src/plugin_runtime.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_worker/tests/ipc_framing.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_runtime/src/native_execution_controller.rs
   - Requirements: 4.4, 6.4, 12.1, 12.2, 12.5, 18.1, 28.2, 32.2, 34.4, 37.5, 40.2, 41.3, 44.3
   - _Requirements: 4.4, 6.4, 12.1, 12.2, 12.5, 18.1, 28.2, 32.2, 34.4, 37.5, 40.2, 41.3, 44.3
   - Design: D8, D12, D13, D17, D18, D20, D21, D22, D29, D32, D34, D35, D39, D40, D41
@@ -8221,11 +8239,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_worker -p comfy_runtime; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_runtime --all-targets; ./script/clippy -p comfy_worker -p comfy_runtime
   - Done when: IPC tests prove interleaved bounded sessions, strict sequence and generation checks, backpressure, cancellation between chunks, late progress rejection, worker crash/restart cleanup, and clean retry without duplicated request, receipt, output, or effect.
 
-- [ ] 414. Deploy identical provider registries in desktop and headless modes
+- [ ] 415. Deploy identical provider registries in desktop and headless modes
   - _id: comfy-parity-provider-deployment-lifecycle
   - Outcome: Install and replace signed provider component snapshots through one deployment lifecycle shared by desktop and headless execution. Offline, disabled, missing, stale, and rejected deployments retain provider-required descriptors and expose deterministic diagnostics without fallback.
-  - Wave: 264
-  - _Wave: 264
+  - Wave: 265
+  - _Wave: 265
   - Dependencies: comfy-parity-provider-worker-stream-bridge
   - _Blocked_by: comfy-parity-provider-worker-stream-bridge
   - Reads: crates/zed/src/comfy_plugin_services.rs, crates/zed/src/comfy_cli.rs, crates/comfy_api/src/headless.rs
@@ -8239,11 +8257,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p zed -p comfy_api; cargo test --locked -p zed --features test-support --all-targets; cargo test --locked -p comfy_api --all-targets; ./script/clippy -p zed -p comfy_api
   - Done when: Desktop and headless hosts admit the same signed snapshot and namespace generations, replace a namespace atomically, invalidate stale sessions/cache identities, and surface identical offline or rejected-deployment diagnostics. Neither mode invents a provider, signer, secret, cost acceptance, or network fallback.
 
-- [ ] 415. Build the hermetic provider component harness
+- [ ] 416. Build the hermetic provider component harness
   - _id: comfy-parity-provider-hermetic-component-harness
   - Outcome: Create one reviewed nested provider-component workspace, shared bounded transport/materializer helpers, and an auto-discovering non-network conformance harness. Vendor leaves add only disjoint Rust modules and fixtures; they never touch a shared manifest, lockfile, registry, runtime, or test implementation.
-  - Wave: 265
-  - _Wave: 265
+  - Wave: 266
+  - _Wave: 266
   - Dependencies: comfy-parity-provider-deployment-lifecycle
   - _Blocked_by: comfy-parity-provider-deployment-lifecycle
   - Reads: crates/comfy_plugin_host/tests/component_contract.rs, crates/comfy_test_support/tests/plugin_e2e.rs
@@ -8257,11 +8275,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The locked nested build is reproducible and auto-discovers vendor modules and fixtures without shared edits. Scripted actuators assert exact method, path, ordered headers, multipart, body, chunk, retry, poll, cost, cancellation, worker-loss, progress, and typed materialization behavior with zero network; malformed or oversized inputs fail before mutation.
 
-- [ ] 416. Implement the anthropic provider component
+- [ ] 417. Implement the anthropic provider component
   - _id: comfy-parity-provider-component-anthropic
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.anthropic`. Its exact generated claim set contains 1 provider-required node contracts and 1 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8275,11 +8293,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 1 node claims and 1 route claims exactly once for `zed.comfy.provider.anthropic` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 417. Implement the beeble provider component
+- [ ] 418. Implement the beeble provider component
   - _id: comfy-parity-provider-component-beeble
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.beeble`. Its exact generated claim set contains 2 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8293,11 +8311,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 2 node claims and 3 route claims exactly once for `zed.comfy.provider.beeble` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 418. Implement the bfl provider component
+- [ ] 419. Implement the bfl provider component
   - _id: comfy-parity-provider-component-bfl
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.bfl`. Its exact generated claim set contains 10 provider-required node contracts and 9 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8311,11 +8329,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 10 node claims and 9 route claims exactly once for `zed.comfy.provider.bfl` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 419. Implement the bria provider component
+- [ ] 420. Implement the bria provider component
   - _id: comfy-parity-provider-component-bria
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.bria`. Its exact generated claim set contains 6 provider-required node contracts and 6 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8329,11 +8347,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 6 node claims and 6 route claims exactly once for `zed.comfy.provider.bria` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 420. Implement the bytedance provider component
+- [ ] 421. Implement the bytedance provider component
   - _id: comfy-parity-provider-component-bytedance
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.bytedance`. Its exact generated claim set contains 14 provider-required node contracts and 12 current external-service rows, normalizes only the reviewed aliases (byteplus, byteplus-seedance2, seedance), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8347,11 +8365,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 14 node claims and 12 route claims exactly once for `zed.comfy.provider.bytedance` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 421. Implement the elevenlabs provider component
+- [ ] 422. Implement the elevenlabs provider component
   - _id: comfy-parity-provider-component-elevenlabs
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.elevenlabs`. Its exact generated claim set contains 8 provider-required node contracts and 9 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8365,11 +8383,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 8 node claims and 9 route claims exactly once for `zed.comfy.provider.elevenlabs` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 422. Implement the gemini provider component
+- [ ] 423. Implement the gemini provider component
   - _id: comfy-parity-provider-component-gemini
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.gemini`. Its exact generated claim set contains 8 provider-required node contracts and 4 current external-service rows, normalizes only the reviewed aliases (vertexai), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8383,11 +8401,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 8 node claims and 4 route claims exactly once for `zed.comfy.provider.gemini` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 423. Implement the grok provider component
+- [ ] 424. Implement the grok provider component
   - _id: comfy-parity-provider-component-grok
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.grok`. Its exact generated claim set contains 7 provider-required node contracts and 7 current external-service rows, normalizes only the reviewed aliases (xai), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8401,11 +8419,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 7 node claims and 7 route claims exactly once for `zed.comfy.provider.grok` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 424. Implement the hitpaw provider component
+- [ ] 425. Implement the hitpaw provider component
   - _id: comfy-parity-provider-component-hitpaw
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.hitpaw`. Its exact generated claim set contains 2 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8419,11 +8437,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 2 node claims and 3 route claims exactly once for `zed.comfy.provider.hitpaw` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 425. Implement the hunyuan3d provider component
+- [ ] 426. Implement the hunyuan3d provider component
   - _id: comfy-parity-provider-component-hunyuan3d
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.hunyuan3d`. Its exact generated claim set contains 6 provider-required node contracts and 10 current external-service rows, normalizes only the reviewed aliases (tencent), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8437,11 +8455,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 6 node claims and 10 route claims exactly once for `zed.comfy.provider.hunyuan3d` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 426. Implement the ideogram provider component
+- [ ] 427. Implement the ideogram provider component
   - _id: comfy-parity-provider-component-ideogram
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.ideogram`. Its exact generated claim set contains 2 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8455,11 +8473,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 2 node claims and 3 route claims exactly once for `zed.comfy.provider.ideogram` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 427. Implement the kling provider component
+- [ ] 428. Implement the kling provider component
   - _id: comfy-parity-provider-component-kling
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.kling`. Its exact generated claim set contains 25 provider-required node contracts and 29 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8473,11 +8491,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 25 node claims and 29 route claims exactly once for `zed.comfy.provider.kling` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 428. Implement the krea provider component
+- [ ] 429. Implement the krea provider component
   - _id: comfy-parity-provider-component-krea
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.krea`. Its exact generated claim set contains 2 provider-required node contracts and 6 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8491,11 +8509,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 2 node claims and 6 route claims exactly once for `zed.comfy.provider.krea` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 429. Implement the ltxv provider component
+- [ ] 430. Implement the ltxv provider component
   - _id: comfy-parity-provider-component-ltxv
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.ltxv`. Its exact generated claim set contains 2 provider-required node contracts and 2 current external-service rows, normalizes only the reviewed aliases (ltx), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8509,11 +8527,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 2 node claims and 2 route claims exactly once for `zed.comfy.provider.ltxv` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 430. Implement the luma provider component
+- [ ] 431. Implement the luma provider component
   - _id: comfy-parity-provider-component-luma
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.luma`. Its exact generated claim set contains 15 provider-required node contracts and 7 current external-service rows, normalizes only the reviewed aliases (luma_2), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8527,11 +8545,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 15 node claims and 7 route claims exactly once for `zed.comfy.provider.luma` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 431. Implement the magnific provider component
+- [ ] 432. Implement the magnific provider component
   - _id: comfy-parity-provider-component-magnific
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.magnific`. Its exact generated claim set contains 5 provider-required node contracts and 15 current external-service rows, normalizes only the reviewed aliases (freepik), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8545,11 +8563,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 5 node claims and 15 route claims exactly once for `zed.comfy.provider.magnific` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 432. Implement the meshy provider component
+- [ ] 433. Implement the meshy provider component
   - _id: comfy-parity-provider-component-meshy
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.meshy`. Its exact generated claim set contains 7 provider-required node contracts and 18 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8563,11 +8581,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 7 node claims and 18 route claims exactly once for `zed.comfy.provider.meshy` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 433. Implement the minimax provider component
+- [ ] 434. Implement the minimax provider component
   - _id: comfy-parity-provider-component-minimax
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.minimax`. Its exact generated claim set contains 3 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8581,11 +8599,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 3 node claims and 3 route claims exactly once for `zed.comfy.provider.minimax` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 434. Implement the openai provider component
+- [ ] 435. Implement the openai provider component
   - _id: comfy-parity-provider-component-openai
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.openai`. Its exact generated claim set contains 8 provider-required node contracts and 7 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8599,11 +8617,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 8 node claims and 7 route claims exactly once for `zed.comfy.provider.openai` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 435. Implement the openrouter provider component
+- [ ] 436. Implement the openrouter provider component
   - _id: comfy-parity-provider-component-openrouter
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.openrouter`. Its exact generated claim set contains 1 provider-required node contracts and 1 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8617,11 +8635,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 1 node claims and 1 route claims exactly once for `zed.comfy.provider.openrouter` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 436. Implement the pixverse provider component
+- [ ] 437. Implement the pixverse provider component
   - _id: comfy-parity-provider-component-pixverse
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.pixverse`. Its exact generated claim set contains 4 provider-required node contracts and 6 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8635,11 +8653,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 4 node claims and 6 route claims exactly once for `zed.comfy.provider.pixverse` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 437. Implement the quiver provider component
+- [ ] 438. Implement the quiver provider component
   - _id: comfy-parity-provider-component-quiver
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.quiver`. Its exact generated claim set contains 2 provider-required node contracts and 2 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8653,11 +8671,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 2 node claims and 2 route claims exactly once for `zed.comfy.provider.quiver` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 438. Implement the recraft provider component
+- [ ] 439. Implement the recraft provider component
   - _id: comfy-parity-provider-component-recraft
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.recraft`. Its exact generated claim set contains 18 provider-required node contracts and 9 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8671,11 +8689,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 18 node claims and 9 route claims exactly once for `zed.comfy.provider.recraft` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 439. Implement the reve provider component
+- [ ] 440. Implement the reve provider component
   - _id: comfy-parity-provider-component-reve
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.reve`. Its exact generated claim set contains 3 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8689,11 +8707,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 3 node claims and 3 route claims exactly once for `zed.comfy.provider.reve` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 440. Implement the rodin provider component
+- [ ] 441. Implement the rodin provider component
   - _id: comfy-parity-provider-component-rodin
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.rodin`. Its exact generated claim set contains 7 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8707,11 +8725,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 7 node claims and 3 route claims exactly once for `zed.comfy.provider.rodin` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 441. Implement the runway provider component
+- [ ] 442. Implement the runway provider component
   - _id: comfy-parity-provider-component-runway
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.runway`. Its exact generated claim set contains 7 provider-required node contracts and 4 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8725,11 +8743,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 7 node claims and 4 route claims exactly once for `zed.comfy.provider.runway` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 442. Implement the sonilo provider component
+- [ ] 443. Implement the sonilo provider component
   - _id: comfy-parity-provider-component-sonilo
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.sonilo`. Its exact generated claim set contains 2 provider-required node contracts and 2 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8743,11 +8761,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 2 node claims and 2 route claims exactly once for `zed.comfy.provider.sonilo` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 443. Implement the topaz provider component
+- [ ] 444. Implement the topaz provider component
   - _id: comfy-parity-provider-component-topaz
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.topaz`. Its exact generated claim set contains 3 provider-required node contracts and 9 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8761,11 +8779,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 3 node claims and 9 route claims exactly once for `zed.comfy.provider.topaz` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 444. Implement the tripo provider component
+- [ ] 445. Implement the tripo provider component
   - _id: comfy-parity-provider-component-tripo
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.tripo`. Its exact generated claim set contains 12 provider-required node contracts and 4 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8779,11 +8797,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 12 node claims and 4 route claims exactly once for `zed.comfy.provider.tripo` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 445. Implement the veo2 provider component
+- [ ] 446. Implement the veo2 provider component
   - _id: comfy-parity-provider-component-veo2
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.veo2`. Its exact generated claim set contains 3 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (veo), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8797,11 +8815,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 3 node claims and 3 route claims exactly once for `zed.comfy.provider.veo2` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 446. Implement the vidu provider component
+- [ ] 447. Implement the vidu provider component
   - _id: comfy-parity-provider-component-vidu
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.vidu`. Its exact generated claim set contains 13 provider-required node contracts and 7 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8815,11 +8833,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 13 node claims and 7 route claims exactly once for `zed.comfy.provider.vidu` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 447. Implement the wan provider component
+- [ ] 448. Implement the wan provider component
   - _id: comfy-parity-provider-component-wan
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.wan`. Its exact generated claim set contains 14 provider-required node contracts and 5 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8833,11 +8851,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 14 node claims and 5 route claims exactly once for `zed.comfy.provider.wan` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 448. Implement the wavespeed provider component
+- [ ] 449. Implement the wavespeed provider component
   - _id: comfy-parity-provider-component-wavespeed
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.wavespeed`. Its exact generated claim set contains 2 provider-required node contracts and 5 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8851,11 +8869,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_host -p comfy_test_support; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_host -p comfy_test_support
   - Done when: The generic non-network conformance harness proves all 2 node claims and 5 route claims exactly once for `zed.comfy.provider.wavespeed` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.
 
-- [ ] 449. Admit externally signed provider deployments
+- [ ] 450. Admit externally signed provider deployments
   - _id: comfy-parity-provider-signed-deployment-registry-user-authority-gate
   - Outcome: Obtain user-approved public verification-key configuration, detached signatures over the exact reproducible component and manifest digests, and a signed deployment-registry record for all 33 complete vendor namespaces. This is an external user-authority gate: repository code may import and verify supplied public artifacts but never generate, request, persist, infer, or check in the production private signing key.
-  - Wave: 267
-  - _Wave: 267
+  - Wave: 268
+  - _Wave: 268
   - Dependencies: comfy-parity-provider-component-anthropic, comfy-parity-provider-component-beeble, comfy-parity-provider-component-bfl, comfy-parity-provider-component-bria, comfy-parity-provider-component-bytedance, comfy-parity-provider-component-elevenlabs, comfy-parity-provider-component-gemini, comfy-parity-provider-component-grok, comfy-parity-provider-component-hitpaw, comfy-parity-provider-component-hunyuan3d, comfy-parity-provider-component-ideogram, comfy-parity-provider-component-kling, comfy-parity-provider-component-krea, comfy-parity-provider-component-ltxv, comfy-parity-provider-component-luma, comfy-parity-provider-component-magnific, comfy-parity-provider-component-meshy, comfy-parity-provider-component-minimax, comfy-parity-provider-component-openai, comfy-parity-provider-component-openrouter, comfy-parity-provider-component-pixverse, comfy-parity-provider-component-quiver, comfy-parity-provider-component-recraft, comfy-parity-provider-component-reve, comfy-parity-provider-component-rodin, comfy-parity-provider-component-runway, comfy-parity-provider-component-sonilo, comfy-parity-provider-component-topaz, comfy-parity-provider-component-tripo, comfy-parity-provider-component-veo2, comfy-parity-provider-component-vidu, comfy-parity-provider-component-wan, comfy-parity-provider-component-wavespeed
   - _Blocked_by: comfy-parity-provider-component-anthropic, comfy-parity-provider-component-beeble, comfy-parity-provider-component-bfl, comfy-parity-provider-component-bria, comfy-parity-provider-component-bytedance, comfy-parity-provider-component-elevenlabs, comfy-parity-provider-component-gemini, comfy-parity-provider-component-grok, comfy-parity-provider-component-hitpaw, comfy-parity-provider-component-hunyuan3d, comfy-parity-provider-component-ideogram, comfy-parity-provider-component-kling, comfy-parity-provider-component-krea, comfy-parity-provider-component-ltxv, comfy-parity-provider-component-luma, comfy-parity-provider-component-magnific, comfy-parity-provider-component-meshy, comfy-parity-provider-component-minimax, comfy-parity-provider-component-openai, comfy-parity-provider-component-openrouter, comfy-parity-provider-component-pixverse, comfy-parity-provider-component-quiver, comfy-parity-provider-component-recraft, comfy-parity-provider-component-reve, comfy-parity-provider-component-rodin, comfy-parity-provider-component-runway, comfy-parity-provider-component-sonilo, comfy-parity-provider-component-topaz, comfy-parity-provider-component-tripo, comfy-parity-provider-component-veo2, comfy-parity-provider-component-vidu, comfy-parity-provider-component-wan, comfy-parity-provider-component-wavespeed
   - Reads: crates/comfy_plugin_host/provider_components/src/vendors, crates/comfy_test_support/fixtures/providers, crates/comfy_runtime/src/trust.rs
@@ -8869,11 +8887,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-RUNTIME-TRUST-001, VAL-PLUGIN-HOST-001, VAL-OWNERSHIP-001; commands: python3 .agents/specs/comfy-parity/regenerate_all.py --check
   - Done when: All 33 detached signatures verify against explicitly admitted public key IDs and bind exact component, manifest, namespace, node-claim, route-claim, transport, and materializer digests. Test-only deterministic keys remain fixture-scoped and cannot satisfy this gate; live paid provider calls remain optional and non-blocking.
 
-- [ ] 450. Close signed provider component coverage
+- [ ] 451. Close signed provider component coverage
   - _id: comfy-parity-native-partner-provider-components-foundation
   - Outcome: Close the complete provider component implementation after the authoritative catalog, namespace projection, streaming ABI/protocol/runtime/host/worker/deployment foundations, all 33 hermetic vendor components, and the external signed-registry authority gate are complete. This task owns only final validation and authoritative ownership evidence, not another provider transport, namespace map, component registry, materializer, trust store, or deployment owner.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-provider-signed-deployment-registry-user-authority-gate
   - _Blocked_by: comfy-parity-provider-signed-deployment-registry-user-authority-gate
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/backend-external-services.csv, projects/comfy/ComfyUI/comfy_api_nodes, .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, crates/comfy_plugin_host/provider_components, crates/comfy_runtime/src/trust.rs, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8887,7 +8905,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_test_support; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_test_support
   - Done when: Final closure proves exactly 224 provider-required nodes, 33 signed vendor namespaces, and every source-fingerprinted external-service route from the generated catalog with zero UNKNOWN executable method, placeholder namespace, missing or extra claim, private key, generic echo, opaque task facade, live-network test requirement, or descriptor-only activation. Full SDK, protocol, runtime, host, worker, desktop/headless, vendor conformance, cancellation, recovery, trust, ownership, and strict regeneration suites pass, while absent signatures, public trust anchors, secrets, costs, networks, or providers remain safely provider-required.
 
-- [x] 451. Implement retained decoder text generation
+- [x] 452. Implement retained decoder text generation
   - _id: comfy-parity-native-decoder-text-generation-foundation
   - Outcome: One canonical native scalar text-generation boundary retains an exact decoder and tokenizer as a concrete CLIP resource, admits only checked attempt-local handles, opens the addressed text-generation RNG transaction, executes source-compatible bounded sampling, and decodes only newly generated tokens. It cannot introduce a metadata-only model, global generator, second tokenizer, template facade, or pretend that media marker IDs are equivalent to multimodal embeddings.
   - Wave: 227
@@ -8907,7 +8925,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK379 RETAINED DECODER TEXT GENERATION 2026-08-12 PASS WITH REPOSITORY-BASELINE EXCEPTIONS. The canonical model boundary now retains one concrete tokenizer/decoder CLIP resource whose semantic identity is derived from configuration, tokenizer vocabulary, and model tensors; resident accounting separates Arc-owned state from deduplicated tensor StorageIds. Stored-payload admission accepts only that concrete CLIP shape while legacy diffusion CLIP remains excluded. The generation adapter validates 1..=32768 maximum-new-token bounds and the decoder maximum, uses canonical numeric tokenization, explicitly projects sampling-off to greedy zero-draw execution, normalizes source sentinels, preserves source top-k tie and top-p crossing behavior, applies repetition and presence penalties once per distinct prior token, stages RNG/KV state, decodes only the generated suffix, and performs a final cancellation check. Runtime resolution retains the handle-store lease, rejects diffusion or non-concrete CLIP payloads, opens one prompt/attempt/node-addressed Philox replay transaction, and publishes only the returned scalar result. Focused source-semantic sampling, tokenizer identity, retained-resource/residency, generated-only decode, RNG replay/cancellation, and ownership-boundary tests passed; locked combined comfy_model/comfy_nodes/comfy_runtime/comfy_test_support check passed; the complete comfy_nodes matrix passed 108/108; the focused ownership boundary passed 1/1; the planning generator tests passed 4/4; cargo formatting, git diff integrity, standalone spec validation, JSON parsing, and strict two-pass regeneration with 533 tasks, 90 validations, 159 ownership rows, and 13,295 traced features passed with snapshot-input closure. The complete support matrix passed 29/30 in the managed sandbox and its sole special-entry permission case passed in an unsandboxed exact rerun. The full model and runtime matrices remain red only in unchanged repository/platform owners: model artifact-index atomic filesystem cases plus the pre-existing fixed VAE hash, and runtime asset/output/trust filesystem-capability cases (290/362 passed); none of those failing source files differs from d1c4410. The exact four-package Clippy command reaches unchanged comfy_backend_cuda and fails its pre-existing dead-code fields under warnings-denied; task-owned crates pass locked check and focused tests. No media embedding parity is claimed here: the discovered executable multimodal dependency is retained as unchecked Task 380 rather than substituting marker IDs or ignoring media.
 
-- [x] 452. Implement prepared decoder generation
+- [x] 453. Implement prepared decoder generation
   - _id: comfy-parity-native-prepared-decoder-generation-foundation
   - Outcome: The canonical retained decoder accepts one checked prepared-prefill representation beside numeric token IDs, including joined embeddings, source sampling-history IDs, optional attention masks, and scalar or multidimensional positions. Both scalar and prepared execution delegate to one bounded generation loop and one KV/RNG transaction; prepared state remains attempt-local and cannot create a second sampler, tokenizer, cache, or persistence form.
   - Wave: 228
@@ -8927,7 +8945,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK380 PREPARED DECODER GENERATION 2026-08-12 PASS. NativeDecoderTextEncoder now accepts checked contiguous prepared [1,tokens,hidden] embeddings with validated attention masks and scalar or multidimensional RoPE positions, and exposes canonical token embedding for multimodal adapters without adding a second tokenizer. Numeric and prepared prefill delegate to the same forward graph, staged DecoderKvState, filtering/stopping loop, borrowed RngTransaction, and cancellation owner. Prepared generation validates prompt-plus-new-token limits, preserves caller sampling-history semantics, derives continuation from the maximum prepared RoPE position, carries source padding masks through later cached steps, returns only generated tokens, and retains all prepared state as borrowed attempt-local data. Focused decoder validation passed 14/14, including exact numeric/prepared logits, three-axis RoPE execution, two-step masked continuation, caller RNG non-mutation, cache rejection, malformed-shape rejection, cancellation, and zero workspace residue. The focused prepared-decoder ownership scan passed 1/1; planning generator tests passed 4/4; combined comfy_model/comfy_test_support locked check, formatting, JSON parsing, spec validation, and diff integrity passed. The full comfy_model library ran 265 tests with 253 passing and only the 12 unchanged artifact-index/filesystem and fixed-VAE-hash baseline failures. The comfy_test_support library ran 30 tests with 29 passing in the managed sandbox; its sole special-entry filesystem-capability case passed 1/1 outside that sandbox. Exact Clippy remains blocked only by unchanged Metal/CUDA warning owners, while task-owned no-default-feature Clippy passed. Mandatory regeneration updated the 536-task planning graph, 159 ownership rows, and 13,295 feature traces; after refreshing validation artifacts and their dependent catalogs, the strict two-pass pipeline passed with snapshot-input closure.
 
-- [x] 453. Implement exact Qwen multimodal image preparation
+- [x] 454. Implement exact Qwen multimodal image preparation
   - _id: comfy-parity-native-qwen-image-preparation-foundation
   - Outcome: The canonical multimodal owner implements source-exact Qwen3-VL chat formatting, image-batch splitting, bounded factor-32 bilinear resizing, RGB normalization, temporal duplication, spatial-merge patch ordering, image-marker replacement planning, three-axis MRoPE positions, visual masks, and deepstack joins. Preparation is checked and cancellation-aware, produces attempt-local tensors only, and cannot run a decoder, retain model weights, open RNG, publish outputs, or substitute marker IDs for image embeddings.
   - Wave: 229
@@ -8947,7 +8965,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK381 QWEN IMAGE PREPARATION FOUNDATION 2026-08-12 PASS. The canonical multimodal owner now implements checked Qwen3-VL IMAGE-batch splitting, Python ties-to-even factor-32 resize projection with pinned 3,136/12,845,056 pixel bounds, canonical bilinear resizing, exact RGB normalization, temporal duplication, source spatial-merge patch packing, one-to-one marker/media admission, expanded marker spans, visual masks, and bounded three-axis MRoPE/deepstack planning without retaining weights, running a decoder, opening RNG, caching, persisting, or publishing. A source-fingerprinted code-inferred fixture records ComfyUI 0.27.1 at the pinned 949-file tree digest, exact Qwen source/tokenizer artifact hashes, deterministic resize/grid/span/MRoPE cases, and coordinate/channel patch-order sentinels; it explicitly makes no licensed checkpoint or upstream runtime-oracle claim. The focused multimodal matrix passed 9/9, including exact template/thinking/preformatted-prefix behavior, zero/one/multiple-image plans, patch-order sentinels, cancellation, OOM, and workspace convergence. The exact Task381 ownership test passed 1/1 after scanning the complete repository and generated ownership catalog. The locked two-package check, task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy, planning generator tests 4/4, formatting, diff integrity, JSON parsing, and complete-spec validation passed. The full model matrix reproduced only the unchanged baseline 11 managed-filesystem capability failures and fixed VAE hash failure while passing 253 tests; the support library reproduced only its unchanged managed-sandbox special-entry permission failure while passing 29 tests. The declared release/all-feature Clippy command remains blocked before task-owned code by unchanged Metal unused-item and CUDA dead-field warning owners. No accelerator or licensed full-model numerical certification is claimed.
 
-- [x] 454. Implement prepared decoder deepstack injection
+- [x] 455. Implement prepared decoder deepstack injection
   - _id: comfy-parity-native-prepared-decoder-deepstack-foundation
   - Outcome: NativeDecoderTextEncoder accepts one optional borrowed and fully checked prepared deepstack plan only for uncached prefill. After decoder layer i and before intermediate capture, layer i's projected visual values are added at exactly the true visual-mask positions; continuation receives no deepstack. This extends one canonical decoder graph, KV transition, and borrowed RNG transaction without retaining vision weights, preprocessing images, tokenizing, opening RNG, caching, persisting, or publishing.
   - Wave: 230
@@ -8967,7 +8985,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK382 PREPARED DECODER DEEPSTACK FOUNDATION 2026-08-12 PASS. NativeDecoderTextEncoder now accepts one borrowed DecoderPreparedDeepstack only on uncached prepared prefill, validates the complete visual mask and every finite contiguous layer tensor before constructing staged KV state, materializes canonical visual indices, and delegates post-layer addition to comfy_tensor's checked index-add owner before intermediate capture. Prepared generation passes deepstack only into its initial prepared request; numeric continuation remains on the existing one decoder loop, KV transition, sampler, and borrowed caller RngTransaction. Exact tests prove no-deepstack parity, one-, two-, and three-layer additions with unchanged nonvisual rows, injection-before-capture, successful two-token continuation without repeated deepstack, wrong/empty/short masks, wrong width/dtype/stream, cached use, too-many layers, cancellation, underauthorized workspace, unchanged input transaction, and zero scratch residue. The full decoder integration target passed 15/15 and the exact repository-wide Task382 ownership scan passed 1/1 after authoritative catalog regeneration. The locked comfy_model/comfy_test_support check, task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy, planning generator tests 4/4, formatting, JSON parsing, and diff integrity passed. The already recorded full model/support baselines remain 253 passing with only 11 managed-filesystem capability plus fixed VAE-hash failures, and 29 passing with only the managed-sandbox special-entry permission failure; broad release/all-feature Clippy remains blocked before task-owned code by unchanged Metal unused-item and CUDA dead-field warning owners. No vision-weight, tokenizer, accelerator, cache, persistence, handle-resolution, or publication claim is made.
 
-- [x] 455. Implement exact Qwen2 byte-BPE tokenization
+- [x] 456. Implement exact Qwen2 byte-BPE tokenization
   - _id: comfy-parity-native-qwen2-tokenizer-foundation
   - Outcome: NativePromptTokenizer gains one exact Qwen2 byte-BPE family backed by the pinned Qwen3-VL and Qwen3.5 vocabularies, ordered merges, and atomic added-token configurations. It applies NFC, the checked Qwen2 or Qwen3.5 declared regex profile, reversible Unicode byte encoding, no end-of-word suffix, no automatic BOS/EOS, source min-one pad behavior, case/whitespace preservation, added-token special classification, skip-special decode, replacement-error decode, no cleanup-spaces behavior, semantic identity, bounded allocation, and cancellation without creating a second tokenizer owner.
   - Wave: 231
@@ -8987,7 +9005,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK383 QWEN2 TOKENIZER FOUNDATION 2026-08-12 PASS. NativePromptTokenizer now owns one additional checked Qwen2ByteBpe family for the pinned Qwen3-VL and Qwen3.5 tokenizer artifacts. Admission validates contiguous base and added-token ID domains, ordered unique merges including the Qwen2 header distinction, exact configuration flags and profile regex, atomic added-token flags, and merge products before publication. Execution applies NFC, the profile-specific Unicode pretokenizer, the reversible 256-byte alphabet, lowest-rank all-occurrence BPE merges without an end-of-word suffix, no automatic BOS/EOS, min-one pad, exact special-versus-nonspecial skip behavior, replacement decode, bounded allocation, cancellation, semantic identity over all three artifacts and selected profile, and owned residency accounting. The tracked code-inferred manifest pins ComfyUI 0.27.1 at the 949-file snapshot digest, both source/config/vocab/merge hashes, ID ranges, merge counts/header forms, and exact Unicode/Mark token vectors while explicitly making no unpinned Transformers runtime-oracle claim. The complete tokenizer target passed 28/28, including both real artifact profiles, NFC, Unicode/newline round trips, image/think/audio classification, invalid configuration/vocabulary and pre-cancellation cases, stable identity/residency, and all prior CLIP/SentencePiece/textual-inversion contracts. The exact whole-repository Task383 ownership scan passed 1/1 over 7,517 production source files after authoritative catalog regeneration. The locked comfy_model/comfy_test_support check and task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed with only unchanged dependency/runtime warnings. No decoder, vision, RNG, cache, persistence, handle-resolution, or publication claim is made.
 
-- [x] 456. Implement exact Qwen3 decoder attention
+- [x] 457. Implement exact Qwen3 decoder attention
   - _id: comfy-parity-native-qwen3-decoder-exactness-foundation
   - Outcome: The canonical decoder owner admits and executes checkpoint-backed Qwen3/Qwen3-VL attention with exact per-head query/key RMS normalization, grouped-query projection, multidimensional RoPE, causal masking, output projection, KV staging, semantic identity, and residency. It extends the existing decoder graph and cache only; it cannot add another generation loop, tokenizer, RNG owner, vision graph, cache, persistence form, or publication path.
   - Wave: 232
@@ -9007,7 +9025,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK384 QWEN3 DECODER EXACTNESS FOUNDATION 2026-08-12 PASS. The canonical NativeDecoderTextEncoder weight contract now admits optional per-head query/key RMSNorm tensors only when the closed decoder profile requires them, validates exact head-width CPU/F32/stream geometry, and includes both tensors in the existing semantic digest and StorageId-aware residency projection. Full-attention execution applies the canonical checked RMSNorm operator independently to projected query and key heads before scalar or multidimensional RoPE, then reuses the existing grouped-query expansion, causal attention, staged KV transition, generation loop, and borrowed transaction. A source-fingerprinted reduced exact-weight fixture records the pinned llama.py and qwen3vl.py hashes, Qwen3 dimensions and weights, 5,000,000-theta RoPE, and the deterministic F32 logits digest without claiming a licensed full checkpoint or accelerator oracle. The full decoder integration target passed 16/16, including exact prefill-versus-single-token continuation cache equivalence, query-normalization weight sensitivity, semantic-digest sensitivity, missing-weight rejection, cancellation, scratch convergence, and all prior decoder, prepared/deepstack, generation, Gemma, GPT-OSS, and Qwen3.5 cases. The exact Task384 whole-repository ownership scan passed 1/1 over 7,517 production source files after authoritative catalog regeneration. The locked comfy_model/comfy_test_support check and task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed with only unchanged dependency/runtime warnings. No second decoder, norm, RoPE, KV, RNG, cache, persistence, or publication owner was introduced, and no full-checkpoint or accelerator numerical certification is claimed.
 
-- [x] 457. Implement exact Qwen3.5 hybrid decoder execution
+- [x] 458. Implement exact Qwen3.5 hybrid decoder execution
   - _id: comfy-parity-native-qwen35-decoder-exactness-foundation
   - Outcome: The canonical decoder owner replaces Qwen3.5 profile facades with complete checkpoint-backed full-attention and linear-attention variants: Q/K normalization, attention output gating, DeltaNet projections and parameters, depthwise causal convolution, gated normalization, recurrent state, and exact cache step tracking. It preserves one decoder loop, KV/cache representation, prepared-prefill path, semantic identity, and residency and introduces no tokenizer, vision, RNG, durable cache, persistence, or publication owner.
   - Wave: 233
@@ -9027,7 +9045,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK385 QWEN3.5 HYBRID DECODER EXACTNESS FOUNDATION 2026-08-12 PASS. The canonical decoder now admits a closed dot-product-or-Qwen3.5-linear weight contract. Qwen3.5 full attention loads the checkpoint's doubled query/gate projection, applies checked per-head Q/K RMSNorm with the source weight offset before partial or multidimensional RoPE, stages canonical KV state, and applies sigmoid output gating before the retained output projection. Qwen3.5 linear attention loads the real mixed QKV, z/b/a and output projections, dt_bias, A_log, depthwise convolution, and gated RMSNorm tensors; it executes the canonical exact convolution and DeltaNet kernels, tracks convolution/recurrent state plus the exact cache step, and contains no synthesized decay, beta, or convolution weights. All modules and raw parameters participate in the existing semantic digest and StorageId-aware residency projection. The tracked code-inferred reduced exact-weight fixture pins ComfyUI 0.27.1, the 949-file snapshot digest, qwen35.py and llama.py hashes, hybrid dimensions/parameters, and deterministic F32 logits digest while explicitly making no licensed full-checkpoint or accelerator claim. The full decoder target passed 16/16, including three-token prefill versus two-token-prefill-plus-recurrent-continuation equivalence, cache shape/step checks, weight and semantic-digest sensitivity, malformed checkpoint rejection, cancellation/OOM coverage, and all prior decoder/generation contracts. The exact Task385 whole-repository ownership scan passed 1/1 over 7,517 production source files after authoritative catalog regeneration. The locked comfy_model/comfy_test_support check and task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed with only unchanged dependency/runtime warnings. No second decoder, attention kernel, KV/cache, RNG, tokenizer, vision, persistence, or publication owner was introduced.
 
-- [x] 458. Implement retained Qwen vision projection
+- [x] 459. Implement retained Qwen vision projection
   - _id: comfy-parity-native-qwen-vision-projection-foundation
   - Outcome: One retained Qwen3-VL/Qwen3.5 vision owner extends canonical preparation with a closed family profile for the correct marker ID and RGB normalization, then consumes checked patches and executes the complete checkpoint-backed patch projection, learned 48-by-48 positional interpolation, vision RoPE, per-image attention blocks, exact learned normalization and merger graph, and Qwen3-VL-only deepstack captures. It returns checked projected embeddings and optional deepstack tensors only; it cannot tokenize, decode, generate, open RNG, resolve handles, cache, persist, or publish.
   - Wave: 234
@@ -9047,7 +9065,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK386 RETAINED QWEN VISION PROJECTION 2026-08-12 PASS. NativeQwenVisionEncoder now admits the seven closed Qwen3-VL/Qwen3.5 visual profiles, derives family-specific marker and RGB normalization behavior through the canonical preparation owner, validates a complete checkpoint-backed patch/position/block/main-merger/deepstack tensor set, and executes flattened exact Conv3d patch projection, learned 48-by-48 bilinear position interpolation in merge-block order, two-axis vision RoPE, canonical per-image SDP attention, affine LayerNorm blocks with source tanh GELU MLPs, exact-GELU main merger, and Qwen3-VL-only post-shuffle deepstack mergers. Semantic state covers the closed profile, learned position table, and every retained NativeModule; residency exposes deduplicated StorageId allocations. The code-inferred reduced exact-weight fixture pins ComfyUI 0.27.1, the 949-file snapshot digest, qwen3vl.py/qwen35.py/qwen_vl.py hashes, both marker/normalization profiles, exact output/deepstack shapes, and deterministic Qwen3.5 F32 output digest 16a13ffa41fb0a5f742f0e8c3b2364fa4020dd2cb9a71e1309e62d6e143cb8ed without claiming licensed full-checkpoint or accelerator numerical parity. The multimodal integration target passed 10/10, including family mismatch, independent per-image projection, cancellation, constrained-workspace rollback, scratch convergence, digest, and residency witnesses. Exact Task386 ownership passed 1/1 over 7,517 production source files; planning tests passed 4/4; locked comfy_model/comfy_test_support check, format, JSON, spec validation, and strict two-pass regeneration passed. Full comfy_model remained at its unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash); comfy_test_support remained at 29/30 with its unchanged managed-sandbox special-entry permission failure. Broad all-feature ./script/clippy stopped only in unchanged Metal/CUDA warning owners, while task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed. No NativeClipVision substitution, second attention/decoder/tokenizer/RNG/cache/persistence/publication owner, licensed checkpoint, accelerator oracle, or external server path was introduced.
 
-- [x] 459. Retain concrete Qwen multimodal CLIP resources
+- [x] 460. Retain concrete Qwen multimodal CLIP resources
   - _id: comfy-parity-native-qwen-multimodal-resource-foundation
   - Outcome: One concrete Qwen multimodal CLIP resource inseparably retains the canonical Qwen2 tokenizer, exact Qwen decoder, and retained Qwen vision owner with closed family/configuration admission. Tokenizer, decoder, vision, deepstack, and source execution identities participate in one semantic digest and StorageId-aware alias residency; the resource remains a sealed CLIP-role model payload and stores no prepared embeddings, KV, RNG, cache, persistence, workflow, or output state.
   - Wave: 235
@@ -9067,7 +9085,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK387 RETAINED QWEN MULTIMODAL CLIP RESOURCE 2026-08-12 PASS. NativeQwenMultimodal now inseparably retains the canonical Qwen2 tokenizer, exact decoder, and retained Qwen vision graph behind one closed seven-family admission matrix. Admission binds the pinned Qwen25/Qwen35 tokenizer artifact digests, full decoder and vision source profiles, family-specific marker and normalization contracts, execution stream, and the sd.py/llama.py/qwen3vl.py/qwen35.py/qwen_vl.py source identities; reduced fixtures, textual-inversion state, cross-family same-width collisions, mutated artifacts, and legacy diffusion/SD1/decoder-only/ClipVision projections fail closed. NativeModelPayload exposes a specialized sealed CLIP resource, stored-payload admission recognizes only concrete decoder or Qwen CLIP resources, and residency separates owner bytes from a size-consistent StorageId union across decoder and vision modules so aliases charge shared tensors once. The source-fingerprinted resource manifest records all seven accepted diagonals and exact source/artifact identities without claiming licensed full-checkpoint or accelerator numerical parity. The multimodal target passed 11/11, comfy_nodes passed 108/108, exact Task387 ownership passed 1/1 over 7,517 production source files, planning tests passed 4/4, and locked comfy_model/comfy_nodes/comfy_test_support check, format, standalone spec validation, and task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed. Full comfy_model remained at its unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash), and comfy_test_support remained at 29/30 with its unchanged managed-sandbox special-entry permission failure. Broad all-feature ./script/clippy stopped only in unchanged Metal/CUDA warning owners. Cancellation, constrained-workspace rollback, semantic-digest sensitivity, deterministic cloning, residency equality, and zero scratch residue were proved without introducing prepared embeddings, KV, RNG, cache, persistence, workflow, output, second tokenizer/decoder/vision, or external server state.
 
-- [x] 460. Implement retained Qwen multimodal generation
+- [x] 461. Implement retained Qwen multimodal generation
   - _id: comfy-parity-native-qwen-multimodal-generation-foundation
   - Outcome: The retained Qwen3-VL/Qwen3.5 vision-text owner consumes only canonical checked image preparation, projects every image through its retained graph, replaces every admitted marker span with real embeddings, and delegates generated-suffix sampling and cleanup to the canonical prepared decoder and Qwen2 tokenizer. Qwen3-VL alone carries three-axis positions, visual masks, and prefill-only deepstack; Qwen3.5 preserves its source scalar generation route. Marker/media mismatches fail without consuming or returning an advanced borrowed RNG transaction.
   - Wave: 236
@@ -9087,7 +9105,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK388 RETAINED QWEN MULTIMODAL GENERATION 2026-08-12 PASS. NativeQwenMultimodal now consumes the canonical family-tagged prepared IMAGE projection, tokenizes through the retained Qwen2 owner, expands and validates every marker span, embeds the expanded numeric sequence once, executes each retained vision projection in prompt order, replaces the complete marker ranges with real embeddings, and delegates exactly one prepared generation to NativeDecoderTextEncoder. Qwen3-VL uses source-derived three-axis prefill positions, its exact visual mask, and the three ordered prefill-only deepstack tensors; the literal inherited Qwen3.5 generation route remains scalar and rejects deepstack. Generation uses no attention mask or prompt sampling history, stages the caller-borrowed RngTransaction, returns generated suffix IDs only, and performs family cleanup through canonical skip-special Qwen2 decode. The resource semantic domain advanced to v2 and now binds sd1_clip.py's embedding-replacement and Qwen3.5 generation route without changing retained tensor residency. The code-inferred reduced exact-weight manifest pins ComfyUI 0.27.1, the 949-file snapshot digest, five source hashes, and all preparation/tokenizer/decoder/vision/resource manifest digests without claiming a licensed checkpoint, upstream Python runtime, accelerator numeric parity, or external server. The multimodal target passed 12/12, the exact generation case passed 1/1, prepared decoder regression cases passed 3/3, exact Task388 ownership passed 1/1 over 7,517 production source files, planning tests passed 4/4, and locked comfy_model/comfy_test_support all-target check, format, and task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed. Full comfy_model remained at its unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash), and comfy_test_support remained at 29/30 with its unchanged managed-sandbox special-entry permission failure. Broad all-feature ./script/clippy stopped only in unchanged Metal/CUDA warning owners. Marker mismatch, cancellation, constrained workspace, resource digest/residency invariance, unchanged caller RNG checkpoints, zero scratch residue, and deterministic success were proved; raw media capability rejection, sealed-handle restart re-resolution, cache keys, RNG opening, and scalar publication remain assigned to the later native text-generation adapter.
 
-- [x] 461. Implement Gemma image and video preparation
+- [x] 462. Implement Gemma image and video preparation
   - _id: comfy-parity-native-gemma-image-video-preparation-foundation
   - Outcome: One canonical Gemma visual preparation owner performs Gemma3 area projection and Gemma4 image/video source selection, video precedence, 24-to-1 FPS frame selection, source-compatible byte quantization, bicubic-antialiased resizing, RGB projection, soft-token budgets, and timestamp planning without executing or retaining a model.
   - Wave: 237
@@ -9107,7 +9125,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK389 GEMMA IMAGE/VIDEO PREPARATION 2026-08-12 PASS. GemmaPreparedVisual is the sole attempt-local visual preparation state. The canonical model adapter now projects Gemma3 RGB/RGBA IMAGE batches to the source 896-square-area geometry with canonical area resize, and projects Gemma4 IMAGE or VIDEO through source-compatible clamp/u8 quantization, canonical bicubic-antialiased resize, first-three-channel RGB output, 280-versus-70 soft-token budgets, VIDEO-over-IMAGE precedence, source frame indices 0/24/48, and sequential timestamp facts. Checked arithmetic and explicit native pixel bounds reject zero, overflow, and pathological aspect geometry; every buffer access is checked, cancellation is observed throughout, constrained workspace returns an error with zero scratch residue, and no tokenizer, retained weights, decoder, RNG, KV, cache, handle, persistence, or publication state is introduced. The code-inferred fixture pins ComfyUI 0.27.1, the 949-file snapshot digest, lt.py, gemma4.py, and utils.py hashes without claiming a licensed checkpoint, upstream Python runtime, accelerator numeric parity, or external server. The full multimodal target passed 13/13, the exact Gemma preparation case passed 1/1, exact Task389 ownership passed 1/1 over 7,517 production source files, planning tests passed 4/4, locked comfy_model/comfy_test_support all-target check passed, format/diff checks passed, and task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed. Full comfy_model remained at its unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash); comfy_test_support remained at 29/30 in the managed sandbox and its sole special-entry permission case passed in an exact unsandboxed rerun. Broad all-feature ./script/clippy stopped only in unchanged Metal/CUDA warning owners.
 
-- [x] 462. Implement Gemma4 audio preparation
+- [x] 463. Implement Gemma4 audio preparation
   - _id: comfy-parity-native-gemma-audio-preparation-foundation
   - Outcome: The canonical Gemma4 audio preparation owner mixes checked AUDIO to mono, resamples to 16 kHz, applies source semicausal padding, exact 320-sample periodic-Hann/512-FFT/128-bin HTK log-mel projection and frame masks, and computes the bounded post-subsample marker count without retaining encoder state.
   - Wave: 238
@@ -9127,7 +9145,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK390 GEMMA4 AUDIO PREPARATION 2026-08-13 PASS. GemmaPreparedAudio is the sole attempt-local audio preparation state. The canonical model adapter accepts checked contiguous finite CPU F32 `[1,channels,samples]` AUDIO projections over the canonical 8 kHz through 384 kHz media range, mixes channels to mono, uses the pinned Comfy source's gcd-reduced Kaiser-6.5 rational polyphase projection at 16 kHz, pads right to 128 samples and semicausally left by 160, frames 321 samples while dropping the final sample, applies the exact 320-sample periodic Hann, delegates 512-point FFT execution to comfy_tensor, builds the 128-bin HTK filterbank, publishes finite log-mel features and boolean frame masks, and computes the two-stage stride-two marker count capped at 750. Checked arithmetic, explicit filter/work bounds, workspace-authorized buffers, periodic cancellation, and final staging reject malformed rates, tensors, nonfinite samples, excessive ratios/work, cancellation, and constrained memory without partial results or scratch residue. The code-inferred fixture pins ComfyUI 0.27.1, its 949-file tree digest, gemma4.py, 16 kHz identity/stereo silence, a 44.1 kHz sine projection, exact masks, short zero-frame input, source-derived values with 2e-6 tolerance, and the stable native byte digest without claiming NumPy pocketfft byte identity, a licensed checkpoint, upstream Python runtime, accelerator parity, or an external server. The full multimodal target passed 14/14, the exact audio case passed 1/1, and exact Task390 ownership passed 1/1 over 7,517 production source files. Planning tests passed 4/4, locked comfy_model/comfy_test_support check passed, strict two-pass regeneration and format/diff checks passed, and the task-owned no-default-feature warnings-denied Clippy path reached only unchanged Metal/runtime warning owners. Full comfy_model remained at its unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash); comfy_test_support remained at 29/30 in the managed sandbox and its sole special-entry permission case passed in an exact unsandboxed rerun.
 
-- [x] 463. Implement Gemma tokenizer admission
+- [x] 464. Implement Gemma tokenizer admission
   - _id: comfy-parity-native-gemma-tokenizer-foundation
   - Outcome: NativePromptTokenizer admits exact Gemma3 SentencePiece and Gemma4 checkpoint tokenizer-json artifacts with their start, pad, control, image, video, audio, turn, and thinking-token classifications, bounded padding rules, canonical encode/decode, semantic identity, and owned residency.
   - Wave: 239
@@ -9147,7 +9165,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK391 GEMMA TOKENIZER ADMISSION 2026-08-13 PASS. NativePromptTokenizer remains the sole generic tokenizer and now admits a closed Gemma family. Gemma3 consumes only ModelStore-verified SentencePiece state, validates token 106 as `<end_of_turn>`, overlays the external image token 262144 without colliding with the ModelProto vocabulary, requires BOS 2/pad 0/no EOS/left minimum padding/disabled weights, and filters both external controls during generated decode. Gemma4 parses a bounded checkpoint tokenizer-JSON Unigram envelope with checked model, normalizer, Metaspace decoder, added-token flags and ID/content collisions; validates image 258880, audio 258881, video 258884, BOS 2, pad 0, turn/eos/channel cleanup state; applies bounded Viterbi segmentation and optional byte fallback; translates thought-channel markers before stripping turn/eos text; and binds exact artifact bytes, profile, configuration, and owned vocabulary state into stable semantic identity and residency. The numeric fast path now honors canonical left padding for every configured family. The source-fingerprinted reduced fixture pins ComfyUI 0.27.1, its 949-file tree digest, gemma4.py, lt.py, and spiece_tokenizer.py; it exercises exact special/control IDs, BOS/left-padding, malformed configuration, cancellation, digest sensitivity, resident accounting, and generated cleanup while truthfully claiming no licensed checkpoint, upstream tokenizers/SentencePiece runtime observation, accelerator parity, or external server. The full clip_tokenizer target passed 29/29, exact Task391 ownership passed 1/1 over 7,517 production source files, planning tests passed 4/4, locked comfy_model/comfy_test_support check passed, format/diff checks passed, and task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed. Full comfy_model remained at the unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash); comfy_test_support remained at 29/30 in the managed sandbox and its sole special-entry permission case passed in an exact unsandboxed rerun. Broad all-feature ./script/clippy stopped only in unchanged Metal/CUDA warning owners.
 
-- [x] 464. Implement exact Gemma3 decoder execution
+- [x] 465. Implement exact Gemma3 decoder execution
   - _id: comfy-parity-native-gemma3-decoder-exactness-foundation
   - Outcome: NativeDecoderTextEncoder admits and executes exact Gemma3 4B-vision and 12B decoder profiles, including alternating global/local RoPE, Q/K normalization, Gemma RMS normalization and scaling, sliding attention, tied output, stop tokens, staged KV, and borrowed RNG generation.
   - Wave: 240
@@ -9167,7 +9185,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK392 EXACT GEMMA3 DECODER 2026-08-13 PASS. NativeDecoderTextEncoder remains the sole decoder graph, KV, and borrowed-generation owner and now exposes closed executable Gemma3 4B-vision and 12B source configurations. The checked Gemma3 adapter enforces the five-sliding/one-global source pattern, 1024-token local attention, local theta 10000 RoPE, global theta 1000000 RoPE with linear scale 8, full-head rotary width, add-one RMS normalization at input/post-attention/pre-feed-forward/post-feed-forward/final boundaries, checkpoint-backed per-head Q/K normalization before RoPE, sqrt-hidden embedding scaling, GELU-tanh gated MLPs, tied output, and stop IDs 1/106. Layer-specific RoPE delegates to the same exact attention owner; the cache retains full staged K/V while the canonical mask applies source-local visibility, and generation continues to clone the caller transaction and returns the advanced state only on success. The code-inferred reduced exact-weight fixture pins ComfyUI 0.27.1, its 949-file tree digest and llama.py, freezes full logits at SHA-256 30447eeb298bdaa2edcf48e1b2407903f2da625da3e2bdf0313acc0bc1b046a8, and truthfully claims no licensed checkpoint, upstream runtime oracle, accelerator numeric parity, or external server. Full and incremental cache logits match within 1e-5; fixed-address sampled replay is identical without mutating the caller; altered retained normalization changes semantic identity; malformed RoPE or missing post norms fail typed; cancellation and constrained workspace leave zero scratch and no partial result. The full decoder target passed 17/17 and exact Task392 ownership passed 1/1 over 7,517 production source files. Planning tests passed 4/4, locked comfy_model/comfy_test_support check passed, and task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed. Full comfy_model remained at the unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash); comfy_test_support remained at 29/30 in the managed sandbox and its sole special-entry permission case passed in an exact unsandboxed rerun. Broad all-feature ./script/clippy stopped only in unchanged Metal/CUDA warning owners.
 
-- [x] 465. Implement exact Gemma4 decoder execution
+- [x] 466. Implement exact Gemma4 decoder execution
   - _id: comfy-parity-native-gemma4-decoder-exactness-foundation
   - Outcome: NativeDecoderTextEncoder admits and executes exact Gemma4 E2B, E4B, and 31B profiles, including global-head geometry, shared key/value layers, double-wide MLPs, hidden per-layer token embeddings from expanded initial IDs, partial rotary attention, logit softcap, staged KV, and borrowed RNG generation.
   - Wave: 241
@@ -9187,7 +9205,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK393 EXACT GEMMA4 DECODER 2026-08-13 PASS. NativeDecoderTextEncoder remains the sole decoder graph, staged KV, and borrowed-generation owner and now admits closed executable Gemma4 E2B, E4B, and 31B profiles. The source profiles bind exact hidden, feed-forward, layer, grouped-query, local/global head, window, partial-RoPE, shared-key/value, per-layer-input, tied-output, stop-token, and softcap contracts. One canonical forward path selects 256-wide local and 512-wide global heads, rotates only the source-active global pairs, uses attention scale 1, shares the final source sliding/global K/V states without creating independent tail caches, doubles only the E2B shared-tail MLPs, and applies checkpoint-backed per-layer input projection, normalization, expanded initial-ID embeddings, gates, residual projections, post norms, and layer scalars. Prepared generation carries initial IDs only through the checked Gemma4 profile, uses each generated ID on continuation, stages KV and RNG state, and returns the advanced transaction only on success. The code-inferred reduced exact-weight fixture pins ComfyUI 0.27.1, its 949-file tree digest and gemma4.py, freezes full logits at SHA-256 10080fb49e529b5b7f341c47c112dba564b067c6f908d7604c200c3b78d02e16, and truthfully claims no licensed checkpoint, upstream runtime oracle, accelerator numeric parity, or external server. Full and incremental cache logits match within 1e-5; expanded initial IDs alter checked logits; fixed-address sampled replay is identical without mutating the caller; layer-scalar mutation changes semantic identity; forged source profiles or missing per-layer weights fail typed; cancellation and constrained workspace leave zero scratch and no partial result. The full decoder target passed 18/18, multimodal regressions passed 14/14, and exact Task393 ownership passed 1/1 over the repository production-source closure after the generated catalog confirmed the canonical owner. Planning tests passed, locked comfy_model/comfy_test_support check passed, and task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed. Full comfy_model remained at the unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash); comfy_test_support remained at 29/30 in the managed sandbox and its sole special-entry permission case passed in an exact unsandboxed rerun. Broad all-feature ./script/clippy stopped only in unchanged Metal/CUDA warning owners.
 
-- [x] 466. Implement retained Gemma3 vision projection
+- [x] 467. Implement retained Gemma3 vision projection
   - _id: comfy-parity-native-gemma3-vision-projection-foundation
   - Outcome: A retained Gemma3 vision owner admits the exact CLIP-vision and multimodal-projector tensors, consumes canonical Gemma3 visual preparation, executes the 896-square projection and 256-token replacement, and exposes content identity and StorageId-aware residency without retaining invocation state.
   - Wave: 242
@@ -9207,7 +9225,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK394 RETAINED GEMMA3 VISION PROJECTION 2026-08-13 PASS. NativeGemma3VisionProjector is the sole retained Gemma3 projection owner and admits a closed 4B-Vision or 12B profile over an evaluation-only NativeClipVision SigLIP owner. The production profile requires the exact 896-square, patch-14, hidden-1152, intermediate-4304, 27-layer, 16-head GELU-tanh graph and a checkpoint-backed add-one RMS normalization plus 1152-to-2560 or 1152-to-3840 projection. Invocation consumes canonical Gemma3 image preparation, delegates crop preprocessing and transformer execution to NativeClipVision, performs the exact 64-by-64 to 16-by-16 average pool, normalizes 256 tokens, and delegates the final matrix multiplication to the canonical tensor owner. Content identity binds the pinned llama.py and lt.py source identities, closed configuration, retained vision semantic state, and projector tensor bytes; residency unions vision, normalization, and projection StorageIds and rejects inconsistent aliases without retaining prepared images or invocation state. The code-inferred reduced exact-weight fixture pins ComfyUI 0.27.1 and its 949-file tree digest and freezes output F32LE SHA-256 bb5037a90b0595cb6e7e18d01f6c22ff7e61a465cddd07ecc3768ca0a9677a3f while truthfully claiming no licensed checkpoint, upstream runtime oracle, or accelerator numeric parity. It proves source-profile dimensions, real projection-weight sensitivity, shared-StorageId deduplication, deterministic semantic identity, training and wrong-family rejection, cancellation, constrained-workspace rollback, and zero scratch residue. The full multimodal target passed 15/15, exact Task394 ownership passed 1/1 after the generated catalog marked the owner authoritative, locked comfy_model/comfy_test_support all-target check passed, planning tests passed, strict two-pass regeneration converged at 552 tasks, 90 validations, 166 ownership rows, and 13,295 trace rows, and task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed for comfy_model and comfy_test_support. Full comfy_model remained at the unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash); comfy_test_support remained at 29/30 in the managed sandbox and its sole special-entry permission case passed in an exact unsandboxed rerun. Broad all-feature ./script/clippy stopped only in unchanged Metal/CUDA warning owners.
 
-- [x] 467. Implement retained Gemma4 vision projection
+- [x] 468. Implement retained Gemma4 vision projection
   - _id: comfy-parity-native-gemma4-vision-projection-foundation
   - Outcome: A retained Gemma4 vision owner admits and executes exact patch projection, learned positions, two-axis RoPE, attention, pooling, and multimodal projector tensors for E2B, E4B, and 31B while consuming canonical image/video preparation and exposing content identity and alias-aware residency.
   - Wave: 243
@@ -9227,7 +9245,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK395 RETAINED GEMMA4 VISION PROJECTION 2026-08-13 PASS. NativeGemma4VisionEncoder is the sole retained Gemma4 vision owner and admits closed E2B, E4B, and 31B profiles over complete checkpoint-backed patch projection, learned two-axis positions, clipped attention and feed-forward blocks, pooling, and multimodal projection state. Execution consumes only canonical Gemma4 image or video-frame preparation, normalizes and pads source patches, applies x-first/y-second theta-100 RoPE with explicit scale-one key-masked attention, preserves the four weighted RMS residual boundaries and tanh-GELU gate, zeroes padding, pools by fixed ninths, strips empty classes, root-scales the vision state, and runs the parameterless-RMS text projector. Square image and video witnesses prove that the 280/70 attention budgets yield 256/64 actual output tokens rather than metadata-only fixed shapes. Content identity binds the pinned gemma4.py source identity, exact configuration, every retained module and raw norm/bound tensor; residency unions StorageIds with byte-consistency checks and retains no prepared media, output, RNG, cache, or invocation state. The code-inferred reduced exact-weight fixture pins ComfyUI 0.27.1 and its 949-file tree digest and freezes video output F32LE SHA-256 9399da44c1b3273c62809112be00ae3ad75a868904ea951f6df171ff79074ea4 while truthfully claiming no licensed checkpoint, upstream runtime oracle, or accelerator numeric parity. It proves all three production profile facts, real graph execution and tensor sensitivity, family and forged-profile rejection, deterministic semantic identity, size-checked alias residency, cancellation, constrained-workspace rollback, zero scratch residue, and no placeholder projection path. The focused Gemma4 model witness passed 1/1, the full multimodal target passed 16/16, exact Task395 ownership passed 1/1 after the generated catalog marked the owner authoritative, and locked comfy_model/comfy_test_support all-target check passed. Full comfy_model remained at the unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash); comfy_test_support remained at 29/30 in the managed sandbox with only the established special-entry permission failure. Broad all-feature ./script/clippy stopped only in unchanged Metal/CUDA warning owners, while task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed for comfy_model and comfy_test_support.
 
-- [x] 468. Implement retained Gemma4 audio execution
+- [x] 469. Implement retained Gemma4 audio execution
   - _id: comfy-parity-native-gemma4-audio-execution-foundation
   - Outcome: A retained Gemma4 audio owner admits and executes exact convolutional subsampling, relative-position chunk attention, conformer feed-forward and causal convolution layers, masks, output projection, and multimodal projector for audio-capable E2B/E4B profiles; 31B rejects audio.
   - Wave: 244
@@ -9247,7 +9265,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK396 RETAINED GEMMA4 AUDIO EXECUTION 2026-08-13 PASS. NativeGemma4AudioEncoder is the sole retained Gemma4 audio owner and admits the closed audio-capable E2B and E4B profiles while rejecting 31B. It executes the source-shaped two-stage masked convolutional subsampler, flattened input projection, twelve-layer production configuration of half-residual conformer feed-forward blocks, chunked relative-position soft-capped attention, causal depthwise GLU convolution, output projection, parameterless RMS normalization, and family-width multimodal projector without retaining prepared audio, outputs, RNG, cache, KV, or invocation state. Content identity binds the pinned gemma4.py source identity, exact closed configuration, every retained module, clipping bound, scale, norm, and raw tensor; residency unions StorageIds with byte-consistency checks. The code-inferred reduced exact-weight fixture pins ComfyUI 0.27.1 and its 949-file tree digest, depends on the canonical audio-preparation manifest, and freezes output F32LE SHA-256 69f911e80b4265c6d3ee445a00585da55928e77808c217b9c6c751c679b6c05e while truthfully claiming no licensed checkpoint, upstream runtime oracle, or accelerator numeric parity. The focused Gemma4 audio witness passed 1/1, the complete multimodal target passed 17/17, exact Task396 ownership passed 1/1, the planning generator suite passed 4/4, and the locked comfy_model/comfy_test_support all-target check passed. Full comfy_model remained at the unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash); comfy_test_support remained at 29/30 in the managed sandbox with only the established special-entry permission failure. Broad all-feature ./script/clippy stopped only in unchanged Metal/CUDA warning owners, while task-owned no-default-feature/all-target/no-dependency warnings-denied Clippy passed for comfy_model and comfy_test_support. Formatting and diff integrity passed.
 
-- [x] 469. Implement retained Gemma multimodal resources
+- [x] 470. Implement retained Gemma multimodal resources
   - _id: comfy-parity-native-gemma-multimodal-resource-foundation
   - Outcome: One sealed Gemma multimodal CLIP resource inseparably retains the exact tokenizer, decoder, required vision owner, and optional admitted audio owner for each closed Gemma3/Gemma4 family, with source-bound semantic identity and size-consistent StorageId-deduplicated residency.
   - Wave: 245
@@ -9267,7 +9285,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK397 RETAINED GEMMA MULTIMODAL RESOURCE 2026-08-13 PASS. NativeGemmaMultimodal is the sole sealed Gemma vision-text CLIP resource and closes five production families: Gemma3 4B-Vision and 12B retain tokenizer, decoder, and Gemma3 vision without audio; Gemma4 E2B/E4B additionally require the matching retained audio owner; Gemma4 31B rejects audio. Production constructors require exact tokenizer artifacts plus closed decoder, vision, audio, hidden-width, stream, marker, and capability profiles; reduced exact-weight fixtures are structurally checked but rejected by NativeModelPayload production admission. Semantic identity binds sd.py, sd1_clip.py, llama.py, lt.py/lumina2.py/gemma4.py, the Gemma3 SentencePiece source when applicable, tokenizer artifacts and semantic state, decoder state, every vision state, and optional audio state. NativeModelPayload exposes one CLIP-role specialized accessor and projects exact owned/backing residency plus one size-consistent StorageId union; NativeStoredModelPayload admits that concrete specialization without weakening legacy or decoder-only CLIP boundaries. The source-fingerprinted resource manifest pins ComfyUI 0.27.1 and its 949-file tree digest plus every prerequisite fixture hash and truthfully claims no licensed checkpoint, upstream runtime oracle, or accelerator numeric parity. The focused resource witness passed 1/1, the full multimodal target passed 18/18, comfy_nodes passed 108/108, exact Task397 ownership passed 1/1, the planning generator suite passed 4/4, and the locked comfy_model/comfy_nodes/comfy_test_support all-target check passed. Full comfy_model reproduced the unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash); comfy_test_support reproduced 29/30 with only the established managed-sandbox special-entry permission failure. Broad all-feature ./script/clippy stopped only in unchanged Metal/CUDA warning owners. Formatting and diff integrity passed.
 
-- [x] 470. Implement retained Gemma multimodal generation
+- [x] 471. Implement retained Gemma multimodal generation
   - _id: comfy-parity-native-gemma-multimodal-generation-foundation
   - Outcome: Concrete retained Gemma3 and Gemma4 vision/audio owners implement exact family templates, image projection, Gemma4 video-over-image preprocessing, 24-to-1 FPS timestamp projection, 16 kHz audio features, marker replacement, expanded initial IDs, and family cleanup through the prepared decoder foundation. Family capability gates, model configuration, projectors, and encoder tensors participate in semantic identity and alias-aware residency.
   - Wave: 246
@@ -9287,7 +9305,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK398 RETAINED GEMMA MULTIMODAL GENERATION 2026-08-13 PASS. NativeGemmaMultimodal::generate is the sole model-domain Gemma generation adapter: it applies exact Gemma3 default and start-of-turn bypass templates with inert thinking, exact Gemma4 thinking-system and turn-prefix bypass templates, video timestamp and audio marker formatting, canonical prepared visual/audio projection, complete marker-span replacement, scalar positions, no deepstack, Gemma3 empty sampling history, and Gemma4 expanded zero-filled sampling history plus per-layer initial input IDs. It delegates exactly once to NativeDecoderTextEncoder::generate_prepared with the borrowed caller transaction and delegates generated-text cleanup to NativePromptTokenizer::decode_generated. The decoder generation path now projects vocabulary logits only from the final prefill token, bounding memory without changing public full-forward logits. The source-fingerprinted generation manifest pins ComfyUI 0.27.1 and its 949-file tree digest, every normative source hash, and all prerequisite fixture hashes while truthfully claiming no licensed checkpoint, upstream Python runtime oracle, or accelerator numerical parity. The focused generation witness passed 1/1, the full multimodal target passed 19/19, the decoder target passed 18/18, the exact Task398 ownership scan passed 1/1, the planning generator suite passed 4/4, and the locked comfy_model/comfy_test_support all-target check passed. Full comfy_model reproduced the unchanged managed-platform baseline of 253/265 (11 artifact-index filesystem-capability failures plus the fixed SD15 VAE hash); comfy_test_support reproduced 29/30 with only the established managed-sandbox special-entry permission failure. Broad all-feature ./script/clippy stopped only in unchanged Metal/CUDA warning owners. Formatting, diff integrity, strict two-pass regeneration, JSON validation, and standalone spec validation passed.
 
-- [x] 471. Implement native multimodal text generation
+- [x] 472. Implement native multimodal text generation
   - _id: comfy-parity-native-text-generation-foundation
   - Outcome: One canonical native multimodal embedding boundary preprocesses source template text with optional image, video, and audio inputs, joins the resulting token, embedding, position, mask, and deep-stack state, and delegates bounded seeded generation to the retained decoder foundation. Generated text leaves receive only checked CLIP handles and attempt-scoped RNG transactions; they cannot insert marker IDs in place of media embeddings, ignore supported media, or introduce a second tokenizer or generation loop.
   - Wave: 247
@@ -9307,7 +9325,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK399 NATIVE MULTIMODAL TEXT GENERATION 2026-08-13 PASS. `execute_native_multimodal_text_generation` is the sole runtime adapter over sealed Qwen and Gemma CLIP resources: it retains the resolved CLIP and demanded media leases, rejects unsupported capability combinations before opening RNG, gives Gemma4 VIDEO precedence over IMAGE without resolving the ignored image, runs canonical Qwen/Gemma image, video, and 16 kHz audio preparation, opens exactly one prompt/attempt/node-addressed text-generation transaction, delegates exactly once to the retained Qwen or Gemma generator, and performs a final cancellation check before returning text. The family-aware checked Qwen formatter preserves the source's ignored `use_default_template` behavior, raw prefix bypass, and distinct Qwen3-VL/Qwen3.5 thinking suffixes. The source-fingerprinted multimodal manifest pins ComfyUI 0.27.1, its 949-file tree digest, every normative source hash, prerequisite Qwen/Gemma generation manifests, exact media precedence, and the zero-publication boundary while truthfully claiming no licensed-checkpoint, upstream-runtime, or accelerator oracle. The full multimodal target passed 19/19, decoder 18/18, tokenizer closure 29/29, the focused runtime wrong/stale/cancelled-handle witness passed 1/1, the exact Task399 ownership scan passed 1/1, comfy_nodes passed 108/108, the locked four-package all-target check passed, and planning passed 4/4. Full comfy_model reproduced its unchanged 253/265 managed-filesystem/fixed-VAE baseline before continuing through all integration targets; additional pre-existing source-scan assertions outside Task399 remained visible, while the sole Task399 controller-digest closure was updated and passed. Full comfy_runtime reproduced 291/363 with only its established managed-filesystem capability failures. Full comfy_test_support reproduced the managed filesystem/network/source-fixture baseline before the long ownership matrix was stopped after the exact Task399 witness had already passed. Broad warnings-denied Clippy stopped only in unchanged Metal/CUDA warning owners. Formatting, diff integrity, JSON validation, standalone spec validation, and strict two-pass regeneration passed.
 
-- [x] 472. Bridge generated text nodes to the canonical runtime generator
+- [x] 473. Bridge generated text nodes to the canonical runtime generator
   - _id: comfy-parity-native-text-generation-node-bridge
   - Outcome: Add a cycle-free identity-checked native node service and request projection for multimodal text generation. comfy_nodes validates and projects leaf inputs only; the runtime implementation delegates exactly once to execute_native_multimodal_text_generation, which remains the sole resource resolution, media preparation, RNG, generation, cache, cancellation, and atomic publication owner.
   - Wave: 248
@@ -9327,7 +9345,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK411 NATIVE TEXT GENERATION NODE BRIDGE 2026-08-22 PASS. `comfy_nodes::NativeTextGenerationService` is the cycle-free attempt-bound projection owner for typed CLIP, IMAGE/video-batch, and AUDIO handles plus exact bounded source sampling values. `NativeRuntimeTextGenerationService` delegates exactly once to `execute_native_multimodal_text_generation`; the executor injects it only for TextGenerate and TextGenerateLTX2Prompt, leaving resource resolution, media preparation, RNG, generation, cache, cancellation, and publication with their canonical owners. The focused comfy_nodes boundary witness passed 1/1 after covering valid exact-once delegation, foreign-store rejection, mismatched identity, missing injection, malformed output, and cancellation after generation. The focused comfy_runtime wrong/stale/runtime-failure and zero-publication witness passed 1/1. The locked comfy_nodes/comfy_runtime check passed before the final test-only strengthening, and both final focused suites rebuilt the changed crates successfully. The ownership catalog regenerated with this concern authoritative and zero missing mappings; standalone spec validation, formatting, and diff integrity passed. The broad comfy_test_support ownership binary was stopped during its unrelated full-desktop cold build after consuming 4.8 GiB with no task diagnostic; warnings-denied Clippy was not attempted under the same host disk limit. Final execution/controller SHA-256 values are `b20e652abea01f5384c01255cc725ad0683acfc49d8da0d5085637259d2da5c3` and `89b231bb082ddf35d8eb730caaa9c4988699ef03dc09f279471a3bd23c2c348b`.
 
-- [x] 473. Implement exact SDPose heatmap and OpenPose projection
+- [x] 474. Implement exact SDPose heatmap and OpenPose projection
   - _id: comfy-parity-native-sdpose-heatmap-projection-foundation
   - Outcome: One canonical SDPose projection owner decodes fixed 133-channel heatmaps with source-exact row-major argmax, max-preserving Gaussian DARK refinement, checked Hessian correction, input-canvas scaling, and 133-to-134 OpenPose whole-body projection. The canonical pose payload admits finite raw heatmap confidence rather than incorrectly constraining SDPose scores to probabilities.
   - Wave: 249
@@ -9347,7 +9365,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK400P SDPOSE HEATMAP PROJECTION 2026-08-13 PASS. `comfy_model::sdpose` is the sole bounded native owner for fixed `[B,133,256,192]` heatmap projection: it preserves row-major first-index argmax and raw scores, executes max-restored sigma-2 Gaussian DARK refinement with checked Hessian correction, scales to the 768-by-1024 source canvas, and projects the exact 133-point MMPose layout into OpenPose 18/6/70/21/21 cardinalities with the strict shoulder threshold and appended eye points. `NativePoseKeypoint` now admits every finite raw confidence, including negative and greater-than-one values, without probability clamping. The source-fingerprinted synthetic fixture truthfully records no licensed checkpoint, upstream Python runtime, or accelerator oracle. Focused SDPose integration passed 4/4, singular-Hessian and media raw-score cases passed 1/1 each, the complete comfy_media suite passed 37/37, the exact Task400P ownership witness passed 1/1, the locked three-package all-target check passed, and planning passed 4/4. Formatting, diff/JSON integrity, standalone spec validation, and strict two-pass regeneration passed. Broad warnings-denied Clippy stopped before task code in the unchanged Metal/CUDA warning owners. Implementation, focused-test, and fixture SHA-256 values are `1ca75930c6e673f1e82f6f41ea8b3fd87063efcc2a89f242ead0c9999b4ddd5c`, `9aa074a39a1f08288de97d98bffe0b0e6e25098b8c494e378a039831f71d1bc3`, and `e2d3b036c064ce263f893e110a5e8f35a4a0892c154a473031443454c23312fa`.
 
-- [x] 474. Implement immutable dtype-preserving dense inference and attention primitives
+- [x] 475. Implement immutable dtype-preserving dense inference and attention primitives
   - _id: comfy-parity-native-immutable-dense-inference-attention-foundation
   - Outcome: The canonical NativeModule owner exposes one immutable forward_dense_inference_with_context entry point for loaded Linear, ordinary Conv2d, LayerNorm, GroupNorm, SiLU, and GELU modules, while comfy_model::attention exposes one tensor-returning scaled-dot-product-attention entry point over the retained checked tensor kernel. Both preserve F16, BF16, or F32 dtype, device, and stream, accumulate deterministically in f32 where the source does, return fresh backend-accounted Tensor results, and account every data-sized decode, encoded-output, result-staging, and score temporary through the caller's ExecutionContext without changing module generation, prefetch, semantic state, or parameter ownership.
   - Wave: 250
@@ -9367,7 +9385,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK401 IMMUTABLE DENSE INFERENCE AND ATTENTION 2026-08-13 PASS. `NativeModule::forward_dense_inference_with_context` now executes loaded Linear, ordinary Conv2d, LayerNorm, GroupNorm, SiLU, and GELU through immutable F16/BF16/F32 caller-context paths, while `scaled_dot_product_attention_tensor_with_context` returns fresh dtype/device/stream-preserving tensor results over the canonical checked attention invocation. Focused NativeModule tests passed 19/19 and attention tests passed 5/5; locked comfy_model/comfy_test_support all-target checking, formatting, planning 4/4, diff integrity, and task-owned warnings-denied Clippy passed. The broad model suite reproduced only the unchanged 11 managed-filesystem failures plus fixed VAE hash (257/269), test-support reproduced its unchanged managed-sandbox permission case (29/30), broad Clippy stopped in unchanged Metal/CUDA warning owners, and the repository-wide ownership scan reached the unchanged optical-flow/CLIP-vision source-string assertion. Implementation SHA-256 values are `3d9a37d32b17cbd34f31dd8775f13200934dbc937c5a0143702c04c45e45c098` and `135b436c311a07e43b3fe33c42dc0ea36ed947a7bfe6b27fc6d2c62d348492aa`.
 
-- [x] 475. Implement full SD2 denoiser execution and SDPose feature capture
+- [x] 476. Implement full SD2 denoiser execution and SDPose feature capture
   - _id: comfy-parity-native-sdpose-sd2-capture-foundation
   - Outcome: The canonical production SD2/OpenAI U-Net owner loads and executes the complete checked SDPose denoiser topology and returns an attempt-local clone of the last output-block input whose channel count is 640. It does not route production through the reduced NativeFamilyModel conformance graph or Sd15TinyModel.
   - Wave: 251
@@ -9387,7 +9405,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK402 SDPOSE SD2 CAPTURE 2026-08-13 PASS. `NativeSdPoseSd2Denoiser` owns complete 690-tensor LotusD U-Net admission (867,556,804 scalars), immutable execution across every input/middle/output residual and spatial-transformer block, and a fresh attempt-local deep clone of the exact last 640-channel pre-concatenation activation at output block 9 with production shape `[B,640,128,96]`. The production manifest is explicitly schema/shape evidence without licensed weights; the reduced numeric fixture is rejected by production admission and exercises the executable equations only. SDPose tests passed 8/8 across manifest closure, missing/nonfinite admission, F32/F16/BF16 execution, fresh StorageId capture, cancellation, and projection regressions; the exact Task402 ownership witness passed. Locked checks, formatting, planning, diff integrity, and task-owned Clippy passed with only the separately recorded repository baseline failures. Implementation, focused-test, production-manifest, and reduced-fixture SHA-256 values are `686d7b23ede20c54221279f564888d4ab371f25e9a98758270c5ab6b93408ac2`, `d11c341aea2070be5194ef97555d3df18dfae25b438f45e74144cb491af26ace`, `d08a427c86c6595b9c012b17be77229fac74823f69d25373160863c5af6e8c24`, and `db7726ed977259a6423489f125d47a6e58f25e563b9eccd3853f9acbced94124`.
 
-- [x] 476. Implement the retained SDPose model and heatmap-head resource
+- [x] 477. Implement the retained SDPose model and heatmap-head resource
   - _id: comfy-parity-native-sdpose-model-resource-foundation
   - Outcome: One sealed MODEL-role NativeSdPoseModel retains the exact full LotusD SD2 denoiser and complete five-tensor 640-to-133 heatmap head from one bound mapped checkpoint, then projects source- and content-sensitive identity plus size-consistent StorageId-aware residency through NativeModelPayload and NativeStoredPayload without retaining invocation capture, heatmaps, sampler state, or output payloads.
   - Wave: 252
@@ -9407,7 +9425,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK403 SDPOSE MODEL RESOURCE 2026-08-13 PASS. `NativeSdPoseModel` binds one source-exact LotusD mapped checkpoint to the complete 690-tensor denoiser and five-tensor heatmap head, rejects reduced resources at the production MODEL boundary, projects content identity independently from physical StorageIds, and exposes a size-consistent alias-deduplicated residency union through the specialized `NativeModelPayload`/`NativeStoredModelPayload` path without broadening legacy SD15 diffusion. Focused SDPose tests passed 11/11; sealed MODEL lifecycle, ownership, and stored-resource boundary tests passed; locked `comfy_model`/`comfy_nodes`/`comfy_test_support` check passed; `comfy_nodes` passed 108/108; task-owned no-default-feature Clippy passed; planning tests, standalone spec validation, JSON checks, formatting, diff integrity, authoritative ownership, and canonical two-pass regeneration passed. Broad `comfy_model` retained only the exact 11 managed-filesystem capability failures plus the fixed SD15 VAE digest baseline; `comfy_test_support` retained only the managed-sandbox special-entry permission baseline; all-feature Clippy stopped only in unchanged Metal/CUDA warning owners. A new Task404 bounded dense-spatial prerequisite records the audited tensor-result workspace gap before head execution. Implementation/payload/stored/test/production-manifest/reduced-manifest/ownership SHA-256 values are `d12f46960aef77246e81e4770af019cbc29138e4390deb9f577ade40185ce606`, `ed128735675cc0bcdba4ae5059e409419e9618c360ced14d01f362de8ee26127`, `2b6292fb497a07cec9f618fbbb2e80004b921faa4bea1b492efa85bf5a90fc8a`, `1313a4f2f53dd342a8252a4d33a8a6489f811134409aee0360db7ea871ab0e80`, `e4e4d6ee76c44be75abfa2a40c124262479a6a6b3fd5325baa102768bbe29d97`, `9daa6b3cdc8e47d0932eb0ae090996598a4fd93c9e539b6b6b4792b988c4b590`, and `f4722474ed17349db4422534931bb107b317e8aa228edc341ed20b41d7f085a4`.
 
-- [x] 477. Implement bounded tensor-returning dense spatial inference
+- [x] 478. Implement bounded tensor-returning dense spatial inference
   - _id: comfy-parity-native-bounded-dense-spatial-inference-foundation
   - Outcome: The canonical tensor and NativeModule owners expose immutable tensor-returning zero-padded ordinary Conv2d, ConvTranspose2d, parameterless InstanceNorm2d, and SiLU execution. Every data-sized temporary or result buffer is caller-authorized or backend-accounted; fixed scalar encoding and shape metadata remain bounded implementation details. The APIs preserve F16, BF16, or F32 dtype, device, stream, semantic state, parameters, generation, and prefetch state and return fresh backend-accounted Tensor results.
   - Wave: 253
@@ -9427,7 +9445,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK404 BOUNDED DENSE SPATIAL INFERENCE 2026-08-13 PASS. Canonical tensor adapters now return fresh backend-accounted F16/BF16/F32 tensors for zero-padded Conv2d, ConvTranspose2d, parameterless InstanceNorm2d, and SiLU; immutable NativeModule dispatch preserves generation, prefetch state, semantic digest, parameters, placement, and caller scratch convergence. Focused immutable model tests passed 2/2; exact tensor convolution, activation, normalization, and Task404 ownership tests passed; locked three-package check and task-owned warnings-denied Clippy passed. Full `comfy_tensor` executed every Task404 test successfully, with only the unrelated headless-adapter DeviceLost platform case in serial mode (the parallel suite reached 118/118 test results before an existing teardown SIGSEGV); broad `comfy_model` retained only the exact 11 managed-filesystem capability failures plus the fixed SD15 VAE digest baseline; `comfy_test_support` retained only the managed-sandbox special-entry permission baseline; all-feature Clippy stopped only in unchanged Metal/CUDA warning owners. Planning tests, standalone spec validation, JSON, formatting, diff integrity, and canonical two-pass regeneration passed. NativeModule/operator/spatial/normalization/activation/model-test/ownership-test/policy SHA-256 values are `47eb23e0c093057a52ee3f206ca60f7de522842137ee64f4503a45c3df3369bb`, `4af190ce6d0249eb775cc960a01a92dbb44098f04b7f20c04de77d71af02118c`, `14ac01f3044131238618056a6d16f65ad09ce027bdcb3256b0021a6f2c99f31d`, `4ad487ed182c6c11201b85207562b9d3c15cd7a6f35911594220d32929f807e3`, `8487ece0f17c36ac88cc6dda6853065c471b1d2b2c0a0405ae0998c098c0e41e`, `ace9ea147045635dd07eb09582c2fa839bc873e67d9aa454b58603f463fa2671`, `30729cb11f0f7be2143f62d8b9ad9914f9396c1cc964599a7e322ef7d7aaabc8`, and `0781858c499be9d1a24d8145d129a91f70ad48a221ab166185d4c2ddd967aeb0`.
 
-- [x] 478. Implement deterministic LotusD sampling
+- [x] 479. Implement deterministic LotusD sampling
   - _id: comfy-parity-native-lotusd-sampling-foundation
   - Outcome: The canonical sampling-profile and Euler owners expose one distinct LotusD IMG_TO_IMG/X0 profile over the established one-thousand-step linear sigma grid and one typed-error-preserving no-churn Euler invocation. The invocation uses the canonical simple one-step schedule, treats model output as denoised state, opens no RNG transaction, and retains no model, image, capture, or output state.
   - Wave: 254
@@ -9447,7 +9465,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK405 LOTUSD SAMPLING 2026-08-13 PASS. The canonical LotusD profile now has a distinct semantic identity while reusing the exact established one-thousand-step numeric sigma grid and Denoised prediction interpretation. The typed one-step adapter delegates the canonical simple scheduler and Euler implementation, maps sigma index 999 to zero, calls the denoiser exactly once on raw input, returns its X0 output as the terminal latent, opens no RNG transaction or compatibility-noise request, and preserves arbitrary typed denoiser failures without String erasure. Focused LotusD sampling and ownership tests passed; the complete `comfy_sampler` suite passed 25 library, 1 breadth-closure, 11 ownership, 190 sampler, 13 sampling-foundation, and 30 scheduler tests. Locked sampler/test-support checks, formatting, planning tests, standalone spec validation, native-compute-closure verification, diff integrity, and canonical two-pass regeneration passed. `comfy_test_support` retained only its known managed-sandbox special-entry permission failure (29/30); broad all-feature Clippy stopped only in unchanged Metal/CUDA warning owners before reaching task code.
 
-- [x] 479. Execute the retained SDPose head and conditioning projection
+- [x] 480. Execute the retained SDPose head and conditioning projection
   - _id: comfy-parity-native-sdpose-head-projection-foundation
   - Outcome: The retained SDPose model owner executes its exact seven-stage heatmap head through the bounded immutable dense-spatial operators, prepares the source-exact attempt-local Lotus cross-attention and ADM tensors, and decodes heatmaps plane-by-plane through the canonical DARK and OpenPose projection without creating another model, head, allocator, or retained invocation state.
   - Wave: 255
@@ -9467,7 +9485,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK406 SDPOSE HEAD PROJECTION 2026-08-13 PASS. NativeSdPoseHeatmapHead now executes its retained ConvTranspose2d, parameterless InstanceNorm2d, SiLU, Conv2d, InstanceNorm2d, SiLU, and final Conv2d weights through immutable bounded NativeModule paths for F16, BF16, and F32 while returning fresh storage and leaving retained identity unchanged. The source-fingerprinted Lotus tensor is embedded as its exact 2,048 F16 bit values, reproduces pinned F16LE and F32LE SHA-256 digests, broadcasts to `[batch,2,1024]`, and pairs with the exact `[sin(1),0,cos(1),1]` ADM tensor. Tensor heatmaps decode one 256x192 plane at a time and match the canonical slice DARK/OpenPose oracle without whole-heatmap f32 staging. All 14 SDPose tests, the focused Task406 ownership test, locked model/support checks, planning tests, standalone spec validation, native compute closure, formatting, JSON, and diff integrity passed. Full `comfy_model` passed 257/269 with only the exact 11 managed-filesystem ArtifactIndex capability failures and fixed SD15 VAE digest baseline; `comfy_test_support` retained only its managed-sandbox special-entry permission baseline (29/30); broad all-feature Clippy stopped only in unchanged Metal/CUDA warning owners before task code.
 
-- [x] 480. Implement the native SDPose model and execution foundation
+- [x] 481. Implement the native SDPose model and execution foundation
   - _id: comfy-parity-native-sdpose-execution-foundation
   - Outcome: One canonical shared SDPose runtime composition owner resolves the sealed SDPose model, VAE, image, and optional bounding boxes and delegates exact resize, Lotus conditioning, one-step Euler sampling, last-640 capture, heatmap-head execution, and OpenPose projection through the established model, VAE, sampler, tensor, media, and attempt-publication boundaries.
   - Wave: 256
@@ -9487,11 +9505,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK407 SDPOSE EXECUTION 2026-08-13 PASS. The canonical runtime controller now retains sealed MODEL, VAE, IMAGE, and optional BOUNDING_BOX leases through one caller-authorized ExecutionContext; stages exact F32-preserving crop and 768-by-1024 Area-or-Bilinear resize; delegates canonical VAE encode and latent casting; prepares the pinned Lotus conditioning and ADM tensors; invokes the typed no-RNG one-step simple-schedule Euler owner exactly once; consumes the last-640 capture through the retained heatmap head and plane-streaming DARK/OpenPose projection; applies source truncation, clamp, broadcast, fallback, invalid-point, and raw-score remap rules; and publishes only the final POSE_KEYPOINT payload after a final cancellation check. Focused bbox/remap and Task407 ownership tests passed, locked runtime/support checks passed, formatting, JSON, planning tests, standalone spec validation, byte-stable regeneration, and diff integrity passed. The full runtime suite executed all 365 tests with both Task407 tests green; 293 passed and 72 unchanged filesystem-capability tests failed with the environment-wide `Bad file descriptor` signature in both managed and escalated runs. Broad all-feature Clippy stopped in the unchanged CUDA dead-code owner before reaching Task407 code.
 
-- [x] 481. Admit safe nested native video output prefixes
+- [x] 482. Admit safe nested native video output prefixes
   - _id: comfy-parity-native-video-output-prefix-foundation
   - Outcome: The portable native output-effect request admits source-compatible nested relative prefixes such as video/ComfyUI while the authoritative OutputCommitter retains final path normalization, containment, collision, journal, and publication ownership.
-  - Wave: 276
-  - _Wave: 276
+  - Wave: 277
+  - _Wave: 277
   - Dependencies: comfy-parity-native-nodes-advanced-hooks-comfy-node-0119
   - _Blocked_by: comfy-parity-native-nodes-advanced-hooks-comfy-node-0119
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/output_committer.rs
@@ -9507,11 +9525,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK408 VIDEO OUTPUT PREFIX 2026-08-13 PASS. NativeOutputEffectRequest now accepts bounded slash-separated relative prefixes such as video/ComfyUI, rejects absolute/trailing/empty/dot/parent/backslash/drive/control/oversized forms, and binds the exact prefix into request identity; OutputCommitter remains unchanged and revalidates containment through normalize_optional_relative_path. The exact focused nodes and ownership tests passed, comfy_nodes all-targets passed 109/109, locked nodes/support check passed, planning tests passed 4/4, regeneration reported 561 tasks, formatting and diff integrity passed. Broad warnings-denied Clippy stopped before task-owned code in unchanged Metal unused-code and CUDA dead-code owners.
 
-- [x] 482. Implement native video component and bit-depth identity
+- [x] 483. Implement native video component and bit-depth identity
   - _id: comfy-parity-native-video-component-foundation
   - Outcome: The canonical NativeVideoPayload owns exact in-memory VIDEO component identity: checked 8-bit or 10-bit depth, rational frame rate, frames, optional audio and separate alpha, bounded metadata, duration and dimensions. Provider transport preserves that identity without quantization, codec work, path state, or a second video value owner.
-  - Wave: 277
-  - _Wave: 277
+  - Wave: 278
+  - _Wave: 278
   - Dependencies: comfy-parity-native-video-output-prefix-foundation
   - _Blocked_by: comfy-parity-native-video-output-prefix-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, projects/comfy/ComfyUI/tests-unit/comfy_api_test/video_bit_depth_test.py, projects/comfy/ComfyUI/tests-unit/comfy_api_test/video_types_test.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_runtime/src/provider_materialization.rs
@@ -9527,11 +9545,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK408 VIDEO COMPONENT DOMAIN 2026-08-13 PASS. NativeVideoPayload now owns canonical reduced u64 frame-rate fractions, typed 8/10-bit identity, duration and dimensions while retaining the existing checked frames/audio/separate-alpha/metadata and alias-aware residency boundary. Its v2 semantic projection binds the exact rate and bit depth, and provider-native transport round-trips both without quantization or codec work while defaulting legacy wire payloads to 8-bit. The source-fingerprinted manifest records exact IEEE-754 Fraction ratios, the explicit nonempty native narrowing, and no codec/runtime oracle. The complete comfy_media all-target suite passed 37/37; focused provider materialization and ownership tests passed; locked media/runtime/support check, planning tests, and standalone spec validation passed; formatting, JSON, and diff integrity passed. Broad warnings-denied Clippy stopped before task-owned code in the unchanged Metal unused-code and CUDA dead-code owners.
 
-- [x] 483. Bind typed media identity into native video output effects
+- [x] 484. Bind typed media identity into native video output effects
   - _id: comfy-parity-native-video-output-media-foundation
   - Outcome: The portable NativeOutputEffectRequest carries a checked media kind and canonical media type in its semantic identity, so VIDEO output bytes cannot be projected as image/png while the runtime output service and OutputCommitter retain effect and publication ownership.
-  - Wave: 278
-  - _Wave: 278
+  - Wave: 279
+  - _Wave: 279
   - Dependencies: comfy-parity-native-video-component-foundation
   - _Blocked_by: comfy-parity-native-video-component-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_runtime/src/queue_history.rs
@@ -9547,11 +9565,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK408 VIDEO OUTPUT MEDIA IDENTITY 2026-08-13 PASS. NativeOutputEffectRequest now carries a checked portable NativeOutputMediaKind plus canonical media type, validates extension-kind-type triples, and binds both fields into its v2 request digest. Existing constructors preserve image preview behavior and infer canonical video/webm or video/mp4 identities without moving effect, path, recovery, or publication authority out of the runtime and OutputCommitter. Focused WEBM/MP4/mismatch and ownership tests passed; the complete comfy_nodes all-target suite passed 109/109; locked compile, planning 4/4, formatting, policy JSON, and diff integrity passed.
 
-- [x] 484. Project typed native video output commits and recovery
+- [x] 485. Project typed native video output commits and recovery
   - _id: comfy-parity-native-video-output-projection-foundation
   - Outcome: The native prepared-output boundary carries checked media kind and type through worker proposals, OutputCommitter projection metadata, preview/output events, and committed-receipt recovery. Versioned metadata upgrades legacy v1 PNG receipts without weakening the authoritative output transaction or path owner.
-  - Wave: 279
-  - _Wave: 279
+  - Wave: 280
+  - _Wave: 280
   - Dependencies: comfy-parity-native-video-output-media-foundation
   - _Blocked_by: comfy-parity-native-video-output-media-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_runtime/src/queue_history.rs, crates/comfy_runtime/src/recovery.rs
@@ -9567,11 +9585,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 966ffcee preserved typed worker proposals, video preview/output projection, v2 receipt recovery, and v1 PNG fallback. Fresh worker-round-trip and typed-video projection tests plus exact ownership passed; the receipt-reconciliation test reproduced only the established host filesystem Bad-file-descriptor baseline in both managed and escalated runs.
 
-- [x] 485. Admit retained FILM and RIFE checkpoint state
+- [x] 486. Admit retained FILM and RIFE checkpoint state
   - _id: comfy-parity-native-frame-interpolation-model-foundation
   - Outcome: One immutable NativeFrameInterpolationModel owns source-order FILM/RIFE detection, collision-safe RIFE checkpoint normalization, complete closed state manifests, artifact/content semantic identity, and alias-aware residency. It retains weights only and does not execute interpolation, cache pair features, resolve handles, or publish output.
-  - Wave: 280
-  - _Wave: 280
+  - Wave: 281
+  - _Wave: 281
   - Dependencies: comfy-parity-native-video-output-projection-foundation
   - _Blocked_by: comfy-parity-native-video-output-projection-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, crates/comfy_model/src/model_store.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs
@@ -9587,11 +9605,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit fd828e49 closed FILM/RIFE checkpoint admission, state identity, and residency. Fresh frame-interpolation model tests and exact ownership passed under the consolidated locked all-target compilation.
 
-- [x] 486. Seal retained FILM and RIFE resources behind INTERP_MODEL handles
+- [x] 487. Seal retained FILM and RIFE resources behind INTERP_MODEL handles
   - _id: comfy-parity-native-frame-interpolation-resource-foundation
   - Outcome: NativeModelPayload is the sole sealed INTERP_MODEL resource adapter for NativeFrameInterpolationModel. NativeStoredModelPayload admits that role only through the concrete accessor while preserving exact artifact/execution identity, backing/tensor residency, and every existing non-interpolation role boundary.
-  - Wave: 281
-  - _Wave: 281
+  - Wave: 282
+  - _Wave: 282
   - Dependencies: comfy-parity-native-frame-interpolation-model-foundation
   - _Blocked_by: comfy-parity-native-frame-interpolation-model-foundation
   - Reads: crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/admission/manifest.json
@@ -9607,11 +9625,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 852e88aa sealed concrete INTERP_MODEL resources and preserved identity and alias-aware residency. Fresh frame-interpolation model tests and exact resource ownership passed under the consolidated locked all-target compilation.
 
-- [x] 487. Plan bounded FILM and RIFE interpolation invocations
+- [x] 488. Plan bounded FILM and RIFE interpolation invocations
   - _id: comfy-parity-native-frame-interpolation-invocation-foundation
   - Outcome: FrameInterpolationInvocationPlan is the sole checked owner of source endpoint/midpoint counts, exact timestep order, FILM/RIFE alignment, reflection-padding admission, result-size overflow protection, bypass semantics, and attempt-local fallback state. The state can disable FILM multi-timestep execution and carries the source RIFE single-timestep batch with persistent floor halving; it does not promise recovery from FILM's pinned multi-element scalarization failure. It executes no model equations and retains no image, feature, grid, cache, handle, or output state.
-  - Wave: 282
-  - _Wave: 282
+  - Wave: 283
+  - _Wave: 283
   - Dependencies: comfy-parity-native-frame-interpolation-resource-foundation
   - _Blocked_by: comfy-parity-native-frame-interpolation-resource-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy/ldm/common_dit.py, crates/comfy_model/src/frame_interpolation.rs
@@ -9627,11 +9645,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit a3306289 added bounded FILM/RIFE invocation planning, ordering, padding, overflow, and OOM-downgrade state. Fresh 20/20 model tests and exact invocation ownership passed.
 
-- [x] 488. Publish bounded tensor grid sampling for model execution
+- [x] 489. Publish bounded tensor grid sampling for model execution
   - _id: comfy-parity-native-tensor-grid-sample-foundation
   - Outcome: The canonical spatial functional owner exposes one tensor-returning grid-sample adapter over its existing normalized-coordinate, padding, and interpolation equations. The CPU path decodes F16/BF16/F32 input and F32 grids into caller-authorized workspace, publishes one fresh backend-accounted tensor in the input dtype, and adds no second sampling equation, allocator, workspace, cancellation, model, cache, or publication owner.
-  - Wave: 283
-  - _Wave: 283
+  - Wave: 284
+  - _Wave: 284
   - Dependencies: comfy-parity-native-frame-interpolation-invocation-foundation
   - _Blocked_by: comfy-parity-native-frame-interpolation-invocation-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/dtypes.rs, crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs
@@ -9647,11 +9665,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 706bd987 added bounded dtype-preserving tensor grid sampling. Fresh spatial tensor tests passed 13/13 and the exact grid-sample ownership witness passed.
 
-- [x] 489. Publish bounded tensor interpolation for model execution
+- [x] 490. Publish bounded tensor interpolation for model execution
   - _id: comfy-parity-native-tensor-interpolate-foundation
   - Outcome: The canonical spatial functional owner exposes one tensor-returning interpolation adapter over its existing size, scale, rank, coordinate, and separable-weight plan. The CPU path decodes F16/BF16/F32 input and accumulates output in caller-authorized F32 workspace before publishing one fresh backend-accounted tensor in the input dtype, without a second interpolation equation, allocator, workspace, cancellation, model, cache, or publication owner.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-native-tensor-grid-sample-foundation
   - _Blocked_by: comfy-parity-native-tensor-grid-sample-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/dtypes.rs, crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs
@@ -9667,11 +9685,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit a34d6ca0 added bounded dtype-preserving tensor interpolation. Fresh spatial tensor tests passed 13/13 and the exact interpolation ownership witness passed.
 
-- [x] 490. Publish bounded low-precision tensor arithmetic for RIFE execution
+- [x] 491. Publish bounded low-precision tensor arithmetic for RIFE execution
   - _id: comfy-parity-native-rife-tensor-arithmetic-foundation
   - Outcome: The canonical elementwise and activation owners expose bounded F16/BF16/F32 broadcast add, multiply, tensor-weighted lerp, and LeakyReLU Tensor adapters needed by RIFE. NativeModule routes immutable LeakyReLU through that activation owner without changing parameters, generation, prefetch, or semantic identity; no model-local equation, host-result Vec, allocator, workspace, cache, or publication owner is introduced.
-  - Wave: 285
-  - _Wave: 285
+  - Wave: 286
+  - _Wave: 286
   - Dependencies: comfy-parity-native-tensor-interpolate-foundation
   - _Blocked_by: comfy-parity-native-tensor-interpolate-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/dtypes.rs, crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs, crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_tensor/tests/ops/activation_normalization_functional_01.rs, crates/comfy_tensor/tests/ops/elementwise_or_runtime_operation_03.rs, crates/comfy_model/tests/native_ops.rs
@@ -9687,11 +9705,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit f7c8126a added bounded dtype-preserving RIFE arithmetic. The fresh exact arithmetic test and exact ownership witness passed.
 
-- [x] 491. Execute retained RIFE interpolation pairs
+- [x] 492. Execute retained RIFE interpolation pairs
   - _id: comfy-parity-native-rife-execution-foundation
   - Outcome: NativeFrameInterpolationModel is the sole retained RIFE execution owner. It composes the admitted head and five IFBlocks from immutable checkpoint tensors, delegates convolution, interpolation, grid sampling, concatenation, pixel shuffle, residual arithmetic, sigmoid, and lerp to their canonical Tensor owners, and returns only a fresh attempt-local interpolated pair without retaining features, flows, grids, output, cache, handles, or publication state.
-  - Wave: 286
-  - _Wave: 286
+  - Wave: 287
+  - _Wave: 287
   - Dependencies: comfy-parity-native-rife-tensor-arithmetic-foundation
   - _Blocked_by: comfy-parity-native-rife-tensor-arithmetic-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs, crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs, crates/comfy_tensor/src/ops/indexing_masking_01.rs, crates/comfy_tensor/src/ops/neural_network_functional_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_02.rs, crates/comfy_tensor/src/ops/shape_layout_transform_03.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/src/ops/storage_dtype_device_01.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/admission/manifest.json
@@ -9707,11 +9725,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 3e284d3e executed retained RIFE pairs with bounded canonical operators. Fresh frame-interpolation model tests passed 20/20 and the exact RIFE execution ownership witness passed.
 
-- [x] 492. Execute bounded RIFE frame sequences
+- [x] 493. Execute bounded RIFE frame sequences
   - _id: comfy-parity-native-rife-sequence-execution-foundation
   - Outcome: NativeFrameInterpolationModel remains the sole retained RIFE owner while one sequence method plans BHWC endpoints and source timesteps, applies canonical reflection padding, reuses each adjacent frame head projection attempt-locally, delegates every midpoint to the retained pair graph, crops and clamps through canonical Tensor owners, and returns one fresh ordered BHWC sequence without retaining features, grids, outputs, cache, handles, codec state, or publication state.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-rife-execution-foundation
   - _Blocked_by: comfy-parity-native-rife-execution-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, projects/comfy/ComfyUI/comfy/ldm/common_dit.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs, crates/comfy_tensor/src/ops/indexing_masking_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_02.rs, crates/comfy_tensor/src/ops/shape_layout_transform_03.rs, crates/comfy_tensor/src/ops/storage_dtype_device_01.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/rife-execution/manifest.json
@@ -9727,11 +9745,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 944e5a1e executed bounded RIFE sequences with endpoint ordering and attempt-local state. Fresh frame-interpolation model tests passed 20/20 and the exact sequence ownership witness passed.
 
-- [x] 493. Publish bounded tensor average pooling for FILM pyramids
+- [x] 494. Publish bounded tensor average pooling for FILM pyramids
   - _id: comfy-parity-native-film-tensor-average-pool-foundation
   - Outcome: The canonical spatial functional owner exposes one tensor-returning AvgPool2d adapter over its existing AveragePoolGeometry traversal. It decodes F16, BF16, or F32 input and accumulates the FILM pyramid result in caller-authorized F32 workspace before publishing one fresh backend-accounted tensor in the input dtype, without adding a second pooling equation, allocator, workspace, model, cache, codec, or publication owner.
-  - Wave: 288
-  - _Wave: 288
+  - Wave: 289
+  - _Wave: 289
   - Dependencies: comfy-parity-native-rife-sequence-execution-foundation
   - _Blocked_by: comfy-parity-native-rife-sequence-execution-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/dtypes.rs, crates/comfy_tensor/src/ops/neural_network_module_01.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs
@@ -9747,11 +9765,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 32c58cb7 added bounded dtype-preserving average pooling. Fresh spatial tensor tests passed 13/13 and the exact FILM pooling ownership witness passed.
 
-- [x] 494. Execute bounded FILM pixel-center warps
+- [x] 495. Execute bounded FILM pixel-center warps
   - _id: comfy-parity-native-film-warp-foundation
   - Outcome: The frame-interpolation owner constructs FILM's F32 pixel-center base grid and source flow normalization in caller-authorized workspace, then delegates bilinear border sampling with align_corners false to the canonical tensor grid-sample owner. It preserves F16, BF16, or F32 input dtype and publishes one fresh attempt-local tensor without adding a second sampler, retained graph, allocator, workspace, codec, cache, handle, or publication owner.
-  - Wave: 289
-  - _Wave: 289
+  - Wave: 290
+  - _Wave: 290
   - Dependencies: comfy-parity-native-film-tensor-average-pool-foundation
   - _Blocked_by: comfy-parity-native-film-tensor-average-pool-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs, crates/comfy_tensor/src/ops/indexing_masking_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_02.rs, crates/comfy_tensor/src/ops/shape_layout_transform_03.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/src/ops/storage_dtype_device_01.rs, crates/comfy_test_support/fixtures/tensor_operations/spatial_functional_kernel_01/film-average-pool/manifest.json
@@ -9767,11 +9785,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 48f3405a added bounded FILM pixel-center warping. Fresh frame-interpolation model tests passed 20/20 and the exact warp ownership witness passed.
 
-- [x] 495. Execute bounded FILM padded convolutions
+- [x] 496. Execute bounded FILM padded convolutions
   - _id: comfy-parity-native-film-padded-convolution-foundation
   - Outcome: The frame-interpolation owner exposes one borrowed-weight FILM convolution adapter. It applies source-specific right and bottom zero padding before even kernels, symmetric convolution padding for odd kernels, optional LeakyReLU with slope 0.2, and delegates all padding, convolution, activation, allocation, storage, stream, workspace, and cancellation mechanics to their canonical owners without retaining invocation state or adding a second graph, codec, cache, handle, or publication owner.
-  - Wave: 290
-  - _Wave: 290
+  - Wave: 291
+  - _Wave: 291
   - Dependencies: comfy-parity-native-film-warp-foundation
   - _Blocked_by: comfy-parity-native-film-warp-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs, crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_03.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-warp/manifest.json
@@ -9787,11 +9805,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 1cda1d78 added bounded source-ordered FILM padded convolution. Fresh frame-interpolation model tests passed 20/20 and the exact convolution ownership witness passed.
 
-- [x] 496. Execute bounded FILM image pyramids
+- [x] 497. Execute bounded FILM image pyramids
   - _id: comfy-parity-native-film-image-pyramid-foundation
   - Outcome: The frame-interpolation owner composes FILM's bounded image pyramid by preserving level zero as the borrowed input and repeatedly delegating two-by-two stride-two average pooling to the canonical tensor owner. The helper returns only attempt-local tensor views and fresh pooled levels, validates the production seven-level extent before allocation, and adds no second pooling equation, retained graph, allocator, workspace, codec, cache, handle, or publication owner.
-  - Wave: 291
-  - _Wave: 291
+  - Wave: 292
+  - _Wave: 292
   - Dependencies: comfy-parity-native-film-padded-convolution-foundation
   - _Blocked_by: comfy-parity-native-film-padded-convolution-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-convolution/manifest.json
@@ -9807,11 +9825,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit b834570f executed bounded FILM image pyramids. Fresh frame-interpolation model tests passed 20/20 and the exact image-pyramid ownership witness passed.
 
-- [x] 497. Execute retained FILM subtree features
+- [x] 498. Execute retained FILM subtree features
   - _id: comfy-parity-native-film-subtree-foundation
   - Outcome: The sole retained frame-interpolation model executes FILM SubTreeExtractor features from its admitted checkpoint tensors. Each of four levels applies the source's two padded three-by-three convolutions with LeakyReLU, doubles channels from the closed base width, and conditionally delegates two-by-two average pooling through the requested subtree depth without copying weights or retaining features, workspace, cache, handles, codecs, effects, or publication state.
-  - Wave: 292
-  - _Wave: 292
+  - Wave: 293
+  - _Wave: 293
   - Dependencies: comfy-parity-native-film-image-pyramid-foundation
   - _Blocked_by: comfy-parity-native-film-image-pyramid-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-image-pyramid/manifest.json
@@ -9827,11 +9845,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit e4758f6b executed retained FILM subtree features. Fresh frame-interpolation model tests passed 20/20 and the exact subtree ownership witness passed.
 
-- [x] 498. Compose retained FILM feature pyramids
+- [x] 499. Compose retained FILM feature pyramids
   - _id: comfy-parity-native-film-feature-pyramid-foundation
   - Outcome: The sole retained frame-interpolation model composes FILM FeatureExtractor output from the canonical seven-level image pyramid and retained SubTreeExtractor. Each output preserves the current subtree root and concatenates older diagonal subtree levels in source order through the canonical tensor concatenation owner, releases obsolete sub-pyramids after their final consumer, and retains no features, workspace, cache, handles, codecs, effects, or publication state.
-  - Wave: 293
-  - _Wave: 293
+  - Wave: 294
+  - _Wave: 294
   - Dependencies: comfy-parity-native-film-subtree-foundation
   - _Blocked_by: comfy-parity-native-film-subtree-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_tensor/src/ops/shape_layout_transform_02.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-subtree/manifest.json
@@ -9847,11 +9865,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit fa0df7d6 composed retained FILM feature pyramids. Fresh frame-interpolation model tests passed 20/20 and the exact feature-pyramid ownership witness passed.
 
-- [x] 499. Synthesize bounded FILM flow pyramids
+- [x] 500. Synthesize bounded FILM flow pyramids
   - _id: comfy-parity-native-film-flow-pyramid-synthesis-foundation
   - Outcome: The frame-interpolation owner synthesizes FILM accumulated flow pyramids from borrowed residual flows in source fine-to-coarse order. It aliases the coarsest residual, repeatedly delegates exact-size bilinear interpolation, doubles the upsampled flow, adds the next residual through canonical tensor arithmetic, reverses the attempt-local outputs back to fine-to-coarse order, and creates no predictor, retained graph, allocator, cache, handle, codec, effect, or publication owner.
-  - Wave: 294
-  - _Wave: 294
+  - Wave: 295
+  - _Wave: 295
   - Dependencies: comfy-parity-native-film-feature-pyramid-foundation
   - _Blocked_by: comfy-parity-native-film-feature-pyramid-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-feature-pyramid/manifest.json
@@ -9867,11 +9885,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit fc2c33d3 synthesized bounded FILM flow pyramids. Fresh model tests passed 20/20; the ownership witness was updated for the later helper extraction and now passes while checking both delegation and canonical interpolation.
 
-- [x] 500. Execute retained FILM flow estimators
+- [x] 501. Execute retained FILM flow estimators
   - _id: comfy-parity-native-film-flow-estimator-foundation
   - Outcome: The sole retained frame-interpolation model executes FILM PyramidFlowEstimator from its admitted checkpoint tensors. It validates exact seven-level feature channels and geometry, predicts the deepest residual through the shared five-convolution estimator, reuses that estimator for levels five through three, routes levels two through zero through the three specialized predictors, upsamples and doubles accumulated flow, warps the second features, and returns source-ordered attempt-local residuals without retaining flows, features, workspace, cache, handles, codecs, effects, or publication state.
-  - Wave: 295
-  - _Wave: 295
+  - Wave: 296
+  - _Wave: 296
   - Dependencies: comfy-parity-native-film-flow-pyramid-synthesis-foundation
   - _Blocked_by: comfy-parity-native-film-flow-pyramid-synthesis-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-flow-pyramid-synthesis/manifest.json
@@ -9887,11 +9905,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit b947f85c executed retained FILM flow estimators. Fresh frame-interpolation model tests passed 20/20 and the exact estimator ownership witness passed.
 
-- [x] 501. Execute bounded FILM pyramid algebra
+- [x] 502. Execute bounded FILM pyramid algebra
   - _id: comfy-parity-native-film-pyramid-algebra-foundation
   - Outcome: The frame-interpolation owner exposes FILM's three bounded pyramid adapters: pairwise image/feature channel concatenation, per-batch scalar multiplication through an unsqueezed broadcast view, and pairwise feature warping by delegated FILM flow. Every output is attempt-local and every tensor equation, allocation, storage, stream, workspace, and cancellation boundary remains owned by canonical tensor or FILM warp primitives; no retained graph, allocator, cache, handle, codec, effect, or publication owner is added.
-  - Wave: 296
-  - _Wave: 296
+  - Wave: 297
+  - _Wave: 297
   - Dependencies: comfy-parity-native-film-flow-estimator-foundation
   - _Blocked_by: comfy-parity-native-film-flow-estimator-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_tensor/src/ops/shape_layout_transform_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_02.rs, crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-flow-estimator/manifest.json
@@ -9907,11 +9925,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit ab21bf9c executed bounded FILM pyramid algebra through canonical tensor owners. Fresh frame-interpolation model tests passed 20/20 and the exact algebra ownership witness passed.
 
-- [x] 502. Execute the retained FILM fusion graph
+- [x] 503. Execute the retained FILM fusion graph
   - _id: comfy-parity-native-film-fusion-foundation
   - Outcome: The sole retained frame-interpolation model executes FILM Fusion from its admitted checkpoint tensors. It consumes five borrowed aligned pyramid levels, starts at the coarsest level, applies four source-ordered nearest-resize plus nonactivated two-by-two and activated joined three-by-three convolution stages, and finishes with the retained one-by-one RGB output projection. All intermediate pyramids and outputs remain attempt-local, while canonical interpolation, concatenation, convolution, activation, storage, workspace, stream, and cancellation owners retain their mechanics.
-  - Wave: 297
-  - _Wave: 297
+  - Wave: 298
+  - _Wave: 298
   - Dependencies: comfy-parity-native-film-pyramid-algebra-foundation
   - _Blocked_by: comfy-parity-native-film-pyramid-algebra-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-pyramid-algebra/manifest.json
@@ -9927,11 +9945,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit a804c02b executed the retained FILM fusion graph. Fresh frame-interpolation model tests passed 20/20 and the exact fusion ownership witness passed.
 
-- [x] 503. Synthesize retained FILM multi-timestep pairs
+- [x] 504. Synthesize retained FILM multi-timestep pairs
   - _id: comfy-parity-native-film-multi-timestep-synthesis-foundation
   - Outcome: The sole retained frame-interpolation model executes a batch-one FILM pair for a bounded set of timesteps. It constructs each endpoint image and feature pyramid once, predicts and synthesizes forward and backward flow once, scales backward flow by t and forward flow by one minus t, warps the source-aligned pyramids, concatenates warped targets before scaled flows in the source order, delegates every timestep to the retained fusion graph, and concatenates the attempt-local RGB results. Canonical tensor, warp, flow, fusion, storage, workspace, stream, and cancellation owners retain their mechanics; adjacent-pair sequence reuse remains a later leaf.
-  - Wave: 298
-  - _Wave: 298
+  - Wave: 299
+  - _Wave: 299
   - Dependencies: comfy-parity-native-film-fusion-foundation
   - _Blocked_by: comfy-parity-native-film-fusion-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-fusion/manifest.json
@@ -9947,11 +9965,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit debba377 synthesized retained FILM multi-timestep pairs with shared pair state. Fresh frame-interpolation model tests passed 20/20 and the exact multi-timestep ownership witness passed.
 
-- [x] 504. Execute FILM sequences with adjacent feature reuse
+- [x] 505. Execute FILM sequences with adjacent feature reuse
   - _id: comfy-parity-native-film-sequence-execution-foundation
   - Outcome: The sole retained frame-interpolation model executes a bounded BHWC FILM sequence through the canonical invocation plan. It converts each endpoint to NCHW once, computes each frame's image and feature pyramids once, moves the second endpoint pyramids into the next pair's first-endpoint cache, delegates every pair to retained multi-timestep synthesis, preserves source endpoint-midpoint ordering, and emits one fresh contiguous clamped BHWC result. The cache is invocation-local Rust state, never NativeCache or retained model state; source OOM downgrade policy remains a later leaf.
-  - Wave: 299
-  - _Wave: 299
+  - Wave: 300
+  - _Wave: 300
   - Dependencies: comfy-parity-native-film-multi-timestep-synthesis-foundation
   - _Blocked_by: comfy-parity-native-film-multi-timestep-synthesis-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-multi-timestep/manifest.json
@@ -9967,11 +9985,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 37b34e82 executed FILM sequences with adjacent attempt-local feature reuse. Fresh frame-interpolation model tests passed 20/20 and the exact sequence ownership witness passed.
 
-- [x] 505. Preserve typed frame-interpolation resource exhaustion
+- [x] 506. Preserve typed frame-interpolation resource exhaustion
   - _id: comfy-parity-native-frame-interpolation-resource-exhaustion-foundation
   - Outcome: The frame-interpolation owner preserves typed tensor allocation, backend-resource, and workspace-authorization exhaustion through its execution adapter instead of erasing those failures into generic strings. Canonical spatial and shape-layout tensor adapters expose TensorError through their standard Error source chain, NativeOps preserves typed spatial tensor failures, and classification downcasts only typed errors; cancellation remains dominant, ordinary execution failures remain non-retryable, and no message matching, allocator, retry loop, cache, handle, effect, or publication owner is introduced.
-  - Wave: 300
-  - _Wave: 300
+  - Wave: 301
+  - _Wave: 301
   - Dependencies: comfy-parity-native-film-sequence-execution-foundation
   - _Blocked_by: comfy-parity-native-film-sequence-execution-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy/model_management.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_02.rs, crates/comfy_tensor/src/ops/shape_layout_transform_03.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-sequence/manifest.json
@@ -9987,11 +10005,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 4000bb17 preserved typed allocation, resource-limit, and workspace exhaustion without message matching. Fresh 20/20 model tests and the exact resource-exhaustion ownership witness passed; locked all-target compilation and model Clippy were green.
 
-- [x] 506. Plan bounded native video codec invocations
+- [x] 507. Plan bounded native video codec invocations
   - _id: comfy-parity-native-video-codec-plan-foundation
   - Outcome: The canonical media-domain codec planner converts one checked NativeVideoPayload into a closed, allocation-free MP4/H.264, WebM/VP9, or WebM/AV1 invocation contract. It binds exact source and millisecond-rounded frame rates, pixel format, bit depth, alpha, audio layout and sample cap, metadata, CRF, preset, and caller limits without loading a codec, opening native libraries, resolving paths or handles, or owning effects, caches, persistence, or publication.
-  - Wave: 301
-  - _Wave: 301
+  - Wave: 302
+  - _Wave: 302
   - Dependencies: comfy-parity-native-frame-interpolation-resource-exhaustion-foundation
   - _Blocked_by: comfy-parity-native-frame-interpolation-resource-exhaustion-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/comfy_media.rs
@@ -10007,11 +10025,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK433 NATIVE-VIDEO-CODEC-PLAN 2026-08-14 PASS. The sealed media-domain planner now projects exact source and ties-even millisecond rates, H.264/VP9/AV1 pixel-depth and alpha policy, bounded audio layout/sample caps, metadata, CRF, preset, and caller limits without codec, FFI, path, handle, effect, cache, persistence, or publication ownership. `cargo check --locked -p comfy_media -p comfy_test_support --all-targets`, 39/39 comfy_media tests, the exact codec-plan ownership witness, planning 4/4, spec validation, formatting, diff hygiene, media Clippy, and full regeneration `--check-twice` passed. The broad comfy_test_support run passed 29/30 in the managed sandbox; its sole established special-entry filesystem permission failure passed on the exact unsandboxed rerun.
 
-- [x] 507. Certify native video codec ABI contracts
+- [x] 508. Certify native video codec ABI contracts
   - _id: comfy-parity-native-video-codec-ffi-certification-foundation
   - Outcome: The canonical NativeFfiRegistry admits a signed canonical FFmpeg 7.1 five-library catalog only for the reviewed target filename, ABI-major, digest, symbol, external-encoder, license-notice, unsafe-owner, and no-runtime-compilation contract. A separate complete observation pass yields opaque registry-issued certificates; catalog verification does not load a library, probe a codec, claim availability, or create an unsafe adapter.
-  - Wave: 302
-  - _Wave: 302
+  - Wave: 303
+  - _Wave: 303
   - Dependencies: comfy-parity-native-video-codec-plan-foundation
   - _Blocked_by: comfy-parity-native-video-codec-plan-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_test_support/fixtures/video/codec-plan/manifest.json
@@ -10027,11 +10045,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK434 NATIVE-VIDEO-CODEC-FFI-CERTIFICATION 2026-08-14 PASS. A canonical signed FFmpeg 7.1 catalog now binds the exact five-library ABI majors, six target filename profiles, sorted symbol sets, external encoder names, license notice, reviewed unsafe owner, and no-runtime-compilation policy. Three focused runtime tests prove complete registry-issued certification plus canonical-JSON, target, signature, license, ABI, filename, digest, duplicate/missing observation, symbol-completeness, and cancellation rejection; the exact ownership witness, locked runtime/test-support all-target compilation, task-scoped runtime Clippy, planning 4/4, spec validation, formatting, diff hygiene, and full regeneration check passed. Broad Clippy remains blocked only by unchanged Metal/CUDA warning owners and the established multimodal large-error lint. This leaf makes no installed-package, library-load, encoder-probe, codec-execution, or numerical-oracle claim.
 
-- [x] 508. Capture and seal native video codec packages
+- [x] 509. Capture and seal native video codec packages
   - _id: comfy-parity-native-video-codec-package-capture-foundation
   - Outcome: The canonical native-library image owner captures each exact FFmpeg catalog file without following a final symlink, rechecks stable file identity and length while hashing bounded bytes, compares filename and digest with the signed five-library contract, and seals immutable retained snapshots. This leaf does not load a library, resolve a symbol, issue an FFI certificate, probe an encoder, or execute a codec.
-  - Wave: 303
-  - _Wave: 303
+  - Wave: 304
+  - _Wave: 304
   - Dependencies: comfy-parity-native-video-codec-ffi-certification-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ffi-certification-foundation
   - Reads: crates/comfy_runtime/src/trust.rs, crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json
@@ -10047,11 +10065,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK435 NATIVE-VIDEO-CODEC-PACKAGE-CAPTURE 2026-08-14 PASS. The canonical native-library image owner is now available to the default runtime and captures the exact five catalog filenames with bounded no-follow reads, stable identity/length rechecks, SHA-256 binding, and immutable sealed retention. Four focused runtime tests, the exact package-capture ownership witness, locked runtime/test-support all-target compilation, task-scoped warning-denying Clippy, planning 4/4, spec validation, formatting, and diff hygiene passed. The tracked fixture and API explicitly make no library-load, symbol-resolution, certificate-issuance, encoder-probe, codec-execution, installed-package, or numerical-oracle claim.
 
-- [x] 509. Inspect sealed native video codec ELF contracts
+- [x] 510. Inspect sealed native video codec ELF contracts
   - _id: comfy-parity-native-video-codec-elf-inspection-foundation
   - Outcome: One canonical bounded ELF64 dynamic-contract inspector validates the loader-consumed machine, dynamic table, SONAME, exported symbols, dependency names, and absence of embedded search paths. ROCm delegates its existing certification inspection to this shared owner, while video package capture derives an inspected sealed package only when all five catalog images have the target machine, exact filename SONAME, and complete signed symbol subset. The inspected result records dependency names but does not authorize them, load a library, resolve a runtime address, issue an FFI certificate, probe an encoder, or execute a codec.
-  - Wave: 304
-  - _Wave: 304
+  - Wave: 305
+  - _Wave: 305
   - Dependencies: comfy-parity-native-video-codec-package-capture-foundation
   - _Blocked_by: comfy-parity-native-video-codec-package-capture-foundation
   - Reads: crates/comfy_runtime/src/native_ffi_rocm.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json
@@ -10067,11 +10085,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK436 NATIVE-VIDEO-CODEC-ELF-INSPECTION 2026-08-14 PASS. One shared bounded ELF64 inspector now owns loader-consumed machine, PT_DYNAMIC, SONAME, exported-symbol, DT_NEEDED, and embedded-search-path validation. ROCm production delegates to it, and the five-library video capture transaction checks exact Linux target machine, filename SONAME, and the signed symbol subset before sealing while retaining only static dependency-name metadata. Two shared-inspector tests, the five-library positive and missing-symbol package test, the ROCm dependency/search-path regression, exact ownership witness, locked runtime/test-support all-target compilation, ROCm-scoped warning-denying Clippy, planning 4/4, spec validation, formatting, diff hygiene, and byte-stable full regeneration passed. Broad all-feature Clippy still stops only in unchanged CUDA/Metal and multimodal-controller warning owners. The tracked synthetic fixture explicitly claims no licensed FFmpeg binary, host probe, dependency authorization, loader call, runtime symbol address, certificate issuance, encoder probe, or codec execution.
 
-- [x] 510. Certify inspected native video codec packages
+- [x] 511. Certify inspected native video codec packages
   - _id: comfy-parity-native-video-codec-inspected-certification-foundation
   - Outcome: The canonical NativeFfiRegistry converts one signed-catalog-matched, sealed, statically inspected five-library video codec package into registry-issued certificates. The result retains the inspected sealed images beside the certificates so later unsafe adapters cannot outlive their exact bytes. It does not authorize DT_NEEDED dependencies, load a library, resolve a runtime address, probe an encoder, or execute a codec.
-  - Wave: 305
-  - _Wave: 305
+  - Wave: 306
+  - _Wave: 306
   - Dependencies: comfy-parity-native-video-codec-elf-inspection-foundation
   - _Blocked_by: comfy-parity-native-video-codec-elf-inspection-foundation
   - Reads: crates/comfy_runtime/src/trust.rs, crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json, crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json
@@ -10085,11 +10103,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-RUNTIME-TRUST-001, VAL-NATIVE-BOUNDARY-001, VAL-CANCEL-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_runtime -p comfy_test_support
   - Done when: A synthetic source-fingerprinted five-library fixture proves catalog-target and library-map equality, exact SONAME and digest binding, complete exported-symbol authorization through NativeFfiRegistry, one registry-issued certificate per library, immutable sealed-image retention, cancellation before result publication, and rejection of mismatched inspected packages. It explicitly records that dependency names remain observed but unauthorized and that no licensed FFmpeg binary, host probe, loader call, runtime symbol address, encoder availability, or codec execution is claimed.
 
-- [x] 511. Verify signed native video codec dependency contracts
+- [x] 512. Verify signed native video codec dependency contracts
   - _id: comfy-parity-native-video-codec-dependency-contract-foundation
   - Outcome: The canonical native trust owner verifies a separately domain-separated, target-specific FFmpeg 7.1 dependency contract against one exact signed five-library catalog. The opaque result binds source, build, license, primary-catalog, dependency SONAME/digest/ABI/sponsor, complete consumer edge, reviewed system-library, and encoder-provider identities in a non-callable dependency registry without reading a filesystem, capturing an image, issuing a dependency certificate, loading a library, resolving an address, probing an encoder, or executing a codec.
-  - Wave: 306
-  - _Wave: 306
+  - Wave: 307
+  - _Wave: 307
   - Dependencies: comfy-parity-native-video-codec-inspected-certification-foundation
   - _Blocked_by: comfy-parity-native-video-codec-inspected-certification-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/trust.rs, crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json, crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json, crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json
@@ -10105,11 +10123,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK438 NATIVE-VIDEO-CODEC-DEPENDENCY-CONTRACT 2026-08-14 PASS. The canonical trust owner now verifies a separately domain-separated canonical signed dependency contract bound to the exact primary catalog digest, source/build/license digests, the fixed x86_64 GNU/Linux system SONAME allowlist, sorted dependency identities and complete consumer edges, exact sponsor and five encoder-provider mappings, reachability, and acyclicity. The resulting opaque projection retains a dependency-only NativeFfiRegistry configuration and exposes no certificate, callable symbol authorization, loader path, address, codec, media, effect, cache, persistence, or publication authority. Focused dependency-contract tests passed 2/2; exact ownership consolidation passed 1/1; locked all-target compile, formatting, diff integrity, planning tests, strict double regeneration, and standalone spec validation passed. The full runtime suite passed 301/374, including both new tests; all 73 failures reproduced the managed-filesystem Bad-file-descriptor capability cluster and no Task438-owned source appeared in the failures. The full support suite passed 29/30 with the established managed-sandbox special-entry Operation-not-permitted failure. Warnings-denied all-feature Clippy reached only unchanged Metal/CUDA warning owners; no-dependency Clippy reached only pre-existing multimodal large-error closures and a pre-existing trust-test redundant clone outside the Task438 diff. The tracked fixture is synthetic and claims no licensed FFmpeg package or executable codec evidence.
 
-- [x] 512. Certify retained native video codec dependency closures
+- [x] 513. Certify retained native video codec dependency closures
   - _id: comfy-parity-native-video-codec-dependency-closure-certification-foundation
   - Outcome: The canonical native trust owner consumes one exact certified inspected five-library FFmpeg package and its separately verified dependency contract, captures and seals every signed non-system dependency, requires the observed ELF DT_NEEDED graph to equal the signed graph, issues only dependency registry certificates, and retains the complete opaque package in deterministic dependency-first order. It performs no library load, symbol-address resolution, encoder probe, codec execution, media allocation, controller work, effect, cache, persistence, recovery, or publication.
-  - Wave: 307
-  - _Wave: 307
+  - Wave: 308
+  - _Wave: 308
   - Dependencies: comfy-parity-native-video-codec-dependency-contract-foundation
   - _Blocked_by: comfy-parity-native-video-codec-dependency-contract-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_ffi_elf.rs, crates/comfy_runtime/src/native_ffi_rocm.rs, crates/comfy_runtime/src/native_ffi_npu.rs, crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json, crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json, crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json
@@ -10125,11 +10143,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK439 NATIVE-VIDEO-CODEC-DEPENDENCY-CLOSURE 2026-08-14 PASS. The canonical trust owner now binds the exact catalog digest retained by the certified five-primary package to the separately signed dependency contract, captures and seals all three signed non-system dependency images through the shared no-follow stable-image owner, rejects duplicate DT_NEEDED entries in the canonical ELF parser, requires the complete normalized observed graph to equal the signed graph, issues only dependency certificates, and retains all eight images in deterministic dependency-first order without exposing a loader path or execution capability. Focused video-codec tests passed 9/9, including three new closure tests; the duplicate-DT_NEEDED parser regression passed 1/1; exact ownership consolidation passed 1/1; locked all-target compile, formatting, diff integrity, planning tests, strict double regeneration, standalone spec validation, and task-owned production Clippy passed. The full runtime suite passed 305/378, including all four Task439-owned regressions; all 73 failures reproduced the established managed-filesystem Bad-file-descriptor cluster and no Task439-owned test failed. The full support library suite passed 29/30 with the established managed-sandbox special-entry Operation-not-permitted failure. Broad warnings-denied Clippy reached only unchanged Metal/CUDA warning owners; unmodified multimodal large-error lint sites block the unfiltered no-dependency run, while the task-owned production path passed with that unrelated lint allowed. The tracked fixture is synthetic and claims no licensed or installed FFmpeg package, loader, address, encoder, codec, media, effect, cache, persistence, recovery, or publication evidence.
 
-- [x] 513. Load certified native video codec closures
+- [x] 514. Load certified native video codec closures
   - _id: comfy-parity-native-video-codec-retained-loader-foundation
   - Outcome: The focused native video codec FFI adapter consumes one certified retained dependency closure and loads every sealed object in its signed dependency-first order into one isolated GNU loader namespace. It proves each runtime link-map path, SONAME, DT_NEEDED edge, reviewed system object, namespace identity, and retained certificate/image lifetime before returning an opaque loaded package. The loader performs relocation-time binding and may run library constructors, but it performs no explicit dlsym or callable-address projection, probes no encoder, calls no codec ABI, allocates no media, and owns no controller, effect, cache, persistence, recovery, or publication state.
-  - Wave: 308
-  - _Wave: 308
+  - Wave: 309
+  - _Wave: 309
   - Dependencies: comfy-parity-native-video-codec-dependency-closure-certification-foundation
   - _Blocked_by: comfy-parity-native-video-codec-dependency-closure-certification-foundation
   - Reads: crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_ffi_elf.rs, crates/comfy_runtime/src/native_ffi_rocm.rs, crates/comfy_backend_rocm/src/loader.rs, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json
@@ -10145,11 +10163,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK440 NATIVE-VIDEO-CODEC-RETAINED-LOADER 2026-08-14 PASS. The focused GNU/Linux unsafe owner now consumes only the opaque certified dependency closure, retains every certificate and sealed descriptor beyond its handles, opens the exact dependency-first image sequence in one non-base dlmopen namespace, and proves live retained paths, SONAMEs, DT_NEEDED sets, namespace identity, and reviewed-system-only link-map contents before returning a thread-bound opaque session. It performs relocation binding and may run constructors or destructors, but exposes no raw handle or path, performs no explicit dlsym or callable-address projection, and invokes no codec. Focused real-loader tests passed 3/3, including isolated loading, reverse cleanup after binding failure, late-cancellation discard, and clean retry; exact ownership consolidation passed 1/1. Locked all-target compile, formatting, diff integrity, planning tests, strict double regeneration, standalone spec validation, and task-owned no-default-feature Clippy passed. The full runtime suite passed 308/381, including all three Task440 tests; its 73 failures match the established managed-filesystem and pre-existing runtime-trust baseline, with no Task440 test failing. The full support library suite passed 29/30 in the managed sandbox, and the established special-entry permission failure passed when rerun outside that sandbox. Broad warnings-denied Clippy stopped only in unchanged Metal/CUDA warning owners; the unfiltered no-default-feature run stopped only at the pre-existing multimodal large-error closures, while the task-owned production path passed with that unrelated lint allowed. The ownership catalog now confirms the shared ELF parser, FFI registry, and retained codec loader as authoritative. The tracked fixture is synthetic and claims no licensed or installed FFmpeg package, reviewed C ABI, encoder availability, codec/media execution, effect, cache, persistence, recovery, or publication evidence.
 
-- [x] 514. Own reviewed FFmpeg 7.1 C ABI declarations
+- [x] 515. Own reviewed FFmpeg 7.1 C ABI declarations
   - _id: comfy-parity-native-video-codec-reviewed-abi-foundation
   - Outcome: One private native video codec ABI owner binds the signature-verified official FFmpeg 7.1 source archive to exact x86_64 GNU C declarations, five library release versions, opaque pointer types, callback signatures, AVRational and AVChannelLayout layouts, and the complete initial 54-symbol catalog. The trust catalog delegates its name and ABI-major projection to this owner. This declaration leaf does not load a library, resolve or retain an address, invoke a version function, probe an encoder, call a codec, allocate media, or own controller, effect, cache, persistence, recovery, or publication state.
-  - Wave: 309
-  - _Wave: 309
+  - Wave: 310
+  - _Wave: 310
   - Dependencies: comfy-parity-native-video-codec-retained-loader-foundation
   - _Blocked_by: comfy-parity-native-video-codec-retained-loader-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/comfy_runtime.rs, crates/comfy_backend_rocm/src/abi.rs, crates/comfy_backend_rocm/build.rs, crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json
@@ -10165,11 +10183,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK441 NATIVE-VIDEO-CODEC-REVIEWED-ABI 2026-08-14 PASS. The declaration-only owner binds the signature-verified official FFmpeg 7.1 archive, release key, exact reviewed header hashes, five release triples, 54 typed function declarations, opaque types, callbacks, and the source AVChannelLayout and AVRational layouts. Its independent warnings-denied C translation unit compiled against the captured official headers, the Rust ABI tests passed 2/2, every affected trust catalog/package/dependency test passed 9/9, exact ownership consolidation passed 1/1, and the locked all-target runtime/support compile passed. The full runtime suite passed 310/383 with both Task441 tests and every video-codec trust/loader test green; the 73 failures exactly match the established managed-filesystem and runtime-trust baseline. The support library passed 29/30 in the managed sandbox and its established special-entry permission case passed outside that sandbox. Formatting, diff integrity, focused warnings-denied Clippy, planning self-tests, scoped byte-stable regeneration, ownership catalog generation, and standalone spec validation passed; broad all-feature Clippy stopped only in unchanged Metal/CUDA warning owners. The fixture explicitly claims no licensed or installed FFmpeg binary package, runtime address or version admission, encoder availability, codec/media execution, effect, cache, persistence, recovery, or publication evidence.
 
-- [x] 515. Certify callable FFmpeg 7.1 ELF exports
+- [x] 516. Certify callable FFmpeg 7.1 ELF exports
   - _id: comfy-parity-native-video-codec-callable-symbol-certification-foundation
   - Outcome: The canonical bounded ELF inspector preserves each required FFmpeg dynamic symbol's binding, type, visibility, definition, value, executable-segment membership, and default GNU version namespace. The video trust owner certifies the reviewed 54-symbol catalog only when every name has one exact global function definition in its owning library's reviewed version namespace. Local, weak, hidden, protected, undefined, object, TLS, NOTYPE, GNU IFUNC, zero-value, non-executable, unversioned, non-default, wrong-version, duplicate, or ambiguous exports fail before a loader, dlsym, address projection, native invocation, encoder probe, codec, media, effect, cache, persistence, recovery, or publication path.
-  - Wave: 310
-  - _Wave: 310
+  - Wave: 311
+  - _Wave: 311
   - Dependencies: comfy-parity-native-video-codec-reviewed-abi-foundation
   - _Blocked_by: comfy-parity-native-video-codec-reviewed-abi-foundation
   - Reads: crates/comfy_runtime/src/native_ffi_elf.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/verify-bindings.c, crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json, crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json, crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json
@@ -10185,11 +10203,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK442 NATIVE-VIDEO-CODEC-CALLABLE-SYMBOL-CERTIFICATION 2026-08-14 PASS. The canonical bounded ELF inspector now retains binding, type, visibility, section, value, size, executable-segment, and GNU default-version identity, and the video trust owner admits the reviewed 54-symbol catalog only as exact global default-visible non-IFUNC functions in the five reviewed namespaces. ELF tests passed 4/4; callable-export, ABI, package-capture, dependency-closure, and ownership tests passed; locked all-target compilation passed. The full runtime suite passed 312/385 with every Task442 test green and exactly the established 73 managed-filesystem/runtime-trust failures. The support suite passed 29/30 in the managed sandbox and its sole established special-entry permission case passed outside the sandbox. Formatting, diff integrity, planning self-tests, ownership generation, and standalone spec validation passed; broad Clippy stopped only in unchanged CUDA dead-code ownership. Whole-pack regeneration reached the canonical Task442 planning/ownership outputs but its check gate was blocked by four pre-existing unrelated desktop-catalog modifications; those paths are excluded from this task. The fixture explicitly claims no licensed or installed FFmpeg package, load, dlsym, address, native invocation, encoder, codec/media, effect, cache, persistence, recovery, or publication evidence.
 
-- [x] 516. Bind retained FFmpeg 7.1 symbols and admit runtime versions
+- [x] 517. Bind retained FFmpeg 7.1 symbols and admit runtime versions
   - _id: comfy-parity-native-video-codec-symbol-binding-foundation
   - Outcome: The focused native video codec FFI owner consumes one exact retained and callable-certified FFmpeg closure, resolves all 54 reviewed symbols through their exact primary handles and GNU version namespaces, proves each defining retained image and certified load-bias-relative address, privately converts the addresses to the reviewed typed aliases, invokes only the five version functions, and admits only the exact FFmpeg 7.1 packed releases. The opaque thread-bound binding retains the complete load and exposes no handle, path, address, function pointer, encoder capability, codec/media authority, controller, effect, cache, persistence, recovery, or publication state.
-  - Wave: 311
-  - _Wave: 311
+  - Wave: 312
+  - _Wave: 312
   - Dependencies: comfy-parity-native-video-codec-callable-symbol-certification-foundation
   - _Blocked_by: comfy-parity-native-video-codec-callable-symbol-certification-foundation
   - Reads: crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_ffi_elf.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json, crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json, crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-callable-symbol-certification/manifest.json
@@ -10205,11 +10223,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK443 NATIVE-VIDEO-CODEC-SYMBOL-BINDING 2026-08-14 PASS. The focused FFI owner now consumes the exact source-bound retained closure, verifies five primary certificates and non-callable dependency certificates, resolves all 54 reviewed symbols through exact GNU-versioned primary handles, proves each retained provider path and load-bias-plus-certified-value address, privately converts only to the reviewed aliases, and invokes only the five exact FFmpeg 7.1 version functions. The six focused loader/binding tests passed, including exact five-provider binding, version and certified-address drift rejection, cancellation discard, reverse cleanup, and retry; all eleven video-codec ownership witnesses passed; locked all-target compilation, formatting, diff integrity, planning self-tests, standalone spec validation, focused no-default-feature Clippy, and repeat native-planning byte stability passed. The full runtime suite executed 388 tests with every Task443 test green and the same established 73 managed-filesystem/runtime-trust failures; comfy_test_support remained 29/30 under the managed sandbox with the established special-entry permission failure. Broad all-feature Clippy stopped only in unchanged Metal unused/dead-code and CUDA dead-code owners. Whole-pack regeneration was not rerun because its escalation was rejected after the earlier unrelated desktop-catalog overwrite; the focused native planning outputs were regenerated and independently hash-stable. The fixture explicitly claims no licensed or installed FFmpeg package, encoder probe, codec/media execution, effect, cache, persistence, recovery, or publication evidence.
 
-- [x] 517. Own reviewed FFmpeg 7.1 video data-plane layouts
+- [x] 518. Own reviewed FFmpeg 7.1 video data-plane layouts
   - _id: comfy-parity-native-video-codec-data-plane-abi-foundation
   - Outcome: The private native video codec ABI owner extends the exact reviewed FFmpeg 7.1 x86_64 GNU contract with only the AVFrame, AVPacket, AVStream, AVFormatContext, and AVIOContext prefixes and constants needed by the first bounded in-memory video data plane. Every prefix remains allocation-opaque and may only describe FFmpeg-owned objects. The existing 54-symbol catalog is unchanged, and this prerequisite loads no library, resolves no address, invokes no native function, probes no codec, allocates no media, and owns no controller, effect, cache, persistence, recovery, or publication state.
-  - Wave: 312
-  - _Wave: 312
+  - Wave: 313
+  - _Wave: 313
   - Dependencies: comfy-parity-native-video-codec-symbol-binding-foundation
   - _Blocked_by: comfy-parity-native-video-codec-symbol-binding-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/verify-bindings.c, crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json
@@ -10225,11 +10243,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK444 NATIVE-VIDEO-CODEC-DATA-PLANE-ABI 2026-08-14 PASS. The private reviewed ABI owner now carries exact allocation-opaque x86_64 GNU prefixes for AVFrame through pts, AVPacket through duration, AVStream through time_base, AVFormatContext through streams, and AVIOContext through buffer, plus the source-required codec, media, pixel-format, timestamp, seek, option, scaling, and error constants while preserving the exact 54-symbol catalog. A warnings-denied C11 verifier compiled against a configured copy of the signature-bound official FFmpeg 7.1 archive; all four ABI tests, the focused ownership witness, locked all-target compilation, formatting, diff integrity, planning self-tests, coding spec validation, and focused manifest/JSON checks passed. The authoritative ownership catalog reports the new concern confirmed. The full runtime suite reproduced its established 317/390 managed-filesystem baseline with all four ABI tests green; comfy_test_support reproduced its established 29/30 special-entry permission baseline. Broad all-feature Clippy stopped only in unchanged Metal/CUDA warning owners, while no-dependency Clippy additionally reached unchanged multimodal and prior trust/binding test lints; no Task444-owned lint was reported. Whole-pack regeneration remained unrun because its earlier escalation was rejected after overwriting unrelated desktop catalogs; focused native-planning and ownership outputs were regenerated and hash-checked for byte stability. The fixture explicitly claims no licensed or installed FFmpeg package, runtime call, codec/media execution, numeric oracle, effect, cache, persistence, recovery, or publication evidence.
 
-- [x] 518. Execute bounded retained FFmpeg memory I/O
+- [x] 519. Execute bounded retained FFmpeg memory I/O
   - _id: comfy-parity-native-video-codec-bounded-memory-avio-foundation
   - Outcome: The focused native video codec FFI owner borrows one exact retained FFmpeg binding and constructs bounded seekable in-memory AVIO input and output sessions through the certified av_malloc, av_free, avio_alloc_context, and avio_context_free functions. Stable boxed callback state, caller-authorized CPU workspace, checked BytesIO-compatible read, write, and seek callbacks, and reverse RAII cleanup keep every raw context, buffer, function pointer, and staged output private and attempt-local. This prerequisite opens no format, probes no encoder or decoder, executes no codec, and owns no media value, handle, cache, persistence, recovery, effect, or publication state.
-  - Wave: 313
-  - _Wave: 313
+  - Wave: 314
+  - _Wave: 314
   - Dependencies: comfy-parity-native-video-codec-data-plane-abi-foundation
   - _Blocked_by: comfy-parity-native-video-codec-data-plane-abi-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json
@@ -10245,11 +10263,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK445 NATIVE-VIDEO-CODEC-BOUNDED-MEMORY-AVIO 2026-08-14 PASS. The sole native video codec FFI owner now borrows the retained typed binding, invokes only the reviewed av_malloc, av_free, avio_alloc_context, and avio_context_free functions, and owns stable boxed input/output callback state, checked BytesIO-compatible read/write/seek behavior, caller-authorized workspace, first-failure latching with cancellation precedence, callback unwind containment, and current-buffer-before-context reverse cleanup. The three focused AVIO tests passed, including exact EOF and seek semantics, sparse overwrite and cap-plus-one rejection, callback panic/cancellation, null allocation, one-byte-below workspace exhaustion, cancellation both before and after native context creation, buffer replacement, zero scratch residue, and clean retry. All four reviewed ABI tests, the exact ownership witness, warnings-denied C11 verifier, locked all-target compilation, formatting, diff integrity, planning self-tests, coding spec validation, and focused native-planning/ownership generation passed. The complete runtime library executed all 393 tests with the three AVIO tests green and reproduced the established managed-filesystem/runtime-trust failure cluster; broad all-feature Clippy stopped only in unchanged Metal/CUDA warning owners. The support aggregate confirmed the AVIO witness inside its 95-test ownership batch, then was intentionally stopped after unrelated existing sandbox, native-diffusion checkpoint, release-boundary network, text-regex, and stored-payload failures made the remaining whole-tree scans non-gating. No licensed or installed FFmpeg package, format open, codec capability, mux, demux, codec/media output, effect, cache, persistence, recovery, or publication evidence is claimed.
 
-- [x] 519. Admit the retained LTXV H.264 codec pair
+- [x] 520. Admit the retained LTXV H.264 codec pair
   - _id: comfy-parity-native-video-codec-ltxv-h264-admission-foundation
   - Outcome: The native video codec FFI owner consumes one exact retained FFmpeg binding, invokes the already certified registry lookups for the concrete libx264 encoder and H.264 decoder ID 27, proves both descriptors originate in the retained avcodec image, and retains the private non-null codec pair with the thread-bound binding for the following LTXV session. The signed package contract admits only concrete encoder implementation names, so the decoder-only h264 name is no longer misrepresented as an encoder. No codec context, frame, packet, format, AVIO, media value, handle, cache, persistence, recovery, effect, or publication state is created.
-  - Wave: 314
-  - _Wave: 314
+  - Wave: 315
+  - _Wave: 315
   - Dependencies: comfy-parity-native-video-codec-bounded-memory-avio-foundation
   - _Blocked_by: comfy-parity-native-video-codec-bounded-memory-avio-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json, crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json
@@ -10265,11 +10283,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK446 NATIVE-VIDEO-CODEC-LTXV-H264-ADMISSION 2026-08-14 PASS. The sole native video codec FFI owner now consumes one retained typed binding, admits exactly the concrete libx264 encoder and H.264 decoder ID 27, proves both private descriptors originate in the retained avcodec image, and preserves the thread-bound binding until reverse cleanup. The four focused admission tests, all 27 video-codec regression tests, the exact ownership witness, locked all-target compilation, formatting, diff integrity, planning self-tests, coding spec validation, and focused native-planning and ownership generation passed. The signed codec provenance was corrected to remove the decoder-only h264 name from concrete encoder rows and all eleven dependent fixture manifests were refreshed in dependency order. The complete runtime library reproduced its established managed-filesystem/runtime-trust baseline with 324 passing and 73 unchanged failures while every new and retained video-codec test passed; the support library reproduced its established managed-sandbox baseline with 29 passing and one special-entry permission failure. Broad all-feature Clippy stopped only in unchanged Metal and CUDA warning owners. No licensed or installed FFmpeg package, codec context, format, mux, demux, encode, decode, media result, numerical oracle, effect, cache, persistence, recovery, or publication evidence is claimed.
 
-- [x] 520. Encode retained LTXV H.264 frames into bounded MP4
+- [x] 521. Encode retained LTXV H.264 frames into bounded MP4
   - _id: comfy-parity-native-video-codec-ltxv-h264-mp4-encode-foundation
   - Outcome: The retained LTXV H.264 codec owner synchronously converts one checked even RGB8 frame to YUV420P, configures the admitted libx264 encoder with source-exact CRF, veryfast preset, rate-one timing, one thread, and MP4 global headers, drains bounded packets into the canonical workspace-backed memory AVIO, and returns one opaque attempt-local encoded result. Every FFmpeg object is private, native calls are cancellation-bounded, packet and output growth are checked, reverse RAII converges scratch accounting, and no decoder, tensor adaptation, media payload, handle, cache, effect, persistence, recovery, or publication owner is introduced.
-  - Wave: 315
-  - _Wave: 315
+  - Wave: 316
+  - _Wave: 316
   - Dependencies: comfy-parity-native-video-codec-ltxv-h264-admission-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-h264-admission-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json
@@ -10285,11 +10303,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK447 NATIVE-VIDEO-CODEC-LTXV-H264-MP4-ENCODE 2026-08-14 PASS. The sole retained LTXV H.264 codec owner now validates one even contiguous CPU RGB8 frame, authorizes caller scratch, configures the admitted libx264 encoder with exact MP4, YUV420P, CRF, veryfast, rate-one, one-thread, and global-header settings, converts RGB24, drains and rescales bounded packets, flushes delayed output, writes the trailer through canonical bounded memory AVIO, and retains only an opaque attempt-local staged result. Two focused encode tests passed exact option/call/packet/cleanup order, ENOMEM mapping, output-cap and iteration rejection, cancellation at every checked boundary, zero scratch residue, and retry. All 29 video-codec tests, the exact ownership witness, locked all-target compilation, formatting, diff integrity, planning self-tests, coding spec validation, and focused planning/ownership generation passed. The complete runtime library executed 399 tests with 326 passing, including both new encode tests, and reproduced the same 73 established managed-filesystem/runtime-trust failures; test support reproduced its established 29-pass/one special-entry sandbox failure baseline. Required all-feature Clippy stopped only in unchanged Metal and CUDA warning owners, while focused runtime Clippy reached only unchanged controller/test lints and reported no new encode-owner lint. No licensed or installed FFmpeg package, decoded RGB result, numerical H.264 oracle, media payload, effect, cache, persistence, recovery, or publication evidence is claimed.
 
-- [x] 521. Reopen retained LTXV H.264 MP4 streams
+- [x] 522. Reopen retained LTXV H.264 MP4 streams
   - _id: comfy-parity-native-video-codec-ltxv-h264-mp4-demux-foundation
   - Outcome: The retained LTXV H.264 owner reopens only its own opaque staged MP4 through lifetime-bound borrowed memory AVIO, executes bounded libavformat auto-probe and header parsing, requires the exact single stream and already admitted H.264 decoder, and retains one private attempt-local demux session. The encoded allocation is never copied into an Arc, format cleanup precedes AVIO cleanup, caller scratch and cancellation bound every observable phase, and no packet decode, RGB result, media payload, cache, effect, persistence, recovery, or publication owner is introduced.
-  - Wave: 316
-  - _Wave: 316
+  - Wave: 317
+  - _Wave: 317
   - Dependencies: comfy-parity-native-video-codec-ltxv-h264-mp4-encode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-h264-mp4-encode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json
@@ -10305,11 +10323,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK448-LTXV-MP4-DEMUX-VALIDATION 2026-08-14; `cargo fmt --all -- --check` and locked all-target checks for comfy_runtime/comfy_test_support passed; all 31 focused native video codec/trust tests and exact ownership witness `val_ownership_native_video_codec_ltxv_h264_mp4_demux_001` passed; the four focused planning self-tests and coding spec validator passed. Broad comfy_runtime reproduced 328/401 passing with the same 73 managed-filesystem/runtime-trust baseline failures, and comfy_test_support reproduced 29/30 passing with the established special-entry `Operation not permitted` sandbox failure. `./script/clippy` stopped only in unchanged CUDA/Metal owners; scoped no-deps Clippy reached only the unchanged multimodal large-error and pre-existing video/trust test lints after the new demux fixture lints were corrected. No new focused failure remains.
 
-- [x] 522. Decode the first retained LTXV H.264 frame
+- [x] 523. Decode the first retained LTXV H.264 frame
   - _id: comfy-parity-native-video-codec-ltxv-h264-mp4-decode-foundation
   - Outcome: The retained LTXV H.264 demux session uses only its already admitted decoder and reviewed function table to read bounded packets, drive the send/receive and EOF flush protocol until the first yielded frame, convert that frame through swscale into caller-accounted contiguous CPU RGB8, and publish one canonical tensor only after cancellation and bounds checks. Packet, frame, codec, swscale, demux, and AVIO owners remain attempt-local and unwind in reverse order; no media payload, cache, effect, persistence, recovery, or publication owner is introduced.
-  - Wave: 317
-  - _Wave: 317
+  - Wave: 318
+  - _Wave: 318
   - Dependencies: comfy-parity-native-video-codec-ltxv-h264-mp4-demux-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-h264-mp4-demux-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-demux/manifest.json
@@ -10325,11 +10343,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK449-LTXV-H264-FIRST-FRAME-DECODE-VALIDATION 2026-08-14; `cargo fmt --all -- --check` and locked all-target checks for comfy_runtime/comfy_test_support passed; all 33 focused native video codec/trust tests and exact ownership witness `val_ownership_native_video_codec_ltxv_h264_mp4_decode_001` passed; the four focused planning self-tests and coding spec validator passed. Broad comfy_runtime reproduced 330/403 passing with the same 73 managed-filesystem/runtime-trust baseline failures, and comfy_test_support reproduced 29/30 passing with the established special-entry `Operation not permitted` sandbox failure. `./script/clippy` stopped only in unchanged CUDA/Metal owners; no-deps Clippy with the established multimodal large-error lint allowed passed clean. No new focused failure remains.
 
-- [x] 523. Apply retained LTXV H.264 preprocessing to IMAGE tensors
+- [x] 524. Apply retained LTXV H.264 preprocessing to IMAGE tensors
   - _id: comfy-parity-native-video-codec-ltxv-tensor-preprocess-foundation
   - Outcome: The retained LTXV H.264 codec composes the completed bounded encode, borrowed demux, and first-frame decode owners into one source-compatible CPU F32 BHWC IMAGE preprocessing operation. Compression zero produces the node's fresh stacked result without cropping or native calls; compression 1 through 100 processes frames serially with exact bottom-right even cropping, canonical source byte conversion, decoded RGB normalization, aggregate bounds, and one final publication after cancellation checks. No new FFI, tensor primitive, media payload, effect, cache, persistence, recovery, or publication owner is introduced.
-  - Wave: 318
-  - _Wave: 318
+  - Wave: 319
+  - _Wave: 319
   - Dependencies: comfy-parity-native-video-codec-ltxv-h264-mp4-decode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-h264-mp4-decode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-demux/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-decode/manifest.json
@@ -10345,11 +10363,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK450-LTXV-TENSOR-PREPROCESS-VALIDATION 2026-08-14; `cargo fmt --all -- --check`, locked all-target checks for comfy_runtime/comfy_test_support, all 35 focused native video codec/trust tests, and exact ownership witness `val_ownership_native_video_codec_ltxv_tensor_preprocess_001` passed. The four planning self-tests and coding spec validator passed; focused production-library Clippy passed with the established multimodal large-error lint allowance. Broad all-feature Clippy stopped only in unchanged CUDA/Metal and pre-existing runtime-test lint owners. The focused ownership and native-planning generators converged without a new task failure.
 
-- [x] 524. Retain LTXV H.264 preprocessing on one codec thread
+- [x] 525. Retain LTXV H.264 preprocessing on one codec thread
   - _id: comfy-parity-native-video-codec-ltxv-thread-service-foundation
   - Outcome: One bounded Send plus Sync proxy owns a named OS thread that alone consumes an already certified video dependency closure, loads and binds its isolated libraries, admits the exact LTXV H.264 codec pair, serializes caller-authorized IMAGE preprocessing, and destroys every intentionally thread-bound native object on that same thread. The source compression-zero adapter also accepts zero spatial dimensions without entering native code. No package discovery, node or executor injection, cache, media handle, effect, persistence, recovery, or publication owner is introduced.
-  - Wave: 319
-  - _Wave: 319
+  - Wave: 320
+  - _Wave: 320
   - Dependencies: comfy-parity-native-video-codec-ltxv-tensor-preprocess-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-tensor-preprocess-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/comfy_runtime.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_types/src/cancellation.rs, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json, crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-tensor-preprocess/manifest.json
@@ -10365,11 +10383,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK451-LTXV-THREAD-SERVICE-VALIDATION 2026-08-14; `cargo fmt --all -- --check`, locked all-target checks for comfy_runtime/comfy_test_support, four focused retained codec-thread tests, all 39 native video codec/trust tests, the Task450 zero-spatial regression, and exact ownership witness `val_ownership_native_video_codec_ltxv_thread_service_001` passed. The four planning self-tests and coding spec validator passed, and focused ownership/native-planning generation converged. Repository Clippy reached only the unchanged Metal unused/dead-code and CUDA unused-field warning-denial baseline, with no Task451 diagnostic.
 
-- [x] 525. Inject retained LTXV preprocessing into native node services
+- [x] 526. Inject retained LTXV preprocessing into native node services
   - _id: comfy-parity-native-video-codec-ltxv-node-service-foundation
   - Outcome: One domain-neutral Send plus Sync LTXV IMAGE preprocessing service port carries the retained codec-thread proxy through NativeNodeServices, ExecutionEngine, and NativeImageExecutor without moving native state across threads. The exact service configuration digest partitions runtime cache identity while every request preserves caller stream, scratch, and cancellation. No package discovery, worker startup, node implementation, codec duplication, media handle, effect, persistence, recovery, or publication owner is introduced.
-  - Wave: 320
-  - _Wave: 320
+  - Wave: 321
+  - _Wave: 321
   - Dependencies: comfy-parity-native-video-codec-ltxv-thread-service-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-thread-service-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/comfy_nodes.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/comfy_runtime.rs, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json
@@ -10385,11 +10403,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK452-LTXV-NODE-SERVICE-VALIDATION 2026-08-14; `cargo fmt --all -- --check`, locked all-target checks for comfy_nodes/comfy_runtime/comfy_test_support, the checked node-service authority test, five retained codec-thread proxy tests, the NativeImageExecutor cache-identity regression, and exact ownership witness `val_ownership_native_video_codec_ltxv_node_service_001` passed. Four planning self-tests, the coding spec validator, and focused ownership/native-planning generation converged. Repository Clippy stopped only at the unchanged CUDA unused-event-field warning-denial baseline, with no Task452 diagnostic.
 
-- [x] 526. Execute LTXV preprocessing as a native node
+- [x] 527. Execute LTXV preprocessing as a native node
   - _id: comfy-parity-native-video-codec-ltxv-node-adapter-foundation
   - Outcome: The exact LTXVPreprocess native node resolves one canonical IMAGE handle, validates the source img_compression integer from zero through 100, invokes the injected retained LTXV service exactly once with the caller's compute authority, and publishes one fresh IMAGE handle only after service completion and cancellation checks. The node exposes no codec, package, path, pointer, media handle, effect, persistence, recovery, or output-committer authority.
-  - Wave: 321
-  - _Wave: 321
+  - Wave: 322
+  - _Wave: 322
   - Dependencies: comfy-parity-native-video-codec-ltxv-node-service-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-node-service-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_test_support/fixtures/video/codec-ltxv-node-service/manifest.json
@@ -10405,11 +10423,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK453-LTXV-NODE-ADAPTER-VALIDATION 2026-08-14; cargo fmt --all -- --check, locked comfy_nodes 113/113 all-target tests, locked comfy_nodes/comfy_runtime/comfy_test_support all-target check, warnings-denied focused comfy_nodes Clippy, exact ownership witness, planning self-tests, and ownership/native-planning generation passed. The generic standalone spec validator remains incompatible with this generated flat task pack and reproduced its pre-existing acceptance-ID/milestone classification errors across all 605 tasks; only unchanged Metal warnings remained in broader dependency builds, with no Task453 diagnostic.
 
-- [x] 527. Create canonical video components as a native node
+- [x] 528. Create canonical video components as a native node
   - _id: comfy-parity-native-video-component-create-node-foundation
   - Outcome: The exact CreateVideo native node resolves one canonical IMAGE batch and optional AUDIO payload, converts the source fps float into its exact reduced Python-Fraction identity, admits only source bit depths 8 or 10, and publishes one canonical VIDEO payload that aliases the immutable component tensors without codec, path, effect, or persistence authority.
-  - Wave: 322
-  - _Wave: 322
+  - Wave: 323
+  - _Wave: 323
   - Dependencies: comfy-parity-native-video-codec-ltxv-node-adapter-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-node-adapter-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, crates/comfy_media/src/native_node_payload.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs
@@ -10425,11 +10443,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK454-CREATE-VIDEO-VALIDATION 2026-08-14; cargo fmt --all, locked CreateVideo 3/3 focused tests, locked comfy_nodes 116/116 all-target tests, locked comfy_media 39/39 all-target tests, locked comfy_nodes/comfy_media/comfy_test_support all-target check, warnings-denied focused comfy_nodes/comfy_media Clippy, exact ownership witness, planning self-tests, and ownership/native-planning generation passed. The unchanged managed-filesystem comfy_test_support broad-suite failures and long conditioning stall were reproduced in the immediately preceding Task453 gate and were not re-run because this leaf changes only the focused node, fixture, ownership, and planning owners; only unchanged Metal warnings remained in broader dependency checks.
 
-- [x] 528. Extract canonical video components as a native node
+- [x] 529. Extract canonical video components as a native node
   - _id: comfy-parity-native-video-component-extract-node-foundation
   - Outcome: The exact GetVideoComponents native node resolves one canonical materialized VIDEO, publishes IMAGE and optional AUDIO component aliases, returns the rational frame rate as a float and the exact 8/10-bit identity, and preserves source None through output-only typed Null. Contiguous F32 frames alias storage; admitted U8 or strided CPU frames materialize through canonical caller-authorized tensor operations. No codec, file demux, slice, effect, persistence, recovery, or external publication authority is introduced.
-  - Wave: 323
-  - _Wave: 323
+  - Wave: 324
+  - _Wave: 324
   - Dependencies: comfy-parity-native-video-component-create-node-foundation
   - _Blocked_by: comfy-parity-native-video-component-create-node-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, crates/comfy_media/src/native_node_payload.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/families/video_01.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_test_support/fixtures/nodes/video-comfy-node-0124/fixture.json
@@ -10445,11 +10463,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK455-GET-VIDEO-COMPONENTS-VALIDATION 2026-08-14; locked GetVideoComponents 3/3 focused tests, locked typed-null runtime regression, locked comfy_nodes 119/119 all-target tests, locked comfy_nodes/comfy_runtime/comfy_test_support all-target check, exact ownership witness, planning self-tests, current coding spec validator, formatting, and diff checks passed. Focused script/clippy reached only the unchanged comfy_backend_cuda dead-code warning denial after Task455 crates compiled; broader checks retained only the established Metal warnings. Focused ownership and native-planning generation converged from 606 to 607 tasks without changing pinned source snapshots.
 
-- [x] 529. Execute source-exact frame-interpolation sequence fallback
+- [x] 530. Execute source-exact frame-interpolation sequence fallback
   - _id: comfy-parity-native-frame-interpolation-sequence-fallback-foundation
   - Outcome: The retained frame-interpolation model executes the pinned attempt-local sequence fallback policy over its already admitted FILM and RIFE graphs. FILM tries multi-timestep synthesis once and disables it after typed resource exhaustion; multiplier two can retry the scalar path, while larger fallback batches preserve the pinned source scalarization failure as a non-retryable execution error. RIFE starts with multiplier-minus-one timesteps, retries only typed exhaustion with floor-halved batches that persist across pairs, and propagates the original typed exhaustion at batch one. Cancellation dominates every retry, failed attempt temporaries remain local, and only a complete fresh BHWC result escapes; no node, handle, cache, allocator, effect, codec, or publication owner is introduced.
-  - Wave: 324
-  - _Wave: 324
+  - Wave: 325
+  - _Wave: 325
   - Dependencies: comfy-parity-native-video-component-extract-node-foundation, comfy-parity-native-frame-interpolation-resource-exhaustion-foundation
   - _Blocked_by: comfy-parity-native-video-component-extract-node-foundation, comfy-parity-native-frame-interpolation-resource-exhaustion-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, projects/comfy/ComfyUI/comfy/model_management.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/invocation/manifest.json, crates/comfy_test_support/fixtures/models/frame-interpolation/film-multi-timestep/manifest.json, crates/comfy_test_support/fixtures/models/frame-interpolation/film-sequence/manifest.json, crates/comfy_test_support/fixtures/models/frame-interpolation/rife-execution/manifest.json, crates/comfy_test_support/fixtures/models/frame-interpolation/rife-sequence/manifest.json, crates/comfy_test_support/fixtures/models/frame-interpolation/resource-exhaustion/manifest.json
@@ -10465,11 +10483,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK456-FRAME-INTERPOLATION-SEQUENCE-FALLBACK-VALIDATION 2026-08-15; all 24 locked frame-interpolation tests, the exact ownership witness, locked all-target comfy_model/comfy_test_support compilation, focused warning-denied comfy_model Clippy, formatting, planning self-tests, the current coding spec validator, JSON validation, and diff checks passed. The 293-test comfy_model baseline passed 281 tests including every Task456 test and retained 11 managed-filesystem failures plus one unrelated deterministic VAE oracle-hash failure; the comfy_test_support baseline retained its established managed-filesystem failures and long conditioning stall. Focused regeneration converged from 607 to 608 tasks without changing pinned source snapshots.
 
-- [x] 530. Execute the source-exact FrameInterpolate native node
+- [x] 531. Execute the source-exact FrameInterpolate native node
   - _id: comfy-parity-native-frame-interpolate-node-foundation
   - Outcome: The exact FrameInterpolate native node resolves canonical INTERP_MODEL and IMAGE handles, preserves the source identity bypass for batches below two without compute or publication, and otherwise bridges the canonical CPU F32 BHWC IMAGE to the retained model dtype before delegating once to the completed frame-interpolation sequence owner. It converts only the complete clamped result back to canonical CPU F32 IMAGE and publishes it atomically. The adapter introduces no checkpoint loader, model equation, retry scheduler, allocator, codec, effect, progress, cache, persistence, recovery, or external publication owner.
-  - Wave: 325
-  - _Wave: 325
+  - Wave: 326
+  - _Wave: 326
   - Dependencies: comfy-parity-native-frame-interpolation-sequence-fallback-foundation
   - _Blocked_by: comfy-parity-native-frame-interpolation-sequence-fallback-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, projects/comfy/ComfyUI/comfy/model_management.py, .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/families/video_01.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/sequence-fallback/manifest.json, crates/comfy_test_support/fixtures/models/frame-interpolation/resource-exhaustion/manifest.json
@@ -10485,11 +10503,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK457-FRAME-INTERPOLATE-NODE-VALIDATION 2026-08-15; all five locked FrameInterpolate adapter tests, the complete 124-test comfy_nodes suite, the exact ownership witness, locked all-target comfy_nodes/comfy_test_support compilation, focused warning-denied comfy_nodes Clippy, formatting, the current coding spec validator, JSON validation, planning self-tests, COMFY-NODE-0190 forward mapping, diff checks, and two byte-stable focused regeneration passes passed. The broader comfy_test_support comparison retained its established managed-sandbox special-entry, cancellation-scan, and filesystem-recovery failures plus the long conditioning stall; the aggregate ownership baseline later failed its unrelated pre-existing OpticalFlow-or-ClipVision source-text assertion, while the new exact ownership witness remained green.
 
-- [x] 531. Admit the retained native video codec suite
+- [x] 532. Admit the retained native video codec suite
   - _id: comfy-parity-native-video-codec-suite-admission-foundation
   - Outcome: One thread-affine NativeVideoCodecSuite retains the existing admitted libx264/H.264 pair and the same certified binding while invoking exact registry admission for AAC, SVT-AV1, and VP9 encoders plus AAC, VP9, and AV1 decoders. Every descriptor is non-null, provider-proved against the retained avcodec image, and private to the sole FFI owner. The retained LTXV codec thread now owns this suite and delegates its completed preprocessing path through it; no second loader, binding, namespace, codec context, media payload, effect, cache, persistence, recovery, or publication owner is introduced.
-  - Wave: 326
-  - _Wave: 326
+  - Wave: 327
+  - _Wave: 327
   - Dependencies: comfy-parity-native-frame-interpolate-node-foundation
   - _Blocked_by: comfy-parity-native-frame-interpolate-node-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json
@@ -10505,11 +10523,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK458-CODEC-SUITE-ADMISSION-VALIDATION 2026-08-15; all 44 locked native video codec ABI, trust, loader, binding, admission, AVIO, LTXV encode/demux/decode/preprocess, retained-thread service, and new suite-admission tests passed; the exact ownership witness, locked all-target comfy_runtime/comfy_test_support compilation, formatting, current coding spec validator, JSON validation, planning self-tests, diff checks, and focused canonical regeneration passed. The broad comfy_runtime comparison completed at 342/415 with the same 73 managed-filesystem and unrelated trust-baseline failures; warning-denied Clippy reached only the established unrelated Metal/runtime dead-code and large-error diagnostics, with no diagnostic in the suite-admission or codec-service changes.
 
-- [x] 532. Encode one bounded RGB8 frame to VP9 WebM
+- [x] 533. Encode one bounded RGB8 frame to VP9 WebM
   - _id: comfy-parity-native-video-codec-vp9-webm-encode-foundation
   - Outcome: NativeVideoCodecSuite consumes its provider-proved libvpx-vp9 descriptor to encode one checked contiguous CPU RGB8 frame into bounded in-memory WebM at a checked reduced frame rate and CRF. It configures RGB24 to YUV420P, zero bit rate, exact packet drain and terminal flush/trailer semantics, caller workspace-backed AVIO, cancellation around every native call, and attempt-local reverse RAII. Batch tensors, alpha, AV1, AAC/audio, metadata, paths, effects, handles, publication, persistence, and recovery remain later owners.
-  - Wave: 327
-  - _Wave: 327
+  - Wave: 328
+  - _Wave: 328
   - Dependencies: comfy-parity-native-video-codec-suite-admission-foundation
   - _Blocked_by: comfy-parity-native-video-codec-suite-admission-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_test_support/fixtures/video/codec-plan/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-suite-admission/manifest.json
@@ -10525,11 +10543,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK459-VP9-WEBM-ENCODE-VALIDATION 2026-08-15; all 27 locked native video codec FFI tests passed, including the new exact WebM/rational-rate/packet/cleanup and bounds/cancellation/retry cases, while the shared LTXV H.264 encode regressions remained green. The exact new and reconciled historical ownership witnesses, locked all-target comfy_runtime/comfy_test_support compilation, formatting, current coding spec validator, JSON validation, planning self-tests, diff checks, and focused canonical regeneration passed. The broad comfy_runtime comparison completed at 344/417 with the same 73 managed-filesystem and unrelated trust-baseline failures. Warning-denied Clippy reached only established unrelated CUDA and Metal/runtime dead-code diagnostics; its first comfy_runtime diagnostics were in native_ffi_metal.rs, with none in the VP9/WebM changes. The fixture explicitly records that no installed/licensed package, playable WebM, or numeric/byte oracle is available.
 
-- [x] 533. Encode bounded IMAGE sequences to VP9 WebM
+- [x] 534. Encode bounded IMAGE sequences to VP9 WebM
   - _id: comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation
   - Outcome: NativeVideoCodecSuite encodes one checked nonempty contiguous CPU F32 BHWC three-channel IMAGE batch into a single bounded in-memory VP9 WebM session. It clamps and truncates one frame at a time to source-compatible RGB8, reuses one YUV frame, conversion context, codec, packet, stream, format, and AVIO owner, assigns increasing frame PTS, drains packets after every frame, and flushes and writes the trailer exactly once. Prompt and extra metadata, alpha, AV1, AAC/audio, the owned codec-thread byte bridge, paths, effects, handles, publication, persistence, and recovery remain later owners.
-  - Wave: 328
-  - _Wave: 328
+  - Wave: 329
+  - _Wave: 329
   - Dependencies: comfy-parity-native-video-codec-vp9-webm-encode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-vp9-webm-encode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_test_support/fixtures/video/codec-plan/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json
@@ -10545,11 +10563,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK460-VP9-WEBM-SEQUENCE-ENCODE-VALIDATION 2026-08-15; all 30 locked native video codec FFI tests passed, including the three new batch order, global protocol bound, later-frame failure, cancellation, cleanup, and retry cases, while the one-frame VP9 and LTXV H.264 regressions remained green. The five canonical RGB8 adapter tests, two native codec-plan tests, exact old and new ownership witnesses, locked all-target comfy_runtime/comfy_test_support compilation, formatting, JSON validation, coding spec validation, planning self-tests, diff checks, and focused canonical regeneration passed. The broad comfy_runtime comparison passed 347 of 420 tests with the same 73 managed-filesystem and unrelated trust-baseline failures. Warning-denied Clippy reached only the established unrelated comfy_backend_cuda dead-code diagnostic before the changed runtime code. The fixture explicitly records that no installed/licensed package, playable WebM, numeric/byte oracle, metadata, alpha/AV1/audio, actor bridge, or publication claim is available.
 
-- [x] 534. Return owned VP9 WebM bytes from the retained codec thread
+- [x] 535. Return owned VP9 WebM bytes from the retained codec thread
   - _id: comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation
   - Outcome: The sole retained native video codec actor accepts checked VP9 IMAGE-batch requests, executes the completed bounded WebM session on its codec-owning thread, copies the exact staged bytes once into a contiguous CPU U8 tensor, and drops every borrowed FFmpeg and AVIO owner before returning only portable bytes, dimensions, frame rate, frame count, and content digest. Caller scratch converges before the response; prompt and extra metadata, alpha, AV1, AAC/audio, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 329
-  - _Wave: 329
+  - Wave: 330
+  - _Wave: 330
   - Dependencies: comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json
@@ -10565,11 +10583,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK461-VP9-WEBM-THREAD-BRIDGE-VALIDATION 2026-08-15; all seven retained codec-service tests passed, including the two new mixed LTXV/VP9 actor-affinity and owned-output accounting, cancellation, exhaustion, and retry cases. All five retained VP9 one-frame and sequence regressions passed; the exact new bridge and historical LTXV actor ownership witnesses passed; locked all-target comfy_runtime/comfy_test_support compilation, focused production Clippy, formatting, JSON validation, coding spec validation, planning self-tests, diff hygiene, and focused canonical regeneration passed. The broad comfy_runtime comparison ran 422 tests: both new tests and every native video codec test passed, while the same 73 managed-filesystem and unrelated trust-baseline failures remained. The result performs one exact staged-byte copy into a backend-accounted CPU U8 Tensor, releases caller scratch before responding, and explicitly claims no metadata, alpha/AV1/audio, node/effect, handle/cache, persistence/recovery, publication, installed codec, playable WebM, or numeric oracle evidence.
 
-- [x] 535. Preserve source VP9 WebM CRF values through retained execution
+- [x] 536. Preserve source VP9 WebM CRF values through retained execution
   - _id: comfy-parity-native-video-codec-vp9-webm-crf-foundation
   - Outcome: The canonical native video codec plan preserves one finite source WebM CRF value from 0 through 63 as exact f64 bits, including negative zero. The sole retained codec actor carries that checked value unchanged to the VP9 session, which renders a bounded source-compatible floating option before avcodec_open2 without widening the separate integer LTXV H.264 contract. Metadata, alpha, AV1, AAC/audio, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 330
-  - _Wave: 330
+  - Wave: 331
+  - _Wave: 331
   - Dependencies: comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation
   - _Blocked_by: comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_test_support/fixtures/video/codec-plan/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json
@@ -10585,11 +10603,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK462-VP9-WEBM-CRF-VALIDATION 2026-08-15; all 40 locked comfy_media tests passed, including exact finite f64 bit admission and rejection. All six retained VP9 one-frame/sequence/formatting tests, the retained mixed codec-thread actor test, both LTXV H.264 regressions, and the exact new ownership witness passed. Locked all-target comfy_media/comfy_runtime/comfy_test_support compilation, formatting, coding spec validation, planning self-tests, diff hygiene, JSON validation, and two focused canonical regenerations passed. The repository-wide ownership gate completed its policy scan and then reached the established unrelated OpticalFlow-or-ClipVision source-text assertion; the focused Task462 witness remained green. The focused Clippy command reached only established unrelated runtime Metal dead-code, large-error, and historical test-only lint baselines; it reported no Task462 production diagnostic. Exact-signature evidence includes Python-compatible `1e-05` and `1e-07` rendering, actor carriage of 31.5 without integer narrowing, unchanged H.264 integer CRF, and explicit exclusions for metadata, alpha/AV1/audio, node/effect/publication, installed codecs, playable WebM, and numeric codec parity.
 
-- [x] 536. Attach bounded VP9 WebM container metadata
+- [x] 537. Attach bounded VP9 WebM container metadata
   - _id: comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation
   - Outcome: One supplementary compiler-verified FFmpeg 7.1 projection exposes only AVFormatContext.metadata while preserving the historical 56-byte data-plane prefix. A bounded ordered pre-serialized metadata value crosses the sole retained codec actor and attaches with flags zero before VP9 WebM stream and header creation; format-context RAII owns all partial and complete native dictionaries. JSON serialization, alpha, AV1, AAC/audio, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 331
-  - _Wave: 331
+  - Wave: 332
+  - _Wave: 332
   - Dependencies: comfy-parity-native-video-codec-vp9-webm-crf-foundation
   - _Blocked_by: comfy-parity-native-video-codec-vp9-webm-crf-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c, crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-crf/manifest.json
@@ -10605,11 +10623,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK463-VP9-WEBM-CONTAINER-METADATA-VALIDATION 2026-08-15; the compiler-verified C overlay and Rust/JSON contract passed with AVFormatContext.metadata at offset 192, projection size 200/alignment 8, the historical 56-byte data-plane manifest and verifier hashes unchanged, and the reviewed symbol count still 54. Four focused ABI/metadata tests, all eight retained VP9 one-frame/sequence/CRF regressions, the mixed retained codec-thread actor test, both LTXV H.264 regressions, the exact Task463 ownership witness, and the prior Task462 CRF witness passed. Locked all-target comfy_runtime/comfy_test_support compilation, formatting, coding spec validation, JSON validation, planning self-tests, diff hygiene, and two byte-identical focused canonical regenerations passed. The full locked comfy_runtime run completed 427 tests with 354 passing and the same 73 established managed-filesystem/unrelated trust failures; every Task463, VP9, actor, H.264, and ABI test passed. The repository-wide ownership scan reached only the established unrelated OpticalFlow-or-ClipVision source-text assertion after accepting the new mappings. Focused Clippy reached only established unrelated Metal dead-code, large-error, and CUDA warning baselines and reported no Task463 production diagnostic. Exact-signature evidence proves bounded ordered duplicate-preserving flags-zero attachment before stream/header, typed native failure/cancellation cleanup and retry, same-thread actor carriage, and explicitly excludes installed/playable/numeric codec evidence, Python JSON ownership, alpha/AV1/audio, nodes/effects/paths, handles/cache/persistence/recovery, and publication.
 
-- [x] 537. Preserve source VP9 WebM alpha through retained execution
+- [x] 538. Preserve source VP9 WebM alpha through retained execution
   - _id: comfy-parity-native-video-codec-vp9-webm-alpha-foundation
   - Outcome: The retained VP9 WebM IMAGE-sequence session and sole codec actor accept source-compatible four-channel CPU F32 BHWC input, clamp and truncate packed RGBA bytes, select compiler-verified RGBA-to-YUVA420P conversion, preserve floating CRF and ordered metadata, and return portable encoded bytes plus a checked alpha projection. The opaque RGB profile remains unchanged. Installed codec, playable or decoded numeric evidence, AV1, AAC/audio, JSON, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 332
-  - _Wave: 332
+  - Wave: 333
+  - _Wave: 333
   - Dependencies: comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation
   - _Blocked_by: comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json, crates/comfy_runtime/abi/video-codec/verify-container-metadata-bindings.c, crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-crf/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json
@@ -10625,11 +10643,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK464-VP9-WEBM-ALPHA-VALIDATION 2026-08-15; the warning-denied FFmpeg 7.1 C verifier and Rust/JSON contract passed with RGBA=26, YUVA420P=33, zero new symbols, the reviewed symbol count still 54, and historical data-plane/container-metadata files hash-stable. Eleven focused VP9 ABI/session tests passed, covering opaque RGB regressions, exact packed RGBA clamp/truncate bytes, RGBA-to-YUVA420P profile selection, ordered metadata, floating CRF, frame order, bounded staging, cancellation, reverse cleanup, zero scratch, and retry; the mixed capacity-one actor test passed with a four-channel IMAGE, fresh accounted U8 output, and checked alpha projection; both LTXV H.264 regressions passed. All 28 video-codec ownership witnesses and the exact Task464 witness passed after reconciling the generic actor identity to v6. Locked all-target comfy_runtime/comfy_test_support compilation, formatting, coding spec validation, planning self-tests, diff hygiene, supplementary JSON validation, and two byte-identical focused canonical regenerations passed. The full locked comfy_runtime run completed 430 tests with 357 passing and the same 73 established managed-filesystem/unrelated trust failures; every Task464, VP9, actor, H.264, and ABI test passed. Focused Clippy reached only established unrelated Metal and CUDA warning-denial baselines and reported no Task464 production diagnostic. The aggregate ownership suite reached its established long-running scan stall; its complete video-codec slice was rerun separately and passed. Evidence is exact-signature/compiler-verified only and explicitly excludes installed/playable/numeric codec or alpha round-trip proof, AV1/AAC/audio, JSON/node/effect/path/UI ownership, handles/cache/persistence/recovery/publication, and complete native-heap interception.
 
-- [x] 538. Encode bounded opaque AV1 WebM IMAGE sequences
+- [x] 539. Encode bounded opaque AV1 WebM IMAGE sequences
   - _id: comfy-parity-native-video-codec-av1-webm-sequence-encode-foundation
   - Outcome: The retained native codec suite executes bounded AV1 WebM IMAGE sequences through its provider-proved libsvtav1 descriptor. It stages the first three channels of canonical CPU F32 BHWC input as packed RGB8, compiler-verifies YUV420P10LE, preserves exact floating CRF text and ordered container metadata, applies preset 6 and the required global-header contract, and returns attempt-local encoded bytes after one flush and trailer. Actor transport, installed codec or playable numeric evidence, alpha preservation, AAC/audio, JSON, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 333
-  - _Wave: 333
+  - Wave: 334
+  - _Wave: 334
   - Dependencies: comfy-parity-native-video-codec-vp9-webm-alpha-foundation
   - _Blocked_by: comfy-parity-native-video-codec-vp9-webm-alpha-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json, crates/comfy_runtime/abi/video-codec/verify-container-metadata-bindings.c, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-vp9-alpha-v1.json, crates/comfy_runtime/abi/video-codec/verify-vp9-alpha-bindings.c, crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-crf/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-alpha/manifest.json
@@ -10645,11 +10663,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK465-AV1-WEBM-SEQUENCE-VALIDATION 2026-08-15; the warning-denied FFmpeg 7.1 C verifier and Rust/JSON contract passed with YUV420P10LE=62, zero new symbols, the reviewed symbol count still 54, and historical data-plane/container-metadata/VP9-alpha files hash-stable. The two focused retained AV1 sequence tests and exact ABI test passed, proving provider-proved libsvtav1 selection, RGB24-to-YUV420P10LE conversion, source-compatible first-three-channel quantization and alpha discard, zero bit rate, exact floating CRF text, preset 6, required global header, ordered preheader metadata, increasing frame order, one flush/trailer, bounded staging, cancellation, zero scratch, and clean retry. All ten VP9 WebM regressions, eight retained LTXV H.264 regressions, the exact Task465 ownership witness, locked all-target comfy_runtime/comfy_test_support compilation, formatting, coding spec validation, JSON validation, planning self-tests, diff hygiene, and two byte-identical focused canonical regenerations passed. The full locked comfy_runtime run completed 433 tests with 360 passing and the same 73 established managed-filesystem/unrelated trust failures; every Task465, VP9, H.264, and ABI test passed. The aggregate ownership scan accepted the new mapping and reached only the established unrelated OpticalFlow-or-ClipVision source-text assertion. Focused Clippy reached only established unrelated Metal and CUDA warning-denial baselines and reported no Task465 production diagnostic. Evidence is compiler-verified and exact-signature only and explicitly excludes actor transport, installed/playable/numeric AV1 proof, AAC/audio, JSON/node/effect/path ownership, handles/cache/persistence/recovery/publication, and complete native-heap interception.
 
-- [x] 539. Carry owned AV1 WebM bytes through the retained codec actor
+- [x] 540. Carry owned AV1 WebM bytes through the retained codec actor
   - _id: comfy-parity-native-video-codec-av1-webm-thread-bridge-foundation
   - Outcome: The sole capacity-one retained codec actor carries checked AV1 IMAGE batches, exact reduced rates, CRF bits, bounded ordered metadata, caller scratch, stream, and cancellation to the native owner thread. It invokes the retained AV1 WebM sequence primitive, drops every borrowed native and AVIO owner on that thread, performs one shared exact-length CPU U8 Tensor copy, and returns portable bytes with digest, dimensions, rate, frame count, ten-bit YUV420P10LE identity, and no alpha. Installed codec or playable numeric evidence, JSON, node services, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 334
-  - _Wave: 334
+  - Wave: 335
+  - _Wave: 335
   - Dependencies: comfy-parity-native-video-codec-av1-webm-sequence-encode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-av1-webm-sequence-encode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json, crates/comfy_test_support/fixtures/video/codec-av1-webm-sequence-encode/manifest.json
@@ -10665,11 +10683,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK466-AV1-WEBM-THREAD-BRIDGE-VALIDATION 2026-08-15; all seven retained codec actor tests passed after adding the AV1 request and portable-output variants, including mixed LTXV, VP9-alpha, and AV1 serialization on one non-caller thread, exact CRF and ordered metadata carriage, one shared exact-length CPU U8 Tensor materializer, exact synthetic bytes and digest, dimensions, reduced rate, frame count, ten-bit YUV420P10LE and no-alpha projections, native-owner drop before response, zero scratch, persistent output accounting, typed cancellation and exhaustion, and clean retry. Both retained AV1 sequence tests, all ten VP9 WebM regressions, all eight retained LTXV H.264 regressions, all 30 focused video-codec ownership witnesses, the exact Task466 ownership witness, locked all-target comfy_runtime/comfy_test_support compilation, formatting, JSON validation, coding spec validation, planning self-tests, diff hygiene, and two byte-identical 618-task canonical regenerations passed. The full locked comfy_runtime run completed 433 tests with 360 passing and the same 73 established managed-filesystem/unrelated trust failures; every Task466, AV1, VP9, H.264, and ABI test passed. Full comfy_test_support reached only its established sandbox special-entry, cancellation-scan, and filesystem-recovery failures before the known long conditioning stall. The aggregate ownership scan accepted every video-codec mapping and reached only established unrelated text-regex and OpticalFlow-or-ClipVision assertions plus long-running baseline scans. Focused Clippy reached only established unrelated Metal and CUDA warning-denial baselines and reported no Task466 production diagnostic. Evidence is exact-signature actor transport and accounting only and explicitly excludes installed/playable/numeric AV1 proof, JSON/node-service/effect/path ownership, handles/cache/persistence/recovery/publication, and complete native-heap interception.
 
-- [x] 540. Inject retained VP9/AV1 WebM encoding into native node execution
+- [x] 541. Inject retained VP9/AV1 WebM encoding into native node execution
   - _id: comfy-parity-native-video-codec-webm-node-service-foundation
   - Outcome: One checked Send+Sync WebM encoding service moves canonical IMAGE requests, VP9/AV1 codec identity, reduced frame rate, exact CRF bits, ordered serialized metadata, caller scratch, stream, and cancellation through the sole retained codec actor. NativeNodeServices, ExecutionEngine, and NativeImageExecutor carry the service without re-owning codec state; the existing exact-length CPU U8 Tensor crosses the portable boundary without another byte copy; and the actor plus all configured batch, session, and metadata limits bind execution/cache identity. JSON serialization, SaveWEBM descriptors, effects, paths, handles, persistence, recovery, and publication remain later owners.
-  - Wave: 335
-  - _Wave: 335
+  - Wave: 336
+  - _Wave: 336
   - Dependencies: comfy-parity-native-video-codec-av1-webm-thread-bridge-foundation
   - _Blocked_by: comfy-parity-native-video-codec-av1-webm-thread-bridge-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/comfy_nodes.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/comfy_runtime.rs, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-alpha/manifest.json, crates/comfy_test_support/fixtures/video/codec-av1-webm-thread-bridge/manifest.json
@@ -10683,11 +10701,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-TENSOR-001, VAL-MEDIA-001, VAL-RUNTIME-TRUST-001, VAL-NATIVE-BOUNDARY-001, VAL-NODE-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_nodes -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_runtime -p comfy_test_support
   - Done when: Focused node-contract, actor-adapter, controller-identity, and ownership tests prove checked request/result identities; VP9 opaque/alpha and AV1 dispatch through the same retained actor; exact ordered metadata and fractional CRF carriage; digest, dimensions, rate, count, codec, pixel-format, bit-depth, alpha, and stream projection validation; no-copy Tensor ownership transfer; bounded metadata allocation, cancellation and resource-exhaustion atomicity, retry, and scratch convergence; exact engine/context propagation; and independent stable WebM cache identity. The fixture explicitly excludes installed codecs, playable or decoded numeric evidence, JSON construction, SaveWEBM nodes/effects/paths, handles, cache payloads, persistence, recovery, and publication.
 
-- [x] 541. Prepare and publish native SaveWEBM output
+- [x] 542. Prepare and publish native SaveWEBM output
   - _id: comfy-parity-native-video-save-webm-node-foundation
   - Outcome: The source-exact experimental SaveWEBM node resolves one canonical IMAGE handle, applies Python ties-even millisecond frame-rate rounding, preserves floating CRF bits, serializes prompt then insertion-ordered extra_pnginfo metadata, and delegates VP9/AV1 encoding to the retained WebM node service. It copies the portable encoded Tensor once into one bounded Output/webm/video-webm prepared effect, returns the identical IMAGE handle with a PreviewVideo transaction projection, and reverses the prepared ticket on late cancellation or invalid completion. Codec lifetimes, output commit/recovery, paths, handles, caches, and persistence remain with their existing owners.
-  - Wave: 336
-  - _Wave: 336
+  - Wave: 337
+  - _Wave: 337
   - Dependencies: comfy-parity-native-video-codec-webm-node-service-foundation
   - _Blocked_by: comfy-parity-native-video-codec-webm-node-service-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_io.py, projects/comfy/ComfyUI/comfy_api/latest/_ui.py, crates/comfy_media/src/video.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/families/video_01.rs, crates/comfy_runtime/src/prompt_compiler.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_test_support/fixtures/video/codec-webm-node-service/manifest.json
@@ -10703,11 +10721,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK468-SAVE-WEBM-NODE-VALIDATION 2026-08-15; all 41 locked comfy_media tests and all 128 locked comfy_nodes tests passed, including Python-compatible ties-even millisecond frame-rate projection, exact SaveWEBM descriptor and hidden inputs, ordered prompt/extra metadata, retained VP9/AV1 service dispatch, identical IMAGE handle return, one prepared WebM output transaction, late-cancellation rollback, and clean retry. The exact Task468 ownership witness, locked all-target comfy_media/comfy_nodes/comfy_test_support compilation, formatting, JSON validation, coding spec validation, planning self-tests, authoritative 220-row ownership generation, diff hygiene, and two byte-identical 620-task full canonical regeneration passes succeeded. Focused Clippy reached only the established unrelated Metal unused/dead-code and CUDA dead-code warning-denial baselines and reported no Task468 diagnostic. Evidence is source-derived and injected-service execution only and explicitly excludes installed/playable/numeric codec proof, filename-counter byte identity, OutputCommitter commit/recovery ownership, cache persistence, and complete process-heap interception.
 
-- [x] 542. Encode bounded 8-bit component IMAGE sequences to H.264 MP4
+- [x] 543. Encode bounded 8-bit component IMAGE sequences to H.264 MP4
   - _id: comfy-parity-native-video-codec-h264-mp4-sequence-encode-foundation
   - Outcome: The retained video codec suite encodes one bounded nonempty contiguous CPU F32 BHWC IMAGE sequence with three or four channels into one attempt-local in-memory H.264 MP4. It clamps and truncates the first three channels to packed RGB8, discards alpha, preserves the checked reduced frame rate and source order, drains packets after every frame, flushes once, and uses the ordinary provider-proved libx264 profile without LTXV-specific CRF or preset options. Ten-bit video, audio, metadata, actor transport, nodes, encoded backing, slicing, effects, handles, caches, persistence, recovery, and publication remain later owners.
-  - Wave: 337
-  - _Wave: 337
+  - Wave: 338
+  - _Wave: 338
   - Dependencies: comfy-parity-native-video-save-webm-node-foundation
   - _Blocked_by: comfy-parity-native-video-save-webm-node-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_test_support/fixtures/video/codec-plan/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-suite-admission/manifest.json
@@ -10723,11 +10741,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK469-H264-MP4-SEQUENCE-VALIDATION 2026-08-15; both locked retained H.264 MP4 sequence tests passed with exact reduced rate, RGB clamp/truncate order, alpha discard, one session, per-frame packet drain, one flush/trailer, absence of LTXV CRF/preset options, bounded later-frame cancellation/failure rollback, zero scratch after drop, and clean same-suite retry. All 8 retained LTXV H.264, 10 retained VP9 WebM, and 2 retained AV1 WebM regressions passed; the exact ownership witness, locked all-target comfy_runtime/comfy_test_support compilation, formatting, JSON validation, planning self-tests, and two byte-identical 621-task canonical regeneration passes succeeded. The broad locked comfy_runtime comparison was 362/435 passed with the same 73 established managed-filesystem and unrelated trust failures; every codec test passed. Focused Clippy reached only the established unrelated Metal unused/dead-code and CUDA dead-code warning-denial baselines and reported no Task469 diagnostic. Evidence remains synthetic exact-signature execution and explicitly excludes installed/playable/numeric codec proof, PyAV encoder-default or byte identity, ten-bit/AAC/metadata, actor/node/backing/slice/effect reachability, publication, and complete native-heap interception.
 
-- [x] 543. Carry owned H.264 MP4 bytes through the retained codec actor
+- [x] 544. Carry owned H.264 MP4 bytes through the retained codec actor
   - _id: comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation
   - Outcome: The sole capacity-one retained codec actor carries checked H.264 IMAGE batches, exact reduced rates, bounded sequence limits, caller scratch, stream, and cancellation to the native owner thread. It invokes the retained H.264 MP4 sequence primitive, drops every borrowed native and AVIO owner on that thread, performs one shared exact-length CPU U8 Tensor copy, and returns portable bytes with digest, dimensions, rate, frame count, eight-bit YUV420P identity, and no alpha. Installed codec or playable numeric evidence, ten-bit video, AAC/audio, metadata, node services, encoded backing, slicing, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 338
-  - _Wave: 338
+  - Wave: 339
+  - _Wave: 339
   - Dependencies: comfy-parity-native-video-codec-h264-mp4-sequence-encode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-h264-mp4-sequence-encode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-av1-webm-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-h264-mp4-sequence-encode/manifest.json
@@ -10743,11 +10761,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK470-H264-MP4-ACTOR-VALIDATION 2026-08-20; all 7 locked native-video codec service tests passed, including mixed LTXV/VP9/AV1/H.264 serialization on the sole non-caller actor, exact H.264 IMAGE storage/rate/limit carriage, one shared checked CPU U8 output copy, digest and eight-bit YUV420P/no-alpha projections, native-owner drop before response, cancellation/resource-exhaustion atomicity, scratch convergence, persistent allocation release, clean retry, and v8 identity. Both retained H.264 MP4 sequence tests and the exact H.264 actor ownership witness passed; regenerated authoritative ownership confirms the H.264 sequence, H.264 actor, VP9 actor, AV1 actor, and shared codec-thread concerns. Locked all-target comfy_runtime/comfy_test_support compilation, formatting, JSON validation, planning self-tests, strict spec validation, diff integrity, and canonical 622-task/222-ownership-row/13,295-trace-row `regenerate_all.py --check-twice` passed. The broad locked comfy_runtime comparison was 362/435 with the same 73 managed-filesystem or unrelated trust failures and every codec test green. The complete comfy_test_support comparison reached every target: Task470 and every neighboring video-codec witness passed; 14 unrelated targets retained current-tree permission, managed-filesystem, network, native-diffusion, legacy-supervisor, and non-video ownership failures, with aggregate ownership 84/120 and all 36 failures outside Task470. Focused Clippy reached only established unrelated Metal/CUDA warning-denial baselines and reported no Task470 diagnostic. Evidence remains synthetic exact-signature execution and excludes installed/playable/numeric H.264 proof, PyAV encoder or byte identity, ten-bit/AAC/metadata, node/backing/slice/effect reachability, publication, and complete native-heap interception.
 
-- [x] 544. Materialize bounded H.264 MP4 backing for component VIDEO
+- [x] 545. Materialize bounded H.264 MP4 backing for component VIDEO
   - _id: comfy-parity-native-video-component-h264-mp4-backing-service-foundation
   - Outcome: A checked native-node service accepts one canonical materialized component VIDEO, derives the canonical metadata-free 8-bit H.264 MP4 encode plan under fixed service limits, and carries its immutable IMAGE storage through the sole retained codec actor. It moves the actor-owned CPU U8 Tensor without another encoded-byte copy into a checked portable backing bound to the source VIDEO semantic digest, content digest, dimensions, reduced rate, frame count, MP4/H.264/YUV420P identity, and no alpha. Ten-bit video, AAC/audio, container metadata, file-backed VIDEO representation, trim windows, slicing, save effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 339
-  - _Wave: 339
+  - Wave: 340
+  - _Wave: 340
   - Dependencies: comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation
   - _Blocked_by: comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/comfy_nodes.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/comfy_runtime.rs, crates/comfy_test_support/fixtures/video/components/manifest.json, crates/comfy_test_support/fixtures/video/codec-plan/manifest.json, crates/comfy_test_support/fixtures/video/codec-h264-mp4-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-h264-mp4-thread-bridge/manifest.json
@@ -10763,11 +10781,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK471-COMPONENT-H264-MP4-BACKING-VALIDATION 2026-08-20; all 7 locked native-video codec service tests passed, including canonical component VIDEO planning, exact source semantic and encoded-content binding, actor request carriage, zero-second-copy Tensor storage identity, projection validation, every planning and sequence limit in service identity, cancellation, exhaustion, accounting, and clean retry. All 129 comfy_nodes tests passed, including checked service identity/request/result validation and absent-service behavior; the controller configuration test passed with stable fixed-order H.264 MP4 identity partitioning. The exact Task471 ownership witness and every H.264/VP9/AV1 codec ownership witness encountered in the aggregate support sweep passed; authoritative ownership confirms the component backing service as the sole owner. Locked all-target comfy_nodes/comfy_runtime/comfy_test_support compilation, planning self-tests, strict spec validation, JSON validation, and diff integrity passed. The broad comfy_runtime comparison was 362/435 with the same 73 managed-filesystem or unrelated trust failures and every video-codec/service test green. The full comfy_test_support comparison reproduced its established sandbox special-entry, cancellation-scan, filesystem/recovery, offline release-download, native-diffusion, legacy-supervisor, and non-video ownership failures; after the Task471 witness passed, the remaining long unrelated aggregate scans were stopped rather than attributed to this leaf. Evidence remains synthetic exact-signature execution and excludes installed/playable/numeric H.264 proof, PyAV encoder or byte identity, ten-bit/AAC/metadata, encoded VIDEO representation, slice/effect reachability, publication, and complete native-heap interception.
 
-- [x] 545. Represent component and encoded VIDEO backings canonically
+- [x] 546. Represent component and encoded VIDEO backings canonically
   - _id: comfy-parity-native-video-backing-representation-foundation
   - Outcome: The canonical VIDEO media payload is a closed tagged representation of either materialized components or one path-free encoded backing. The completed component H.264 MP4 service moves its actor-owned CPU U8 Tensor directly into the narrow encoded variant, binding fixed MP4/H.264/YUV420P/eight-bit/no-audio/no-alpha identity, source VIDEO semantic digest, content digest, dimensions, reduced rate, and frame count without a second byte copy. The existing VIDEO handle kind remains singular, while component-only codec planning, GetVideoComponents, provider materialization, and plugin projection reject encoded backing until their later decode owners exist. Trim windows, ten-bit H.264, AAC/audio, container metadata, file/path ingest, demux/decode, VideoSlice, SaveVideo effects, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 340
-  - _Wave: 340
+  - Wave: 341
+  - _Wave: 341
   - Dependencies: comfy-parity-native-video-component-h264-mp4-backing-service-foundation
   - _Blocked_by: comfy-parity-native-video-component-h264-mp4-backing-service-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/video.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/families/video_01.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_plugin_host/src/registry_adapter.rs, crates/comfy_test_support/fixtures/video/components/manifest.json, crates/comfy_test_support/fixtures/video/component-h264-mp4-backing-service/manifest.json
@@ -10783,11 +10801,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK472-VIDEO-BACKING-REPRESENTATION-VALIDATION 2026-08-20; focused media, node-service, runtime adapter, provider, GetVideoComponents, plugin projection, and exact ownership tests passed. All 42 comfy_media and 130 comfy_nodes tests passed; locked all-target compilation passed for comfy_media, comfy_nodes, comfy_plugin_host, comfy_runtime, and comfy_test_support. The canonical VIDEO payload now has checked component and encoded tags, the narrow MP4/H.264/YUV420P/eight-bit encoded constructor binds source and content digests plus exact geometry/rate/count, and the actor-owned encoded Tensor StorageId moves without a second copy. Component-only codec planning, GetVideoComponents, provider materialization, and plugin projection reject encoded input. Both relevant ownership concerns are authoritative_owner_confirmed, planning self-tests and strict spec validation passed, and the exact Task471/Task472 ownership witnesses passed. The broad comfy_runtime comparison remained the established 362/435 baseline with the same 73 filesystem/trust failures and no video regression; comfy_plugin_host reproduced its established sandbox Bad-file-descriptor failure. Focused Clippy reached only established unrelated Metal/CUDA warning-denial baselines. Evidence remains structural and synthetic, excluding trim windows, ten-bit H.264, AAC/audio, arbitrary metadata, path/file ingest, demux/decode, VideoSlice, SaveVideo/effects, cache/persistence/recovery/publication, installed/playable codec proof, PyAV byte identity, and complete native-heap interception.
 
-- [x] 546. Encode bounded ten-bit component IMAGE sequences to H.264 MP4
+- [x] 547. Encode bounded ten-bit component IMAGE sequences to H.264 MP4
   - _id: comfy-parity-native-video-codec-h264-mp4-10bit-sequence-encode-foundation
   - Outcome: The retained provider-proved libx264 suite encodes bounded CPU F32 BHWC three- or four-channel component IMAGE sequences through the existing one-session H.264 MP4 state machine at ten-bit depth. It stages only the first three channels as source-compatible clamped and truncated little-endian RGB48LE, converts to compiler-reviewed YUV420P10LE, preserves exact reduced rate, frame order, packet bounds, flush, trailer, cancellation, reverse cleanup, and retry semantics, and leaves the reviewed 54-symbol table unchanged. Actor transport, canonical encoded backing, AAC/audio, metadata, trim windows, VideoSlice, SaveVideo effects, paths, handles, cache, persistence, recovery, publication, and installed/playable/numeric codec evidence remain later owners.
-  - Wave: 341
-  - _Wave: 341
+  - Wave: 342
+  - _Wave: 342
   - Dependencies: comfy-parity-native-video-backing-representation-foundation
   - _Blocked_by: comfy-parity-native-video-backing-representation-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-av1-pixel-format-v1.json, crates/comfy_runtime/abi/video-codec/verify-av1-pixel-format-bindings.c, crates/comfy_test_support/fixtures/video/codec-h264-mp4-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/encoded-video-backing-payload/manifest.json
@@ -10803,11 +10821,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK473-H264-MP4-10BIT-SEQUENCE-VALIDATION 2026-08-20; the official FFmpeg 7.1 pixfmt.h matched the reviewed ace2ebcf... SHA-256 and the warning-denied C verifier compiled RGB48LE=35 and YUV420P10LE=62 with no new symbols. Focused ABI/session tests passed, proving exact clamped/truncated U16 little-endian packed RGB staging with fourth-channel discard, RGB48LE-to-YUV420P10LE selection, ten-bit projection, no ordinary CRF/preset, output choreography, and zero scratch. Both retained eight-bit H.264 sequence regressions and both old/new exact ownership witnesses passed; locked all-target comfy_runtime/comfy_test_support compilation, planning self-tests, JSON validation, and diff integrity passed. Authoritative ownership confirms the single H.264 MP4 sequence owner across both depths. The broad comfy_runtime comparison was 364/437 with the same 73 managed-filesystem or unrelated trust failures and every video-codec test green. Focused Clippy reached only the established unrelated Metal/CUDA warning-denial baseline. Evidence remains synthetic exact-signature execution and excludes actor/node/backing/slice/effect reachability, AAC/audio, metadata, paths, handles, cache, persistence, recovery, publication, installed/playable/numeric codec proof, PyAV byte identity, and complete native-heap interception.
 
-- [x] 547. Carry owned ten-bit H.264 MP4 bytes through the retained codec actor
+- [x] 548. Carry owned ten-bit H.264 MP4 bytes through the retained codec actor
   - _id: comfy-parity-native-video-codec-h264-mp4-10bit-thread-bridge-foundation
   - Outcome: The sole capacity-one retained codec actor carries checked ten-bit H.264 IMAGE batches, exact reduced rates, bounded sequence limits, caller scratch, stream, and cancellation to the native owner thread. One closed bit-depth request selects the completed ten-bit retained session, drops every borrowed native and AVIO owner on that thread, reuses the shared exact-length CPU U8 Tensor copy, and returns portable bytes with digest, dimensions, rate, frame count, ten-bit YUV420P10LE identity, and no alpha. Eight-bit H.264, LTXV, VP9, AV1, and component-backing behavior remain unchanged; ten-bit encoded VIDEO backing, AAC/audio, metadata, slicing, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 342
-  - _Wave: 342
+  - Wave: 343
+  - _Wave: 343
   - Dependencies: comfy-parity-native-video-codec-h264-mp4-10bit-sequence-encode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-h264-mp4-10bit-sequence-encode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_test_support/fixtures/video/codec-h264-mp4-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-h264-mp4-10bit-sequence-encode/manifest.json
@@ -10823,11 +10841,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK474-H264-MP4-10BIT-THREAD-BRIDGE-VALIDATION 2026-08-20 PASS. The sole capacity-one retained codec actor now carries a closed eight/ten-bit H.264 MP4 request on the same native thread, selects the completed ten-bit retained session, derives Ten/YUV420P10LE from the native result, and reuses the one exact-length accounted CPU U8 Tensor materializer while the existing component-backing adapter remains explicitly eight-bit. The actor identity advanced from v8 to v9. The seven focused codec-service tests, six H.264 runtime tests, and all 35 focused native-video ownership witnesses passed, including the exact differential Task474 witness over the two existing actor concerns. Formatting and locked comfy_runtime/comfy_test_support all-target compilation passed. The full comfy_runtime comparison was 364/437 with the same 73 established managed-filesystem or unrelated trust failures and every codec test green. Six pre-existing codec catalog regex/parser rows remain non-authoritative despite their focused witnesses passing; Task474's two extended concerns are authoritative. Evidence remains synthetic exact-signature execution and excludes installed or playable codec proof, PyAV byte identity, AAC/audio, metadata, ten-bit encoded VIDEO backing, nodes, VideoSlice, SaveVideo effects, paths, handles, cache, persistence, recovery, publication, and complete native-heap interception.
 
-- [x] 548. Materialize ten-bit H.264 MP4 backing for component VIDEO
+- [x] 549. Materialize ten-bit H.264 MP4 backing for component VIDEO
   - _id: comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation
   - Outcome: The existing checked component H.264 MP4 backing service admits the closed eight- and ten-bit component VIDEO profiles without a second service, actor, or payload owner. It derives depth from the canonical source, selects the matching retained actor operation, validates the actual YUV420P or YUV420P10LE projection, and moves the actor-owned CPU U8 Tensor into the canonical encoded VIDEO representation without another encoded-byte copy. Existing eight-bit semantic identity remains byte-stable; AAC/audio, metadata, trim windows, slicing, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 343
-  - _Wave: 343
+  - Wave: 344
+  - _Wave: 344
   - Dependencies: comfy-parity-native-video-codec-h264-mp4-10bit-thread-bridge-foundation
   - _Blocked_by: comfy-parity-native-video-codec-h264-mp4-10bit-thread-bridge-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/video.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_test_support/fixtures/video/component-h264-mp4-backing-service/manifest.json, crates/comfy_test_support/fixtures/video/encoded-video-backing-payload/manifest.json, crates/comfy_test_support/fixtures/video/codec-h264-mp4-10bit-thread-bridge/manifest.json
@@ -10843,11 +10861,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK475-H264-MP4-10BIT-BACKING-VALIDATION 2026-08-20 PASS. The canonical component backing service now admits both checked Eight/YUV420P and Ten/YUV420P10LE plans, selects the matching retained v9 actor operation, validates the actual depth/profile projection, and moves the actor-owned CPU U8 Tensor into the sole encoded VIDEO payload without another encoded-byte copy. The existing eight-bit encoded semantic digest is frozen byte-for-byte while ten-bit identity binds the distinct pixel profile; the backing service identity advanced from v1 to v2. All 42 comfy_media tests, 130 comfy_nodes tests, seven retained codec-service tests, and all 41 native-video ownership witnesses passed, including the exact differential Task475 witness over the two extended authoritative concerns. Formatting, locked all-target compilation, four planning self-tests, and strict spec validation passed. The full comfy_runtime comparison remained 364/437 with the same 73 established managed-filesystem or unrelated trust failures and every video/codec test green. Focused Clippy reached only the unchanged Metal unused-code and CUDA dead-code warning-denial baseline. Evidence remains synthetic exact-signature execution and excludes installed or playable H.264 proof, PyAV byte identity, AAC/audio, metadata, trim windows, VideoSlice, SaveVideo effects, paths, handles, cache, persistence, recovery, publication, and complete native-heap interception.
 
-- [ ] 549. Review the general native video codec ABI
+- [ ] 550. Review the general native video codec ABI
   - _id: comfy-parity-native-video-codec-general-abi-foundation
   - Outcome: Extend the existing reviewed FFmpeg 7.1 ABI beyond its encode and LTXV subset with the exact bounded demux, general decode, seek, remux, rotation, AAC resampling, alignment, and pre-conversion padding/filter declarations required by the pinned video source. Preserve every existing H.264 and WebM ABI identity and admit no library or availability claim from declarations alone.
-  - Wave: 344
-  - _Wave: 344
+  - Wave: 345
+  - _Wave: 345
   - Dependencies: comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation
   - _Blocked_by: comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_ffi_elf.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/abi/video-codec
@@ -10861,11 +10879,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-NATIVE-E2E-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_runtime -p comfy_test_support
   - Done when: Official FFmpeg 7.1 header and archive fingerprints plus warning-denied C verification prove every required symbol, version namespace, checked struct prefix, seek/remux/decode/AAC/filter declaration, and retained-library dependency. Existing codec identities remain frozen; absent, mismatched, or incomplete declarations fail before any library load, and the task makes no codec-availability claim.
 
-- [ ] 550. Bootstrap the signed native video codec package
+- [ ] 551. Bootstrap the signed native video codec package
   - _id: comfy-parity-native-video-codec-package-bootstrap-foundation
   - Outcome: Add one explicit runtime-profile codec package authority, independently of compute backend selection, and use it to verify the canonical signed FFmpeg package and dependency closure before starting the sole thread-affine codec actor inside the worker. Inject the existing LTXV, WebM, and H.264 service ports through the normal executor configuration and bind the package identity into cache configuration without a downloader or private signing key.
-  - Wave: 345
-  - _Wave: 345
+  - Wave: 346
+  - _Wave: 346
   - Dependencies: comfy-parity-native-video-codec-general-abi-foundation
   - _Blocked_by: comfy-parity-native-video-codec-general-abi-foundation
   - Reads: crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/settings.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_worker/src/comfy_worker_main.rs, crates/comfy_worker/src/comfy_worker.rs
@@ -10879,11 +10897,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-NATIVE-E2E-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_runtime -p settings_content -p comfy_worker -p comfy_test_support; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p settings_content --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_runtime -p settings_content -p comfy_worker -p comfy_test_support
   - Done when: CPU and accelerator worker launches carry the same independent codec authority. Valid signed Linux packages reach the retained actor from production startup; missing, tampered, symlinked, incomplete, wrong-target, unlicensed, or signer-mismatched packages fail before executor construction. Shutdown releases thread-affine state on its owner thread, service identity changes invalidate cache configuration, and fixture keys never become production trust roots.
 
-- [ ] 551. Demux and decode sealed native video bytes
+- [ ] 552. Demux and decode sealed native video bytes
   - _id: comfy-parity-native-video-demux-decode-foundation
   - Outcome: Implement bounded in-memory MP4/H.264 and WebM VP9 or AV1 demux and full-sequence decode through the retained codec actor. Select the first video stream and last decodable audio stream, retain typed diagnostics for skipped unsupported streams, recover exact rate, depth, alpha, metadata, rotation, and AAC samples, and reproduce the source pre-conversion pad/smear/crop behavior without paths or subprocesses.
-  - Wave: 346
-  - _Wave: 346
+  - Wave: 347
+  - _Wave: 347
   - Dependencies: comfy-parity-native-video-codec-package-bootstrap-foundation
   - _Blocked_by: comfy-parity-native-video-codec-package-bootstrap-foundation
   - Reads: projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_media/src/video.rs
@@ -10897,11 +10915,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-NATIVE-E2E-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_runtime -p comfy_media -p comfy_test_support; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_media --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_runtime -p comfy_media -p comfy_test_support
   - Done when: Golden 8/10-bit MP4, VP9-alpha WebM, AV1 WebM, AAC, rotation, odd-width, truncated, malformed, and missing-stream fixtures prove average-rate fallback, bounded packet/frame loops, source-exact padding/filter order, float-planar resampling, seek windows, and typed diagnostics. Cancellation and exhaustion at every demux, decode, filter, conversion, and resample boundary publish nothing and retry cleanly.
 
-- [ ] 552. Retain sealed video sources and immutable slice views
+- [ ] 553. Retain sealed video sources and immutable slice views
   - _id: comfy-parity-native-video-source-slice-materialization-foundation
   - Outcome: Generalize canonical encoded VIDEO beyond the fixed H.264 profile while keeping its existing semantic identity byte-stable. Retain sealed bytes and checked probe identity, never a path; add alias-aware immutable trim views with source-exact negative start, nested composition, zero-duration-to-EOF, and strict-duration rules; and extend canonical worker asset collection and decode materialization for LoadVideo and encoded GetVideoComponents without a second asset owner.
-  - Wave: 347
-  - _Wave: 347
+  - Wave: 348
+  - _Wave: 348
   - Dependencies: comfy-parity-native-video-demux-decode-foundation
   - _Blocked_by: comfy-parity-native-video-demux-decode-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -10915,11 +10933,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-NATIVE-E2E-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_media -p comfy_nodes -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_media --all-targets; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_media -p comfy_nodes -p comfy_runtime -p comfy_test_support
   - Done when: No path survives prompt compilation. Content replacement, probe changes, and trim changes alter semantic identity; stale references fail closed. Nested and negative slices, zero duration, strict overflow, alias residency, cancellation, cache retry, persistence, and restart recovery are deterministic. Encoded GetVideoComponents uses the canonical decoder while already materialized component VIDEO retains its existing zero-copy path.
 
-- [ ] 553. Save, remux, and publish native video outputs
+- [ ] 554. Save, remux, and publish native video outputs
   - _id: comfy-parity-native-video-save-remux-audio-effects-foundation
   - Outcome: Implement source-exact SaveVideo remux and transcode policy over sealed VIDEO. Packet-copy only when container, codec, depth, and no-trim constraints match; otherwise materialize and encode MP4/H.264 at the retained depth, map AAC layouts and exact sample caps, merge source and explicit metadata under the global suppression policy, and delegate nested-prefix preparation, commit, rollback, recovery, and UI projection to the existing output committer.
-  - Wave: 348
-  - _Wave: 348
+  - Wave: 349
+  - _Wave: 349
   - Dependencies: comfy-parity-native-video-source-slice-materialization-foundation
   - _Blocked_by: comfy-parity-native-video-source-slice-materialization-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/output_committer.rs
@@ -10933,11 +10951,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-NATIVE-E2E-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_runtime -p comfy_media -p comfy_nodes -p comfy_test_support; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_media --all-targets; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_runtime -p comfy_media -p comfy_nodes -p comfy_test_support
   - Done when: The remux/transcode decision matrix, unsupported-stream handling, source-versus-explicit metadata precedence, metadata suppression, mono/stereo/5.1/fallback layout, ceil-derived AAC sample cap, float-planar PTS/flush behavior, and 8/10-bit round trips match source-derived fixtures. Every cancellation, trailer, codec, effect, collision, and recovery failure publishes no partial output; the returned VIDEO aliases the canonical checked source semantics.
 
-- [ ] 554. Implement native video codecs, transforms, effects, and frame interpolation
+- [ ] 555. Implement native video codecs, transforms, effects, and frame interpolation
   - _id: comfy-parity-native-video-execution-foundation
   - Outcome: Close the canonical native video foundation after the reviewed codec ABI, signed package bootstrap, full demux/decode, sealed source and slice representation, and save/remux/audio/effect phases are complete. Reuse the separately owned concrete frame-interpolation model loader and existing FrameInterpolate execution; this task is validation and ownership closure, not a second codec, model loader, node registry, output committer, or payload owner.
-  - Wave: 349
-  - _Wave: 349
+  - Wave: 350
+  - _Wave: 350
   - Dependencies: comfy-parity-native-video-save-remux-audio-effects-foundation, comfy-parity-native-nodes-model-loaders-comfy-node-0012
   - _Blocked_by: comfy-parity-native-video-save-remux-audio-effects-foundation, comfy-parity-native-nodes-model-loaders-comfy-node-0012
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_nodes/src/families/video_01.rs, crates/comfy_runtime/src/output_committer.rs
@@ -10951,11 +10969,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-MODEL-FAMILY-001, VAL-NATIVE-E2E-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_test_support; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_test_support
   - Done when: Cross-phase fixtures prove production-reachable signed Linux codec startup; source-exact 8/10-bit H.264/MP4 and VP9/AV1 WebM decode/encode; AAC, alpha, rotation, metadata, slicing, remux, LTXV, preview/save, rollback, recovery, cancellation, alias-aware residency, and zero partial publication. Concrete FILM/RIFE publication is imported from the model-loader node owner and its execution from the existing video node adapter. Missing target packages remain explicit unavailable release gates; no fixture key, absent package, or unsupported platform is promoted to production availability.
 
-- [ ] 555. Retain ordered path-free asset directory snapshots
+- [ ] 556. Retain ordered path-free asset directory snapshots
   - _id: comfy-parity-native-asset-directory-snapshot-foundation
   - Outcome: Extend the sole authorized asset service with an immutable path-free directory snapshot that preserves source enumeration order, entry kind, nested repeat-folder identity, and caption-file references without exposing a host path or creating a second scanner.
-  - Wave: 355
-  - _Wave: 355
+  - Wave: 356
+  - _Wave: 356
   - Dependencies: comfy-parity-native-detection-execution-foundation, comfy-parity-native-media-text-rendering-foundation, comfy-parity-native-nodes-utilities-comfy-node-0077
   - _Blocked_by: comfy-parity-native-detection-execution-foundation, comfy-parity-native-media-text-rendering-foundation, comfy-parity-native-nodes-utilities-comfy-node-0077
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/persistence.rs
@@ -10969,11 +10987,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-008, VAL-MEDIA-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_nodes -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_runtime -p comfy_test_support
   - Done when: An authorized snapshot records exact one-level file and directory order, ordered nested entries, stable content references and digests, caption reads, and repeat-folder counts without BTreeSet reordering or raw paths. Change during enumeration or read, wrong root, stale identity, malformed caption, cancellation, exhaustion, cache retry, persistence, and restart fail or recover deterministically without publishing a partial snapshot.
 
-- [ ] 556. Project bounded node progress text through execution
+- [ ] 557. Project bounded node progress text through execution
   - _id: comfy-parity-native-node-progress-text-foundation
   - Outcome: Add one bounded attempt- and node-scoped text progress event to the canonical execution owner, private-worker wire, API/WebSocket presentation, and GPUI projection so source nodes can publish live text without a leaf-owned event bus or an untracked side channel.
-  - Wave: 356
-  - _Wave: 356
+  - Wave: 357
+  - _Wave: 357
   - Dependencies: comfy-parity-native-asset-directory-snapshot-foundation
   - _Blocked_by: comfy-parity-native-asset-directory-snapshot-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_images.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/queue_history.rs, crates/comfy_runtime/src/execution_presentation.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_api/src/websocket.rs, crates/comfy_ui/src/execution_model.rs, crates/comfy_worker/src/comfy_worker.rs
@@ -10987,11 +11005,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-004, VAL-NATIVE-API-001, VAL-GPUI-007, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_nodes -p comfy_runtime -p comfy_api -p comfy_ui -p comfy_worker -p comfy_test_support; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_api --all-targets; cargo test --locked -p comfy_ui --features test-support --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_runtime -p comfy_api -p comfy_ui -p comfy_worker -p comfy_test_support
   - Done when: Source-compatible text progress is bound to the exact attempt, node, hidden unique identifier, and monotonic event sequence; bounded Unicode, replacement, clearing, reconnect, persistence, retry, stale-attempt, cancellation, worker loss, and terminal-state cases project identically through worker, reducer, API/WebSocket, and GPUI. Oversize, malformed, late, or cross-attempt text is rejected before mutation and no node leaf owns a competing progress channel.
 
-- [ ] 557. Decode sealed raster and visual-stream assets
+- [ ] 558. Decode sealed raster and visual-stream assets
   - _id: comfy-parity-native-visual-asset-decode-foundation
   - Outcome: Implement one injected path-free visual decode service over sealed asset bytes. It reuses the retained native video decoder for the first visual stream and owns bounded PNG, JPEG, static or animated WebP, EXIF orientation, RGB, raw alpha, and source frame filtering without putting codec logic in image-family leaves.
-  - Wave: 357
-  - _Wave: 357
+  - Wave: 358
+  - _Wave: 358
   - Dependencies: comfy-parity-native-node-progress-text-foundation, comfy-parity-native-image-source-compatibility-foundation, comfy-parity-native-video-execution-foundation
   - _Blocked_by: comfy-parity-native-node-progress-text-foundation, comfy-parity-native-image-source-compatibility-foundation, comfy-parity-native-video-execution-foundation
   - Reads: projects/comfy/ComfyUI/nodes.py, projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, projects/comfy/ComfyUI/comfy_extras/nodes_painter.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/png.rs, crates/comfy_media/src/video.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -11005,11 +11023,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-NATIVE-E2E-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_media -p comfy_nodes -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_media --all-targets; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_media -p comfy_nodes -p comfy_runtime -p comfy_test_support
   - Done when: Hermetic PNG, JPEG, static and animated WebP, EXIF, RGBA, audio-only video, and multi-stream video fixtures prove video-first first-visual-stream selection, Pillow-compatible fallback, same-size frame retention, RGB normalization, raw alpha, decoded order, dimensions, and semantic digests. Malformed, truncated, unsupported, no-frame, oversize, cancellation, exhaustion, service loss, cache retry, and restart publish no partial image or mask; no path, Python, subprocess, or second video decoder enters production.
 
-- [ ] 558. Encode and prepare native image output effects
+- [ ] 559. Encode and prepare native image output effects
   - _id: comfy-parity-native-image-output-codec-effect-foundation
   - Outcome: Extend the canonical image codec and prepared-effect service with source-compatible APNG, animated WebP, PNG8/PNG16, EXR32, and SVG output plans while leaving naming, collision policy, journaling, publication, and UI projection to OutputCommitter.
-  - Wave: 359
-  - _Wave: 359
+  - Wave: 360
+  - _Wave: 360
   - Dependencies: comfy-parity-native-visual-asset-decode-foundation, comfy-parity-native-nodes-image-comfy-node-0160
   - _Blocked_by: comfy-parity-native-visual-asset-decode-foundation, comfy-parity-native-nodes-image-comfy-node-0160
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_images.py, projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, projects/comfy/ComfyUI/comfy_extras/nodes_webcam.py, projects/comfy/ComfyUI/comfy_api/latest/_ui.py, crates/comfy_media/src/image_codec.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -11023,11 +11041,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-NATIVE-E2E-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_media -p comfy_nodes -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_media --all-targets; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_media -p comfy_nodes -p comfy_runtime -p comfy_test_support
   - Done when: Golden decode-verified outputs prove APNG timing, animated WebP lossless/lossy quality and method, PNG 8/16-bit depth, EXR float channels and chromaticity, SVG geometry and metadata, batch ordering, metadata suppression, bounded encode/flush, and returned image aliases. Unsupported configuration, malformed image, cancellation, exhaustion, codec failure, effect rejection, rollback, retry, and restart publish no partial bytes or UI entry, and the service owns no final filename or collision transition.
 
-- [ ] 559. Journal source-compatible dataset output policies
+- [ ] 560. Journal source-compatible dataset output policies
   - _id: comfy-parity-native-dataset-output-policy-foundation
   - Outcome: Add sealed cataloged dataset publication policies to OutputCommitter. Reject-only remains the default; exact source rows may select journaled overwrite or countered publication, including atomic paired image-and-caption output, without exposing replacement authority to node leaves.
-  - Wave: 360
-  - _Wave: 360
+  - Wave: 361
+  - _Wave: 361
   - Dependencies: comfy-parity-native-image-output-codec-effect-foundation
   - _Blocked_by: comfy-parity-native-image-output-codec-effect-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, projects/comfy/ComfyUI/nodes.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_runtime/src/recovery.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -11041,11 +11059,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-008, VAL-MEDIA-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_nodes -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_runtime -p comfy_test_support
   - Done when: Cataloged source rows alone may request exact-name overwrite, reject, or deterministic counter allocation. Replacement journals a sealed destination backup before mutation; paired PNG and TXT either both commit and become visible or both restore across error, cancellation, process loss, retry, and restart. Wrong row, arbitrary destination, stale snapshot, collision race, backup failure, capacity exhaustion, or recovery ambiguity fails closed without an asset record or partial final file.
 
-- [ ] 560. Decode, encode, and publish native audio assets
+- [ ] 561. Decode, encode, and publish native audio assets
   - _id: comfy-parity-native-audio-output-codec-effect-foundation
   - Outcome: Extend one checked retained native audio codec/effect service with source-exact first-audio-stream decoding for LoadAudio and RecordAudio and FLAC, MP3, and Opus encoding for preview and save nodes, reusing the retained codec actor and canonical output committer rather than accepting pre-encoded bytes or leaf-local containers.
-  - Wave: 362
-  - _Wave: 362
+  - Wave: 363
+  - _Wave: 363
   - Dependencies: comfy-parity-native-audio-empty-segment-foundation, comfy-parity-native-video-execution-foundation, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-native-detection-execution-foundation, comfy-parity-native-nodes-image-detection-comfy-node-0136, comfy-parity-native-media-text-rendering-foundation, comfy-parity-native-nodes-utilities-comfy-node-0077, comfy-parity-native-nodes-image-comfy-node-0586
   - _Blocked_by: comfy-parity-native-audio-empty-segment-foundation, comfy-parity-native-video-execution-foundation, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-native-detection-execution-foundation, comfy-parity-native-nodes-image-detection-comfy-node-0136, comfy-parity-native-media-text-rendering-foundation, comfy-parity-native-nodes-utilities-comfy-node-0077, comfy-parity-native-nodes-image-comfy-node-0586
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_audio.py, projects/comfy/ComfyUI/comfy_api/latest/_ui.py, crates/comfy_media/src/metadata.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/comfy_nodes.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -11059,11 +11077,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-MEDIA-001, VAL-RECOVERY-005, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_media -p comfy_nodes -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_media --all-targets; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_media -p comfy_nodes -p comfy_runtime -p comfy_test_support
   - Done when: Bounded path-free verified bytes and their content digest select the first audio stream, decode every frame in order, preserve planar or interleaved channel orientation, convert float samples exactly and signed 16-bit or signed 32-bit PCM by the source scale, and publish canonical CPU F32 [1,C,T] AUDIO with the decoded sample rate. Hermetic audio and video-container fixtures prove stream precedence, multi-frame concatenation, channel layout, rate, sample count, and digest; no-stream, no-frame, malformed, unsupported, truncated, oversize, OOM, cancellation, service-unavailable, and restart failures publish nothing. The same sealed service preserves per-batch FLAC, libmp3lame V0/128k/320k, and Opus 64/96/128/192/320k selection, FLAC preview/output namespace, source Opus sample-rate promotion and canonical resampling, mono/stereo admission, prompt and extra metadata suppression/inclusion, deterministic filename counters, bounded encode/drain/flush bytes, returned AUDIO alias identity, ordered UI output, and transactional rollback/retry/restart. Node leaves own no codec, container, filesystem path, metadata, counter, or publication implementation.
 
-- [ ] 561. Retarget native diffusion resources through checked reconstruction
+- [ ] 562. Retarget native diffusion resources through checked reconstruction
   - _id: comfy-parity-native-diffusion-device-retarget-foundation
   - Outcome: Add one runtime-injected, path-free native diffusion placement service that enumerates source-compatible targets and reconstructs immutable MODEL, CLIP, and VAE resources on an admitted target while preserving their artifact, patch, conditioning, execution, routing, residency, cache, and persistence identities.
-  - Wave: 364
-  - _Wave: 364
+  - Wave: 365
+  - _Wave: 365
   - Dependencies: comfy-parity-native-model-accelerator-execution-foundation, comfy-parity-native-audio-output-codec-effect-foundation, comfy-parity-native-nodes-audio-comfy-node-0009, comfy-parity-native-model-resource-service-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-memory-planner
   - _Blocked_by: comfy-parity-native-model-accelerator-execution-foundation, comfy-parity-native-audio-output-codec-effect-foundation, comfy-parity-native-nodes-audio-comfy-node-0009, comfy-parity-native-model-resource-service-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-memory-planner
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_multigpu.py, projects/comfy/ComfyUI/comfy/model_management.py, projects/comfy/ComfyUI/comfy/model_patcher.py, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_runtime/src/cache.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_worker/src/memory_modes.rs
@@ -11077,11 +11095,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DEVICE-001, VAL-MODEL-FAMILY-001, VAL-MEMORY-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_sampler -p comfy_nodes -p comfy_runtime -p comfy_worker -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_sampler --all-targets; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_sampler -p comfy_nodes -p comfy_runtime -p comfy_worker -p comfy_test_support
   - Done when: The injected placement service enumerates exact default, cpu, and available gpu:N targets, with VAE CPU exclusion matching source behavior. Reload descriptors reconstruct fresh immutable MODEL, CLIP, and VAE resources on the selected target, preserve and restore base load/offload routing, select only certified compute dtypes, and bind target and routing into semantic identity, residency, cache, persistence, and restart reconstruction. Unknown targets, nonreloadable resources, unsupported operations, device loss, stale state, OOM, and cancellation return typed results without mutation; the source-compatible unchanged-clone fallback carries an explicit diagnostic and cannot masquerade as a moved resource.
 
-- [ ] 562. Execute canonical guidance across independent device clones
+- [ ] 563. Execute canonical guidance across independent device clones
   - _id: comfy-parity-native-multigpu-guidance-execution-foundation
   - Outcome: Add one canonical sampler-owned multi-device guidance payload and execution path over ordered independent MODEL clone resources. Runtime and worker adapters expose checked device sessions, while comfy_sampler alone owns work distribution, transfers, concurrent invocation, synchronization, aggregation, reuse, pruning, and cleanup.
-  - Wave: 365
-  - _Wave: 365
+  - Wave: 366
+  - _Wave: 366
   - Dependencies: comfy-parity-native-diffusion-device-retarget-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-native-memory-planner
   - _Blocked_by: comfy-parity-native-diffusion-device-retarget-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-native-memory-planner
   - Reads: projects/comfy/ComfyUI/comfy/multigpu.py, projects/comfy/ComfyUI/comfy/samplers.py, projects/comfy/ComfyUI/comfy/model_patcher.py, projects/comfy/ComfyUI/comfy/sampler_helpers.py, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_worker/src/memory_modes.rs
@@ -11095,11 +11113,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DEVICE-001, VAL-SAMPLER-001, VAL-MEMORY-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_sampler -p comfy_runtime -p comfy_worker -p comfy_test_support; cargo test --locked -p comfy_sampler --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_sampler -p comfy_runtime -p comfy_worker -p comfy_test_support
   - Done when: A canonical payload retains an ordered independent MODEL clone set keyed by DeviceId. Sampling uses source-compatible ceil-divided evaluation batches, per-device memory fit, checked input, conditioning, and time transfers, concurrent cancellable invocation, output-device transfer and fences, deterministic aggregation, cleanup, clone reuse, pruning, max_gpus, and collision handling. Combined residency, peak memory, cache, persistence, and restart identities include every clone and route. OOM, cancellation, device loss, transfer or fence failure, stale clone, and aggregation failure publish no partial guidance or retained clone mutation; no node or runtime adapter owns CFG equations or a second scheduler.
 
-- [ ] 563. Implement native MediaPipe, RT-DETR, and SAM3 execution
+- [ ] 564. Implement native MediaPipe, RT-DETR, and SAM3 execution
   - _id: comfy-parity-native-detection-execution-foundation
   - Outcome: Canonical retained MediaPipe FaceLandmarker, RT-DETR, and SAM3 resources own checked model admission and native image/video execution. They publish exact face landmarks, boxes, scores, segmentation, and track state through the sealed payload boundary and delegate preview video encoding to the native video foundation without metadata-only model facades.
-  - Wave: 351
-  - _Wave: 351
+  - Wave: 352
+  - _Wave: 352
   - Dependencies: comfy-parity-native-video-execution-foundation, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-video-execution-foundation, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_mediapipe.py, projects/comfy/ComfyUI/comfy_extras/nodes_rtdetr.py, projects/comfy/ComfyUI/comfy_extras/nodes_sam3.py, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs
@@ -11113,7 +11131,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MODEL-FAMILY-001, VAL-MEDIA-001, VAL-NATIVE-E2E-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_media -p comfy_nodes -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_media --all-targets; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_media -p comfy_nodes -p comfy_runtime -p comfy_test_support
   - Done when: Source-derived fixtures prove exact model identity and state admission, RT-DETR 640-square preprocessing and scored boxes, MediaPipe landmarks/blendshapes/transforms, SAM3 image and video segmentation/tracking, canonical preview encoding, cancellation, wrong-model rejection, alias-aware residency, attempt rollback, restart staleness, and zero partial publication.
 
-- [x] 564. Implement native node family: (empty root category declared by source) part 1
+- [x] 565. Implement native node family: (empty root category declared by source) part 1
   - _id: comfy-parity-native-nodes-empty-root-category-declared-by-source-comfy-node-0757
   - Outcome: The 1 rows assigned to this disjoint `(empty root category declared by source)` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11133,11 +11151,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK372 COMFY-NODE-0757 2026-08-10 commit 1f69b41c PASS. The sole declared family leaf now resolves and revalidates a checked SD15 NativeDiffusionPayload::Model through NativeStoredModelPayload and the exact MODEL handle; the previous Noise-as-Model fixture is absent. `cargo test --locked -p comfy_nodes --lib generated_empty_root_category_declared_by_source_01::tests -- --nocapture` selected 4 and passed 4/4; exact `generated_manifest_tests::generated_manifests_are_sorted_unique_and_catalog_backed` selected 1 and passed 1/1; `./script/clippy -p comfy_nodes`, `cargo fmt --all -- --check`, and diff hygiene exited 0. Observed on Darwin/aarch64 with the native CPU backend; no optional accelerator or provider certification is claimed.
 
-- [ ] 565. Implement native node family: 3d part 1
+- [ ] 566. Implement native node family: 3d part 1
   - _id: comfy-parity-native-nodes-three-d-comfy-node-0115
   - Outcome: The 10 rows assigned to this disjoint `3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the missing shared native 3D execution seams required by its rows: sealed LOAD_3D and LOAD3D_MODEL_INFO payloads, prompt-to-attempt asset sealing, safe output subfolders and logical locators, deterministic GLB encoding, and bounded basic and Surface Nets voxel-to-mesh kernels.
-  - Wave: 270
-  - _Wave: 270
+  - Wave: 271
+  - _Wave: 271
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-nodes-partner-three-d-comfy-node-0408
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-nodes-partner-three-d-comfy-node-0408
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_load_3d.py, projects/comfy/ComfyUI/comfy_extras/nodes_save_3d.py, projects/comfy/ComfyUI/comfy_extras/nodes_hunyuan3d.py, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/output_committer.rs
@@ -11151,11 +11169,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-008, VAL-MEDIA-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001, VAL-RECOVERY-005; commands: cargo check --locked -p comfy_nodes -p comfy_test_support -p comfy_media -p comfy_runtime; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_test_support --all-targets; cargo test --locked -p comfy_media --all-targets; cargo test --locked -p comfy_runtime --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support -p comfy_media -p comfy_runtime
   - Done when: Every exactly assigned feature row (COMFY-NODE-0115, COMFY-NODE-0334, COMFY-NODE-0335, COMFY-NODE-0487, COMFY-NODE-0488, COMFY-NODE-0491, COMFY-NODE-0493, COMFY-NODE-0592, COMFY-NODE-0746, COMFY-NODE-0747) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Canonical lower tests prove exact GLB chunks, voxel topology/colors/world transforms, sealed asset-selector admission, traversal/change-during-read rejection, safe subfolder staging, cancellation and restart cleanup, and one shared owner for every new payload and kernel.
 
-- [ ] 566. Implement native node family: 3d/splat part 1
+- [ ] 567. Implement native node family: 3d/splat part 1
   - _id: comfy-parity-native-nodes-three-d-splat-comfy-node-0172
   - Outcome: The 7 rows assigned to this disjoint `3d/splat` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the missing shared Gaussian-splat compute foundation: checked codec-to-payload conversion, variable-count/SH-aware merge, uniform and covariance-preserving nonuniform transforms, anisotropic EWA rendering, and density-grid Surface Nets meshing through the canonical media, tensor, scratch, and cancellation owners.
-  - Wave: 271
-  - _Wave: 271
+  - Wave: 272
+  - _Wave: 272
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-three-d-comfy-node-0115
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-three-d-comfy-node-0115
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_gaussian_splat.py, crates/comfy_media/src/gaussian_splat.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_tensor/src/image_ops.rs
@@ -11169,11 +11187,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CANCEL-001, VAL-MEDIA-001, VAL-MEMORY-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001, VAL-TENSOR-001; commands: cargo check --locked -p comfy_nodes -p comfy_test_support -p comfy_media -p comfy_tensor -p comfy_runtime; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_test_support --all-targets; cargo test --locked -p comfy_media --all-targets; cargo test --locked -p comfy_tensor --all-targets; cargo test --locked -p comfy_runtime --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support -p comfy_media -p comfy_tensor -p comfy_runtime
   - Done when: Every exactly assigned feature row (COMFY-NODE-0172, COMFY-NODE-0206, COMFY-NODE-0406, COMFY-NODE-0533, COMFY-NODE-0628, COMFY-NODE-0629, COMFY-NODE-0682) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Source-derived numeric fixtures prove codec conversion, active-count padding, merge, covariance transforms, color/clay/depth/normal rendering, meshing, bounded scratch, cancellation, wrong-backend rejection, deterministic CPU execution, and zero partial publication.
 
-- [ ] 567. Implement native node family: advanced/debug part 1
+- [ ] 568. Implement native node family: advanced/debug part 1
   - _id: comfy-parity-native-nodes-advanced-debug-comfy-node-0140
   - Outcome: The 3 rows assigned to this disjoint `advanced/debug` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the missing shared immutable model-execution modifier boundary for EasyCache, LazyCache, and ModelComputeDtype: checked dtype policy, source-exact cache policy, attempt-local sampler state, canonical execution identity and residency, and runtime reset on every exit.
-  - Wave: 272
-  - _Wave: 272
+  - Wave: 273
+  - _Wave: 273
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-three-d-splat-comfy-node-0172
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-three-d-splat-comfy-node-0172
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_easycache.py, projects/comfy/ComfyUI/comfy_extras/nodes_model_advanced.py, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -11187,11 +11205,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CANCEL-001, VAL-MEMORY-001, VAL-MODEL-FAMILY-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001, VAL-SAMPLER-001; commands: cargo check --locked -p comfy_nodes -p comfy_test_support -p comfy_model -p comfy_sampler -p comfy_runtime; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_test_support --all-targets; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_sampler --all-targets; cargo test --locked -p comfy_runtime --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support -p comfy_model -p comfy_sampler -p comfy_runtime
   - Done when: Every exactly assigned feature row (COMFY-NODE-0140, COMFY-NODE-0333, COMFY-NODE-0418) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Exact source fixtures prove real compute-dtype kernel selection, Easy/Lazy cache thresholds and sigma windows, conditioning UUID/video/audio invalidation, scope-guard restoration after success/failure/cancellation, immutable base reuse, attempt scratch convergence, cache identity invalidation, and no cross-attempt state leakage.
 
-- [ ] 568. Implement native node family: advanced/guidance part 1
+- [ ] 569. Implement native node family: advanced/guidance part 1
   - _id: comfy-parity-native-nodes-advanced-guidance-comfy-node-0049
   - Outcome: The 7 rows assigned to this disjoint `advanced/guidance` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the guidance extension of the shared immutable model-execution modifier boundary: CFG normalization and zero-star transforms, normalized-attention guidance, per-layer DiT/SD3 skip guidance, and TCFG are checked immutable MODEL modifiers consumed by the canonical sampler and model-forward paths.
-  - Wave: 273
-  - _Wave: 273
+  - Wave: 274
+  - _Wave: 274
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-advanced-debug-comfy-node-0140
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-advanced-debug-comfy-node-0140
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_cfg.py, projects/comfy/ComfyUI/comfy_extras/nodes_nag.py, projects/comfy/ComfyUI/comfy_extras/nodes_slg.py, projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py, projects/comfy/ComfyUI/comfy_extras/nodes_tcfg.py, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/model_execution_modifiers.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -11205,11 +11223,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CANCEL-001, VAL-MEMORY-001, VAL-MODEL-FAMILY-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001, VAL-SAMPLER-001; commands: cargo check --locked -p comfy_nodes -p comfy_test_support -p comfy_model -p comfy_sampler -p comfy_runtime; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_test_support --all-targets; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_sampler --all-targets; cargo test --locked -p comfy_runtime --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support -p comfy_model -p comfy_sampler -p comfy_runtime
   - Done when: Every exactly assigned feature row (COMFY-NODE-0049, COMFY-NODE-0051, COMFY-NODE-0455, COMFY-NODE-0622, COMFY-NODE-0623, COMFY-NODE-0624, COMFY-NODE-0656) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Source-derived execution fixtures prove that every modifier changes real denoiser/model execution at the exact source boundary, binds semantic and cache identity, preserves immutable base payloads and alias-aware residency, rejects unsupported architectures and layers, restores attempt-local state on success/failure/cancellation, and never leaks modifiers across attempts, retries, lists, or restarts.
 
-- [ ] 569. Implement native node family: advanced/hooks part 1
+- [ ] 570. Implement native node family: advanced/hooks part 1
   - _id: comfy-parity-native-nodes-advanced-hooks-comfy-node-0079
   - Outcome: The 10 rows assigned to this disjoint `advanced/hooks` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the missing shared canonical HOOKS and HOOK_KEYFRAMES payload boundary, including ordered immutable hook composition, checked keyframe schedules, conditioning hook-property application, exact handle identity, semantic digest, alias-aware residency, and attempt-store admission.
-  - Wave: 274
-  - _Wave: 274
+  - Wave: 275
+  - _Wave: 275
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-advanced-guidance-comfy-node-0049
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-advanced-guidance-comfy-node-0049
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_hooks.py, crates/comfy_model/src/conditioning.rs, crates/comfy_sampler/src/native_diffusion_payload.rs
@@ -11223,11 +11241,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CANCEL-001, VAL-DOMAIN-004, VAL-MEMORY-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_nodes -p comfy_test_support -p comfy_model -p comfy_sampler -p comfy_runtime; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_test_support --all-targets; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_sampler --all-targets; cargo test --locked -p comfy_runtime --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support -p comfy_model -p comfy_sampler -p comfy_runtime
   - Done when: Every exactly assigned feature row (COMFY-NODE-0079, COMFY-NODE-0080, COMFY-NODE-0081, COMFY-NODE-0096, COMFY-NODE-0098, COMFY-NODE-0099, COMFY-NODE-0102, COMFY-NODE-0116, COMFY-NODE-0117, COMFY-NODE-0118) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Source-derived fixtures prove exact 2/4/8 hook order, keyframe construction/interpolation and bounds, conditioning default/property/timestep behavior, immutable input reuse, canonical hook/keyframe publication and resolution, shared-allocation deduplication, cancellation rollback, persistence rejection, recovery, and no generic record or provider fallback.
 
-- [ ] 570. Implement native node family: advanced/hooks part 2
+- [ ] 571. Implement native node family: advanced/hooks part 2
   - _id: comfy-parity-native-nodes-advanced-hooks-comfy-node-0119
   - Outcome: The 10 rows assigned to this disjoint `advanced/hooks` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the asset-backed and CLIP-consuming extension of the canonical hook boundary: attempt-scoped selectors seal verified LoRA/checkpoint inputs, hook creation clones immutable model facts, SetHookKeyframes applies canonical schedules, and SetClipHooks publishes a checked modified CLIP payload without exposing paths or inventing a second model owner.
-  - Wave: 275
-  - _Wave: 275
+  - Wave: 276
+  - _Wave: 276
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-advanced-hooks-comfy-node-0079
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-advanced-hooks-comfy-node-0079
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_hooks.py, crates/comfy_model/src/clip.rs, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/prompt_compiler.rs
@@ -11241,11 +11259,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CANCEL-001, VAL-DOMAIN-004, VAL-MEMORY-001, VAL-NATIVE-E2E-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_nodes -p comfy_test_support -p comfy_model -p comfy_runtime; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_test_support --all-targets; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_runtime --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support -p comfy_model -p comfy_runtime
   - Done when: Every exactly assigned feature row (COMFY-NODE-0119, COMFY-NODE-0120, COMFY-NODE-0121, COMFY-NODE-0122, COMFY-NODE-0470, COMFY-NODE-0471, COMFY-NODE-0472, COMFY-NODE-0473, COMFY-NODE-0615, COMFY-NODE-0617) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Exact fixtures prove verified selector sealing, LoRA/checkpoint type and digest admission, immutable model/CLIP cloning, schedule attachment, paired-conditioning behavior, wrong profile/attempt/path/type/digest rejection, cancellation and partial-publication rollback, cache invalidation, restart staleness, and one canonical owner for hook, keyframe, CLIP, asset, and stored-payload state.
 
-- [ ] 571. Implement native node family: advanced/multigpu part 1
+- [ ] 572. Implement native node family: advanced/multigpu part 1
   - _id: comfy-parity-native-nodes-advanced-multigpu-comfy-node-0454
   - Outcome: The 4 rows assigned to this disjoint `advanced/multigpu` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 366
-  - _Wave: 366
+  - Wave: 367
+  - _Wave: 367
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-diffusion-device-retarget-foundation, comfy-parity-native-multigpu-guidance-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-diffusion-device-retarget-foundation, comfy-parity-native-multigpu-guidance-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_multigpu.py, projects/comfy/ComfyUI/comfy/multigpu.py, projects/comfy/ComfyUI/comfy/model_management.py, projects/comfy/ComfyUI/comfy/model_patcher.py, projects/comfy/ComfyUI/comfy/samplers.py, projects/comfy/ComfyUI/comfy/sampler_helpers.py, crates/comfy_sampler/src/guidance.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/supervisor.rs
@@ -11259,11 +11277,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CANCEL-001, VAL-DEVICE-001, VAL-MEMORY-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001, VAL-SAMPLER-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0454, COMFY-NODE-0611, COMFY-NODE-0612, COMFY-NODE-0613) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. SelectModelDevice, SelectCLIPDevice, and SelectVAEDevice delegate reload-backed reconstruction and routing identity to the canonical placement service; MultiGPU CFG Split delegates independent clone-set retention and guidance work distribution to the canonical sampler owner. The leaf owns only exact schemas, checked input choreography, portable fallback diagnostics, and result projection.
 
-- [ ] 572. Implement native node family: audio part 1
+- [ ] 573. Implement native node family: audio part 1
   - _id: comfy-parity-native-nodes-audio-comfy-node-0009
   - Outcome: The 10 rows assigned to this disjoint `audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 363
-  - _Wave: 363
+  - Wave: 364
+  - _Wave: 364
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-audio-empty-segment-foundation, comfy-parity-native-audio-output-codec-effect-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-audio-empty-segment-foundation, comfy-parity-native-audio-output-codec-effect-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/audio.rs, crates/comfy_runtime/src/native_audio_codec_service.rs
@@ -11277,11 +11295,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0009, COMFY-NODE-0010, COMFY-NODE-0013, COMFY-NODE-0014, COMFY-NODE-0152, COMFY-NODE-0274, COMFY-NODE-0336, COMFY-NODE-0490, COMFY-NODE-0508, COMFY-NODE-0588) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. LoadAudio and RecordAudio delegate verified-byte first-stream decoding to the retained input codec service; PreviewAudio and SaveAudio delegate FLAC encoding, metadata, effects, and publication to the retained output codec service; EmptyAudio preserves duration-zero and 1-through-192000-Hz payloads. The leaf owns only schemas, checked choreography, and tensor composition.
 
-- [ ] 573. Implement native node family: audio part 2
+- [ ] 574. Implement native node family: audio part 2
   - _id: comfy-parity-native-nodes-audio-comfy-node-0589
   - Outcome: The 5 rows assigned to this disjoint `audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 363
-  - _Wave: 363
+  - Wave: 364
+  - _Wave: 364
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-audio-empty-segment-foundation, comfy-parity-native-audio-output-codec-effect-foundation, comfy-parity-native-detection-execution-foundation, comfy-parity-native-media-text-rendering-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-audio-empty-segment-foundation, comfy-parity-native-audio-output-codec-effect-foundation, comfy-parity-native-detection-execution-foundation, comfy-parity-native-media-text-rendering-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/audio.rs, crates/comfy_runtime/src/native_audio_codec_service.rs
@@ -11295,7 +11313,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0589, COMFY-NODE-0590, COMFY-NODE-0591, COMFY-NODE-0630, COMFY-NODE-0683) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 574. Implement native node family: experimental part 1
+- [ ] 575. Implement native node family: experimental part 1
   - _id: comfy-parity-native-nodes-experimental-comfy-node-0133
   - Outcome: The 10 rows assigned to this disjoint `experimental` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11313,7 +11331,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CANCEL-001, VAL-MEMORY-001, VAL-MODEL-FAMILY-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001, VAL-RECOVERY-005, VAL-SAMPLER-001, VAL-SAMPLING-FOUNDATION-001, VAL-TENSOR-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0133, COMFY-NODE-0185, COMFY-NODE-0194, COMFY-NODE-0315, COMFY-NODE-0354, COMFY-NODE-0396, COMFY-NODE-0475, COMFY-NODE-0476, COMFY-NODE-0579, COMFY-NODE-0614) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Differential mask, Flux stateful KV/input cleanup, FreSca, Mahiro, PerpNeg, SAG, and deprecated CFG hooks delegate to the persistent canonical model-transform and guidance owners; regular and alternative Euler CFG++ delegate to the canonical sampler algorithm owner; LoraSave delegates keyed MODEL/CLIP diff extraction and atomic safetensors preparation to the retained model-transform/output owners. The leaf owns only exact parameter projection, LatentBlend tensor choreography, descriptors, and fixtures.
 
-- [ ] 575. Implement native node family: experimental part 2
+- [ ] 576. Implement native node family: experimental part 2
   - _id: comfy-parity-native-nodes-experimental-comfy-node-0680
   - Outcome: The 1 rows assigned to this disjoint `experimental` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11331,7 +11349,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CANCEL-001, VAL-MODEL-FAMILY-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001, VAL-RECOVERY-005; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0680) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. TorchCompileModel delegates backend admission, disable-dynamic cloning, transformer-options guard filtering, compiled wrapper installation, cache identity, cancellation, persistence, and rebinding exclusively to the canonical compile-policy bridge. The leaf owns only exact schema, checked service invocation, and result projection.
 
-- [ ] 576. Implement native node family: experimental/attention_experiments part 1
+- [ ] 577. Implement native node family: experimental/attention_experiments part 1
   - _id: comfy-parity-native-nodes-experimental-attention-experiments-comfy-node-0057
   - Outcome: The 4 rows assigned to this disjoint `experimental/attention_experiments` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11349,7 +11367,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0057, COMFY-NODE-0704, COMFY-NODE-0706, COMFY-NODE-0707) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [x] 577. Implement native node family: experimental/stable cascade part 1
+- [x] 578. Implement native node family: experimental/stable cascade part 1
   - _id: comfy-parity-native-nodes-experimental-stable-cascade-comfy-node-0638
   - Outcome: The 1 rows assigned to this disjoint `experimental/stable cascade` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11369,11 +11387,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-22 merged-checkpoint reconciliation PASS at d7708e2b1a. The exact native StableCascade_SuperResolutionControlnet implementation is present in integration commit b7e2d96016 (worker-equivalent f176ac7d89), with canonical VAE encode, source-exact Stage C/Stage B latent shapes, typed handle admission, cancellation, cache dependencies, atomic publication, persistence, and recovery. The focused suite passed 6/6 and the merged comfy_nodes all-target matrix passed 165/165; formatting passed. The two-crate check reached comfy_test_support without a compiler diagnostic but could not create its final temp directory after the shared 38 GiB target cache exhausted disk space. Implementation/fixture SHA-256 are d8f9cebb7d8882a8d929438695148ecfe90c44bd558520609df85457b9d6b84c and 532668a7f2eb0ec895052b06a90b71b2c67db9ce051d1e796be24620e38814fc. Pinned source SHA-256 is c11f471ef730405e43e66fbadca3adcf4bc503b3fb5997ea262fca9da7aaa09a. Native Rust CPU/macOS arm64 was exercised; no accelerator certification is claimed.
 
-- [ ] 578. Implement native node family: image part 1
+- [ ] 579. Implement native node family: image part 1
   - _id: comfy-parity-native-nodes-image-comfy-node-0160
   - Outcome: The 10 rows assigned to this disjoint `image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 358
-  - _Wave: 358
+  - Wave: 359
+  - _Wave: 359
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-directory-snapshot-foundation, comfy-parity-native-node-progress-text-foundation, comfy-parity-native-visual-asset-decode-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-directory-snapshot-foundation, comfy-parity-native-node-progress-text-foundation, comfy-parity-native-visual-asset-decode-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, projects/comfy/ComfyUI/nodes.py, projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, projects/comfy/ComfyUI/comfy_extras/nodes_images.py, projects/comfy/ComfyUI/comfy_extras/nodes_image_compare.py, projects/comfy/ComfyUI/comfy_extras/nodes_painter.py, projects/comfy/ComfyUI/comfy_api/latest/_ui.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, crates/comfy_media/src/image_codec.rs, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/native_image_codec_service.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_nodes/src/slices/native_image.rs
@@ -11387,11 +11405,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CANCEL-001, VAL-DOMAIN-008, VAL-MEDIA-001, VAL-MEMORY-001, VAL-NATIVE-E2E-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001, VAL-RECOVERY-005; commands: cargo check -p comfy_nodes -p comfy_test_support -p comfy_runtime; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; cargo test -p comfy_runtime --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support -p comfy_runtime
   - Done when: Every exactly assigned feature row (COMFY-NODE-0160, COMFY-NODE-0205, COMFY-NODE-0245, COMFY-NODE-0339, COMFY-NODE-0340, COMFY-NODE-0341, COMFY-NODE-0342, COMFY-NODE-0343, COMFY-NODE-0469, COMFY-NODE-0492) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. LoadImage, LoadImageMask, LoadImageOutput, Painter, and dataset loaders delegate sealed video-first and PNG/JPEG/WebP/animated/EXIF/RGBA decoding to the canonical visual service; dataset rows consume ordered path-free snapshots; GetImageSize emits bounded node-scoped text progress; PreviewImage delegates prepared effects. The early LoadImage and PreviewImage owners are reconciled atomically so generated family registration has exactly one executable binding.
 
-- [ ] 579. Implement native node family: image part 2
+- [ ] 580. Implement native node family: image part 2
   - _id: comfy-parity-native-nodes-image-comfy-node-0586
   - Outcome: The 8 rows assigned to this disjoint `image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 361
-  - _Wave: 361
+  - Wave: 362
+  - _Wave: 362
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-image-comfy-node-0160, comfy-parity-native-image-output-codec-effect-foundation, comfy-parity-native-dataset-output-policy-foundation, comfy-parity-native-structured-input-link-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-image-comfy-node-0160, comfy-parity-native-image-output-codec-effect-foundation, comfy-parity-native-dataset-output-policy-foundation, comfy-parity-native-structured-input-link-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, projects/comfy/ComfyUI/nodes.py, projects/comfy/ComfyUI/comfy_extras/nodes_images.py, projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, projects/comfy/ComfyUI/comfy_extras/nodes_webcam.py, projects/comfy/ComfyUI/comfy_api/latest/_ui.py, crates/comfy_media/src/image_codec.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_runtime/src/native_image_codec_service.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_nodes/src/slices/native_image.rs, crates/comfy_runtime/src/prompt_compiler.rs
@@ -11405,7 +11423,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CANCEL-001, VAL-DOMAIN-008, VAL-MEDIA-001, VAL-MEMORY-001, VAL-NATIVE-E2E-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001, VAL-RECOVERY-005; commands: cargo check -p comfy_nodes -p comfy_test_support -p comfy_runtime; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; cargo test -p comfy_runtime --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support -p comfy_runtime
   - Done when: Every exactly assigned feature row (COMFY-NODE-0586, COMFY-NODE-0587, COMFY-NODE-0593, COMFY-NODE-0594, COMFY-NODE-0595, COMFY-NODE-0596, COMFY-NODE-0599, COMFY-NODE-0788) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Animated PNG/WebP, PNG16, EXR, SVG, Webcam media, and ordinary SaveImage delegate encoding and prepared effects to the canonical image codec service; dataset writers use only the sealed journaled overwrite/counter policy and atomic image-caption publication; SaveImageAdvanced consumes canonical structured links. The early SaveImage owner is reconciled atomically, and no leaf owns a codec, path, collision counter, overwrite transition, output transaction, or duplicate binding.
 
-- [x] 580. Implement native node family: image/adjustments part 1
+- [x] 581. Implement native node family: image/adjustments part 1
   - _id: comfy-parity-native-nodes-image-adjustments-comfy-node-0004
   - Outcome: The 2 rows assigned to this disjoint `image/adjustments` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11425,7 +11443,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-11 integrated Task389 PASS at a70748c8. Source-exact Adjust Brightness and Adjust Contrast descriptors and equations execute through the canonical CPU image payload/compute-session/handle-store boundary; the focused family suite passed 4/4, the final comfy_nodes all-target matrix passed 55/55, the complete comfy_test_support all-target matrix passed, locked two-crate check and warnings-denied all-target/all-feature Clippy passed, and formatting/diff integrity passed. Canonical VAL-NODE-001 passed 808/808 with zero failures/skips at SHA-256 8313d6bcfda423eb3d797bde2c3b9d4113f82e1b694054f13c8d6e3d2f022f; VAL-NODE-REGISTRY-001 passed 6/6 at fecd595b8380ba2a135aadb574c492f3067bcc85cfd6c6841306bde2f5ddf0c2. Implementation/fixture SHA-256 are f492f77faf13ade34f6c3717949c40338556109c590ea9c577a6cc630f99d4d4 and ab8791e6b9050d23c18ffca8e0e1725ea1ecefddd4d6ed42283be3f935ab2855. Validated on macOS aarch64 native Rust CPU; no accelerator hardware certification is claimed.
 
-- [ ] 581. Implement native node family: image/background removal part 1
+- [ ] 582. Implement native node family: image/background removal part 1
   - _id: comfy-parity-native-nodes-image-background-removal-comfy-node-0532
   - Outcome: The 1 rows assigned to this disjoint `image/background removal` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11443,7 +11461,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0532) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [x] 582. Implement native node family: image/batch part 1
+- [x] 583. Implement native node family: image/batch part 1
   - _id: comfy-parity-native-nodes-image-batch-comfy-node-0017
   - Outcome: The 10 rows assigned to this disjoint `image/batch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11463,7 +11481,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-22 merged-checkpoint reconciliation PASS at d7708e2b1a. All ten native image/batch bindings are present in integration commit 33d0f55667, with catalog-authoritative presentation reconciled by 10b350aeb5 and exact NumPy RandomState permutation semantics repaired by 9f9242a268. The merged focused suite passed 5/5, including the NumPy oracle, and comfy_nodes all-targets passed 165/165; formatting passed. The two-crate check reached comfy_test_support without a compiler diagnostic but exhausted disk while creating its final temp directory. Current implementation/fixture SHA-256 are 43e00008d7e4ec70aab5eb55a1ae5c5073097fe7b8211d0a2c3baa75389b9887 and f35040f9e406b83d86637fe52d232cb190c764daf97787cba926dcd9e0fa2f41. Execution is deterministic native Rust CPU with typed IMAGE handles, cancellation, rollback, persistence, and stale-handle recovery; no accelerator certification is claimed.
 
-- [x] 583. Implement native node family: image/batch part 2
+- [x] 584. Implement native node family: image/batch part 2
   - _id: comfy-parity-native-nodes-image-batch-comfy-node-0621
   - Outcome: The 2 rows assigned to this disjoint `image/batch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11483,7 +11501,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-22 merged-checkpoint repair reconciliation PASS at d7708e2b1a. Integration commit 9f9242a268 repairs the checked family to use the canonical NumPy RandomState permutation rather than address-hashed generic randperm while preserving exact row-major bankers-rounded tiling, typed publication, cancellation, stale-store recovery, and rollback. The repaired focused suite passed 6/6, the sibling image_batch_01 suite passed 5/5, and the merged comfy_nodes all-target matrix passed 165/165; formatting passed. The two-crate check reached comfy_test_support without a compiler diagnostic but exhausted disk while creating its final temp directory. Current implementation/fixture SHA-256 are f64becf35f0c5c6143c5a1ce601b86a1ada7dfacd6c3d0aaff35fec7ee703170 and 7ffaf3e052e02aa99c3f3b076865a18552a74ffddf0756a670f162a7735162a5. Validated on macOS arm64 native Rust CPU; no accelerator certification is claimed.
 
-- [x] 584. Implement native node family: image/color part 1
+- [x] 585. Implement native node family: image/color part 1
   - _id: comfy-parity-native-nodes-image-color-comfy-node-0254
   - Outcome: The 4 rows assigned to this disjoint `image/color` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11503,7 +11521,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-11 integrated Task393 PASS at 9c2862e4. ImageRGBToYUV, ImageYUVToRGB, and NormalizeImages execute exact source arithmetic through canonical image payloads while the existing sole ImageInvert owner remains reconciled rather than duplicated; focused success, schema, boundary, stale-store, cancellation, and publication tests passed 4/4. The final comfy_nodes all-target matrix passed 55/55, the complete comfy_test_support all-target matrix passed, locked two-crate check and warnings-denied all-target/all-feature Clippy passed, and formatting/diff integrity passed. Canonical VAL-NODE-001 passed 808/808 with zero failures/skips at SHA-256 8313d6bcfda423eb3d797bde2c3b9d4113f82e1b694054f13c8d6e3d2f022f; VAL-NODE-REGISTRY-001 passed 6/6 at fecd595b8380ba2a135aadb574c492f3067bcc85cfd6c6841306bde2f5ddf0c2. Implementation/fixture SHA-256 are df49903892c60f4061106a6095ee494f5d6c6f45a97155062859065a37cf0d4f and 697869bb2853b0d285b9acfc4bc0cb3ac3541adf45cd5a3d9141209bc0fd6659. Validated on macOS aarch64 native Rust CPU; no accelerator hardware certification is claimed.
 
-- [x] 585. Implement native node family: image/compositing part 1
+- [x] 586. Implement native node family: image/compositing part 1
   - _id: comfy-parity-native-nodes-image-compositing-comfy-node-0246
   - Outcome: The 4 rows assigned to this disjoint `image/compositing` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11523,11 +11541,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-11 image compositing PASS at integrated checkpoint fe06a5eb. ImageCompositeMasked, JoinImageWithAlpha, PorterDuffImageComposite, and SplitImageWithAlpha preserve exact source schema, clipping/broadcast, inverted alpha, and all 18 premultiplied Porter-Duff modes through canonical CPU image payloads; focused tests passed 4/4. Final locked two-crate check passed, comfy_nodes all-targets passed 72/72, the complete comfy_test_support target matrix passed with exact permission-enabled reruns for its two sandbox-only filesystem cases, warnings-denied all-target/all-feature Clippy passed, and formatting/diff integrity passed. VAL-NODE-001 and VAL-NODE-REGISTRY-001 artifacts have SHA-256 8313d6bcfda423eb3d797bde2c3b9d4113f82e1b694054f13c8d6e3d2f022f17 and c027a05208574a4226d8f427484020ba1113e4687dde8c3a1051869ee2c2d38f. Implementation/fixture SHA-256 are 6b3750bd6751f5231339401c933a412ca9c4f5d1724cde6aac7ac062d5034926 and 1f030e3646d1d9733935cddcdcf1e503fbf7424fdeee8b863efa0f7e5bcdb03f. Validated on macOS aarch64 native Rust CPU; no accelerator certification is claimed.
 
-- [ ] 586. Implement native node family: image/detection part 1
+- [ ] 587. Implement native node family: image/detection part 1
   - _id: comfy-parity-native-nodes-image-detection-comfy-node-0136
   - Outcome: The 10 rows assigned to this disjoint `image/detection` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 352
-  - _Wave: 352
+  - Wave: 353
+  - _Wave: 353
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-c5a306eb73fd, comfy-parity-native-detection-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-c5a306eb73fd, comfy-parity-native-detection-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_model/src/families/rt_detr_v4_comfy_model_0114.rs, crates/comfy_tensor/src/ops/external_tensor_kernel_03.rs, crates/comfy_model/src/detection.rs, crates/comfy_media/src/video.rs
@@ -11541,7 +11559,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0136, COMFY-NODE-0402, COMFY-NODE-0403, COMFY-NODE-0404, COMFY-NODE-0556, COMFY-NODE-0564, COMFY-NODE-0565, COMFY-NODE-0566, COMFY-NODE-0567, COMFY-NODE-0606) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. RT-DETR, MediaPipe FaceLandmarker, and SAM3 execution delegate to retained canonical model resources, while track-preview encoding delegates to the native video foundation; no model or media facade is accepted.
 
-- [ ] 587. Implement native node family: image/detection part 2
+- [ ] 588. Implement native node family: image/detection part 2
   - _id: comfy-parity-native-nodes-image-detection-comfy-node-0607
   - Outcome: The 2 rows assigned to this disjoint `image/detection` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task consumes the canonical native SDPose execution foundation for exact face bounding-box and keypoint extraction behavior.
   - Wave: 257
@@ -11559,7 +11577,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0607, COMFY-NODE-0608) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Source-derived fixtures prove exact whole-body keypoint and score projection, face bounding-box broadcast and cropping, cancellation, wrong-model rejection, and zero partial publication through that shared owner.
 
-- [x] 588. Implement native node family: image/filters part 1
+- [x] 589. Implement native node family: image/filters part 1
   - _id: comfy-parity-native-nodes-image-filters-comfy-node-0045
   - Outcome: The 8 rows assigned to this disjoint `image/filters` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11579,7 +11597,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: NATIVE-IMAGE-FILTERS-COMFY-NODE-0045 2026-08-24 implementation and focused validation PASS. The leaf closes exactly COMFY-NODE-0045/0078/0240/0242/0243/0259/0266/0453 with source-derived schemas and deterministic CPU execution for Canny, all ColorTransfer methods and source-statistics modes, seeded ImageAddNoise, all ImageBlend modes, Blur, Quantize, Sharpen, and all seven morphology operations. It delegates eigendecomposition, seeded random streams and Gaussian sampling, reflective padding, grouped convolution, image resizing, color conversion, and morphology to their canonical owners and contains no second RNG, padding-coordinate map, or convolution traversal. Locked comfy_nodes library check passed; focused image_filters_01 tests passed 4/4; warnings-denied all-target/all-feature `./script/clippy -p comfy_nodes --lib`, cargo formatting, JSON fixture validation, and diff integrity passed. Production and fixture SHA-256 values are `8a0186dec59edaf7a323dada1e7c66221bc2d80616e80e9b8202bbfdb8e570ac` and `f00ab7732cb835453511541a7da751e76f656279b5dca7ea68c99b1081d53e10`. Validated on Darwin arm64 with the native Rust CPU tensor backend; no accelerator execution claim is made.
 
-- [ ] 589. Implement native node family: image/geometry estimation part 1
+- [ ] 590. Implement native node family: image/geometry estimation part 1
   - _id: comfy-parity-native-nodes-image-geometry-estimation-comfy-node-0129
   - Outcome: The 7 rows assigned to this disjoint `image/geometry estimation` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11597,7 +11615,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0129, COMFY-NODE-0130, COMFY-NODE-0131, COMFY-NODE-0449, COMFY-NODE-0450, COMFY-NODE-0451, COMFY-NODE-0452) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [x] 590. Implement native node family: image/mask part 1
+- [x] 591. Implement native node family: image/mask part 1
   - _id: comfy-parity-native-nodes-image-mask-comfy-node-0019
   - Outcome: The 10 rows assigned to this disjoint `image/mask` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11617,7 +11635,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-22 merged-checkpoint reconciliation PASS at d7708e2b1a. The ten exact native mask bindings are present in integration commit b756afbe61 (worker-equivalent a6981448c6), covering batching, crop, feather/grow morphology, color/image conversion, inversion, composite, preview effects, cancellation, cache identity, atomic rollback, persistence, and stale-handle recovery. The focused suite passed 5/5 and the merged comfy_nodes all-target matrix passed 165/165; formatting passed. The two-crate check reached comfy_test_support without a compiler diagnostic but exhausted disk while creating its final temp directory. Implementation/fixture SHA-256 are 3077ae72667cc3becb945ef727202a83eff03465bc38f8604201311958ee450a and c4b0bec85cad1555bf0534b5996f274e4e87ee6419588c111c7876938dec7305. Pinned nodes_mask.py and nodes_post_processing.py SHA-256 are 9ff6c44f6114e36cfd17886a92b6cfb1d824013b43242ea1ee6b86c93a71b7dc and 96ec39e8d0e9fe9a70b332f97f994d507e1fa223a26699a3c9c9fbeedacf6575. Native Rust CPU/macOS arm64 was exercised; no accelerator certification is claimed.
 
-- [x] 591. Implement native node family: image/mask part 2
+- [x] 592. Implement native node family: image/mask part 2
   - _id: comfy-parity-native-nodes-image-mask-comfy-node-0625
   - Outcome: The 3 rows assigned to this disjoint `image/mask` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11637,7 +11655,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-11 final-tree Task 408 PASS on native Rust CPU/macOS arm64. Exact source-derived SolidMask, ThresholdMask, and VOIDQuadmaskPreprocess schema, success, bounds, cancellation, handle validation, cache identity, atomic publication, and recovery cases passed 4/4 inside the complete `comfy_nodes --all-targets` matrix; the integrated matrix passed 91/91, the permissioned complete `comfy_test_support --all-targets --no-fail-fast` matrix passed every library and integration target, locked two-crate check exited 0, and warnings-denied release/all-target/all-feature Clippy for comfy_nodes and comfy_test_support exited 0. No Python or external Comfy runtime was used.
 
-- [x] 592. Implement native node family: image/shader part 1
+- [x] 593. Implement native node family: image/shader part 1
   - _id: comfy-parity-native-nodes-image-shader-comfy-node-0211
   - Outcome: The 1 rows assigned to this disjoint `image/shader` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11657,7 +11675,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-22 merged-checkpoint reconciliation PASS at d7708e2b1a. The exact GLSLShader binding is present in integration commit b91c7a3bf4 (worker-equivalent 12c4484c97), with ordered dynamic inputs, structured combo projection, exact curve LUTs, single delegation to the canonical NativeShaderService, four typed IMAGE outputs, cancellation, diagnostic mapping, transactional previews, rollback, persistence, and stale-handle recovery. The focused suite passed 4/4 and the merged comfy_nodes all-target matrix passed 165/165; formatting passed. The two-crate check reached comfy_test_support without a compiler diagnostic but exhausted disk while creating its final temp directory. Implementation/fixture SHA-256 are 5aa5bbcaec120baa1c57466649ca4231b691f8bb48b3d4612f5ed207e1be1735 and 5b61964191617c1b896d3e0b73b1f1ebedc4b18bf2a36d8f9ff27a2a2ec03ebf. Pinned nodes_glsl.py SHA-256 is fd4725172fe84e5ea3b9274ceddb44fefedaa27815fb6c9bc2689862760bda9c. The canonical service boundary was exercised with deterministic native CPU image payloads on macOS arm64; physical GPU numeric certification is not claimed.
 
-- [x] 593. Implement native node family: image/transform part 1
+- [x] 594. Implement native node family: image/transform part 1
   - _id: comfy-parity-native-nodes-image-transform-comfy-node-0047
   - Outcome: The 10 rows assigned to this disjoint `image/transform` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11677,7 +11695,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: NATIVE-IMAGE-TRANSFORM-COMFY-NODE-0047 2026-08-24 implementation and integrated validation PASS. The leaf closes exactly COMFY-NODE-0047/0125/0247/0248/0250/0258/0261/0267/0504/0540 with pinned Center/Random presentation, source-valid crop/outpaint/stitch dimensions, typed fractional-bounding-box and zero-fit rejection, fallible allocation, bounded cancellation, exact prepared preview effects, cache, persistence, and schema fixtures. The worker commit `89c4d652fd946b5e6eb0344f9cc25791aeea6199` was normal-merged without rewriting history. Integrated comfy_nodes library check passed; focused image_transform_01 tests passed 4/4; warnings-denied all-target/all-feature `./script/clippy -p comfy_nodes --lib`, cargo formatting, JSON fixture validation, complete spec validation, and diff integrity passed. Production and fixture SHA-256 values are `d26576205ed1261a80206fd8d09c16d60ce6467ebb80ea6b63e45d0926500a36` and `799b9e91d29982e15911e038ec6304654c0e8038f22d122c6805751799793b47`. Validated on Darwin arm64 with native Rust CPU F32 BHWC execution; no accelerator execution claim is made.
 
-- [x] 594. Implement native node family: image/transform part 2
+- [x] 595. Implement native node family: image/transform part 2
   - _id: comfy-parity-native-nodes-image-transform-comfy-node-0541
   - Outcome: The 3 rows assigned to this disjoint `image/transform` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11697,7 +11715,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: NATIVE-IMAGE-TRANSFORM-COMFY-NODE-0541 2026-08-24 implementation and integrated validation PASS. The leaf closes exactly COMFY-NODE-0541/0542/0543: ResizeImageMask preserves every source resize plan, identity branch, recursive schema-guided IMAGE/MASK MATCH_SIZE resolution, crop and cache semantics; the deprecated longer/shorter-edge nodes preserve Pillow LANCZOS quantization, batch order, source dimensions, experimental availability, exact `(DEPRECATED)` display names, and deprecated presentation. The selector default now fails typed instead of using an unreachable panic. Focused image_transform_02 tests passed 6/6; the complete locked comfy_nodes all-target suite passed 171/171, including VAL-NODE-001 and VAL-NODE-REGISTRY-001; warnings-denied all-target/all-feature Clippy, locked library check, cargo formatting, strict two-pass regeneration, complete spec validation, JSON fixture validation, and diff integrity passed. Production and fixture SHA-256 values are `aeca35ef4225dbc09db276e8f820c496d009e900af38a804ea94357329ef657e` and `d20187cdefed837bddad9e3d69014b440f214b76c32b8ef206698f4fec894ec0`. Validated on Darwin arm64 with native Rust CPU execution; no accelerator execution claim is made.
 
-- [ ] 595. Implement native node family: image/upscaling part 1
+- [ ] 596. Implement native node family: image/upscaling part 1
   - _id: comfy-parity-native-nodes-image-upscaling-comfy-node-0262
   - Outcome: The 5 rows assigned to this disjoint `image/upscaling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11715,7 +11733,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0262, COMFY-NODE-0263, COMFY-NODE-0264, COMFY-NODE-0265, COMFY-NODE-0269) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 596. Implement native node family: image/video part 1
+- [ ] 597. Implement native node family: image/video part 1
   - _id: comfy-parity-native-nodes-image-video-comfy-node-0762
   - Outcome: The 2 rows assigned to this disjoint `image/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11733,7 +11751,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0762, COMFY-NODE-0763) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 597. Implement native node family: model/conditioning part 1
+- [ ] 598. Implement native node family: model/conditioning part 1
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0008
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11751,7 +11769,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0008, COMFY-NODE-0011, COMFY-NODE-0022, COMFY-NODE-0063, COMFY-NODE-0064, COMFY-NODE-0065, COMFY-NODE-0066, COMFY-NODE-0067, COMFY-NODE-0068, COMFY-NODE-0069) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 598. Implement native node family: model/conditioning part 2
+- [ ] 599. Implement native node family: model/conditioning part 2
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0070
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11769,7 +11787,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0070, COMFY-NODE-0071, COMFY-NODE-0072, COMFY-NODE-0073, COMFY-NODE-0074, COMFY-NODE-0075, COMFY-NODE-0088, COMFY-NODE-0089, COMFY-NODE-0090, COMFY-NODE-0091) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 599. Implement native node family: model/conditioning part 3
+- [ ] 600. Implement native node family: model/conditioning part 3
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0092
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11787,7 +11805,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0092, COMFY-NODE-0093, COMFY-NODE-0094, COMFY-NODE-0095, COMFY-NODE-0097, COMFY-NODE-0100, COMFY-NODE-0101, COMFY-NODE-0103, COMFY-NODE-0105, COMFY-NODE-0106) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 600. Implement native node family: model/conditioning part 4
+- [ ] 601. Implement native node family: model/conditioning part 4
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0107
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11805,7 +11823,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0107, COMFY-NODE-0108, COMFY-NODE-0112, COMFY-NODE-0113, COMFY-NODE-0178, COMFY-NODE-0180, COMFY-NODE-0181, COMFY-NODE-0183, COMFY-NODE-0203, COMFY-NODE-0204) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 601. Implement native node family: model/conditioning part 5
+- [ ] 602. Implement native node family: model/conditioning part 5
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0210
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11823,7 +11841,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0210, COMFY-NODE-0225, COMFY-NODE-0228, COMFY-NODE-0229, COMFY-NODE-0230, COMFY-NODE-0231, COMFY-NODE-0232, COMFY-NODE-0234, COMFY-NODE-0271, COMFY-NODE-0272) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 602. Implement native node family: model/conditioning part 6
+- [ ] 603. Implement native node family: model/conditioning part 6
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0277
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11841,7 +11859,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0277, COMFY-NODE-0356, COMFY-NODE-0358, COMFY-NODE-0365, COMFY-NODE-0367, COMFY-NODE-0369, COMFY-NODE-0370, COMFY-NODE-0373, COMFY-NODE-0457, COMFY-NODE-0478) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 603. Implement native node family: model/conditioning part 7
+- [ ] 604. Implement native node family: model/conditioning part 7
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0480
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11859,7 +11877,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0480, COMFY-NODE-0527, COMFY-NODE-0528, COMFY-NODE-0603, COMFY-NODE-0605, COMFY-NODE-0619, COMFY-NODE-0636, COMFY-NODE-0639, COMFY-NODE-0640, COMFY-NODE-0650) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 604. Implement native node family: model/conditioning part 8
+- [ ] 605. Implement native node family: model/conditioning part 8
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0653
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11877,7 +11895,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0653, COMFY-NODE-0654, COMFY-NODE-0655, COMFY-NODE-0664, COMFY-NODE-0665, COMFY-NODE-0666, COMFY-NODE-0667, COMFY-NODE-0668, COMFY-NODE-0669, COMFY-NODE-0670) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 605. Implement native node family: model/conditioning part 9
+- [ ] 606. Implement native node family: model/conditioning part 9
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0696
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11895,7 +11913,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0696, COMFY-NODE-0697, COMFY-NODE-0703, COMFY-NODE-0741, COMFY-NODE-0749, COMFY-NODE-0750, COMFY-NODE-0756, COMFY-NODE-0758, COMFY-NODE-0759, COMFY-NODE-0761) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 606. Implement native node family: model/conditioning part 10
+- [ ] 607. Implement native node family: model/conditioning part 10
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0764
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11913,7 +11931,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0764, COMFY-NODE-0765, COMFY-NODE-0766, COMFY-NODE-0767, COMFY-NODE-0768, COMFY-NODE-0770, COMFY-NODE-0772, COMFY-NODE-0773, COMFY-NODE-0774, COMFY-NODE-0775) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 607. Implement native node family: model/conditioning part 11
+- [ ] 608. Implement native node family: model/conditioning part 11
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0776
   - Outcome: The 7 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11931,7 +11949,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0776, COMFY-NODE-0777, COMFY-NODE-0779, COMFY-NODE-0780, COMFY-NODE-0781, COMFY-NODE-0784, COMFY-NODE-0785) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 608. Implement native node family: model/latent part 1
+- [ ] 609. Implement native node family: model/latent part 1
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0018
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11949,7 +11967,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0018, COMFY-NODE-0149, COMFY-NODE-0150, COMFY-NODE-0151, COMFY-NODE-0153, COMFY-NODE-0154, COMFY-NODE-0155, COMFY-NODE-0156, COMFY-NODE-0157, COMFY-NODE-0158) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 609. Implement native node family: model/latent part 2
+- [ ] 610. Implement native node family: model/latent part 2
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0159
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11967,7 +11985,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0159, COMFY-NODE-0161, COMFY-NODE-0162, COMFY-NODE-0163, COMFY-NODE-0164, COMFY-NODE-0165, COMFY-NODE-0166, COMFY-NODE-0167, COMFY-NODE-0233, COMFY-NODE-0310) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 610. Implement native node family: model/latent part 3
+- [ ] 611. Implement native node family: model/latent part 3
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0311
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -11985,7 +12003,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0311, COMFY-NODE-0312, COMFY-NODE-0313, COMFY-NODE-0314, COMFY-NODE-0316, COMFY-NODE-0317, COMFY-NODE-0318, COMFY-NODE-0319, COMFY-NODE-0320, COMFY-NODE-0321) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 611. Implement native node family: model/latent part 4
+- [ ] 612. Implement native node family: model/latent part 4
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0322
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12003,7 +12021,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0322, COMFY-NODE-0323, COMFY-NODE-0324, COMFY-NODE-0325, COMFY-NODE-0326, COMFY-NODE-0327, COMFY-NODE-0328, COMFY-NODE-0329, COMFY-NODE-0330, COMFY-NODE-0331) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 612. Implement native node family: model/latent part 5
+- [ ] 613. Implement native node family: model/latent part 5
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0344
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12021,7 +12039,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0344, COMFY-NODE-0361, COMFY-NODE-0362, COMFY-NODE-0364, COMFY-NODE-0368, COMFY-NODE-0371, COMFY-NODE-0375, COMFY-NODE-0507, COMFY-NODE-0536, COMFY-NODE-0538) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 613. Implement native node family: model/latent part 6
+- [ ] 614. Implement native node family: model/latent part 6
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0597
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12039,7 +12057,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0597, COMFY-NODE-0618, COMFY-NODE-0635, COMFY-NODE-0637, COMFY-NODE-0684, COMFY-NODE-0698, COMFY-NODE-0710, COMFY-NODE-0711, COMFY-NODE-0712, COMFY-NODE-0713) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 614. Implement native node family: model/latent part 7
+- [ ] 615. Implement native node family: model/latent part 7
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0714
   - Outcome: The 8 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12057,7 +12075,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0714, COMFY-NODE-0715, COMFY-NODE-0716, COMFY-NODE-0717, COMFY-NODE-0718, COMFY-NODE-0719, COMFY-NODE-0744, COMFY-NODE-0745) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 615. Implement native node family: model/loaders part 1
+- [ ] 616. Implement native node family: model/loaders part 1
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0012
   - Outcome: The 10 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12075,7 +12093,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0012, COMFY-NODE-0052, COMFY-NODE-0053, COMFY-NODE-0058, COMFY-NODE-0076, COMFY-NODE-0109, COMFY-NODE-0132, COMFY-NODE-0134, COMFY-NODE-0138, COMFY-NODE-0191) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 616. Implement native node family: model/loaders part 2
+- [ ] 617. Implement native node family: model/loaders part 2
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0209
   - Outcome: The 10 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12093,7 +12111,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0209, COMFY-NODE-0235, COMFY-NODE-0256, COMFY-NODE-0332, COMFY-NODE-0337, COMFY-NODE-0338, COMFY-NODE-0345, COMFY-NODE-0346, COMFY-NODE-0349, COMFY-NODE-0350) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 617. Implement native node family: model/loaders part 3
+- [ ] 618. Implement native node family: model/loaders part 3
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0351
   - Outcome: The 10 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12111,7 +12129,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0351, COMFY-NODE-0352, COMFY-NODE-0353, COMFY-NODE-0357, COMFY-NODE-0363, COMFY-NODE-0439, COMFY-NODE-0467, COMFY-NODE-0479, COMFY-NODE-0500, COMFY-NODE-0651) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 618. Implement native node family: model/loaders part 4
+- [ ] 619. Implement native node family: model/loaders part 4
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0685
   - Outcome: The 5 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12129,7 +12147,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0685, COMFY-NODE-0702, COMFY-NODE-0705, COMFY-NODE-0708, COMFY-NODE-0720) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 619. Implement native node family: model/merging part 1
+- [ ] 620. Implement native node family: model/merging part 1
   - _id: comfy-parity-native-nodes-model-merging-comfy-node-0054
   - Outcome: The 10 rows assigned to this disjoint `model/merging` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12147,7 +12165,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0054, COMFY-NODE-0059, COMFY-NODE-0060, COMFY-NODE-0061, COMFY-NODE-0062, COMFY-NODE-0257, COMFY-NODE-0419, COMFY-NODE-0420, COMFY-NODE-0421, COMFY-NODE-0422) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 620. Implement native node family: model/merging part 2
+- [ ] 621. Implement native node family: model/merging part 2
   - _id: comfy-parity-native-nodes-model-merging-comfy-node-0423
   - Outcome: The 10 rows assigned to this disjoint `model/merging` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12165,7 +12183,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0423, COMFY-NODE-0424, COMFY-NODE-0425, COMFY-NODE-0426, COMFY-NODE-0427, COMFY-NODE-0428, COMFY-NODE-0429, COMFY-NODE-0430, COMFY-NODE-0431, COMFY-NODE-0432) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 621. Implement native node family: model/merging part 3
+- [ ] 622. Implement native node family: model/merging part 3
   - _id: comfy-parity-native-nodes-model-merging-comfy-node-0433
   - Outcome: The 8 rows assigned to this disjoint `model/merging` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12183,7 +12201,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0433, COMFY-NODE-0434, COMFY-NODE-0435, COMFY-NODE-0436, COMFY-NODE-0437, COMFY-NODE-0448, COMFY-NODE-0598, COMFY-NODE-0721) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 622. Implement native node family: model/patch part 1
+- [ ] 623. Implement native node family: model/patch part 1
   - _id: comfy-parity-native-nodes-model-patch-comfy-node-0055
   - Outcome: The 10 rows assigned to this disjoint `model/patch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12201,7 +12219,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0055, COMFY-NODE-0104, COMFY-NODE-0168, COMFY-NODE-0192, COMFY-NODE-0193, COMFY-NODE-0224, COMFY-NODE-0236, COMFY-NODE-0366, COMFY-NODE-0438, COMFY-NODE-0440) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 623. Implement native node family: model/patch part 2
+- [ ] 624. Implement native node family: model/patch part 2
   - _id: comfy-parity-native-nodes-model-patch-comfy-node-0441
   - Outcome: The 10 rows assigned to this disjoint `model/patch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12219,7 +12237,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0441, COMFY-NODE-0442, COMFY-NODE-0443, COMFY-NODE-0444, COMFY-NODE-0445, COMFY-NODE-0446, COMFY-NODE-0447, COMFY-NODE-0474, COMFY-NODE-0477, COMFY-NODE-0503) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 624. Implement native node family: model/patch part 3
+- [ ] 625. Implement native node family: model/patch part 3
   - _id: comfy-parity-native-nodes-model-patch-comfy-node-0534
   - Outcome: The 9 rows assigned to this disjoint `model/patch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12237,7 +12255,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0534, COMFY-NODE-0539, COMFY-NODE-0604, COMFY-NODE-0652, COMFY-NODE-0657, COMFY-NODE-0676, COMFY-NODE-0709, COMFY-NODE-0760, COMFY-NODE-0789) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 625. Implement native node family: model/sampling part 1
+- [ ] 626. Implement native node family: model/sampling part 1
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0001
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12255,7 +12273,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0001, COMFY-NODE-0006, COMFY-NODE-0007, COMFY-NODE-0015, COMFY-NODE-0016, COMFY-NODE-0023, COMFY-NODE-0048, COMFY-NODE-0050, COMFY-NODE-0135, COMFY-NODE-0137) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 626. Implement native node family: model/sampling part 2
+- [ ] 627. Implement native node family: model/sampling part 2
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0139
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12273,7 +12291,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0139, COMFY-NODE-0169, COMFY-NODE-0170, COMFY-NODE-0173, COMFY-NODE-0177, COMFY-NODE-0208, COMFY-NODE-0237, COMFY-NODE-0278, COMFY-NODE-0306, COMFY-NODE-0307) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 627. Implement native node family: model/sampling part 3
+- [ ] 628. Implement native node family: model/sampling part 3
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0308
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12291,7 +12309,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0308, COMFY-NODE-0309, COMFY-NODE-0374, COMFY-NODE-0398, COMFY-NODE-0468, COMFY-NODE-0485, COMFY-NODE-0505, COMFY-NODE-0568, COMFY-NODE-0569, COMFY-NODE-0570) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 628. Implement native node family: model/sampling part 4
+- [ ] 629. Implement native node family: model/sampling part 4
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0571
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12309,7 +12327,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0571, COMFY-NODE-0572, COMFY-NODE-0573, COMFY-NODE-0574, COMFY-NODE-0575, COMFY-NODE-0576, COMFY-NODE-0577, COMFY-NODE-0578, COMFY-NODE-0580, COMFY-NODE-0581) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 629. Implement native node family: model/sampling part 5
+- [ ] 630. Implement native node family: model/sampling part 5
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0582
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12327,7 +12345,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0582, COMFY-NODE-0583, COMFY-NODE-0584, COMFY-NODE-0585, COMFY-NODE-0609, COMFY-NODE-0616, COMFY-NODE-0633, COMFY-NODE-0634, COMFY-NODE-0726, COMFY-NODE-0727) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 630. Implement native node family: model/sampling part 6
+- [ ] 631. Implement native node family: model/sampling part 6
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0743
   - Outcome: The 2 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12345,7 +12363,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0743, COMFY-NODE-0748) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 631. Implement native node family: model/training part 1
+- [ ] 632. Implement native node family: model/training part 1
   - _id: comfy-parity-native-nodes-model-training-comfy-node-0347
   - Outcome: The 6 rows assigned to this disjoint `model/training` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12363,11 +12381,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0347, COMFY-NODE-0355, COMFY-NODE-0397, COMFY-NODE-0544, COMFY-NODE-0600, COMFY-NODE-0681) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 632. Implement native node family: partner/3d part 1
+- [ ] 633. Implement native node family: partner/3d part 1
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0408
   - Outcome: The 10 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12381,11 +12399,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0408, COMFY-NODE-0409, COMFY-NODE-0410, COMFY-NODE-0411, COMFY-NODE-0412, COMFY-NODE-0413, COMFY-NODE-0414, COMFY-NODE-0549, COMFY-NODE-0550, COMFY-NODE-0551) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 633. Implement native node family: partner/3d part 2
+- [ ] 634. Implement native node family: partner/3d part 2
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0552
   - Outcome: The 10 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12399,11 +12417,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0552, COMFY-NODE-0553, COMFY-NODE-0554, COMFY-NODE-0555, COMFY-NODE-0658, COMFY-NODE-0659, COMFY-NODE-0660, COMFY-NODE-0661, COMFY-NODE-0662, COMFY-NODE-0663) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 634. Implement native node family: partner/3d part 3
+- [ ] 635. Implement native node family: partner/3d part 3
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0686
   - Outcome: The 10 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12417,11 +12435,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0686, COMFY-NODE-0687, COMFY-NODE-0688, COMFY-NODE-0689, COMFY-NODE-0690, COMFY-NODE-0691, COMFY-NODE-0692, COMFY-NODE-0693, COMFY-NODE-0694, COMFY-NODE-0695) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 635. Implement native node family: partner/3d part 4
+- [ ] 636. Implement native node family: partner/3d part 4
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0699
   - Outcome: The 2 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12435,11 +12453,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0699, COMFY-NODE-0700) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 636. Implement native node family: partner/audio part 1
+- [ ] 637. Implement native node family: partner/audio part 1
   - _id: comfy-parity-native-nodes-partner-audio-comfy-node-0040
   - Outcome: The 10 rows assigned to this disjoint `partner/audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12453,11 +12471,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0040, COMFY-NODE-0141, COMFY-NODE-0142, COMFY-NODE-0143, COMFY-NODE-0144, COMFY-NODE-0145, COMFY-NODE-0146, COMFY-NODE-0147, COMFY-NODE-0148, COMFY-NODE-0626) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 637. Implement native node family: partner/audio part 2
+- [ ] 638. Implement native node family: partner/audio part 2
   - _id: comfy-parity-native-nodes-partner-audio-comfy-node-0627
   - Outcome: The 1 rows assigned to this disjoint `partner/audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12471,11 +12489,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0627) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 638. Implement native node family: partner/image part 1
+- [ ] 639. Implement native node family: partner/image part 1
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0020
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12489,11 +12507,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0020, COMFY-NODE-0024, COMFY-NODE-0025, COMFY-NODE-0034, COMFY-NODE-0037, COMFY-NODE-0042, COMFY-NODE-0043, COMFY-NODE-0174, COMFY-NODE-0175, COMFY-NODE-0176) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 639. Implement native node family: partner/image part 2
+- [ ] 640. Implement native node family: partner/image part 2
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0179
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12507,11 +12525,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0179, COMFY-NODE-0182, COMFY-NODE-0184, COMFY-NODE-0186, COMFY-NODE-0187, COMFY-NODE-0188, COMFY-NODE-0189, COMFY-NODE-0195, COMFY-NODE-0196, COMFY-NODE-0198) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 640. Implement native node family: partner/image part 3
+- [ ] 641. Implement native node family: partner/image part 3
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0199
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12525,11 +12543,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0199, COMFY-NODE-0212, COMFY-NODE-0213, COMFY-NODE-0214, COMFY-NODE-0226, COMFY-NODE-0238, COMFY-NODE-0239, COMFY-NODE-0286, COMFY-NODE-0293, COMFY-NODE-0303) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 641. Implement native node family: partner/image part 4
+- [ ] 642. Implement native node family: partner/image part 4
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0304
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12543,11 +12561,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0304, COMFY-NODE-0305, COMFY-NODE-0377, COMFY-NODE-0378, COMFY-NODE-0379, COMFY-NODE-0380, COMFY-NODE-0389, COMFY-NODE-0391, COMFY-NODE-0392, COMFY-NODE-0393) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 642. Implement native node family: partner/image part 5
+- [ ] 643. Implement native node family: partner/image part 5
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0394
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12561,11 +12579,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0394, COMFY-NODE-0395, COMFY-NODE-0460, COMFY-NODE-0461, COMFY-NODE-0462, COMFY-NODE-0463, COMFY-NODE-0501, COMFY-NODE-0502, COMFY-NODE-0509, COMFY-NODE-0510) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 643. Implement native node family: partner/image part 6
+- [ ] 644. Implement native node family: partner/image part 6
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0511
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12579,11 +12597,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0511, COMFY-NODE-0512, COMFY-NODE-0513, COMFY-NODE-0514, COMFY-NODE-0515, COMFY-NODE-0516, COMFY-NODE-0517, COMFY-NODE-0518, COMFY-NODE-0519, COMFY-NODE-0520) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 644. Implement native node family: partner/image part 7
+- [ ] 645. Implement native node family: partner/image part 7
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0521
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12597,11 +12615,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0521, COMFY-NODE-0522, COMFY-NODE-0523, COMFY-NODE-0524, COMFY-NODE-0525, COMFY-NODE-0526, COMFY-NODE-0546, COMFY-NODE-0547, COMFY-NODE-0548, COMFY-NODE-0563) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 645. Implement native node family: partner/image part 8
+- [ ] 646. Implement native node family: partner/image part 8
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0677
   - Outcome: The 4 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12615,11 +12633,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0677, COMFY-NODE-0769, COMFY-NODE-0782, COMFY-NODE-0787) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 646. Implement native node family: partner/text part 1
+- [ ] 647. Implement native node family: partner/text part 1
   - _id: comfy-parity-native-nodes-partner-text-comfy-node-0041
   - Outcome: The 9 rows assigned to this disjoint `partner/text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12633,11 +12651,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0041, COMFY-NODE-0056, COMFY-NODE-0197, COMFY-NODE-0200, COMFY-NODE-0201, COMFY-NODE-0458, COMFY-NODE-0459, COMFY-NODE-0464, COMFY-NODE-0466) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 647. Implement native node family: partner/video part 1
+- [ ] 648. Implement native node family: partner/video part 1
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0021
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12651,11 +12669,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0021, COMFY-NODE-0026, COMFY-NODE-0027, COMFY-NODE-0028, COMFY-NODE-0029, COMFY-NODE-0031, COMFY-NODE-0032, COMFY-NODE-0033, COMFY-NODE-0035, COMFY-NODE-0036) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 648. Implement native node family: partner/video part 2
+- [ ] 649. Implement native node family: partner/video part 2
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0038
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12669,11 +12687,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0038, COMFY-NODE-0039, COMFY-NODE-0044, COMFY-NODE-0202, COMFY-NODE-0215, COMFY-NODE-0216, COMFY-NODE-0217, COMFY-NODE-0218, COMFY-NODE-0220, COMFY-NODE-0221) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 649. Implement native node family: partner/video part 3
+- [ ] 650. Implement native node family: partner/video part 3
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0222
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12687,11 +12705,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0222, COMFY-NODE-0223, COMFY-NODE-0227, COMFY-NODE-0279, COMFY-NODE-0280, COMFY-NODE-0281, COMFY-NODE-0282, COMFY-NODE-0283, COMFY-NODE-0284, COMFY-NODE-0285) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 650. Implement native node family: partner/video part 4
+- [ ] 651. Implement native node family: partner/video part 4
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0287
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12705,11 +12723,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0287, COMFY-NODE-0288, COMFY-NODE-0289, COMFY-NODE-0290, COMFY-NODE-0291, COMFY-NODE-0292, COMFY-NODE-0294, COMFY-NODE-0295, COMFY-NODE-0296, COMFY-NODE-0297) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 651. Implement native node family: partner/video part 5
+- [ ] 652. Implement native node family: partner/video part 5
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0298
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12723,11 +12741,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0298, COMFY-NODE-0299, COMFY-NODE-0300, COMFY-NODE-0301, COMFY-NODE-0302, COMFY-NODE-0359, COMFY-NODE-0360, COMFY-NODE-0376, COMFY-NODE-0381, COMFY-NODE-0382) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 652. Implement native node family: partner/video part 6
+- [ ] 653. Implement native node family: partner/video part 6
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0383
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12741,11 +12759,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0383, COMFY-NODE-0384, COMFY-NODE-0385, COMFY-NODE-0386, COMFY-NODE-0387, COMFY-NODE-0388, COMFY-NODE-0390, COMFY-NODE-0415, COMFY-NODE-0416, COMFY-NODE-0417) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 653. Implement native node family: partner/video part 7
+- [ ] 654. Implement native node family: partner/video part 7
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0465
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12759,11 +12777,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0465, COMFY-NODE-0481, COMFY-NODE-0482, COMFY-NODE-0483, COMFY-NODE-0484, COMFY-NODE-0557, COMFY-NODE-0558, COMFY-NODE-0559, COMFY-NODE-0560, COMFY-NODE-0561) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 654. Implement native node family: partner/video part 8
+- [ ] 655. Implement native node family: partner/video part 8
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0562
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12777,11 +12795,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0562, COMFY-NODE-0678, COMFY-NODE-0679, COMFY-NODE-0722, COMFY-NODE-0723, COMFY-NODE-0724, COMFY-NODE-0728, COMFY-NODE-0729, COMFY-NODE-0730, COMFY-NODE-0731) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 655. Implement native node family: partner/video part 9
+- [ ] 656. Implement native node family: partner/video part 9
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0732
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12795,11 +12813,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0732, COMFY-NODE-0733, COMFY-NODE-0734, COMFY-NODE-0735, COMFY-NODE-0736, COMFY-NODE-0737, COMFY-NODE-0738, COMFY-NODE-0739, COMFY-NODE-0740, COMFY-NODE-0751) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [ ] 656. Implement native node family: partner/video part 10
+- [ ] 657. Implement native node family: partner/video part 10
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0752
   - Outcome: The 8 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12813,7 +12831,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0752, COMFY-NODE-0753, COMFY-NODE-0754, COMFY-NODE-0755, COMFY-NODE-0771, COMFY-NODE-0778, COMFY-NODE-0783, COMFY-NODE-0786) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite.
 
-- [x] 657. Implement native node family: text part 1
+- [x] 658. Implement native node family: text part 1
   - _id: comfy-parity-native-nodes-text-comfy-node-0002
   - Outcome: The 10 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task owns the source-compatible text-regex adapter over the workspace-pinned bounded backtracking engine; no leaf-local parser or substring fallback is permitted.
   - Wave: 257
@@ -12833,7 +12851,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-11 final-tree Task 474 PASS on native Rust CPU/macOS arm64. All ten assigned source-derived text adapters passed exact schema, JSON/prompt shape, list transform, Python case mode, regex search/findall/finditer, flags, named/numbered capture, invalid-pattern fallback, limit, cancellation, cache, and recovery cases 5/5 inside the complete `comfy_nodes --all-targets` matrix; the integrated matrix passed 91/91, the permissioned complete `comfy_test_support --all-targets --no-fail-fast` matrix passed every library and integration target, locked two-crate check exited 0, and warnings-denied release/all-target/all-feature Clippy for comfy_nodes and comfy_test_support exited 0. The canonical bounded regex owner remained unique and no Python or external Comfy runtime was used.
 
-- [x] 658. Implement native node family: text part 2
+- [x] 659. Implement native node family: text part 2
   - _id: comfy-parity-native-nodes-text-comfy-node-0531
   - Outcome: The 10 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12853,7 +12871,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-11 final-tree Task 477 PASS on native Rust CPU/macOS arm64. The five focused family cases passed 5/5, including source-exact deprecated ReplaceText presentation, Python-compatible RegexReplace delegation, canonical StringFormat delegation, list and boundary behavior, cancellation, cache, persistence, and recovery. The locked two-crate check exited 0; `comfy_nodes --all-targets` passed 97/97; the complete `comfy_test_support --all-targets --no-fail-fast` matrix passed every ordinary library and integration target, with its two sandbox-denied special-filesystem hardening cases each passing on exact permissioned rerun; warnings-denied release/all-target/all-feature Clippy for comfy_nodes and comfy_test_support exited 0; and repository-wide formatting and diff checks passed. No second regex or format parser owner was introduced.
 
-- [ ] 659. Implement native node family: text part 3
+- [ ] 660. Implement native node family: text part 3
   - _id: comfy-parity-native-nodes-text-comfy-node-0649
   - Outcome: The 6 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12871,11 +12889,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0649, COMFY-NODE-0671, COMFY-NODE-0672, COMFY-NODE-0673, COMFY-NODE-0674, COMFY-NODE-0701) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. TextGenerate and TextGenerateLTX2Prompt delegate template-aware multimodal tokenization, seeded bounded generation, and decoding to the canonical retained decoder-text model owner with attempt-scoped RNG and zero partial publication.
 
-- [ ] 660. Implement native node family: utilities part 1
+- [ ] 661. Implement native node family: utilities part 1
   - _id: comfy-parity-native-nodes-utilities-comfy-node-0077
   - Outcome: The 10 rows assigned to this disjoint `utilities` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 354
-  - _Wave: 354
+  - Wave: 355
+  - _Wave: 355
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-media-text-rendering-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-media-text-rendering-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/text_rendering.rs, projects/comfy/ComfyUI/comfy_extras/nodes_bounding_boxes.py
@@ -12889,7 +12907,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0077, COMFY-NODE-0083, COMFY-NODE-0085, COMFY-NODE-0114, COMFY-NODE-0123, COMFY-NODE-0127, COMFY-NODE-0128, COMFY-NODE-0253, COMFY-NODE-0489, COMFY-NODE-0545) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. CreateBoundingBoxes delegates scalable default-font measurement, wrapping, glyph rasterization, and RGBA composition to the canonical media text-rendering owner; no leaf-local bitmap font or text approximation is permitted.
 
-- [x] 661. Implement native node family: utilities part 2
+- [x] 662. Implement native node family: utilities part 2
   - _id: comfy-parity-native-nodes-utilities-comfy-node-0610
   - Outcome: The 1 rows assigned to this disjoint `utilities` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12909,7 +12927,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-11 SeedNode PASS at integrated checkpoint fe06a5eb. The node preserves exact signed/unsigned integer identity over source bounds, fixed after-generate metadata, pure InputIdentity caching, cancellation, invalid-input rejection, and persistence/restart recovery without RNG, compute, handle, or effect mutation; focused tests passed 4/4. Final locked two-crate check passed, comfy_nodes all-targets passed 72/72, the complete comfy_test_support target matrix passed with exact permission-enabled reruns for its two sandbox-only filesystem cases, warnings-denied all-target/all-feature Clippy passed, and formatting/diff integrity passed. Implementation/fixture SHA-256 are 26269e0a69fac13d74a6d9dd0ebec6e9f831152433a36349d23d16cd7b32364b and b47c6b2402b69ba55cb4011d5c81bd7ee7c3405e9bae30e0ffa7e6bc720ad72e. Validated on macOS aarch64 native Rust CPU; no accelerator certification is claimed.
 
-- [x] 662. Implement native node family: utilities/logic part 1
+- [x] 663. Implement native node family: utilities/logic part 1
   - _id: comfy-parity-native-nodes-utilities-logic-comfy-node-0082
   - Outcome: The 4 rows assigned to this disjoint `utilities/logic` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12929,7 +12947,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-11 utilities logic PASS at integrated checkpoint fe06a5eb. ComfyAndNode, ComfyNotNode, ComfyOrNode, and ComfySwitchNode preserve exact source truthiness over primitive/list/preserved JSON values; Switch demands only the selected missing branch and returns the selected value unchanged. Focused schema, execution, lazy-demand, cache, cancellation, and fresh-attempt recovery tests passed 4/4. Final locked two-crate check passed, comfy_nodes all-targets passed 72/72, the complete comfy_test_support target matrix passed with exact permission-enabled reruns for its two sandbox-only filesystem cases, warnings-denied all-target/all-feature Clippy passed, and formatting/diff integrity passed. Implementation/fixture SHA-256 are 437352c3e9570fbe4850701bd0a974a1dd45595a61d2db5831528c38aa9d0730 and 83703bdd2cb5ba64e1962e52dd99ed3abd506368570f520d8d5a2b83ea6a9e42. Validated on macOS aarch64 native Rust CPU; no accelerator certification is claimed.
 
-- [x] 663. Implement native node family: utilities/primitive part 1
+- [x] 664. Implement native node family: utilities/primitive part 1
   - _id: comfy-parity-native-nodes-utilities-primitive-comfy-node-0494
   - Outcome: The 6 rows assigned to this disjoint `utilities/primitive` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 257
@@ -12949,11 +12967,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-11 final-tree Task 480 PASS on native Rust CPU/macOS arm64. All six assigned primitive adapters passed exact schema, numeric bounds, scalar identity, bounded multiline tab/CR/LF/Unicode preservation, canonical bounding-box publication, invalid-input, cancellation, stale-handle, persistence, and recovery cases 5/5 inside the complete `comfy_nodes --all-targets` matrix; the integrated matrix passed 91/91, the permissioned complete `comfy_test_support --all-targets --no-fail-fast` matrix passed every library and integration target, locked two-crate check exited 0, and warnings-denied release/all-target/all-feature Clippy for comfy_nodes and comfy_test_support exited 0. The shared workflow-text and payload owners remained canonical and no Python or external Comfy runtime was used.
 
-- [ ] 664. Implement native node family: video part 1
+- [ ] 665. Implement native node family: video part 1
   - _id: comfy-parity-native-nodes-video-comfy-node-0124
   - Outcome: The 7 rows assigned to this disjoint `video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 350
-  - _Wave: 350
+  - Wave: 351
+  - _Wave: 351
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-video-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-video-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/video.rs, crates/comfy_model/src/frame_interpolation.rs
@@ -12967,11 +12985,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0124, COMFY-NODE-0190, COMFY-NODE-0207, COMFY-NODE-0348, COMFY-NODE-0601, COMFY-NODE-0602, COMFY-NODE-0725) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every video codec, bit-depth, slice, interpolation, preview/save, and LTXV compression path delegates to the canonical native video foundation with bounded cancellation and zero partial publication.
 
-- [ ] 665. Implement native node family: video/preprocessors part 1
+- [ ] 666. Implement native node family: video/preprocessors part 1
   - _id: comfy-parity-native-nodes-video-preprocessors-comfy-node-0372
   - Outcome: The 1 rows assigned to this disjoint `video/preprocessors` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 350
-  - _Wave: 350
+  - Wave: 351
+  - _Wave: 351
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-video-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-video-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/video.rs, crates/comfy_model/src/frame_interpolation.rs
@@ -12985,11 +13003,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0372) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Every video codec, bit-depth, slice, interpolation, preview/save, and LTXV compression path delegates to the canonical native video foundation with bounded cancellation and zero partial publication.
 
-- [ ] 666. Generate the final native implementation registry and closure report
+- [ ] 667. Generate the final native implementation registry and closure report
   - _id: comfy-parity-native-registry-integration
   - Outcome: A serialized generator consumes disjoint node/model/provider bindings after all family tasks and emits the central implementation registry, object-info and production runtime projections, and zero-delta closure report.
-  - Wave: 367
-  - _Wave: 367
+  - Wave: 368
+  - _Wave: 368
   - Dependencies: comfy-parity-native-nodes-empty-root-category-declared-by-source-comfy-node-0757, comfy-parity-native-nodes-three-d-comfy-node-0115, comfy-parity-native-nodes-three-d-splat-comfy-node-0172, comfy-parity-native-nodes-advanced-debug-comfy-node-0140, comfy-parity-native-nodes-advanced-guidance-comfy-node-0049, comfy-parity-native-nodes-advanced-hooks-comfy-node-0079, comfy-parity-native-nodes-advanced-hooks-comfy-node-0119, comfy-parity-native-nodes-advanced-multigpu-comfy-node-0454, comfy-parity-native-nodes-audio-comfy-node-0009, comfy-parity-native-nodes-audio-comfy-node-0589, comfy-parity-native-nodes-experimental-comfy-node-0133, comfy-parity-native-nodes-experimental-comfy-node-0680, comfy-parity-native-nodes-experimental-attention-experiments-comfy-node-0057, comfy-parity-native-nodes-experimental-stable-cascade-comfy-node-0638, comfy-parity-native-nodes-image-comfy-node-0160, comfy-parity-native-nodes-image-comfy-node-0586, comfy-parity-native-nodes-image-adjustments-comfy-node-0004, comfy-parity-native-nodes-image-background-removal-comfy-node-0532, comfy-parity-native-nodes-image-batch-comfy-node-0017, comfy-parity-native-nodes-image-batch-comfy-node-0621, comfy-parity-native-nodes-image-color-comfy-node-0254, comfy-parity-native-nodes-image-compositing-comfy-node-0246, comfy-parity-native-nodes-image-detection-comfy-node-0136, comfy-parity-native-nodes-image-detection-comfy-node-0607, comfy-parity-native-nodes-image-filters-comfy-node-0045, comfy-parity-native-nodes-image-geometry-estimation-comfy-node-0129, comfy-parity-native-nodes-image-mask-comfy-node-0019, comfy-parity-native-nodes-image-mask-comfy-node-0625, comfy-parity-native-nodes-image-shader-comfy-node-0211, comfy-parity-native-nodes-image-transform-comfy-node-0047, comfy-parity-native-nodes-image-transform-comfy-node-0541, comfy-parity-native-nodes-image-upscaling-comfy-node-0262, comfy-parity-native-nodes-image-video-comfy-node-0762, comfy-parity-native-nodes-model-conditioning-comfy-node-0008, comfy-parity-native-nodes-model-conditioning-comfy-node-0070, comfy-parity-native-nodes-model-conditioning-comfy-node-0092, comfy-parity-native-nodes-model-conditioning-comfy-node-0107, comfy-parity-native-nodes-model-conditioning-comfy-node-0210, comfy-parity-native-nodes-model-conditioning-comfy-node-0277, comfy-parity-native-nodes-model-conditioning-comfy-node-0480, comfy-parity-native-nodes-model-conditioning-comfy-node-0653, comfy-parity-native-nodes-model-conditioning-comfy-node-0696, comfy-parity-native-nodes-model-conditioning-comfy-node-0764, comfy-parity-native-nodes-model-conditioning-comfy-node-0776, comfy-parity-native-nodes-model-latent-comfy-node-0018, comfy-parity-native-nodes-model-latent-comfy-node-0159, comfy-parity-native-nodes-model-latent-comfy-node-0311, comfy-parity-native-nodes-model-latent-comfy-node-0322, comfy-parity-native-nodes-model-latent-comfy-node-0344, comfy-parity-native-nodes-model-latent-comfy-node-0597, comfy-parity-native-nodes-model-latent-comfy-node-0714, comfy-parity-native-nodes-model-loaders-comfy-node-0012, comfy-parity-native-nodes-model-loaders-comfy-node-0209, comfy-parity-native-nodes-model-loaders-comfy-node-0351, comfy-parity-native-nodes-model-loaders-comfy-node-0685, comfy-parity-native-nodes-model-merging-comfy-node-0054, comfy-parity-native-nodes-model-merging-comfy-node-0423, comfy-parity-native-nodes-model-merging-comfy-node-0433, comfy-parity-native-nodes-model-patch-comfy-node-0055, comfy-parity-native-nodes-model-patch-comfy-node-0441, comfy-parity-native-nodes-model-patch-comfy-node-0534, comfy-parity-native-nodes-model-sampling-comfy-node-0001, comfy-parity-native-nodes-model-sampling-comfy-node-0139, comfy-parity-native-nodes-model-sampling-comfy-node-0308, comfy-parity-native-nodes-model-sampling-comfy-node-0571, comfy-parity-native-nodes-model-sampling-comfy-node-0582, comfy-parity-native-nodes-model-sampling-comfy-node-0743, comfy-parity-native-nodes-model-training-comfy-node-0347, comfy-parity-native-nodes-partner-three-d-comfy-node-0408, comfy-parity-native-nodes-partner-three-d-comfy-node-0552, comfy-parity-native-nodes-partner-three-d-comfy-node-0686, comfy-parity-native-nodes-partner-three-d-comfy-node-0699, comfy-parity-native-nodes-partner-audio-comfy-node-0040, comfy-parity-native-nodes-partner-audio-comfy-node-0627, comfy-parity-native-nodes-partner-image-comfy-node-0020, comfy-parity-native-nodes-partner-image-comfy-node-0179, comfy-parity-native-nodes-partner-image-comfy-node-0199, comfy-parity-native-nodes-partner-image-comfy-node-0304, comfy-parity-native-nodes-partner-image-comfy-node-0394, comfy-parity-native-nodes-partner-image-comfy-node-0511, comfy-parity-native-nodes-partner-image-comfy-node-0521, comfy-parity-native-nodes-partner-image-comfy-node-0677, comfy-parity-native-nodes-partner-text-comfy-node-0041, comfy-parity-native-nodes-partner-video-comfy-node-0021, comfy-parity-native-nodes-partner-video-comfy-node-0038, comfy-parity-native-nodes-partner-video-comfy-node-0222, comfy-parity-native-nodes-partner-video-comfy-node-0287, comfy-parity-native-nodes-partner-video-comfy-node-0298, comfy-parity-native-nodes-partner-video-comfy-node-0383, comfy-parity-native-nodes-partner-video-comfy-node-0465, comfy-parity-native-nodes-partner-video-comfy-node-0562, comfy-parity-native-nodes-partner-video-comfy-node-0732, comfy-parity-native-nodes-partner-video-comfy-node-0752, comfy-parity-native-nodes-text-comfy-node-0002, comfy-parity-native-nodes-text-comfy-node-0531, comfy-parity-native-nodes-text-comfy-node-0649, comfy-parity-native-nodes-utilities-comfy-node-0077, comfy-parity-native-nodes-utilities-comfy-node-0610, comfy-parity-native-nodes-utilities-logic-comfy-node-0082, comfy-parity-native-nodes-utilities-primitive-comfy-node-0494, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-native-nodes-video-preprocessors-comfy-node-0372
   - _Blocked_by: comfy-parity-native-nodes-empty-root-category-declared-by-source-comfy-node-0757, comfy-parity-native-nodes-three-d-comfy-node-0115, comfy-parity-native-nodes-three-d-splat-comfy-node-0172, comfy-parity-native-nodes-advanced-debug-comfy-node-0140, comfy-parity-native-nodes-advanced-guidance-comfy-node-0049, comfy-parity-native-nodes-advanced-hooks-comfy-node-0079, comfy-parity-native-nodes-advanced-hooks-comfy-node-0119, comfy-parity-native-nodes-advanced-multigpu-comfy-node-0454, comfy-parity-native-nodes-audio-comfy-node-0009, comfy-parity-native-nodes-audio-comfy-node-0589, comfy-parity-native-nodes-experimental-comfy-node-0133, comfy-parity-native-nodes-experimental-comfy-node-0680, comfy-parity-native-nodes-experimental-attention-experiments-comfy-node-0057, comfy-parity-native-nodes-experimental-stable-cascade-comfy-node-0638, comfy-parity-native-nodes-image-comfy-node-0160, comfy-parity-native-nodes-image-comfy-node-0586, comfy-parity-native-nodes-image-adjustments-comfy-node-0004, comfy-parity-native-nodes-image-background-removal-comfy-node-0532, comfy-parity-native-nodes-image-batch-comfy-node-0017, comfy-parity-native-nodes-image-batch-comfy-node-0621, comfy-parity-native-nodes-image-color-comfy-node-0254, comfy-parity-native-nodes-image-compositing-comfy-node-0246, comfy-parity-native-nodes-image-detection-comfy-node-0136, comfy-parity-native-nodes-image-detection-comfy-node-0607, comfy-parity-native-nodes-image-filters-comfy-node-0045, comfy-parity-native-nodes-image-geometry-estimation-comfy-node-0129, comfy-parity-native-nodes-image-mask-comfy-node-0019, comfy-parity-native-nodes-image-mask-comfy-node-0625, comfy-parity-native-nodes-image-shader-comfy-node-0211, comfy-parity-native-nodes-image-transform-comfy-node-0047, comfy-parity-native-nodes-image-transform-comfy-node-0541, comfy-parity-native-nodes-image-upscaling-comfy-node-0262, comfy-parity-native-nodes-image-video-comfy-node-0762, comfy-parity-native-nodes-model-conditioning-comfy-node-0008, comfy-parity-native-nodes-model-conditioning-comfy-node-0070, comfy-parity-native-nodes-model-conditioning-comfy-node-0092, comfy-parity-native-nodes-model-conditioning-comfy-node-0107, comfy-parity-native-nodes-model-conditioning-comfy-node-0210, comfy-parity-native-nodes-model-conditioning-comfy-node-0277, comfy-parity-native-nodes-model-conditioning-comfy-node-0480, comfy-parity-native-nodes-model-conditioning-comfy-node-0653, comfy-parity-native-nodes-model-conditioning-comfy-node-0696, comfy-parity-native-nodes-model-conditioning-comfy-node-0764, comfy-parity-native-nodes-model-conditioning-comfy-node-0776, comfy-parity-native-nodes-model-latent-comfy-node-0018, comfy-parity-native-nodes-model-latent-comfy-node-0159, comfy-parity-native-nodes-model-latent-comfy-node-0311, comfy-parity-native-nodes-model-latent-comfy-node-0322, comfy-parity-native-nodes-model-latent-comfy-node-0344, comfy-parity-native-nodes-model-latent-comfy-node-0597, comfy-parity-native-nodes-model-latent-comfy-node-0714, comfy-parity-native-nodes-model-loaders-comfy-node-0012, comfy-parity-native-nodes-model-loaders-comfy-node-0209, comfy-parity-native-nodes-model-loaders-comfy-node-0351, comfy-parity-native-nodes-model-loaders-comfy-node-0685, comfy-parity-native-nodes-model-merging-comfy-node-0054, comfy-parity-native-nodes-model-merging-comfy-node-0423, comfy-parity-native-nodes-model-merging-comfy-node-0433, comfy-parity-native-nodes-model-patch-comfy-node-0055, comfy-parity-native-nodes-model-patch-comfy-node-0441, comfy-parity-native-nodes-model-patch-comfy-node-0534, comfy-parity-native-nodes-model-sampling-comfy-node-0001, comfy-parity-native-nodes-model-sampling-comfy-node-0139, comfy-parity-native-nodes-model-sampling-comfy-node-0308, comfy-parity-native-nodes-model-sampling-comfy-node-0571, comfy-parity-native-nodes-model-sampling-comfy-node-0582, comfy-parity-native-nodes-model-sampling-comfy-node-0743, comfy-parity-native-nodes-model-training-comfy-node-0347, comfy-parity-native-nodes-partner-three-d-comfy-node-0408, comfy-parity-native-nodes-partner-three-d-comfy-node-0552, comfy-parity-native-nodes-partner-three-d-comfy-node-0686, comfy-parity-native-nodes-partner-three-d-comfy-node-0699, comfy-parity-native-nodes-partner-audio-comfy-node-0040, comfy-parity-native-nodes-partner-audio-comfy-node-0627, comfy-parity-native-nodes-partner-image-comfy-node-0020, comfy-parity-native-nodes-partner-image-comfy-node-0179, comfy-parity-native-nodes-partner-image-comfy-node-0199, comfy-parity-native-nodes-partner-image-comfy-node-0304, comfy-parity-native-nodes-partner-image-comfy-node-0394, comfy-parity-native-nodes-partner-image-comfy-node-0511, comfy-parity-native-nodes-partner-image-comfy-node-0521, comfy-parity-native-nodes-partner-image-comfy-node-0677, comfy-parity-native-nodes-partner-text-comfy-node-0041, comfy-parity-native-nodes-partner-video-comfy-node-0021, comfy-parity-native-nodes-partner-video-comfy-node-0038, comfy-parity-native-nodes-partner-video-comfy-node-0222, comfy-parity-native-nodes-partner-video-comfy-node-0287, comfy-parity-native-nodes-partner-video-comfy-node-0298, comfy-parity-native-nodes-partner-video-comfy-node-0383, comfy-parity-native-nodes-partner-video-comfy-node-0465, comfy-parity-native-nodes-partner-video-comfy-node-0562, comfy-parity-native-nodes-partner-video-comfy-node-0732, comfy-parity-native-nodes-partner-video-comfy-node-0752, comfy-parity-native-nodes-text-comfy-node-0002, comfy-parity-native-nodes-text-comfy-node-0531, comfy-parity-native-nodes-text-comfy-node-0649, comfy-parity-native-nodes-utilities-comfy-node-0077, comfy-parity-native-nodes-utilities-comfy-node-0610, comfy-parity-native-nodes-utilities-logic-comfy-node-0082, comfy-parity-native-nodes-utilities-primitive-comfy-node-0494, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-native-nodes-video-preprocessors-comfy-node-0372
   - Reads: crates/comfy_nodes/src/families, crates/comfy_model/src/families, crates/comfy_plugin_host, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_api/src/services.rs, crates/zed/src/zed.rs, .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-models.csv
@@ -13003,11 +13021,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CATALOG-001, VAL-NODE-CLOSURE-001, VAL-MODEL-FAMILY-001, VAL-NATIVE-E2E-001, VAL-NATIVE-E2E-002; commands: cargo check -p comfy_nodes -p comfy_model -p comfy_runtime -p comfy_worker -p comfy_api -p zed -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_model --all-targets; cargo test -p comfy_runtime --all-targets; cargo test -p comfy_worker --all-targets; cargo test -p comfy_api --all-targets; cargo test -p zed --features test-support --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_model -p comfy_runtime -p comfy_worker -p comfy_api -p zed -p comfy_test_support
   - Done when: Every node/model row has one collision-free executable, verified-provider, or descriptor-only unavailable status; the production desktop, API, headless, and worker projections consume that exact registry; generator output is byte-stable; both native E2E slices pass; and schema, behavior, provider, model, object-info, runtime, and recovery closure has zero unexplained rows.
 
-- [ ] 667. Implement templates, App Mode, sharing, tabs, and workflow recovery
+- [ ] 668. Implement templates, App Mode, sharing, tabs, and workflow recovery
   - _id: comfy-parity-workflow-experience
   - Outcome: Native workflow tabs, recents, autosave/drafts, local/bundled/provider/plugin templates, App Mode projections, and approved sharing preserve provenance, dirty state, permissions, and lossless documents.
-  - Wave: 368
-  - _Wave: 368
+  - Wave: 369
+  - _Wave: 369
   - Dependencies: comfy-parity-native-registry-integration
   - _Blocked_by: comfy-parity-native-registry-integration
   - Reads: crates/comfy_ui/src/workflow_item.rs, crates/comfy_runtime/src/workflow_formats.rs, .agents/specs/comfy-parity/catalogs/frontend-features.csv
@@ -13021,11 +13039,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-007, VAL-GPUI-004, VAL-RECOVERY-002; commands: cargo check -p comfy_ui; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_ui
   - Done when: Create/open/import/save/export/close/restart/conflict/template/App Mode/share states pass with explicit missing dependencies, cancellation, provider gating, focus, and accessibility.
 
-- [ ] 668. Build node library, asset panels, missing-dependency flows, and content dispatch
+- [ ] 669. Build node library, asset panels, missing-dependency flows, and content dispatch
   - _id: comfy-parity-assets-editors-viewers
   - Outcome: Node library/search/replacement and native asset browsing dispatch typed outputs to specialized GPUI editors/viewers while preserving missing node/model/media/plugin state.
-  - Wave: 369
-  - _Wave: 369
+  - Wave: 370
+  - _Wave: 370
   - Dependencies: comfy-parity-workflow-experience
   - _Blocked_by: comfy-parity-workflow-experience
   - Reads: crates/comfy_ui, crates/comfy_runtime/src/assets.rs, .agents/specs/comfy-parity/catalogs/frontend-component-surfaces.csv
@@ -13039,11 +13057,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-GPUI-006, VAL-GPUI-007, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_ui; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_ui
   - Done when: Catalog counts reconcile and empty/loading/missing/filter/drag/drop/replace/delete/recovery plus keyboard/focus/semantic behavior pass.
 
-- [ ] 669. Implement native image, HDR, mask, crop, paint, and bounding-box content
+- [ ] 670. Implement native image, HDR, mask, crop, paint, and bounding-box content
   - _id: comfy-parity-image-mask-content
   - Outcome: Bounded native codecs and GPUI surfaces cover image/HDR/depth/mask/crop/painter/bounding-box load, view, edit, undo, metadata, output, and external changes.
-  - Wave: 370
-  - _Wave: 370
+  - Wave: 371
+  - _Wave: 371
   - Dependencies: comfy-parity-assets-editors-viewers
   - _Blocked_by: comfy-parity-assets-editors-viewers
   - Reads: crates/comfy_media, crates/comfy_ui/src/content_registry.rs, .agents/specs/comfy-parity/catalogs/frontend-component-surfaces.csv
@@ -13057,11 +13075,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-GPUI-007, VAL-MEDIA-001, VAL-RECOVERY-005; commands: cargo check -p comfy_media -p comfy_ui; cargo test -p comfy_media --all-targets; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_media -p comfy_ui
   - Done when: Pixels/color/orientation/alpha/metadata and interaction/accessibility results match fixtures across malformed/oversized/cancel/crash/unsupported/external-change cases.
 
-- [ ] 670. Implement native audio and video codecs, widgets, players, and output inspection
+- [ ] 671. Implement native audio and video codecs, widgets, players, and output inspection
   - _id: comfy-parity-audio-video-content
   - Outcome: Native readers/writers and GPUI controls cover cataloged audio/video samples, frames, timing, metadata, playback, previews, edits, outputs, and platform codec availability without command subprocesses.
-  - Wave: 371
-  - _Wave: 371
+  - Wave: 372
+  - _Wave: 372
   - Dependencies: comfy-parity-image-mask-content
   - _Blocked_by: comfy-parity-image-mask-content
   - Reads: crates/comfy_media/src/comfy_media.rs, crates/comfy_ui/src/content_registry.rs
@@ -13075,11 +13093,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-GPUI-007, VAL-MEDIA-001; commands: cargo check -p comfy_media -p comfy_ui; cargo test -p comfy_media --all-targets; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_media -p comfy_ui
   - Done when: Sample/frame/timing/metadata fixtures and play/pause/seek/focus/accessibility/cancel/malformed/unavailable-codec/restart paths pass; no FFmpeg command launches.
 
-- [ ] 671. Implement native 3D, latent, text, JSON, file, and unknown-output inspection
+- [ ] 672. Implement native 3D, latent, text, JSON, file, and unknown-output inspection
   - _id: comfy-parity-three-d-latent-content
   - Outcome: Typed GPUI content covers mesh/point/splat/animation, latent channels, text/JSON/files, and preserved unknown outputs with bounded parsing and exact serialization.
-  - Wave: 372
-  - _Wave: 372
+  - Wave: 373
+  - _Wave: 373
   - Dependencies: comfy-parity-audio-video-content
   - _Blocked_by: comfy-parity-audio-video-content
   - Reads: crates/comfy_media, crates/comfy_ui/src/content_registry.rs, crates/comfy_model/src/latent_formats, .agents/specs/comfy-parity/catalogs/native-compute-closure.json
@@ -13093,11 +13111,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-GPUI-007, VAL-LATENT-001, VAL-MEDIA-001; commands: cargo check -p comfy_media -p comfy_ui; cargo test -p comfy_media --all-targets; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_media -p comfy_ui
   - Done when: Format/data/view/edit/focus/accessibility/malformed/cancel/device-loss/external-change tests pass and unknown outputs remain downloadable/inspectable without reinterpretation.
 
-- [ ] 672. Implement profile-scoped providers, secrets, cloud gates, telemetry, and tasks
+- [ ] 673. Implement profile-scoped providers, secrets, cloud gates, telemetry, and tasks
   - _id: comfy-parity-auth-cloud-telemetry
   - Outcome: Native provider services isolate auth, secrets, entitlements, costs, uploads, polling, cancellation, tasks, feature flags, surveys, and consented telemetry by profile and plugin grants.
-  - Wave: 373
-  - _Wave: 373
+  - Wave: 374
+  - _Wave: 374
   - Dependencies: comfy-parity-three-d-latent-content
   - _Blocked_by: comfy-parity-three-d-latent-content
   - Reads: crates/credentials_provider, crates/comfy_runtime/src/trust.rs, .agents/specs/comfy-parity/catalogs/backend-external-services.csv
@@ -13111,11 +13129,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-E2E-005, VAL-DOMAIN-008, VAL-PLUGIN-001; commands: cargo check -p comfy_runtime; cargo test -p comfy_runtime --all-targets; ./script/clippy -p comfy_runtime
   - Done when: Fake-provider fixtures pass expiry/offline/disabled/missing-secret/cost-confirm/ambiguous timeout/cancel/redaction/consent/restart; no unapproved real call occurs.
 
-- [ ] 673. Expose native settings, themes, localization, onboarding, help, and docs
+- [ ] 674. Expose native settings, themes, localization, onboarding, help, and docs
   - _id: comfy-parity-settings-localization-ui
   - Outcome: GPUI surfaces expose native runtime/backend/memory/plugin/API/provider/update settings plus themes, palettes, shortcuts, locales, onboarding, help, evidence-linked docs, and the exact public-help navigation commands assigned by the native menu ledger through Zed's central Settings Editor registration. This task owns the visible help command surfaces and destinations; `comfy-parity-desktop-native-ui` and `comfy-parity-security-platform` retain the platform adapter and ExternalNavigationPolicy enforcement, so the UI never owns a second URL-security decision.
-  - Wave: 374
-  - _Wave: 374
+  - Wave: 375
+  - _Wave: 375
   - Dependencies: comfy-parity-auth-cloud-telemetry
   - _Blocked_by: comfy-parity-auth-cloud-telemetry
   - Reads: crates/settings, crates/settings_content, crates/settings_ui/src/page_data.rs, crates/comfy_runtime/src/settings.rs, .agents/specs/comfy-parity/catalogs/frontend-settings.csv, .agents/specs/comfy-parity/catalogs/docs-pages.csv, .agents/specs/comfy-parity/catalogs/native-menu-dispositions.csv, crates/comfy_runtime/src/trust.rs
@@ -13129,11 +13147,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-005, VAL-GPUI-008, VAL-GPUI-011, VAL-DOCS-001; commands: cargo check -p comfy_ui -p settings_ui; cargo test -p comfy_ui --features test-support --all-targets; cargo test -p settings_ui --all-targets; ./script/clippy -p comfy_ui -p settings_ui
   - Done when: All keys/defaults/flags/locales/preference layers/search/validation/restart/dismissal/contrast/focus/English fallback and documentation-only labels reconcile; the pages are visible through the existing central Settings Editor; every assigned public/help menu row has a real visible command surface and typed destination; safe navigation is delegated once to the canonical platform/security adapter with denial surfaced to the user.
 
-- [ ] 674. Map Desktop onboarding, adoption, migration, and profiles to native data
+- [ ] 675. Map Desktop onboarding, adoption, migration, and profiles to native data
   - _id: comfy-parity-desktop-installations
   - Outcome: Desktop-visible lifecycle becomes native profile/backend/model/plugin/workflow/output adoption with preview, isolation, cancellation, journals, and read-only legacy Python metadata.
-  - Wave: 375
-  - _Wave: 375
+  - Wave: 376
+  - _Wave: 376
   - Dependencies: comfy-parity-settings-localization-ui
   - _Blocked_by: comfy-parity-settings-localization-ui
   - Reads: .agents/specs/comfy-parity/catalogs/desktop-features.csv, crates/comfy_runtime/src/legacy_installations.rs, crates/comfy_ui/src/onboarding.rs
@@ -13147,11 +13165,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DESKTOP-001, VAL-GPUI-009, VAL-GPUI-010; commands: cargo check -p comfy_ui -p comfy_runtime; cargo test -p comfy_ui --features test-support --all-targets; cargo test -p comfy_runtime --all-targets; ./script/clippy -p comfy_ui -p comfy_runtime
   - Done when: Every source lifecycle state has a native/migration/conflict/defer decision and platform GPUI tests cover success, invalid, busy, permission, cancel, crash, restart, and multi-profile isolation.
 
-- [ ] 675. Implement native downloads, updates, snapshots, rollback, and auto-update mapping
+- [ ] 676. Implement native downloads, updates, snapshots, rollback, and auto-update mapping
   - _id: comfy-parity-updates-snapshots
   - Outcome: Application/backend/codec/model/registry/plugin operations use staged downloads, integrity/signature checks, pause/resume/cancel, snapshots, quiescence, verification, atomic commit, rollback, and relaunch guards.
-  - Wave: 376
-  - _Wave: 376
+  - Wave: 377
+  - _Wave: 377
   - Dependencies: comfy-parity-desktop-installations
   - _Blocked_by: comfy-parity-desktop-installations
   - Reads: crates/auto_update, crates/comfy_runtime/src/profile_operations.rs, .agents/specs/comfy-parity/catalogs/desktop-features.csv
@@ -13165,11 +13183,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-E2E-004, VAL-RECOVERY-007, VAL-GPUI-009; commands: cargo check -p comfy_runtime -p comfy_ui; cargo test -p comfy_runtime --all-targets; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_runtime -p comfy_ui
   - Done when: Every stage survives injected failure/crash/restart; progress and integrity are accurate; rollback retains data; Python/custom-node update paths stay inactive migration evidence.
 
-- [ ] 676. Implement worker health, logs, terminal, diagnostics, feedback, and crash recovery
+- [ ] 677. Implement worker health, logs, terminal, diagnostics, feedback, and crash recovery
   - _id: comfy-parity-process-diagnostics
   - Outcome: Native worker/backend/device/model/plugin/API health and bounded sanitized logs drive diagnostic panels, terminal-like read-only streams, popouts, feedback artifacts, and recovery without arbitrary shell execution.
-  - Wave: 377
-  - _Wave: 377
+  - Wave: 378
+  - _Wave: 378
   - Dependencies: comfy-parity-updates-snapshots
   - _Blocked_by: comfy-parity-updates-snapshots
   - Reads: crates/comfy_worker, crates/comfy_runtime/src/updates.rs, .agents/specs/comfy-parity/catalogs/desktop-renderer-surfaces.csv
@@ -13183,11 +13201,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-E2E-002, VAL-GPUI-009, VAL-RECOVERY-003, VAL-RECOVERY-009; commands: cargo check -p comfy_runtime -p comfy_ui; cargo test -p comfy_runtime --all-targets; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_runtime -p comfy_ui
   - Done when: Health transitions, log retention/search/export/redaction, crash/orphan/restart-loop, diagnostics archive, feedback consent, focus, and platform behavior pass.
 
-- [ ] 677. Map Desktop IPC, preload, menus, windows, choosers, and OS integration
+- [ ] 678. Map Desktop IPC, preload, menus, windows, choosers, and OS integration
   - _id: comfy-parity-desktop-native-ui
   - Outcome: Every Desktop bridge/channel/menu/window/chooser/navigation/OS contract receives a Rust service, GPUI action/event, native lifecycle mapping, inactive legacy response, or explicit defer and is registered in Zed's existing application module.
-  - Wave: 378
-  - _Wave: 378
+  - Wave: 379
+  - _Wave: 379
   - Dependencies: comfy-parity-process-diagnostics
   - _Blocked_by: comfy-parity-process-diagnostics
   - Reads: .agents/specs/comfy-parity/catalogs/desktop-ipc.csv, .agents/specs/comfy-parity/catalogs/desktop-preload-apis.csv, .agents/specs/comfy-parity/catalogs/desktop-menu-actions.csv, crates/zed/src/main.rs, crates/zed/src/zed.rs
@@ -13201,11 +13219,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DESKTOP-001, VAL-GPUI-010, VAL-GPUI-011; commands: cargo check -p comfy_ui -p zed; cargo test -p comfy_ui --features test-support --all-targets; cargo test -p zed --features test-support --all-targets; ./script/clippy -p comfy_ui -p zed
   - Done when: The new module is compiled and initialized; all counts reconcile and platform tests cover args/results/errors, menu enablement, chooser cancel, lifecycle order, destructive guards, safe navigation, notifications, relaunch, and profile isolation.
 
-- [ ] 678. Harden native runtime security and platform packaging
+- [ ] 679. Harden native runtime security and platform packaging
   - _id: comfy-parity-security-platform
   - Outcome: Windows/macOS/Linux packages define backend/vendor/codec/plugin trust, signatures, sandbox/permissions, typed locations, remote API policy, secrets, model parser bounds, worker isolation, and native-only contents.
-  - Wave: 379
-  - _Wave: 379
+  - Wave: 380
+  - _Wave: 380
   - Dependencies: comfy-parity-desktop-native-ui
   - _Blocked_by: comfy-parity-desktop-native-ui
   - Reads: crates/comfy_runtime, crates/comfy_worker, crates/comfy_plugin_host, crates/comfy_media, nix, script
@@ -13219,11 +13237,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-008, VAL-NATIVE-BOUNDARY-001, VAL-DEVICE-001, VAL-PLUGIN-001, VAL-MEDIA-001; commands: cargo check -p comfy_runtime -p comfy_worker; cargo test -p comfy_runtime --all-targets; cargo test -p comfy_worker --all-targets; ./script/clippy -p comfy_runtime -p comfy_worker
   - Done when: Security corpus, platform paths/signing/permissions, device libraries, codec licensing, plugin sandbox, remote-host policy, binary/package/dependency scan, and isolated runtime all pass.
 
-- [ ] 679. Audit GPUI ownership, registered persistence, cancellation, and error propagation
+- [ ] 680. Audit GPUI ownership, registered persistence, cancellation, and error propagation
   - _id: comfy-parity-gpui-persistence
   - Outcome: Every entity/service/task/subscription/profile handle and persisted model has explicit ownership, lifetime, cancellation, migration, watcher, error-to-UI, and accessibility behavior.
-  - Wave: 380
-  - _Wave: 380
+  - Wave: 381
+  - _Wave: 381
   - Dependencies: comfy-parity-security-platform
   - _Blocked_by: comfy-parity-security-platform
   - Reads: crates/comfy_ui, crates/comfy_runtime, crates/comfy_worker, crates/workspace, crates/db, crates/settings
@@ -13237,11 +13255,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-001, VAL-DOMAIN-006, VAL-RECOVERY-001, VAL-RECOVERY-008, VAL-GPUI-011; commands: cargo check -p comfy_ui -p comfy_runtime; cargo test -p comfy_ui --features test-support --all-targets; cargo test -p comfy_runtime --all-targets; ./script/clippy -p comfy_ui -p comfy_runtime
   - Done when: No nested entity update, leaked/dropped required task, stale cross-profile update, silent fallible result, unregistered persistence type, inaccessible error, or destructive watcher conflict remains.
 
-- [ ] 680. Enforce format, identifier, plugin, availability, and deprecation policy
+- [ ] 681. Enforce format, identifier, plugin, availability, and deprecation policy
   - _id: comfy-parity-backward-compatibility
   - Outcome: Legacy/current workflow and protocol versions, node/plugin IDs, Desktop/CLI state, unknown fields, deprecations, flags, docs-only claims, and inactive source behaviors preserve data and use explicit mappings or gates.
-  - Wave: 381
-  - _Wave: 381
+  - Wave: 382
+  - _Wave: 382
   - Dependencies: comfy-parity-gpui-persistence
   - _Blocked_by: comfy-parity-gpui-persistence
   - Reads: crates/comfy_runtime/src/legacy_connections.rs, crates/comfy_plugin_host/src/legacy_mapping.rs, .agents/specs/comfy-parity/parity-matrix.md
@@ -13255,11 +13273,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CATALOG-001, VAL-DOMAIN-002, VAL-E2E-003, VAL-DOCS-001, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_runtime -p comfy_plugin_host; cargo test -p comfy_runtime --all-targets; cargo test -p comfy_plugin_host --all-targets; ./script/clippy -p comfy_runtime -p comfy_plugin_host
   - Done when: Every cataloged version/conflict/deprecation/uncertainty maps to tested preserve/migrate/gate/defer behavior with provenance and no silent promotion, deletion, rewrite, or external fallback.
 
-- [ ] 681. Meet native graph, tensor, model, sampler, media, API, and recovery budgets
+- [ ] 682. Meet native graph, tensor, model, sampler, media, API, and recovery budgets
   - _id: comfy-parity-performance
   - Outcome: Benchmark the numeric budgets in validation.md: image ≤2 s, tiny diffusion ≤5 s, 1,000-node input p95 ≤8 ms and frame p95 ≤16.7 ms, 10,000-node interaction p95 <50 ms, worker readiness ≤2/5 s, API events ≤50 ms, preview ≤250 ms, visible cancellation ≤100 ms, bounded terminal cancellation, and ten-second resource convergence.
-  - Wave: 382
-  - _Wave: 382
+  - Wave: 383
+  - _Wave: 383
   - Dependencies: comfy-parity-backward-compatibility
   - _Blocked_by: comfy-parity-backward-compatibility
   - Reads: crates/comfy_tensor, crates/comfy_model, crates/comfy_sampler, crates/comfy_runtime, crates/comfy_ui, .agents/specs/comfy-parity/validation.md
@@ -13273,11 +13291,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-RECOVERY-008, VAL-MEMORY-001, VAL-GPUI-002, VAL-NATIVE-E2E-001, VAL-NATIVE-E2E-002; commands: cargo check -p comfy_test_support -p comfy_ui; cargo test -p comfy_test_support --all-targets; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_test_support -p comfy_ui
   - Done when: Every numeric budget passes in release profile with hardware/driver/OS/fixture/warmup/sample provenance; a miss fails the release unless the exact conditional platform row remains explicitly uncertified.
 
-- [ ] 682. Run parity, closure, platform, accessibility, security, and readiness audits
+- [ ] 683. Run parity, closure, platform, accessibility, security, and readiness audits
   - _id: comfy-parity-final-validation
   - Outcome: All deterministic source/oracle, native unit/contract/GPUI/E2E/restart/failure/accessibility/platform/security/performance tests and forward/reverse coverage gates produce an auditable implementation-closure report for the CPU and Apple Metal certified baseline plus fail-closed optional adapters.
-  - Wave: 383
-  - _Wave: 383
+  - Wave: 384
+  - _Wave: 384
   - Dependencies: comfy-parity-performance, comfy-parity-certify-device-apple-metal-mps-comfy-model-0015, comfy-parity-certify-device-cpu-comfy-model-0016, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation
   - _Blocked_by: comfy-parity-performance, comfy-parity-certify-device-apple-metal-mps-comfy-model-0015, comfy-parity-certify-device-cpu-comfy-model-0016, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation
   - Reads: .agents/specs/comfy-parity, crates/comfy_test_support, crates/comfy_ui, script
@@ -13291,7 +13309,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CATALOG-001, VAL-CANCEL-001, VAL-DESKTOP-001, VAL-DOMAIN-001, VAL-DOMAIN-002, VAL-WORKFLOW-OWNERSHIP-001, VAL-DOMAIN-003, VAL-DOMAIN-004, VAL-DOMAIN-005, VAL-DOMAIN-006, VAL-DOMAIN-007, VAL-DOMAIN-008, VAL-RUNTIME-PERSISTENCE-001, VAL-RUNTIME-SETTINGS-001, VAL-RUNTIME-TRUST-001, VAL-FOUNDATION-001, VAL-E2E-001, VAL-E2E-002, VAL-PROTOCOL-001, VAL-LEGACY-ENGINE-001, VAL-E2E-003, VAL-E2E-004, VAL-E2E-005, VAL-GPUI-001, VAL-GPUI-002, VAL-GPUI-003, VAL-GPUI-004, VAL-GPUI-005, VAL-GPUI-006, VAL-GPUI-007, VAL-GPUI-008, VAL-GPUI-009, VAL-GPUI-010, VAL-GPUI-011, VAL-GPUI-012, VAL-GPUI-013, VAL-GPUI-014, VAL-GPUI-015, VAL-HTTP-001, VAL-WS-001, VAL-NODE-001, VAL-NODE-002, VAL-RECOVERY-001, VAL-RECOVERY-002, VAL-RECOVERY-003, VAL-RECOVERY-004, VAL-RECOVERY-005, VAL-RECOVERY-006, VAL-RECOVERY-007, VAL-RECOVERY-008, VAL-RECOVERY-009, VAL-NATIVE-BOUNDARY-001, VAL-NODE-REGISTRY-001, VAL-TENSOR-001, VAL-NUMERIC-FORMATS-001, VAL-AUTOGRAD-001, VAL-RNG-001, VAL-DEVICE-001, VAL-MEMORY-001, VAL-MODEL-FORMAT-001, VAL-CLIP-001, VAL-PATCH-001, VAL-CONTROLNET-001, VAL-CONDITIONING-001, VAL-PATCH-ADAPTER-001, VAL-VAE-001, VAL-WEIGHT-ADAPTER-001, VAL-MODEL-REGISTRY-001, VAL-MODEL-FAMILY-FOUNDATION-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-FAMILY-001, VAL-SAMPLING-FOUNDATION-001, VAL-SAMPLER-001, VAL-SCHEDULER-001, VAL-LATENT-001, VAL-PLUGIN-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-NATIVE-API-001, VAL-OWNERSHIP-DOMAIN-001, VAL-OWNERSHIP-001, VAL-NATIVE-E2E-001, VAL-NATIVE-E2E-002, VAL-MEDIA-001, VAL-METADATA-001, VAL-DOCS-001, VAL-CLI-001, VAL-NODE-CLOSURE-001, VAL-COMFY-BUILD-001; commands: python3 .agents/specs/comfy-parity/regenerate_all.py --check; ./script/clippy; python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete
   - Done when: Every active/conditional feature and every native node/model/operator/device/plugin/API/media contract has implementation evidence or an explicit non-completion-blocking external release gate; deterministic CPU conformance, verification of any supplied CPU attestation, retained signed Metal baseline evidence, compiled CoreX typed-Unbound behavior, audits, `./script/clippy`, and the exact strict spec validator pass. No unavailable optional hardware work is marked complete.
 
-- [x] 683. Consolidate native model-family row validation artifacts
+- [x] 684. Consolidate native model-family row validation artifacts
   - _id: comfy-parity-model-family-row-validation-artifact-owner
   - Outcome: Make the generated model-family test harness the sole owner of deterministic per-row validation artifact schema, source/fixture/provenance digesting, environment identity, case accounting, and artifact serialization. Row tests provide only immutable identity and passed-case projections.
   - Wave: 83
@@ -13311,7 +13329,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION 2026-07-27 independent audit found one stale manually-created ACEStep15 artifact with no reproducing code and no artifacts for four sibling rows. The canonical generated model-family harness now solely owns schema, path admission, digesting, environment/case projection and serialization; row adapters provide immutable identity/cases only. The stale artifact was removed. Exact VAL-MODEL-FAMILY-ROW-001 passed twice with 13/13 tests and five byte-stable zero-failure/zero-skip artifacts: ACEStep `5f9a531ca8509859273b9accd91b9205843261306e21fc226639d046537336c9`, ACEStep15 `c19c76713b00d08a4bf6d2a1d168fdbb755037d6a2914e77908faf1d2213883e`, Anima `532127634dd303919122abb4feec8d863454b687f38a7acb3d5b039c2bf12284`, AuraFlow `392926b63fe43b032e43e3ffac0df4fd12129958d5b47b8d82d38790f9b41831`, Boogu `980982f8001f3d03de8be2f30e93b1b8d1d528f3def7b08ff1d4fcc056dcf089`. Whole-repository scans and VAL-OWNERSHIP-001 twice over 7,100 source files passed at SHA-256 `19e6538839ec325c1e83215d949b50508d70cbff33d7547b9f78d69a5ba59180`; no second row-evidence writer remains. Full locked comfy_model and comfy_test_support all-target suites, locked check, formatting and warnings-denied release clippy passed. Harness SHA-256 `ac45e33a60620cb0626f062dbe6b1b60407d53de235968f55c17d7d55dc7d9ac`. The generator now emits 469 tasks and D39/VAL-MODEL-FAMILY-ROW-001 document per-fixture ownership; strict regeneration exited 0 and Task 15 remained `[x]` with evidence intact._
 
-- [x] 684. Consolidate CogVideoX family configuration adapters
+- [x] 685. Consolidate CogVideoX family configuration adapters
   - _id: comfy-parity-cogvideox-family-adapter-consolidation
   - Outcome: Make one focused CogVideoX family adapter the authoritative consumer of canonical key-derived native/Diffusers layout identity and the owner of parsed shape/configuration normalization, 1.0/1.5 latent-profile selection, patch defaults, and typed configuration errors shared by the I2V, Inpaint, and T2V immutable row definitions.
   - Wave: 165
@@ -13331,7 +13349,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-MODEL-LAYOUT-OWNER 2026-08-05 independent implementation and integration validation replaced the stale caller-metadata path. The canonical detector owner now exposes bounded `AnyTensorDimensionValue` rules (at most 16 unique nonzero values and 16 keys, dimension below rank 32); the sole `cogvideox_family` adapter owns native/Diffusers marker and patch-projection keys plus spatial/temporal shape normalization, 2B/5B profiles, optional text/OFS dimensions, positional state, latent selection, and typed configuration failures. I2V, Inpaint, and T2V registrations have no metadata detector or source-configuration authority: their immutable row rules select exact 32/48/16-channel spatial projections and corresponding 256/384/128 flattened temporal projections from ModelStore keys, while profile/state-plan resolution rejects partial, mixed, cross-family, malformed, and ambiguous layouts. Focused adapter/detector tests passed 5/5, canonical VAL-MODEL-DETECTION-001 regression passed 1/1, model-family foundation passed 21/21, and all three generated rows passed 9/9. Current zero-failure/zero-skip artifacts are VAL-MODEL-DETECTION-001 14/0/0 at SHA-256 `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`, VAL-MEMORY-001 14/0/0 at `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`, and VAL-OWNERSHIP-001 174/0/0 at `4ba63fca12d4fab740ccef7fb39acfa80ebe09cf9ec3fc719e4f58d3a8cec4bf`; focused ownership passed 5/5 in 174.78s. Complete locked comfy_model all-target validation passed 229 library tests, 82/82 generated-family cases, every adapter/foundation/format/patch/VAE target, 9/9 native vision forwards in 216.12s, and 17/17 weight-adapter cases. The locked compile check, cargo formatting check, and isolated release/all-target/all-feature warnings-denied clippy passed; an earlier concurrent Clippy/debug-build artifact collision produced E0463 without a source diagnostic, and the identical command passed alone. Shared detector/adapter/test and I2V/Inpaint/T2V row SHA-256 values are `582e44bcf6f60f38dec5c540e005591b3ae42d61eeade18acdd9c3d81db18b08`, `ee910caccd523472fb8b2ae22205f0d64b2686900787f8c7cfded68ea4036d8c`, `5c8b79d4d497b666b03e2151452d50d3c3e2fa891d352603bd96150a0b494989`, `24ade5380a48336a86e8cdd3a391655509b8435c6af76d0cf01d0ea99880c87e`, `d8033c99642f1e0d1773177b37676c5786bb7809712c3a388084e8c0c2fa5194`, and `67faeba953425ff0489eabfa172357ec843b8d692d0710367273dead18d6013c`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed and no Python/JavaScript or external Comfy production path exists._
 
-- [x] 685. Consolidate Cosmos family configuration adapters
+- [x] 686. Consolidate Cosmos family configuration adapters
   - _id: comfy-parity-cosmos-family-adapter-consolidation
   - Outcome: Make one focused Cosmos family adapter the authoritative consumer of canonical key-derived native layout admission and the owner of GeneralDIT versus Predict2 marker separation, packed-channel derivation, shared geometry and patch defaults, architecture/model-size profile selection, Predict2 positional and memory facts, and typed configuration errors shared by the Cosmos I2V/T2V and Predict2 immutable row definitions.
   - Wave: 166
@@ -13351,7 +13369,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-MODEL-LAYOUT-OWNER 2026-08-05 independent current-tree implementation and revalidation PASS. The sole `comfy_model::cosmos_family` adapter now consumes canonical key-derived layout admission and owns explicit GeneralDIT, Predict2, and Anima marker separation, packed-channel derivation, shared geometry and patch defaults, 7B/14B/Predict2 profiles, positional/RoPE facts, and typed configuration failures. COMFY-MODEL-0071 has no caller metadata or source-configuration authority: its bounded detector requires the source-exact GeneralDIT marker and projection dimension 72, ignores misleading metadata, and rejects missing/wrong-channel, Predict2, Anima, partial, mixed, malformed, and ambiguous inputs before loading. The shared adapter suite passed 4/4 and the focused row passed 3/3. Complete locked `comfy_model --all-targets --no-fail-fast` validation passed 229 library tests, all 82 generated-row cases, every adapter/foundation/format/patch/VAE target, 9/9 native vision forwards, and 17/17 weight-adapter cases. The exact locked compile check and isolated release/all-target/all-feature warnings-denied `./script/clippy -p comfy_model` passed. VAL-MODEL-DETECTION-001 records 14/0/0 at SHA-256 `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`; VAL-MEMORY-001 records 14/0/0 at `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`; the Cosmos row artifact records 6/0/0 at `3fa6490dcc474129b6ba0834467d596e0b05fe437b5072ad0f9c15e9921ef0bb`; and VAL-OWNERSHIP-001 passed 23/23 focused cases with 174/0/0 assertions at `4ccaa6585db950422e2b1152b39e4abaa2728ef40dfa3165566516eea0f7bbad`. Whole-repository ownership generation scanned 7,381 source files and produced catalog SHA-256 `537f0739196344056b63fdd3b2c639487c7b86e88a923c3268cc70064e2aa75f`; no second Cosmos architecture, profile, parser, tensor, transaction, patch, memory, or cancellation owner remains. Adapter/export/row/shared-test/row-test SHA-256 values are `afac5885f3fd5bbd0cded2b9f5e09aebf63dfcffabfec3e15f2de1a46c47bcdb`, `e23e3cc8a302b63927292f173bb611985437333fe6a1e3ea3eae1d6c9f30a4f9`, `4594f045f3855f590f54856b597650d46808d970c87069253ee7c63cc7a79c5f`, `e5580c78e4ef50b76355d473bc5790ee4c83b84e6c962e14d1a3c2e691d9be79`, and `3d2cddebf071411f4ee25e1491e46c61d8455befeebae7154b991d2f98d7a81e`. Validation discovered and corrected the stale metadata-era wrong-channel assertion and added the omitted row-test write to the generated task contract. A concurrent worker briefly leaked an incomplete leaf into the integration tree and interrupted the first clippy build; after isolating that worker file, the identical clippy command passed with no source diagnostic. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed, unavailable hardware certification is not claimed, and no Python/JavaScript or external Comfy production path exists._
 
-- [x] 686. Consolidate Flux and Chroma family detection adapters
+- [x] 687. Consolidate Flux and Chroma family detection adapters
   - _id: comfy-parity-flux-chroma-family-adapter-consolidation
   - Outcome: Make one focused Flux/Chroma family adapter the authoritative consumer of the canonical key-derived prefixed-native, standalone-native, and Flux-Diffusers layouts and the owner of key-norm variants, checked shape extraction, double/single block counting, Flux/Flux2/Chroma/Radiance discrimination, hidden/context/vector/guidance facts, common Flux state plans, and LongCat-versus-Flux precedence. Preserve canonical Flux and Flux2 latent owners and use model_family for layout admission and state-plan selection.
   - Wave: 167
@@ -13371,7 +13389,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-MODEL-LAYOUT-OWNER POST-FLUX-CHROMA-CONSOLIDATION 2026-08-05 independent implementation and integration revalidation replaced the stale caller-metadata path. `comfy_model::flux_chroma_family` is the sole adapter and layout/state-plan owner for key-derived prefixed-native, standalone-native, and `x_embedder` Flux-Diffusers checkpoints; misleading `model_layout`/`image_model` metadata is ignored. The adapter owns exact weight/scale key-norm admission, checked hidden/context/vector/guidance facts, consecutive double/single block counts, Flux/Flux2/Chroma/Radiance/LongCat discrimination, and LongCat (3584 context, no vector/guidance) versus Schnell (4096 context) precedence. The Diffusers plan transactionally projects canonical input/text/output keys and assembles representative double-stream QKV and single-stream QKV/MLP tensors while retaining all remaining source tensors under an explicit model route; cancellation publishes no mapped state. Chroma and Radiance retain lossless native-only signatures because the pinned generic converter does not preserve their distilled-guidance, NeRF, or sentinel state. The focused adapter suite passed 7/7, Chroma and Radiance rows passed 3/3 each, the full comfy_model matrix passed 228/228 ordinary library tests plus the exact host-only special-file test 1/1, 95/95 generated-family tests, 9/9 native vision tests in 312.57s, 17/17 weight-adapter tests, and every other all-target test. VAL-MEMORY-001 passed 1/1 and focused VAL-OWNERSHIP-001 passed 5/5 in 210.26s. `cargo check -p comfy_model`, formatting, diff hygiene, and release/all-target/all-feature warnings-denied clippy passed. Adapter/test/Chroma-row/Radiance-row/Radiance-test SHA-256: `747df646976912e8749f1abebcdc42fa99b6c6d5f1fc1977f8e269d9972a10a3`, `8682a294fa391540d076440014813a69d799c2d90035cbf8f6fd5ec093f70616`, `90b5d6ed04a19635eb70e7bc0411aea9bbb85e300bcd08ecae855262a09236ee`, `25c41775fef6713ffce73327e4b5db16afda19de7997012f16c8fa4cd2c3a4de`, `4c69c5f7323bc9a8a7ef520e04f6b4ad6b67aa1752990ff485c035d7af56f9fd`. Validated native CPU F16/BF16/F32 on macOS aarch64; Apple Metal remains typed fail-closed, with no production Python, JavaScript, or external Comfy process path._
 
-- [x] 687. Consolidate HiDreamO1 model and conditioning ownership
+- [x] 688. Consolidate HiDreamO1 model and conditioning ownership
   - _id: comfy-parity-hidream-o1-family-conditioning-adapter-consolidation
   - Outcome: Make `comfy_model::hidream_o1_family` the sole HiDreamO1 consumer of canonical key-derived layout admission and owner of detector normalization, patch and special-token constants, conditioning geometry, CLIP target definition, component schemas, and native/unprefixed transactional plans. The adapter drops visual deep-stack merger state and generates the exact pixel-space VAE and text-encoder sentinels while importing rather than restating the canonical COMFY-MODEL-0031 latent contract. Classic HiDream remains a separate row because its architecture, latent, CLIP, detector, state, and execution semantics are disjoint.
   - Wave: 168
@@ -13391,7 +13409,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-FLUX-CHROMA-CONSOLIDATION POST-MODEL-LAYOUT-OWNER 2026-08-06 independent implementation audit and current-tree revalidation PASS. The existing native Rust adapter from commit `cca500f969014dd31f2880fc20317422db21aa04` is the sole HiDreamO1 normalization owner: key-derived prefixed-native and standalone-native layouts normalize the exact `[4096, 256]` timestep and `[1024, 3072]` pixel-patch projections; misleading metadata cannot override keys; malformed, partial, and Flux-family probes fail typed. Both transactional plans discard `visual.deepstack_merger_list`, route all surviving model state, drop source VAE/text state, generate exactly `pixel_space_vae=1.0` and `_hidream_o1_te_sentinel=0.0`, and publish nothing on cancellation. The adapter imports canonical COMFY-MODEL-0031 `HiDreamO1Pixel` rather than duplicating it and binds source-exact patch size 32, vision patch/merge geometry, Qwen dimensions/token identifiers, BF16/F32 CPU dtype/device admission, memory factor 0.033, CLIP target, components, and state schemas. Focused validation passed 7/7, including detection, mapping/sentinels, cancellation, pinned latent/conditioning facts, AppleDouble-safe ownership scanning, and single-owner checks. The complete locked comfy_model all-target matrix already passed on this identical implementation (229 library tests, 111/111 generated-family cases, 9/9 native vision, 17/17 weight adapters), as did release/all-target/all-feature warnings-denied clippy and locked check. Source/test SHA-256 values are `2715dfc972715f1ef30e0ee0e52bd622091a08845128d8ee49c62e8323cf5e82` and `36a02f54420278a0554e534aec0d1d1bfe557330d8a1c0126924be4aacf2abf5`. Validated on macOS aarch64 native Rust CPU; no production Python, JavaScript, external Comfy process, or accelerator fallback is introduced._
 
-- [x] 688. Consolidate Hunyuan3D v2 family adapters
+- [x] 689. Consolidate Hunyuan3D v2 family adapters
   - _id: comfy-parity-hunyuan3d-family-adapter-consolidation
   - Outcome: Make `comfy_model::hunyuan3d_family` the sole owner of Hunyuan3D v2/v2.1/Mini layout admission, checked shape extraction, classic-versus-2.1 marker discrimination, depth and Mini specialization, guidance/QKV/context/head facts, and common source-specific immutable mapping data. Preserve the three canonical latent-format owners and reuse the canonical ModelProbe, state transaction, tensor, patch, memory, and cancellation services rather than creating parallel generic owners.
   - Wave: 169
@@ -13411,7 +13429,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-HIDREAM-O1-CONSOLIDATION POST-MODEL-LAYOUT-OWNER 2026-08-06 Shard A native implementation and independent validation PASS. `comfy_model::hunyuan3d_family` is now the sole shared adapter and immutable common-map owner for Hunyuan3D v2, v2.1, and Mini. It derives prefixed `model.diffusion_model.`, saved `model.`, and standalone layouts only from parsed keys; distinguishes classic `latent_in` from the complete v2.1 timestep/QK-norm/x-embedder marker set; selects Mini before base at exact depth 8; extracts non-empty matrices and consecutive double/single/2.1 block depths; validates 16-head geometry; and binds guidance, QKV bias, context, memory factor 3.5, BF16/F16/F32 CPU admission, components, and the three canonical COMFY-MODEL-0032/0033/0034 latent owners. Three bounded transactional plans normalize every admitted layout to `native.*`, rewrite source `.scale` suffixes to `.weight`, preserve optional VAE/vision components, reject unmatched state, and publish nothing on cancellation. Genmo-only, partial 2.1, mixed variant/layout, hidden-shape, nonconsecutive-depth, and misleading-metadata fixtures fail closed. Focused validation passed 5/5; locked all-target check passed; complete comfy_model all-targets passed (229 library tests, 111/111 generated-family cases, 9/9 native vision in 238.67 s, 17/17 weight adapters, and every integration target); VAL-MEMORY-001 passed 1/1; formatting, diff hygiene, and warnings-denied release/all-target/all-feature clippy passed. Adapter/test/export SHA-256 values are `4df9577ede2512897754478e1b3db458f71b4236d89212f63ed27b3580deeb1f`, `2c71689af8c712a33a36429fc6fa814a6f9ffd2068a116573a8f2732bfd5c937`, and `8dd89d4015cec24e850f5216a205b0b066b8364313f25b342e1e6f459b83d8bf`. Validated on macOS aarch64 native Rust CPU; Apple Metal and non-CPU devices remain typed fail-closed with no production Python, JavaScript, or external Comfy process._
 
-- [x] 689. Consolidate HunyuanDiT family adapters
+- [x] 690. Consolidate HunyuanDiT family adapters
   - _id: comfy-parity-hunyuandit-family-adapter-consolidation
   - Outcome: Extend the canonical model-family tensor-fact predicates with bounded rank/dimension comparisons and make `comfy_model::hunyuandit_family` the sole owner of HunyuanDiT/DiT1 marker, depth, profile, size/style-conditioning, common CLIP/component/state/program, and source-layout facts. The adapter reuses the canonical SDXL latent, ModelStore projection, state transaction, tensor, patch, memory, and cancellation owners.
   - Wave: 171
@@ -13431,7 +13449,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-HUNYUANDIT-ADAPTER-CONSOLIDATION 2026-08-06 PASS. Canonical `ModelDetectionRule::AnyTensorFact` now admits 1..=16 unique bounded rank/dimension predicates and 1..=16 keys, supports exact/inequality/ordered comparisons, validates rank and dimension indices below rank 32, inspects parsed tensor shapes only, and contributes one score per rule. The sole `hunyuandit_family` adapter derives prefixed, saved-`model.`, and standalone source layouts; 28/40-block profiles; 1,152/1,408 hidden geometry; the source 3,968-wide DiT1 size/style discriminator; SDXL latent identity; Hydit CLIP target; components; transactional state plans; named program checkpoints; memory 1.3; base Float32 attention and 0.018 sampling end versus DiT1 inherited attention and 0.03 sampling end. Focused adapter tests passed 5/5 and foundation tests 21/21; complete comfy_model all-targets passed 229 library, 152 generated-family, 9 native vision in 145.84s, and 17 weight-adapter tests; complete comfy_test_support all-targets passed with native diffusion E2E 174.09s, checkpoint foundation 4/4 in 76.86s, ownership 23/23 in 177.38s, native image/recovery/release/boundary/plugin/workflow; VAL-MEMORY-001 passed 1/1; compile, formatting, and warnings-denied release/all-target/all-feature Clippy passed. Source/module/export/test SHA-256 values are `24e85a50ef26b18541378ae63109ee18433a18e816f5f25deecc13f143cc1f0c`, `ddacdc3f7043df7ee930f754bd05cf9c29a352b0c6f784c3c2c58e90448b19ad`, `201bdb5158315ecfd399c5cb78525b54b176f083eb933933ec9fd11c9741e8d4`, and `429e31f662add6f56bec3e63b89d5a4f6c5c46da36113aa5dbbbedea63c4e450`; foundation/detection/memory/ownership artifact SHA-256 values are `ed7406b00491c6a794c598af37ea918123ad70c618051fcaaa77c01e73a35884`, `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`, `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`, and `1eca3fab6369249624901bfdd0d2c8e3b2a71392dc2737bb690bb430f5ac9a1d`. Post-regeneration focused ownership passed 5/5 in 117.84s. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed, and no production Python/JavaScript or external Comfy path exists._
 
-- [x] 690. Consolidate Hunyuan image and video family adapters
+- [x] 691. Consolidate Hunyuan image and video family adapters
   - _id: comfy-parity-hunyuan-video-family-adapter-consolidation
   - Outcome: Make `comfy_model::hunyuan_video_family` the sole owner of shared Hunyuan image/video marker, patch/channel/context/hidden/head/block/vector/ByT5/guidance/mean-flow/vision/condition facts, rank-dependent axes, ordered state-key rewrites, save prefix, component schemas, and architecture program. Extend the canonical key-rewrite domain with one bounded ordered optional-replacement form rather than creating a Hunyuan-specific transaction engine. Refiner stochastic conditioning reuses canonical RNG transactions and bilinear resize operations.
   - Wave: 173
@@ -13451,7 +13469,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-HUNYUAN-VIDEO-ADAPTER-CONSOLIDATION 2026-08-05 PASS. The sole `hunyuan_video_family` adapter now owns seven parsed-key-derived Hunyuan image/video variants across prefixed-native, saved-`model.`, and standalone-native layouts; exact rank-four/rank-five patch geometry, channels, hidden/context/head/block/vector/ByT5/guidance/mean-flow/vision facts; axes; latent identities; CLIP targets; save prefix; components; and architecture checkpoints. Canonical `ModelKeyRewrite::OrderedOptional` preserves bounded source-order optional rewrites transactionally, while refiner conditioning delegates bilinear resize and caller-addressed canonical RNG transactions with commit-on-success rollback semantics. Focused Hunyuan adapter validation passed 5/5 and model-family foundation passed 21/21. Complete locked `comfy_model` all-target validation passed 229 library tests (228 in the restricted sandbox plus the exact special-file fixture 1/1 outside it), 158 generated-family tests, 9 native-vision tests in 170.98s, 17 weight-adapter tests, and every remaining model target; VAL-MEMORY-001 passed 1/1. Compile, formatting, and warnings-denied release/all-target/all-feature Clippy passed. Strict regeneration completed twice with snapshot-input closure over 514 tasks, 155 authoritative ownership rows, 7,548 repository source files, and 13,295 trace-complete feature rows. Source/module/export/test SHA-256 values are `e8f81022b58ce66d03c595e455f6f01d78d0a224480b59dafded615cc29cba56`, `1ca1e3c9cc826fd5f59f1fc10f5b4685f475379ddc45d04920f4486063b4a94c`, `cd4ad566b0fa06b97048b9c8bad4d0be01922f97d7a6aab5d2dbf14d87e70cf2`, and `4901a241eb48e41fa343f156f5a664b2c66c7c52264f9f7859bf82ed60773622`; foundation/detection/memory/RNG/cancellation/ownership artifact SHA-256 values are `ed7406b00491c6a794c598af37ea918123ad70c618051fcaaa77c01e73a35884`, `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`, `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`, `25065656e091e20003a2e9a6e48cf32327b5e9c30d0eba60e578aea3e8a29041`, `81209461cf73d91830688fe949065bed6bcf3659b7a357ca12e536d1944aa4fe`, and `1eca3fab6369249624901bfdd0d2c8e3b2a71392dc2737bb690bb430f5ac9a1d`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 691. Consolidate parsed model-layout and state-plan ownership
+- [x] 692. Consolidate parsed model-layout and state-plan ownership
   - _id: comfy-parity-model-layout-state-plan-owner-consolidation
   - Outcome: Make comfy_model::model_family the sole owner of key-derived prefixed-native, standalone-native, and Diffusers layout admission and layout-to-state-plan selection. ModelStore::family_probe remains projection-only; rows and shared adapters supply immutable bounded key signatures and consume a checked layout, while caller metadata cannot select or override layout, parsing, validation, transformation, security, or commit behavior.
   - Wave: 162
@@ -13471,7 +13489,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-MODEL-LAYOUT-OWNER 2026-07-28 independent current-tree implementation and validation audit. `comfy_model::model_family` now owns the bounded typed `PrefixedNative`, `StandaloneNative`, and `Diffusers` domain, immutable key signatures, admission, ambiguity rejection, and layout-to-state-plan mapping; `ModelStore::family_probe` remains projection-only. All 19 affected row registrations and the CogVideoX, Cosmos, Flux/Chroma, and HiDreamO1 adapters consume that owner. Whole-repository scans found zero production `model_layout` metadata reads or `ModelFamilyStatePlanSelector::Metadata` uses; the only two test occurrences are explicit spoof-resistance fixtures. Real safetensors pass through ArtifactRoot, ArtifactIndex, and ModelStore and prove exact native/spoof/Diffusers plan identities plus standalone admission and typed partial, mixed, ambiguous, unsupported, and excessive-signature failures. Independent `cargo check --locked -p comfy_model --all-targets` exited 0; the focused owner suite passed 2/2; `cargo test --locked -p comfy_model --all-targets --no-fail-fast` passed 357/357 with the native vision target completing in 143.23 seconds; `cargo fmt --all -- --check` and warnings-denied release/all-target/all-feature `./script/clippy -p comfy_model` exited 0. Exact VAL-CANCEL-001 passed 31/0/0 at SHA-256 `acc32d22dade74be549cb6ed014e0d188622662e2094fa606e78753e06e4040f`. VAL-OWNERSHIP-001 passed twice in 91.08 and 87.20 seconds with byte-stable 137/0/0 artifact SHA-256 `7458f7e157834185014e7f4d8cd7985e7d49432a5bfe9c14fd12b52d1f7c0f42`. Canonical owner/test/export SHA-256: `7394e6c988278d56e74e54c8ef7f4934e0ff84f4b249a4dcd6afbee7adac5853`, `9617efd4971c67a6e2ce59189d16f51ca45429c93b1c7baab25417369fc5fab9`, `4b79db1bd51bdcb529e68d8b07300744999f94ab5d4292f6d2833734f8e43c6f`. macOS arm64 native Rust CPU; unavailable accelerator execution is not claimed. POST-WEIGHT-STATISTIC-NO-REGRESSION 2026-07-28: after Task 482 extended `model_family.rs`, the focused canonical layout-owner suite independently passed 2/2 and the complete locked `comfy_model --all-targets --no-fail-fast` suite passed 360/360, including all 19 migrated rows/adapters and the long sparse vision forward. The refreshed authoritative-ownership catalog classifies key-derived `ModelStateLayout`/layout-to-plan selection as confirmed and VAL-OWNERSHIP-001 passed twice with byte-stable 137/0/0 SHA-256 `84fcab0df824424839164796edee9894d8ac0fc2e8de96bf55f581cad333ab02`; current `model_family.rs` SHA-256 is `05cd8c8882954a36539203e980b9c89bb530471c0efce4db260e405627792244`. Prior evidence remains historical detail for the same completed owner.
 
-- [x] 692. Consolidate SDXL family adapters
+- [x] 693. Consolidate SDXL family adapters
   - _id: comfy-parity-sdxl-family-adapter-consolidation
   - Outcome: Make comfy_model::sdxl_family the sole shared owner of SDXL, Refiner, KOALA, instruct-pix2pix, SSD1B, and Segmind configuration/profile discrimination, common SDXL CLIP/component/state-plan/program/memory facts, and source-supported native/Diffusers signatures while importing the canonical SDXL latent and canonical model-family layout/transaction owners.
   - Wave: 174
@@ -13491,7 +13509,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-SDXL-ADAPTER-CONSOLIDATION 2026-08-05 PASS. The sole `sdxl_family` adapter now owns source-order discrimination for SDXL instruct-pix2pix, Refiner, base, SSD1B, KOALA 700M/1B, and Segmind Vega across parsed prefixed-native, standalone-native, and source-supported Diffusers signatures. Exact input/model/context/ADM dimensions, residual counts, transformer input/output/middle depths, base/refiner CLIP targets, components, state plans, architecture checkpoints, supported dtype/device facts, and 0.8/1.0 memory factors are shared while the canonical COMFY-MODEL-0047 SDXL latent, model-layout selector, state transaction, tensor, patch, memory, and cancellation owners remain unique. Focused adapter validation passed 5/5 and foundation passed 21/21; VAL-MEMORY-001 passed 1/1. Complete locked `comfy_model` all-target validation passed 229 library tests (228 in the restricted sandbox plus the exact special-file fixture 1/1 outside it), 158 generated-family tests, the 5 SDXL adapter tests, 9 native-vision tests in 146.64s, 17 weight-adapter tests, and every remaining model target. Compile, formatting, and warnings-denied release/all-target/all-feature Clippy passed. Strict regeneration completed twice with snapshot-input closure over 514 tasks, 155 authoritative ownership rows, 7,552 repository source files, and 13,295 trace-complete feature rows. Adapter/export/test SHA-256 values are `0a891f6ee1e08403089116571512ffe860753fc3b81fd8ba2d1e2a84db8727d9`, `1a15b1038ac8b651bb17a5608a13323d0773c48adc9d3463ae91279f8457412f`, and `eefc1400cd7461fca2e4a84194c64a49d65fc8ada76902422d82d087030a2809`; foundation/detection/memory/cancellation/ownership artifact SHA-256 values are `ed7406b00491c6a794c598af37ea918123ad70c618051fcaaa77c01e73a35884`, `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`, `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`, `81209461cf73d91830688fe949065bed6bcf3659b7a357ca12e536d1944aa4fe`, and `1eca3fab6369249624901bfdd0d2c8e3b2a71392dc2737bb690bb430f5ac9a1d`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 693. Consolidate Kandinsky5 family adapters
+- [x] 694. Consolidate Kandinsky5 family adapters
   - _id: comfy-parity-kandinsky5-family-adapter-consolidation
   - Outcome: Make comfy_model::kandinsky5_family the sole shared owner of Kandinsky5 base/image marker and model-dimension discrimination, axes/RoPE, block counts, conditioning, CLIP, component/state/program/profile facts, and source-native layouts. Image specialization wins before base; the adapter imports canonical Flux and HunyuanVideo latents and explicitly rejects unsupported Diffusers layouts.
   - Wave: 175
@@ -13511,7 +13529,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-KANDINSKY5-ADAPTER-CONSOLIDATION 2026-08-05 PASS. The sole `kandinsky5_family` adapter now owns source-native prefixed/standalone detection, exact 1792/4096 video and image-specialized 2560/64 discrimination, checked 2/32 block topology, axes/head/RoPE profiles, pooled/cross-attention/mask/time-replacement/concat conditioning facts, Qwen 2.5 7B plus CLIP-L targets, component schemas, transactional state plans, dtype/device/program facts, 1.25 memory factor, and typed unsupported-Diffusers rejection. It imports the canonical COMFY-MODEL-0037 HunyuanVideo and COMFY-MODEL-0029 Flux latent owners and delegates tensor, transaction, memory, and cancellation mechanics to their canonical owners. Focused adapter validation passed 5/5 and model detection passed 1/1; foundation passed 21/21. Complete locked `comfy_model` all-target validation passed 229 library tests, 158 generated-family tests, the 5 Kandinsky5 and 5 SDXL adapter tests, 9 native-vision tests in 151.84s, 17 weight-adapter tests, and every remaining model target. Compile, formatting, and warnings-denied release/all-target/all-feature Clippy passed. Adapter/export/test SHA-256 values are `fe46f954d41c49a0d0e29827ce61125020b51e1bae189b4f0a40689c3a127fdd`, `e6c4808518f23ae3b7f6c2b201de79ca396d8834f9f2d4f8fbd85982163f29ec`, and `307c7d34687ea4216e7b1119f1c59fbd985262aefdea666200022debb45c079a`; foundation/detection/memory/cancellation/ownership artifact SHA-256 values are `ed7406b00491c6a794c598af37ea918123ad70c618051fcaaa77c01e73a35884`, `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`, `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`, `81209461cf73d91830688fe949065bed6bcf3659b7a357ca12e536d1944aa4fe`, and `1eca3fab6369249624901bfdd0d2c8e3b2a71392dc2737bb690bb430f5ac9a1d`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 694. Consolidate LTXV and LTXAV family adapters
+- [x] 695. Consolidate LTXV and LTXAV family adapters
   - _id: comfy-parity-ltx-family-adapter-consolidation
   - Outcome: Make comfy_model::ltx_family the sole shared owner of LTX timestep/audio markers, PixArt collision rejection, checked layers/heads/context, bounded transformer config override, common CLIP/components/state/program/conditioning facts, and source-native layouts. Preserve LTXV dynamic memory (cross_attention_dim / 2048) * 5.5 and LTXAV final override 0.077 through the canonical estimator; import the canonical LTXV and LTXAV latents and explicitly reject unsupported Diffusers layouts.
   - Wave: 176
@@ -13531,7 +13549,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-LTX-FAMILY-ADAPTER-CONSOLIDATION 2026-08-06 PASS. The sole native `ltx_family` adapter discriminates LTXAV before LTXV, rejects PixArt collisions and unsupported Diffusers-only layouts, admits exactly the source-prefixed, saved-`model.`, and standalone-native layouts, derives checked 32-head/layer/context/channel configurations, and permits only a bounded 16-KiB transformer metadata override consistent with detected checkpoint shapes. It preserves LTXV `(cross_attention_dim / 2048) * 5.5` memory and the final LTXAV `0.077` override, imports canonical COMFY-MODEL-0040 LTXV and COMFY-MODEL-0039 LTXAV latent owners, and records exact shared T5, component, video/audio conditioning, source-state, forward, dtype, and typed device facts. Transactional state mapping, deterministic cancellation, undersized-workspace OOM, workspace convergence, and canonical tensor ownership were exercised without partial publication. Focused adapter validation passed 5/5; the complete locked `comfy_model --all-targets` integration suite passed 229 library tests, 176 generated-family tests, 21 foundation tests, the long 9-case native-vision target in 146.27s, all remaining integration targets, and zero failures. Formatting, compile check, warnings-denied release/all-target/all-feature Clippy, and strict twice-regenerated specification consistency passed. Adapter/test/export SHA-256 values are `e655e96897672ba2875d42cb2b9f3f09333ccb42678d94819392c0617ae062b4`, `3c829771bb4d7594b46422b6c3c41c779e6526adcd5997f3547b03c67fb62111`, and `7fc89e37a20cee74254e14ac9b1cc0b7ef9fc72a7d46e132fc168212f32fc6f5`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 695. Consolidate SD2 and Lotus family adapters
+- [x] 696. Consolidate SD2 and Lotus family adapters
   - _id: comfy-parity-sd2-lotus-family-adapter-consolidation
   - Outcome: Make comfy_model::sd2_family the sole shared owner of standard-UNet SD2, LotusD, and Unclip family matching, shared SD2 CLIP transforms, native/Diffusers state plans, latent/dtype/memory facts, specialization precedence, and consumption of the canonical loaded-weight statistic used to distinguish SD2.0 EPS from V-prediction. Reuse canonical standard-UNet normalization and SD15 latent; Lotus remains an IMG_TO_IMG row and owns only its deterministic task embedding.
   - Wave: 177
@@ -13551,7 +13569,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-SD2-LOTUS-ADAPTER-CONSOLIDATION 2026-08-06 PASS. The sole native `sd2_family` adapter reuses the canonical standard-UNet normalizer to admit exact 320-channel/1,024-context SD2 topology, applies source order LotusD before generic SD20 and exact 1,536/2,048 Unclip specializations, preserves native and pinned Diffusers layouts, and imports canonical COMFY-MODEL-0045 SD15 latent, dtype, device, memory, component, forward, and conditioning facts. The native transaction implements both source SD2 CLIP prefixes, bounded 32-layer QKV split, OpenCLIP-to-transformers key transforms, text-projection transpose, optional vision/VAE routing, and failure-atomic publication; the Diffusers plan maps all standard input/time/class/output keys and routes residual/attention namespaces without a Python conversion path. Lotus remains IMG_TO_IMG with exactly `[sin(1), sin(0), cos(1), cos(0)]` task conditioning and bypasses the inherited statistic. SD20 and Unclip consume only Task 499's real ModelStore-loaded population-standard-deviation observation at the source tensor and checked `> 0.09` threshold; spoofed metadata, wrong observations, partial/mixed layouts, unsupported topology, OOM, and cancellation fail typed without publication. Focused adapter validation passed 5/5. Complete locked `comfy_model --all-targets` validation passed 229 library tests, 176 generated-family tests, 21 foundation tests, the canonical three-case statistic target, the long 9-case native-vision target in 145.40s, all remaining integration targets, and zero failures. Formatting, compile check, warnings-denied release/all-target/all-feature Clippy, and strict twice-regenerated specification consistency passed. Adapter/test/export SHA-256 values are `5afaa4159dec31897fb1809c07f9a913b6a6fda39a334cb6df76fdc74bebc79f`, `129f71d76ca9298d15c8f97ae0785e0f6b3df48bc50cd4edc4831cd221da93f9`, and `b3bd51b2faede380bc058e5f9dff8c0e37074902ee2c3282c9b97871fa5787b9`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 696. Add the canonical model weight-statistic profile hook
+- [x] 697. Add the canonical model weight-statistic profile hook
   - _id: comfy-parity-model-weight-statistic-profile-hook
   - Outcome: Extend comfy_model::model_family with one bounded post-parse profile-observation hook over ModelStore-loaded tensor bytes so SD2.0's checked population-standard-deviation threshold is computed from canonical loaded tensors rather than invented metadata. The hook owns no parser, cache, tensor equation, allocator, device policy, or cancellation state and delegates reduction to canonical comfy_tensor operations.
   - Wave: 163
@@ -13571,7 +13589,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-MODEL-WEIGHT-STATISTIC-OWNER 2026-07-28 independent current-tree audit. Pinned ComfyUI `supported_models.py:112` establishes that the `torch.std(out, unbiased=False) > 0.09` predicate belongs to SD2.0. `comfy_model::model_family` now exclusively owns the bounded 16-request typed domain, duplicate/name/device/dtype admission, population-standard-deviation dispatch, finite observation, and checked threshold comparison; `ModelStore::observe_weight_statistics_with_context` is a focused adapter over the existing store-scoped loaded handle, ArtifactIndex-verified exact bytes, caller-authorized CpuBackend workspace/upload, and failure-atomic staged publication. It delegates the only equation/traversal to canonical `torch_std_with_context_exact_native(... correction=0 ...)`. A real SD2-shaped safetensors fixture with spoofed statistic metadata produced exact f64 bits `0.11180340498685837` and `> 0.09`; unsupported I64/Metal, 17 requests, empty/non-finite output, cancellation, 15-byte scratch OOM, and post-load artifact mutation all failed typed with no observation or leaked workspace. Focused tests passed 3/3; `cargo check --locked -p comfy_model --all-targets`, `cargo fmt --all -- --check`, and warnings-denied release/all-target/all-feature `./script/clippy -p comfy_model` exited 0; complete locked `comfy_model --all-targets --no-fail-fast` passed 360/360. Exact artifacts passed: VAL-MODEL-FAMILY-FOUNDATION-001 19/0/0 SHA-256 `09f8ff0be64a23d17bbd57fa1a5530673ba332145cac1a229821c4975118bc7b`; VAL-MODEL-DETECTION-001 14/0/0 `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`; VAL-TENSOR-001 27/0/0 `ab10ad94519a15cbe5d300511367d1816c7dd52ebac065fd0463ae38e5af34f2`; VAL-MEMORY-001 tensor, worker, and packaged preflight-OOM paths with 14/0/0 artifact `42fea4f07bfde5b6d05739adb617fe360fe39e27543d9672099d0087ef70a6b9`; VAL-CANCEL-001 31/0/0 `55ca6b0b59cee8410bef52608506142b86982a2c72db4ba161889bed3782ee0e`; VAL-OWNERSHIP-001 passed twice in 86.52s and 86.72s with byte-stable 137/0/0 `84fcab0df824424839164796edee9894d8ac0fc2e8de96bf55f581cad333ab02`. Whole-repository scans found one ModelStore/ModelCache, one model-layer statistic invocation, and one canonical tensor reduction owner; the new ownership concern is confirmed in the 134-row catalog (133 confirmed plus the pre-existing explicit CoreX provenance gap). Reuse/separation decision is recorded in D31 and `ownership-policy.json`; no parser, cache, index, allocator, workspace authority, device policy, cancellation token, persistence layer, or transaction manager was added. Implementation SHA-256: model family `05cd8c8882954a36539203e980b9c89bb530471c0efce4db260e405627792244`; model-store adapter `c51786c2f001779fe4c64a0657cce7593581da41276c46030861f48dca4cd745`; focused tests `e15092409b55690c6eef9cd0b1424930ea0984893bb269b9c5f754e967a841cc`; ownership catalog `43e10f62201b093a56620d7fd12b92f840e00179a4fd1ef8292921ca954ce9ee`. macOS arm64 native Rust CPU; unavailable accelerator execution is not claimed, and the dependent SD2 consumer remains Task 481.
 
-- [x] 697. Consolidate Lumina2 and ZImage family adapters
+- [x] 698. Consolidate Lumina2 and ZImage family adapters
   - _id: comfy-parity-lumina-zimage-family-adapter-consolidation
   - Outcome: Make comfy_model::lumina_zimage_family the sole shared owner of Lumina2, ZImage, and ZImagePixelSpace detector/config normalization, pixel-before-ZImage-before-Lumina precedence, conditioning schema, common plans/program/profile facts, and typed errors. Only ZImage admits the pinned Diffusers conversion; the adapter imports canonical Flux and ZImagePixelSpace latents.
   - Wave: 178
@@ -13591,7 +13609,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-LUMINA-ZIMAGE-ADAPTER-CONSOLIDATION 2026-08-06 PASS. The sole native `lumina_zimage_family` adapter enforces pixel-space before ZImage before Lumina2 precedence, recognizes exact prefixed, saved-model, and standalone native layouts, and admits the pinned Diffusers layout only for 3,840-dimensional ZImage. Parsed shape facts distinguish Lumina2's 2,304 dimension, 24/8 attention heads, Flux latent, shift 6.0, and factor 1.4 from ZImage's 3,840 dimension, 30/30 heads, Flux latent, shift 3.0, and factor 2.8. Pixel-space checkpoints derive an exact RGB patch square, decoder input/hidden widths, consecutive residual blocks, exact frequency square, and optional `__x0__` marker before importing canonical COMFY-MODEL-0055 with factor 0.03; malformed squares, projection mismatches, block gaps, partial/mixed layouts, cross-family dimensions, and pixel Diffusers layouts fail typed. Common conditioning records mask/token behavior, cross attention, pooled text, SigLIP features, canonical reference-latent processing, reference contexts, and reference-latent memory accounting. Transactional native and Diffusers plans route all accepted state through the canonical state transaction, preserve the pinned Diffusers namespace plus canonical entry/exit tensors, and cancellation or workspace OOM publishes nothing. Focused adapter validation passed 5/5. The complete locked unrestricted `comfy_model --all-targets` suite exited 0, including 229 library tests, 176 generated-family tests, 21 foundation tests, the 5-case Task 500 target, the long 9-case native-vision target in 152.62s, and every remaining integration target. Formatting, compile check, and warnings-denied release/all-target/all-feature Clippy passed. Adapter/test/export SHA-256 values are `947bc2e0794a15ccb2145734c9d80b613f5ef380b85ce9408b8b7f907d5a97f0`, `c6f58aacea8632e2022e157281e6d5c2b3f3bbacdbf6a5ac37ecdbf7479fe440`, and `7baf057798490253589474f910a511d28cf36759131ed44afcab9b7178293724`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 698. Consolidate Omnigen2 and Boogu family adapters
+- [x] 699. Consolidate Omnigen2 and Boogu family adapters
   - _id: comfy-parity-omnigen2-boogu-family-adapter-consolidation
   - Outcome: Make comfy_model::omnigen2_boogu_family the sole shared owner of Omnigen2/Boogu source-native layout, configuration, CLIP, components, state plans, keys, program, profile, memory and specialization precedence. Omnigen conditionally admits F16 only through canonical extended capability; Boogu remains BF16/F32 because its source bypasses that mutation. Rename the old row-local pseudo-Diffusers plan as standalone native and make source memory factors affect the canonical estimator.
   - Wave: 179
@@ -13611,7 +13629,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-OMNIGEN2-BOOGU-ADAPTER-CONSOLIDATION 2026-08-06 PASS. The sole native `omnigen2_boogu_family` adapter now owns Omnigen2/Boogu marker precedence, prefixed-native and standalone-native layouts, checked shape-derived configuration, canonical Flux latent admission, CLIP targets, conditioning/components, transactional state plans, executable programs, capability-gated dtype sets, and memory profiles. Boogu wins when its marker coexists with the shared timestep marker; malformed, partial, mixed, cross-family, and pseudo-Diffusers probes fail typed. Omnigen2 binds the pinned 2,520 hidden width, 32 transformer layers, two refiners, 21/7 query/KV heads, 2,048 text width, patch geometry, axes/token facts, shift 2.6, and factor 1.95. Boogu derives its widths and consecutive layer counts from keys, binds 28/7 heads, exact axes/token facts, shift 3.16, and factor 2.15. Omnigen2 admits F16 only when the canonical `BackendCapabilityMatrix` reports it; Boogu remains BF16/F32. Both variants use canonical state transactions with runtime reference-latent counts, cancellation publishes nothing, and source factors drive canonical estimator descriptors (4/8 and 4/9 bytes-per-pixel/activation factors). The reopened generated Boogu row imports this adapter, recognizes standalone native state without invented layout metadata, and rejects Diffusers. Focused adapter validation passed 5/5 and the reopened row passed 3/3. The complete locked unrestricted `comfy_model --all-targets` suite exited 0, including 229 library tests, 176 generated-family tests, 21 foundation tests, the 5-case Task 501 target, the long 9-case native-vision target in 155.14s, and all remaining integration targets. Locked check, formatting, and warnings-denied release/all-target/all-feature Clippy passed. Adapter/test/export/row/row-test SHA-256 values are `049b3b9066cb8e2bd7e845c0a401f859098346f48eaa900439f8a15f98a86bb2`, `2a9f25a2b24f2af9d6833369778b0da2ac39553c9a1ac9d1436353d9d8ec9e7e`, `02e5f6824280fe0bbd59c2c711d7153730efc1e765e6512e1d6ff8020259f156`, `140b8a8e5834a2113d0cf8229bcd9d421f7b2e98f953bf121d4ff20d92e2c4cc`, and `caadd34ed2de5be7a7cac7234b453c6b6cf00b4709efde2f4bb07807b792fe00`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 699. Consolidate PixelDiT and PiD family adapters
+- [x] 700. Consolidate PixelDiT and PiD family adapters
   - _id: comfy-parity-pixeldit-pid-family-adapter-consolidation
   - Outcome: Make comfy_model::pixeldit_pid_family the sole shared owner of source-native core/net layout stripping, projector/net_ema drops, exact checked adaLN reshape/split into MSA/MLP, PiD-before-base detection, down-factor/latent-channel/gate-interval configuration, and typed conditioning keys. Import canonical PixelDiTPixel latent and canonical tensor shape/index/resize operations; node consumers receive typed keys only.
   - Wave: 180
@@ -13631,7 +13649,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-PIXELDIT-PID-ADAPTER-CONSOLIDATION 2026-08-06 PASS. The sole native `pixeldit_pid_family` adapter now owns PiD-before-PixelDiT precedence, exact `core.` and `net.` native-layout admission, checked configuration, canonical PixelDiTPixel latent import, CLIP/components/program/profile facts, and typed `attention_mask`, `lq_latent`, and `degrade_sigma` conditioning keys. PixelDiT binds the pinned 1,536 hidden width, 24 heads, 14 patch blocks, two pixel blocks, 1,152 pixel-attention width, 16 pixel heads, 2,304 text width, patch 16, 300-token limit, shift 4.0, and factor 0.04. PiD is selected first by its low-quality projection marker and additionally derives exact latent channels, hidden width, down factor, super-resolution factor 4, paired gate counts, and gate interval while binding shift 1.5. The two transactional state plans strip their source layout, drop optional `_repa_projector` and `net_ema` training state, and use canonical checked reshape/narrow transforms to split each pixel-block adaLN weight and optional bias into exact MSA and MLP tensors. Wrong rank, non-divisible dimensions, incomplete/cross-layout state, missing markers, mismatched PiD projections/gates, and cancellation fail typed without publication. The adapter references canonical tensor facilities and does not duplicate tensor shape/index/resize equations or transaction ownership. Focused adapter validation passed 5/5. The complete locked unrestricted `comfy_model --all-targets` suite exited 0, including 229 library tests, 185 generated-family tests, 21 foundation tests, the 5-case Task 502 target, the long 9-case native-vision target in 206.24s, and every remaining integration target. Locked compile check, formatting, diff hygiene, and warnings-denied release/all-target/all-feature Clippy passed. Adapter/test/export SHA-256 values are `0568ed4ffc21cbbfea8cf1dc5cdb008d9ca8bef483631825a0f5e15687b6823c`, `932730549676f6bc16f98a8ccd3950bf385aaaa0724c7c8c6865c61d7832a92c`, and `02749efb388bcf183d4c7abb9dca293ff2513d0ae15bebfbe2cc3ddf49d2580e`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 700. Consolidate PixArt family adapters
+- [x] 701. Consolidate PixArt family adapters
   - _id: comfy-parity-pixart-family-adapter-consolidation
   - Outcome: Make comfy_model::pixart_family the sole shared owner of PixArt detector/config, CLIP/components/state mapping/program/memory, Alpha-versus-Sigma micro-conditioning, and the pinned native/Diffusers mapping including QKV assembly. Import canonical SD15/SDXL latents and tensor transforms; node micro-conditioning consumes the adapter.
   - Wave: 181
@@ -13651,7 +13669,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-PIXART-ADAPTER-CONSOLIDATION 2026-08-06 PASS. The sole native `pixart_family` adapter now owns PixArt Alpha/Sigma selection over exact prefixed-native, standalone-native, and pinned Diffusers layouts; checked configuration; T5XXL CLIP binding; typed conditioning keys; components/program/profile facts; canonical SD15/SDXL latent imports; and transactional state conversion. Every admitted layout binds hidden width 1,152, 16 heads, four input channels, patch size two, exact consecutive depth, 4,096 caption width, bounded model length, the pinned sqrt-linear 1,000-step schedule, factor 0.5, and F16/BF16/F32 CPU admission. Alpha requires complete, exact size/aspect micro-conditioning projections and exposes typed `c_size`/`c_ar` alongside `c_crossattn`; Sigma excludes micro-conditioning and imports canonical SDXL instead of Alpha's canonical SD15. Native position tokens are rank/width/square checked before exact input-size and interpolation derivation. The bounded Diffusers plan implements every pinned basic/block mapping and canonically assembles self-attention Q/K/V and cross-attention K/V weights and biases for every checked block without duplicating tensor concatenation mechanics. Mixed/partial layouts, gapped or excessive depths, invalid projection/patch/position geometry, incomplete micro-conditioning, workspace OOM, and cancellation fail typed without publication. Focused adapter validation passed 5/5. The complete locked unrestricted `comfy_model --all-targets` suite exited 0, including 229 library tests, 185 generated-family tests, 21 foundation tests, the 5-case Task 503 target, the long 9-case native-vision target in 231.06s, and every remaining integration target. Locked compile check, formatting, diff hygiene, and warnings-denied release/all-target/all-feature Clippy passed. Adapter/test/export SHA-256 values are `59fc6260f85587a760578bd4fb513b27962920dbeada6c84c9de998cc6d2ec2b`, `1f4f2445d46e088223b296f3567dd53e273019a6e299141e1827fe00b04aa618`, and `3eac150a1d035787630705a69471f1687b183c4a0d54b9f7f4815c8f6a33b46a`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 701. Consolidate Qwen Image family ownership
+- [x] 702. Consolidate Qwen Image family ownership
   - _id: comfy-parity-qwen-image-family-adapter-consolidation
   - Outcome: Make comfy_model::qwen_image_family the sole reusable owner of Qwen Image detector/config, txt_norm, depth/channels, timestep-zero marker, optional addition-time/ref-image facts, source-native layout, block-prefix catalog, and typed conditioning keys. Import canonical Wan21 latent and PatchGraph; layered latent/edit/merge/control nodes consume the adapter without owning geometry, tensor creation, or patch commit.
   - Wave: 183
@@ -13671,7 +13689,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-QWEN-IMAGE-ADAPTER-CONSOLIDATION 2026-08-05 PASS. The sole native `qwen_image_family` adapter now owns exact prefixed-native and standalone-native detection, explicit unsupported-Diffusers rejection, checked `txt_norm`/input/output/block geometry, consecutive bounded depth, timestep-zero and optional addition-time precedence, reference-image method facts, typed conditioning keys, source/mapped base and control block-prefix catalog, Qwen 2.5 text-target facts, BF16/F32 CPU admission, and the pinned 1.8 memory factor. It imports the canonical COMFY-MODEL-0053 Wan21 latent and converts the source layered-slice request into a checked canonical three-dimensional `LatentExtent`; tensor allocation remains exclusively in `empty_latent`, including fail-closed cancellation and OOM rollback. Weight-patch admission is limited to the audited Qwen block-prefix catalog and delegates ordered identity, semantic conversion, validation, and commit to canonical `PatchGraph`. Mixed layouts, gapped blocks, wrong ranks/dimensions/channels, malformed timestep markers, invalid addition-time embeddings, invalid layered extents, and out-of-catalog patch targets fail typed. Focused adapter validation passed 7/7. `cargo check -p comfy_model` exited 0. The unrestricted complete `comfy_model --all-targets` suite exited 0, including 229 library tests, 223 generated-family tests, 21 foundation tests, the 7-case Task 504 target, the long 9-case native-vision target in 155.98s, and every remaining integration target. Formatting, diff hygiene, and warnings-denied release/all-target/all-feature `./script/clippy -p comfy_model` passed. Adapter/export/test SHA-256 values are `249ca141b38e2bba6c705c92fa3e5b35bbb04d5761365dcc8fae48e8bee0e35f`, `b30f247a9a15b64c3f912fc89b3296ae158a42ccc939cdce8fb7fafbf7596134`, and `98a83c91959b7e06934e1258e019f5bfde0dab094d79ef9e03526476b4912ea3`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 702. Implement native weight-adapter runtime and bypass semantics
+- [x] 703. Implement native weight-adapter runtime and bypass semantics
   - _id: comfy-parity-weight-adapter-runtime-bypass
   - Outcome: Implement the pinned source-facing weight-adapter registry and typed trainable/bypass runtime plans as one focused comfy_model::weight_adapter owner. Static payload calculation delegates to PatchGraph, saved tensors and reverse traversal delegate to canonical comfy_tensor autograd, quantized values delegate to comfy_model::quantization, and execution uses `&dyn TensorBackend`, the caller's ExecutionContext, canonical cancellation, and external worker retry policy.
   - Wave: 128
@@ -13691,7 +13709,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WEIGHT-ADAPTER-RUNTIME-CLOSURE 2026-07-31 independent current-tree audit PASS. The 18 exact pinned source/symbol rows execute 36 valid/invalid cases with 36 passed, 0 failed, 0 skipped in schema-v1 `VAL-WEIGHT-ADAPTER-001` (artifact SHA-256 `f4cad2a517c744aa39ced4a60df0da9dfd1edb1c50a447e0f1e7d51f950d6cdd`). Focused native runtime tests passed 16/16, covering all six families, all seven LoRA aliases, LoHa/LoKr direct/decomposed/Tucker paths, GLoRA, OFT/BOFT order, source convolution geometry, caller RNG commit, canonical first-order and analytical LoHa higher-order autograd, mutation witnesses/release, quantized materialization, static PatchGraph projection, cancellation/failure atomicity, and sole-owner scans. Fresh locked numeric, autograd, device, memory, cancellation, and ownership gates exited 0; the approved unsandboxed cancellation probe passed and VAL-OWNERSHIP-001 passed after removing declaration-shaped test needles that contaminated repository scans. Fresh all-target suites passed for comfy_model (including the unsandboxed special-file security probe and long native vision execution), comfy_tensor, comfy_worker, and comfy_test_support (including native image/diffusion E2E, no-Python/no-external-Comfy, recovery, release, and 10/10 ownership). Locked four-crate check, formatting, conditioning generation, and warnings-denied release/all-target/all-feature clippy exited 0. The normative validation runner was corrected to the executable comfy_model integration target; `regenerate_all.py --check-twice` was rerun after the expected derived-artifact refresh and exited 0 with snapshot-input closure, 517 tasks, 86 validations, 150 ownership rows, and 13,283 traced feature rows. Repository-wide ownership proves one NativeWeightAdapter, AutogradTape, GradientStore, CancellationToken, BackendWorkspaceAuthority, AttemptMemoryController, PatchGraph, and QuantizedMatrix owner; the narrow `cpu_backend` projection has one trait declaration and one canonical CPU implementation, with unsupported backends rejected typed before mutation and no private backend construction. Implementation SHA-256: weight adapter `9ce574ea9d9279370e874b57bef4df34b02df2b40abd38e922cda770785c9663`; focused tests `954faa1ee345fa929b090287e3559164d2a5bddc0505ac3fdfcfcbbe5c7915fb`; tensor boundary `5baaf2749deba9a9982c4dd279d025331ff33abb46b87555c7302f7e8f5b3160`; CPU projection `548a04dcf9b01281990f4639f6219f9bc9c467dc52b35526ec70c07bb8d81c8a`; conditioning catalog `659cc63959870fc253107e8665d6060967972b223a633f4d79f1cb1c775da179`. Validated native Rust CPU on macOS aarch64; unavailable accelerator execution is not claimed.
 
-- [x] 703. Implement patch loading, merge, and quantized replacement adapters
+- [x] 704. Implement patch loading, merge, and quantized replacement adapters
   - _id: comfy-parity-patch-loading-merge-quantized-adapter
   - Outcome: Implement comfy_model::patches as the focused adapter for checked LoRA key discovery and load diagnostics, Model/CLIP add and subtract merge mapping, and quantized-operation replacement mapping. It constructs immutable PatchGraph payloads and canonical quantized values, executes through the selected TensorBackend and caller ExecutionContext, and owns no ordering, payload equation, quantization codec/storage/materialization, allocator, retry, persistence, or commit state.
   - Wave: 129
@@ -13711,7 +13729,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-07-31 independent current-tree Task 511 audit PASS. `comfy_model::patches` is a focused source-key/load/merge/quantized-replacement adapter; `comfy_model::weight_adapter` remains the sole adapter-family registry and payload owner, `PatchGraph` remains the sole ordered payload validation/application/commit owner, and `quantization` remains the sole codec/storage/materialization owner. Whole-repository definition and call-site scans plus adapter tests found no competing family parser, patch executor, quantizer, allocator, cancellation, persistence, retry, or transaction owner. Exact source-derived validation covers all 14 catalog rows and writes schema-v1 `VAL-PATCH-ADAPTER-001` with 28 passed, 0 failed, 0 skipped on native Rust CPU/macOS aarch64; artifact SHA-256 `ee9ed10790bf8b5a4d7943c3d156190483e297baffb8219e99c1d109dae4114e`. Implementation SHA-256: patches `83ffd1a485c9a67960029772f4c72d262e58e52e02982ea2387a1e4d89ce780c`, PatchGraph `95512635a4ac81e68ce7a2a56818c0a41cdbe89feb5321e7c753d05eac07855e`, weight adapter `7d8bb136d37546bb8f202559417488f7bd01d17314db36d376ccb469404fe9c3`, focused tests `e27c6b3d5d999da269e4bdf71da0085326eabcbe489bd213e0bbac572f20c200`. Fresh declared validation exited 0: formatting; conditioning and ownership generators; locked four-crate all-target check; focused patch adapters 8/8; numeric formats 1/1; autograd 1/1; device 1/1; memory 1/1; cancellation ownership 1/1; focused ownership 1/1 over the full repository; complete comfy_model, comfy_tensor, comfy_worker, and comfy_test_support all-target suites, including deterministic native diffusion 1/1 and native image 1/1; and warnings-denied release `./script/clippy -p comfy_model -p comfy_tensor -p comfy_worker -p comfy_test_support`. Unsupported accelerator hardware was not claimed; unsupported-device paths were validated as typed failures without CPU fallback. Fresh `python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice` exited 0 with snapshot-input closure, preserving this `[x]` status and evidence across 517 tasks, 87 validations, 151 authoritative ownership rows over 7,277 source files, 264 criteria, 41 decisions, and 13,283 traced feature rows._
 
-- [x] 704. Consolidate the native SD1 tokenizer owner
+- [x] 705. Consolidate the native SD1 tokenizer owner
   - _id: comfy-parity-sd1-tokenizer-owner-consolidation
   - Outcome: Remove duplicate SD1 BPE, prompt-bound, fixed-context padding/token-sequence, textual-inversion artifact-binding, SentencePiece vocabulary, storage-dtype, and runtime tokenizer-cache identity behavior from native-diffusion and clip_tokenizer before Task 348 breadth. Keep comfy_model::clip::Sd1Tokenizer as the sole canonical SD1 vocabulary-domain, exact merge-header/cardinality, merge-rank, byte-encoding, BPE traversal, shared bound, cancellation, and fixed-77 padding/token-sequence owner. Keep NativePromptTokenizer as the sole generic configurable multi-section, special-token, padding, and word-identity packer, and formats/ModelStore as the sole bounded ModelProto, restricted fallback archive, canonical storage-dtype, verified artifact-payload, and parsed-model cache owners. Native-diffusion may provide only checked SD15 descriptor, typed-error, and fixed-77-token projections; clip_tokenizer may provide only explicitly distinct focused source-family adapters over canonical untruncated content tokens, opaque store-scoped verified artifacts, and parsed SentencePiece facts. Runtime provider, handle, resolution, and cache identities bind the exact TokenizerIdentity digest beside the model digest.
   - Wave: 126
@@ -13731,7 +13749,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK348-TOKENIZER-OWNERSHIP-CLOSURE 2026-07-31 independent current-tree implementation, traceability, artifact-consistency, and ownership audit PASS. comfy_model::clip is the sole exact contiguous 49,408-token SD1 vocabulary, canonical `#version: 0.2` plus 48,894-pair merge, byte/BPE, untruncated-content, and fixed-77 owner; NativePromptTokenizer alone owns generic configurable section packing. ModelStore and formats issue opaque current-store verified SentencePiece/embedding payloads, parse the restricted stored-ZIP fallback, normalize storage dtypes, distinguish genuine nested PyTorch string_to_param from flat safetensors names, and reject raw caller rows, fabricated or stale handles, mixed stores, and mutation. Native diffusion is projection-only; runtime provider, retained handle, resolution, and cache dependencies bind the exact tokenizer digest beside the model digest. Fresh locked validation exited 0: formatting; the generator produced 151 ownership rows from 7,277 repository source files; four-crate check; clip_tokenizer 22/22; restricted format 1/1; CLIP library 9/9; runtime 283/283; native diffusion foundation 4/4 and E2E 1/1 (199.26s); tensor and worker VAL-MEMORY-001 1/1 each; packaged-worker preflight OOM 1/1; canonical cancellation 1/1; generic ownership 1/1 and focused Task 512 ownership 1/1 with four cases; comfy_model all targets (182 library tests plus every integration target); comfy_test_support all targets (28 library tests plus every integration target, ownership 12/12, native boundary and both E2Es); and `./script/clippy -p comfy_model -p comfy_runtime -p comfy_worker -p comfy_test_support` warnings-denied plus cargo-machete. VAL-CLIP task result records 12 passed, 0 failed, 0 skipped over a seven-file implementation closure in artifact SHA-256 `5db4289df455c1da3acd8e33ebda4caa44974fb1e55740452d5e1f8f79674941`; focused ownership artifact SHA-256 `17502a43aa7cc819146a0010d246214aede84f4a9be40cc2ebafe2a2fb8f64fd`. Fresh approved `python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice` exited 0 with snapshot-input closure, 517 tasks, 87 validations, 151 ownership rows, 13,283 trace rows, 264 criteria, and 41 decisions. Validated native Rust CPU on macOS aarch64 with no Python/JavaScript production engine, external Comfy process, network request, or approved Task 512 deferral._
 
-- [x] 705. Consolidate image VAE geometry and EfficientNet feature ownership
+- [x] 706. Consolidate image VAE geometry and EfficientNet feature ownership
   - _id: comfy-parity-vae-image-foundation-consolidation
   - Outcome: Before image architecture breadth, keep operation-specific encode/decode geometry and temporal batch-group tiling policy in the canonical comfy_model::vae owner, reuse vision_models::NativeEfficientNetV2S for Stable Cascade Stage C, and delegate GELU numerics to the canonical activation-normalization functional owner. Add checked x4, batch-normalized, TAESD-128, Stage A/C, Hunyuan image, pixel-space, and bounded explicit-config geometry; preserve the complete batch-as-time group when spatially tiling TemporalAutoencodingEngine decode; report constructor availability only for profiles already registered to the native image adapter, without treating constructor reachability as Task 353 execution conformance; and extend the existing vision owner with strict atomic F32/F16/BF16/I64 state projection/loading plus a checked canonical-state execution bridge rather than creating another EfficientNet or state-loader subsystem. Preserve the canonical TensorBackend interface; the generic NativeVae boundary may safely project its concrete caller to the same CpuBackend instance only for CPU-only architecture adapters and must fail typed otherwise.
   - Wave: 128
@@ -13751,7 +13769,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-07-29 independent current-tree Task 512 audit PASS after reopening four evidence gaps. One VaeSpatialGeometry/TileExecutionPlan owner covers operation-specific x4, BN, explicit-config, TAESD-128, Stage A/C, Hunyuan, pixel-space and temporal grouped decode tiling; one NativeEfficientNetV2S owner provides exact Stage C prefix projection, strict atomic feature loading, canonical feature execution, and F32/F16/BF16/I64 ModelStore materialization; vae_image delegates GELU to the canonical comfy_tensor helper. Public NativeVae encode/decode prove the exact CpuBackend instance is projected; a delegating noncanonical backend fails typed with no retained output allocation. Fresh validation: cargo check --locked -p comfy_tensor -p comfy_model exit 0; cargo test --locked -p comfy_tensor --all-targets exit 0; cargo test --locked -p comfy_model --all-targets exit 0 (177 lib tests and all integrations, vision_models 9/9); cargo fmt --all -- --check exit 0; ./script/clippy -p comfy_tensor -p comfy_model exit 0 warnings-denied. Independent repository scan found no competing geometry/tiler, EfficientNet, feature-state loader, GELU, workspace, cancellation, retry, persistence, or publication owner. Constructor availability is explicitly registration-only; Task 513 owns state/equation conformance and Task 353 owns architecture execution breadth. Strict regeneration will be rerun after finish._
 
-- [x] 706. Consolidate image VAE state admission and tensor equations
+- [x] 707. Consolidate image VAE state admission and tensor equations
   - _id: comfy-parity-vae-image-adapter-ownership-consolidation
   - Outcome: Before Task 353 architecture breadth, remove the remaining duplicate image-state schema, dtype admission, convolution geometry, softmax, normalization, padding, and pixel-rearrangement ownership from comfy_model::vae_image. Extend the existing canonical comfy_tensor and comfy_model owners only with the narrow checked adapters required by image VAE execution; replace checkpoint-derived self-comparison with immutable source-derived architecture manifests and exact legacy-prefix normalization; and connect the loader through the existing authorized AssetService/ModelStore production boundary without exposing its private ArtifactIndex or adding a second backend, workspace, cancellation, cache, retry, persistence, or publication owner.
   - Wave: 130
@@ -13771,7 +13789,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: Fresh independent Task 513 rerun PASS: locked four-crate check; locked four-crate all-target suite including 182 model, 277 runtime, 96 tensor, native image/diffusion E2E, recovery and 8 ownership tests; rustfmt; release all-feature clippy; ownership generator twice byte-identical SHA-256 563f85c31fb87d85d16428404e0a1ab5b4c37f69f9fab2ed3f113972b6fabb50 with native_model_vae_domain authoritative_owner_confirmed; validate_spec exit 0; strict regenerate_all --check-twice exit 0 after one expected stale-artifact refresh._
 
-- [x] 707. Implement the canonical CPU convolution and mixed-precision VAE execution bridge
+- [x] 708. Implement the canonical CPU convolution and mixed-precision VAE execution bridge
   - _id: comfy-parity-vae-canonical-cpu-execution-bridge
   - Outcome: Make CpuBackend::convolution a checked TensorBackend adapter to the existing generated_comfy_operator_indirection_01 convolution owner and make native image-module execution honest for every advertised CPU dtype. Preserve NativeModule as the sole parameter lifecycle and cast-generation owner, preserve the caller's ExecutionContext and backend workspace authority, and reject every unavailable device or dtype before state or output mutation. No image architecture adapter may copy convolution arithmetic, construct a private backend, or advertise an execution target that the selected backend cannot run.
   - Wave: 131
@@ -13791,7 +13809,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: Fresh four-crate check, all declared all-target suites, production F32/F16/BF16 VAE execution, ownership audit, signed CPU certification, rustfmt, release all-feature clippy, validate_spec, and exact strict regeneration rerun all passed._
 
-- [x] 708. Consolidate NativeModule backend target admission for CLIP execution
+- [x] 709. Consolidate NativeModule backend target admission for CLIP execution
   - _id: comfy-parity-native-module-backend-target-admission-consolidation
   - Outcome: Before native CLIP text or vision breadth, extend the existing NativeModule operation-selection boundary and canonical TensorBackend capability matrix with one checked backend, device, dtype, layout, and required-operation admission path. CLIP plans remain the target-identity owner, NativeModule remains the parameter and cast lifecycle owner, and TensorBackend remains the capability and execution owner; this task adds no registry, device model, dtype model, allocator, workspace authority, cancellation token, cache, retry policy, persistence layer, or publication transaction.
   - Wave: 146
@@ -13811,7 +13829,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: Fresh independent Task 506 PASS. The pre-change whole-repository ownership audit retained exactly one `BackendCapabilityMatrix` owner in `comfy_tensor::operation`, one `NativeModule` parameter/cast lifecycle owner, and one immutable `NativeExecutionRequirements` adapter in `comfy_model::native_ops`; no registry, device/dtype model, backend, allocator, workspace authority, cancellation token, cache, retry owner, persistence layer, or publication transaction was added. Production call-site scans found all loaded CLIP construction, text execution, vision preprocessing/forward, NativeModule materialization/forward, and VBAR casts using `NativeExecutionRequirements::admit_backend_target` against the actual `TensorBackend`, with no direct arbitrary-matrix admission in CLIP adapters. Locked focused admission tests passed 5/5; CLIP library, tokenizer 22/22, vision 11/11, and native-ops suites 17/17 plus 8/8 passed; locked `comfy_model --all-targets` passed including 229 library tests and every integration; locked `comfy_test_support --all-targets` passed including 28 library tests, native image and diffusion E2E, cancellation, recovery, native-boundary, plugin/workspace, and ownership 19/19. Locked two-crate check, rustfmt, and release all-feature `./script/clippy -p comfy_model -p comfy_test_support` exited 0. The ownership generator reported 151 authoritative rows across 7,300 repository source files. Standalone `validate_spec.py` exited 0 and the exact post-change `regenerate_all.py --check-twice` rerun completed twice byte-identically with exit 0. Retained artifacts: VAL-CLIP-001 SHA-256 f2e909b0928faf588a432a2ce7029434f2bc5def91fcebc61e6f51d06dbc37d6, VAL-NUMERIC-FORMATS-001 f36cadf49db79aa973358eb9f11013c9404e401984385cc50d15dcc744162fc9, VAL-OWNERSHIP-001 b549a64a55c6850c650c9db3850009a3de096e66255587df4165245e43a95dba, and the exact CLIP implementation closure digest is 789624c9b16cfb94d4c98fd30ac4d74621c7df0fb13d186c7bf6e5fa39bd52de._
 
-- [x] 709. Reconcile backend catalog cryptographic provenance after the baseline scope amendment
+- [x] 710. Reconcile backend catalog cryptographic provenance after the baseline scope amendment
   - _id: comfy-parity-backend-catalog-provenance-reconciliation
   - Outcome: After the CPU-and-Apple-Metal baseline amendment and retained fail-closed CoreX scope transfer change the normative backend-model catalog, reconcile every checked-in implementation-closure and source-provenance digest that consumes that catalog. Preserve fixture observations and execution semantics byte-for-byte apart from the catalog digest, bind the CUDA-integrated native runtime controller digest in the tokenizer closure, and keep CoreX partial only because its compiled zero-symbol adapter remains canonically Unbound pending the separate comfy-corex-enablement specification.
   - Wave: 144
@@ -13831,7 +13849,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-01 independent catalog-provenance reconciliation PASS: repository-wide search found zero stale pre-amendment backend-model digest; the registry reports exactly COMFY-MODEL-0015 Metal and COMFY-MODEL-0020 CoreX as partial while CoreX remains compiled zero-symbol typed Unbound with proprietary enablement pending only in comfy-corex-enablement. Numeric provenance passed 1/1; tokenizer closure passed 22/22; complete comfy_model all-targets passed (183 library tests and every integration target, including 9/9 vision in 165.82s); complete comfy_sampler passed 18 library, 11 ownership, 190 sampler, 12 foundation, and 30 scheduler tests; complete comfy_test_support passed 28 library tests plus every integration target, deterministic native diffusion 200.07s, checkpoint closure 90.41s, native image/recovery/release/no-Python/no-external-Comfy/plugin/workflow, and ownership 17/17 in 164.93s. Combined locked check, cargo fmt --check, warnings-denied release clippy, twice-stable regenerate_all.py --check-twice (508 tasks, 87 validations, 151 ownership rows, 13295 trace rows), and validate_spec.py all exited 0. No unavailable hardware, signing material, or proprietary CoreX work was claimed._
 
-- [x] 710. Add canonical bounded model-key and tensor-dimension detection
+- [x] 711. Add canonical bounded model-key and tensor-dimension detection
   - _id: comfy-parity-model-detection-any-of-key-selector-consolidation
   - Outcome: Before dependent model-family rows close, extend the existing comfy_model::model_family detection rule and registry with bounded disjunctive any-of-key and any-tensor-dimension selectors. model_family remains the sole detection-rule validation, scoring, evidence, precedence, and ambiguity owner, while ModelStore remains the sole parsed key/shape projection owner. This focused extension adds no family registry, parser, metadata authority, state planner, cache, persistence layer, or transaction.
   - Wave: 164
@@ -13851,7 +13869,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-ANY-KEY-OWNERSHIP-CONSOLIDATION POST-MODEL-LAYOUT-OWNER 2026-08-05 independent current-tree validation refreshed the canonical detector after its bounded tensor-dimension extension. `comfy_model::model_family` remains the sole owner of `ModelDetectionRule`, validation, scoring, evidence, precedence, and ambiguity, and ModelStore remains the sole parsed key/shape projection. `AnyKeyPresent` retains its 1..=16 unique bounded-key contract and one-match scoring; `AnyTensorDimensionValue` admits 1..=16 unique nonzero values and 1..=16 unique keys, requires a dimension below rank 32, inspects only parsed tensor shapes, contributes its score once, and fails typed for empty, duplicate, malformed, absent, out-of-rank, overflow, tied, or ambiguous probes. ACE-Step key alternatives and CogVideoX native/Diffusers patch-channel alternatives require no invented metadata. Fresh focused validation passed CogVideoX detector/adapter 5/5, canonical VAL-MODEL-DETECTION-001 1/1, model-family foundation 21/21, layout-owner 2/2, and the three generated CogVideoX rows 9/9. Complete locked comfy_model all-target validation passed 229 library tests, 82/82 generated-family cases, every integration target, 9/9 native vision forwards, and 17/17 weight-adapter cases; locked check, cargo formatting, focused/full ownership, and isolated warnings-denied release/all-target/all-feature `./script/clippy -p comfy_model` passed. Current zero-failure/zero-skip artifacts are VAL-MODEL-DETECTION-001 14/0/0 at SHA-256 `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`, VAL-MEMORY-001 14/0/0 at `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`, and VAL-OWNERSHIP-001 174/0/0 at `4ba63fca12d4fab740ccef7fb39acfa80ebe09cf9ec3fc719e4f58d3a8cec4bf`. Source SHA-256 values are `model_family.rs` `582e44bcf6f60f38dec5c540e005591b3ae42d61eeade18acdd9c3d81db18b08`, unchanged `model_family_foundation.rs` `fc697e67eafd0c46a9c1d2a9f10524de587ea65896e03df5a1a9f2431542523a`, and unchanged `model_layout_owner.rs` `6d1bc54a8d9823deeefc3330dd9fec552f1010dca63cfe89e0131a6fced74bda`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed and no Python/JavaScript or external Comfy production path exists._
 
-- [x] 711. Make generated and audited source discovery portable across macOS filesystems
+- [x] 712. Make generated and audited source discovery portable across macOS filesystems
   - _id: comfy-parity-appledouble-source-scan-portability
   - Outcome: Classify macOS AppleDouble `._*` entries as non-source filesystem metadata at every generated Rust module and repository source-audit boundary. Preserve exact discovery, UTF-8 failure, digest, collision, and ownership checks for every other path; do not delete user files, weaken registered-source closure, or make local cleanup a build prerequisite.
   - Wave: 82
@@ -13871,7 +13889,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-05 portability discovery, implementation, and independent audit. Fingerprint-verified immutable snapshots exposed macOS AppleDouble `._*` metadata entries containing invalid UTF-8 on the external filesystem. Generated model module/test discovery and every repository production-source audit now classify only basename-prefixed `._*` entries as metadata before UTF-8/source parsing; all ordinary hidden, malformed, missing, orphaned, duplicate, unregistered, collision, digest, and ownership paths remain fail-closed, and no sidecar deletion is required. Synthetic invalid-UTF-8 sidecar tests passed in the build-manifest 6/6, tokenizer 24/24, HiDream 7/7, and weight-adapter 17/17 suites; the shared helper unit target passed within 29/29 support tests. Exact cargo checks passed; the complete comfy_model all-target/all-feature suite and complete comfy_test_support all-target suite passed, including deterministic native diffusion/image, all-checkpoint comparison, release boundary, recovery, no-external-Comfy, no-Python, plugin, workflow, and 23/23 ownership targets. VAL-FOUNDATION-001 passed 22/22 at SHA-256 `004d801872d7d98e151b5989c8faf1aba16f4863c146309e2c7f0af1924ecbf2`; VAL-MODEL-FAMILY-FOUNDATION-001 passed 19/19 at `ed7406b00491c6a794c598af37ea918123ad70c618051fcaaa77c01e73a35884`; VAL-OWNERSHIP-001 passed 174/174 at `9e7efb96644b97e06dc744438e96d1413b74d2c471ca677e5025e44a85ff9cbf`. Build/helper source SHA-256 are `cc0a252b01d6762672789c10cd3399669dcb5ec402995b86013c4f3a832f0928` and `fe3f33ed0f7c917a3c65e51b4d4a50fd6b4963d51984a9751b0f699cf2aed42d`. Formatting, diff checks, strict double regeneration with 514 tasks/87 validations/155 ownership rows/13,295 traced features, standalone spec validation, and release/all-target/all-feature warnings-denied clippy passed on macOS aarch64 CPU without deleting sidecars._
 
-- [x] 712. Close CPU low-precision BMM/tanh and model-execution admission
+- [x] 713. Close CPU low-precision BMM/tanh and model-execution admission
   - _id: comfy-parity-cpu-low-precision-bmm-model-execution-closure
   - Outcome: Close the execution gaps discovered while independently validating the LTXAV, LTXV, and LotusD rows: make the canonical CPU BatchMatrixMultiply and hyperbolic-tangent primitives honestly execute F32, F16, and BF16 tensors, carry low-precision tanh through its canonical tensor facade, and make NativeModule target admission request only primitives its selected execution path actually dispatches. Preserve deterministic f32 accumulation/evaluation, canonical DType decoding/encoding, caller-owned cancellation and workspace authority, backend capacity accounting, typed fail-closed behavior, and atomic publication.
   - Wave: 182
@@ -13891,7 +13909,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-CPU-LOW-PRECISION-BMM-MODEL-CLOSURE 2026-08-06 independent implementation and validation PASS. The canonical CPU capability matrix now advertises contiguous/strided BatchMatrixMultiply and hyperbolic tangent for exactly F32/F16/BF16, decodes inputs with the canonical DType codecs, performs deterministic f32 accumulation/evaluation, rounds through the requested output dtype, accounts workspace through the caller-owned authority, and publishes only after success. Focused nonzero fixtures prove exact values in all three dtypes; mixed BMM dtypes, output mismatch, malformed geometry, pre-cancellation, mid-cancellation, and OOM fail typed without output publication or capacity leaks. The canonical tanh facade preserves F16/BF16/F32, while unsupported non-float modes remain fail-closed. NativeModule SiLU admission now requests only the bounded f32-workspace path it actually dispatches. Original and patched LTXAV/LTXV BF16/F32 and LotusD F16/BF16/F32 executions pass through these real primitives. The focused BMM, tanh, and every-advertised-CPU-signature tests each passed; the complete locked tensor matrix passed 100 library cases and every integration target, the complete model matrix passed 229 library/207 generated-family/21 foundation/9 native-vision cases, and the complete support matrix passed 29 library, deterministic native diffusion in 215.69s, four checkpoints in 100.02s, native image/recovery/release/no-external-Comfy/no-Python/plugin/workflow, and ownership 23/23 in 249.08s. VAL-MEMORY-001, canonical cancellation, and focused ownership passed; locked compile, formatting, diff integrity, warnings-denied release/all-target/all-feature Clippy in 4m39s, strict double regeneration with 515 tasks/87 validations/155 ownership rows/13,295 trace rows, and standalone spec validation exited 0. CPU backend/tanh facade/NativeModule SHA-256 values are `464808a9eeb6d3d91fa1d43f44639f52c0711acbb84ca4f064f9f1fa51fc4a01`, `b01f8f43847c733cf88eee912e55cbf9d485c3ce77aea66ad66b2660b98d3abd`, and `e10870454abc5f7026466c5979e7b06b95c9e46604f10ef00b91e8cf9eeeb9d4`; LTXAV/LTXV/LotusD row artifacts are `9cd2ff4fba0cdd053e4721a3ff3f717b311c4d281d05b461e46e2f0c9b1a2bce`, `970eaec9d239c2165e9d205a0635bf447999d97d38721dd2ab7da33a2358262a`, and `1559e8b7d0aec054f79e179746a6cf635b02e805ca9af1c050ca17b51874b77c`, each with 7 passed/0 failed/0 skipped. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed and no production Python/JavaScript or external Comfy process exists._
 
-- [x] 713. Add canonical probe-derived model state-plan selection
+- [x] 714. Add canonical probe-derived model state-plan selection
   - _id: comfy-parity-probe-derived-model-state-plan-selector
   - Outcome: Close the registry reachability gap discovered while integrating PixArtAlpha: extend the sole comfy_model::model_family state-plan selector with an immutable row-owned probe selector for plans whose bounded operation sequence depends on already validated tensor facts such as consecutive transformer depth. The canonical registry must invoke the selector during resolution, revalidate every returned operation and declared component before publication, bind the resulting owned plan into ResolvedModelFamily, and remain the only state-transaction entry point; leaves may not execute an alternate mapping path.
   - Wave: 184
