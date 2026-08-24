@@ -32,6 +32,7 @@ pub mod push_lease;
 pub mod reaction;
 pub mod read_state;
 pub mod reminder;
+pub mod retention;
 pub mod review;
 pub mod scheduled_message;
 pub mod tenant;
@@ -207,6 +208,14 @@ pub use reminder::{
     ReminderDueOutcome, ReminderError, ReminderHandled, ReminderHandledReason, ReminderHead,
     ReminderId, ReminderLifecycle, ReminderRecordFields, ReminderRetention, ReminderScope,
     ReminderTarget, ReminderTargetStatus,
+};
+pub use retention::{
+    ArchiveRetentionRule, CURRENT_RETENTION_POLICY_SCHEMA_VERSION, CommunityRetentionPolicy,
+    CommunityRetentionPolicyFields, LegalHoldScope, LegalHoldSnapshot, LegalHoldState,
+    MAX_RETENTION_KIND_RULES, RetentionArchiveSnapshot, RetentionDecision, RetentionDisposition,
+    RetentionError, RetentionEventKind, RetentionKindRule, RetentionPersistenceClass,
+    RetentionPolicySchemaVersion, RetentionReason, RetentionRecord, RetentionRequest,
+    RetentionResolution, RetentionSnapshot, RetentionTtl, RetentionVisibility, resolve_retention,
 };
 pub use review::{
     ApprovalApplicability, MergeEligibility, MergeReadiness, PatchRevision, PatchRevisionInput,

@@ -2860,14 +2860,16 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 37. Port retention, deletion and recovery state machines
 
-  - [ ] 37.1. Define canonical retention and expiry policy
+  - [x] 37.1. Define canonical retention and expiry policy
     - Resolve event kind, community policy, legal hold, ephemeral and archive rules into one disposition.
     - _Requirements: 15.2, 19.2_
     - _Capability IDs: CAP-030_
     - _Depends on: 11.5, 36.3_
     - _Reads: projects/buzz/crates/buzz-deletion/**, projects/buzz/migrations/0007-*.sql_
-    - _Writes: crates/collaboration_domain/src/retention.rs_
+    - _Writes: crates/collaboration_domain/src/retention.rs, crates/collaboration_domain/src/collaboration_domain.rs_
     - _Validation: policy tests cover TTL, archive, legal hold, mixed version and retry_
+    - _Discovered contradiction (2026-08-24): the planned standalone file cannot compile or expose its canonical types without crate-root registration, while `collaboration_domain` deliberately cannot depend on the protocol-compatibility crate that owns the generated kind registry. The narrow correction registers/re-exports the module and accepts a registry-derived kind value/persistence projection whose constructor independently enforces the standard ephemeral range. It adds no protocol dependency, worker, repository, projection cleanup, legal-hold store or deletion executor owned by later leaves._
+    - _Evidence: 2026-08-24 — added a pure tenant-scoped resolver over bounded per-kind/default TTL rules, archive policy, authoritative legal-hold and community-archive snapshots, and an authoritative retention-start timestamp. Standard ephemeral kinds produce only `DoNotPersist`; durable records produce live/archive-only retention, one checked exact deadline or immediate deletion. Active holds override due TTL and archive deletion without restoring archived visibility. Unknown policy schemas, unavailable/ambiguous authority, malformed archive/hold shapes, foreign tenants and overflowing deadlines fail before destructive work. Decisions retain selected policy, hold and archive content/version fences: exact retries are unchanged, time advances a scheduled deadline at its exact boundary, authority versions cannot regress and same-version content drift conflicts. Five focused tests passed for TTL/kind override, archive expiry, legal-hold precedence, ephemeral/mixed-version failure and retry monotonicity; the complete domain suite passed 173/173 and warning-denied release Clippy passed. The generated registry guard still matches all 133 cataloged kinds and four ranges. Formatting, diff hygiene, dependency, inventory and canonical specification gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 37.2. Implement authoritative retention worker
     - Apply policy to event/projection authority in bounded tenant batches with resumable checkpoints.
