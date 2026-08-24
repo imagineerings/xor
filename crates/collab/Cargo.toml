@@ -39,6 +39,7 @@ clock.workspace = true
 cloud_api_types.workspace = true
 collections.workspace = true
 collaboration_domain.workspace = true
+collaboration_workflow.workspace = true
 dashmap.workspace = true
 envy = "0.4.2"
 futures.workspace = true

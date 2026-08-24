@@ -76,10 +76,46 @@ pub struct WorkflowDefinition {
     description: Option<String>,
     enabled: bool,
     trigger: WorkflowTrigger,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     secrets: BTreeMap<String, SecretReference>,
     retry: RetryPolicy,
     steps: Vec<WorkflowStep>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CanonicalWorkflowDefinition {
+    version: u32,
+    name: String,
+    #[serde(default)]
+    description: Option<String>,
+    enabled: bool,
+    trigger: WorkflowTrigger,
+    #[serde(default)]
+    secrets: BTreeMap<String, SecretReference>,
+    retry: RetryPolicy,
+    steps: Vec<WorkflowStep>,
+}
+
+impl<'de> Deserialize<'de> for WorkflowDefinition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let canonical = CanonicalWorkflowDefinition::deserialize(deserializer)?;
+        let definition = Self {
+            version: canonical.version,
+            name: canonical.name,
+            description: canonical.description,
+            enabled: canonical.enabled,
+            trigger: canonical.trigger,
+            secrets: canonical.secrets,
+            retry: canonical.retry,
+            steps: canonical.steps,
+        };
+        validate_canonical_definition(&definition).map_err(serde::de::Error::custom)?;
+        Ok(definition)
+    }
 }
 
 impl WorkflowDefinition {
@@ -90,6 +126,15 @@ impl WorkflowDefinition {
                 detail: bounded_error_detail(&error.to_string()),
             })?;
         Self::try_from(raw)
+    }
+
+    pub fn parse_canonical_json(json: &str) -> Result<Self, DefinitionError> {
+        validate_yaml_shape(json)?;
+        let definition: Self =
+            serde_yaml_ng::from_str(json).map_err(|error| DefinitionError::InvalidYaml {
+                detail: bounded_error_detail(&error.to_string()),
+            })?;
+        Ok(definition)
     }
 
     pub fn version(&self) -> u32 {
@@ -129,7 +174,7 @@ pub fn parse_yaml(yaml: &str) -> Result<WorkflowDefinition, DefinitionError> {
     WorkflowDefinition::parse_yaml(yaml)
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "on", rename_all = "snake_case")]
 pub enum WorkflowTrigger {
     MessagePosted {
@@ -150,13 +195,13 @@ pub enum WorkflowTrigger {
     Webhook,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum Schedule {
     Cron(String),
     IntervalSeconds(u64),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(transparent)]
 pub struct ConditionExpression(String);
 
@@ -166,7 +211,7 @@ impl ConditionExpression {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SecretReference {
     credential: String,
 }
@@ -177,7 +222,7 @@ impl SecretReference {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum RetryPolicy {
     Never,
@@ -191,13 +236,13 @@ pub enum RetryPolicy {
     },
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RetryJitter {
     Full,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RetryFailureClass {
     RateLimited,
@@ -206,7 +251,7 @@ pub enum RetryFailureClass {
     Transport,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct WorkflowStep {
     id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -240,7 +285,7 @@ impl WorkflowStep {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum StepAction {
     SendMessage {
@@ -269,6 +314,7 @@ pub enum StepAction {
     RequestApproval {
         from: String,
         message: TemplateString,
+        #[serde(rename = "approval_timeout_secs")]
         timeout_secs: u64,
     },
     Delay {
@@ -276,7 +322,7 @@ pub enum StepAction {
     },
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(transparent)]
 pub struct TemplateString(String);
 
@@ -286,14 +332,14 @@ impl TemplateString {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum ActionValue {
     Literal(TemplateString),
     Secret { secret_ref: String },
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum WebhookMethod {
     Post,
@@ -472,6 +518,231 @@ impl TryFrom<RawWorkflowDefinition> for WorkflowDefinition {
             steps,
         })
     }
+}
+
+fn validate_canonical_definition(definition: &WorkflowDefinition) -> Result<(), DefinitionError> {
+    if definition.version != CURRENT_DEFINITION_VERSION {
+        return Err(DefinitionError::UnsupportedVersion {
+            version: definition.version,
+        });
+    }
+    validate_required_string(&definition.name, MAX_NAME_BYTES, "name")?;
+    if let Some(description) = definition.description.as_deref() {
+        validate_optional_string(description, MAX_DESCRIPTION_BYTES, "description")?;
+    }
+    if definition.secrets.len() > MAX_SECRET_REFERENCES {
+        return Err(invalid("secrets", "contains too many references"));
+    }
+    for (name, reference) in &definition.secrets {
+        if !valid_identifier(name, MAX_SECRET_NAME_BYTES) {
+            return Err(invalid(
+                "secrets.<name>",
+                "must be an ASCII identifier of at most 64 bytes",
+            ));
+        }
+        validate_required_string(
+            &reference.credential,
+            MAX_SECRET_REFERENCE_BYTES,
+            "secrets.<name>.credential",
+        )?;
+        if reference.credential.chars().any(char::is_control) {
+            return Err(invalid(
+                "secrets.<name>.credential",
+                "must not contain control characters",
+            ));
+        }
+    }
+    match &definition.trigger {
+        WorkflowTrigger::MessagePosted { condition }
+        | WorkflowTrigger::DiffPosted { condition } => {
+            if let Some(condition) = condition {
+                validate_condition(condition.as_str())?;
+            }
+        }
+        WorkflowTrigger::ReactionAdded { emoji } => {
+            if let Some(emoji) = emoji {
+                validate_required_string(emoji, 128, "trigger.emoji")?;
+            }
+        }
+        WorkflowTrigger::Schedule { schedule } => match schedule {
+            Schedule::Cron(cron) => validate_cron(cron)?,
+            Schedule::IntervalSeconds(seconds)
+                if (60..=MAX_SCHEDULE_INTERVAL_SECS).contains(seconds) => {}
+            Schedule::IntervalSeconds(_) => {
+                return Err(invalid(
+                    "trigger.interval",
+                    "must be between 60 seconds and 366 days",
+                ));
+            }
+        },
+        WorkflowTrigger::Webhook => {}
+    }
+    match &definition.retry {
+        RetryPolicy::Never => {}
+        RetryPolicy::Exponential {
+            max_attempts,
+            max_elapsed_secs,
+            initial_backoff_secs,
+            max_backoff_secs,
+            jitter: RetryJitter::Full,
+            retry_on,
+        } => {
+            if !(2..=MAX_RETRY_ATTEMPTS).contains(max_attempts)
+                || *max_elapsed_secs == 0
+                || *max_elapsed_secs > MAX_RETRY_ELAPSED_SECS
+                || *initial_backoff_secs == 0
+                || initial_backoff_secs > max_backoff_secs
+                || *max_backoff_secs > MAX_RETRY_BACKOFF_SECS
+                || max_backoff_secs > max_elapsed_secs
+                || retry_on.is_empty()
+            {
+                return Err(invalid("retry", "canonical retry policy is invalid"));
+            }
+        }
+    }
+    if definition.steps.is_empty() || definition.steps.len() > MAX_WORKFLOW_STEPS {
+        return Err(invalid("steps", "must contain between 1 and 64 entries"));
+    }
+    let mut identifiers = BTreeSet::new();
+    for step in &definition.steps {
+        if !valid_identifier(&step.id, MAX_STEP_ID_BYTES) || !identifiers.insert(step.id.as_str()) {
+            return Err(invalid(
+                "steps[].id",
+                "must be a unique ASCII identifier of at most 64 bytes",
+            ));
+        }
+        if let Some(name) = step.name.as_deref() {
+            validate_optional_string(name, MAX_NAME_BYTES, "steps[].name")?;
+        }
+        if let Some(condition) = &step.condition {
+            validate_condition(condition.as_str())?;
+        }
+        if step.timeout_secs == 0 || step.timeout_secs > MAX_STEP_TIMEOUT_SECS {
+            return Err(invalid("steps[].timeout_secs", "must be between 1 and 600"));
+        }
+        validate_canonical_action(&step.action, &definition.secrets)?;
+    }
+    Ok(())
+}
+
+fn validate_canonical_action(
+    action: &StepAction,
+    secrets: &BTreeMap<String, SecretReference>,
+) -> Result<(), DefinitionError> {
+    match action {
+        StepAction::SendMessage { text, channel } => {
+            validate_template(text.as_str(), secrets, true, "steps[].text")?;
+            if let Some(channel) = channel {
+                validate_template(channel.as_str(), secrets, false, "steps[].channel")?;
+            }
+        }
+        StepAction::SendDm { to, text } => {
+            validate_template(to.as_str(), secrets, false, "steps[].to")?;
+            validate_template(text.as_str(), secrets, true, "steps[].text")?;
+        }
+        StepAction::SetChannelTopic { topic } => {
+            validate_template(topic.as_str(), secrets, false, "steps[].topic")?;
+        }
+        StepAction::AddReaction { emoji } => {
+            validate_template(emoji.as_str(), secrets, false, "steps[].emoji")?;
+        }
+        StepAction::CallWebhook {
+            url,
+            method: _,
+            headers,
+            body,
+        } => {
+            validate_required_string(url, MAX_URL_BYTES, "steps[].url")?;
+            if url.contains("{{") || contains_secret_word(url) {
+                return Err(invalid(
+                    "steps[].url",
+                    "must be a fixed non-secret destination",
+                ));
+            }
+            if headers.len() > MAX_HEADER_COUNT {
+                return Err(invalid("steps[].headers", "contains too many entries"));
+            }
+            let mut total_bytes = 0_usize;
+            for (name, value) in headers {
+                if name.is_empty()
+                    || name.len() > MAX_HEADER_NAME_BYTES
+                    || !name.bytes().all(|byte| {
+                        byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte)
+                    })
+                    || forbidden_header(name)
+                {
+                    return Err(invalid(
+                        "steps[].headers.<name>",
+                        "is not an allowed outbound header name",
+                    ));
+                }
+                total_bytes = total_bytes.saturating_add(name.len());
+                match value {
+                    ActionValue::Literal(value) => {
+                        if sensitive_header(name) {
+                            return Err(DefinitionError::SecretLiteral {
+                                path: "steps[].headers.<value>",
+                            });
+                        }
+                        total_bytes = total_bytes.saturating_add(value.as_str().len());
+                        if value.as_str().len() > MAX_HEADER_VALUE_BYTES {
+                            return Err(invalid(
+                                "steps[].headers.<value>",
+                                "exceeds the header value byte limit",
+                            ));
+                        }
+                        validate_template(
+                            value.as_str(),
+                            secrets,
+                            true,
+                            "steps[].headers.<value>",
+                        )?;
+                    }
+                    ActionValue::Secret { secret_ref } => {
+                        if !secrets.contains_key(secret_ref) {
+                            return Err(invalid(
+                                "steps[].headers.<value>.secret_ref",
+                                "must name a declared secret reference",
+                            ));
+                        }
+                        total_bytes = total_bytes.saturating_add(secret_ref.len());
+                    }
+                }
+                if total_bytes > MAX_TOTAL_HEADER_BYTES {
+                    return Err(invalid(
+                        "steps[].headers",
+                        "exceeds the aggregate header byte limit",
+                    ));
+                }
+            }
+            if let Some(body) = body {
+                reject_literal_secret_assignments(body.as_str(), "steps[].body")?;
+                validate_template(body.as_str(), secrets, true, "steps[].body")?;
+            }
+        }
+        StepAction::RequestApproval {
+            from,
+            message,
+            timeout_secs,
+        } => {
+            validate_required_string(from, 256, "steps[].from")?;
+            validate_template(message.as_str(), secrets, false, "steps[].message")?;
+            if *timeout_secs == 0 || *timeout_secs > MAX_APPROVAL_WAIT_SECS {
+                return Err(invalid(
+                    "steps[].timeout",
+                    "must be between 1 second and 30 days",
+                ));
+            }
+        }
+        StepAction::Delay { duration_secs } if (1..=MAX_DELAY_SECS).contains(duration_secs) => {}
+        StepAction::Delay { .. } => {
+            return Err(invalid(
+                "steps[].duration",
+                "must be between 1 and 270 seconds",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_yaml_shape(yaml: &str) -> Result<(), DefinitionError> {
@@ -1516,5 +1787,15 @@ steps:
         let definition = parse_yaml(yaml).expect("supported Buzz action shapes");
         assert_eq!(definition.retry(), &RetryPolicy::Never);
         assert_eq!(definition.steps().len(), 5);
+    }
+
+    #[test]
+    fn canonical_definition_round_trips_through_the_validated_storage_shape() {
+        let definition = parse_yaml(VALID_V1).expect("valid definition");
+        let canonical = serde_json::to_string(&definition).expect("canonical storage shape");
+        assert_eq!(
+            WorkflowDefinition::parse_canonical_json(&canonical),
+            Ok(definition)
+        );
     }
 }

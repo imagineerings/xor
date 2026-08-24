@@ -3611,6 +3611,7 @@ dependencies = [
  "collab",
  "collab_ui",
  "collaboration_domain",
+ "collaboration_workflow",
  "collections",
  "command_palette_hooks",
  "ctor",
@@ -3758,6 +3759,7 @@ version = "0.1.0"
 dependencies = [
  "cron",
  "serde",
+ "serde_json",
  "serde_yaml_ng",
  "thiserror 2.0.17",
  "yaml-rust2",
