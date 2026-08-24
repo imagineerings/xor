@@ -352,6 +352,24 @@ async fn duplicate_trigger_returns_the_existing_definition_pinned_run() {
 }
 
 #[tokio::test]
+async fn trigger_claim_rejects_a_superseded_definition_version() {
+    let community_id = community(1);
+    let tenant = tenant(community_id);
+    let request = run_request(community_id);
+    let mut superseded = definition_row(community_id);
+    superseded.insert("current_definition_version_text".into(), "2".into());
+    let repository = repository(vec![vec![], vec![superseded]], &[1]);
+
+    let result = repository.claim_run(&tenant, &request).await;
+
+    assert!(matches!(
+        result,
+        Err(WorkflowRepositoryError::TransitionConflict)
+    ));
+    assert!(!log(repository).contains("INSERT INTO public.collaboration_workflow_runs"));
+}
+
+#[tokio::test]
 async fn approval_wait_is_lease_fenced_and_restarts_from_durable_state() {
     let community_id = community(1);
     let tenant = tenant(community_id);
