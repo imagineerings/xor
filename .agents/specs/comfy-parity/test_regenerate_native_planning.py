@@ -455,6 +455,15 @@ class ValidationGenerationTests(unittest.TestCase):
                 "comfy-parity-native-sdpose-execution-foundation",
             ],
         )
+        provider_catalog = tasks_by_id[provider_shared_ids[0]]
+        self.assertIn(
+            ".agents/specs/comfy-parity/catalogs/source-snapshot-manifest.json",
+            provider_catalog["reads"],
+        )
+        self.assertIn(
+            ".agents/specs/comfy-parity/catalogs/source-snapshot-manifest.json",
+            provider_catalog["writes"],
+        )
         for previous, current in zip(provider_shared_ids, provider_shared_ids[1:]):
             self.assertEqual(tasks_by_id[current]["dependencies"], [previous])
         for identifier in provider_vendor_ids:

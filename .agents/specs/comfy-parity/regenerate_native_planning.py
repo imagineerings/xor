@@ -10386,6 +10386,7 @@ def provider_component_foundation_tasks(
             ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
             ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
             ".agents/specs/comfy-parity/catalogs/backend-external-services.csv",
+            ".agents/specs/comfy-parity/catalogs/source-snapshot-manifest.json",
             "projects/comfy/ComfyUI/comfy_api_nodes",
         ],
         [
@@ -10393,6 +10394,7 @@ def provider_component_foundation_tasks(
             ".agents/specs/comfy-parity/test_generate_provider_component_catalog.py",
             ".agents/specs/comfy-parity/catalogs/provider-component-contracts.json",
             ".agents/specs/comfy-parity/catalogs/backend-external-services.csv",
+            ".agents/specs/comfy-parity/catalogs/source-snapshot-manifest.json",
             ".agents/specs/comfy-parity/regenerate_all.py",
         ],
         "Generation is byte-stable and starts from exactly 224 provider nodes, 33 vendors, 217 route rows, and 61 unresolved methods. The resulting catalog has zero UNKNOWN executable methods, one vendor and namespace per node and route, no `comfy-node-*` namespace, no duplicate or missing claim, and no unsupported synthetic row. Every added route or tombstone carries source path, symbol, line, source SHA-256, and explicit disposition.",
