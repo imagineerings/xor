@@ -51,6 +51,11 @@ pub enum AttentionMask<'a> {
         values: &'a [f32],
         shape: AttentionMaskShape,
     },
+    OrderedAdditive {
+        first_values: &'a [f32],
+        second_values: &'a [f32],
+        shape: AttentionMaskShape,
+    },
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -90,6 +95,8 @@ pub enum AttentionKernelError {
     },
     #[error("attention mask expected {expected} values, got {actual}")]
     MaskValueCount { expected: usize, actual: usize },
+    #[error("attention ordered additive {term} mask value at index {index} is not finite")]
+    NonFiniteOrderedMask { term: &'static str, index: usize },
     #[error("attention scale must be finite and greater than zero")]
     InvalidScale,
     #[error(
@@ -174,6 +181,32 @@ impl<'a> CheckedAttentionInvocation<'a> {
             .ok_or(AttentionKernelError::ShapeOverflow)
     }
 
+    fn validate_ordered_mask_finite(
+        self,
+        context: &ExecutionContext<'_>,
+    ) -> Result<(), AttentionKernelError> {
+        let Some(AttentionMask::OrderedAdditive {
+            first_values,
+            second_values,
+            ..
+        }) = self.mask
+        else {
+            return Ok(());
+        };
+        for (term, values) in [("first", first_values), ("second", second_values)] {
+            for (index, value) in values.iter().enumerate() {
+                if index.is_multiple_of(1_024) {
+                    context.cancellation.check()?;
+                }
+                if !value.is_finite() {
+                    return Err(AttentionKernelError::NonFiniteOrderedMask { term, index });
+                }
+            }
+        }
+        context.cancellation.check()?;
+        Ok(())
+    }
+
     pub fn execute_with_context(
         self,
         backend: &CpuBackend,
@@ -195,6 +228,7 @@ impl<'a> CheckedAttentionInvocation<'a> {
             });
         }
         context.cancellation.check()?;
+        self.validate_ordered_mask_finite(context)?;
         let shape = self.request.shape;
         let output_length = checked_product(&[
             shape.batch,
@@ -279,6 +313,7 @@ impl<'a> CheckedAttentionInvocation<'a> {
             });
         }
         context.cancellation.check()?;
+        self.validate_ordered_mask_finite(context)?;
         let mut query_gradient = zeroed(self.query.len(), "query gradient")?;
         let mut key_gradient = zeroed(self.key.len(), "key gradient")?;
         let mut value_gradient = zeroed(self.value.len(), "value gradient")?;
@@ -425,6 +460,7 @@ impl<'a> CheckedAttentionInvocation<'a> {
             }
         }
         context.cancellation.check()?;
+        self.validate_ordered_mask_finite(context)?;
         let shape = self.request.shape;
         let output_length = checked_product(&[
             shape.batch,
@@ -833,6 +869,22 @@ fn validate_request(
         let (actual, mask_shape) = match mask {
             AttentionMask::Boolean { values, shape } => (values.len(), shape),
             AttentionMask::Additive { values, shape } => (values.len(), shape),
+            AttentionMask::OrderedAdditive {
+                first_values,
+                second_values,
+                shape: mask_shape,
+            } => {
+                let expected = mask_length(shape, mask_shape)?;
+                for values in [first_values, second_values] {
+                    if values.len() != expected {
+                        return Err(AttentionKernelError::MaskValueCount {
+                            expected,
+                            actual: values.len(),
+                        });
+                    }
+                }
+                (expected, mask_shape)
+            }
         };
         let expected = mask_length(shape, mask_shape)?;
         if actual != expected {
@@ -878,13 +930,38 @@ fn apply_mask(
                     expected: index.saturating_add(1),
                     actual: values.len(),
                 })?),
+        AttentionMask::OrderedAdditive {
+            first_values,
+            second_values,
+            ..
+        } => {
+            let first =
+                first_values
+                    .get(index)
+                    .copied()
+                    .ok_or(AttentionKernelError::MaskValueCount {
+                        expected: index.saturating_add(1),
+                        actual: first_values.len(),
+                    })?;
+            let second =
+                second_values
+                    .get(index)
+                    .copied()
+                    .ok_or(AttentionKernelError::MaskValueCount {
+                        expected: index.saturating_add(1),
+                        actual: second_values.len(),
+                    })?;
+            Ok((score + first) + second)
+        }
     }
 }
 
 impl AttentionMask<'_> {
     const fn shape(self) -> AttentionMaskShape {
         match self {
-            Self::Boolean { shape, .. } | Self::Additive { shape, .. } => shape,
+            Self::Boolean { shape, .. }
+            | Self::Additive { shape, .. }
+            | Self::OrderedAdditive { shape, .. } => shape,
         }
     }
 }

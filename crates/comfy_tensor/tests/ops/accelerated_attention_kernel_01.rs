@@ -549,6 +549,340 @@ fn canonical_attention_cancellation_and_backend_oom_publish_nothing() {
     assert_eq!(backend.memory_snapshot().current_bytes, 0);
 }
 
+#[test]
+fn ordered_additive_mask_preserves_f32_association_and_legacy_masks() {
+    let shape = AttentionShape {
+        batch: 1,
+        query_tokens: 1,
+        key_tokens: 2,
+        heads: 1,
+        head_dimension: 1,
+        value_dimension: 1,
+    };
+    let request = AttentionKernelRequest {
+        kind: AttentionKernelKind::ReferenceSdp,
+        device: DeviceId::CPU,
+        layout: AttentionLayout::Nhd,
+        shape,
+        scale: Some(1.0),
+        causal: false,
+        dropout_probability: 0.0,
+    };
+    let query = [1.0e10_f32];
+    let key = [1.0e10_f32, 0.0];
+    let value = [0.0_f32, 2.0];
+    let first = [-1.0e20_f32, 0.0];
+    let second = [-100.0_f32, 0.0];
+    assert_eq!((1.0e20_f32 + first[0]) + second[0], -100.0);
+    let precombined = [first[0] + second[0], 0.0];
+    assert_eq!(1.0e20_f32 + precombined[0], 0.0);
+
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(64)
+        .unwrap_or_else(|error| panic!("backend construction failed: {error}"));
+    let cancellation = CancellationToken::default();
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority
+            .authorize_workspace(8)
+            .unwrap_or_else(|error| panic!("workspace authorization failed: {error}")),
+        &cancellation,
+    );
+    let ordered = CheckedAttentionInvocation::new(
+        request,
+        &query,
+        &key,
+        &value,
+        Some(AttentionMask::OrderedAdditive {
+            first_values: &first,
+            second_values: &second,
+            shape: AttentionMaskShape::KeyTokens,
+        }),
+    )
+    .unwrap_or_else(|error| panic!("ordered invocation failed: {error}"))
+    .execute_with_context(&backend, 1, &context)
+    .unwrap_or_else(|error| panic!("ordered execution failed: {error}"));
+    let combined = CheckedAttentionInvocation::new(
+        request,
+        &query,
+        &key,
+        &value,
+        Some(AttentionMask::Additive {
+            values: &precombined,
+            shape: AttentionMaskShape::KeyTokens,
+        }),
+    )
+    .unwrap_or_else(|error| panic!("legacy additive invocation failed: {error}"))
+    .execute_with_context(&backend, 1, &context)
+    .unwrap_or_else(|error| panic!("legacy additive execution failed: {error}"));
+    assert_eq!(ordered, vec![2.0]);
+    assert_eq!(combined, vec![1.0]);
+    assert_eq!(query, [1.0e10_f32]);
+    assert_eq!(key, [1.0e10_f32, 0.0]);
+    assert_eq!(value, [0.0_f32, 2.0]);
+    assert_eq!(first, [-1.0e20_f32, 0.0]);
+    assert_eq!(second, [-100.0_f32, 0.0]);
+}
+
+#[test]
+fn ordered_additive_mask_checks_every_broadcast_and_rejects_atomically() {
+    let shape = AttentionShape {
+        batch: 2,
+        query_tokens: 2,
+        key_tokens: 2,
+        heads: 2,
+        head_dimension: 1,
+        value_dimension: 1,
+    };
+    let request = AttentionKernelRequest {
+        kind: AttentionKernelKind::ReferenceSdp,
+        device: DeviceId::CPU,
+        layout: AttentionLayout::Nhd,
+        shape,
+        scale: Some(1.0),
+        causal: false,
+        dropout_probability: 0.0,
+    };
+    let query = [0.0_f32; 8];
+    let key = [0.0_f32; 8];
+    let value = [0.0_f32, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0];
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(64)
+        .unwrap_or_else(|error| panic!("backend construction failed: {error}"));
+    let active = CancellationToken::default();
+    let execution = backend.execution_context(
+        StreamId::DEFAULT,
+        authority
+            .authorize_workspace(8)
+            .unwrap_or_else(|error| panic!("workspace authorization failed: {error}")),
+        &active,
+    );
+    for (mask_shape, second, expected) in [
+        (
+            AttentionMaskShape::KeyTokens,
+            vec![0.0, -100.0],
+            vec![0.0; 8],
+        ),
+        (
+            AttentionMaskShape::QueryByKey,
+            vec![0.0, -100.0, -100.0, 0.0],
+            vec![0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0],
+        ),
+        (
+            AttentionMaskShape::BatchQueryByKey,
+            vec![0.0, -100.0, -100.0, 0.0, -100.0, 0.0, 0.0, -100.0],
+            vec![0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0],
+        ),
+        (
+            AttentionMaskShape::BatchHeadQueryByKey,
+            vec![
+                0.0, -100.0, -100.0, 0.0, -100.0, 0.0, 0.0, -100.0, -100.0, 0.0, 0.0, -100.0, 0.0,
+                -100.0, -100.0, 0.0,
+            ],
+            vec![0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0],
+        ),
+    ] {
+        let first = vec![0.0_f32; second.len()];
+        let output = CheckedAttentionInvocation::new(
+            request,
+            &query,
+            &key,
+            &value,
+            Some(AttentionMask::OrderedAdditive {
+                first_values: &first,
+                second_values: &second,
+                shape: mask_shape,
+            }),
+        )
+        .unwrap_or_else(|error| panic!("{mask_shape:?} admission failed: {error}"))
+        .execute_with_context(&backend, 1, &execution)
+        .unwrap_or_else(|error| panic!("{mask_shape:?} execution failed: {error}"));
+        for (actual, expected) in output.iter().zip(&expected) {
+            assert!(
+                (actual - expected).abs() < 1.0e-5,
+                "{mask_shape:?} produced {output:?}, expected {expected:?}"
+            );
+        }
+    }
+
+    let exact = [0.0_f32; 16];
+    let short = [0.0_f32; 15];
+    assert!(matches!(
+        CheckedAttentionInvocation::new(
+            request,
+            &query,
+            &key,
+            &value,
+            Some(AttentionMask::OrderedAdditive {
+                first_values: &short,
+                second_values: &exact,
+                shape: AttentionMaskShape::BatchHeadQueryByKey,
+            }),
+        ),
+        Err(AttentionKernelError::MaskValueCount {
+            expected: 16,
+            actual: 15,
+        })
+    ));
+    assert!(matches!(
+        CheckedAttentionInvocation::new(
+            request,
+            &query,
+            &key,
+            &value,
+            Some(AttentionMask::OrderedAdditive {
+                first_values: &exact,
+                second_values: &short,
+                shape: AttentionMaskShape::BatchHeadQueryByKey,
+            }),
+        ),
+        Err(AttentionKernelError::MaskValueCount {
+            expected: 16,
+            actual: 15,
+        })
+    ));
+    for (term, first, second) in [
+        ("first", [f32::NAN; 16], exact),
+        ("second", exact, [f32::INFINITY; 16]),
+    ] {
+        let invocation = CheckedAttentionInvocation::new(
+            request,
+            &query,
+            &key,
+            &value,
+            Some(AttentionMask::OrderedAdditive {
+                first_values: &first,
+                second_values: &second,
+                shape: AttentionMaskShape::BatchHeadQueryByKey,
+            }),
+        )
+        .unwrap_or_else(|error| panic!("nonfinite mask count admission failed: {error}"));
+        assert!(matches!(
+            invocation.execute_with_context(&backend, 1, &execution),
+            Err(AttentionKernelError::NonFiniteOrderedMask {
+                term: actual_term,
+                index: 0,
+            }) if actual_term == term
+        ));
+    }
+
+    let constrained = backend.execution_context(
+        StreamId::DEFAULT,
+        authority
+            .authorize_workspace(4)
+            .unwrap_or_else(|error| panic!("workspace authorization failed: {error}")),
+        &active,
+    );
+    let constrained_invocation = CheckedAttentionInvocation::new(
+        request,
+        &query,
+        &key,
+        &value,
+        Some(AttentionMask::OrderedAdditive {
+            first_values: &exact,
+            second_values: &exact,
+            shape: AttentionMaskShape::BatchHeadQueryByKey,
+        }),
+    )
+    .unwrap_or_else(|error| panic!("checked invocation failed: {error}"));
+    let query_before = query;
+    let key_before = key;
+    let value_before = value;
+    let first_before = exact;
+    let second_before = exact;
+    let memory_before = backend.memory_snapshot();
+    assert!(matches!(
+        constrained_invocation.execute_with_context(&backend, 1, &constrained),
+        Err(AttentionKernelError::Tensor(_))
+    ));
+    assert_eq!(constrained.scratch.in_use_bytes(), 0);
+    assert_eq!(backend.memory_snapshot(), memory_before);
+    assert_eq!(query, query_before);
+    assert_eq!(key, key_before);
+    assert_eq!(value, value_before);
+    assert_eq!(exact, first_before);
+    assert_eq!(exact, second_before);
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority
+            .authorize_workspace(8)
+            .unwrap_or_else(|error| panic!("workspace authorization failed: {error}")),
+        &cancelled,
+    );
+    let invocation = CheckedAttentionInvocation::new(
+        request,
+        &query,
+        &key,
+        &value,
+        Some(AttentionMask::OrderedAdditive {
+            first_values: &exact,
+            second_values: &exact,
+            shape: AttentionMaskShape::BatchHeadQueryByKey,
+        }),
+    )
+    .unwrap_or_else(|error| panic!("checked invocation failed: {error}"));
+    assert!(matches!(
+        invocation.execute_with_context(&backend, 1, &context),
+        Err(AttentionKernelError::Cancelled)
+    ));
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+    assert_eq!(backend.memory_snapshot().current_bytes, 0);
+
+    let long_shape = AttentionShape {
+        batch: 1,
+        query_tokens: 65_536,
+        key_tokens: 2,
+        heads: 1,
+        head_dimension: 1,
+        value_dimension: 1,
+    };
+    let long_request = AttentionKernelRequest {
+        shape: long_shape,
+        ..request
+    };
+    let long_query = vec![0.0_f32; long_shape.query_tokens];
+    let long_key = [0.0_f32; 2];
+    let long_value = [0.0_f32; 2];
+    let long_first = vec![0.0_f32; long_shape.query_tokens * long_shape.key_tokens];
+    let mut long_second = vec![0.0_f32; long_first.len()];
+    let nonfinite_index = long_second.len() - 1;
+    long_second[nonfinite_index] = f32::NAN;
+    let long_invocation = CheckedAttentionInvocation::new(
+        long_request,
+        &long_query,
+        &long_key,
+        &long_value,
+        Some(AttentionMask::OrderedAdditive {
+            first_values: &long_first,
+            second_values: &long_second,
+            shape: AttentionMaskShape::QueryByKey,
+        }),
+    )
+    .unwrap_or_else(|error| panic!("long ordered-mask count admission failed: {error}"));
+    assert!(matches!(
+        long_invocation.execute_with_context(&backend, 1, &context),
+        Err(AttentionKernelError::Cancelled)
+    ));
+    let long_active = CancellationToken::default();
+    let long_context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority
+            .authorize_workspace(8)
+            .unwrap_or_else(|error| panic!("workspace authorization failed: {error}")),
+        &long_active,
+    );
+    assert!(matches!(
+        long_invocation.execute_with_context(&backend, 1, &long_context),
+        Err(AttentionKernelError::NonFiniteOrderedMask {
+            term: "second",
+            index,
+        }) if index == nonfinite_index
+    ));
+    assert_eq!(long_context.scratch.in_use_bytes(), 0);
+    assert_eq!(backend.memory_snapshot().current_bytes, 0);
+}
+
 fn dot(left: &[f32], right: &[f32]) -> f32 {
     left.iter()
         .zip(right)

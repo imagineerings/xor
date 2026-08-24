@@ -97,6 +97,11 @@ pub enum AttentionMask<'a> {
         values: &'a [f32],
         shape: AttentionMaskShape,
     },
+    OrderedAdditive {
+        first_values: &'a [f32],
+        second_values: &'a [f32],
+        shape: AttentionMaskShape,
+    },
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -308,6 +313,8 @@ pub enum AttentionError {
     },
     #[error("attention mask expected {expected} values, got {actual}")]
     MaskValueCount { expected: usize, actual: usize },
+    #[error("attention ordered additive {term} mask value at index {index} is not finite")]
+    NonFiniteOrderedMask { term: &'static str, index: usize },
     #[error("attention scale must be finite and greater than zero")]
     InvalidScale,
     #[error("attention tensor {name} expected shape {expected:?}, got {actual:?}")]
@@ -1263,6 +1270,15 @@ fn map_mask(mask: AttentionMask<'_>) -> TensorAttentionMask<'_> {
             values,
             shape: map_mask_shape(shape),
         },
+        AttentionMask::OrderedAdditive {
+            first_values,
+            second_values,
+            shape,
+        } => TensorAttentionMask::OrderedAdditive {
+            first_values,
+            second_values,
+            shape: map_mask_shape(shape),
+        },
     }
 }
 
@@ -1294,6 +1310,9 @@ fn map_kernel_error(error: AttentionKernelError, backend: AttentionBackend) -> A
         },
         AttentionKernelError::MaskValueCount { expected, actual } => {
             AttentionError::MaskValueCount { expected, actual }
+        }
+        AttentionKernelError::NonFiniteOrderedMask { term, index } => {
+            AttentionError::NonFiniteOrderedMask { term, index }
         }
         AttentionKernelError::InvalidScale => AttentionError::InvalidScale,
         AttentionKernelError::Cancelled => AttentionError::Cancelled,
@@ -1360,6 +1379,73 @@ mod tests {
             scale: Some(1.0),
             workspace_limit_bytes: 8,
         }
+    }
+
+    #[test]
+    fn ordered_additive_mask_is_mirrored_without_precombining()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let request = AttentionRequest {
+            backend: AttentionBackend::PytorchSdp,
+            fallback: AttentionFallbackPolicy::AllowExactNative,
+            batch: 1,
+            query_tokens: 1,
+            key_tokens: 2,
+            heads: 1,
+            head_dimension: 1,
+            value_dimension: 1,
+            scale: Some(1.0),
+            workspace_limit_bytes: 8,
+        };
+        let query = [1.0e10_f32];
+        let key = [1.0e10_f32, 0.0];
+        let value = [0.0_f32, 2.0];
+        let first = [-1.0e20_f32, 0.0];
+        let second = [-100.0_f32, 0.0];
+        let token = CancellationToken::default();
+        let (backend, workspace_authority) =
+            comfy_tensor::CpuWorkspaceAuthority::create_backend(64)?;
+        let context = backend.execution_context(
+            comfy_tensor::StreamId::DEFAULT,
+            workspace_authority.authorize_workspace(8)?,
+            &token,
+        );
+        let output = scaled_dot_product_attention_with_context(
+            &backend,
+            request,
+            &query,
+            &key,
+            &value,
+            Some(AttentionMask::OrderedAdditive {
+                first_values: &first,
+                second_values: &second,
+                shape: AttentionMaskShape::KeyTokens,
+            }),
+            &context,
+        )?;
+        assert_eq!(output.values, vec![2.0]);
+
+        let non_finite = [f32::NAN, 0.0];
+        assert!(matches!(
+            scaled_dot_product_attention_with_context(
+                &backend,
+                request,
+                &query,
+                &key,
+                &value,
+                Some(AttentionMask::OrderedAdditive {
+                    first_values: &non_finite,
+                    second_values: &second,
+                    shape: AttentionMaskShape::KeyTokens,
+                }),
+                &context,
+            ),
+            Err(AttentionError::NonFiniteOrderedMask {
+                term: "first",
+                index: 0,
+            })
+        ));
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
     }
 
     #[test]
