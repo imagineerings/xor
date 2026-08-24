@@ -13,10 +13,11 @@ use comfy_tensor::{CancellationToken, DType, StorageId, Tensor, TensorError};
 use crate::{
     GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256, GEMMA3_MULTIMODAL_SOURCE_SHA256,
     GEMMA4_MULTIMODAL_SOURCE_SHA256, LLAMA_SOURCE_SHA256, NativeAudioEncoder,
-    NativeDecoderTextEncoder, NativeFrameInterpolationModel, NativeGemmaMultimodal,
-    NativeLatentUpscaleModelResource, NativePromptTokenizer, NativeQwenMultimodal, NativeRaftLarge,
-    NativeSdPoseModel, NativeStructuredVae, NativeVae, QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256,
-    QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256, QWEN35_SOURCE_SHA256,
+    NativeBackgroundRemovalResource, NativeDecoderTextEncoder, NativeFrameInterpolationModel,
+    NativeGemmaMultimodal, NativeLatentUpscaleModelResource, NativePromptTokenizer,
+    NativeQwenMultimodal, NativeRaftLarge, NativeSdPoseModel, NativeStructuredVae, NativeVae,
+    QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256,
+    QWEN35_SOURCE_SHA256,
     clip::{LoadedSd1Clip, NativeClipResidentOwnerKind, NativeClipResource, NativeTokenizer},
     clip_vision::NativeClipVision,
     generated_native_diffusion::{Sd1Tokenizer, Sd15TinyModel},
@@ -304,6 +305,9 @@ enum NativeModelResource {
     LatentUpscaleModel {
         resource: Arc<NativeLatentUpscaleModelResource>,
     },
+    BackgroundRemoval {
+        resource: Arc<NativeBackgroundRemovalResource>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -336,6 +340,7 @@ pub enum NativeModelBackingKind {
     NativeSdPoseModel,
     NativeFrameInterpolationModel,
     NativeLatentUpscaleModel,
+    NativeBackgroundRemovalResource,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -971,6 +976,61 @@ impl NativeModelPayload {
         })
     }
 
+    pub fn background_removal(
+        resource: Arc<NativeBackgroundRemovalResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if !resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "BiRefNet production source-exact profile",
+            ));
+        }
+        Self::background_removal_checked(resource, cancellation)
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn background_removal_test_fixture(
+        resource: Arc<NativeBackgroundRemovalResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "BiRefNet reduced test fixture profile",
+            ));
+        }
+        Self::background_removal_checked(resource, cancellation)
+    }
+
+    fn background_removal_checked(
+        resource: Arc<NativeBackgroundRemovalResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        resource
+            .validate(cancellation)
+            .map_err(|error| match error {
+                crate::background_removal::NativeBackgroundRemovalError::Cancelled => {
+                    NativeModelPayloadError::Tensor(TensorError::Cancelled)
+                }
+                crate::background_removal::NativeBackgroundRemovalError::Tensor(error) => {
+                    NativeModelPayloadError::Tensor(error)
+                }
+                error => NativeModelPayloadError::ResourceAccounting(error.to_string()),
+            })?;
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::BackgroundRemoval,
+            resource.identifier(),
+            "zed-native-background-removal-v1",
+            resource.artifact_sha256(),
+            resource.semantic_digest_sha256(),
+        )?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, resource.resident_bytes())?,
+            identity,
+            resource: NativeModelResource::BackgroundRemoval { resource },
+        })
+    }
+
     pub fn identity(&self) -> &NativeModelResourceIdentity {
         &self.identity
     }
@@ -1369,6 +1429,29 @@ impl NativeModelPayload {
                     })?,
                 }]
             }
+            NativeModelResource::BackgroundRemoval { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::NativeBackgroundRemovalResource,
+                    address: Arc::as_ptr(resource) as usize,
+                    resident_bytes: resource.resident_owned_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                }]
+            }
         };
         let parts = NativeModelResidentParts {
             owned_bytes,
@@ -1403,7 +1486,8 @@ impl NativeModelPayload {
             | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
             | NativeModelResource::FrameInterpolation { .. }
-            | NativeModelResource::LatentUpscaleModel { .. } => None,
+            | NativeModelResource::LatentUpscaleModel { .. }
+            | NativeModelResource::BackgroundRemoval { .. } => None,
         }
     }
 
@@ -1432,7 +1516,8 @@ impl NativeModelPayload {
             | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
             | NativeModelResource::FrameInterpolation { .. }
-            | NativeModelResource::LatentUpscaleModel { .. } => None,
+            | NativeModelResource::LatentUpscaleModel { .. }
+            | NativeModelResource::BackgroundRemoval { .. } => None,
         }
     }
 
@@ -1452,7 +1537,8 @@ impl NativeModelPayload {
             | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
             | NativeModelResource::FrameInterpolation { .. }
-            | NativeModelResource::LatentUpscaleModel { .. } => None,
+            | NativeModelResource::LatentUpscaleModel { .. }
+            | NativeModelResource::BackgroundRemoval { .. } => None,
         }
     }
 
@@ -1486,7 +1572,8 @@ impl NativeModelPayload {
             | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
             | NativeModelResource::FrameInterpolation { .. }
-            | NativeModelResource::LatentUpscaleModel { .. } => None,
+            | NativeModelResource::LatentUpscaleModel { .. }
+            | NativeModelResource::BackgroundRemoval { .. } => None,
         }
     }
 
@@ -1506,7 +1593,8 @@ impl NativeModelPayload {
             | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
             | NativeModelResource::FrameInterpolation { .. }
-            | NativeModelResource::LatentUpscaleModel { .. } => None,
+            | NativeModelResource::LatentUpscaleModel { .. }
+            | NativeModelResource::BackgroundRemoval { .. } => None,
         }
     }
 
@@ -1557,6 +1645,13 @@ impl NativeModelPayload {
     pub fn latent_upscale_model_resource(&self) -> Option<&Arc<NativeLatentUpscaleModelResource>> {
         match &self.resource {
             NativeModelResource::LatentUpscaleModel { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
+    pub fn background_removal_resource(&self) -> Option<&Arc<NativeBackgroundRemovalResource>> {
+        match &self.resource {
+            NativeModelResource::BackgroundRemoval { resource } => Some(resource),
             _ => None,
         }
     }
@@ -1612,6 +1707,25 @@ impl NativeModelPayload {
             }
             NativeModelResource::LatentUpscaleModel { resource } => {
                 Self::latent_upscale_model(resource.clone())?
+            }
+            NativeModelResource::BackgroundRemoval { resource } => {
+                if resource.is_source_exact_profile() {
+                    Self::background_removal(resource.clone(), &CancellationToken::default())?
+                } else {
+                    #[cfg(feature = "test-support")]
+                    {
+                        Self::background_removal_test_fixture(
+                            resource.clone(),
+                            &CancellationToken::default(),
+                        )?
+                    }
+                    #[cfg(not(feature = "test-support"))]
+                    {
+                        return Err(NativeModelPayloadError::ResourceMismatch(
+                            "BiRefNet reduced test fixture profile",
+                        ));
+                    }
+                }
             }
         };
         if self.identity() != expected.identity() || self.resident_bytes != expected.resident_bytes

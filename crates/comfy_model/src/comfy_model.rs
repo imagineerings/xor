@@ -2,6 +2,7 @@ pub mod alias_free_activation;
 pub mod artifact_index;
 pub mod attention;
 pub mod audio_encoder;
+pub mod background_removal;
 pub mod clip;
 pub mod clip_text;
 pub mod clip_text_encoder_composite;
@@ -80,6 +81,17 @@ pub use audio_encoder::{
     NativeAudioEncoderCheckpoint, NativeAudioEncoderDiagnostic, NormalizedAudioEncoderCheckpoint,
     WAV2VEC2_SOURCE_PATH, WAV2VEC2_SOURCE_SHA256, WHISPER_SOURCE_PATH, WHISPER_SOURCE_SHA256,
     normalize_and_select_architecture, normalize_and_select_profile,
+};
+pub use background_removal::{
+    BACKGROUND_REMOVAL_MODEL_SOURCE_SHA256, BIREFNET_CONFIG_SOURCE_SHA256, BIREFNET_MARKER,
+    BIREFNET_SOURCE_SHA256, CLIP_MODEL_SOURCE_SHA256, COMFY_OPS_SOURCE_SHA256,
+    MODEL_MANAGEMENT_SOURCE_SHA256, NODES_BACKGROUND_REMOVAL_SOURCE_SHA256,
+    NativeBackgroundRemovalCheckpoint, NativeBackgroundRemovalError,
+    NativeBackgroundRemovalResource,
+};
+#[cfg(any(test, feature = "test-support"))]
+pub use background_removal::{
+    BackgroundRemovalFixtureMutation, deterministic_reduced_test_checkpoint,
 };
 pub use clip_text::{
     CLIP_TEXT_CATALOG_SYMBOLS, CLIP_TEXT_SOURCE_PATH, CLIP_TEXT_SOURCE_SHA256, ClipTextActivation,
