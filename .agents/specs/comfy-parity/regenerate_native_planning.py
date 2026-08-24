@@ -10607,12 +10607,27 @@ def provider_component_foundation_tasks(
         ],
     )
     append_shared(
+        "comfy-parity-provider-worker-stream-protocol-clippy-correction",
+        "Restore warning-clean provider worker protocol ownership",
+        "Remove the redundant restart-time streaming contract clone while preserving the exact provider worker protocol-v8 wire and state-machine contract.",
+        [
+            "crates/comfy_types/src/worker_protocol.rs",
+        ],
+        [
+            "crates/comfy_types/src/worker_protocol.rs",
+        ],
+        "Restart moves the validator's already-owned streaming contract into the replacement validator exactly once while preserving protocol-v8 bytes and discriminants, the monotonic call-id high-water mark, strict fresh session and invocation generations, cancellation, revocation, and every existing typed disposition. Focused restart tests and warning-denied comfy_types clippy pass without changing the public wire surface.",
+        ["comfy_types"],
+        validation_packages=["comfy_types"],
+    )
+    append_shared(
         "comfy-parity-provider-runtime-stream-progress-foundation",
         "Own provider streams, receipts, and progress",
         "Make the runtime the sole authorized provider stream/session owner. Bind provider, method, endpoint, headers, secret reference, body digest, component and binding generations, accepted cost, request ordinal, response head, chunk digest, and idempotency; project monotonic attempt-local progress without persisting it as an output or effect.",
         [
             "crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit",
             "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
+            "crates/comfy_plugin_host/src/capabilities.rs",
             "crates/comfy_plugin_host/src/component_host.rs",
             "crates/comfy_types/src/worker_protocol.rs",
             "crates/comfy_runtime/src/plugin_services.rs",
@@ -10633,13 +10648,14 @@ def provider_component_foundation_tasks(
             "crates/comfy_runtime/src/trust.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_plugin_host/src/capabilities.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "The existing v1 capability and receipt lane remains byte-compatible but delegates session ownership through the same runtime table. V2 authorization derives provider only from the verified signed invocation and ProviderBindingSet, consumes the provider-v8 worker protocol's typed endpoint, optional secret-id reference, method, headers, and generation fields, and reuses the streaming component ABI's ProviderStreamValidatorV2; authorization and credential admission precede actuation. This task defines the checked runtime authority input, but only the later component-host adapter task may construct it from the verified signed invocation and full sealed activation identity; no runtime API accepts a component-supplied provider identity or authorization decision. Runtime receipts use a separately domain-versioned v2 identity binding provider, method, endpoint, ordered headers, secret reference, request and body digest, component and binding generations, accepted cost, ordinal, response head, ordered chunk digest, and idempotency without changing v1 receipt bytes. Cumulative quotas, one bounded decimal-seconds Retry-After value, monotonic rate-limited attempt-local progress, bounded stale and late diagnostics, and atomic revocation are hermetically proven. The current native capability-envelope Begin, Call, Resolve, Finish, Abort, and every terminal cleanup delegate to the sole ProviderRuntimeStreamOwner. The worker protocol direction gates remain rejecting until comfy-parity-provider-worker-stream-bridge; that bridge alone routes direct protocol-v8 messages and must decode before actuation. Canonical typed materialization publishes all outputs or none.",
-        ["comfy_runtime", "comfy_test_support"],
-        validation_packages=["comfy_runtime", "comfy_test_support"],
+        "The existing v1 capability and receipt lane remains byte-compatible but delegates session ownership through the same runtime table. V2 authorization derives provider only from the verified signed invocation and ProviderBindingSet, consumes the provider-v8 worker protocol's typed endpoint, optional secret-id reference, method, headers, and generation fields, and reuses the streaming component ABI's ProviderStreamValidatorV2; authorization and credential admission precede actuation. This task defines the checked runtime authority input, but only the later component-host adapter task may construct it from the verified signed invocation and full sealed activation identity; no runtime API accepts a component-supplied provider identity or authorization decision. Runtime receipts use a separately domain-versioned v2 identity binding provider, method, endpoint, ordered headers, secret reference, request and body digest, component and binding generations, accepted cost, ordinal, response head, ordered chunk digest, and idempotency without changing v1 receipt bytes. Cumulative quotas, one bounded decimal-seconds Retry-After value, monotonic rate-limited attempt-local progress, bounded stale and late diagnostics, and atomic revocation are hermetically proven. The current native capability-envelope Begin, Call, Resolve, Finish, Abort, and every terminal cleanup delegate to the sole ProviderRuntimeStreamOwner. Every new typed runtime-stream error maps exhaustively to the existing fail-closed plugin-host invocation error without granting a capability or routing a request. The worker protocol direction gates remain rejecting until comfy-parity-provider-worker-stream-bridge; that bridge alone routes direct protocol-v8 messages and must decode before actuation. Canonical typed materialization publishes all outputs or none.",
+        ["comfy_runtime", "comfy_plugin_host", "comfy_test_support"],
+        validation_packages=["comfy_runtime", "comfy_plugin_host", "comfy_test_support"],
     )
     append_shared(
         "comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair",
@@ -10694,7 +10710,7 @@ def provider_component_foundation_tasks(
             "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component",
             "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source",
         ],
-        "Before exposing any provider-v8 invocation context to a component, the adapter maps its runtime-issued session identity and generation to the verified signed invocation's full sealed activation identity, including registry generation and digest, component generation and digest, authorization-generation digest, binding-set digest, node identity, and compiled-plan digest. Verified outer and inner provider-v2 authorization and the signed streaming-contract digest remain bound to that activation; the host derives provider identity from the verified binding set. Components can reference the host-issued capability but cannot construct or replace its authority. Generated provider-v2 invocation-input-host methods delegate the existing canonical InvocationHost input methods, and returned outputs remain proposals for Task412's all-or-none materializer. Component contract tests prove exact grant checks before every request, upload, cost, stream, and input operation, generation-scoped handle revocation, bounded response streaming and progress, traps, cancellation, and atomic output proposals. Missing or extra manifest claims, undeclared operations, stale handles, and worker loss cannot actuate or publish. Direct provider-v8 worker routing remains rejected until comfy-parity-provider-worker-stream-bridge.",
+        "Before exposing any provider-v8 invocation context to a component, the adapter maps its runtime-issued session identity and generation to the verified signed invocation's full sealed activation identity, including registry generation and digest, component generation and digest, authorization-generation digest, binding-set digest, node identity, and compiled-plan digest. Verified outer and inner provider-v2 authorization and the signed streaming-contract digest remain bound to that activation; the host derives provider identity from the verified binding set. Components can reference a host-issued capability but cannot construct or replace its authority. Generated provider-v2 invocation-input-host methods delegate the existing canonical InvocationHost input methods, and returned outputs remain proposals for Task412's all-or-none materializer. Component contract tests prove missing-grant denial, exact claim-and-bind checks before every request, upload, cost, stream, and input operation, generation-scoped handle revocation, bounded response streaming and progress, traps, cancellation, and atomic output proposals. The adapter does not expose or invoke the crate-private raw grant constructor or registration seam; the later worker bridge owns the first production valid-grant issuance and end-to-end success proof. Missing or extra manifest claims, undeclared operations, stale handles, and worker loss cannot actuate or publish. Direct provider-v8 worker routing remains rejected until comfy-parity-provider-worker-stream-bridge.",
         ["comfy_plugin_host"],
     )
     append_shared(
@@ -10719,7 +10735,7 @@ def provider_component_foundation_tasks(
             "crates/comfy_runtime/src/runtime_supervisor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
         ],
-        "IPC tests prove interleaved bounded sessions, strict sequence and generation checks, backpressure, cancellation between chunks, late progress rejection, worker crash/restart cleanup, and clean retry without duplicated request, receipt, output, or effect.",
+        "The native controller mints and registers the one-use runtime activation grant only from the current active deployment and full sealed generation identity; the component host then claims and binds that opaque grant before the first provider-v8 request is routed. No public raw-field constructor or component-supplied authority exists. IPC tests prove the first valid-grant end-to-end success path, interleaved bounded sessions, strict sequence and generation checks, backpressure, cancellation between chunks, late progress rejection, worker crash/restart cleanup, and clean retry without duplicated request, receipt, output, or effect.",
         ["comfy_plugin_host", "comfy_worker", "comfy_runtime"],
     )
     append_shared(

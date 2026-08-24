@@ -2191,8 +2191,7 @@ impl WorkerProviderStreamTransportValidator {
             return Err(WorkerProviderStreamError::StaleGeneration);
         }
         let last_admitted_call_id = self.last_admitted_call_id;
-        let mut restarted =
-            Self::checked_for_host_session(context, self.contract.clone(), cancellation)?;
+        let mut restarted = Self::checked_for_host_session(context, self.contract, cancellation)?;
         restarted.last_admitted_call_id = last_admitted_call_id;
         Ok(restarted)
     }

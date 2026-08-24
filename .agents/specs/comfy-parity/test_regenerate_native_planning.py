@@ -83,7 +83,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 716)
+        self.assertEqual(len(tasks), 717)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -456,6 +456,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-provider-streaming-component-abi-v2",
             "comfy-parity-provider-streaming-component-abi-v2-request-authority-repair",
             "comfy-parity-provider-worker-stream-protocol",
+            "comfy-parity-provider-worker-stream-protocol-clippy-correction",
             "comfy-parity-provider-runtime-stream-progress-foundation",
             "comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair",
             "comfy-parity-provider-component-host-stream-adapter",
@@ -473,7 +474,7 @@ class ValidationGenerationTests(unittest.TestCase):
         provider_closure_id = (
             "comfy-parity-native-partner-provider-components-foundation"
         )
-        self.assertEqual(len(provider_shared_ids), 11)
+        self.assertEqual(len(provider_shared_ids), 12)
         self.assertEqual(len(provider_vendor_ids), 33)
         provider_projection = tasks_by_id[
             "comfy-parity-provider-namespace-binding-projection"
@@ -576,12 +577,40 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("endpoint, optional secret-id", provider_worker_stream["done"])
         self.assertIn("no component-supplied provider identity", provider_worker_stream["done"])
         self.assertIn("workspace SHA-256", provider_worker_stream["done"])
+        provider_worker_clippy_correction = tasks_by_id[
+            "comfy-parity-provider-worker-stream-protocol-clippy-correction"
+        ]
+        self.assertEqual(
+            provider_worker_clippy_correction["dependencies"],
+            ["comfy-parity-provider-worker-stream-protocol"],
+        )
+        self.assertEqual(
+            provider_worker_clippy_correction["writes"],
+            ["crates/comfy_types/src/worker_protocol.rs"],
+        )
+        self.assertIn(
+            "moves the validator's already-owned streaming contract",
+            provider_worker_clippy_correction["done"],
+        )
+        self.assertIn("comfy_types", provider_worker_clippy_correction["validation_packages"])
         provider_runtime_stream = tasks_by_id[
             "comfy-parity-provider-runtime-stream-progress-foundation"
         ]
+        self.assertEqual(
+            provider_runtime_stream["dependencies"],
+            ["comfy-parity-provider-worker-stream-protocol-clippy-correction"],
+        )
         self.assertIn(
             "crates/comfy_plugin_host/src/component_host.rs",
             provider_runtime_stream["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_plugin_host/src/capabilities.rs",
+            provider_runtime_stream["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_plugin_host/src/capabilities.rs",
+            provider_runtime_stream["writes"],
         )
         for path in (
             "crates/comfy_runtime/src/native_execution_controller.rs",
@@ -608,6 +637,11 @@ class ValidationGenerationTests(unittest.TestCase):
             "no runtime API accepts a component-supplied provider identity",
             provider_runtime_stream["done"],
         )
+        self.assertIn(
+            "maps exhaustively to the existing fail-closed plugin-host invocation error",
+            provider_runtime_stream["done"],
+        )
+        self.assertIn("comfy_plugin_host", provider_runtime_stream["validation_packages"])
         provider_input_host = tasks_by_id[
             "comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair"
         ]
@@ -670,6 +704,15 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn("InvocationHost", provider_component_stream["done"])
         self.assertIn("all-or-none materializer", provider_component_stream["done"])
+        self.assertIn("missing-grant denial", provider_component_stream["done"])
+        self.assertIn(
+            "does not expose or invoke the crate-private raw grant constructor",
+            provider_component_stream["done"],
+        )
+        self.assertIn(
+            "worker bridge owns the first production valid-grant issuance",
+            provider_component_stream["done"],
+        )
         self.assertIn(
             "crates/comfy_plugin_host/src/private_worker.rs",
             provider_component_stream["reads"],
@@ -707,6 +750,14 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn(
             "crates/comfy_plugin_host/src/private_worker.rs",
             provider_worker_bridge["writes"],
+        )
+        self.assertIn(
+            "native controller mints and registers the one-use runtime activation grant",
+            provider_worker_bridge["done"],
+        )
+        self.assertIn(
+            "first valid-grant end-to-end success path",
+            provider_worker_bridge["done"],
         )
         self.assertIn(
             "crates/comfy_nodes/src/families/partner_three_d_03.rs",
