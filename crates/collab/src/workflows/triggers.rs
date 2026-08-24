@@ -520,7 +520,7 @@ where
     }
 }
 
-fn validate_current_definition(
+pub(super) fn validate_current_definition(
     tenant: &TenantContext,
     definition: &StoredWorkflowDefinition,
 ) -> Result<(), WorkflowTriggerAdmissionError> {
@@ -557,7 +557,7 @@ fn validate_event_authorization(
     validate_owner_authorization(tenant, definition, owner)
 }
 
-fn validate_owner_authorization(
+pub(super) fn validate_owner_authorization(
     tenant: &TenantContext,
     definition: &StoredWorkflowDefinition,
     owner: &AuthorizationRequest<'_>,
@@ -588,7 +588,7 @@ fn authorization_subject(request: &AuthorizationRequest<'_>) -> PrincipalId {
     }
 }
 
-fn run_request(
+pub(super) fn run_request(
     definition: &StoredWorkflowDefinition,
     trigger_kind: WorkflowTriggerKind,
     source_id: &str,
@@ -613,7 +613,8 @@ fn run_request(
         match trigger_kind {
             WorkflowTriggerKind::Event => "collaboration_event",
             WorkflowTriggerKind::Schedule => "workflow_scheduler",
-            WorkflowTriggerKind::Webhook | WorkflowTriggerKind::Manual => {
+            WorkflowTriggerKind::Webhook => "workflow_webhook",
+            WorkflowTriggerKind::Manual => {
                 return Err(WorkflowTriggerAdmissionError::TriggerMismatch);
             }
         },
