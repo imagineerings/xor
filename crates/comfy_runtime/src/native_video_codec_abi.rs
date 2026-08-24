@@ -17,6 +17,7 @@ pub(crate) const FFMPEG_7_1_AVFORMAT_VERSION: c_uint = version(61, 7, 100);
 pub(crate) const FFMPEG_7_1_AVUTIL_VERSION: c_uint = version(59, 39, 100);
 pub(crate) const FFMPEG_7_1_SWRESAMPLE_VERSION: c_uint = version(5, 3, 100);
 pub(crate) const FFMPEG_7_1_SWSCALE_VERSION: c_uint = version(8, 3, 100);
+pub(crate) const FFMPEG_7_1_AVFILTER_VERSION: c_uint = version(10, 4, 100);
 
 const fn version(major: c_uint, minor: c_uint, micro: c_uint) -> c_uint {
     (major << 16) | (minor << 8) | micro
@@ -38,6 +39,9 @@ opaque_ffi_type!(AvCodecParameters);
 opaque_ffi_type!(AvBufferRef);
 opaque_ffi_type!(AvClass);
 opaque_ffi_type!(AvDictionary);
+opaque_ffi_type!(AvFilter);
+opaque_ffi_type!(AvFilterContext);
+opaque_ffi_type!(AvFilterGraph);
 opaque_ffi_type!(AvInputFormat);
 opaque_ffi_type!(AvOutputFormat);
 opaque_ffi_type!(AvPacketSideData);
@@ -76,6 +80,7 @@ pub(crate) struct AvChannelLayout {
 
 pub(crate) const AV_NUM_DATA_POINTERS: usize = 8;
 pub(crate) const AV_MEDIA_TYPE_VIDEO: c_int = 0;
+pub(crate) const AV_MEDIA_TYPE_AUDIO: c_int = 1;
 pub(crate) const AV_CODEC_ID_H264: c_int = 27;
 pub(crate) const AV_CODEC_ID_VP9: c_int = 167;
 pub(crate) const AV_CODEC_ID_AV1: c_int = 225;
@@ -86,6 +91,20 @@ pub(crate) const AV_PIXEL_FORMAT_RGBA: c_int = 26;
 pub(crate) const AV_PIXEL_FORMAT_YUVA420P: c_int = 33;
 pub(crate) const AV_PIXEL_FORMAT_RGB48LE: c_int = 35;
 pub(crate) const AV_PIXEL_FORMAT_YUV420P10LE: c_int = 62;
+pub(crate) const AV_PIXEL_FORMAT_PAL8: c_int = 11;
+pub(crate) const AV_PIXEL_FORMAT_YUVJ420P: c_int = 12;
+pub(crate) const AV_PIXEL_FORMAT_YUVJ422P: c_int = 13;
+pub(crate) const AV_PIXEL_FORMAT_YUVJ444P: c_int = 14;
+pub(crate) const AV_PIXEL_FORMAT_GBRPF32LE: c_int = 175;
+pub(crate) const AV_PIXEL_FORMAT_GBRAPF32LE: c_int = 177;
+pub(crate) const AV_SAMPLE_FORMAT_FLTP: c_int = 8;
+pub(crate) const AV_PACKET_DATA_DISPLAY_MATRIX: c_int = 5;
+pub(crate) const AV_FRAME_DATA_DISPLAY_MATRIX: c_int = 6;
+pub(crate) const AV_DICTIONARY_IGNORE_SUFFIX: c_int = 2;
+pub(crate) const AV_PIXEL_FORMAT_FLAG_ALPHA: u64 = 1 << 7;
+pub(crate) const AV_BUFFER_SOURCE_FLAG_KEEP_REFERENCE: c_int = 8;
+pub(crate) const AV_ROUND_NEAREST_AWAY_FROM_ZERO: c_int = 5;
+pub(crate) const AV_ROUND_PASS_MIN_MAX: c_int = 8192;
 pub(crate) const AV_NO_PRESENTATION_TIMESTAMP: i64 = i64::MIN;
 pub(crate) const AV_SEEK_SIZE: c_int = 0x1_0000;
 pub(crate) const AV_SEEK_FORCE: c_int = 0x2_0000;
@@ -166,6 +185,122 @@ pub(crate) struct AvIoContext {
     pub(crate) buffer: *mut u8,
 }
 
+#[repr(C)]
+pub(crate) struct AvCodecParametersGeneralProjection {
+    pub(crate) codec_type: c_int,
+    pub(crate) codec_id: c_int,
+    pub(crate) codec_tag: c_uint,
+    pub(crate) _pointer_alignment: c_uint,
+    pub(crate) extra_data: *mut u8,
+    pub(crate) extra_data_size: c_int,
+    pub(crate) _side_data_alignment: c_uint,
+    pub(crate) coded_side_data: *mut AvPacketSideData,
+    pub(crate) coded_side_data_count: c_int,
+    pub(crate) format: c_int,
+    pub(crate) bit_rate: i64,
+    pub(crate) bits_per_coded_sample: c_int,
+    pub(crate) bits_per_raw_sample: c_int,
+    pub(crate) profile: c_int,
+    pub(crate) level: c_int,
+    pub(crate) width: c_int,
+    pub(crate) height: c_int,
+    pub(crate) sample_aspect_ratio: AvRational,
+    pub(crate) frame_rate: AvRational,
+    pub(crate) field_order: c_int,
+    pub(crate) color_range: c_int,
+    pub(crate) color_primaries: c_int,
+    pub(crate) color_transfer: c_int,
+    pub(crate) color_space: c_int,
+    pub(crate) chroma_location: c_int,
+    pub(crate) video_delay: c_int,
+    pub(crate) _channel_layout_alignment: c_int,
+    pub(crate) channel_layout: AvChannelLayout,
+    pub(crate) sample_rate: c_int,
+    pub(crate) _frame_size_through_initial_padding: [u8; 20],
+}
+
+#[repr(C)]
+pub(crate) struct AvStreamGeneralProjection {
+    pub(crate) prefix: AvStream,
+    pub(crate) start_time: i64,
+    pub(crate) duration: i64,
+    pub(crate) frame_count: i64,
+    pub(crate) disposition: c_int,
+    pub(crate) discard: c_int,
+    pub(crate) sample_aspect_ratio: AvRational,
+    pub(crate) metadata: *mut AvDictionary,
+    pub(crate) average_frame_rate: AvRational,
+    pub(crate) _attached_picture_through_codec_properties: [u8; 136],
+}
+
+#[repr(C)]
+pub(crate) struct AvFormatContextGeneralProjection {
+    pub(crate) prefix: AvFormatContext,
+    pub(crate) _stream_groups_through_url: [u8; 40],
+    pub(crate) start_time: i64,
+    pub(crate) duration: i64,
+    pub(crate) _bit_rate_through_metadata: [u8; 80],
+    pub(crate) metadata: *mut AvDictionary,
+    pub(crate) _control_and_timing_tail: [u8; 272],
+}
+
+#[repr(C)]
+pub(crate) struct AvFrameGeneralProjection {
+    pub(crate) prefix: AvFrame,
+    pub(crate) _packet_dts_through_color_range: [u8; 48],
+    pub(crate) sample_rate: c_int,
+    pub(crate) _legacy_channel_layout_through_side_data: [u8; 124],
+    pub(crate) best_effort_timestamp: i64,
+    pub(crate) _packet_position: [u8; 8],
+    pub(crate) metadata: *mut AvDictionary,
+    pub(crate) _decode_flags_through_crop: [u8; 64],
+    pub(crate) channel_layout: AvChannelLayout,
+    pub(crate) duration: i64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(C)]
+pub(crate) struct AvComponentDescriptor {
+    pub(crate) plane: c_int,
+    pub(crate) step: c_int,
+    pub(crate) offset: c_int,
+    pub(crate) shift: c_int,
+    pub(crate) depth: c_int,
+}
+
+#[repr(C)]
+pub(crate) struct AvPixelFormatDescriptor {
+    pub(crate) name: *const c_char,
+    pub(crate) component_count: u8,
+    pub(crate) log2_chroma_width: u8,
+    pub(crate) log2_chroma_height: u8,
+    pub(crate) _flags_alignment: [u8; 5],
+    pub(crate) flags: u64,
+    pub(crate) components: [AvComponentDescriptor; 4],
+    pub(crate) alias: *const c_char,
+}
+
+#[repr(C)]
+pub(crate) struct AvInputFormatNameProjection {
+    pub(crate) name: *const c_char,
+}
+
+#[repr(C)]
+pub(crate) struct AvDictionaryEntry {
+    pub(crate) key: *mut c_char,
+    pub(crate) value: *mut c_char,
+}
+
+#[repr(C)]
+pub(crate) struct AvFrameSideData {
+    pub(crate) side_data_type: c_int,
+    pub(crate) _data_alignment: c_int,
+    pub(crate) data: *mut u8,
+    pub(crate) size: usize,
+    pub(crate) metadata: *mut AvDictionary,
+    pub(crate) buffer: *mut AvBufferRef,
+}
+
 pub(crate) type AvIoReadPacket = unsafe extern "C" fn(*mut c_void, *mut u8, c_int) -> c_int;
 pub(crate) type AvIoWritePacket = unsafe extern "C" fn(*mut c_void, *const u8, c_int) -> c_int;
 pub(crate) type AvIoSeek = unsafe extern "C" fn(*mut c_void, i64, c_int) -> i64;
@@ -183,6 +318,8 @@ pub(crate) type AvcodecParametersFromContext =
     unsafe extern "C" fn(*mut AvCodecParameters, *const AvCodecContext) -> c_int;
 pub(crate) type AvcodecParametersToContext =
     unsafe extern "C" fn(*mut AvCodecContext, *const AvCodecParameters) -> c_int;
+pub(crate) type AvcodecParametersCopy =
+    unsafe extern "C" fn(*mut AvCodecParameters, *const AvCodecParameters) -> c_int;
 pub(crate) type AvcodecReceiveFrame =
     unsafe extern "C" fn(*mut AvCodecContext, *mut AvFrame) -> c_int;
 pub(crate) type AvcodecReceivePacket =
@@ -191,6 +328,9 @@ pub(crate) type AvcodecSendFrame =
     unsafe extern "C" fn(*mut AvCodecContext, *const AvFrame) -> c_int;
 pub(crate) type AvcodecSendPacket =
     unsafe extern "C" fn(*mut AvCodecContext, *const AvPacket) -> c_int;
+pub(crate) type AvcodecFlushBuffers = unsafe extern "C" fn(*mut AvCodecContext);
+pub(crate) type AvPacketRescaleTimestamps =
+    unsafe extern "C" fn(*mut AvPacket, AvRational, AvRational);
 pub(crate) type AvcodecVersion = unsafe extern "C" fn() -> c_uint;
 
 pub(crate) type AvFindBestStream = unsafe extern "C" fn(
@@ -215,6 +355,8 @@ pub(crate) type AvformatAllocOutputContext2 = unsafe extern "C" fn(
 pub(crate) type AvformatCloseInput = unsafe extern "C" fn(*mut *mut AvFormatContext);
 pub(crate) type AvformatFindStreamInfo =
     unsafe extern "C" fn(*mut AvFormatContext, *mut *mut AvDictionary) -> c_int;
+pub(crate) type AvGuessFrameRate =
+    unsafe extern "C" fn(*mut AvFormatContext, *mut AvStream, *mut AvFrame) -> AvRational;
 pub(crate) type AvformatFreeContext = unsafe extern "C" fn(*mut AvFormatContext);
 pub(crate) type AvformatNewStream =
     unsafe extern "C" fn(*mut AvFormatContext, *const AvCodec) -> *mut AvStream;
@@ -227,6 +369,10 @@ pub(crate) type AvformatOpenInput = unsafe extern "C" fn(
 pub(crate) type AvformatWriteHeader =
     unsafe extern "C" fn(*mut AvFormatContext, *mut *mut AvDictionary) -> c_int;
 pub(crate) type AvformatVersion = unsafe extern "C" fn() -> c_uint;
+pub(crate) type AvSeekFrame =
+    unsafe extern "C" fn(*mut AvFormatContext, c_int, i64, c_int) -> c_int;
+pub(crate) type AvformatSeekFile =
+    unsafe extern "C" fn(*mut AvFormatContext, c_int, i64, i64, i64, c_int) -> c_int;
 pub(crate) type AvioAllocContext = unsafe extern "C" fn(
     *mut u8,
     c_int,
@@ -239,20 +385,32 @@ pub(crate) type AvioAllocContext = unsafe extern "C" fn(
 pub(crate) type AvioContextFree = unsafe extern "C" fn(*mut *mut AvIoContext);
 
 pub(crate) type AvChannelLayoutDefault = unsafe extern "C" fn(*mut AvChannelLayout, c_int);
+pub(crate) type AvChannelLayoutCopy =
+    unsafe extern "C" fn(*mut AvChannelLayout, *const AvChannelLayout) -> c_int;
 pub(crate) type AvChannelLayoutUninit = unsafe extern "C" fn(*mut AvChannelLayout);
 pub(crate) type AvDictFree = unsafe extern "C" fn(*mut *mut AvDictionary);
+pub(crate) type AvDictIterate =
+    unsafe extern "C" fn(*const AvDictionary, *const AvDictionaryEntry) -> *const AvDictionaryEntry;
 pub(crate) type AvDictSet =
     unsafe extern "C" fn(*mut *mut AvDictionary, *const c_char, *const c_char, c_int) -> c_int;
 pub(crate) type AvFrameAlloc = unsafe extern "C" fn() -> *mut AvFrame;
 pub(crate) type AvFrameFree = unsafe extern "C" fn(*mut *mut AvFrame);
 pub(crate) type AvFrameGetBuffer = unsafe extern "C" fn(*mut AvFrame, c_int) -> c_int;
 pub(crate) type AvFrameMakeWritable = unsafe extern "C" fn(*mut AvFrame) -> c_int;
+pub(crate) type AvFrameGetSideData =
+    unsafe extern "C" fn(*const AvFrame, c_int) -> *mut AvFrameSideData;
+pub(crate) type AvFrameUnref = unsafe extern "C" fn(*mut AvFrame);
 pub(crate) type AvFree = unsafe extern "C" fn(*mut c_void);
 pub(crate) type AvMalloc = unsafe extern "C" fn(usize) -> *mut c_void;
 pub(crate) type AvOptSet =
     unsafe extern "C" fn(*mut c_void, *const c_char, *const c_char, c_int) -> c_int;
 pub(crate) type AvOptSetInt = unsafe extern "C" fn(*mut c_void, *const c_char, i64, c_int) -> c_int;
 pub(crate) type AvRescaleQ = unsafe extern "C" fn(i64, AvRational, AvRational) -> i64;
+pub(crate) type AvDisplayRotationGet = unsafe extern "C" fn(*const i32) -> c_double;
+pub(crate) type AvGetPixelFormatName = unsafe extern "C" fn(c_int) -> *const c_char;
+pub(crate) type AvPixelFormatDescriptorGet =
+    unsafe extern "C" fn(c_int) -> *const AvPixelFormatDescriptor;
+pub(crate) type AvRescaleRounded = unsafe extern "C" fn(i64, i64, i64, c_int) -> i64;
 pub(crate) type AvutilVersion = unsafe extern "C" fn() -> c_uint;
 
 pub(crate) type SwrAlloc = unsafe extern "C" fn() -> *mut SwrContext;
@@ -271,6 +429,7 @@ pub(crate) type SwrConvert =
     unsafe extern "C" fn(*mut SwrContext, *mut *mut u8, c_int, *const *const u8, c_int) -> c_int;
 pub(crate) type SwrFree = unsafe extern "C" fn(*mut *mut SwrContext);
 pub(crate) type SwrInit = unsafe extern "C" fn(*mut SwrContext) -> c_int;
+pub(crate) type SwrGetDelay = unsafe extern "C" fn(*mut SwrContext, i64) -> i64;
 pub(crate) type SwresampleVersion = unsafe extern "C" fn() -> c_uint;
 
 pub(crate) type SwsFreeContext = unsafe extern "C" fn(*mut SwsContext);
@@ -296,6 +455,27 @@ pub(crate) type SwsScale = unsafe extern "C" fn(
     *const c_int,
 ) -> c_int;
 pub(crate) type SwscaleVersion = unsafe extern "C" fn() -> c_uint;
+
+pub(crate) type AvfilterVersion = unsafe extern "C" fn() -> c_uint;
+pub(crate) type AvfilterGetByName = unsafe extern "C" fn(*const c_char) -> *const AvFilter;
+pub(crate) type AvfilterGraphAlloc = unsafe extern "C" fn() -> *mut AvFilterGraph;
+pub(crate) type AvfilterGraphFree = unsafe extern "C" fn(*mut *mut AvFilterGraph);
+pub(crate) type AvfilterGraphCreateFilter = unsafe extern "C" fn(
+    *mut *mut AvFilterContext,
+    *const AvFilter,
+    *const c_char,
+    *const c_char,
+    *mut c_void,
+    *mut AvFilterGraph,
+) -> c_int;
+pub(crate) type AvfilterGraphConfig =
+    unsafe extern "C" fn(*mut AvFilterGraph, *mut c_void) -> c_int;
+pub(crate) type AvfilterLink =
+    unsafe extern "C" fn(*mut AvFilterContext, c_uint, *mut AvFilterContext, c_uint) -> c_int;
+pub(crate) type AvBufferSourceAddFrameFlags =
+    unsafe extern "C" fn(*mut AvFilterContext, *mut AvFrame, c_int) -> c_int;
+pub(crate) type AvBufferSinkGetFrame =
+    unsafe extern "C" fn(*mut AvFilterContext, *mut AvFrame) -> c_int;
 
 pub(crate) const VIDEO_CODEC_AVCODEC_SYMBOLS: [&str; 15] = [
     "av_packet_alloc",
@@ -362,6 +542,37 @@ pub(crate) const VIDEO_CODEC_SWSCALE_SYMBOLS: [&str; 4] = [
     "swscale_version",
 ];
 
+pub(crate) const GENERAL_VIDEO_AVCODEC_SYMBOLS: [&str; 3] = [
+    "av_packet_rescale_ts",
+    "avcodec_flush_buffers",
+    "avcodec_parameters_copy",
+];
+pub(crate) const GENERAL_VIDEO_AVFORMAT_SYMBOLS: [&str; 3] =
+    ["av_guess_frame_rate", "av_seek_frame", "avformat_seek_file"];
+pub(crate) const GENERAL_VIDEO_AVUTIL_SYMBOLS: [&str; 8] = [
+    "av_channel_layout_copy",
+    "av_dict_iterate",
+    "av_display_rotation_get",
+    "av_frame_get_side_data",
+    "av_frame_unref",
+    "av_get_pix_fmt_name",
+    "av_pix_fmt_desc_get",
+    "av_rescale_rnd",
+];
+pub(crate) const GENERAL_VIDEO_SWRESAMPLE_SYMBOLS: [&str; 1] = ["swr_get_delay"];
+pub(crate) const GENERAL_VIDEO_SWSCALE_SYMBOLS: [&str; 0] = [];
+pub(crate) const GENERAL_VIDEO_AVFILTER_SYMBOLS: [&str; 9] = [
+    "av_buffersink_get_frame",
+    "av_buffersrc_add_frame_flags",
+    "avfilter_get_by_name",
+    "avfilter_graph_alloc",
+    "avfilter_graph_config",
+    "avfilter_graph_create_filter",
+    "avfilter_graph_free",
+    "avfilter_link",
+    "avfilter_version",
+];
+
 pub(crate) fn video_codec_library_contracts() -> [(&'static str, u16, &'static [&'static str]); 5] {
     [
         ("avcodec", 61, &VIDEO_CODEC_AVCODEC_SYMBOLS),
@@ -394,9 +605,51 @@ pub(crate) fn video_codec_abi_version(identity: &str) -> Option<&'static str> {
     }
 }
 
+pub(crate) fn general_video_codec_library_extensions()
+-> [(&'static str, u16, &'static [&'static str]); 6] {
+    [
+        ("avcodec", 61, &GENERAL_VIDEO_AVCODEC_SYMBOLS),
+        ("avformat", 61, &GENERAL_VIDEO_AVFORMAT_SYMBOLS),
+        ("avutil", 59, &GENERAL_VIDEO_AVUTIL_SYMBOLS),
+        ("swresample", 5, &GENERAL_VIDEO_SWRESAMPLE_SYMBOLS),
+        ("swscale", 8, &GENERAL_VIDEO_SWSCALE_SYMBOLS),
+        ("avfilter", 10, &GENERAL_VIDEO_AVFILTER_SYMBOLS),
+    ]
+}
+
+pub(crate) fn general_video_codec_library_contracts() -> [(&'static str, u16, Vec<&'static str>); 6]
+{
+    let historical = video_codec_library_contracts()
+        .into_iter()
+        .map(|(identity, abi_major, symbols)| (identity, (abi_major, symbols)))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    general_video_codec_library_extensions().map(|(identity, abi_major, supplemental_symbols)| {
+        let mut symbols = historical
+            .get(identity)
+            .map(|(_, symbols)| symbols.to_vec())
+            .unwrap_or_default();
+        symbols.extend_from_slice(supplemental_symbols);
+        symbols.sort_unstable();
+        (identity, abi_major, symbols)
+    })
+}
+
+pub(crate) fn general_video_codec_symbol_version_namespace(identity: &str) -> Option<&'static str> {
+    match identity {
+        "avcodec" => Some("LIBAVCODEC_61"),
+        "avformat" => Some("LIBAVFORMAT_61"),
+        "avutil" => Some("LIBAVUTIL_59"),
+        "swresample" => Some("LIBSWRESAMPLE_5"),
+        "swscale" => Some("LIBSWSCALE_8"),
+        "avfilter" => Some("LIBAVFILTER_10"),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sha2::{Digest, Sha256};
     use std::{collections::BTreeSet, mem};
 
     #[test]
@@ -777,5 +1030,187 @@ mod tests {
                 "AV_PIX_FMT_YUV420P10LE": AV_PIXEL_FORMAT_YUV420P10LE
             })
         );
+    }
+
+    #[test]
+    fn general_video_abi_is_supplementary_six_library_contract() {
+        assert_eq!(video_codec_library_contracts().len(), 5);
+        assert_eq!(
+            video_codec_library_contracts()
+                .iter()
+                .map(|(_, _, symbols)| symbols.len())
+                .sum::<usize>(),
+            54
+        );
+
+        assert_eq!(mem::size_of::<AvCodecParametersGeneralProjection>(), 176);
+        assert_eq!(mem::align_of::<AvCodecParametersGeneralProjection>(), 8);
+        assert_eq!(
+            mem::offset_of!(AvCodecParametersGeneralProjection, codec_type),
+            0
+        );
+        assert_eq!(
+            mem::offset_of!(AvCodecParametersGeneralProjection, codec_id),
+            4
+        );
+        assert_eq!(
+            mem::offset_of!(AvCodecParametersGeneralProjection, format),
+            44
+        );
+        assert_eq!(
+            mem::offset_of!(AvCodecParametersGeneralProjection, bits_per_raw_sample),
+            60
+        );
+        assert_eq!(
+            mem::offset_of!(AvCodecParametersGeneralProjection, width),
+            72
+        );
+        assert_eq!(
+            mem::offset_of!(AvCodecParametersGeneralProjection, height),
+            76
+        );
+        assert_eq!(
+            mem::offset_of!(AvCodecParametersGeneralProjection, channel_layout),
+            128
+        );
+        assert_eq!(
+            mem::offset_of!(AvCodecParametersGeneralProjection, sample_rate),
+            152
+        );
+
+        assert_eq!(mem::size_of::<AvStreamGeneralProjection>(), 232);
+        assert_eq!(mem::align_of::<AvStreamGeneralProjection>(), 8);
+        assert_eq!(mem::offset_of!(AvStreamGeneralProjection, start_time), 40);
+        assert_eq!(mem::offset_of!(AvStreamGeneralProjection, duration), 48);
+        assert_eq!(mem::offset_of!(AvStreamGeneralProjection, frame_count), 56);
+        assert_eq!(mem::offset_of!(AvStreamGeneralProjection, metadata), 80);
+        assert_eq!(
+            mem::offset_of!(AvStreamGeneralProjection, average_frame_rate),
+            88
+        );
+
+        assert_eq!(mem::size_of::<AvFormatContextGeneralProjection>(), 472);
+        assert_eq!(mem::align_of::<AvFormatContextGeneralProjection>(), 8);
+        assert_eq!(
+            mem::offset_of!(AvFormatContextGeneralProjection, start_time),
+            96
+        );
+        assert_eq!(
+            mem::offset_of!(AvFormatContextGeneralProjection, duration),
+            104
+        );
+        assert_eq!(
+            mem::offset_of!(AvFormatContextGeneralProjection, metadata),
+            192
+        );
+
+        assert_eq!(mem::size_of::<AvFrameGeneralProjection>(), 440);
+        assert_eq!(mem::align_of::<AvFrameGeneralProjection>(), 8);
+        assert_eq!(mem::offset_of!(AvFrameGeneralProjection, sample_rate), 192);
+        assert_eq!(
+            mem::offset_of!(AvFrameGeneralProjection, best_effort_timestamp),
+            320
+        );
+        assert_eq!(mem::offset_of!(AvFrameGeneralProjection, metadata), 336);
+        assert_eq!(
+            mem::offset_of!(AvFrameGeneralProjection, channel_layout),
+            408
+        );
+        assert_eq!(mem::offset_of!(AvFrameGeneralProjection, duration), 432);
+        assert_eq!(mem::size_of::<AvDictionaryEntry>(), 16);
+        assert_eq!(mem::size_of::<AvFrameSideData>(), 40);
+        assert_eq!(mem::size_of::<AvComponentDescriptor>(), 20);
+        assert_eq!(mem::size_of::<AvPixelFormatDescriptor>(), 112);
+
+        let manifest: serde_json::Value = serde_json::from_str(include_str!(
+            "../abi/video-codec/ffmpeg-7.1-x86_64-gnu-general-video-v1.json"
+        ))
+        .expect("general video ABI manifest must be valid JSON");
+        assert_eq!(
+            manifest["source"]["archive_sha256"],
+            FFMPEG_7_1_SOURCE_ARCHIVE_SHA256
+        );
+        assert_eq!(
+            manifest["source"]["signature_sha256"],
+            FFMPEG_7_1_RELEASE_SIGNATURE_SHA256
+        );
+        assert_eq!(
+            manifest["source"]["signing_key_fingerprint"],
+            FFMPEG_7_1_RELEASE_SIGNING_KEY_FINGERPRINT
+        );
+        assert_eq!(manifest["contract"]["historical_symbol_count"], 54);
+        assert_eq!(manifest["contract"]["supplemental_symbol_count"], 24);
+        assert_eq!(manifest["contract"]["general_symbol_count"], 78);
+
+        let mut total = 0;
+        for (identity, abi_major, expected) in general_video_codec_library_contracts() {
+            assert_eq!(manifest["libraries"][identity]["abi_major"], abi_major);
+            assert_eq!(
+                manifest["libraries"][identity]["symbol_version_namespace"],
+                general_video_codec_symbol_version_namespace(identity)
+                    .expect("general video library namespace")
+            );
+            let actual = manifest["libraries"][identity]["symbols"]
+                .as_array()
+                .expect("general symbols must be an array")
+                .iter()
+                .map(|value| value.as_str().expect("general symbol must be a string"))
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected);
+            total += actual.len();
+        }
+        assert_eq!(total, 78);
+
+        let historical = [
+            (
+                "ffmpeg-7.1-x86_64-gnu-v1.json",
+                include_bytes!("../abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json").as_slice(),
+            ),
+            (
+                "ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+                include_bytes!("../abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json")
+                    .as_slice(),
+            ),
+            (
+                "ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json",
+                include_bytes!(
+                    "../abi/video-codec/ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json"
+                )
+                .as_slice(),
+            ),
+            (
+                "ffmpeg-7.1-x86_64-gnu-vp9-alpha-v1.json",
+                include_bytes!("../abi/video-codec/ffmpeg-7.1-x86_64-gnu-vp9-alpha-v1.json")
+                    .as_slice(),
+            ),
+            (
+                "ffmpeg-7.1-x86_64-gnu-av1-pixel-format-v1.json",
+                include_bytes!("../abi/video-codec/ffmpeg-7.1-x86_64-gnu-av1-pixel-format-v1.json")
+                    .as_slice(),
+            ),
+            (
+                "ffmpeg-7.1-x86_64-gnu-h264-mp4-10bit-v1.json",
+                include_bytes!("../abi/video-codec/ffmpeg-7.1-x86_64-gnu-h264-mp4-10bit-v1.json")
+                    .as_slice(),
+            ),
+        ];
+        for (name, bytes) in historical {
+            assert_eq!(
+                manifest["historical_manifest_sha256"][name],
+                format!("{:x}", Sha256::digest(bytes))
+            );
+        }
+
+        assert_eq!(FFMPEG_7_1_AVFILTER_VERSION, 0x0a0464);
+        assert_eq!(AV_MEDIA_TYPE_AUDIO, 1);
+        assert_eq!(AV_SAMPLE_FORMAT_FLTP, 8);
+        assert_eq!(AV_BUFFER_SOURCE_FLAG_KEEP_REFERENCE, 8);
+        assert_eq!(AV_ROUND_NEAREST_AWAY_FROM_ZERO, 5);
+        assert_eq!(AV_ROUND_PASS_MIN_MAX, 8192);
+        assert_eq!(AV_PIXEL_FORMAT_FLAG_ALPHA, 128);
+        assert_eq!(manifest["claims"]["native_library_loaded"], false);
+        assert_eq!(manifest["claims"]["runtime_symbol_address_resolved"], false);
+        assert_eq!(manifest["claims"]["codec_availability_probed"], false);
+        assert_eq!(manifest["claims"]["codec_execution"], false);
     }
 }

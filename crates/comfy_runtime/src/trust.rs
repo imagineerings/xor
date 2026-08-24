@@ -43,7 +43,11 @@ use crate::{
     AuthorizedCapabilities, CapabilitySet, PermissionError, PermissionPolicy,
     PermissionPolicyGeneration,
     native_ffi_elf::{NativeElfInspectionError, inspect_elf64_dynamic_contract},
-    native_video_codec_abi::{video_codec_library_contracts, video_codec_symbol_version_namespace},
+    native_video_codec_abi::{
+        general_video_codec_library_contracts, general_video_codec_library_extensions,
+        general_video_codec_symbol_version_namespace, video_codec_library_contracts,
+        video_codec_symbol_version_namespace,
+    },
 };
 
 pub const SEALED_PLUGIN_AUTHORIZATION_VERSION: u16 = 2;
@@ -3690,6 +3694,11 @@ impl CertifiedNativeFfi {
 
 pub const VIDEO_CODEC_FFI_PROFILE: &str = "ffmpeg-7.1";
 pub const VIDEO_CODEC_FFI_UNSAFE_OWNER: &str = "comfy_runtime::native_video_codec_ffi";
+pub const GENERAL_VIDEO_CODEC_ABI_PROFILE: &str = "ffmpeg-7.1-x86_64-gnu-general-video-v1";
+pub const GENERAL_VIDEO_CODEC_ABI_MANIFEST_SHA256: &str =
+    "772b01d7db041e0da57dd7d5a09e1b5ae267804b934b2b533ce1fc62e521089d";
+const GENERAL_VIDEO_CODEC_ABI_MANIFEST: &[u8] =
+    include_bytes!("../abi/video-codec/ffmpeg-7.1-x86_64-gnu-general-video-v1.json");
 
 const VIDEO_CODEC_FFI_TARGETS: [&str; 6] = [
     "aarch64-apple-darwin",
@@ -3727,6 +3736,523 @@ struct VideoCodecFfiLibraryDto {
     sha256: String,
     abi_major: u16,
     required_symbols: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GeneralVideoCodecAbiManifestDto {
+    schema_version: u16,
+    profile: String,
+    target: String,
+    source: GeneralVideoCodecSourceDto,
+    compiler_oracle: GeneralVideoCodecCompilerOracleDto,
+    historical_manifest_sha256: BTreeMap<String, String>,
+    contract: GeneralVideoCodecContractDto,
+    projections: BTreeMap<String, BTreeMap<String, u64>>,
+    libraries: BTreeMap<String, GeneralVideoCodecLibraryDto>,
+    claims: GeneralVideoCodecClaimsDto,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GeneralVideoCodecSourceDto {
+    release: String,
+    archive_sha256: String,
+    signature_sha256: String,
+    signing_key_fingerprint: String,
+    signature_verified: bool,
+    headers: BTreeMap<String, GeneralVideoCodecHeaderDto>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GeneralVideoCodecHeaderDto {
+    bytes: u64,
+    sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GeneralVideoCodecCompilerOracleDto {
+    compiler: String,
+    compiler_target: String,
+    oci_index_sha256: String,
+    oci_linux_amd64_manifest_sha256: String,
+    command: String,
+    object_format: String,
+    object_sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GeneralVideoCodecContractDto {
+    historical_library_count: usize,
+    historical_symbol_count: usize,
+    required_library_count: usize,
+    supplemental_symbol_count: usize,
+    general_symbol_count: usize,
+    runtime_compilation: bool,
+    runtime_loading: bool,
+    runtime_symbol_resolution: bool,
+    runtime_function_invocation: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GeneralVideoCodecLibraryDto {
+    abi_major: u16,
+    symbol_version_namespace: String,
+    symbols: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GeneralVideoCodecClaimsDto {
+    official_release_signature_verified: bool,
+    reviewed_typed_declarations: bool,
+    installed_ffmpeg_package: bool,
+    loadable_native_library: bool,
+    certified_native_ffi: bool,
+    native_library_loaded: bool,
+    runtime_symbol_address_resolved: bool,
+    runtime_version_checked: bool,
+    codec_availability_probed: bool,
+    codec_available: bool,
+    executable: bool,
+    codec_execution: bool,
+    media_allocation: bool,
+    publication: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReviewedGeneralVideoCodecLibraryRequirement {
+    abi_major: u16,
+    symbol_version_namespace: String,
+    symbols: BTreeSet<String>,
+}
+
+impl ReviewedGeneralVideoCodecLibraryRequirement {
+    pub fn abi_major(&self) -> u16 {
+        self.abi_major
+    }
+
+    pub fn symbol_version_namespace(&self) -> &str {
+        &self.symbol_version_namespace
+    }
+
+    pub fn symbols(&self) -> &BTreeSet<String> {
+        &self.symbols
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReviewedGeneralVideoCodecDeclarations {
+    profile: String,
+    target: String,
+    manifest_sha256: String,
+    libraries: BTreeMap<String, ReviewedGeneralVideoCodecLibraryRequirement>,
+}
+
+impl ReviewedGeneralVideoCodecDeclarations {
+    pub fn profile(&self) -> &str {
+        &self.profile
+    }
+
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    pub fn manifest_sha256(&self) -> &str {
+        &self.manifest_sha256
+    }
+
+    pub fn libraries(&self) -> &BTreeMap<String, ReviewedGeneralVideoCodecLibraryRequirement> {
+        &self.libraries
+    }
+}
+
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+pub enum GeneralVideoCodecDeclarationReviewError {
+    #[error("general video codec ABI verification was cancelled")]
+    Cancelled,
+    #[error("general video codec ABI manifest is malformed")]
+    Malformed,
+    #[error("general video codec ABI manifest differs from the reviewed declaration oracle")]
+    ContractMismatch,
+}
+
+pub fn review_general_video_codec_declarations(
+    manifest_bytes: &[u8],
+    cancellation: &CancellationToken,
+) -> Result<ReviewedGeneralVideoCodecDeclarations, GeneralVideoCodecDeclarationReviewError> {
+    cancellation
+        .check()
+        .map_err(|_| GeneralVideoCodecDeclarationReviewError::Cancelled)?;
+    if manifest_bytes.is_empty() || manifest_bytes.len() > 256 * 1024 {
+        return Err(GeneralVideoCodecDeclarationReviewError::Malformed);
+    }
+    let manifest_sha256 = format!("{:x}", Sha256::digest(manifest_bytes));
+    if manifest_sha256 != GENERAL_VIDEO_CODEC_ABI_MANIFEST_SHA256
+        || manifest_bytes != GENERAL_VIDEO_CODEC_ABI_MANIFEST
+    {
+        return Err(GeneralVideoCodecDeclarationReviewError::ContractMismatch);
+    }
+    let value = parse_strict_json_value(manifest_bytes)
+        .map_err(|_| GeneralVideoCodecDeclarationReviewError::Malformed)?;
+    let manifest: GeneralVideoCodecAbiManifestDto = serde_json::from_value(value)
+        .map_err(|_| GeneralVideoCodecDeclarationReviewError::Malformed)?;
+    let libraries = validate_general_video_codec_abi(&manifest, cancellation)?;
+    cancellation
+        .check()
+        .map_err(|_| GeneralVideoCodecDeclarationReviewError::Cancelled)?;
+    Ok(ReviewedGeneralVideoCodecDeclarations {
+        profile: manifest.profile,
+        target: manifest.target,
+        manifest_sha256,
+        libraries,
+    })
+}
+
+fn validate_general_video_codec_abi(
+    manifest: &GeneralVideoCodecAbiManifestDto,
+    cancellation: &CancellationToken,
+) -> Result<
+    BTreeMap<String, ReviewedGeneralVideoCodecLibraryRequirement>,
+    GeneralVideoCodecDeclarationReviewError,
+> {
+    let source = &manifest.source;
+    let compiler = &manifest.compiler_oracle;
+    let contract = &manifest.contract;
+    let claims = &manifest.claims;
+    if manifest.schema_version != 1
+        || manifest.profile != GENERAL_VIDEO_CODEC_ABI_PROFILE
+        || manifest.target != "x86_64-unknown-linux-gnu"
+        || source.release != "FFmpeg 7.1"
+        || source.archive_sha256
+            != "40973d44970dbc83ef302b0609f2e74982be2d85916dd2ee7472d30678a7abe6"
+        || source.signature_sha256
+            != "9bd1689dce76b109034dcc4765a406e84e8799a2fd857b000c0a4d9744b70617"
+        || source.signing_key_fingerprint != "FCF986EA15E6E293A5644F10B4322F04D67658D8"
+        || !source.signature_verified
+        || compiler.compiler != "gcc 15.2.0"
+        || compiler.compiler_target != "x86_64-linux-gnu"
+        || compiler.oci_index_sha256
+            != "3ae15afe768b06d0c0fe088d822ba5f8045c26630bdacc8d8e7713cf5d8e7289"
+        || compiler.oci_linux_amd64_manifest_sha256
+            != "c101370f78e4a30be178c11dd18aeee64c65d617908a98157db2392ca73ab04f"
+        || compiler.command
+            != "gcc -std=c11 -Wall -Wextra -Werror -I<verified-ffmpeg-7.1-source> -c verify-general-video-bindings.c"
+        || compiler.object_format != "ELF 64-bit LSB relocatable, x86-64"
+        || compiler.object_sha256
+            != "c9eb3db4d182c44e71439513cc1108e239f63cc3cda8ee7decc52bbd5c029ae2"
+        || contract.historical_library_count != 5
+        || contract.historical_symbol_count != 54
+        || contract.required_library_count != 6
+        || contract.supplemental_symbol_count != 24
+        || contract.general_symbol_count != 78
+        || contract.runtime_compilation
+        || contract.runtime_loading
+        || contract.runtime_symbol_resolution
+        || contract.runtime_function_invocation
+        || !claims.official_release_signature_verified
+        || !claims.reviewed_typed_declarations
+        || claims.installed_ffmpeg_package
+        || claims.loadable_native_library
+        || claims.certified_native_ffi
+        || claims.native_library_loaded
+        || claims.runtime_symbol_address_resolved
+        || claims.runtime_version_checked
+        || claims.codec_availability_probed
+        || claims.codec_available
+        || claims.executable
+        || claims.codec_execution
+        || claims.media_allocation
+        || claims.publication
+    {
+        return Err(GeneralVideoCodecDeclarationReviewError::ContractMismatch);
+    }
+
+    validate_general_video_codec_headers(&source.headers)?;
+    validate_general_video_codec_historical_manifests(&manifest.historical_manifest_sha256)?;
+    validate_general_video_codec_projections(&manifest.projections)?;
+
+    let mut libraries = BTreeMap::new();
+    let mut supplemental_count = 0_usize;
+    let mut general_count = 0_usize;
+    let supplemental = general_video_codec_library_extensions()
+        .into_iter()
+        .map(|(identity, _, symbols)| (identity, symbols.len()))
+        .collect::<BTreeMap<_, _>>();
+    for (identity, abi_major, expected_symbols) in general_video_codec_library_contracts() {
+        cancellation
+            .check()
+            .map_err(|_| GeneralVideoCodecDeclarationReviewError::Cancelled)?;
+        let row = manifest
+            .libraries
+            .get(identity)
+            .ok_or(GeneralVideoCodecDeclarationReviewError::ContractMismatch)?;
+        supplemental_count = supplemental_count
+            .checked_add(
+                *supplemental
+                    .get(identity)
+                    .ok_or(GeneralVideoCodecDeclarationReviewError::ContractMismatch)?,
+            )
+            .ok_or(GeneralVideoCodecDeclarationReviewError::ContractMismatch)?;
+        general_count = general_count
+            .checked_add(expected_symbols.len())
+            .ok_or(GeneralVideoCodecDeclarationReviewError::ContractMismatch)?;
+        let expected_symbols = expected_symbols.into_iter().collect::<BTreeSet<_>>();
+        let manifest_symbols = row
+            .symbols
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        if row.abi_major != abi_major
+            || row.symbol_version_namespace
+                != general_video_codec_symbol_version_namespace(identity)
+                    .ok_or(GeneralVideoCodecDeclarationReviewError::ContractMismatch)?
+            || manifest_symbols.len() != row.symbols.len()
+            || manifest_symbols != expected_symbols
+            || row.symbols.windows(2).any(|pair| pair[0] >= pair[1])
+        {
+            return Err(GeneralVideoCodecDeclarationReviewError::ContractMismatch);
+        }
+        libraries.insert(
+            identity.to_owned(),
+            ReviewedGeneralVideoCodecLibraryRequirement {
+                abi_major,
+                symbol_version_namespace: row.symbol_version_namespace.clone(),
+                symbols: row.symbols.iter().cloned().collect(),
+            },
+        );
+    }
+    if libraries.len() != manifest.libraries.len()
+        || libraries.len() != contract.required_library_count
+        || supplemental_count != contract.supplemental_symbol_count
+        || general_count != contract.general_symbol_count
+    {
+        return Err(GeneralVideoCodecDeclarationReviewError::ContractMismatch);
+    }
+    Ok(libraries)
+}
+
+fn validate_general_video_codec_headers(
+    headers: &BTreeMap<String, GeneralVideoCodecHeaderDto>,
+) -> Result<(), GeneralVideoCodecDeclarationReviewError> {
+    let expected = [
+        (
+            "libavcodec/avcodec.h",
+            114_986,
+            "d6dbc9694974237888592f71020092c4594511e762d609b0076a90e9696ad1b1",
+        ),
+        (
+            "libavcodec/codec_par.h",
+            7_727,
+            "73b787e33b009eee85e62cc91ae6b58ba23565dc1909da98912ffe9104ef1e51",
+        ),
+        (
+            "libavcodec/packet.h",
+            30_025,
+            "219679e1ffe55fd22bc81b151fce8315372c87028fea87780be686f2b38f305f",
+        ),
+        (
+            "libavformat/avformat.h",
+            119_096,
+            "6171ac10e35a67fe04aa8ddfbf84263def2d7ae9159019dd71e5597be5dd3944",
+        ),
+        (
+            "libavutil/channel_layout.h",
+            33_387,
+            "93191d16f2667e0d1aaced08b6de97ad7d5553bd06e6e1a0dc08fa97cb5b80d3",
+        ),
+        (
+            "libavutil/dict.h",
+            9_374,
+            "c95cba1829e7886e31469f4e058bb9af3c8f215619c7ffddbc2045c9039f0554",
+        ),
+        (
+            "libavutil/display.h",
+            3_472,
+            "b9c78c80aa9331b945802b6bcd1db4ecc9ec4f9fad41993cc82b880c0dec2576",
+        ),
+        (
+            "libavutil/frame.h",
+            41_581,
+            "8218f0295206a6543e7d3974a6fcb1f22100a273b09234d0cb84c60cd1638e75",
+        ),
+        (
+            "libavutil/mathematics.h",
+            9_563,
+            "64fac2eb3a42fd3788f5585ac8e65c7d5cd82711730d1f030042ba0a62fe1a62",
+        ),
+        (
+            "libavutil/pixdesc.h",
+            16_165,
+            "5e5b269eae685c54a3f9aa2ff6ab3749e6237a5dfee5bfad1d2c4aef6171a66a",
+        ),
+        (
+            "libswresample/swresample.h",
+            22_360,
+            "ed295cf600b31f445103b0ed08852f46d24c2dc1f8b3b6cd70a91c4b1eca8937",
+        ),
+        (
+            "libswscale/swscale.h",
+            16_928,
+            "42ab58ed743efc74ba2152a049b521d41a0fae31595a9b9c6858742391570ca4",
+        ),
+        (
+            "libavfilter/avfilter.h",
+            53_419,
+            "925d5c51412d5f7d4f404a6ff2f0f40f9d6b004b30e5275b4cf9dd849433c703",
+        ),
+        (
+            "libavfilter/buffersrc.h",
+            6_747,
+            "b4e8e39bcd4179934064572a40fba7d0830f615dbee3c53859addb28bf2d487a",
+        ),
+        (
+            "libavfilter/buffersink.h",
+            6_923,
+            "ab5fe19d11f039ba40d97bc40855d3ffc3df4c8a2d91be6efb141304510c8f34",
+        ),
+        (
+            "libavfilter/version.h",
+            1_653,
+            "3469d7376608039a622aad725daaf5d624bd8e9e25d6956eea621ab2a237a66b",
+        ),
+        (
+            "libavfilter/version_major.h",
+            1_288,
+            "7a8bf18dba3ba32195c213a29a5779e21949c43b41a7c2a7c28f2822e69be9e5",
+        ),
+    ];
+    if headers.len() != expected.len()
+        || expected.into_iter().any(|(name, bytes, sha256)| {
+            headers
+                .get(name)
+                .is_none_or(|header| header.bytes != bytes || header.sha256 != sha256)
+        })
+    {
+        return Err(GeneralVideoCodecDeclarationReviewError::ContractMismatch);
+    }
+    Ok(())
+}
+
+fn validate_general_video_codec_historical_manifests(
+    historical: &BTreeMap<String, String>,
+) -> Result<(), GeneralVideoCodecDeclarationReviewError> {
+    let expected = [
+        (
+            "ffmpeg-7.1-x86_64-gnu-v1.json",
+            "cefc4429df3abe09508a4f6c91ba2c749580109fab52f3f79e9db7a998b4bb76",
+        ),
+        (
+            "ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+            "c5d4780cac865e9dd327f42f80278e6cfd4d85a94cbdd48cafbc981872b440ec",
+        ),
+        (
+            "ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json",
+            "cb989b103743491f19d41a7f451bac06c055496a9ff2cf3d37b12d92b133192d",
+        ),
+        (
+            "ffmpeg-7.1-x86_64-gnu-vp9-alpha-v1.json",
+            "766d286761651abd80698aa986cb79e2c5022d432573f13e949c851ad10b05c1",
+        ),
+        (
+            "ffmpeg-7.1-x86_64-gnu-av1-pixel-format-v1.json",
+            "c467a7efa46dd2291bbe9a5fc1a0ddaa1a8685fa74de377f1b6b366ba464e6ca",
+        ),
+        (
+            "ffmpeg-7.1-x86_64-gnu-h264-mp4-10bit-v1.json",
+            "b81706ef04a75af4fb3547de17f6f950b1df826b2aac4f9b2cb78df0ab0a4d6a",
+        ),
+    ];
+    if historical.len() != expected.len()
+        || expected
+            .into_iter()
+            .any(|(name, sha256)| historical.get(name).is_none_or(|actual| actual != sha256))
+    {
+        return Err(GeneralVideoCodecDeclarationReviewError::ContractMismatch);
+    }
+    Ok(())
+}
+
+fn validate_general_video_codec_projections(
+    projections: &BTreeMap<String, BTreeMap<String, u64>>,
+) -> Result<(), GeneralVideoCodecDeclarationReviewError> {
+    let expected = [
+        (
+            "AVCodecParameters",
+            [
+                ("size", 176),
+                ("alignment", 8),
+                ("codec_type", 0),
+                ("codec_id", 4),
+                ("format", 44),
+                ("bits_per_raw_sample", 60),
+                ("width", 72),
+                ("height", 76),
+                ("ch_layout", 128),
+                ("sample_rate", 152),
+            ]
+            .as_slice(),
+        ),
+        (
+            "AVStream",
+            [
+                ("size", 232),
+                ("alignment", 8),
+                ("codecpar", 16),
+                ("time_base", 32),
+                ("start_time", 40),
+                ("duration", 48),
+                ("nb_frames", 56),
+                ("metadata", 80),
+                ("avg_frame_rate", 88),
+            ]
+            .as_slice(),
+        ),
+        (
+            "AVFormatContext",
+            [
+                ("size", 472),
+                ("alignment", 8),
+                ("nb_streams", 44),
+                ("streams", 48),
+                ("start_time", 96),
+                ("duration", 104),
+                ("metadata", 192),
+            ]
+            .as_slice(),
+        ),
+        (
+            "AVFrame",
+            [
+                ("size", 440),
+                ("alignment", 8),
+                ("pts", 136),
+                ("sample_rate", 192),
+                ("best_effort_timestamp", 320),
+                ("metadata", 336),
+                ("ch_layout", 408),
+                ("duration", 432),
+            ]
+            .as_slice(),
+        ),
+    ];
+    if projections.len() != expected.len()
+        || expected.into_iter().any(|(name, fields)| {
+            projections.get(name).is_none_or(|actual| {
+                actual.len() != fields.len()
+                    || fields
+                        .iter()
+                        .any(|(field, value)| actual.get(*field) != Some(value))
+            })
+        })
+    {
+        return Err(GeneralVideoCodecDeclarationReviewError::ContractMismatch);
+    }
+    Ok(())
 }
 
 const VIDEO_CODEC_DEPENDENCY_CONTRACT_TARGET: &str = "x86_64-unknown-linux-gnu";
@@ -9297,6 +9823,149 @@ mod tests {
         ]);
         assert!(cases.values().all(|passed| *passed), "{cases:#?}");
         write_trust_validation_artifact(&root, &cases)?;
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_codec_abi_is_exact_and_declaration_only()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let verified = review_general_video_codec_declarations(
+            GENERAL_VIDEO_CODEC_ABI_MANIFEST,
+            &cancellation,
+        )?;
+        assert_eq!(verified.profile(), GENERAL_VIDEO_CODEC_ABI_PROFILE);
+        assert_eq!(verified.target(), "x86_64-unknown-linux-gnu");
+        assert_eq!(
+            verified.manifest_sha256(),
+            GENERAL_VIDEO_CODEC_ABI_MANIFEST_SHA256
+        );
+        assert_eq!(verified.libraries().len(), 6);
+        assert_eq!(
+            verified
+                .libraries()
+                .values()
+                .map(|library| library.symbols().len())
+                .sum::<usize>(),
+            78
+        );
+        assert_eq!(
+            verified
+                .libraries()
+                .get("avfilter")
+                .map(ReviewedGeneralVideoCodecLibraryRequirement::symbol_version_namespace),
+            Some("LIBAVFILTER_10")
+        );
+        let certification_registry = NativeFfiRegistry::default();
+        for (identity, declarations) in verified.libraries() {
+            assert_eq!(
+                certification_registry.authorize(
+                    identity,
+                    verified.manifest_sha256(),
+                    &format!("ffmpeg-7.1:{}", declarations.abi_major()),
+                    declarations.symbols(),
+                ),
+                Err(TrustError::UncertifiedFfi),
+                "reviewed declarations unexpectedly certified {identity}"
+            );
+        }
+
+        let original: serde_json::Value = serde_json::from_slice(GENERAL_VIDEO_CODEC_ABI_MANIFEST)?;
+        let mut mutation_paths = vec![
+            "/schema_version".to_owned(),
+            "/profile".to_owned(),
+            "/target".to_owned(),
+            "/source/archive_sha256".to_owned(),
+            "/source/signature_sha256".to_owned(),
+            "/source/signing_key_fingerprint".to_owned(),
+            "/source/signature_verified".to_owned(),
+            "/compiler_oracle/compiler".to_owned(),
+            "/compiler_oracle/compiler_target".to_owned(),
+            "/compiler_oracle/oci_index_sha256".to_owned(),
+            "/compiler_oracle/oci_linux_amd64_manifest_sha256".to_owned(),
+            "/compiler_oracle/command".to_owned(),
+            "/compiler_oracle/object_format".to_owned(),
+            "/compiler_oracle/object_sha256".to_owned(),
+            "/contract/historical_library_count".to_owned(),
+            "/contract/historical_symbol_count".to_owned(),
+            "/contract/required_library_count".to_owned(),
+            "/contract/supplemental_symbol_count".to_owned(),
+            "/contract/general_symbol_count".to_owned(),
+        ];
+        for name in original["claims"]
+            .as_object()
+            .ok_or("claims must be an object")?
+            .keys()
+        {
+            mutation_paths.push(format!("/claims/{name}"));
+        }
+        for name in original["source"]["headers"]
+            .as_object()
+            .ok_or("headers must be an object")?
+            .keys()
+        {
+            mutation_paths.push(format!(
+                "/source/headers/{}/sha256",
+                name.replace('~', "~0").replace('/', "~1")
+            ));
+        }
+        for name in original["historical_manifest_sha256"]
+            .as_object()
+            .ok_or("historical manifests must be an object")?
+            .keys()
+        {
+            mutation_paths.push(format!(
+                "/historical_manifest_sha256/{}",
+                name.replace('~', "~0").replace('/', "~1")
+            ));
+        }
+        for (name, fields) in original["projections"]
+            .as_object()
+            .ok_or("projections must be an object")?
+        {
+            for field in fields
+                .as_object()
+                .ok_or("projection fields must be an object")?
+                .keys()
+            {
+                mutation_paths.push(format!("/projections/{name}/{field}"));
+            }
+        }
+        for name in original["libraries"]
+            .as_object()
+            .ok_or("libraries must be an object")?
+            .keys()
+        {
+            mutation_paths.push(format!("/libraries/{name}/abi_major"));
+            mutation_paths.push(format!("/libraries/{name}/symbol_version_namespace"));
+            mutation_paths.push(format!("/libraries/{name}/symbols/0"));
+        }
+
+        for path in mutation_paths {
+            let mut mutated = original.clone();
+            let value = mutated
+                .pointer_mut(&path)
+                .ok_or_else(|| format!("missing mutation path {path}"))?;
+            match value {
+                serde_json::Value::Bool(value) => *value = !*value,
+                serde_json::Value::Number(_) => *value = serde_json::json!(999_999),
+                serde_json::Value::String(value) => value.push_str("-mutated"),
+                _ => return Err(format!("unsupported mutation path {path}").into()),
+            }
+            let bytes = serde_json::to_vec(&mutated)?;
+            assert_eq!(
+                review_general_video_codec_declarations(&bytes, &cancellation),
+                Err(GeneralVideoCodecDeclarationReviewError::ContractMismatch),
+                "mutation was admitted: {path}"
+            );
+        }
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        assert_eq!(
+            review_general_video_codec_declarations(GENERAL_VIDEO_CODEC_ABI_MANIFEST, &cancelled,),
+            Err(GeneralVideoCodecDeclarationReviewError::Cancelled)
+        );
         Ok(())
     }
 }
