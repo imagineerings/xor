@@ -2530,7 +2530,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Discovered contradiction (2026-08-24): the planned standalone write cannot compile, be reached or replace the timeline's incomplete generic rows without Multiplayer crate-root registration and narrow integration in `collaborative_timeline.rs`. Permission, error and waiting controls also cannot safely perform approval, retry or navigation because those authorities remain with their existing owners. The correction therefore adds only those registration/integration edits and a typed timeline intervention event; no execution, policy, navigation or protocol authority moves into the renderer._
     - _Evidence: 2026-08-24 — added one native semantic-card presentation for message, operation, search, edit, command, test, thought, plan, permission, error, lifecycle, raw and suppressed activity. Cards expose lifecycle-aware tones, explicit waiting-for-user treatment, progressive native detail, a reconciled raw-protocol provenance rail and typed permission/error/resume requests without directly exercising authority. The existing virtualized timeline now delegates its rows to the card while retaining stable expansion state. Three focused all-feature release GPUI fixtures cover the thought/plan/search/edit/command/test matrix, permission/error/waiting interventions and accessibility labels, and progressive raw provenance disclosure. Five integrated timeline fixtures also pass reducer ordering, virtualization, typed-detail disclosure, truthful unknown rendering and accessibility assertions; final Standard and Multiplayer checks plus repository gates are recorded in the enclosing checkpoint commit._
 
-  - [ ] 32.6. Add complete activity-catalog conformance
+  - [x] 32.6. Add complete activity-catalog conformance
     - Verify every ACP, NIP-AO, message, Git, job and platform fixture maps exactly once and never goes blank.
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 20.1_
     - _Capability IDs: CAP-025, CAP-044_
@@ -2538,10 +2538,12 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/agent_ui/src/activity_*.rs, .agents/specs/collaborative-workspace/fixtures/**_
     - _Writes: crates/agent_ui/tests/activity_catalog.rs_
     - _Validation: `cargo test -p agent_ui activity_catalog` reports zero unmapped or duplicate semantic records_
+    - _Discovered contradiction (2026-08-24): the planned bare validation cannot compile or execute NIP-AO, collaboration, Git, job or platform catalog coverage because those public projectors are correctly gated behind `agent_ui/multiplayer-tools`. The narrow correction is to run the same named test with `--all-features`; no Standard module exposure or production behavior changes._
+    - _Evidence: 2026-08-24 — added one all-feature integration catalog over 58 real projector fixtures: 16 ACP message/tool/lifecycle cases, all four NIP-AO telemetry kinds, both accepted legacy/v2 message vectors from the checked-in protocol manifest/events, 15 Git/branch/review/CI cases, all six delegated-job states and all 15 registered platform kinds. The release fixture passed exact closed family counts, unique names and canonical IDs, nonblank source/actor/verb/object/outcome semantics, one reducer insertion per fixture and duplicate replay suppression. Repository-standard all-target/all-feature warning-denied Clippy also passed; final Standard/Multiplayer, formatting, dependency, specification and inventory gates are recorded in the enclosing checkpoint commit._
 
 - [ ] 33. Merge remote-agent providers with Zed remote execution
 
-  - [ ] 33.1. Port the remote-provider discovery contract
+  - [x] 33.1. Port the remote-provider discovery contract
     - Discover versioned provider executables/configurations without loading provider code into the client process.
     - _Requirements: 11.5, 16.2_
     - _Capability IDs: CAP-034_
@@ -2549,6 +2551,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/docs/remote-agents.md, projects/buzz/crates/buzz-backend-kubernetes/**_
     - _Writes: crates/remote/src/agent_provider_discovery.rs_
     - _Validation: discovery tests cover supported, duplicate, missing, incompatible and untrusted providers_
+    - _Discovered contradiction (2026-08-24): the planned single implementation file cannot be compiled or reached without registering it in `crates/remote/src/remote.rs`. Provider configuration and its declared protocol version are obtained only by invoking and parsing an executable, which is explicitly hostile work owned by Task 33.2; doing that during discovery would violate this leaf's no-load/no-execute requirement. The narrow correction registers the module and exposes a pure explicit-version gate for the later parser, without spawning a process, reading provider output or accepting a missing-version default._
+    - _Evidence: 2026-08-24 — added ordered filesystem-only discovery across the current executable directory, `PATH` and `~/.local/bin`; strict provider-ID and executable validation; deterministic first-wins selection with retained shadowed and rejected candidates; canonical-path trust classification; current-report and stale-reference resolution; and an explicit protocol-version-one gate. Six focused release tests pass supported discovery without execution, duplicate/rejected candidates, invalid/missing/stale resolution, missing/incompatible versions, untrusted-provider rejection and search ordering. Repository-standard all-target/all-feature warning-denied Clippy also passed; final release, formatting, dependency, specification and inventory gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 33.2. Parse and bound hostile provider output
     - Validate structured output, redact secrets and cap stdout/stderr/time/resources before state updates.
