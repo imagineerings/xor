@@ -47,6 +47,8 @@ interface types {
     }
 
     record request-head {
+        endpoint: string,
+        secret-id: option<string>,
         method: http-method,
         headers: list<header>,
         declared-body-bytes: option<u64>,
@@ -166,6 +168,7 @@ interface types {
         invalid-progress,
         invalid-terminal,
         invalid-invocation-result,
+        invalid-request-authority,
     }
 
     record manifest-v2 {

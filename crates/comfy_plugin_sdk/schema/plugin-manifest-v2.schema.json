@@ -206,8 +206,25 @@
           }
         }
       ],
-      "required": ["method", "headers", "declared_body_bytes"],
+      "required": ["endpoint", "secret_id", "method", "headers", "declared_body_bytes"],
       "properties": {
+        "endpoint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^[\\u0021-\\u007e]+$"
+        },
+        "secret_id": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024,
+              "pattern": "^[\\u0021-\\u007e]+$"
+            }
+          ]
+        },
         "method": { "$ref": "#/$defs/http_method" },
         "headers": {
           "type": "array",
@@ -524,7 +541,8 @@
         "invalid-cost-request",
         "invalid-progress",
         "invalid-terminal",
-        "invalid-invocation-result"
+        "invalid-invocation-result",
+        "invalid-request-authority"
       ]
     },
     "manifest_projection_v1": {

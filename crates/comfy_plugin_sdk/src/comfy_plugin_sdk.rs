@@ -45,6 +45,8 @@ pub const MAX_PROVIDER_STREAM_HEADERS: usize = 256;
 pub const MAX_PROVIDER_STREAM_HEADER_NAME_BYTES: usize = 256;
 pub const MAX_PROVIDER_STREAM_HEADER_VALUE_BYTES: usize = 8 * 1024;
 pub const MAX_PROVIDER_STREAM_HEADER_BYTES: usize = 256 * 1024;
+pub const MAX_PROVIDER_REQUEST_ENDPOINT_BYTES: usize = 2_048;
+pub const MAX_PROVIDER_REQUEST_SECRET_ID_BYTES: usize = 1_024;
 pub const MAX_PROVIDER_STREAM_BODY_BYTES: u64 = 64 * 1024 * 1024;
 pub const MAX_PROVIDER_ENCODED_VALUE_BYTES: u64 = MAX_MANIFEST_BYTES as u64;
 pub const MAX_PROVIDER_STREAM_CHUNK_BYTES: usize = 1024 * 1024;
@@ -67,6 +69,7 @@ pub const ED25519_SIGNATURE_BYTES: usize = 64;
 const PROVIDER_RESULT_RECEIPT_SET_DOMAIN: &[u8] = b"zed.comfy.provider-result-receipt-set\0";
 const PROVIDER_RESULT_RECEIPT_SET_VERSION: u16 = 1;
 const PROVIDER_MANIFEST_V2_SIGNATURE_DOMAIN: &[u8] = b"zed.comfy.provider-manifest.v2\0";
+const PROVIDER_REQUEST_HEAD_V2_CANONICAL_DOMAIN: &str = "zed:comfy-provider-request-head@2";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProviderResultReceiptSet {
@@ -745,9 +748,68 @@ impl ProviderStreamingContractV2 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProviderRequestHeadV2 {
+    pub endpoint: String,
+    pub secret_id: Option<String>,
     pub method: ProviderHttpMethodV2,
     pub headers: Vec<ProviderHeaderV2>,
     pub declared_body_bytes: Option<u64>,
+}
+
+impl ProviderRequestHeadV2 {
+    pub fn validate_for_contract(
+        &self,
+        contract: &ProviderStreamingContractV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        if !valid_provider_request_authority(&self.endpoint, MAX_PROVIDER_REQUEST_ENDPOINT_BYTES)
+            || self.secret_id.as_deref().is_some_and(|secret_id| {
+                !valid_provider_request_authority(secret_id, MAX_PROVIDER_REQUEST_SECRET_ID_BYTES)
+            })
+        {
+            return Err(ProviderStreamingContractError::InvalidRequestAuthority);
+        }
+        if !contract.admits_method(self.method) {
+            return Err(ProviderStreamingContractError::InvalidMethod);
+        }
+        validate_provider_headers(&self.headers, contract)?;
+        if self
+            .declared_body_bytes
+            .is_some_and(|bytes| bytes > contract.maximum_request_body_bytes)
+            || (self.method == ProviderHttpMethodV2::Head
+                && self.declared_body_bytes.is_some_and(|bytes| bytes != 0))
+        {
+            return Err(ProviderStreamingContractError::BodyLimit);
+        }
+        Ok(())
+    }
+
+    pub fn canonical_bytes(
+        &self,
+        contract: &ProviderStreamingContractV2,
+    ) -> Result<Vec<u8>, ProviderStreamingContractError> {
+        contract.validate()?;
+        self.validate_for_contract(contract)?;
+        let mut writer = CanonicalWriter::with_limit(MAX_MANIFEST_BYTES);
+        writer.string(PROVIDER_REQUEST_HEAD_V2_CANONICAL_DOMAIN);
+        writer.string(&self.endpoint);
+        writer.optional_string(self.secret_id.as_deref());
+        writer.byte(self.method as u8);
+        writer.usize(self.headers.len());
+        for header in &self.headers {
+            writer.string(&header.name);
+            writer.string(&header.value);
+        }
+        match self.declared_body_bytes {
+            Some(bytes) => {
+                writer.byte(1);
+                writer.u64(bytes);
+            }
+            None => writer.byte(0),
+        }
+        if writer.overflowed() {
+            return Err(ProviderStreamingContractError::InvalidContract);
+        }
+        Ok(writer.finish())
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -1063,6 +1125,7 @@ pub enum ProviderStreamingContractError {
     InvalidProgress,
     InvalidTerminal,
     InvalidInvocationResult,
+    InvalidRequestAuthority,
 }
 
 impl fmt::Display for ProviderStreamingContractError {
@@ -1085,6 +1148,7 @@ impl fmt::Display for ProviderStreamingContractError {
             Self::InvalidProgress => "invalid provider progress",
             Self::InvalidTerminal => "invalid provider terminal state",
             Self::InvalidInvocationResult => "invalid provider invocation result",
+            Self::InvalidRequestAuthority => "invalid provider request authority",
         })
     }
 }
@@ -1093,6 +1157,7 @@ impl Error for ProviderStreamingContractError {}
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[repr(u8)]
 pub enum ProviderStreamErrorV2 {
     Cancelled,
     TimedOut,
@@ -1114,6 +1179,7 @@ pub enum ProviderStreamErrorV2 {
     InvalidProgress,
     InvalidTerminal,
     InvalidInvocationResult,
+    InvalidRequestAuthority,
 }
 
 impl From<&ProviderStreamingContractError> for ProviderStreamErrorV2 {
@@ -1137,6 +1203,9 @@ impl From<&ProviderStreamingContractError> for ProviderStreamErrorV2 {
             ProviderStreamingContractError::InvalidTerminal => Self::InvalidTerminal,
             ProviderStreamingContractError::InvalidInvocationResult => {
                 Self::InvalidInvocationResult
+            }
+            ProviderStreamingContractError::InvalidRequestAuthority => {
+                Self::InvalidRequestAuthority
             }
         }
     }
@@ -1184,18 +1253,7 @@ impl ProviderStreamValidatorV2 {
         if context.generation != host_handle.generation {
             return Err(ProviderStreamingContractError::RevokedHandle);
         }
-        if !contract.admits_method(request.method) {
-            return Err(ProviderStreamingContractError::InvalidMethod);
-        }
-        validate_provider_headers(&request.headers, &contract)?;
-        if request
-            .declared_body_bytes
-            .is_some_and(|bytes| bytes > contract.maximum_request_body_bytes)
-            || (request.method == ProviderHttpMethodV2::Head
-                && request.declared_body_bytes.is_some_and(|bytes| bytes != 0))
-        {
-            return Err(ProviderStreamingContractError::BodyLimit);
-        }
+        request.validate_for_contract(&contract)?;
         Ok(Self {
             contract,
             handle: host_handle,
@@ -1632,6 +1690,14 @@ fn validate_provider_headers(
         return Err(ProviderStreamingContractError::InvalidHeaders);
     }
     Ok(())
+}
+
+fn valid_provider_request_authority(value: &str, maximum_bytes: usize) -> bool {
+    !value.is_empty()
+        && value.len() <= maximum_bytes
+        && value.is_ascii()
+        && value.trim() == value
+        && value.bytes().all(|byte| byte.is_ascii_graphic())
 }
 
 fn valid_http_token_byte(byte: u8) -> bool {
@@ -4520,6 +4586,33 @@ mod tests {
             .map(|(record, _)| record)
             .ok_or("v2 request-head record disappeared")?;
         assert!(!request_head.contains("handle:"));
+        assert!(!request_head.contains("provider:"));
+        let mut previous_field = 0;
+        for field in [
+            "endpoint: string",
+            "secret-id: option<string>",
+            "method: http-method",
+            "headers: list<header>",
+            "declared-body-bytes: option<u64>",
+        ] {
+            let position = request_head
+                .find(field)
+                .ok_or_else(|| format!("v2 request-head is missing `{field}`"))?;
+            assert!(position >= previous_field);
+            previous_field = position;
+        }
+        let stream_error = wit
+            .split_once("enum stream-error {")
+            .and_then(|(_, remainder)| remainder.split_once('}'))
+            .map(|(enumeration, _)| enumeration)
+            .ok_or("v2 stream-error enum disappeared")?;
+        let invocation_result_position = stream_error
+            .find("invalid-invocation-result")
+            .ok_or("v2 stream-error lost invalid-invocation-result")?;
+        let request_authority_position = stream_error
+            .find("invalid-request-authority")
+            .ok_or("v2 stream-error lost invalid-request-authority")?;
+        assert!(invocation_result_position < request_authority_position);
         assert!(!wit.contains("manifest-v1: list<u8>"));
         assert!(!wit.contains("invoke: func(node-id: string) -> result<list<u8>"));
         for forbidden in ["native-handle", "secret-bytes", "filesystem-path"] {
@@ -4615,6 +4708,8 @@ mod tests {
             &v1_schema,
             "request_head",
             &ProviderRequestHeadV2 {
+                endpoint: "https://api.provider.invalid/v1/generate".to_owned(),
+                secret_id: Some("provider-api-key".to_owned()),
                 method: ProviderHttpMethodV2::Post,
                 headers: vec![ProviderHeaderV2 {
                     name: "X-Test".to_owned(),
@@ -4735,6 +4830,7 @@ mod tests {
             ProviderStreamErrorV2::Cancelled,
             ProviderStreamErrorV2::HostFailure,
             ProviderStreamErrorV2::InvalidInvocationResult,
+            ProviderStreamErrorV2::InvalidRequestAuthority,
         ] {
             assert_v2_schema_definition(&schema, &v1_schema, "stream_error", &error)?;
         }
@@ -4839,6 +4935,201 @@ mod tests {
     }
 
     #[test]
+    fn provider_streaming_v2_request_authority_is_canonical_bounded_and_host_derived()
+    -> Result<(), Box<dyn Error>> {
+        let contract = provider_streaming_contract_fixture();
+        let context = ProviderInvocationContextV2 {
+            invocation: 19,
+            generation: 2,
+        };
+        let handle = ProviderStreamHandleV2 {
+            invocation: 19,
+            slot: 1,
+            generation: 2,
+        };
+        let request = ProviderRequestHeadV2 {
+            endpoint: "https://api.provider.invalid/v1/generate".to_owned(),
+            secret_id: Some("provider-api-key".to_owned()),
+            method: ProviderHttpMethodV2::Post,
+            headers: vec![
+                ProviderHeaderV2 {
+                    name: "X-First".to_owned(),
+                    value: "one".to_owned(),
+                },
+                ProviderHeaderV2 {
+                    name: "X-Second".to_owned(),
+                    value: "two".to_owned(),
+                },
+            ],
+            declared_body_bytes: Some(4),
+        };
+        ProviderStreamValidatorV2::checked(contract.clone(), context, handle, &request)?;
+        let canonical = request.canonical_bytes(&contract)?;
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&canonical)),
+            "013523b74dac607f933629834429d2cfd4cdcbc8c6653b2ec6e4f61cc93c54c8"
+        );
+        for mutation in [
+            ProviderRequestHeadV2 {
+                endpoint: "https://api.provider.invalid/v1/other".to_owned(),
+                ..request.clone()
+            },
+            ProviderRequestHeadV2 {
+                secret_id: None,
+                ..request.clone()
+            },
+            ProviderRequestHeadV2 {
+                secret_id: Some("different-provider-api-key".to_owned()),
+                ..request.clone()
+            },
+            ProviderRequestHeadV2 {
+                method: ProviderHttpMethodV2::Get,
+                ..request.clone()
+            },
+            ProviderRequestHeadV2 {
+                headers: request.headers.iter().cloned().rev().collect(),
+                ..request.clone()
+            },
+            ProviderRequestHeadV2 {
+                headers: vec![
+                    ProviderHeaderV2 {
+                        name: "X-Changed".to_owned(),
+                        value: "one".to_owned(),
+                    },
+                    request.headers[1].clone(),
+                ],
+                ..request.clone()
+            },
+            ProviderRequestHeadV2 {
+                headers: vec![
+                    ProviderHeaderV2 {
+                        name: "X-First".to_owned(),
+                        value: "changed".to_owned(),
+                    },
+                    request.headers[1].clone(),
+                ],
+                ..request.clone()
+            },
+            ProviderRequestHeadV2 {
+                declared_body_bytes: Some(3),
+                ..request.clone()
+            },
+        ] {
+            assert_ne!(mutation.canonical_bytes(&contract)?, canonical);
+        }
+
+        for (endpoint, secret_id) in [
+            (String::new(), None),
+            (" https://api.provider.invalid".to_owned(), None),
+            ("https://api.provider.invalid\n".to_owned(), None),
+            ("https://api.provider.invalid/é".to_owned(), None),
+            ("x".repeat(MAX_PROVIDER_REQUEST_ENDPOINT_BYTES + 1), None),
+            (
+                "https://api.provider.invalid".to_owned(),
+                Some(String::new()),
+            ),
+            (
+                "https://api.provider.invalid".to_owned(),
+                Some("secret id".to_owned()),
+            ),
+            (
+                "https://api.provider.invalid".to_owned(),
+                Some("é".to_owned()),
+            ),
+            (
+                "https://api.provider.invalid".to_owned(),
+                Some("x".repeat(MAX_PROVIDER_REQUEST_SECRET_ID_BYTES + 1)),
+            ),
+        ] {
+            let invalid = ProviderRequestHeadV2 {
+                endpoint,
+                secret_id,
+                ..request.clone()
+            };
+            assert_eq!(
+                ProviderStreamValidatorV2::checked(contract.clone(), context, handle, &invalid,)
+                    .err(),
+                Some(ProviderStreamingContractError::InvalidRequestAuthority)
+            );
+        }
+
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schema/plugin-manifest-v2.schema.json"))?;
+        let mut v1_schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schema/plugin-manifest-v1.schema.json"))?;
+        v1_schema["$id"] = serde_json::Value::String(
+            "https://zed.dev/schema/comfy-plugin-manifest-v1.json".to_owned(),
+        );
+        let request_schema = serde_json::json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$ref": "#/$defs/request_head",
+            "$defs": schema["$defs"].clone(),
+        });
+        let validator = jsonschema::options()
+            .with_resource(
+                "https://zed.dev/schema/comfy-plugin-manifest-v1.json",
+                jsonschema::Resource::from_contents(v1_schema),
+            )
+            .build(&request_schema)?;
+        let serialized = serde_json::to_value(&request)?;
+        assert!(validator.is_valid(&serialized));
+        assert!(serialized.get("provider").is_none());
+        for invalid_value in [
+            serde_json::Value::Null,
+            serde_json::Value::String(String::new()),
+            serde_json::Value::String("https://api.provider.invalid/é".to_owned()),
+            serde_json::Value::String("x".repeat(MAX_PROVIDER_REQUEST_ENDPOINT_BYTES + 1)),
+        ] {
+            let mut invalid = serialized.clone();
+            invalid["endpoint"] = invalid_value;
+            assert!(!validator.is_valid(&invalid));
+        }
+        let mut missing_endpoint = serialized.clone();
+        missing_endpoint
+            .as_object_mut()
+            .ok_or("request head was not an object")?
+            .remove("endpoint");
+        assert!(!validator.is_valid(&missing_endpoint));
+        let mut missing_secret = serialized.clone();
+        missing_secret
+            .as_object_mut()
+            .ok_or("request head was not an object")?
+            .remove("secret_id");
+        assert!(!validator.is_valid(&missing_secret));
+        let mut null_secret = serialized.clone();
+        null_secret["secret_id"] = serde_json::Value::Null;
+        assert!(validator.is_valid(&null_secret));
+        for invalid_value in [
+            serde_json::Value::String(String::new()),
+            serde_json::Value::String("secret id".to_owned()),
+            serde_json::Value::String("é".to_owned()),
+            serde_json::Value::String("x".repeat(MAX_PROVIDER_REQUEST_SECRET_ID_BYTES + 1)),
+        ] {
+            let mut invalid = serialized.clone();
+            invalid["secret_id"] = invalid_value;
+            assert!(!validator.is_valid(&invalid));
+        }
+        let boundary = ProviderRequestHeadV2 {
+            endpoint: "x".repeat(MAX_PROVIDER_REQUEST_ENDPOINT_BYTES),
+            secret_id: Some("s".repeat(MAX_PROVIDER_REQUEST_SECRET_ID_BYTES)),
+            ..request
+        };
+        boundary.validate_for_contract(&contract)?;
+        assert!(validator.is_valid(&serde_json::to_value(boundary)?));
+        let mut component_provider = serialized;
+        component_provider
+            .as_object_mut()
+            .ok_or("request head was not an object")?
+            .insert(
+                "provider".to_owned(),
+                serde_json::Value::String("forged-provider".to_owned()),
+            );
+        assert!(!validator.is_valid(&component_provider));
+        assert!(serde_json::from_value::<ProviderRequestHeadV2>(component_provider).is_err());
+        Ok(())
+    }
+
+    #[test]
     fn provider_streaming_v2_is_generation_scoped_ordered_and_bounded() -> Result<(), Box<dyn Error>>
     {
         let contract = provider_streaming_contract_fixture();
@@ -4852,6 +5143,8 @@ mod tests {
             generation: 3,
         };
         let request = ProviderRequestHeadV2 {
+            endpoint: "https://api.provider.invalid/v1/generate".to_owned(),
+            secret_id: Some("provider-api-key".to_owned()),
             method: ProviderHttpMethodV2::Post,
             headers: vec![
                 ProviderHeaderV2 {
@@ -5176,6 +5469,8 @@ mod tests {
                 context,
                 handle,
                 &ProviderRequestHeadV2 {
+                    endpoint: "https://api.provider.invalid/v1/generate".to_owned(),
+                    secret_id: None,
                     method,
                     headers: Vec::new(),
                     declared_body_bytes,
@@ -5191,6 +5486,8 @@ mod tests {
 
         let contract = provider_streaming_contract_fixture();
         let request = ProviderRequestHeadV2 {
+            endpoint: "https://api.provider.invalid/v1/generate".to_owned(),
+            secret_id: Some("provider-api-key".to_owned()),
             method: ProviderHttpMethodV2::Post,
             headers: Vec::new(),
             declared_body_bytes: Some(3),
@@ -5216,6 +5513,8 @@ mod tests {
             Err(ProviderStreamingContractError::ChunkLimit)
         );
         let head_with_body = ProviderRequestHeadV2 {
+            endpoint: "https://api.provider.invalid/v1/generate".to_owned(),
+            secret_id: None,
             method: ProviderHttpMethodV2::Head,
             headers: Vec::new(),
             declared_body_bytes: Some(1),
@@ -5227,6 +5526,8 @@ mod tests {
         );
 
         let open_request = ProviderRequestHeadV2 {
+            endpoint: "https://api.provider.invalid/v1/generate".to_owned(),
+            secret_id: None,
             method: ProviderHttpMethodV2::Post,
             headers: Vec::new(),
             declared_body_bytes: None,
@@ -5319,6 +5620,8 @@ mod tests {
                     context,
                     handle,
                     &ProviderRequestHeadV2 {
+                        endpoint: "https://api.provider.invalid/v1/generate".to_owned(),
+                        secret_id: None,
                         method,
                         headers: Vec::new(),
                         declared_body_bytes: Some(0),
@@ -5608,6 +5911,7 @@ mod tests {
 
         let internal_errors = [
             ProviderStreamingContractError::InvalidContract,
+            ProviderStreamingContractError::InvalidRequestAuthority,
             ProviderStreamingContractError::InvalidHandle,
             ProviderStreamingContractError::ForeignHandle,
             ProviderStreamingContractError::RevokedHandle,
@@ -5630,6 +5934,38 @@ mod tests {
             .map(ProviderStreamErrorV2::from)
             .collect::<BTreeSet<_>>();
         assert_eq!(wire_errors.len(), internal_errors.len());
+        assert_eq!(
+            ProviderStreamErrorV2::from(&ProviderStreamingContractError::InvalidRequestAuthority),
+            ProviderStreamErrorV2::InvalidRequestAuthority
+        );
+        for (index, error) in [
+            ProviderStreamErrorV2::Cancelled,
+            ProviderStreamErrorV2::TimedOut,
+            ProviderStreamErrorV2::HostFailure,
+            ProviderStreamErrorV2::InvalidContract,
+            ProviderStreamErrorV2::InvalidHandle,
+            ProviderStreamErrorV2::ForeignHandle,
+            ProviderStreamErrorV2::RevokedHandle,
+            ProviderStreamErrorV2::InvalidMethod,
+            ProviderStreamErrorV2::InvalidHeaders,
+            ProviderStreamErrorV2::BodyLimit,
+            ProviderStreamErrorV2::ChunkLimit,
+            ProviderStreamErrorV2::InvalidNdjsonLine,
+            ProviderStreamErrorV2::InvalidSequence,
+            ProviderStreamErrorV2::InvalidOrder,
+            ProviderStreamErrorV2::WaitLimit,
+            ProviderStreamErrorV2::InvalidUpload,
+            ProviderStreamErrorV2::InvalidCostRequest,
+            ProviderStreamErrorV2::InvalidProgress,
+            ProviderStreamErrorV2::InvalidTerminal,
+            ProviderStreamErrorV2::InvalidInvocationResult,
+            ProviderStreamErrorV2::InvalidRequestAuthority,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_eq!(usize::from(error as u8), index);
+        }
         Ok(())
     }
 
