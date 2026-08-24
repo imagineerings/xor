@@ -1,7 +1,11 @@
 use comfy_media::{PngLimits, encode_png_frame};
 use comfy_model::{
-    NativeFrameInterpolationModel, NativeModelPayload, NativeSdPoseHeatmapHead, NativeSdPoseModel,
-    NativeSdPoseSd2Denoiser, SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration,
+    NATIVE_UPSCALE_ADMITTED_ARCHITECTURE_COUNT, NATIVE_UPSCALE_ARCHITECTURE_COUNT,
+    NATIVE_UPSCALE_CONTRACT_SHA256, NativeFrameInterpolationModel, NativeModelPayload,
+    NativeSdPoseHeatmapHead, NativeSdPoseModel, NativeSdPoseSd2Denoiser,
+    NativeUpscaleContractError, NativeUpscaleModelError, NativeUpscaleModelResource,
+    NativeUpscaleStateDictionaryLayout, NativeUpscaleUnavailableReason,
+    SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration, compiled_native_upscale_contract,
     sdpose_heatmap_head_weight_manifest, sdpose_sd2_weight_manifest,
 };
 use comfy_nodes::{
@@ -24,6 +28,7 @@ use comfy_tensor::{
     generated_comfy_operator_indirection_01::tensor_from_f32_with_context_exact_native,
 };
 use comfy_types::{AttemptId, NodeId, ProfileId, PromptId, WorkerId, WorkerMessage};
+use serde::Deserialize;
 use serde_json::json;
 use std::{
     collections::BTreeMap,
@@ -38,6 +43,28 @@ const PROFILE_ID: ProfileId = ProfileId(Uuid::from_u128(0x3670));
 const WORKFLOW_FIXTURE: &[u8] = include_bytes!("../fixtures/native_image/workflow.json");
 const SDPOSE_FIXTURE_ARTIFACT: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const UPSCALE_MODEL_RESOURCE_FIXTURE: &str =
+    include_str!("../fixtures/models/upscale-model-resource-foundation/contract.json");
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UpscaleModelResourceFixture {
+    schema_version: u32,
+    contract_sha256: String,
+    architecture_count: usize,
+    admitted_architecture_count: usize,
+    cases: Vec<UpscaleModelResourceCase>,
+    forbidden_substitutes: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UpscaleModelResourceCase {
+    layout: String,
+    state_keys: Vec<String>,
+    architecture_id: String,
+    diagnostic: String,
+}
 
 fn sdpose_tensor(
     backend: &CpuBackend,
@@ -124,6 +151,114 @@ fn reduced_frame_interpolation_stored_payload() -> Result<NativeStoredPayload, B
     Ok(NativeStoredPayload::Model(Arc::new(
         NativeStoredModelPayload::model_resource(model)?,
     )))
+}
+
+#[test]
+fn native_upscale_model_resource_is_closed_and_source_specific() -> Result<(), Box<dyn Error>> {
+    let fixture: UpscaleModelResourceFixture =
+        serde_json::from_str(UPSCALE_MODEL_RESOURCE_FIXTURE)?;
+    assert_eq!(fixture.schema_version, 1);
+    assert_eq!(fixture.contract_sha256, NATIVE_UPSCALE_CONTRACT_SHA256);
+    assert_eq!(
+        fixture.architecture_count,
+        NATIVE_UPSCALE_ARCHITECTURE_COUNT
+    );
+    assert_eq!(
+        fixture.admitted_architecture_count,
+        NATIVE_UPSCALE_ADMITTED_ARCHITECTURE_COUNT
+    );
+    assert_eq!(fixture.forbidden_substitutes.len(), 5);
+
+    let cancellation = CancellationToken::default();
+    let contract = compiled_native_upscale_contract()?;
+    assert_eq!(contract.architectures().len(), fixture.architecture_count);
+    assert_eq!(contract.admitted_architecture_count(), 0);
+    for architecture in contract.architectures() {
+        let error = match NativeUpscaleModelResource::checked(
+            NativeUpscaleStateDictionaryLayout::Flat,
+            architecture.detection_state_keys.iter(),
+            &cancellation,
+        ) {
+            Err(error) => error,
+            Ok(resource) => match resource {},
+        };
+        let unavailable = error
+            .unavailable()
+            .ok_or("architecture rejection lost its typed diagnostic")?;
+        assert_eq!(unavailable.ordinal(), architecture.ordinal);
+        assert_eq!(unavailable.architecture_id(), architecture.architecture_id);
+        let expected_reason = if architecture.origin == "main" {
+            NativeUpscaleUnavailableReason::MissingIndividualLicense
+        } else {
+            NativeUpscaleUnavailableReason::ReferenceOnlyExtraArchitecture
+        };
+        assert_eq!(unavailable.reason(), expected_reason);
+        assert_eq!(unavailable.diagnostic(), architecture.license_disposition);
+    }
+
+    for fixture_case in fixture.cases {
+        let layout = match fixture_case.layout.as_str() {
+            "flat" => NativeUpscaleStateDictionaryLayout::Flat,
+            "state_dict" => NativeUpscaleStateDictionaryLayout::StateDict,
+            _ => return Err("unknown upscale fixture layout".into()),
+        };
+        let error = match NativeUpscaleModelResource::checked(
+            layout,
+            fixture_case.state_keys.iter(),
+            &cancellation,
+        ) {
+            Err(error) => error,
+            Ok(resource) => match resource {},
+        };
+        let NativeUpscaleModelError::Unavailable {
+            architecture_id,
+            reason,
+            ..
+        } = error
+        else {
+            return Err("upscale rejection lost its source-specific error".into());
+        };
+        assert_eq!(architecture_id, fixture_case.architecture_id);
+        assert_eq!(reason.diagnostic(), fixture_case.diagnostic);
+    }
+
+    assert!(matches!(
+        NativeUpscaleModelResource::checked(
+            NativeUpscaleStateDictionaryLayout::Flat,
+            ["not.an.upscale.architecture"],
+            &cancellation,
+        ),
+        Err(NativeUpscaleModelError::Contract(
+            NativeUpscaleContractError::NoArchitectureMatch
+        ))
+    ));
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    assert!(matches!(
+        NativeUpscaleModelResource::checked(
+            NativeUpscaleStateDictionaryLayout::Flat,
+            ["body.0.weight", "body.1.weight"],
+            &cancelled,
+        ),
+        Err(NativeUpscaleModelError::Contract(
+            NativeUpscaleContractError::Cancelled
+        ))
+    ));
+
+    let resource_source = include_str!("../../comfy_model/src/upscale_model.rs");
+    let payload_source = include_str!("../../comfy_model/src/native_node_payload.rs");
+    for forbidden in [
+        "std::fs",
+        "pyo3",
+        "Python::",
+        "image_resize",
+        "generic_fallback",
+        "model.safetensors",
+    ] {
+        assert!(!resource_source.contains(forbidden));
+    }
+    assert!(!payload_source.contains("NativeModelResource::UpscaleModel"));
+    Ok(())
 }
 
 #[test]

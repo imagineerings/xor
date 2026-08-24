@@ -46,6 +46,7 @@ pub mod sd2_family;
 pub mod sdpose;
 pub mod sdxl_family;
 pub mod upscale_contract;
+pub mod upscale_model;
 pub mod vae;
 pub mod vae_architecture;
 pub mod vae_audio;
@@ -581,6 +582,10 @@ pub use upscale_contract::{
     NativeUpscaleCanonicalStateKeys, NativeUpscaleContractError, NativeUpscaleDetection,
     NativeUpscaleRuntimeContract, NativeUpscaleSourceFile, NativeUpscaleStateDictionaryLayout,
     compiled_native_upscale_contract, validate_native_upscale_contract_candidate,
+};
+pub use upscale_model::{
+    NativeUpscaleModelError, NativeUpscaleModelResource, NativeUpscaleUnavailable,
+    NativeUpscaleUnavailableReason,
 };
 pub use vae::validate_native_vae_backend_target;
 pub use vae::{

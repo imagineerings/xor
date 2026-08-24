@@ -403,7 +403,15 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(generated_upscale_leaves, [])
         self.assertIn("zero-admission", tasks_by_id[upscale_resource_id]["outcome"])
         self.assertIn(
+            "crates/comfy_model/src/upscale_contract.rs",
+            tasks_by_id[upscale_resource_id]["reads"],
+        )
+        self.assertIn(
             "missing individual-license or reference-only",
+            tasks_by_id[upscale_resource_id]["done"],
+        )
+        self.assertIn(
+            "before tensor payload, device, workspace, or resource allocation",
             tasks_by_id[upscale_resource_id]["done"],
         )
         self.assertNotIn(stored_payload, tasks_by_id[latent_upscale_id]["writes"])

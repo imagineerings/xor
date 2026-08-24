@@ -9415,6 +9415,7 @@ def native_model_resource_precursor_tasks(
             "projects/comfy/Spandrel",
             "projects/comfy/spandrel-extra-arches",
             ".agents/specs/comfy-parity/catalogs/spandrel-image-model-contract.json",
+            "crates/comfy_model/src/upscale_contract.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/model_store.rs",
             "crates/comfy_model/src/model_family.rs",
@@ -9440,8 +9441,9 @@ def native_model_resource_precursor_tasks(
         )
         tasks[-1]["done"] = (
             "The exact zero-admission generated contract rejects every observed Spandrel and "
-            "extra-arches architecture before allocation, model parsing, handle publication, cache, "
-            "or execution, with the source-specific missing individual-license or reference-only "
+            "extra-arches architecture before tensor payload, device, workspace, or resource allocation, "
+            "architecture-specific state/model construction, handle publication, cache, or execution, "
+            "with the source-specific missing individual-license or reference-only "
             "diagnostic. No image resize, generic neural fallback, Python import, source-tree access, "
             "or model weight substitutes for an admitted equation family. Canonical handle publication, "
             "cache, persistence, restart, and stale-generation behavior remain assigned to "
