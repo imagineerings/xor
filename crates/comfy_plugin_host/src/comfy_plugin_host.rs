@@ -61,19 +61,27 @@ use wasmtime::{
 
 mod wit_contract {
     wasmtime::component::bindgen!({
-        path: "../comfy_plugin_sdk/wit",
+        path: "../comfy_plugin_sdk/wit/comfy-plugin.wit",
         world: "comfy-plugin",
     });
 }
 
 mod provider_wit_contract {
     wasmtime::component::bindgen!({
-        path: "../comfy_plugin_sdk/wit",
+        path: "../comfy_plugin_sdk/wit/comfy-plugin.wit",
         world: "comfy-provider-plugin",
         with: {
             "zed:comfy-plugin/types@1.0.0": super::wit_contract::zed::comfy_plugin::types,
             "zed:comfy-plugin/host@1.0.0": super::wit_contract::zed::comfy_plugin::host,
         },
+    });
+}
+
+#[allow(dead_code)]
+mod provider_v2_wit_contract {
+    wasmtime::component::bindgen!({
+        path: "../comfy_plugin_sdk/wit/provider-v2",
+        world: "comfy-provider-plugin",
     });
 }
 

@@ -17,6 +17,10 @@ use std::{
     error::Error,
     fmt,
     str::FromStr,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 #[cfg(any(feature = "signing-tooling", test))]
 use zeroize::Zeroizing;
@@ -24,6 +28,10 @@ use zeroize::Zeroizing;
 pub const COMPONENT_API_VERSION: ApiVersion = ApiVersion::new(1, 0, 0);
 pub const COMPONENT_WORLD: &str = "zed:comfy-plugin@1.0.0";
 pub const PROVIDER_COMPONENT_WORLD: &str = "zed:comfy-provider-plugin@1.0.0";
+pub const PROVIDER_COMPONENT_API_VERSION_V2: ApiVersion = ApiVersion::new(2, 0, 0);
+pub const PROVIDER_COMPONENT_WORLD_V2: &str = "zed:comfy-provider-plugin@2.0.0";
+pub const PROVIDER_MANIFEST_SCHEMA_VERSION_V2: u16 = 2;
+pub const PROVIDER_STREAMING_API_FEATURE_V2: &str = "provider.streaming.v2";
 pub const MANIFEST_SCHEMA_VERSION: u16 = 1;
 pub const MAX_MANIFEST_NODES: usize = 4_096;
 pub const MAX_PORTS_PER_NODE: usize = 1_024;
@@ -33,6 +41,23 @@ pub const MAX_MANIFEST_BYTES: usize = 16 * 1024 * 1024;
 pub const MAX_PROVIDER_RESULT_RECEIPTS: usize = 1_024;
 pub const MAX_PROVIDER_RESULT_RECEIPT_BYTES: usize = 32 * 1024;
 pub const MAX_PROVIDER_RESULT_RECEIPT_SET_BYTES: usize = 16 * 1024 * 1024;
+pub const MAX_PROVIDER_STREAM_HEADERS: usize = 256;
+pub const MAX_PROVIDER_STREAM_HEADER_NAME_BYTES: usize = 256;
+pub const MAX_PROVIDER_STREAM_HEADER_VALUE_BYTES: usize = 8 * 1024;
+pub const MAX_PROVIDER_STREAM_HEADER_BYTES: usize = 256 * 1024;
+pub const MAX_PROVIDER_STREAM_BODY_BYTES: u64 = 64 * 1024 * 1024;
+pub const MAX_PROVIDER_ENCODED_VALUE_BYTES: u64 = MAX_MANIFEST_BYTES as u64;
+pub const MAX_PROVIDER_STREAM_CHUNK_BYTES: usize = 1024 * 1024;
+pub const MAX_PROVIDER_STREAM_NDJSON_LINE_BYTES: usize = 1024 * 1024;
+pub const MAX_PROVIDER_STREAM_WAIT_MILLISECONDS: u64 = 60_000;
+pub const MAX_PROVIDER_STREAM_PROGRESS_TOTAL: u64 = 1_000_000_000;
+pub const MAX_PROVIDER_STREAM_PROGRESS_MESSAGE_BYTES: usize = 1_024;
+pub const MAX_PROVIDER_STREAM_UPLOADS: u32 = 128;
+pub const MAX_PROVIDER_STREAM_UPLOAD_BODY_BYTES: u64 = 64 * 1024 * 1024;
+pub const MAX_PROVIDER_STREAM_COST_REQUESTS: u32 = 64;
+pub const MAX_PROVIDER_COST_REQUEST_BYTES: u64 = 512;
+pub const MAX_PROVIDER_COST_RESPONSE_BYTES: u64 =
+    1 + 8 + 4 + MAX_PROVIDER_RESULT_RECEIPT_BYTES as u64;
 pub const PLUGIN_SIGNATURE_ALGORITHM: &str = "ed25519-v1";
 #[cfg(any(feature = "signing-tooling", test))]
 pub const ED25519_PRIVATE_KEY_SEED_BYTES: usize = 32;
@@ -41,6 +66,7 @@ pub const ED25519_SIGNATURE_BYTES: usize = 64;
 
 const PROVIDER_RESULT_RECEIPT_SET_DOMAIN: &[u8] = b"zed.comfy.provider-result-receipt-set\0";
 const PROVIDER_RESULT_RECEIPT_SET_VERSION: u16 = 1;
+const PROVIDER_MANIFEST_V2_SIGNATURE_DOMAIN: &[u8] = b"zed.comfy.provider-manifest.v2\0";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProviderResultReceiptSet {
@@ -222,6 +248,23 @@ impl PluginSigningKey {
             .map_err(|_| PluginContractError::InvalidSigningKey)?;
         Ok(encode_hex(
             key_pair.sign(&manifest.signing_payload()).as_ref(),
+        ))
+    }
+
+    pub fn sign_provider_manifest_v2(
+        &self,
+        manifest: &ProviderPluginManifestV2,
+    ) -> Result<String, PluginContractError> {
+        if manifest.signature.algorithm != PLUGIN_SIGNATURE_ALGORITHM
+            || manifest.signature.key_id != self.key_id
+        {
+            return Err(PluginContractError::InvalidSignatureMetadata);
+        }
+        manifest.validate(&TypeRegistry::built_in()?)?;
+        let key_pair = Ed25519KeyPair::from_seed_unchecked(self.seed.as_ref())
+            .map_err(|_| PluginContractError::InvalidSigningKey)?;
+        Ok(encode_hex(
+            key_pair.sign(&manifest.signing_payload()?).as_ref(),
         ))
     }
 }
@@ -549,6 +592,1080 @@ impl ProviderBindingSet {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum ProviderHttpMethodV2 {
+    Delete,
+    Get,
+    Head,
+    Options,
+    Patch,
+    Post,
+    Put,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderHeaderV2 {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderStreamHandleV2 {
+    pub invocation: u64,
+    pub slot: u32,
+    pub generation: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderInvocationContextV2 {
+    pub invocation: u64,
+    pub generation: u32,
+}
+
+impl ProviderInvocationContextV2 {
+    pub fn validate(self) -> Result<(), ProviderStreamingContractError> {
+        if self.invocation == 0 || self.generation == 0 {
+            return Err(ProviderStreamingContractError::InvalidHandle);
+        }
+        Ok(())
+    }
+}
+
+impl ProviderStreamHandleV2 {
+    pub fn validate(self) -> Result<(), ProviderStreamingContractError> {
+        if self.invocation == 0 || self.slot == 0 || self.generation == 0 {
+            return Err(ProviderStreamingContractError::InvalidHandle);
+        }
+        Ok(())
+    }
+}
+
+fn require_matching_stream_handle(
+    actual: ProviderStreamHandleV2,
+    expected: ProviderStreamHandleV2,
+) -> Result<(), ProviderStreamingContractError> {
+    actual.validate()?;
+    if actual.invocation != expected.invocation || actual.slot != expected.slot {
+        return Err(ProviderStreamingContractError::ForeignHandle);
+    }
+    if actual.generation != expected.generation {
+        return Err(ProviderStreamingContractError::RevokedHandle);
+    }
+    Ok(())
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderStreamingContractV2 {
+    pub methods: Vec<ProviderHttpMethodV2>,
+    pub maximum_headers: u16,
+    pub maximum_header_bytes: u32,
+    pub maximum_request_body_bytes: u64,
+    pub maximum_response_body_bytes: u64,
+    pub maximum_chunk_bytes: u32,
+    pub maximum_ndjson_line_bytes: u32,
+    pub maximum_wait_milliseconds: u64,
+    pub maximum_uploads: u32,
+    pub maximum_upload_body_bytes: u64,
+    pub maximum_cost_requests: u32,
+    pub maximum_progress_total: u64,
+    pub uploads: bool,
+    pub cost_requests: bool,
+}
+
+impl ProviderStreamingContractV2 {
+    pub fn validate(&self) -> Result<(), ProviderStreamingContractError> {
+        if self.methods.is_empty()
+            || self.methods.len() > 7
+            || self
+                .methods
+                .windows(2)
+                .any(|methods| methods[0] >= methods[1])
+            || self.maximum_headers == 0
+            || usize::from(self.maximum_headers) > MAX_PROVIDER_STREAM_HEADERS
+            || self.maximum_header_bytes == 0
+            || usize::try_from(self.maximum_header_bytes)
+                .map_or(true, |value| value > MAX_PROVIDER_STREAM_HEADER_BYTES)
+            || self.maximum_request_body_bytes == 0
+            || self.maximum_request_body_bytes > MAX_PROVIDER_STREAM_BODY_BYTES
+            || self.maximum_response_body_bytes == 0
+            || self.maximum_response_body_bytes > MAX_PROVIDER_STREAM_BODY_BYTES
+            || self.maximum_chunk_bytes == 0
+            || usize::try_from(self.maximum_chunk_bytes)
+                .map_or(true, |value| value > MAX_PROVIDER_STREAM_CHUNK_BYTES)
+            || self.maximum_ndjson_line_bytes == 0
+            || self.maximum_ndjson_line_bytes > self.maximum_chunk_bytes
+            || usize::try_from(self.maximum_ndjson_line_bytes)
+                .map_or(true, |value| value > MAX_PROVIDER_STREAM_NDJSON_LINE_BYTES)
+            || self.maximum_wait_milliseconds == 0
+            || self.maximum_wait_milliseconds > MAX_PROVIDER_STREAM_WAIT_MILLISECONDS
+            || self.maximum_progress_total == 0
+            || self.maximum_progress_total > MAX_PROVIDER_STREAM_PROGRESS_TOTAL
+            || self.maximum_uploads > MAX_PROVIDER_STREAM_UPLOADS
+            || self.maximum_upload_body_bytes > MAX_PROVIDER_STREAM_UPLOAD_BODY_BYTES
+            || self.maximum_cost_requests > MAX_PROVIDER_STREAM_COST_REQUESTS
+            || self.uploads != (self.maximum_uploads != 0 && self.maximum_upload_body_bytes != 0)
+            || (!self.uploads && (self.maximum_uploads != 0 || self.maximum_upload_body_bytes != 0))
+            || self.cost_requests != (self.maximum_cost_requests != 0)
+        {
+            return Err(ProviderStreamingContractError::InvalidContract);
+        }
+        Ok(())
+    }
+
+    fn admits_method(&self, method: ProviderHttpMethodV2) -> bool {
+        self.methods.binary_search(&method).is_ok()
+    }
+
+    fn write_canonical(&self, writer: &mut CanonicalWriter) {
+        writer.usize(self.methods.len());
+        for method in &self.methods {
+            writer.byte(*method as u8);
+        }
+        writer.u16(self.maximum_headers);
+        writer.u32(self.maximum_header_bytes);
+        writer.u64(self.maximum_request_body_bytes);
+        writer.u64(self.maximum_response_body_bytes);
+        writer.u32(self.maximum_chunk_bytes);
+        writer.u32(self.maximum_ndjson_line_bytes);
+        writer.u64(self.maximum_wait_milliseconds);
+        writer.u32(self.maximum_uploads);
+        writer.u64(self.maximum_upload_body_bytes);
+        writer.u32(self.maximum_cost_requests);
+        writer.u64(self.maximum_progress_total);
+        writer.byte(u8::from(self.uploads));
+        writer.byte(u8::from(self.cost_requests));
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderRequestHeadV2 {
+    pub method: ProviderHttpMethodV2,
+    pub headers: Vec<ProviderHeaderV2>,
+    pub declared_body_bytes: Option<u64>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderRequestChunkV2 {
+    pub handle: ProviderStreamHandleV2,
+    pub sequence: u64,
+    pub bytes: Vec<u8>,
+    pub end: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderResponseHeadV2 {
+    pub status: u16,
+    pub headers: Vec<ProviderHeaderV2>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "value",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
+pub enum ProviderResponseChunkV2 {
+    Binary(Vec<u8>),
+    Text(String),
+    NdjsonLine(String),
+}
+
+impl ProviderResponseChunkV2 {
+    fn byte_length(&self) -> usize {
+        match self {
+            Self::Binary(bytes) => bytes.len(),
+            Self::Text(text) | Self::NdjsonLine(text) => text.len(),
+        }
+    }
+
+    fn validate(
+        &self,
+        contract: &ProviderStreamingContractV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        let byte_length = self.byte_length();
+        if byte_length == 0
+            || u32::try_from(byte_length).map_or(true, |value| value > contract.maximum_chunk_bytes)
+        {
+            return Err(ProviderStreamingContractError::ChunkLimit);
+        }
+        if let Self::NdjsonLine(line) = self {
+            if line.contains(['\n', '\r'])
+                || u32::try_from(byte_length)
+                    .map_or(true, |value| value > contract.maximum_ndjson_line_bytes)
+                || serde_json::from_str::<serde_json::Value>(line).is_err()
+            {
+                return Err(ProviderStreamingContractError::InvalidNdjsonLine);
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderWaitRequestV2 {
+    pub handle: ProviderStreamHandleV2,
+    pub after_sequence: Option<u64>,
+    pub timeout_milliseconds: u64,
+}
+
+impl ProviderWaitRequestV2 {
+    fn validate_for_handle(
+        &self,
+        contract: &ProviderStreamingContractV2,
+        handle: ProviderStreamHandleV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        require_matching_stream_handle(self.handle, handle)?;
+        if self.timeout_milliseconds == 0
+            || self.timeout_milliseconds > contract.maximum_wait_milliseconds
+        {
+            return Err(ProviderStreamingContractError::WaitLimit);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "value",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
+pub enum ProviderWaitOutcomeV2 {
+    Frame(ProviderResponseFrameV2),
+    TimedOut,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderUploadRequestV2 {
+    pub handle: ProviderStreamHandleV2,
+    pub port_id: String,
+    pub media_type: String,
+    pub byte_length: u64,
+    pub content_sha256: String,
+}
+
+impl ProviderUploadRequestV2 {
+    fn validate_for_handle(
+        &self,
+        contract: &ProviderStreamingContractV2,
+        handle: ProviderStreamHandleV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        require_matching_stream_handle(self.handle, handle)?;
+        if !contract.uploads
+            || !valid_dotted_identifier(&self.port_id)
+            || !valid_media_type(&self.media_type)
+            || self.byte_length == 0
+            || self.byte_length > contract.maximum_request_body_bytes
+            || validate_sha256(&self.content_sha256).is_err()
+        {
+            return Err(ProviderStreamingContractError::InvalidUpload);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderCostRequestV2 {
+    pub handle: ProviderStreamHandleV2,
+    pub operation: String,
+    pub currency: String,
+    pub maximum_microunits: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderCostResponseV2 {
+    pub accepted: bool,
+    pub approved_microunits: u64,
+    pub receipt: Vec<u8>,
+}
+
+impl ProviderCostResponseV2 {
+    fn validate_for_request(
+        &self,
+        request: &ProviderCostRequestV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        let accepted = self.accepted
+            && self.approved_microunits != 0
+            && self.approved_microunits <= request.maximum_microunits
+            && !self.receipt.is_empty()
+            && self.receipt.len() <= MAX_PROVIDER_RESULT_RECEIPT_BYTES;
+        let denied = !self.accepted && self.approved_microunits == 0 && self.receipt.is_empty();
+        if !accepted && !denied {
+            return Err(ProviderStreamingContractError::InvalidCostRequest);
+        }
+        Ok(())
+    }
+}
+
+impl ProviderCostRequestV2 {
+    fn validate_for_handle(
+        &self,
+        contract: &ProviderStreamingContractV2,
+        handle: ProviderStreamHandleV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        require_matching_stream_handle(self.handle, handle)?;
+        if !contract.cost_requests
+            || !valid_dotted_identifier(&self.operation)
+            || self.currency.len() != 3
+            || !self.currency.bytes().all(|byte| byte.is_ascii_uppercase())
+            || self.maximum_microunits == 0
+        {
+            return Err(ProviderStreamingContractError::InvalidCostRequest);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderProgressV2 {
+    pub handle: ProviderStreamHandleV2,
+    pub sequence: u64,
+    pub completed: u64,
+    pub total: u64,
+    pub message: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum ProviderStreamTerminalV2 {
+    Completed { receipt: Vec<u8> },
+    Failed { code: String, message: String },
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "value",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
+pub enum ProviderResponseFrameEventV2 {
+    Head(ProviderResponseHeadV2),
+    Chunk(ProviderResponseChunkV2),
+    Terminal(ProviderStreamTerminalV2),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderResponseFrameV2 {
+    pub handle: ProviderStreamHandleV2,
+    pub sequence: u64,
+    pub event: ProviderResponseFrameEventV2,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderEncodedValueV2 {
+    pub type_id: CanonicalTypeId,
+    pub family: ValueFamily,
+    pub abi_bytes: Vec<u8>,
+}
+
+impl ProviderEncodedValueV2 {
+    fn validate(&self, registry: &TypeRegistry) -> Result<(), ProviderStreamingContractError> {
+        registry
+            .require_family(&self.type_id, self.family)
+            .map_err(|_| ProviderStreamingContractError::InvalidInvocationResult)?;
+        if self.abi_bytes.is_empty()
+            || u64::try_from(self.abi_bytes.len())
+                .map_or(true, |length| length > MAX_PROVIDER_ENCODED_VALUE_BYTES)
+        {
+            return Err(ProviderStreamingContractError::InvalidInvocationResult);
+        }
+        let value = PluginValue::from_abi_bytes(&self.abi_bytes, registry)
+            .map_err(|_| ProviderStreamingContractError::InvalidInvocationResult)?;
+        if value.type_id() != &self.type_id || value.family() != self.family {
+            return Err(ProviderStreamingContractError::InvalidInvocationResult);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderMaterializedOutputV2 {
+    pub port_id: String,
+    pub value: ProviderEncodedValueV2,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderInvocationResultV2 {
+    pub outputs: Vec<ProviderMaterializedOutputV2>,
+    pub receipt: Vec<u8>,
+}
+
+impl ProviderInvocationResultV2 {
+    pub fn validate(&self, registry: &TypeRegistry) -> Result<(), ProviderStreamingContractError> {
+        if self.outputs.len() > MAX_PORTS_PER_NODE
+            || self.receipt.is_empty()
+            || self.receipt.len() > MAX_PROVIDER_RESULT_RECEIPT_BYTES
+        {
+            return Err(ProviderStreamingContractError::InvalidInvocationResult);
+        }
+        let mut previous_port_id: Option<&str> = None;
+        let mut aggregate_bytes = 0u64;
+        for output in &self.outputs {
+            if !valid_dotted_identifier(&output.port_id)
+                || previous_port_id.is_some_and(|previous| previous >= output.port_id.as_str())
+            {
+                return Err(ProviderStreamingContractError::InvalidInvocationResult);
+            }
+            output.value.validate(registry)?;
+            aggregate_bytes = aggregate_bytes
+                .checked_add(
+                    u64::try_from(output.value.abi_bytes.len())
+                        .map_err(|_| ProviderStreamingContractError::InvalidInvocationResult)?,
+                )
+                .ok_or(ProviderStreamingContractError::InvalidInvocationResult)?;
+            if aggregate_bytes > MAX_PROVIDER_STREAM_BODY_BYTES {
+                return Err(ProviderStreamingContractError::InvalidInvocationResult);
+            }
+            previous_port_id = Some(output.port_id.as_str());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ProviderStreamingContractError {
+    InvalidContract,
+    InvalidHandle,
+    ForeignHandle,
+    RevokedHandle,
+    InvalidMethod,
+    InvalidHeaders,
+    BodyLimit,
+    ChunkLimit,
+    InvalidNdjsonLine,
+    InvalidSequence,
+    InvalidOrder,
+    WaitLimit,
+    InvalidUpload,
+    InvalidCostRequest,
+    InvalidProgress,
+    InvalidTerminal,
+    InvalidInvocationResult,
+}
+
+impl fmt::Display for ProviderStreamingContractError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::InvalidContract => "invalid provider streaming contract",
+            Self::InvalidHandle => "invalid provider stream handle",
+            Self::ForeignHandle => "provider stream handle belongs to another invocation",
+            Self::RevokedHandle => "provider stream handle was revoked",
+            Self::InvalidMethod => "provider HTTP method is not declared",
+            Self::InvalidHeaders => "invalid or oversized provider headers",
+            Self::BodyLimit => "provider body exceeds its cumulative bound",
+            Self::ChunkLimit => "provider chunk exceeds its bound",
+            Self::InvalidNdjsonLine => "invalid provider NDJSON line",
+            Self::InvalidSequence => "provider stream sequence is not monotonic",
+            Self::InvalidOrder => "provider stream event is out of order",
+            Self::WaitLimit => "provider wait exceeds its bound",
+            Self::InvalidUpload => "invalid provider upload request",
+            Self::InvalidCostRequest => "invalid provider cost request",
+            Self::InvalidProgress => "invalid provider progress",
+            Self::InvalidTerminal => "invalid provider terminal state",
+            Self::InvalidInvocationResult => "invalid provider invocation result",
+        })
+    }
+}
+
+impl Error for ProviderStreamingContractError {}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProviderStreamErrorV2 {
+    Cancelled,
+    TimedOut,
+    HostFailure,
+    InvalidContract,
+    InvalidHandle,
+    ForeignHandle,
+    RevokedHandle,
+    InvalidMethod,
+    InvalidHeaders,
+    BodyLimit,
+    ChunkLimit,
+    InvalidNdjsonLine,
+    InvalidSequence,
+    InvalidOrder,
+    WaitLimit,
+    InvalidUpload,
+    InvalidCostRequest,
+    InvalidProgress,
+    InvalidTerminal,
+    InvalidInvocationResult,
+}
+
+impl From<&ProviderStreamingContractError> for ProviderStreamErrorV2 {
+    fn from(error: &ProviderStreamingContractError) -> Self {
+        match error {
+            ProviderStreamingContractError::InvalidContract => Self::InvalidContract,
+            ProviderStreamingContractError::InvalidHandle => Self::InvalidHandle,
+            ProviderStreamingContractError::ForeignHandle => Self::ForeignHandle,
+            ProviderStreamingContractError::RevokedHandle => Self::RevokedHandle,
+            ProviderStreamingContractError::InvalidMethod => Self::InvalidMethod,
+            ProviderStreamingContractError::InvalidHeaders => Self::InvalidHeaders,
+            ProviderStreamingContractError::BodyLimit => Self::BodyLimit,
+            ProviderStreamingContractError::ChunkLimit => Self::ChunkLimit,
+            ProviderStreamingContractError::InvalidNdjsonLine => Self::InvalidNdjsonLine,
+            ProviderStreamingContractError::InvalidSequence => Self::InvalidSequence,
+            ProviderStreamingContractError::InvalidOrder => Self::InvalidOrder,
+            ProviderStreamingContractError::WaitLimit => Self::WaitLimit,
+            ProviderStreamingContractError::InvalidUpload => Self::InvalidUpload,
+            ProviderStreamingContractError::InvalidCostRequest => Self::InvalidCostRequest,
+            ProviderStreamingContractError::InvalidProgress => Self::InvalidProgress,
+            ProviderStreamingContractError::InvalidTerminal => Self::InvalidTerminal,
+            ProviderStreamingContractError::InvalidInvocationResult => {
+                Self::InvalidInvocationResult
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ProviderStreamValidatorV2 {
+    contract: ProviderStreamingContractV2,
+    handle: ProviderStreamHandleV2,
+    request_method: ProviderHttpMethodV2,
+    declared_body_bytes: Option<u64>,
+    request_bytes: u64,
+    response_bytes: u64,
+    next_request_sequence: u64,
+    next_response_sequence: u64,
+    last_response_sequence: Option<u64>,
+    next_progress_sequence: u64,
+    request_finished: bool,
+    response_started: bool,
+    response_status: Option<u16>,
+    terminal: bool,
+    uploads: u32,
+    upload_bytes: u64,
+    upload_handles: BTreeSet<ProviderStreamHandleV2>,
+    upload_completions: Vec<Arc<AtomicBool>>,
+    cost_requests: u32,
+    progress_completed: u64,
+    progress_total: Option<u64>,
+    revoked: Arc<AtomicBool>,
+}
+
+impl ProviderStreamValidatorV2 {
+    pub fn checked(
+        contract: ProviderStreamingContractV2,
+        context: ProviderInvocationContextV2,
+        host_handle: ProviderStreamHandleV2,
+        request: &ProviderRequestHeadV2,
+    ) -> Result<Self, ProviderStreamingContractError> {
+        contract.validate()?;
+        context.validate()?;
+        host_handle.validate()?;
+        if context.invocation != host_handle.invocation {
+            return Err(ProviderStreamingContractError::ForeignHandle);
+        }
+        if context.generation != host_handle.generation {
+            return Err(ProviderStreamingContractError::RevokedHandle);
+        }
+        if !contract.admits_method(request.method) {
+            return Err(ProviderStreamingContractError::InvalidMethod);
+        }
+        validate_provider_headers(&request.headers, &contract)?;
+        if request
+            .declared_body_bytes
+            .is_some_and(|bytes| bytes > contract.maximum_request_body_bytes)
+            || (request.method == ProviderHttpMethodV2::Head
+                && request.declared_body_bytes.is_some_and(|bytes| bytes != 0))
+        {
+            return Err(ProviderStreamingContractError::BodyLimit);
+        }
+        Ok(Self {
+            contract,
+            handle: host_handle,
+            request_method: request.method,
+            declared_body_bytes: request.declared_body_bytes,
+            request_bytes: 0,
+            response_bytes: 0,
+            next_request_sequence: 0,
+            next_response_sequence: 0,
+            last_response_sequence: None,
+            next_progress_sequence: 0,
+            request_finished: false,
+            response_started: false,
+            response_status: None,
+            terminal: false,
+            uploads: 0,
+            upload_bytes: 0,
+            upload_handles: BTreeSet::new(),
+            upload_completions: Vec::new(),
+            cost_requests: 0,
+            progress_completed: 0,
+            progress_total: None,
+            revoked: Arc::new(AtomicBool::new(false)),
+        })
+    }
+
+    pub fn write_request_chunk(
+        &mut self,
+        chunk: &ProviderRequestChunkV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        self.require_active_handle(chunk.handle)?;
+        if self.request_finished || self.response_started {
+            return Err(ProviderStreamingContractError::InvalidOrder);
+        }
+        if chunk.sequence != self.next_request_sequence
+            || chunk.bytes.len() > MAX_PROVIDER_STREAM_CHUNK_BYTES
+            || (chunk.bytes.is_empty() && !chunk.end)
+        {
+            return Err(if chunk.sequence != self.next_request_sequence {
+                ProviderStreamingContractError::InvalidSequence
+            } else {
+                ProviderStreamingContractError::ChunkLimit
+            });
+        }
+        if u32::try_from(chunk.bytes.len())
+            .map_or(true, |length| length > self.contract.maximum_chunk_bytes)
+        {
+            return Err(ProviderStreamingContractError::ChunkLimit);
+        }
+        let request_bytes = self
+            .request_bytes
+            .checked_add(
+                u64::try_from(chunk.bytes.len())
+                    .map_err(|_| ProviderStreamingContractError::BodyLimit)?,
+            )
+            .ok_or(ProviderStreamingContractError::BodyLimit)?;
+        if request_bytes > self.contract.maximum_request_body_bytes
+            || (self.request_method == ProviderHttpMethodV2::Head && request_bytes != 0)
+            || self
+                .declared_body_bytes
+                .is_some_and(|declared| request_bytes > declared)
+            || (chunk.end
+                && self
+                    .declared_body_bytes
+                    .is_some_and(|declared| request_bytes != declared))
+        {
+            return Err(ProviderStreamingContractError::BodyLimit);
+        }
+        let next_sequence = chunk
+            .sequence
+            .checked_add(1)
+            .ok_or(ProviderStreamingContractError::InvalidSequence)?;
+        self.request_bytes = request_bytes;
+        self.next_request_sequence = next_sequence;
+        self.request_finished = chunk.end;
+        Ok(())
+    }
+
+    pub fn accept_wait(
+        &mut self,
+        request: &ProviderWaitRequestV2,
+        outcome: ProviderWaitOutcomeV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        self.require_active_handle(request.handle)?;
+        request.validate_for_handle(&self.contract, self.handle)?;
+        if request.after_sequence != self.last_response_sequence {
+            return Err(ProviderStreamingContractError::InvalidSequence);
+        }
+        match outcome {
+            ProviderWaitOutcomeV2::Frame(frame) => self.accept_response_frame(&frame)?,
+            ProviderWaitOutcomeV2::Cancelled => {
+                self.terminal = true;
+                self.revoked.store(true, Ordering::Release);
+            }
+            ProviderWaitOutcomeV2::TimedOut => {}
+        }
+        Ok(())
+    }
+
+    pub fn start_upload(
+        &mut self,
+        request: &ProviderUploadRequestV2,
+        upload_handle: ProviderStreamHandleV2,
+    ) -> Result<ProviderUploadValidatorV2, ProviderStreamingContractError> {
+        self.require_active_handle(request.handle)?;
+        request.validate_for_handle(&self.contract, self.handle)?;
+        upload_handle.validate()?;
+        if upload_handle.invocation != self.handle.invocation
+            || upload_handle.slot == self.handle.slot
+            || self.upload_handles.contains(&upload_handle)
+        {
+            return Err(ProviderStreamingContractError::ForeignHandle);
+        }
+        if upload_handle.generation != self.handle.generation {
+            return Err(ProviderStreamingContractError::RevokedHandle);
+        }
+        let uploads = self
+            .uploads
+            .checked_add(1)
+            .ok_or(ProviderStreamingContractError::InvalidUpload)?;
+        if uploads > self.contract.maximum_uploads {
+            return Err(ProviderStreamingContractError::InvalidUpload);
+        }
+        let upload_bytes = self
+            .upload_bytes
+            .checked_add(request.byte_length)
+            .ok_or(ProviderStreamingContractError::InvalidUpload)?;
+        if upload_bytes > self.contract.maximum_upload_body_bytes {
+            return Err(ProviderStreamingContractError::InvalidUpload);
+        }
+        self.uploads = uploads;
+        self.upload_bytes = upload_bytes;
+        self.upload_handles.insert(upload_handle);
+        let completed = Arc::new(AtomicBool::new(false));
+        self.upload_completions.push(completed.clone());
+        Ok(ProviderUploadValidatorV2::new(
+            upload_handle,
+            request.byte_length,
+            request.content_sha256.clone(),
+            self.contract.maximum_chunk_bytes,
+            self.revoked.clone(),
+            completed,
+        ))
+    }
+
+    pub fn accept_cost_request(
+        &mut self,
+        request: &ProviderCostRequestV2,
+        response: &ProviderCostResponseV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        self.require_active_handle(request.handle)?;
+        request.validate_for_handle(&self.contract, self.handle)?;
+        response.validate_for_request(request)?;
+        let cost_requests = self
+            .cost_requests
+            .checked_add(1)
+            .ok_or(ProviderStreamingContractError::InvalidCostRequest)?;
+        if cost_requests > self.contract.maximum_cost_requests {
+            return Err(ProviderStreamingContractError::InvalidCostRequest);
+        }
+        self.cost_requests = cost_requests;
+        Ok(())
+    }
+
+    pub fn accept_progress(
+        &mut self,
+        progress: &ProviderProgressV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        self.require_active_handle(progress.handle)?;
+        if progress.sequence != self.next_progress_sequence
+            || progress.total == 0
+            || progress.total > self.contract.maximum_progress_total
+            || progress.completed < self.progress_completed
+            || progress.completed > progress.total
+            || self
+                .progress_total
+                .is_some_and(|total| total != progress.total)
+            || progress.message.as_ref().is_some_and(|message| {
+                message.is_empty() || message.len() > MAX_PROVIDER_STREAM_PROGRESS_MESSAGE_BYTES
+            })
+        {
+            return Err(ProviderStreamingContractError::InvalidProgress);
+        }
+        let next_sequence = progress
+            .sequence
+            .checked_add(1)
+            .ok_or(ProviderStreamingContractError::InvalidProgress)?;
+        self.next_progress_sequence = next_sequence;
+        self.progress_completed = progress.completed;
+        self.progress_total = Some(progress.total);
+        Ok(())
+    }
+
+    fn accept_response_frame(
+        &mut self,
+        frame: &ProviderResponseFrameV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        self.require_active_handle(frame.handle)?;
+        if frame.sequence != self.next_response_sequence {
+            return Err(ProviderStreamingContractError::InvalidSequence);
+        }
+        match &frame.event {
+            ProviderResponseFrameEventV2::Head(head) => {
+                if !self.request_finished
+                    || self.response_started
+                    || !(200..=599).contains(&head.status)
+                {
+                    return Err(ProviderStreamingContractError::InvalidOrder);
+                }
+                validate_provider_headers(&head.headers, &self.contract)?;
+                self.response_started = true;
+                self.response_status = Some(head.status);
+            }
+            ProviderResponseFrameEventV2::Chunk(chunk) => {
+                if !self.response_started
+                    || self.request_method == ProviderHttpMethodV2::Head
+                    || self
+                        .response_status
+                        .is_some_and(|status| matches!(status, 204 | 205 | 304))
+                {
+                    return Err(ProviderStreamingContractError::InvalidOrder);
+                }
+                chunk.validate(&self.contract)?;
+                let response_bytes = self
+                    .response_bytes
+                    .checked_add(
+                        u64::try_from(chunk.byte_length())
+                            .map_err(|_| ProviderStreamingContractError::BodyLimit)?,
+                    )
+                    .ok_or(ProviderStreamingContractError::BodyLimit)?;
+                if response_bytes > self.contract.maximum_response_body_bytes {
+                    return Err(ProviderStreamingContractError::BodyLimit);
+                }
+                self.response_bytes = response_bytes;
+            }
+            ProviderResponseFrameEventV2::Terminal(terminal) => {
+                self.validate_terminal(terminal)?;
+                self.terminal = true;
+                self.revoked.store(true, Ordering::Release);
+            }
+        }
+        self.last_response_sequence = Some(frame.sequence);
+        self.next_response_sequence = frame
+            .sequence
+            .checked_add(1)
+            .ok_or(ProviderStreamingContractError::InvalidSequence)?;
+        Ok(())
+    }
+
+    fn validate_terminal(
+        &self,
+        terminal: &ProviderStreamTerminalV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        match terminal {
+            ProviderStreamTerminalV2::Completed { receipt } => {
+                if !self.request_finished
+                    || !self.response_started
+                    || self
+                        .upload_completions
+                        .iter()
+                        .any(|completed| !completed.load(Ordering::Acquire))
+                    || receipt.is_empty()
+                    || receipt.len() > MAX_PROVIDER_RESULT_RECEIPT_BYTES
+                {
+                    return Err(ProviderStreamingContractError::InvalidTerminal);
+                }
+            }
+            ProviderStreamTerminalV2::Failed { code, message } => {
+                if !valid_dotted_identifier(code)
+                    || message.is_empty()
+                    || message.len() > MAX_PROVIDER_STREAM_HEADER_VALUE_BYTES
+                {
+                    return Err(ProviderStreamingContractError::InvalidTerminal);
+                }
+            }
+            ProviderStreamTerminalV2::Cancelled => {}
+        }
+        Ok(())
+    }
+
+    pub fn is_terminal(&self) -> bool {
+        self.terminal
+    }
+
+    pub fn revoke(&mut self) {
+        self.terminal = true;
+        self.revoked.store(true, Ordering::Release);
+    }
+
+    pub fn request_bytes(&self) -> u64 {
+        self.request_bytes
+    }
+
+    pub fn response_bytes(&self) -> u64 {
+        self.response_bytes
+    }
+
+    fn require_active_handle(
+        &self,
+        handle: ProviderStreamHandleV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        handle.validate()?;
+        if self.revoked.load(Ordering::Acquire) {
+            return Err(ProviderStreamingContractError::RevokedHandle);
+        }
+        require_matching_stream_handle(handle, self.handle)?;
+        if self.terminal {
+            return Err(ProviderStreamingContractError::InvalidOrder);
+        }
+        Ok(())
+    }
+}
+
+pub struct ProviderUploadValidatorV2 {
+    handle: ProviderStreamHandleV2,
+    expected_bytes: u64,
+    expected_sha256: String,
+    maximum_chunk_bytes: u32,
+    received_bytes: u64,
+    next_sequence: u64,
+    digest: Sha256,
+    terminal: bool,
+    revoked: Arc<AtomicBool>,
+    completed: Arc<AtomicBool>,
+}
+
+impl ProviderUploadValidatorV2 {
+    fn new(
+        handle: ProviderStreamHandleV2,
+        expected_bytes: u64,
+        expected_sha256: String,
+        maximum_chunk_bytes: u32,
+        revoked: Arc<AtomicBool>,
+        completed: Arc<AtomicBool>,
+    ) -> Self {
+        Self {
+            handle,
+            expected_bytes,
+            expected_sha256,
+            maximum_chunk_bytes,
+            received_bytes: 0,
+            next_sequence: 0,
+            digest: Sha256::new(),
+            terminal: false,
+            revoked,
+            completed,
+        }
+    }
+
+    pub fn write_chunk(
+        &mut self,
+        chunk: &ProviderRequestChunkV2,
+    ) -> Result<(), ProviderStreamingContractError> {
+        chunk.handle.validate()?;
+        if self.revoked.load(Ordering::Acquire) {
+            return Err(ProviderStreamingContractError::RevokedHandle);
+        }
+        require_matching_stream_handle(chunk.handle, self.handle)?;
+        if self.terminal
+            || chunk.sequence != self.next_sequence
+            || (chunk.bytes.is_empty() && !chunk.end)
+        {
+            return Err(if chunk.sequence != self.next_sequence {
+                ProviderStreamingContractError::InvalidSequence
+            } else {
+                ProviderStreamingContractError::InvalidOrder
+            });
+        }
+        if u32::try_from(chunk.bytes.len()).map_or(true, |length| length > self.maximum_chunk_bytes)
+        {
+            return Err(ProviderStreamingContractError::ChunkLimit);
+        }
+        let received_bytes = self
+            .received_bytes
+            .checked_add(
+                u64::try_from(chunk.bytes.len())
+                    .map_err(|_| ProviderStreamingContractError::BodyLimit)?,
+            )
+            .ok_or(ProviderStreamingContractError::BodyLimit)?;
+        if received_bytes > self.expected_bytes
+            || (chunk.end && received_bytes != self.expected_bytes)
+        {
+            return Err(ProviderStreamingContractError::BodyLimit);
+        }
+        let next_sequence = chunk
+            .sequence
+            .checked_add(1)
+            .ok_or(ProviderStreamingContractError::InvalidSequence)?;
+        let mut digest = self.digest.clone();
+        digest.update(&chunk.bytes);
+        if chunk.end && format!("{:x}", digest.clone().finalize()) != self.expected_sha256 {
+            return Err(ProviderStreamingContractError::InvalidUpload);
+        }
+        self.received_bytes = received_bytes;
+        self.next_sequence = next_sequence;
+        self.digest = digest;
+        self.terminal = chunk.end;
+        if chunk.end {
+            self.completed.store(true, Ordering::Release);
+        }
+        Ok(())
+    }
+
+    pub fn is_terminal(&self) -> bool {
+        self.terminal
+    }
+}
+
+fn validate_provider_headers(
+    headers: &[ProviderHeaderV2],
+    contract: &ProviderStreamingContractV2,
+) -> Result<(), ProviderStreamingContractError> {
+    if headers.len() > usize::from(contract.maximum_headers) {
+        return Err(ProviderStreamingContractError::InvalidHeaders);
+    }
+    let mut aggregate = 0usize;
+    for header in headers {
+        if header.name.is_empty()
+            || header.name.len() > MAX_PROVIDER_STREAM_HEADER_NAME_BYTES
+            || !header.name.bytes().all(valid_http_token_byte)
+            || header.value.len() > MAX_PROVIDER_STREAM_HEADER_VALUE_BYTES
+            || header.value.bytes().any(|byte| {
+                byte == b'\r' || byte == b'\n' || byte == 0x7f || (byte < 0x20 && byte != b'\t')
+            })
+        {
+            return Err(ProviderStreamingContractError::InvalidHeaders);
+        }
+        aggregate = aggregate
+            .checked_add(header.name.len())
+            .and_then(|bytes| bytes.checked_add(header.value.len()))
+            .ok_or(ProviderStreamingContractError::InvalidHeaders)?;
+    }
+    if aggregate > usize::try_from(contract.maximum_header_bytes).unwrap_or(usize::MAX) {
+        return Err(ProviderStreamingContractError::InvalidHeaders);
+    }
+    Ok(())
+}
+
+fn valid_http_token_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric()
+        || matches!(
+            byte,
+            b'!' | b'#'
+                | b'$'
+                | b'%'
+                | b'&'
+                | b'\''
+                | b'*'
+                | b'+'
+                | b'-'
+                | b'.'
+                | b'^'
+                | b'_'
+                | b'`'
+                | b'|'
+                | b'~'
+        )
+}
+
+fn valid_media_type(value: &str) -> bool {
+    let Some((kind, subtype)) = value.split_once('/') else {
+        return false;
+    };
+    !kind.is_empty()
+        && !subtype.is_empty()
+        && value.len() <= 256
+        && kind.bytes().all(valid_http_token_byte)
+        && subtype.bytes().all(valid_http_token_byte)
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PluginNode {
@@ -794,6 +1911,140 @@ pub struct PluginManifest {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct ProviderPluginManifestV2 {
+    pub schema_version: u16,
+    pub component_world: String,
+    pub manifest: PluginManifest,
+    pub streaming: ProviderStreamingContractV2,
+    pub signature: ManifestSignature,
+}
+
+impl ProviderPluginManifestV2 {
+    pub fn validate(&self, registry: &TypeRegistry) -> Result<(), PluginContractError> {
+        if self.schema_version != PROVIDER_MANIFEST_SCHEMA_VERSION_V2 {
+            return Err(PluginContractError::UnsupportedManifestSchema(
+                self.schema_version,
+            ));
+        }
+        if self.component_world != PROVIDER_COMPONENT_WORLD_V2
+            || self.manifest.provider_binding.is_none()
+            || !self
+                .manifest
+                .api
+                .required_features
+                .iter()
+                .any(|feature| feature == PROVIDER_STREAMING_API_FEATURE_V2)
+        {
+            return Err(PluginContractError::InvalidProviderStreamingContract);
+        }
+        self.manifest.validate(registry)?;
+        self.streaming
+            .validate()
+            .map_err(|_| PluginContractError::InvalidProviderStreamingContract)?;
+        let upload_capabilities = self
+            .manifest
+            .capabilities
+            .iter()
+            .filter(|capability| capability.kind == CapabilityKind::ProviderUpload)
+            .collect::<Vec<_>>();
+        let cost_capabilities = self
+            .manifest
+            .capabilities
+            .iter()
+            .filter(|capability| capability.kind == CapabilityKind::ProviderCost)
+            .collect::<Vec<_>>();
+        let upload_capability_matches = match upload_capabilities.as_slice() {
+            [capability] if self.streaming.uploads => {
+                capability.quota.maximum_operations >= u64::from(self.streaming.maximum_uploads)
+                    && capability.quota.maximum_request_bytes
+                        >= self
+                            .streaming
+                            .maximum_request_body_bytes
+                            .min(self.streaming.maximum_upload_body_bytes)
+                    && capability.quota.maximum_total_bytes
+                        >= self.streaming.maximum_upload_body_bytes
+                    && capability.quota.maximum_handles >= self.streaming.maximum_uploads
+                    && capability.quota.timeout_milliseconds
+                        >= self.streaming.maximum_wait_milliseconds
+            }
+            [] => !self.streaming.uploads,
+            _ => false,
+        };
+        let cost_capability_matches = match cost_capabilities.as_slice() {
+            [capability] if self.streaming.cost_requests => {
+                let maximum_cost_bytes = u64::from(self.streaming.maximum_cost_requests)
+                    .checked_mul(
+                        MAX_PROVIDER_COST_REQUEST_BYTES + MAX_PROVIDER_COST_RESPONSE_BYTES,
+                    );
+                capability.quota.maximum_operations
+                    >= u64::from(self.streaming.maximum_cost_requests)
+                    && capability.quota.maximum_handles != 0
+                    && capability.quota.maximum_request_bytes >= MAX_PROVIDER_COST_REQUEST_BYTES
+                    && capability.quota.maximum_response_bytes >= MAX_PROVIDER_COST_RESPONSE_BYTES
+                    && maximum_cost_bytes.is_some_and(|maximum_cost_bytes| {
+                        capability.quota.maximum_total_bytes >= maximum_cost_bytes
+                    })
+                    && capability.quota.timeout_milliseconds
+                        >= self.streaming.maximum_wait_milliseconds
+            }
+            [] => !self.streaming.cost_requests,
+            _ => false,
+        };
+        if !upload_capability_matches || !cost_capability_matches {
+            return Err(PluginContractError::InvalidProviderStreamingContract);
+        }
+        if self.signature.algorithm != PLUGIN_SIGNATURE_ALGORITHM
+            || !valid_authority_identifier(&self.signature.key_id)
+            || self.signature.value.len() != ED25519_SIGNATURE_BYTES * 2
+            || !self
+                .signature
+                .value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(PluginContractError::InvalidSignatureMetadata);
+        }
+        self.signing_payload()?;
+        Ok(())
+    }
+
+    pub fn signing_payload(&self) -> Result<Vec<u8>, PluginContractError> {
+        let manifest_payload = self.manifest.signing_payload();
+        let mut writer = CanonicalWriter::with_limit(MAX_MANIFEST_BYTES);
+        writer.raw(PROVIDER_MANIFEST_V2_SIGNATURE_DOMAIN);
+        writer.u16(self.schema_version);
+        writer.string(&self.component_world);
+        writer.usize(manifest_payload.len());
+        writer.raw(&manifest_payload);
+        writer.string(&self.manifest.signature.value);
+        self.streaming.write_canonical(&mut writer);
+        writer.string(&self.signature.algorithm);
+        writer.string(&self.signature.key_id);
+        if writer.overflowed() {
+            return Err(PluginContractError::ManifestTooLarge);
+        }
+        Ok(writer.finish())
+    }
+
+    pub fn component_projection(
+        &self,
+    ) -> Result<ProviderComponentManifestProjectionV2, PluginContractError> {
+        Ok(ProviderComponentManifestProjectionV2 {
+            schema_version: self.schema_version,
+            component_world: self.component_world.clone(),
+            manifest: self.manifest.component_projection(),
+            provider_binding: self
+                .manifest
+                .provider_binding
+                .clone()
+                .ok_or(PluginContractError::InvalidProviderStreamingContract)?,
+            streaming: self.streaming.clone(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ComponentManifestProjection {
     pub component_world: String,
     pub schema_version: u16,
@@ -825,6 +2076,30 @@ impl ComponentManifestProjection {
         manifest.validate(registry)?;
         self.canonical_bytes()?;
         if self != &manifest.component_projection() {
+            return Err(PluginContractError::ComponentProjectionMismatch);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderComponentManifestProjectionV2 {
+    pub schema_version: u16,
+    pub component_world: String,
+    pub manifest: ComponentManifestProjection,
+    pub provider_binding: ProviderBindingSet,
+    pub streaming: ProviderStreamingContractV2,
+}
+
+impl ProviderComponentManifestProjectionV2 {
+    pub fn validate_for_manifest(
+        &self,
+        manifest: &ProviderPluginManifestV2,
+        registry: &TypeRegistry,
+    ) -> Result<(), PluginContractError> {
+        manifest.validate(registry)?;
+        if self != &manifest.component_projection()? {
             return Err(PluginContractError::ComponentProjectionMismatch);
         }
         Ok(())
@@ -1804,6 +3079,7 @@ pub enum PluginContractError {
     InvalidSigningKey,
     InvalidProvenance,
     InvalidProviderBindingSet,
+    InvalidProviderStreamingContract,
     InvalidProviderReceiptSet,
     InvalidNodeCount(usize),
     DuplicateOrInvalidNode(String),
@@ -1869,6 +3145,9 @@ impl fmt::Display for PluginContractError {
             Self::InvalidProvenance => formatter.write_str("invalid manifest provenance"),
             Self::InvalidProviderBindingSet => {
                 formatter.write_str("invalid signed provider binding set")
+            }
+            Self::InvalidProviderStreamingContract => {
+                formatter.write_str("invalid provider streaming component contract")
             }
             Self::InvalidProviderReceiptSet => {
                 formatter.write_str("invalid provider result receipt set")
@@ -2426,6 +3705,37 @@ impl CanonicalWriter {
 mod tests {
     use super::*;
 
+    fn assert_v2_schema_definition<T: Serialize>(
+        schema: &serde_json::Value,
+        v1_schema: &serde_json::Value,
+        definition: &str,
+        value: &T,
+    ) -> Result<(), Box<dyn Error>> {
+        let definition_schema = serde_json::json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$ref": format!("#/$defs/{definition}"),
+            "$defs": schema["$defs"].clone(),
+        });
+        let mut v1_schema = v1_schema.clone();
+        v1_schema["$id"] = serde_json::Value::String(
+            "https://zed.dev/schema/comfy-plugin-manifest-v1.json".to_owned(),
+        );
+        let validator = jsonschema::options()
+            .with_resource(
+                "https://zed.dev/schema/comfy-plugin-manifest-v1.json",
+                jsonschema::Resource::from_contents(v1_schema),
+            )
+            .build(&definition_schema)?;
+        let serialized = serde_json::to_value(value)?;
+        if !validator.is_valid(&serialized) {
+            return Err(format!(
+                "serialized Rust value does not match v2 schema definition `{definition}`: {serialized}"
+            )
+            .into());
+        }
+        Ok(())
+    }
+
     fn manifest_fixture(registry: &TypeRegistry) -> Result<PluginManifest, Box<dyn Error>> {
         let string_type = registry.resolve("STRING")?.clone();
         Ok(PluginManifest {
@@ -2504,6 +3814,90 @@ mod tests {
                     legacy_output_index: 2,
                 }],
             }],
+        })
+    }
+
+    fn provider_streaming_contract_fixture() -> ProviderStreamingContractV2 {
+        ProviderStreamingContractV2 {
+            methods: vec![ProviderHttpMethodV2::Get, ProviderHttpMethodV2::Post],
+            maximum_headers: 8,
+            maximum_header_bytes: 1_024,
+            maximum_request_body_bytes: 16,
+            maximum_response_body_bytes: 64,
+            maximum_chunk_bytes: 16,
+            maximum_ndjson_line_bytes: 16,
+            maximum_wait_milliseconds: 1_000,
+            maximum_uploads: 2,
+            maximum_upload_body_bytes: 8,
+            maximum_cost_requests: 2,
+            maximum_progress_total: 100,
+            uploads: true,
+            cost_requests: true,
+        }
+    }
+
+    fn provider_manifest_v2_fixture(
+        registry: &TypeRegistry,
+    ) -> Result<ProviderPluginManifestV2, Box<dyn Error>> {
+        let mut manifest = manifest_fixture(registry)?;
+        manifest.api.required_features.extend([
+            PROVIDER_BINDING_API_FEATURE.to_owned(),
+            PROVIDER_STREAMING_API_FEATURE_V2.to_owned(),
+        ]);
+        manifest.nodes[0].determinism = DeterminismPolicy::External;
+        manifest.nodes[0].cache = CachePolicy::Never;
+        manifest.nodes[0].effects = EffectPolicy::Provider;
+        manifest.capabilities = vec![
+            CapabilityRequest {
+                kind: CapabilityKind::ProviderUpload,
+                scope: "provider.upload".to_owned(),
+                quota: CapabilityQuota {
+                    maximum_operations: 2,
+                    maximum_request_bytes: 8,
+                    maximum_response_bytes: 1,
+                    maximum_total_bytes: 8,
+                    maximum_handles: 2,
+                    timeout_milliseconds: 1_000,
+                },
+            },
+            CapabilityRequest {
+                kind: CapabilityKind::ProviderCost,
+                scope: "provider.cost".to_owned(),
+                quota: CapabilityQuota {
+                    maximum_operations: 2,
+                    maximum_request_bytes: MAX_PROVIDER_COST_REQUEST_BYTES,
+                    maximum_response_bytes: MAX_PROVIDER_COST_RESPONSE_BYTES,
+                    maximum_total_bytes: 2
+                        * (MAX_PROVIDER_COST_REQUEST_BYTES + MAX_PROVIDER_COST_RESPONSE_BYTES),
+                    maximum_handles: 1,
+                    timeout_milliseconds: 1_000,
+                },
+            },
+        ];
+        let mut provider_binding = ProviderBindingSet {
+            schema_version: PROVIDER_BINDING_SCHEMA_VERSION,
+            implementation_namespace: manifest.identifier.clone(),
+            bindings_sha256: "0".repeat(64),
+            bindings: vec![ProviderBindingClaim {
+                feature_id: "COMFY-NODE-0001".to_owned(),
+                node_id: manifest.nodes[0].id.clone(),
+                contract_sha256: "3".repeat(64),
+                transport_schema: "zed:comfy-provider-transport@1".parse()?,
+                materializer_schema: "zed:comfy-provider-materializer@1".parse()?,
+            }],
+        };
+        provider_binding.bindings_sha256 = provider_binding.canonical_bindings_sha256()?;
+        manifest.provider_binding = Some(provider_binding);
+        Ok(ProviderPluginManifestV2 {
+            schema_version: PROVIDER_MANIFEST_SCHEMA_VERSION_V2,
+            component_world: PROVIDER_COMPONENT_WORLD_V2.to_owned(),
+            manifest,
+            streaming: provider_streaming_contract_fixture(),
+            signature: ManifestSignature {
+                algorithm: PLUGIN_SIGNATURE_ALGORITHM.to_owned(),
+                key_id: "test-key".to_owned(),
+                value: "4".repeat(ED25519_SIGNATURE_BYTES * 2),
+            },
         })
     }
 
@@ -3073,6 +4467,1170 @@ mod tests {
         assert!(!wit.contains("legacy-widget-names"));
         assert!(!wit.contains("input-translations"));
         assert!(!wit.contains("output-translations"));
+    }
+
+    #[test]
+    fn provider_streaming_v2_preserves_v1_and_has_typed_schema_parity() -> Result<(), Box<dyn Error>>
+    {
+        assert_eq!(
+            format!(
+                "{:x}",
+                Sha256::digest(include_bytes!("../wit/comfy-plugin.wit"))
+            ),
+            "51538d3720188321d54df2bc3947d334c52bbadff5610f2623ab2a8bc4616cad"
+        );
+        assert_eq!(
+            include_bytes!("../wit/comfy-plugin.wit"),
+            include_bytes!("../wit/provider-v2/deps/comfy-plugin/comfy-plugin.wit")
+        );
+        assert_eq!(
+            format!(
+                "{:x}",
+                Sha256::digest(include_bytes!("../schema/plugin-manifest-v1.schema.json"))
+            ),
+            "fc2be2425ab15f21f6b05a27086272fc95fd4dd5e27c4106a17a69d3351b5c7f"
+        );
+
+        let wit = include_str!("../wit/provider-v2/comfy-provider-plugin.wit");
+        for contract in [
+            "record invocation-context",
+            "record stream-handle",
+            "maximum-upload-body-bytes: u64",
+            "record request-head",
+            "after-sequence: option<u64>",
+            "variant response-frame-event",
+            "record response-frame",
+            "variant wait-outcome",
+            "record upload-request",
+            "record cost-request",
+            "record cost-response",
+            "record invocation-result",
+            "record manifest-v2",
+            "manifest: manifest-projection",
+            "provider-binding: provider-binding-set",
+            "start-request: func(context: invocation-context",
+            "request-cost: func(request: cost-request) -> result<cost-response, stream-error>",
+            "invoke: func(context: invocation-context, node-id: string) -> result<invocation-result, stream-error>",
+        ] {
+            assert!(wit.contains(contract), "v2 WIT is missing `{contract}`");
+        }
+        let request_head = wit
+            .split_once("record request-head {")
+            .and_then(|(_, remainder)| remainder.split_once('}'))
+            .map(|(record, _)| record)
+            .ok_or("v2 request-head record disappeared")?;
+        assert!(!request_head.contains("handle:"));
+        assert!(!wit.contains("manifest-v1: list<u8>"));
+        assert!(!wit.contains("invoke: func(node-id: string) -> result<list<u8>"));
+        for forbidden in ["native-handle", "secret-bytes", "filesystem-path"] {
+            assert!(!wit.contains(forbidden));
+        }
+
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schema/plugin-manifest-v2.schema.json"))?;
+        for definition in [
+            "streaming_contract",
+            "invocation_context",
+            "stream_handle",
+            "request_head",
+            "request_chunk",
+            "response_frame",
+            "wait_request",
+            "wait_outcome",
+            "upload_request",
+            "cost_request",
+            "cost_response",
+            "progress",
+            "invocation_result",
+            "stream_error",
+            "component_manifest_projection_v2",
+        ] {
+            assert!(
+                schema["$defs"].get(definition).is_some(),
+                "v2 schema is missing `{definition}`"
+            );
+        }
+        let contract_schema = serde_json::json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$ref": "#/$defs/streaming_contract",
+            "$defs": {
+                "streaming_contract": schema["$defs"]["streaming_contract"].clone(),
+                "http_method": schema["$defs"]["http_method"].clone(),
+            },
+        });
+        let validator = jsonschema::validator_for(&contract_schema)?;
+        let contract = provider_streaming_contract_fixture();
+        contract.validate()?;
+        let contract_value = serde_json::to_value(&contract)?;
+        assert!(validator.is_valid(&contract_value));
+        let mut unknown_contract = contract_value;
+        unknown_contract
+            .as_object_mut()
+            .ok_or("streaming contract was not an object")?
+            .insert("ignored".to_owned(), serde_json::Value::Bool(true));
+        assert!(!validator.is_valid(&unknown_contract));
+        assert!(serde_json::from_value::<ProviderStreamingContractV2>(unknown_contract).is_err());
+
+        let registry = TypeRegistry::built_in()?;
+        let manifest = provider_manifest_v2_fixture(&registry)?;
+        manifest.validate(&registry)?;
+        let component_projection = manifest.component_projection()?;
+        component_projection.validate_for_manifest(&manifest, &registry)?;
+        let v1_schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schema/plugin-manifest-v1.schema.json"))?;
+
+        let context = ProviderInvocationContextV2 {
+            invocation: 7,
+            generation: 3,
+        };
+        let handle = ProviderStreamHandleV2 {
+            invocation: 7,
+            slot: 1,
+            generation: 3,
+        };
+        let response_head = ProviderResponseHeadV2 {
+            status: 200,
+            headers: vec![ProviderHeaderV2 {
+                name: "X-Test".to_owned(),
+                value: "value".to_owned(),
+            }],
+        };
+        let chunks = [
+            ProviderResponseChunkV2::Binary(vec![1]),
+            ProviderResponseChunkV2::Text("text".to_owned()),
+            ProviderResponseChunkV2::NdjsonLine("{\"ok\":true}".to_owned()),
+        ];
+        let terminals = [
+            ProviderStreamTerminalV2::Completed { receipt: vec![1] },
+            ProviderStreamTerminalV2::Failed {
+                code: "provider.failed".to_owned(),
+                message: "failed".to_owned(),
+            },
+            ProviderStreamTerminalV2::Cancelled,
+        ];
+        assert_v2_schema_definition(&schema, &v1_schema, "invocation_context", &context)?;
+        assert_v2_schema_definition(&schema, &v1_schema, "stream_handle", &handle)?;
+        assert_v2_schema_definition(
+            &schema,
+            &v1_schema,
+            "request_head",
+            &ProviderRequestHeadV2 {
+                method: ProviderHttpMethodV2::Post,
+                headers: vec![ProviderHeaderV2 {
+                    name: "X-Test".to_owned(),
+                    value: "value".to_owned(),
+                }],
+                declared_body_bytes: Some(1),
+            },
+        )?;
+        assert_v2_schema_definition(
+            &schema,
+            &v1_schema,
+            "request_chunk",
+            &ProviderRequestChunkV2 {
+                handle,
+                sequence: 0,
+                bytes: vec![1],
+                end: true,
+            },
+        )?;
+        assert_v2_schema_definition(&schema, &v1_schema, "response_head", &response_head)?;
+        for chunk in &chunks {
+            assert_v2_schema_definition(&schema, &v1_schema, "response_chunk", chunk)?;
+        }
+        for terminal in &terminals {
+            assert_v2_schema_definition(&schema, &v1_schema, "terminal", terminal)?;
+        }
+        let frame = ProviderResponseFrameV2 {
+            handle,
+            sequence: 0,
+            event: ProviderResponseFrameEventV2::Head(response_head),
+        };
+        assert_v2_schema_definition(&schema, &v1_schema, "response_frame", &frame)?;
+        assert_v2_schema_definition(
+            &schema,
+            &v1_schema,
+            "wait_request",
+            &ProviderWaitRequestV2 {
+                handle,
+                after_sequence: Some(0),
+                timeout_milliseconds: 1,
+            },
+        )?;
+        for outcome in [
+            ProviderWaitOutcomeV2::Frame(frame),
+            ProviderWaitOutcomeV2::TimedOut,
+            ProviderWaitOutcomeV2::Cancelled,
+        ] {
+            assert_v2_schema_definition(&schema, &v1_schema, "wait_outcome", &outcome)?;
+        }
+        assert_v2_schema_definition(
+            &schema,
+            &v1_schema,
+            "upload_request",
+            &ProviderUploadRequestV2 {
+                handle,
+                port_id: "image".to_owned(),
+                media_type: "image/png".to_owned(),
+                byte_length: 1,
+                content_sha256: "0".repeat(64),
+            },
+        )?;
+        assert_v2_schema_definition(
+            &schema,
+            &v1_schema,
+            "cost_request",
+            &ProviderCostRequestV2 {
+                handle,
+                operation: "generate".to_owned(),
+                currency: "USD".to_owned(),
+                maximum_microunits: 2,
+            },
+        )?;
+        for response in [
+            ProviderCostResponseV2 {
+                accepted: true,
+                approved_microunits: 1,
+                receipt: vec![1],
+            },
+            ProviderCostResponseV2 {
+                accepted: false,
+                approved_microunits: 0,
+                receipt: Vec::new(),
+            },
+        ] {
+            assert_v2_schema_definition(&schema, &v1_schema, "cost_response", &response)?;
+        }
+        assert_v2_schema_definition(
+            &schema,
+            &v1_schema,
+            "progress",
+            &ProviderProgressV2 {
+                handle,
+                sequence: 0,
+                completed: 1,
+                total: 2,
+                message: Some("running".to_owned()),
+            },
+        )?;
+        let type_id = registry.resolve("STRING")?.clone();
+        let encoded = PluginValue::scalar(
+            type_id.clone(),
+            ScalarValue::String("done".to_owned()),
+            &registry,
+        )?;
+        let invocation_result = ProviderInvocationResultV2 {
+            outputs: vec![ProviderMaterializedOutputV2 {
+                port_id: "text".to_owned(),
+                value: ProviderEncodedValueV2 {
+                    type_id,
+                    family: ValueFamily::Scalar,
+                    abi_bytes: encoded.abi_bytes()?,
+                },
+            }],
+            receipt: vec![1],
+        };
+        assert_v2_schema_definition(&schema, &v1_schema, "invocation_result", &invocation_result)?;
+        for error in [
+            ProviderStreamErrorV2::Cancelled,
+            ProviderStreamErrorV2::HostFailure,
+            ProviderStreamErrorV2::InvalidInvocationResult,
+        ] {
+            assert_v2_schema_definition(&schema, &v1_schema, "stream_error", &error)?;
+        }
+        assert_eq!(
+            schema["$defs"]["encoded_value"]["properties"]["abi_bytes"]["maxItems"].as_u64(),
+            Some(MAX_PROVIDER_ENCODED_VALUE_BYTES)
+        );
+        let mut v1_schema_resource = v1_schema;
+        v1_schema_resource["$id"] = serde_json::Value::String(
+            "https://zed.dev/schema/comfy-plugin-manifest-v1.json".to_owned(),
+        );
+        let root_validator = jsonschema::options()
+            .with_resource(
+                "https://zed.dev/schema/comfy-plugin-manifest-v1.json",
+                jsonschema::Resource::from_contents(v1_schema_resource.clone()),
+            )
+            .build(&schema)?;
+        let manifest_value = serde_json::to_value(&manifest)?;
+        let root_errors = root_validator
+            .iter_errors(&manifest_value)
+            .map(|error| error.to_string())
+            .collect::<Vec<_>>();
+        assert!(root_errors.is_empty(), "{root_errors:#?}");
+        let component_schema = serde_json::json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$ref": "#/$defs/component_manifest_projection_v2",
+            "$defs": schema["$defs"].clone(),
+        });
+        let component_validator = jsonschema::options()
+            .with_resource(
+                "https://zed.dev/schema/comfy-plugin-manifest-v1.json",
+                jsonschema::Resource::from_contents(v1_schema_resource),
+            )
+            .build(&component_schema)?;
+        assert!(component_validator.is_valid(&serde_json::to_value(&component_projection)?));
+        let signing_payload = manifest.signing_payload()?;
+        let mut changed = manifest.clone();
+        changed.streaming.maximum_response_body_bytes += 1;
+        assert_ne!(signing_payload, changed.signing_payload()?);
+        let key = PluginSigningKey::new("test-key", b"0123456789abcdef0123456789abcdef")?;
+        assert_eq!(
+            key.sign_provider_manifest_v2(&manifest)?,
+            key.sign_provider_manifest_v2(&manifest)?
+        );
+
+        let mut missing_upload_grant = manifest.clone();
+        missing_upload_grant
+            .manifest
+            .capabilities
+            .retain(|capability| capability.kind != CapabilityKind::ProviderUpload);
+        assert_eq!(
+            missing_upload_grant.validate(&registry),
+            Err(PluginContractError::InvalidProviderStreamingContract)
+        );
+        let mut undersized_upload_grant = manifest.clone();
+        undersized_upload_grant
+            .manifest
+            .capabilities
+            .iter_mut()
+            .find(|capability| capability.kind == CapabilityKind::ProviderUpload)
+            .ok_or("upload capability disappeared")?
+            .quota
+            .maximum_request_bytes = 7;
+        assert_eq!(
+            undersized_upload_grant.validate(&registry),
+            Err(PluginContractError::InvalidProviderStreamingContract)
+        );
+        for (maximum_request_bytes, maximum_response_bytes, maximum_total_bytes) in [
+            (
+                MAX_PROVIDER_COST_REQUEST_BYTES - 1,
+                MAX_PROVIDER_COST_RESPONSE_BYTES,
+                2 * (MAX_PROVIDER_COST_REQUEST_BYTES + MAX_PROVIDER_COST_RESPONSE_BYTES),
+            ),
+            (
+                MAX_PROVIDER_COST_REQUEST_BYTES,
+                MAX_PROVIDER_COST_RESPONSE_BYTES - 1,
+                2 * (MAX_PROVIDER_COST_REQUEST_BYTES + MAX_PROVIDER_COST_RESPONSE_BYTES),
+            ),
+            (
+                MAX_PROVIDER_COST_REQUEST_BYTES,
+                MAX_PROVIDER_COST_RESPONSE_BYTES,
+                2 * (MAX_PROVIDER_COST_REQUEST_BYTES + MAX_PROVIDER_COST_RESPONSE_BYTES) - 1,
+            ),
+        ] {
+            let mut undersized_cost_grant = manifest.clone();
+            let quota = &mut undersized_cost_grant
+                .manifest
+                .capabilities
+                .iter_mut()
+                .find(|capability| capability.kind == CapabilityKind::ProviderCost)
+                .ok_or("cost capability disappeared")?
+                .quota;
+            quota.maximum_request_bytes = maximum_request_bytes;
+            quota.maximum_response_bytes = maximum_response_bytes;
+            quota.maximum_total_bytes = maximum_total_bytes;
+            assert_eq!(
+                undersized_cost_grant.validate(&registry),
+                Err(PluginContractError::InvalidProviderStreamingContract)
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn provider_streaming_v2_is_generation_scoped_ordered_and_bounded() -> Result<(), Box<dyn Error>>
+    {
+        let contract = provider_streaming_contract_fixture();
+        let context = ProviderInvocationContextV2 {
+            invocation: 7,
+            generation: 3,
+        };
+        let handle = ProviderStreamHandleV2 {
+            invocation: 7,
+            slot: 1,
+            generation: 3,
+        };
+        let request = ProviderRequestHeadV2 {
+            method: ProviderHttpMethodV2::Post,
+            headers: vec![
+                ProviderHeaderV2 {
+                    name: "X-Test".to_owned(),
+                    value: "first".to_owned(),
+                },
+                ProviderHeaderV2 {
+                    name: "x-test".to_owned(),
+                    value: "second".to_owned(),
+                },
+            ],
+            declared_body_bytes: Some(4),
+        };
+        let mut validator =
+            ProviderStreamValidatorV2::checked(contract.clone(), context, handle, &request)?;
+        let stale_handle = ProviderStreamHandleV2 {
+            generation: 2,
+            ..handle
+        };
+        assert_eq!(
+            ProviderStreamValidatorV2::checked(contract.clone(), context, stale_handle, &request)
+                .err(),
+            Some(ProviderStreamingContractError::RevokedHandle)
+        );
+        assert_eq!(
+            ProviderStreamValidatorV2::checked(
+                contract.clone(),
+                context,
+                ProviderStreamHandleV2 {
+                    invocation: 8,
+                    ..handle
+                },
+                &request,
+            )
+            .err(),
+            Some(ProviderStreamingContractError::ForeignHandle)
+        );
+        let mut invalid_header = request.clone();
+        invalid_header.headers[0].value = "bad\u{7f}".to_owned();
+        assert_eq!(
+            ProviderStreamValidatorV2::checked(contract.clone(), context, handle, &invalid_header)
+                .err(),
+            Some(ProviderStreamingContractError::InvalidHeaders)
+        );
+        assert_eq!(
+            validator.write_request_chunk(&ProviderRequestChunkV2 {
+                handle,
+                sequence: 0,
+                bytes: Vec::new(),
+                end: false,
+            }),
+            Err(ProviderStreamingContractError::ChunkLimit)
+        );
+        validator.write_request_chunk(&ProviderRequestChunkV2 {
+            handle,
+            sequence: 0,
+            bytes: b"da".to_vec(),
+            end: false,
+        })?;
+        validator.write_request_chunk(&ProviderRequestChunkV2 {
+            handle,
+            sequence: 1,
+            bytes: b"ta".to_vec(),
+            end: true,
+        })?;
+        assert_eq!(validator.request_bytes(), 4);
+
+        let upload_request = ProviderUploadRequestV2 {
+            handle,
+            port_id: "image".to_owned(),
+            media_type: "image/png".to_owned(),
+            byte_length: 4,
+            content_sha256: format!("{:x}", Sha256::digest(b"file")),
+        };
+        let upload_handle = ProviderStreamHandleV2 { slot: 2, ..handle };
+        let mut upload = validator.start_upload(&upload_request, upload_handle)?;
+        assert_eq!(
+            validator.start_upload(&upload_request, upload_handle).err(),
+            Some(ProviderStreamingContractError::ForeignHandle)
+        );
+        upload.write_chunk(&ProviderRequestChunkV2 {
+            handle: upload_handle,
+            sequence: 0,
+            bytes: b"file".to_vec(),
+            end: true,
+        })?;
+        assert!(upload.is_terminal());
+
+        let second_upload_request = ProviderUploadRequestV2 {
+            byte_length: 1,
+            content_sha256: format!("{:x}", Sha256::digest(b"x")),
+            ..upload_request.clone()
+        };
+        let second_upload_handle = ProviderStreamHandleV2 { slot: 3, ..handle };
+        let mut second_upload =
+            validator.start_upload(&second_upload_request, second_upload_handle)?;
+        let over_aggregate_request = ProviderUploadRequestV2 {
+            byte_length: 4,
+            content_sha256: format!("{:x}", Sha256::digest(b"more")),
+            ..upload_request.clone()
+        };
+        assert_eq!(
+            validator
+                .start_upload(
+                    &over_aggregate_request,
+                    ProviderStreamHandleV2 { slot: 4, ..handle },
+                )
+                .err(),
+            Some(ProviderStreamingContractError::InvalidUpload)
+        );
+
+        let cost_request = ProviderCostRequestV2 {
+            handle,
+            operation: "generate.image".to_owned(),
+            currency: "USD".to_owned(),
+            maximum_microunits: 50,
+        };
+        let accepted_cost = ProviderCostResponseV2 {
+            accepted: true,
+            approved_microunits: 40,
+            receipt: b"cost-receipt".to_vec(),
+        };
+        validator.accept_cost_request(&cost_request, &accepted_cost)?;
+        validator.accept_cost_request(
+            &cost_request,
+            &ProviderCostResponseV2 {
+                accepted: false,
+                approved_microunits: 0,
+                receipt: Vec::new(),
+            },
+        )?;
+        assert_eq!(
+            validator.accept_cost_request(&cost_request, &accepted_cost),
+            Err(ProviderStreamingContractError::InvalidCostRequest)
+        );
+        assert_eq!(
+            validator.accept_cost_request(
+                &cost_request,
+                &ProviderCostResponseV2 {
+                    accepted: true,
+                    approved_microunits: 51,
+                    receipt: b"cost-receipt".to_vec(),
+                },
+            ),
+            Err(ProviderStreamingContractError::InvalidCostRequest)
+        );
+
+        validator.accept_progress(&ProviderProgressV2 {
+            handle,
+            sequence: 0,
+            completed: 10,
+            total: 100,
+            message: Some("started".to_owned()),
+        })?;
+        assert_eq!(
+            validator.accept_progress(&ProviderProgressV2 {
+                handle,
+                sequence: 1,
+                completed: 9,
+                total: 100,
+                message: None,
+            }),
+            Err(ProviderStreamingContractError::InvalidProgress)
+        );
+        validator.accept_progress(&ProviderProgressV2 {
+            handle,
+            sequence: 1,
+            completed: 100,
+            total: 100,
+            message: None,
+        })?;
+
+        let first_wait = ProviderWaitRequestV2 {
+            handle,
+            after_sequence: None,
+            timeout_milliseconds: 100,
+        };
+        validator.accept_wait(
+            &first_wait,
+            ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+                handle,
+                sequence: 0,
+                event: ProviderResponseFrameEventV2::Head(ProviderResponseHeadV2 {
+                    status: 200,
+                    headers: Vec::new(),
+                }),
+            }),
+        )?;
+        let second_wait = ProviderWaitRequestV2 {
+            after_sequence: Some(0),
+            ..first_wait.clone()
+        };
+        validator.accept_wait(
+            &second_wait,
+            ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+                handle,
+                sequence: 1,
+                event: ProviderResponseFrameEventV2::Chunk(ProviderResponseChunkV2::NdjsonLine(
+                    "{\"ok\":true}".to_owned(),
+                )),
+            }),
+        )?;
+        let terminal_wait = ProviderWaitRequestV2 {
+            after_sequence: Some(1),
+            ..first_wait.clone()
+        };
+        let completed_frame = ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+            handle,
+            sequence: 2,
+            event: ProviderResponseFrameEventV2::Terminal(ProviderStreamTerminalV2::Completed {
+                receipt: b"result-receipt".to_vec(),
+            }),
+        });
+        assert_eq!(
+            validator.accept_wait(&terminal_wait, completed_frame.clone()),
+            Err(ProviderStreamingContractError::InvalidTerminal)
+        );
+        second_upload.write_chunk(&ProviderRequestChunkV2 {
+            handle: second_upload_handle,
+            sequence: 0,
+            bytes: b"x".to_vec(),
+            end: true,
+        })?;
+        validator.accept_wait(&terminal_wait, completed_frame)?;
+        assert!(validator.is_terminal());
+        assert_eq!(validator.response_bytes(), 11);
+        assert_eq!(
+            upload.write_chunk(&ProviderRequestChunkV2 {
+                handle: upload_handle,
+                sequence: 1,
+                bytes: Vec::new(),
+                end: true,
+            }),
+            Err(ProviderStreamingContractError::RevokedHandle)
+        );
+
+        let mut informational = ProviderStreamValidatorV2::checked(
+            contract.clone(),
+            context,
+            handle,
+            &ProviderRequestHeadV2 {
+                declared_body_bytes: Some(0),
+                ..request.clone()
+            },
+        )?;
+        informational.write_request_chunk(&ProviderRequestChunkV2 {
+            handle,
+            sequence: 0,
+            bytes: Vec::new(),
+            end: true,
+        })?;
+        assert_eq!(
+            informational.accept_wait(
+                &first_wait,
+                ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+                    handle,
+                    sequence: 0,
+                    event: ProviderResponseFrameEventV2::Head(ProviderResponseHeadV2 {
+                        status: 103,
+                        headers: Vec::new(),
+                    }),
+                }),
+            ),
+            Err(ProviderStreamingContractError::InvalidOrder)
+        );
+
+        let mut cancelled =
+            ProviderStreamValidatorV2::checked(contract, context, handle, &request)?;
+        let mut cancelled_upload = cancelled.start_upload(&upload_request, upload_handle)?;
+        cancelled.accept_wait(&first_wait, ProviderWaitOutcomeV2::Cancelled)?;
+        assert_eq!(
+            cancelled_upload.write_chunk(&ProviderRequestChunkV2 {
+                handle: upload_handle,
+                sequence: 0,
+                bytes: b"file".to_vec(),
+                end: true,
+            }),
+            Err(ProviderStreamingContractError::RevokedHandle)
+        );
+
+        let mut unknown_chunk = serde_json::to_value(ProviderRequestChunkV2 {
+            handle,
+            sequence: 0,
+            bytes: b"data".to_vec(),
+            end: true,
+        })?;
+        unknown_chunk
+            .as_object_mut()
+            .ok_or("request chunk was not an object")?
+            .insert("ignored".to_owned(), serde_json::Value::Bool(true));
+        assert!(serde_json::from_value::<ProviderRequestChunkV2>(unknown_chunk).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn provider_streaming_v2_rejects_every_bounded_lifecycle_drift() -> Result<(), Box<dyn Error>> {
+        let context = ProviderInvocationContextV2 {
+            invocation: 11,
+            generation: 5,
+        };
+        let handle = ProviderStreamHandleV2 {
+            invocation: 11,
+            slot: 1,
+            generation: 5,
+        };
+        let methods = vec![
+            ProviderHttpMethodV2::Delete,
+            ProviderHttpMethodV2::Get,
+            ProviderHttpMethodV2::Head,
+            ProviderHttpMethodV2::Options,
+            ProviderHttpMethodV2::Patch,
+            ProviderHttpMethodV2::Post,
+            ProviderHttpMethodV2::Put,
+        ];
+        let mut all_methods = provider_streaming_contract_fixture();
+        all_methods.methods = methods.clone();
+        all_methods.validate()?;
+        for method in methods {
+            let declared_body_bytes = (method == ProviderHttpMethodV2::Head).then_some(0);
+            ProviderStreamValidatorV2::checked(
+                all_methods.clone(),
+                context,
+                handle,
+                &ProviderRequestHeadV2 {
+                    method,
+                    headers: Vec::new(),
+                    declared_body_bytes,
+                },
+            )?;
+        }
+        let mut unordered_methods = all_methods.clone();
+        unordered_methods.methods.swap(0, 1);
+        assert_eq!(
+            unordered_methods.validate(),
+            Err(ProviderStreamingContractError::InvalidContract)
+        );
+
+        let contract = provider_streaming_contract_fixture();
+        let request = ProviderRequestHeadV2 {
+            method: ProviderHttpMethodV2::Post,
+            headers: Vec::new(),
+            declared_body_bytes: Some(3),
+        };
+        let mut body_validator =
+            ProviderStreamValidatorV2::checked(contract.clone(), context, handle, &request)?;
+        assert_eq!(
+            body_validator.write_request_chunk(&ProviderRequestChunkV2 {
+                handle,
+                sequence: 0,
+                bytes: b"four".to_vec(),
+                end: true,
+            }),
+            Err(ProviderStreamingContractError::BodyLimit)
+        );
+        assert_eq!(
+            body_validator.write_request_chunk(&ProviderRequestChunkV2 {
+                handle,
+                sequence: 0,
+                bytes: vec![0; 17],
+                end: false,
+            }),
+            Err(ProviderStreamingContractError::ChunkLimit)
+        );
+        let head_with_body = ProviderRequestHeadV2 {
+            method: ProviderHttpMethodV2::Head,
+            headers: Vec::new(),
+            declared_body_bytes: Some(1),
+        };
+        assert_eq!(
+            ProviderStreamValidatorV2::checked(all_methods, context, handle, &head_with_body,)
+                .err(),
+            Some(ProviderStreamingContractError::BodyLimit)
+        );
+
+        let open_request = ProviderRequestHeadV2 {
+            method: ProviderHttpMethodV2::Post,
+            headers: Vec::new(),
+            declared_body_bytes: None,
+        };
+        let mut waiting =
+            ProviderStreamValidatorV2::checked(contract.clone(), context, handle, &open_request)?;
+        assert_eq!(
+            waiting.accept_wait(
+                &ProviderWaitRequestV2 {
+                    handle,
+                    after_sequence: Some(0),
+                    timeout_milliseconds: 1,
+                },
+                ProviderWaitOutcomeV2::TimedOut,
+            ),
+            Err(ProviderStreamingContractError::InvalidSequence)
+        );
+        assert_eq!(
+            waiting.accept_wait(
+                &ProviderWaitRequestV2 {
+                    handle,
+                    after_sequence: None,
+                    timeout_milliseconds: 0,
+                },
+                ProviderWaitOutcomeV2::TimedOut,
+            ),
+            Err(ProviderStreamingContractError::WaitLimit)
+        );
+        assert_eq!(
+            waiting.accept_wait(
+                &ProviderWaitRequestV2 {
+                    handle: ProviderStreamHandleV2 {
+                        generation: 4,
+                        ..handle
+                    },
+                    after_sequence: None,
+                    timeout_milliseconds: 1,
+                },
+                ProviderWaitOutcomeV2::TimedOut,
+            ),
+            Err(ProviderStreamingContractError::RevokedHandle)
+        );
+        assert_eq!(
+            waiting.accept_wait(
+                &ProviderWaitRequestV2 {
+                    handle: ProviderStreamHandleV2 { slot: 9, ..handle },
+                    after_sequence: None,
+                    timeout_milliseconds: 1,
+                },
+                ProviderWaitOutcomeV2::TimedOut,
+            ),
+            Err(ProviderStreamingContractError::ForeignHandle)
+        );
+        waiting.accept_wait(
+            &ProviderWaitRequestV2 {
+                handle,
+                after_sequence: None,
+                timeout_milliseconds: 1,
+            },
+            ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+                handle,
+                sequence: 0,
+                event: ProviderResponseFrameEventV2::Terminal(ProviderStreamTerminalV2::Failed {
+                    code: "provider.failed".to_owned(),
+                    message: "failed before a response".to_owned(),
+                }),
+            }),
+        )?;
+        assert_eq!(
+            waiting.accept_progress(&ProviderProgressV2 {
+                handle,
+                sequence: 0,
+                completed: 0,
+                total: 1,
+                message: None,
+            }),
+            Err(ProviderStreamingContractError::RevokedHandle)
+        );
+
+        let ready_response =
+            |method: ProviderHttpMethodV2,
+             status: u16,
+             response_limit: u64|
+             -> Result<ProviderStreamValidatorV2, ProviderStreamingContractError> {
+                let mut contract = provider_streaming_contract_fixture();
+                contract.methods = vec![method];
+                contract.maximum_response_body_bytes = response_limit;
+                let mut validator = ProviderStreamValidatorV2::checked(
+                    contract,
+                    context,
+                    handle,
+                    &ProviderRequestHeadV2 {
+                        method,
+                        headers: Vec::new(),
+                        declared_body_bytes: Some(0),
+                    },
+                )?;
+                validator.write_request_chunk(&ProviderRequestChunkV2 {
+                    handle,
+                    sequence: 0,
+                    bytes: Vec::new(),
+                    end: true,
+                })?;
+                validator.accept_wait(
+                    &ProviderWaitRequestV2 {
+                        handle,
+                        after_sequence: None,
+                        timeout_milliseconds: 1,
+                    },
+                    ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+                        handle,
+                        sequence: 0,
+                        event: ProviderResponseFrameEventV2::Head(ProviderResponseHeadV2 {
+                            status,
+                            headers: Vec::new(),
+                        }),
+                    }),
+                )?;
+                Ok(validator)
+            };
+        let chunk_wait = ProviderWaitRequestV2 {
+            handle,
+            after_sequence: Some(0),
+            timeout_milliseconds: 1,
+        };
+        for (method, status) in [
+            (ProviderHttpMethodV2::Head, 200),
+            (ProviderHttpMethodV2::Post, 204),
+            (ProviderHttpMethodV2::Post, 205),
+            (ProviderHttpMethodV2::Post, 304),
+        ] {
+            let mut no_body = ready_response(method, status, 64)?;
+            assert_eq!(
+                no_body.accept_wait(
+                    &chunk_wait,
+                    ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+                        handle,
+                        sequence: 1,
+                        event: ProviderResponseFrameEventV2::Chunk(
+                            ProviderResponseChunkV2::Binary(vec![1]),
+                        ),
+                    }),
+                ),
+                Err(ProviderStreamingContractError::InvalidOrder)
+            );
+        }
+        let mut invalid_ndjson = ready_response(ProviderHttpMethodV2::Post, 200, 64)?;
+        assert_eq!(
+            invalid_ndjson.accept_wait(
+                &chunk_wait,
+                ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+                    handle,
+                    sequence: 1,
+                    event: ProviderResponseFrameEventV2::Chunk(
+                        ProviderResponseChunkV2::NdjsonLine("not-json".to_owned()),
+                    ),
+                }),
+            ),
+            Err(ProviderStreamingContractError::InvalidNdjsonLine)
+        );
+        let mut response_overflow = ready_response(ProviderHttpMethodV2::Post, 200, 8)?;
+        assert_eq!(
+            response_overflow.accept_wait(
+                &chunk_wait,
+                ProviderWaitOutcomeV2::Frame(ProviderResponseFrameV2 {
+                    handle,
+                    sequence: 1,
+                    event: ProviderResponseFrameEventV2::Chunk(ProviderResponseChunkV2::Binary(
+                        vec![0; 9]
+                    ),),
+                }),
+            ),
+            Err(ProviderStreamingContractError::BodyLimit)
+        );
+
+        let upload_request = ProviderUploadRequestV2 {
+            handle,
+            port_id: "image".to_owned(),
+            media_type: "image/png".to_owned(),
+            byte_length: 4,
+            content_sha256: format!("{:x}", Sha256::digest(b"file")),
+        };
+        let mut upload_parent =
+            ProviderStreamValidatorV2::checked(contract.clone(), context, handle, &open_request)?;
+        assert_eq!(
+            upload_parent
+                .start_upload(
+                    &upload_request,
+                    ProviderStreamHandleV2 {
+                        slot: 2,
+                        generation: 4,
+                        ..handle
+                    },
+                )
+                .err(),
+            Some(ProviderStreamingContractError::RevokedHandle)
+        );
+        assert_eq!(
+            upload_parent
+                .start_upload(
+                    &upload_request,
+                    ProviderStreamHandleV2 {
+                        invocation: 12,
+                        slot: 2,
+                        ..handle
+                    },
+                )
+                .err(),
+            Some(ProviderStreamingContractError::ForeignHandle)
+        );
+        let upload_handle = ProviderStreamHandleV2 { slot: 2, ..handle };
+        let mut bad_digest = upload_parent.start_upload(&upload_request, upload_handle)?;
+        assert_eq!(
+            bad_digest.write_chunk(&ProviderRequestChunkV2 {
+                handle: upload_handle,
+                sequence: 0,
+                bytes: b"fail".to_vec(),
+                end: true,
+            }),
+            Err(ProviderStreamingContractError::InvalidUpload)
+        );
+        assert!(!bad_digest.is_terminal());
+        assert_eq!(
+            bad_digest.write_chunk(&ProviderRequestChunkV2 {
+                handle: ProviderStreamHandleV2 {
+                    generation: 4,
+                    ..upload_handle
+                },
+                sequence: 0,
+                bytes: b"file".to_vec(),
+                end: true,
+            }),
+            Err(ProviderStreamingContractError::RevokedHandle)
+        );
+
+        let mut aggregate_contract = contract.clone();
+        aggregate_contract.maximum_uploads = 3;
+        aggregate_contract.maximum_upload_body_bytes = 5;
+        let mut aggregate_uploads =
+            ProviderStreamValidatorV2::checked(aggregate_contract, context, handle, &open_request)?;
+        aggregate_uploads.start_upload(&upload_request, upload_handle)?;
+        assert_eq!(
+            aggregate_uploads
+                .start_upload(
+                    &ProviderUploadRequestV2 {
+                        byte_length: 2,
+                        content_sha256: format!("{:x}", Sha256::digest(b"ok")),
+                        ..upload_request.clone()
+                    },
+                    ProviderStreamHandleV2 { slot: 3, ..handle },
+                )
+                .err(),
+            Some(ProviderStreamingContractError::InvalidUpload)
+        );
+
+        let mut costs =
+            ProviderStreamValidatorV2::checked(contract.clone(), context, handle, &open_request)?;
+        let valid_cost_response = ProviderCostResponseV2 {
+            accepted: true,
+            approved_microunits: 1,
+            receipt: b"receipt".to_vec(),
+        };
+        for invalid_request in [
+            ProviderCostRequestV2 {
+                handle,
+                operation: "generate".to_owned(),
+                currency: "usd".to_owned(),
+                maximum_microunits: 2,
+            },
+            ProviderCostRequestV2 {
+                handle,
+                operation: "generate".to_owned(),
+                currency: "USD".to_owned(),
+                maximum_microunits: 0,
+            },
+        ] {
+            assert_eq!(
+                costs.accept_cost_request(&invalid_request, &valid_cost_response),
+                Err(ProviderStreamingContractError::InvalidCostRequest)
+            );
+        }
+        assert_eq!(
+            costs.accept_cost_request(
+                &ProviderCostRequestV2 {
+                    handle,
+                    operation: "generate".to_owned(),
+                    currency: "USD".to_owned(),
+                    maximum_microunits: 2,
+                },
+                &ProviderCostResponseV2 {
+                    accepted: true,
+                    approved_microunits: 1,
+                    receipt: vec![0; MAX_PROVIDER_RESULT_RECEIPT_BYTES + 1],
+                },
+            ),
+            Err(ProviderStreamingContractError::InvalidCostRequest)
+        );
+
+        let mut progress =
+            ProviderStreamValidatorV2::checked(contract, context, handle, &open_request)?;
+        for invalid_progress in [
+            ProviderProgressV2 {
+                handle,
+                sequence: 1,
+                completed: 0,
+                total: 1,
+                message: None,
+            },
+            ProviderProgressV2 {
+                handle,
+                sequence: 0,
+                completed: 0,
+                total: 101,
+                message: None,
+            },
+            ProviderProgressV2 {
+                handle,
+                sequence: 0,
+                completed: 0,
+                total: 1,
+                message: Some("x".repeat(MAX_PROVIDER_STREAM_PROGRESS_MESSAGE_BYTES + 1)),
+            },
+        ] {
+            assert_eq!(
+                progress.accept_progress(&invalid_progress),
+                Err(ProviderStreamingContractError::InvalidProgress)
+            );
+        }
+
+        let nested_unknown = serde_json::json!({
+            "kind": "head",
+            "value": {"status": 200, "headers": [], "ignored": true}
+        });
+        assert!(serde_json::from_value::<ProviderResponseFrameEventV2>(nested_unknown).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn provider_streaming_v2_materializes_only_canonical_typed_results()
+    -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        let type_id = registry.resolve("STRING")?.clone();
+        let value = PluginValue::scalar(
+            type_id.clone(),
+            ScalarValue::String("done".to_owned()),
+            &registry,
+        )?;
+        let result = ProviderInvocationResultV2 {
+            outputs: vec![ProviderMaterializedOutputV2 {
+                port_id: "text".to_owned(),
+                value: ProviderEncodedValueV2 {
+                    type_id,
+                    family: ValueFamily::Scalar,
+                    abi_bytes: value.abi_bytes()?,
+                },
+            }],
+            receipt: b"sealed-result".to_vec(),
+        };
+        result.validate(&registry)?;
+
+        let mut malformed = result.clone();
+        malformed.outputs[0].value.abi_bytes = b"../secret/native-handle".to_vec();
+        assert_eq!(
+            malformed.validate(&registry),
+            Err(ProviderStreamingContractError::InvalidInvocationResult)
+        );
+        let mut mismatched = result.clone();
+        mismatched.outputs[0].value.type_id = registry.resolve("FLOAT")?.clone();
+        assert_eq!(
+            mismatched.validate(&registry),
+            Err(ProviderStreamingContractError::InvalidInvocationResult)
+        );
+        let mut duplicate = result;
+        duplicate.outputs.push(duplicate.outputs[0].clone());
+        assert_eq!(
+            duplicate.validate(&registry),
+            Err(ProviderStreamingContractError::InvalidInvocationResult)
+        );
+
+        let internal_errors = [
+            ProviderStreamingContractError::InvalidContract,
+            ProviderStreamingContractError::InvalidHandle,
+            ProviderStreamingContractError::ForeignHandle,
+            ProviderStreamingContractError::RevokedHandle,
+            ProviderStreamingContractError::InvalidMethod,
+            ProviderStreamingContractError::InvalidHeaders,
+            ProviderStreamingContractError::BodyLimit,
+            ProviderStreamingContractError::ChunkLimit,
+            ProviderStreamingContractError::InvalidNdjsonLine,
+            ProviderStreamingContractError::InvalidSequence,
+            ProviderStreamingContractError::InvalidOrder,
+            ProviderStreamingContractError::WaitLimit,
+            ProviderStreamingContractError::InvalidUpload,
+            ProviderStreamingContractError::InvalidCostRequest,
+            ProviderStreamingContractError::InvalidProgress,
+            ProviderStreamingContractError::InvalidTerminal,
+            ProviderStreamingContractError::InvalidInvocationResult,
+        ];
+        let wire_errors = internal_errors
+            .iter()
+            .map(ProviderStreamErrorV2::from)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(wire_errors.len(), internal_errors.len());
+        Ok(())
     }
 
     #[test]
