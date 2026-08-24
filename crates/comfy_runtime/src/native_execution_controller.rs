@@ -60,9 +60,10 @@ use comfy_nodes::{
     NativeStoredModelPayload, NativeStoredPayload, NativeTextGenerationService,
     NativeTextGenerationServiceError, NativeTextGenerationServiceOutput, NativeTypeUnion,
     NativeValue, NativeValueType, NativeWebmEncodeService, NodeDescriptor, NodeRegistry,
-    PortDescriptor, generated_family_node_bindings, native_diffusion_descriptors,
-    native_image_descriptors, native_source_type_projection, native_text_generation_transaction,
-    native_value_type_for_output_schema, native_value_types_for_input_schema,
+    PortDescriptor, authoritative_provider_namespace, generated_family_node_bindings,
+    native_diffusion_descriptors, native_image_descriptors, native_source_type_projection,
+    native_text_generation_transaction, native_value_type_for_output_schema,
+    native_value_types_for_input_schema, project_authoritative_provider_bindings,
 };
 use comfy_nodes::{
     NativeEffectServiceError, NativeImagePreviewError, NativeNodeServiceIdentity,
@@ -1741,7 +1742,9 @@ pub fn prewarm_native_shader_executor() {
 fn register_generated_family_bindings(
     registry: &mut NativeNodeRegistry,
 ) -> Result<(), NativeImageRuntimeError> {
-    let family_bindings = generated_family_node_bindings()?;
+    let mut family_bindings = generated_family_node_bindings()?;
+    project_authoritative_provider_bindings(&mut family_bindings)
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     let family_class_types = family_bindings
         .iter()
         .map(|binding| binding.descriptor().class_type.clone())
@@ -1767,7 +1770,7 @@ fn generated_provider_required_bindings() -> Result<Vec<NativeNodeBinding>, Nati
     PROVIDER_BINDINGS
         .get_or_init(|| {
             let catalog = NodeRegistry::built_in().map_err(|error| error.to_string())?;
-            catalog
+            let mut bindings = catalog
                 .registered()
                 .values()
                 .filter(|descriptor| {
@@ -1777,7 +1780,10 @@ fn generated_provider_required_bindings() -> Result<Vec<NativeNodeBinding>, Nati
                     provider_required_binding(&catalog, descriptor)
                         .map_err(|error| error.to_string())
                 })
-                .collect()
+                .collect::<Result<Vec<_>, _>>()?;
+            project_authoritative_provider_bindings(&mut bindings)
+                .map_err(|error| error.to_string())?;
+            Ok(bindings)
         })
         .clone()
         .map_err(NativeImageRuntimeError::Registry)
@@ -1883,10 +1889,12 @@ fn provider_required_binding(
     let execution_schema = source_schema
         .bind_execution_ports(&input_names, &source_schema.dynamic_inputs, &output_names)
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
-    let provider_namespace = format!(
-        "zed.comfy.provider.{}",
-        catalog_descriptor.feature_id.to_ascii_lowercase()
-    );
+    let provider_namespace = authoritative_provider_namespace(
+        &catalog_descriptor.feature_id,
+        &catalog_descriptor.node_identifier,
+    )
+    .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?
+    .to_owned();
     Ok(NativeNodeBinding::ProviderRequired {
         feature_id: catalog_descriptor.feature_id.clone(),
         descriptor: RuntimeNodeDescriptor {
@@ -9142,24 +9150,37 @@ mod tests {
         let bindings = generated_family_node_bindings()?;
         let registry = generated_native_node_registry_projection(None)?;
         registry.validate_comprehensive_bindings()?;
-        let provider_required = NodeRegistry::built_in()?
+        let catalog = NodeRegistry::built_in()?;
+        let provider_descriptors = catalog
             .registered()
             .values()
             .filter(|descriptor| descriptor.catalog_status == CatalogNodeStatus::ProviderRequired)
-            .count();
-        assert_eq!(provider_required, 224);
-        assert_eq!(
-            NodeRegistry::built_in()?
-                .registered()
-                .values()
-                .filter(|descriptor| {
-                    descriptor.catalog_status == CatalogNodeStatus::ProviderRequired
-                        && registry.binding_declared_disposition(&descriptor.node_identifier)
-                            == Some(NativeNodeBindingDisposition::ProviderRequired)
-                })
-                .count(),
-            provider_required
-        );
+            .collect::<Vec<_>>();
+        assert_eq!(provider_descriptors.len(), 224);
+        let mut provider_namespaces = BTreeSet::new();
+        for descriptor in &provider_descriptors {
+            assert_eq!(
+                registry.binding_declared_disposition(&descriptor.node_identifier),
+                Some(NativeNodeBindingDisposition::ProviderRequired)
+            );
+            assert_eq!(
+                registry.provider_binding_is_activated(&descriptor.node_identifier),
+                Some(false)
+            );
+            assert!(registry.node(&descriptor.node_identifier).is_none());
+            let expected_namespace = authoritative_provider_namespace(
+                &descriptor.feature_id,
+                &descriptor.node_identifier,
+            )?;
+            assert_eq!(
+                registry.binding_implementation_namespace(&descriptor.node_identifier),
+                Some(expected_namespace)
+            );
+            assert_ne!(expected_namespace, "comfy-api");
+            assert!(!expected_namespace.contains("comfy-node-"));
+            provider_namespaces.insert(expected_namespace);
+        }
+        assert_eq!(provider_namespaces.len(), 33);
         let paid = registry
             .descriptor("ElevenLabsAudioIsolation")
             .and_then(|descriptor| descriptor.source_schema.as_ref())
@@ -9168,7 +9189,7 @@ mod tests {
         paid.validate()?;
         assert_eq!(
             registry.binding_implementation_namespace("ElevenLabsAudioIsolation"),
-            Some("zed.comfy.provider.comfy-node-0141")
+            Some("zed.comfy.provider.elevenlabs")
         );
         for class_type in [
             "LoadImage",
@@ -9258,6 +9279,311 @@ mod tests {
                 .ok_or("union input was absent from frontend projection")?;
             assert!(frontend_input.type_name.contains('|'));
             assert_eq!(frontend_descriptor.outputs.len(), descriptor.outputs.len());
+        }
+        Ok(())
+    }
+
+    #[derive(Clone)]
+    struct CatalogProviderTestNode {
+        class_type: String,
+        implementation_version: String,
+        implementation_namespace: String,
+    }
+
+    impl NativeNode for CatalogProviderTestNode {
+        fn class_type(&self) -> &str {
+            &self.class_type
+        }
+
+        fn implementation_version(&self) -> &str {
+            &self.implementation_version
+        }
+
+        fn implementation_namespace(&self) -> &str {
+            &self.implementation_namespace
+        }
+
+        fn execute<'a>(
+            &'a self,
+            _context: comfy_nodes::NativeNodeContext,
+            _inputs: BTreeMap<String, NativeValue>,
+        ) -> BoxFuture<'a, Result<comfy_nodes::NativeNodeOutcome, comfy_nodes::NativeNodeFailure>>
+        {
+            Box::pin(async {
+                Err(comfy_nodes::NativeNodeFailure {
+                    code: "provider_test_not_invoked".to_owned(),
+                    message: "provider activation fixture is not executable".to_owned(),
+                    kind: comfy_nodes::NativeNodeFailureKind::Failure,
+                    retryable: false,
+                })
+            })
+        }
+    }
+
+    #[test]
+    fn catalog_provider_activation_is_complete_per_authoritative_namespace_and_atomic()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            NativeNodeRegistryError, NativeProviderBindingActivation,
+            NativeProviderBindingActivationSet,
+        };
+        use comfy_plugin_sdk::{ProviderBindingClaim, ProviderBindingSet};
+
+        let namespace = "zed.comfy.provider.beeble";
+        let projection = comfy_nodes::authoritative_provider_namespace_projection()?;
+        let members = projection
+            .namespace_members(namespace)
+            .ok_or("Beeble namespace is absent")?;
+        assert_eq!(members.len(), 2);
+        let mut registry = NativeNodeRegistry::default();
+        registry.register_native_bindings(generated_provider_required_bindings()?)?;
+        let catalog = NodeRegistry::built_in()?;
+        let provider_descriptors = catalog
+            .registered()
+            .values()
+            .filter(|descriptor| descriptor.catalog_status == CatalogNodeStatus::ProviderRequired)
+            .collect::<Vec<_>>();
+        assert_eq!(provider_descriptors.len(), 224);
+        let mut provider_namespaces = BTreeSet::new();
+        for descriptor in provider_descriptors {
+            let expected_namespace = authoritative_provider_namespace(
+                &descriptor.feature_id,
+                &descriptor.node_identifier,
+            )?;
+            assert_eq!(
+                registry.binding_declared_disposition(&descriptor.node_identifier),
+                Some(NativeNodeBindingDisposition::ProviderRequired)
+            );
+            assert_eq!(
+                registry.provider_binding_is_activated(&descriptor.node_identifier),
+                Some(false)
+            );
+            assert!(registry.node(&descriptor.node_identifier).is_none());
+            assert_eq!(
+                registry.binding_implementation_namespace(&descriptor.node_identifier),
+                Some(expected_namespace)
+            );
+            assert_ne!(expected_namespace, "comfy-api");
+            assert!(!expected_namespace.contains("comfy-node-"));
+            provider_namespaces.insert(expected_namespace);
+        }
+        assert_eq!(provider_namespaces.len(), 33);
+        let transport_schema: comfy_plugin_sdk::CanonicalTypeId =
+            "zed:comfy-provider-transport@1".parse()?;
+        let materializer_schema: comfy_plugin_sdk::CanonicalTypeId =
+            "zed:comfy-provider-materializer@1".parse()?;
+        let mut claims = Vec::new();
+        let mut activations = Vec::new();
+        for class_type in members {
+            let descriptor = registry
+                .descriptor(class_type)
+                .ok_or("provider descriptor is absent")?;
+            let feature_id = projection
+                .contract_for_node(class_type)
+                .ok_or("provider contract is absent")?
+                .feature_id()
+                .to_owned();
+            let claim = ProviderBindingClaim {
+                feature_id,
+                node_id: class_type.clone(),
+                contract_sha256: registry
+                    .provider_binding_contract_sha256(
+                        class_type,
+                        &transport_schema.to_string(),
+                        &materializer_schema.to_string(),
+                    )?
+                    .ok_or("provider contract digest is absent")?,
+                transport_schema: transport_schema.clone(),
+                materializer_schema: materializer_schema.clone(),
+            };
+            let node: Arc<dyn NativeNode> = Arc::new(CatalogProviderTestNode {
+                class_type: class_type.clone(),
+                implementation_version: descriptor.implementation_version.clone(),
+                implementation_namespace: namespace.to_owned(),
+            });
+            claims.push(claim.clone());
+            activations.push(NativeProviderBindingActivation::new(claim, node));
+        }
+        claims.sort_by(|left, right| left.node_id.cmp(&right.node_id));
+
+        let activation_set =
+            |implementation_namespace: &str,
+             claims: Vec<ProviderBindingClaim>,
+             bindings: Vec<NativeProviderBindingActivation>|
+             -> Result<NativeProviderBindingActivationSet, Box<dyn std::error::Error>> {
+                let mut binding_set = ProviderBindingSet {
+                    schema_version: comfy_plugin_sdk::PROVIDER_BINDING_SCHEMA_VERSION,
+                    implementation_namespace: implementation_namespace.to_owned(),
+                    bindings_sha256: "0".repeat(64),
+                    bindings: claims,
+                };
+                binding_set.bindings_sha256 = binding_set.canonical_bindings_sha256()?;
+                Ok(NativeProviderBindingActivationSet::checked(
+                    "task-408-profile",
+                    1,
+                    "1".repeat(64),
+                    "2".repeat(64),
+                    "3".repeat(64),
+                    binding_set,
+                    bindings,
+                )?)
+            };
+        let assert_inactive = |registry: &NativeNodeRegistry| {
+            for class_type in members {
+                assert_eq!(
+                    registry.provider_binding_is_activated(class_type),
+                    Some(false)
+                );
+                assert!(registry.node(class_type).is_none());
+                assert_eq!(
+                    registry.binding_declared_disposition(class_type),
+                    Some(NativeNodeBindingDisposition::ProviderRequired)
+                );
+            }
+        };
+
+        let incomplete = activation_set(
+            namespace,
+            vec![claims[0].clone()],
+            vec![activations[0].clone()],
+        )?;
+        assert!(matches!(
+            registry.activate_provider_binding_set(incomplete),
+            Err(NativeNodeRegistryError::IncompleteProviderActivation(value)) if value == namespace
+        ));
+        assert_inactive(&registry);
+
+        let duplicate = activation_set(
+            namespace,
+            claims.clone(),
+            vec![activations[0].clone(), activations[0].clone()],
+        )?;
+        assert!(matches!(
+            registry.activate_provider_binding_set(duplicate),
+            Err(NativeNodeRegistryError::DuplicateBinding(_))
+        ));
+        assert_inactive(&registry);
+
+        let mixed_contract = projection
+            .contract_for_feature_id("COMFY-NODE-0056")
+            .ok_or("Anthropic provider contract is absent")?;
+        let mixed_descriptor = registry
+            .descriptor(mixed_contract.node_identifier())
+            .ok_or("Anthropic provider descriptor is absent")?;
+        let mixed_claim = ProviderBindingClaim {
+            feature_id: mixed_contract.feature_id().to_owned(),
+            node_id: mixed_contract.node_identifier().to_owned(),
+            contract_sha256: registry
+                .provider_binding_contract_sha256(
+                    mixed_contract.node_identifier(),
+                    &transport_schema.to_string(),
+                    &materializer_schema.to_string(),
+                )?
+                .ok_or("Anthropic provider contract digest is absent")?,
+            transport_schema,
+            materializer_schema,
+        };
+        let mixed_node: Arc<dyn NativeNode> = Arc::new(CatalogProviderTestNode {
+            class_type: mixed_contract.node_identifier().to_owned(),
+            implementation_version: mixed_descriptor.implementation_version.clone(),
+            implementation_namespace: mixed_contract.implementation_namespace().to_owned(),
+        });
+        let mixed = activation_set(
+            namespace,
+            vec![claims[0].clone(), mixed_claim.clone()],
+            vec![
+                activations[0].clone(),
+                NativeProviderBindingActivation::new(mixed_claim, mixed_node),
+            ],
+        )?;
+        assert!(matches!(
+            registry.activate_provider_binding_set(mixed),
+            Err(NativeNodeRegistryError::IncompleteProviderActivation(value)) if value == namespace
+        ));
+        assert_inactive(&registry);
+
+        for invalid_namespace in [
+            "zed.comfy.provider.byteplus",
+            "zed.comfy.provider.comfy-node-0020",
+        ] {
+            let invalid = activation_set(invalid_namespace, claims.clone(), activations.clone())?;
+            assert!(matches!(
+                registry.activate_provider_binding_set(invalid),
+                Err(NativeNodeRegistryError::IncompleteProviderActivation(value))
+                    if value == invalid_namespace
+            ));
+            assert_inactive(&registry);
+        }
+
+        let mut stale_claims = claims.clone();
+        stale_claims[0].feature_id = "COMFY-NODE-0056".to_owned();
+        let stale_node: Arc<dyn NativeNode> = Arc::new(CatalogProviderTestNode {
+            class_type: stale_claims[0].node_id.clone(),
+            implementation_version: registry
+                .descriptor(&stale_claims[0].node_id)
+                .ok_or("provider descriptor is absent")?
+                .implementation_version
+                .clone(),
+            implementation_namespace: namespace.to_owned(),
+        });
+        let mut stale_activations = activations.clone();
+        stale_activations[0] =
+            NativeProviderBindingActivation::new(stale_claims[0].clone(), stale_node);
+        let stale = activation_set(namespace, stale_claims, stale_activations)?;
+        assert!(matches!(
+            registry.activate_provider_binding_set(stale),
+            Err(NativeNodeRegistryError::BindingMismatch(_))
+        ));
+        assert_inactive(&registry);
+
+        let mut forged_claims = claims.clone();
+        forged_claims[0].contract_sha256 = "9".repeat(64);
+        let forged_node: Arc<dyn NativeNode> = Arc::new(CatalogProviderTestNode {
+            class_type: forged_claims[0].node_id.clone(),
+            implementation_version: registry
+                .descriptor(&forged_claims[0].node_id)
+                .ok_or("provider descriptor is absent")?
+                .implementation_version
+                .clone(),
+            implementation_namespace: namespace.to_owned(),
+        });
+        let mut forged_activations = activations.clone();
+        forged_activations[0] =
+            NativeProviderBindingActivation::new(forged_claims[0].clone(), forged_node);
+        let forged = activation_set(namespace, forged_claims, forged_activations)?;
+        assert!(matches!(
+            registry.activate_provider_binding_set(forged),
+            Err(NativeNodeRegistryError::BindingMismatch(_))
+        ));
+        assert_inactive(&registry);
+
+        let mut mismatched_activations = activations.clone();
+        let mismatched_node: Arc<dyn NativeNode> = Arc::new(CatalogProviderTestNode {
+            class_type: claims[0].node_id.clone(),
+            implementation_version: registry
+                .descriptor(&claims[0].node_id)
+                .ok_or("provider descriptor is absent")?
+                .implementation_version
+                .clone(),
+            implementation_namespace: "zed.comfy.provider.openai".to_owned(),
+        });
+        mismatched_activations[0] =
+            NativeProviderBindingActivation::new(claims[0].clone(), mismatched_node);
+        let mismatched = activation_set(namespace, claims.clone(), mismatched_activations)?;
+        assert!(matches!(
+            registry.activate_provider_binding_set(mismatched),
+            Err(NativeNodeRegistryError::BindingMismatch(_))
+        ));
+        assert_inactive(&registry);
+
+        let complete = activation_set(namespace, claims, activations)?;
+        registry.activate_provider_binding_set(complete)?;
+        for class_type in members {
+            assert_eq!(
+                registry.provider_binding_is_activated(class_type),
+                Some(true)
+            );
+            assert!(registry.node(class_type).is_some());
         }
         Ok(())
     }

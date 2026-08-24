@@ -3,7 +3,7 @@ use crate::{
     NativeEffectClass, NativeInputDescriptor, NativeInputRequirement, NativeNodeBinding,
     NativeNodeBindingsFactory, NativeNodeContractError, NativeNodeDescriptor,
     NativeNodePresentation, NativeOutputDescriptor, NativePortCardinality, NativeValueType,
-    built_in_source_schema, native_value_type_for_output_schema,
+    authoritative_provider_namespace, built_in_source_schema, native_value_type_for_output_schema,
     native_value_types_for_input_schema,
 };
 
@@ -22,7 +22,6 @@ pub const NODE_DESCRIPTOR_IDS: &[&str] = &[
 pub const NATIVE_NODE_BINDINGS: NativeNodeBindingsFactory = native_node_bindings;
 
 const CATEGORY: &str = "partner/3d/Tripo";
-const PROVIDER: &str = "comfy-api";
 const PROVIDER_REASON: &str = "cloud provider authorization is required";
 const IMPLEMENTATION_VERSION: &str = "source-d380b5bb-v1";
 
@@ -119,9 +118,9 @@ fn native_node_bindings() -> Result<Vec<NativeNodeBinding>, NativeNodeContractEr
         .collect()
 }
 
-fn native_node_binding(
-    kind: TripoNodeKind,
-) -> Result<NativeNodeBinding, NativeNodeContractError> {
+fn native_node_binding(kind: TripoNodeKind) -> Result<NativeNodeBinding, NativeNodeContractError> {
+    let provider = authoritative_provider_namespace(kind.feature_id(), kind.class_type())
+        .map_err(|error| NativeNodeContractError::InvalidSourceSchema(error.to_string()))?;
     let catalog_schema = built_in_source_schema(kind.class_type())
         .map_err(|error| NativeNodeContractError::InvalidSourceSchema(error.to_string()))?;
     let input_names = catalog_schema
@@ -187,7 +186,7 @@ fn native_node_binding(
             is_deprecated: presentation_metadata.is_deprecated,
             is_experimental: presentation_metadata.is_experimental,
         },
-        provider: PROVIDER.to_owned(),
+        provider: provider.to_owned(),
         reason: PROVIDER_REASON.to_owned(),
     })
 }
@@ -276,7 +275,13 @@ mod tests {
                 NativeNodeBinding::ProviderRequired {
                     provider, reason, ..
                 } => {
-                    assert_eq!(provider, PROVIDER);
+                    assert_eq!(
+                        provider,
+                        authoritative_provider_namespace(
+                            binding.feature_id(),
+                            &binding.descriptor().class_type,
+                        )?
+                    );
                     assert_eq!(reason, PROVIDER_REASON);
                 }
                 _ => unreachable!("Tripo API row must remain provider-required"),

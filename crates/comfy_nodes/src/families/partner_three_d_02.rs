@@ -3,7 +3,7 @@ use crate::{
     NativeEffectClass, NativeInputDescriptor, NativeInputRequirement, NativeNodeBinding,
     NativeNodeBindingsFactory, NativeNodeContractError, NativeNodeDescriptor,
     NativeNodePresentation, NativeOutputDescriptor, NativePortCardinality, NativeValueType,
-    built_in_source_schema, native_value_type_for_output_schema,
+    authoritative_provider_namespace, built_in_source_schema, native_value_type_for_output_schema,
     native_value_types_for_input_schema,
 };
 
@@ -21,7 +21,6 @@ pub const NODE_DESCRIPTOR_IDS: &[&str] = &[
 ];
 pub const NATIVE_NODE_BINDINGS: NativeNodeBindingsFactory = native_node_bindings;
 
-const PROVIDER: &str = "comfy-api";
 const PROVIDER_REASON: &str = "cloud provider authorization is required";
 
 struct ProviderNodeSpec {
@@ -151,6 +150,8 @@ fn native_node_bindings() -> Result<Vec<NativeNodeBinding>, NativeNodeContractEr
 }
 
 fn provider_binding(spec: &ProviderNodeSpec) -> Result<NativeNodeBinding, NativeNodeContractError> {
+    let provider = authoritative_provider_namespace(spec.feature_id, spec.class_type)
+        .map_err(|error| NativeNodeContractError::InvalidSourceSchema(error.to_string()))?;
     let catalog_schema = built_in_source_schema(spec.class_type)
         .map_err(|error| NativeNodeContractError::InvalidSourceSchema(error.to_string()))?;
     let input_names = catalog_schema
@@ -250,7 +251,7 @@ fn provider_binding(spec: &ProviderNodeSpec) -> Result<NativeNodeBinding, Native
             is_deprecated: false,
             is_experimental: false,
         },
-        provider: PROVIDER.to_owned(),
+        provider: provider.to_owned(),
         reason: PROVIDER_REASON.to_owned(),
     })
 }
@@ -301,7 +302,7 @@ mod tests {
             fixture.stable_task_id,
             "comfy-parity-native-nodes-partner-three-d-comfy-node-0552"
         );
-        assert_eq!(fixture.provider.identifier, PROVIDER);
+        assert_eq!(fixture.provider.identifier, "comfy-api");
         assert_eq!(fixture.provider.disposition, "provider_required");
         assert_eq!(fixture.provider.reason, PROVIDER_REASON);
         assert_eq!(fixture.provider.effect, "provider");
@@ -369,7 +370,13 @@ mod tests {
             else {
                 return Err("binding is executable instead of provider-required".into());
             };
-            assert_eq!(provider, PROVIDER);
+            assert_eq!(
+                provider,
+                authoritative_provider_namespace(
+                    binding.feature_id(),
+                    &binding.descriptor().class_type,
+                )?
+            );
             assert_eq!(reason, PROVIDER_REASON);
         }
         assert!(fixture.nodes.iter().all(|expected| {
