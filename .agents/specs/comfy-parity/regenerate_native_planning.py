@@ -10472,7 +10472,7 @@ def provider_component_foundation_tasks(
             "crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json",
             "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
         ],
-        "Provider-v2 request-head contains, in canonical order, endpoint, optional secret-id, method, ordered headers, and optional declared-body-bytes. Rust ProviderRequestHeadV2 and JSON request_head carry the same fields as visible ASCII with endpoint at most 2,048 bytes and secret-id at most 1,024 bytes; required strings are non-empty, trimmed, and control-free. The canonical provider is derived only from the verified signed invocation and ProviderBindingSet, never from a component-supplied request field. comfy_runtime::ProviderPolicy, ProviderEndpoint, and SecretId remain the sole semantic provider, URL, credential-reference, and authorization owners. Canonical bytes bind every field in that order, every authority-field mutation changes the identity, and missing, extra, malformed, or non-ASCII fields fail before host actuation. V1 WIT and schema hashes remain exact, and no DTO contains secret bytes, filesystem paths, native handles, or a caller-supplied authorization decision.",
+        "Provider-v2 request-head contains, in canonical order, endpoint, optional secret-id, method, ordered headers, and optional declared-body-bytes. Rust ProviderRequestHeadV2 and JSON request_head carry the same fields as visible ASCII with endpoint at most 2,048 bytes and secret-id at most 1,024 bytes; required strings are non-empty, trimmed, and control-free. The component cannot supply a provider identity; the later canonical runtime owner derives it only from the verified signed invocation and ProviderBindingSet. comfy_runtime::ProviderPolicy, ProviderEndpoint, and SecretId remain the sole semantic provider, URL, credential-reference, and authorization owners. Canonical bytes bind every field in that order, every authority-field mutation changes the identity, and missing, extra, malformed, or non-ASCII fields fail before host actuation. V1 WIT and schema hashes remain exact, and no DTO contains secret bytes, filesystem paths, native handles, or a caller-supplied authorization decision.",
         ["comfy_plugin_sdk", "comfy_plugin_host"],
         validation_packages=["comfy_plugin_sdk", "comfy_plugin_host"],
     )
@@ -10486,6 +10486,7 @@ def provider_component_foundation_tasks(
             "Cargo.toml",
             "Cargo.lock",
             "crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit",
+            "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
             "crates/comfy_worker/src/supervisor.rs",
             "crates/comfy_runtime/src/runtime_supervisor.rs",
             "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",

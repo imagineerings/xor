@@ -494,7 +494,7 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         for field in ("endpoint", "secret-id"):
             self.assertIn(field, provider_request_authority["done"])
-        self.assertIn("never from a component-supplied request", provider_request_authority["done"])
+        self.assertIn("component cannot supply a provider identity", provider_request_authority["done"])
         provider_worker_stream = tasks_by_id[
             "comfy-parity-provider-worker-stream-protocol"
         ]
@@ -517,6 +517,10 @@ class ValidationGenerationTests(unittest.TestCase):
             self.assertIn(path, provider_worker_stream["reads"])
             self.assertIn(path, provider_worker_stream["writes"])
         self.assertIn("Cargo.toml", provider_worker_stream["reads"])
+        self.assertIn(
+            "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
+            provider_worker_stream["reads"],
+        )
         self.assertNotIn("Cargo.toml", provider_worker_stream["writes"])
         for package in (
             "comfy_types",
