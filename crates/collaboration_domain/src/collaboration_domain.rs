@@ -14,6 +14,7 @@ pub mod custom_emoji;
 pub mod dm;
 pub mod feedback;
 pub mod forum;
+pub mod huddle;
 pub mod identity_types;
 pub mod inbox;
 pub mod job;
@@ -123,6 +124,13 @@ pub use forum::{
     ForumComment, ForumError, ForumMessageInput, ForumPost, ForumPostCursor, ForumPostPage,
     ForumProjection, ForumThreadPage, ForumVote, ForumVoteDirection, ForumVoteSummary,
     MAX_FORUM_MESSAGES, MAX_FORUM_POST_PAGE_ROWS, MAX_FORUM_VOTES,
+};
+pub use huddle::{
+    Huddle, HuddleCommandOutcome, HuddleEndReason, HuddleError, HuddleEvent, HuddleGeneration,
+    HuddleIdentity, HuddleLifecycleState, HuddleModerationState, HuddleParticipant,
+    HuddleParticipantPresence, HuddleParticipantRole, HuddleReaction, HuddleReactionValue,
+    HuddleRecordFields, HuddleTranscriptReference, HuddleTranscriptSegmentId, MAX_HUDDLE_EVENTS,
+    MAX_HUDDLE_PARTICIPANTS, MAX_HUDDLE_REACTIONS, MAX_HUDDLE_TRANSCRIPT_REFERENCES,
 };
 pub use identity_types::{
     AggregateId, AggregateType, CommunityId, OperationId, PrincipalId, ScopedAggregateId,

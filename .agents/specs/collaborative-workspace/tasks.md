@@ -3034,7 +3034,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 39. Consolidate huddles, voice, TTS and transcription
 
-  - [ ] 39.1. Define transport-neutral huddle lifecycle
+  - [x] 39.1. Define transport-neutral huddle lifecycle
     - Model start, join, leave, end, participant, reaction and transcript references under ADR-004.
     - _Requirements: 14.3_
     - _Capability IDs: CAP-032_
@@ -3042,6 +3042,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: .agents/specs/collaborative-workspace/decisions/adr-004-huddle-transport.md, projects/buzz/crates/buzz-relay/src/audio/**_
     - _Writes: crates/collaboration_domain/src/huddle.rs_
     - _Validation: lifecycle tests cover duplicate join/leave, owner disconnect, end and transcript linkage_
+    - _Discovered contradiction (2026-08-24): the planned write set named only the new domain module, but Rust requires registering and re-exporting it from the crate root for downstream transport adapters. The narrow correction also updates `crates/collaboration_domain/src/collaboration_domain.rs`; no transport dependency or implementation enters the domain crate._
+    - _Evidence: 2026-08-24 — added a transport-neutral aggregate keyed by community, channel, huddle and nonzero generation with bounded participants, events, reactions and transcript references. Its replayable versioned history makes exact start/join/leave/end retries idempotent, rejects changed operation reuse, preserves a populated huddle when its owner disconnects, atomically ends on the final leave and fences all subsequent joins. Owner/moderator authority governs role, moderation and explicit end transitions; transcript links bind the exact generation, participant, canonical message and interval, and delayed links after termination are accepted only for segments completed before the end. Hydration rejects reordered versions, operation collisions, cross-generation records and illegal transitions without retaining partial state. Six focused lifecycle tests cover duplicate join/leave and rejoin, owner disconnect and final departure, explicit end authorization, roles/moderation/reactions, transcript linkage and corrupted replay. The full collaboration-domain suite passes 188/188, repository warning-denied release/all-target Clippy passes, and formatting/diff/spec/inventory checks are recorded in the enclosing checkpoint commit._
 
   - [ ] 39.2. Implement the approved native huddle transport adapter
     - Map lifecycle and participants to the ADR-selected Zed audio transport with bounded cleanup.
