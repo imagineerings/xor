@@ -2953,14 +2953,16 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 38. Merge media storage and Blossom compatibility
 
-  - [ ] 38.1. Define canonical media and attachment metadata
+  - [x] 38.1. Define canonical media and attachment metadata
     - Model content hash, type, size, tenant owner, variants and message links without object credentials.
     - _Requirements: 14.1, 14.2_
     - _Capability IDs: CAP-031_
     - _Depends on: 11.1, 19.2_
     - _Reads: projects/buzz/crates/buzz-media/**, crates/media/**_
-    - _Writes: crates/collaboration_domain/src/media.rs_
+    - _Writes: crates/collaboration_domain/src/media.rs, crates/collaboration_domain/src/collaboration_domain.rs_
     - _Validation: metadata tests cover hash identity, attachment link, variant and invalid tenant path_
+    - _Discovered contradiction (2026-08-24): the planned standalone domain source cannot compile or expose its canonical types without crate-root registration and living-design traceability. Buzz's `BlobMeta` mixes durable byte facts with full public thumbnail URLs and object-key extensions, while Zed's existing `media` crate is a macOS playback binding rather than a metadata owner. The canonical model therefore retains only tenant/content identity, owner, MIME, size, time, bounded derived descriptors and typed message linkage; raw URLs, bucket keys, credentials, byte validation and rendering remain with Tasks 38.2–38.6._
+    - _Evidence: 2026-08-24 — added a pure media model with a byte-exact SHA-256 identity scoped by canonical community, a non-nil owner principal, strict lowercase bounded MIME grammar, positive byte size and upload time. Bounded unique thumbnail/poster descriptors carry independent hashes, MIME and sizes; typed logical paths resolve only an original or declared variant for the admitted tenant, and message links require non-nil channel/message IDs in that same community. Bucket names, object keys, URLs, signed requests and credentials are unrepresentable. Four focused tests pass hash round-trip and cross-tenant identity, same-tenant attachment linkage, unique/missing variants, malformed MIME/size/time, traversal-shaped hashes and foreign tenant paths. The complete collaboration-domain suite passes 182/182 and repository-standard release/all-target/all-feature warning-denied Clippy passes. Rust formatting, diff hygiene and the collaboration dependency boundary pass; inventory and canonical specification validation are recorded in the enclosing checkpoint commit._
 
   - [ ] 38.2. Implement authenticated upload admission
     - Authorize tenant/user, bound request size and issue an upload operation without exposing storage credentials.

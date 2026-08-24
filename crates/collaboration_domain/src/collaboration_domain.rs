@@ -18,6 +18,7 @@ pub mod identity_types;
 pub mod inbox;
 pub mod job;
 pub mod job_authorization;
+pub mod media;
 pub mod membership;
 pub mod message;
 pub mod message_marker;
@@ -139,6 +140,12 @@ pub use job_authorization::{
     JobServiceGrant, JobTeamMembership, JobTeamRole, JobTransitionSet, MAX_ACTIVE_CHILD_JOBS,
     MAX_ACTIVE_COMMUNITY_JOBS, MAX_JOB_DELEGATION_DEPTH, MAX_JOB_RESOURCE_IDS,
     authorize_job_transition,
+};
+pub use media::{
+    MAX_MEDIA_CONTENT_TYPE_BYTES, MAX_MEDIA_VARIANTS, MediaAttachmentLink, MediaByteSize,
+    MediaContentHash, MediaContentType, MediaDescriptor, MediaIdentity, MediaMetadata,
+    MediaMetadataError, MediaMetadataFields, MediaObjectSelection, MediaTenantPath, MediaVariant,
+    MediaVariantKind,
 };
 pub use membership::{
     InviteMembershipProjection, Membership, MembershipCommandOutcome, MembershipCreateFields,
