@@ -21,6 +21,7 @@ pub mod membership;
 pub mod message;
 pub mod message_marker;
 pub mod moderation;
+pub mod moderation_policy;
 pub mod notification_policy;
 pub mod presence;
 pub mod principal;
@@ -151,6 +152,12 @@ pub use moderation::{
     ModerationResolutionRecord, ModerationRestriction, ModerationRestrictionRecordFields,
     PersonalMute, PersonalMuteRecordFields, PersonalMuteState, PersonalMuteTransition,
     RestrictionTransition, RestrictionTransitionKind, TimeoutState,
+};
+pub use moderation_policy::{
+    CommunityArchivePolicyState, CommunityArchiveSnapshot, HistoricalAttributionSnapshot,
+    IdentityArchivePolicyState, IdentityArchiveSnapshot, ModerationAuthorization,
+    ModerationAuthorizationDecision, ModerationAuthorizationDenial, ModerationAuthorizationRequest,
+    ModerationResourceContext, ModerationSnapshot, authorize_with_moderation,
 };
 pub use notification_policy::{
     NotificationCandidate, NotificationDecision, NotificationDeliveryId,
