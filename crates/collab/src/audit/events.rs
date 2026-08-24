@@ -175,6 +175,7 @@ impl MembershipAuditOperation {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ModerationAuditOperation {
+    ViewQueue,
     Report,
     ResolveReport,
     ApplyRestriction,
@@ -186,6 +187,7 @@ pub enum ModerationAuditOperation {
 impl ModerationAuditOperation {
     const fn action(self) -> &'static str {
         match self {
+            Self::ViewQueue => "moderation.view_queue",
             Self::Report => "moderation.report",
             Self::ResolveReport => "moderation.resolve_report",
             Self::ApplyRestriction => "moderation.apply_restriction",
