@@ -9512,6 +9512,26 @@ def native_model_resource_precursor_tasks(
         "Hunyuan 720p, Hunyuan 1080p, and LTX fixtures preserve the source's strict ordered marker precedence of 720p before 1080p before LTX, exact selected-profile configuration parsing, first-only nin_shortcut key normalization with duplicate or normalized-key collision rejected atomically, complete strict state schemas, semantic identity, alias-aware residency, and reconstructive resource state on certified CPU F32 execution. Ambiguity is rejected only for conflicting configuration or state evidence within the selected profile; coexistence of lower-precedence profile markers selects the earlier profile and any lower-profile keys then fail that profile's strict state schema. The 720p graph implements causal VideoConv3d with past-only temporal and replicate spatial padding, input and output convolutions, each residual as x + conv3(SiLU(conv2(SiLU(conv1(x))))), the exact configured block count, and global_residual=false. The 1080p graph implements causal_conv(z) + repeat_interleave(z), exactly three ordered ResnetBlocks for each detected stage, each block as h=conv2(dropout0(SiLU(RMS(conv1(SiLU(RMS(x))))))) then shortcut(x)+h with RMS(x)=normalize(x,dim=1)*sqrt(C)*gamma, and final conv_out(SiLU(RMS(x))). The LTX graph implements initial convolution then GroupNorm32 then SiLU; each pre/post block as convolution then GroupNorm32 then SiLU then convolution then GroupNorm32 then SiLU(x+residual); exact 8C then PixelShuffleND dimension three, 4C then dimension two, and 2C then dimension one branches; dims-two and spatial-only dims-three frame folding/restoration; temporal first-frame cropping only after temporal shuffle; rational 3/4, 3/2, 2/1, and 4/1 spatial resampling; and the fixed normalized [1, 4, 6, 4, 1] depthwise blur. Independent reduced raw-output oracles and field-mutation tests discriminate every graph ordering and branch. Hunyuan invocation matches both-zero identity aliasing of the original latent bundle, ties-to-even aspect rounding, minimum 64, floor-to-16 target shape, nearest-exact (distinct from nearest), bilinear, bicubic, area, and bislerp modes through the canonical tensor operation owners, optional center crop, rank-five folding, exact model invocation, and for every nonzero dimension returns a fresh CPU-F32 samples-only bundle that drops noise mask, batch indices, and metadata. Bislerp preserves the source operation order and explicit weighted multiply then add expression rather than a fused lerp; reduced oracles cover zero norm, coincident, antipodal, and rounding-sensitive inputs. LTX invocation matches exact per-channel VAE unnormalize (x*std)+mean, model execution, VAE normalize (x-mean)/std, rational spatial and temporal scale behavior, guaranteed offload, metadata and batch preservation, and noise_mask removal. Tensor creation, convolution, resize, concatenation, repeat, pixel shuffle, normalization, indexing, comparison, reduction, arithmetic, and trigonometric operations remain delegated to their canonical owners; VAE statistics and latent bundles remain delegated to their canonical owners. NativeLatentUpscaleModelResource alone owns retained Hunyuan and LTX graph state and execution, while later handle publication, cache, persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation. Cross-variant invocation, unknown marker, selected-profile ambiguity, malformed configuration or weights, incompatible latent or VAE state, uncertified device, conservative phase-memory OOM, and cancellation publish no resource or latent, and the tracked fixture generator reproduces the checked fixture byte-for-byte.",
     )
     append(
+        "comfy-parity-native-attention-ordered-additive-mask-foundation",
+        "Apply ordered additive attention masks",
+        "Extend the canonical attention owner with two explicitly ordered additive terms so source relative-position bias and shifted-window masks remain f32-exact without a leaf-local attention loop or precombined mask.",
+        [
+            "projects/comfy/ComfyUI/comfy/background_removal/birefnet.py",
+            "crates/comfy_tensor/src/ops/accelerated_attention_kernel_01.rs",
+            "crates/comfy_tensor/tests/accelerated_attention_kernel_01.rs",
+            "crates/comfy_tensor/tests/ops/accelerated_attention_kernel_01.rs",
+            "crates/comfy_model/src/attention.rs",
+        ],
+        [
+            "crates/comfy_tensor/src/ops/accelerated_attention_kernel_01.rs",
+            "crates/comfy_tensor/tests/accelerated_attention_kernel_01.rs",
+            "crates/comfy_tensor/tests/ops/accelerated_attention_kernel_01.rs",
+            "crates/comfy_model/src/attention.rs",
+        ],
+        "The canonical tensor and model AttentionMask enums gain one mirrored append-only OrderedAdditive variant carrying first_values, second_values, and the shared broadcast shape. Admission independently validates both finite value sets, exact broadcast element counts, checked bounds, workspace, and cancellation before mutation. Score evaluation applies the source order `(score + first) + second` in f32 before softmax, never precombines the terms, and preserves every existing Boolean, Additive, causal, scale, wire, and error behavior byte-for-byte. A rounding-sensitive oracle pins score=1e20, first=-1e20, second=-100 to -100 and proves a precombined mask would produce 0; focused tests also cover every broadcast form, wrong counts, non-finite values, workspace exhaustion, cancellation, immutability, and the unchanged existing variants. Downstream background removal consumes only this canonical ordered-mask API and owns no attention equation.",
+        include_model_payload=False,
+    )
+    append(
         "comfy-parity-native-background-removal-resource-foundation",
         "Retain executable native background-removal models",
         "Implement the source BACKGROUND_REMOVAL architecture as a retained native resource with exact image preprocessing, bounded inference, mask projection, and cancellation rather than a fabricated segmentation mask.",
@@ -9628,6 +9648,7 @@ def native_model_resource_precursor_tasks(
         *generated_upscale_leaf_ids,
         "comfy-parity-native-upscale-model-resource-foundation",
         "comfy-parity-native-latent-upscale-model-resource-foundation",
+        "comfy-parity-native-attention-ordered-additive-mask-foundation",
         "comfy-parity-native-background-removal-resource-foundation",
         "comfy-parity-native-depth-anything-3-resource-foundation",
         "comfy-parity-native-moge-resource-foundation",
@@ -10714,6 +10735,28 @@ def provider_component_foundation_tasks(
         "The frozen v1 WIT and schema hashes remain unchanged. Provider-v2 imports a dedicated invocation-input-host using the canonical zed:comfy-plugin/types@1.0.0 input-state, encoded-value, value-handle, and invocation-error DTOs. It exposes only get-input-state, read-scalar-input, take-input, read-handle, and invocation-level check-cancelled; it exposes no provider identity, endpoint, secret, provider-request, output or effect, filesystem, model, clock, random, UI, route, or authorization operation. Scalar and non-inline handle ownership, presence, cardinality, type, family, ABI identity, bounds, single-consumption, invocation and generation scoping, and cancellation remain canonical. SDK and schema tests prove exact imported field and order parity but introduce no second input validator or schema authority. This ABI only observes invocation inputs and cannot actuate a provider or publish output.",
         ["comfy_plugin_sdk", "comfy_plugin_host", "comfy_types"],
         validation_packages=["comfy_plugin_sdk", "comfy_plugin_host", "comfy_types"],
+    )
+    append_shared(
+        "comfy-parity-provider-runtime-component-activation-preflight-foundation",
+        "Preflight sealed provider component activations",
+        "Seal and consume the full runtime activation identity before a provider-v2 component is instantiated or receives invocation context or inputs, while leaving request-head and policy authorization for the later request bind.",
+        [
+            "crates/comfy_runtime/src/plugin_services.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_plugin_host/src/component_host.rs",
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
+            "crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit",
+        ],
+        [
+            "crates/comfy_runtime/src/plugin_services.rs",
+            "crates/comfy_plugin_host/src/component_host.rs",
+        ],
+        "ProviderRuntimeActivationGrant::preflight_installed_component consumes a claimed opaque grant, checks sealed cancellation before and after validation, and compares the exact registry generation and digest, component generation and digest, provider outer-signing-payload digest and independently verified inner authorization identity, authorization-generation digest, binding generation and set digest, node identity, and compiled-plan digest. It returns a distinct non-cloneable PreflightedProviderRuntimeActivationGrant. Every failure atomically revokes the one-use claim. Only the preflighted grant exposes the later consuming bind for a checked request head and ProviderPolicy; the raw grant no longer exposes bind, fields, constructors, registration, provider identity, or authority material. A private component-host PreflightedProviderComponentCapsule retains that grant together with the exact selected InstalledVerifiedPlugin, current VerifiedComponentGeneration, and node identity. Its private constructor derives evidence only from those installed objects, and the later adapter must instantiate only by consuming the capsule without accepting a second plugin, component generation, or node. No public primitive-field evidence constructor or capsule getter exists, the runtime wildcard export remains unchanged, and repository ownership asserts exactly one production preflight callsite. Focused tests independently mutate every sealed field, outer streaming contract, inner authorization, binding membership, and cancellation; prove failure before begin_invocation, input state, read, take, node creation, or guest code; prove a failed preflight cannot be retried; and prove neither the retained authorization nor selected installed component can be swapped during request bind or instantiation.",
+        ["comfy_runtime", "comfy_plugin_host"],
+        validation_packages=["comfy_runtime", "comfy_plugin_host"],
     )
     append_shared(
         "comfy-parity-provider-component-host-stream-adapter",

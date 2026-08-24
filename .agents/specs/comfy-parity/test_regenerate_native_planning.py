@@ -83,7 +83,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 717)
+        self.assertEqual(len(tasks), 719)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -127,6 +127,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-native-upscale-runtime-contract-foundation",
             "comfy-parity-native-upscale-model-resource-foundation",
             "comfy-parity-native-latent-upscale-model-resource-foundation",
+            "comfy-parity-native-attention-ordered-additive-mask-foundation",
             "comfy-parity-native-background-removal-resource-foundation",
             "comfy-parity-native-depth-anything-3-resource-foundation",
             "comfy-parity-native-moge-resource-foundation",
@@ -303,10 +304,34 @@ class ValidationGenerationTests(unittest.TestCase):
         background_removal_task = tasks_by_id[
             "comfy-parity-native-background-removal-resource-foundation"
         ]
+        ordered_attention_task = tasks_by_id[
+            "comfy-parity-native-attention-ordered-additive-mask-foundation"
+        ]
+        self.assertEqual(
+            ordered_attention_task["dependencies"],
+            ["comfy-parity-native-latent-upscale-model-resource-foundation"],
+        )
+        self.assertEqual(
+            ordered_attention_task["writes"],
+            [
+                "crates/comfy_tensor/src/ops/accelerated_attention_kernel_01.rs",
+                "crates/comfy_tensor/tests/accelerated_attention_kernel_01.rs",
+                "crates/comfy_tensor/tests/ops/accelerated_attention_kernel_01.rs",
+                "crates/comfy_model/src/attention.rs",
+            ],
+        )
+        for phrase in (
+            "append-only OrderedAdditive",
+            "(score + first) + second",
+            "score=1e20",
+            "precombined mask would produce 0",
+            "owns no attention equation",
+        ):
+            self.assertIn(phrase, ordered_attention_task["done"])
         self.assertEqual(
             background_removal_task["dependencies"],
             [
-                "comfy-parity-native-latent-upscale-model-resource-foundation",
+                "comfy-parity-native-attention-ordered-additive-mask-foundation",
                 "comfy-parity-model-detection-any-of-key-selector-consolidation",
             ],
         )
@@ -520,6 +545,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-provider-worker-stream-protocol-clippy-correction",
             "comfy-parity-provider-runtime-stream-progress-foundation",
             "comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair",
+            "comfy-parity-provider-runtime-component-activation-preflight-foundation",
             "comfy-parity-provider-component-host-stream-adapter",
             "comfy-parity-provider-worker-stream-bridge",
             "comfy-parity-provider-deployment-lifecycle",
@@ -535,7 +561,7 @@ class ValidationGenerationTests(unittest.TestCase):
         provider_closure_id = (
             "comfy-parity-native-partner-provider-components-foundation"
         )
-        self.assertEqual(len(provider_shared_ids), 12)
+        self.assertEqual(len(provider_shared_ids), 13)
         self.assertEqual(len(provider_vendor_ids), 33)
         provider_projection = tasks_by_id[
             "comfy-parity-provider-namespace-binding-projection"
@@ -750,14 +776,56 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("no provider identity", provider_input_host["done"])
         self.assertIn("provider-request", provider_input_host["done"])
         self.assertIn("output or effect", provider_input_host["done"])
+        provider_activation_preflight = tasks_by_id[
+            "comfy-parity-provider-runtime-component-activation-preflight-foundation"
+        ]
+        self.assertEqual(
+            provider_activation_preflight["dependencies"],
+            ["comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair"],
+        )
+        self.assertEqual(
+            provider_activation_preflight["writes"],
+            [
+                "crates/comfy_runtime/src/plugin_services.rs",
+                "crates/comfy_plugin_host/src/component_host.rs",
+            ],
+        )
+        for preflight_read in (
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
+            "crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit",
+        ):
+            self.assertIn(preflight_read, provider_activation_preflight["reads"])
+            self.assertNotIn(preflight_read, provider_activation_preflight["writes"])
+        self.assertIn(
+            "crates/comfy_plugin_host/src/component_host.rs",
+            provider_activation_preflight["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_plugin_host/src/component_host.rs",
+            provider_activation_preflight["writes"],
+        )
+        self.assertIn(
+            "PreflightedProviderRuntimeActivationGrant",
+            provider_activation_preflight["done"],
+        )
+        self.assertIn(
+            "PreflightedProviderComponentCapsule",
+            provider_activation_preflight["done"],
+        )
+        self.assertIn("Every failure atomically revokes", provider_activation_preflight["done"])
+        self.assertIn("raw grant no longer exposes bind", provider_activation_preflight["done"])
+        self.assertIn("No public primitive-field evidence constructor", provider_activation_preflight["done"])
+        self.assertIn("can be swapped", provider_activation_preflight["done"])
         provider_component_stream = tasks_by_id[
             "comfy-parity-provider-component-host-stream-adapter"
         ]
         self.assertEqual(
             provider_component_stream["dependencies"],
-            [
-                "comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair"
-            ],
+            ["comfy-parity-provider-runtime-component-activation-preflight-foundation"],
         )
         self.assertIn(
             "crates/comfy_runtime/src/plugin_services.rs",
