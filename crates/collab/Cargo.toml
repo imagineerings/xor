@@ -51,6 +51,7 @@ gpui.workspace = true
 hex.workspace = true
 hmac.workspace = true
 http_client.workspace = true
+image.workspace = true
 livekit_api.workspace = true
 log.workspace = true
 nanoid.workspace = true
@@ -58,6 +59,7 @@ nostr_compat.workspace = true
 parking_lot.workspace = true
 prometheus = "0.14"
 prost.workspace = true
+mp4 = "0.14"
 rand.workspace = true
 reqwest = { version = "0.11", features = ["json"] }
 rpc.workspace = true
