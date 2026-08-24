@@ -40,6 +40,12 @@
     "match_size": "recursively resolved schema-guided IMAGE or MASK handle"
   },
   "deprecated_edges": {
+    "presentation": {
+      "longer": "Resize Images by Longer Edge (DEPRECATED)",
+      "shorter": "Resize Images by Shorter Edge (DEPRECATED)",
+      "is_deprecated": true,
+      "is_experimental": true
+    },
     "mode": "Pillow LANCZOS over uint8-quantized source values",
     "longer": {"input": [1, 2, 4, 1], "edge": 6, "output": [1, 3, 6, 1]},
     "shorter": {"input": [1, 2, 4, 1], "edge": 3, "output": [1, 3, 6, 1]}

@@ -99,6 +99,10 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[inherited_v3_presentation_id]["writes"],
         )
         self.assertIn(
+            "crates/comfy_nodes/src/registry_generator.rs",
+            tasks_by_id[inherited_v3_presentation_id]["writes"],
+        )
+        self.assertIn(
             "COMFY-NODE-0542 and COMFY-NODE-0543",
             tasks_by_id[inherited_v3_presentation_id]["done"],
         )

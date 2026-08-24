@@ -8730,6 +8730,7 @@ def native_node_inherited_v3_presentation_catalog_correction_task(
             ".agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
             ".agents/specs/comfy-parity/regenerate_native_planning.py",
             ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "crates/comfy_nodes/src/registry_generator.rs",
         ],
         "COMFY-NODE-0542 and COMFY-NODE-0543 retain their source identifiers and experimental availability while backend display names exactly include `(DEPRECATED)` and portable schema presentation sets both `is_deprecated` and `is_experimental`. The generic inherited/class-override projection is source-ordered, limited to recognized node options, deterministic, and covered by catalog and registry validation without weakening descriptor equality.",
         dependency,
@@ -19939,6 +19940,15 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "cargo test --locked -p comfy_nodes val_node_registry_001 -- --nocapture",
             "cargo test --locked -p comfy_runtime val_domain_004 -- --nocapture",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+        ])
+    if identifier == "comfy-parity-native-node-inherited-v3-presentation-catalog-correction":
+        commands.extend([
+            "cargo test --locked -p comfy_nodes val_node_001 -- --nocapture",
+            "cargo test --locked -p comfy_nodes val_node_registry_001 -- --nocapture",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",

@@ -405,8 +405,8 @@ fn validate_contract_wire(
         || contract.source.symbol.status != "parsed_definition"
         || contract.source.symbol.symbol.is_empty()
         || contract.schema.portable.node.feature_id.as_deref() != Some(&contract.feature_id)
-        || contract.schema.portable.presentation.is_deprecated
-            != (contract.availability == "deprecated/dead")
+        || (contract.availability == "deprecated/dead"
+            && !contract.schema.portable.presentation.is_deprecated)
         || contract.output_node && contract.capability_hints.asset_or_effect == expected_provider
     {
         return Err(NodeRegistryError::InvalidDescriptor {

@@ -191,7 +191,7 @@ fn deprecated_edge_binding(edge: Edge) -> Result<NativeNodeBinding, NativeNodeCo
             description: edge.description().to_owned(),
             output_names: vec!["images".to_owned()],
             search_aliases: Vec::new(),
-            is_deprecated: false,
+            is_deprecated: true,
             is_experimental: true,
         },
         node: Arc::new(DeprecatedEdgeResize { edge }),
@@ -232,8 +232,8 @@ impl Edge {
 
     const fn display_name(self) -> &'static str {
         match self {
-            Self::Longer => LONGER_CLASS_TYPE,
-            Self::Shorter => SHORTER_CLASS_TYPE,
+            Self::Longer => "Resize Images by Longer Edge (DEPRECATED)",
+            Self::Shorter => "Resize Images by Shorter Edge (DEPRECATED)",
         }
     }
 
@@ -575,7 +575,7 @@ fn validate_resize_fields(fields: &BTreeMap<String, NativeValue>) -> Result<(), 
         "scale to multiple" => {
             bounded_unsigned(fields.get("multiple"), "multiple", 1, MAX_RESOLUTION)?;
         }
-        _ => unreachable!(),
+        _ => return Err(invalid_inputs("resize_type selector is unsupported")),
     }
     Ok(())
 }
@@ -1674,6 +1674,18 @@ mod tests {
             fixture.pointer("/sources/1/sha256").and_then(Value::as_str),
             Some("3b27465fec391509083bd1837895c09abc489c04d81afae5ffe631abd6a4e772")
         );
+        assert_eq!(
+            fixture
+                .pointer("/deprecated_edges/presentation/is_deprecated")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        assert_eq!(
+            fixture
+                .pointer("/deprecated_edges/presentation/is_experimental")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
         let bindings = native_node_bindings()?;
         assert_eq!(bindings.len(), NODE_DESCRIPTOR_IDS.len());
         let registry = NodeRegistry::built_in()?;
@@ -1681,6 +1693,15 @@ mod tests {
             assert_eq!(binding.descriptor().class_type, *class_type);
             binding.validate()?;
             registry.validate_native_binding(binding)?;
+        }
+        for class_type in [LONGER_CLASS_TYPE, SHORTER_CLASS_TYPE] {
+            let binding = bindings
+                .iter()
+                .find(|binding| binding.descriptor().class_type == class_type)
+                .ok_or("deprecated edge binding is absent")?;
+            assert!(binding.presentation().is_deprecated);
+            assert!(binding.presentation().is_experimental);
+            assert!(binding.presentation().display_name.ends_with(" (DEPRECATED)"));
         }
         let resize = bindings
             .iter()
