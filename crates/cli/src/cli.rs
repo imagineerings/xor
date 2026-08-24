@@ -5,6 +5,9 @@ use collections::HashMap;
 pub use ipc_channel::ipc;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaboration_moderation;
+
 #[derive(Serialize, Deserialize)]
 pub struct IpcHandshake {
     pub requests: ipc::IpcSender<CliRequest>,
