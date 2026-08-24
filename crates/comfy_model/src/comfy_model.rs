@@ -45,6 +45,7 @@ pub mod restricted_pickle;
 pub mod sd2_family;
 pub mod sdpose;
 pub mod sdxl_family;
+pub mod upscale_contract;
 pub mod vae;
 pub mod vae_architecture;
 pub mod vae_audio;
@@ -572,6 +573,14 @@ pub use sdxl_family::{
     SDXL_TRANSFORMER_DEPTH_OUTPUT, SdxlCommonMapping, SdxlConfiguration, SdxlLayout, SdxlVariant,
     common_mapping as sdxl_common_mapping, configuration_for_probe as sdxl_configuration_for_probe,
     state_plan_for_layout as sdxl_state_plan_for_layout,
+};
+pub use upscale_contract::{
+    NATIVE_UPSCALE_ADMITTED_ARCHITECTURE_COUNT, NATIVE_UPSCALE_ARCHITECTURE_COUNT,
+    NATIVE_UPSCALE_CONTRACT_ID, NATIVE_UPSCALE_CONTRACT_SCHEMA_VERSION,
+    NATIVE_UPSCALE_CONTRACT_SHA256, NativeUpscaleArchitectureContract,
+    NativeUpscaleCanonicalStateKeys, NativeUpscaleContractError, NativeUpscaleDetection,
+    NativeUpscaleRuntimeContract, NativeUpscaleSourceFile, NativeUpscaleStateDictionaryLayout,
+    compiled_native_upscale_contract, validate_native_upscale_contract_candidate,
 };
 pub use vae::validate_native_vae_backend_target;
 pub use vae::{

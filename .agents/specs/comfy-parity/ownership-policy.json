@@ -20308,6 +20308,7 @@
       "allowed_adapters": [
         "comfy_plugin_sdk::PluginManifest is a signed ABI DTO",
         "comfy_plugin_sdk owns development-only private-key signing and the canonical domain-separated payload",
+        "comfy_plugin_sdk::ProviderPluginManifestV2 remains a signed boundary DTO; PluginTrustPolicy verifies its outer streaming-contract signature before independently authorizing the retained inner manifest",
         "extension_host::ExtensionStore owns installed component lifecycle after canonical verification",
         "comfy_plugin_host accepts only authenticated versioned PluginAuthorization projections bound to manifest, profile, subject, grants, and policy generation"
       ],
@@ -20325,6 +20326,12 @@
           "symbol": "PluginAuthorization"
         },
         {
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "qualified": "comfy_runtime::ProviderManifestAuthorizationV2",
+          "role": "sealed_authorization",
+          "symbol": "ProviderManifestAuthorizationV2"
+        },
+        {
           "path": "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
           "qualified": "comfy_plugin_sdk::PluginManifest",
           "role": "boundary_dto",
@@ -20334,19 +20341,26 @@
       "call_symbols": [
         "PluginAuthorization",
         "PluginManifest",
-        "PluginTrustPolicy"
+        "PluginTrustPolicy",
+        "ProviderManifestAuthorizationV2"
       ],
       "required_mappings": [
         {
           "name": "sdk-manifest-to-canonical-trust-policy",
           "path": "crates/comfy_runtime/src/trust.rs",
           "pattern": "PluginTrustPolicy[\\s\\S]*PluginManifest|PluginManifest[\\s\\S]*PluginTrustPolicy"
+        },
+        {
+          "name": "task412-provider-v2-outer-and-inner-signatures-precede-authorization",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "authorize_provider_manifest_v2[\\s\\S]*manifest\\.validate[\\s\\S]*verify\\(&signing_payload[\\s\\S]*authorize_manifest[\\s\\S]*ProviderManifestAuthorizationV2"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-trust-foundation",
-        "comfy-parity-authoritative-domain-ownership"
+        "comfy-parity-authoritative-domain-ownership",
+        "comfy-parity-provider-runtime-stream-progress-foundation"
       ],
       "production_consumers": [
         "ExtensionStore Comfy component adapter",
@@ -20444,6 +20458,7 @@
       "allowed_adapters": [
         "comfy_plugin_sdk network-provider capability is an ABI DTO mapped to ProviderPolicy authorization",
         "comfy_types::WorkerProviderStreamTransportValidator owns only protocol-v8 wire bounds, sequence state, generation-scoped handle validation, incremental upload SHA-256, cancellation observation, and revocation; the later runtime bridge must look up its host-issued session identifier in a pre-existing sealed activation table before routing and cannot derive provider or authorization from worker fields",
+        "comfy_runtime::ProviderRuntimeAuthorityInput is issued only by consuming a runtime-minted activation grant and binds the verified provider-v2 manifest, request head, and ProviderPolicy decision before actuation",
         "provider implementations consume AuthorizedProviderRequest and own protocol execution plus transport-syntax conversion only; they cannot repeat scheme, authority, host, query, fragment, profile, subject, provider, endpoint, or credential authorization",
         "Task 20 binds checked provider and credential scopes to the authenticated plugin authorization and verified native component measurement before provider or secret effects"
       ],
@@ -20459,6 +20474,12 @@
           "qualified": "comfy_runtime::AuthorizedProviderRequest",
           "role": "sealed_authorization",
           "symbol": "AuthorizedProviderRequest"
+        },
+        {
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "qualified": "comfy_runtime::ProviderRuntimeAuthorityInput",
+          "role": "sealed_authorization",
+          "symbol": "ProviderRuntimeAuthorityInput"
         },
         {
           "path": "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
@@ -20477,6 +20498,7 @@
         "AuthorizedProviderRequest",
         "CapabilityRequest",
         "ProviderPolicy",
+        "ProviderRuntimeAuthorityInput",
         "WorkerProviderStreamTransportValidator"
       ],
       "required_mappings": [
@@ -20484,6 +20506,11 @@
           "name": "plugin-provider-request-to-runtime-policy",
           "path": "crates/comfy_runtime/src/plugin_services.rs",
           "pattern": "provider_policy[\\s\\S]*\\.authorize\\([\\s\\S]*AuthorizedCredentialPresenceRequest"
+        },
+        {
+          "name": "task412-runtime-authority-is-host-checked-and-provider-derived",
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "pattern": "ProviderRuntimeActivationGrant[\\s\\S]*pub fn bind\\([\\s\\S]*ProviderRuntimeAuthorityInput[\\s\\S]*provider_binding\\(\\)[\\s\\S]*implementation_namespace[\\s\\S]*provider_policy[\\s\\S]*\\.authorize\\("
         },
         {
           "name": "zed-provider-actuator-consumes-sealed-endpoint-without-policy-revalidation",
@@ -20495,7 +20522,8 @@
       "consolidation_tasks": [
         "comfy-parity-trust-foundation",
         "comfy-parity-authoritative-domain-ownership",
-        "comfy-parity-provider-worker-stream-protocol"
+        "comfy-parity-provider-worker-stream-protocol",
+        "comfy-parity-provider-runtime-stream-progress-foundation"
       ],
       "production_consumers": [
         "native provider services",
@@ -20524,12 +20552,13 @@
     },
     {
       "concern": "provider_result_receipts",
-      "canonical_owner": "comfy_runtime::ProviderResultReceiptVerifier",
+      "canonical_owner": "comfy_runtime::{ProviderResultReceiptVerifier, ProviderRuntimeReceiptVerifierV2}",
       "owner_files": [
         "crates/comfy_runtime/src/trust.rs"
       ],
       "owner_symbols": [
-        "ProviderResultReceiptVerifier"
+        "ProviderResultReceiptVerifier",
+        "ProviderRuntimeReceiptVerifierV2"
       ],
       "allowed_adapters": [
         "Plugin capability sessions assign request ordinals and retain bounded provider response bytes app-side",
@@ -20560,19 +20589,66 @@
           "qualified": "comfy_runtime::ProviderResultReceiptVerifier",
           "role": "canonical",
           "symbol": "ProviderResultReceiptVerifier"
+        },
+        {
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "qualified": "comfy_runtime::ProviderRuntimeReceiptIdentityV2",
+          "role": "canonical_identity",
+          "symbol": "ProviderRuntimeReceiptIdentityV2"
+        },
+        {
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "qualified": "comfy_runtime::ProviderRuntimeReceiptV2",
+          "role": "sealed_authorization",
+          "symbol": "ProviderRuntimeReceiptV2"
+        },
+        {
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "qualified": "comfy_runtime::ProviderRuntimeReceiptIssuerV2",
+          "role": "related_owner",
+          "symbol": "ProviderRuntimeReceiptIssuerV2"
+        },
+        {
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "qualified": "comfy_runtime::ProviderRuntimeReceiptVerifierV2",
+          "role": "canonical",
+          "symbol": "ProviderRuntimeReceiptVerifierV2"
+        },
+        {
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "qualified": "comfy_runtime::VerifiedProviderRuntimeReceiptV2",
+          "role": "sealed_authorization",
+          "symbol": "VerifiedProviderRuntimeReceiptV2"
         }
       ],
       "call_symbols": [
         "ProviderInvocationIdentity",
         "ProviderResultReceipt",
         "ProviderResultReceiptIssuer",
-        "ProviderResultReceiptVerifier"
+        "ProviderResultReceiptVerifier",
+        "ProviderRuntimeReceiptIdentityV2",
+        "ProviderRuntimeReceiptIssuerV2",
+        "ProviderRuntimeReceiptV2",
+        "ProviderRuntimeReceiptVerifierV2",
+        "VerifiedProviderRuntimeReceiptV2"
       ],
-      "required_mappings": [],
+      "required_mappings": [
+        {
+          "name": "task412-runtime-receipts-use-a-distinct-sealed-v2-domain",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "PROVIDER_RUNTIME_RECEIPT_SIGNATURE_DOMAIN_V2[\\s\\S]*ProviderRuntimeReceiptIdentityV2[\\s\\S]*ProviderRuntimeReceiptV2[\\s\\S]*ProviderRuntimeReceiptIssuerV2[\\s\\S]*ProviderRuntimeReceiptVerifierV2[\\s\\S]*provider_runtime_receipt_signing_payload_v2"
+        },
+        {
+          "name": "task412-stream-owner-issues-the-exact-terminal-receipt",
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "pattern": "finish_streaming[\\s\\S]*ProviderRuntimeReceiptIdentityV2[\\s\\S]*issuer\\.issue"
+        }
+      ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-native-node-provider-invocation-foundation",
-        "comfy-parity-authoritative-domain-ownership"
+        "comfy-parity-authoritative-domain-ownership",
+        "comfy-parity-provider-runtime-stream-progress-foundation"
       ],
       "production_consumers": [
         "app-owned provider capability sessions",
@@ -20598,7 +20674,171 @@
         "VAL-NATIVE-E2E-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "ProviderResultReceiptVerifier alone admits a domain-separated host-issued provider result receipt bound to the exact principal, profile, prompt, attempt, node, request ordinal and digest, signed provider binding, endpoint, and result digest; worker, plugin, and materialization adapters cannot mint or reinterpret that authority."
+      "decision_reason": "The domain-versioned ProviderResultReceiptVerifier and ProviderRuntimeReceiptVerifierV2 are the sole admission owners. V1 bytes and identity remain frozen, while v2 additionally binds the complete runtime request, response, terminal, upload, cost, and idempotency identity; worker, plugin, and materialization adapters cannot mint or reinterpret either authority."
+    },
+    {
+      "concern": "provider_runtime_stream_sessions",
+      "canonical_owner": "comfy_runtime::ProviderRuntimeStreamService",
+      "owner_files": [
+        "crates/comfy_runtime/src/plugin_services.rs"
+      ],
+      "owner_symbols": [
+        "ProviderRuntimeStreamService"
+      ],
+      "allowed_adapters": [
+        "NativeExecutionController constructs and shares the sole ProviderRuntimeStreamService, and delegates the existing v1 provider capability envelope only through its crate-owned legacy methods",
+        "comfy_plugin_sdk::ProviderStreamValidatorV2 remains the typed ABI-state validator and owns no runtime authorization or live session table",
+        "comfy_runtime::materialize_provider_invocation_result_v2 maps a receipt-verified complete DTO to one canonical response and cannot publish a partial result",
+        "The later component-host adapter alone claims a runtime-minted one-use activation grant and consumes it to bind a checked ProviderRuntimeAuthorityInput; worker and component fields cannot mint authority",
+        "ProviderRuntimeStreamOwner and ProviderRuntimeStreamState are private implementation details reachable only while ProviderRuntimeStreamService holds its shared state lock; no public state, owner, lock, actuator, credential resolver, network client, purchase, or charge seam exists"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "qualified": "comfy_runtime::ProviderRuntimeStreamService",
+          "role": "canonical_state",
+          "symbol": "ProviderRuntimeStreamService"
+        },
+        {
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "qualified": "comfy_runtime::ProviderRuntimeStreamOwner",
+          "role": "related_owner",
+          "symbol": "ProviderRuntimeStreamOwner"
+        },
+        {
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "qualified": "comfy_runtime::ProviderRuntimeActivationGrant",
+          "role": "sealed_authorization",
+          "symbol": "ProviderRuntimeActivationGrant"
+        },
+        {
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "qualified": "comfy_runtime::ProviderRuntimeActivationGrantSource",
+          "role": "related_owner",
+          "symbol": "ProviderRuntimeActivationGrantSource"
+        },
+        {
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "qualified": "comfy_runtime::ProviderRuntimeAuthorityInput",
+          "role": "sealed_authorization",
+          "symbol": "ProviderRuntimeAuthorityInput"
+        },
+        {
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "qualified": "comfy_runtime::ProviderRuntimeActuationProposal",
+          "role": "sealed_authorization",
+          "symbol": "ProviderRuntimeActuationProposal"
+        },
+        {
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "qualified": "comfy_runtime::ProviderRuntimeProgressProjection",
+          "role": "lossless_presentation_adapter",
+          "symbol": "ProviderRuntimeProgressProjection"
+        },
+        {
+          "path": "crates/comfy_runtime/src/provider_materialization.rs",
+          "qualified": "comfy_runtime::materialize_provider_invocation_result_v2",
+          "role": "allowed_adapter",
+          "symbol": "materialize_provider_invocation_result_v2",
+          "pattern": "^pub fn materialize_provider_invocation_result_v2\\("
+        }
+      ],
+      "call_symbols": [
+        "ProviderRuntimeActuationProposal",
+        "ProviderRuntimeActivationGrant",
+        "ProviderRuntimeActivationGrantSource",
+        "ProviderRuntimeAuthorityInput",
+        "ProviderRuntimeProgressProjection",
+        "ProviderRuntimeStreamService",
+        "materialize_provider_invocation_result_v2"
+      ],
+      "call_path_prefixes": [
+        "crates/comfy_runtime/",
+        "crates/comfy_plugin_host/"
+      ],
+      "required_mappings": [
+        {
+          "name": "task412-runtime-authority-is-host-checked-and-provider-derived",
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "pattern": "ProviderRuntimeActivationGrant[\\s\\S]*pub fn bind\\([\\s\\S]*ProviderRuntimeAuthorityInput[\\s\\S]*provider_binding\\(\\)[\\s\\S]*implementation_namespace[\\s\\S]*provider_policy[\\s\\S]*\\.authorize\\("
+        },
+        {
+          "name": "task412-stream-service-retains-complete-v1-v2-lifecycle",
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "pattern": "pub struct ProviderRuntimeStreamService[\\s\\S]*impl ProviderRuntimeStreamService[\\s\\S]*pub fn start_request\\([\\s\\S]*pub fn write_request_chunk\\([\\s\\S]*pub fn accept_wait\\([\\s\\S]*pub fn start_upload\\([\\s\\S]*pub fn write_upload_chunk\\([\\s\\S]*pub fn accept_streaming_cost\\([\\s\\S]*pub fn deny_streaming_cost\\([\\s\\S]*pub fn report_progress\\([\\s\\S]*pub fn prepare_streaming_actuation\\([\\s\\S]*pub fn finish_streaming\\([\\s\\S]*pub fn revoke_stream\\([\\s\\S]*pub fn revoke_invocation\\([\\s\\S]*pub\\(crate\\) fn begin_legacy\\([\\s\\S]*pub\\(crate\\) fn call_legacy\\([\\s\\S]*pub\\(crate\\) fn resolve_legacy\\([\\s\\S]*pub\\(crate\\) fn finish_legacy\\([\\s\\S]*pub\\(crate\\) fn abort_legacy\\([\\s\\S]*pub fn revoke_all\\("
+        },
+        {
+          "name": "task412-raw-owner-remains-private-behind-service-lock",
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "pattern": "struct ProviderRuntimeStreamState[\\s\\S]*owner: ProviderRuntimeStreamOwner[\\s\\S]*pub struct ProviderRuntimeStreamService[\\s\\S]*state: Arc<Mutex<ProviderRuntimeStreamState>>[\\s\\S]*struct ProviderRuntimeStreamOwner[\\s\\S]*fn begin_streaming\\([\\s\\S]*fn write_streaming_request_chunk\\([\\s\\S]*fn accept_streaming_wait\\([\\s\\S]*fn finish_streaming\\("
+        },
+        {
+          "name": "task412-actuation-proposal-binds-authority-body-uploads-cost-and-idempotency",
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "pattern": "fn prepare_streaming_actuation\\([\\s\\S]*request_finished[\\s\\S]*upload_validators[\\s\\S]*accepted_cost_microunits[\\s\\S]*with_idempotency_key_sha256[\\s\\S]*ProviderRuntimeActuationProposal"
+        },
+        {
+          "name": "task412-controller-shares-service-and-delegates-v1-cleanup",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "provider_streams: ProviderRuntimeStreamService[\\s\\S]*ProviderRuntimeStreamService::new\\(\\)[\\s\\S]*provider_runtime_stream_service[\\s\\S]*\\.begin_legacy\\([\\s\\S]*\\.call_legacy\\([\\s\\S]*\\.resolve_legacy\\([\\s\\S]*\\.finish_legacy\\([\\s\\S]*abort_legacy\\([\\s\\S]*fn abort_provider_sessions\\([\\s\\S]*provider_streams\\.revoke_all\\("
+        },
+        {
+          "name": "task412-root-exports-runtime-stream-authority",
+          "path": "crates/comfy_runtime/src/comfy_runtime.rs",
+          "pattern": "pub use plugin_services::\\*;[\\s\\S]*pub use provider_materialization::\\*;[\\s\\S]*pub use trust::\\*;"
+        },
+        {
+          "name": "task412-v2-materialization-validates-before-canonical-projection",
+          "path": "crates/comfy_runtime/src/provider_materialization.rs",
+          "pattern": "pub fn materialize_provider_invocation_result_v2\\([\\s\\S]*verified_receipt[\\s\\S]*cancellation[\\s\\S]*result[\\s\\S]*\\.validate\\(registry\\)[\\s\\S]*ProviderTransportResponse::checked\\("
+        },
+        {
+          "name": "task412-ownership-oracle-proves-single-owner-and-root-export",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "val_ownership_task412_provider_runtime_stream_progress_001"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-provider-runtime-stream-progress-foundation"
+      ],
+      "production_consumers": [
+        "native provider capability-envelope sessions",
+        "provider-v2 component-host adapter",
+        "provider-v8 private-worker bridge"
+      ],
+      "requirements": [
+        "Requirement 12",
+        "Requirement 18",
+        "Requirement 28",
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 37",
+        "Requirement 40",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D12",
+        "D13",
+        "D18",
+        "D21",
+        "D22",
+        "D29",
+        "D32",
+        "D39",
+        "D40",
+        "D41"
+      ],
+      "validation": [
+        "VAL-PLUGIN-HOST-001",
+        "VAL-WORKER-PLUGIN-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-CANCEL-001",
+        "VAL-RECOVERY-005",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "ProviderRuntimeStreamService is the only public live-session authority and shares one private ProviderRuntimeStreamState and ProviderRuntimeStreamOwner across controller, component-host, and worker adapters. It retains v1 and v2 session tables, cumulative quotas and verified single-use cost accounting, sealed actuation proposals, retry and progress projection, terminal receipt state, and atomic revocation without exposing any network, credential, purchase, charge, or actuator capability. ABI validators, adapters, and the materializer retain no competing session state or authority."
     },
     {
       "concern": "recovery_receipts",

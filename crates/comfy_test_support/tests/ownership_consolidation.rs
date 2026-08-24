@@ -5,8 +5,14 @@ use comfy_plugin_host::AssetPluginCapabilityServices;
 use comfy_plugin_sdk::{CapabilityKind, CapabilityQuota, CapabilityRequest};
 use comfy_runtime::{
     AssetIdentity, AssetNamespace, AssetOperation, Capability, ExternalNavigationPolicy,
-    authorize_native_output_committer, authorize_native_output_ui,
-    authorize_native_plugin_asset_broker, open_native_profile_asset_service,
+    ProviderManifestAuthorizationV2, ProviderRuntimeActivationGrant,
+    ProviderRuntimeActivationGrantSource, ProviderRuntimeActuationProposal,
+    ProviderRuntimeAuthorityInput, ProviderRuntimeProgressProjection,
+    ProviderRuntimeReceiptIdentityV2, ProviderRuntimeReceiptIssuerV2, ProviderRuntimeReceiptV2,
+    ProviderRuntimeReceiptVerifierV2, ProviderRuntimeStreamService,
+    VerifiedProviderRuntimeReceiptV2, authorize_native_output_committer,
+    authorize_native_output_ui, authorize_native_plugin_asset_broker,
+    open_native_profile_asset_service,
 };
 use comfy_tensor::{
     BackendCapabilityMatrix, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext, StreamId,
@@ -19156,6 +19162,305 @@ fn val_ownership_task411_provider_worker_stream_protocol_001()
                             })
                         })
             }))
+    );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_task412_provider_runtime_stream_progress_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    fn assert_root_export<T>() {}
+
+    assert_root_export::<ProviderManifestAuthorizationV2>();
+    assert_root_export::<ProviderRuntimeActivationGrant>();
+    assert_root_export::<ProviderRuntimeActivationGrantSource>();
+    assert_root_export::<ProviderRuntimeActuationProposal>();
+    assert_root_export::<ProviderRuntimeAuthorityInput>();
+    assert_root_export::<ProviderRuntimeProgressProjection>();
+    assert_root_export::<ProviderRuntimeReceiptIdentityV2>();
+    assert_root_export::<ProviderRuntimeReceiptIssuerV2>();
+    assert_root_export::<ProviderRuntimeReceiptV2>();
+    assert_root_export::<ProviderRuntimeReceiptVerifierV2>();
+    assert_root_export::<ProviderRuntimeStreamService>();
+    assert_root_export::<VerifiedProviderRuntimeReceiptV2>();
+    let _materializer = comfy_runtime::materialize_provider_invocation_result_v2;
+
+    let root = repository_root()?;
+    let runtime_root = fs::read_to_string(root.join("crates/comfy_runtime/src/comfy_runtime.rs"))?;
+    let services = fs::read_to_string(root.join("crates/comfy_runtime/src/plugin_services.rs"))?;
+    let controller =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_execution_controller.rs"))?;
+    let component_host =
+        fs::read_to_string(root.join("crates/comfy_plugin_host/src/component_host.rs"))?;
+    for required in [
+        "pub use plugin_services::*;",
+        "pub use provider_materialization::*;",
+        "pub use trust::*;",
+    ] {
+        assert!(
+            runtime_root.contains(required),
+            "Task412 runtime root lacks {required}"
+        );
+    }
+    for required in [
+        "ProviderRuntimeActivationGrantSource",
+        "ProviderRuntimeActuationProposal",
+        "ProviderRuntimeAuthorityInput",
+        "ProviderRuntimeProgressProjection",
+        "ProviderRuntimeStreamService",
+        "ProviderRuntimeStreamOwner",
+        "start_request(",
+        "write_request_chunk(",
+        "accept_wait(",
+        "start_upload(",
+        "write_upload_chunk(",
+        "accept_streaming_cost(",
+        "deny_streaming_cost(",
+        "report_progress(",
+        "prepare_streaming_actuation(",
+        "finish_streaming(",
+        "revoke_stream(",
+        "revoke_invocation(",
+        "begin_legacy(",
+        "call_legacy(",
+        "resolve_legacy(",
+        "finish_legacy(",
+        "abort_legacy(",
+        "revoke_all(",
+    ] {
+        assert!(
+            services.contains(required),
+            "Task412 owner lacks {required}"
+        );
+    }
+    for required in [
+        "provider_streams: ProviderRuntimeStreamService",
+        "ProviderRuntimeStreamService::new()",
+        "provider_runtime_stream_service",
+        "begin_legacy(",
+        "call_legacy(",
+        "resolve_legacy(",
+        "finish_legacy(",
+        "abort_legacy(",
+        "abort_provider_sessions",
+        "revoke_all(",
+    ] {
+        assert!(
+            controller.contains(required),
+            "Task412 controller delegation lacks {required}"
+        );
+    }
+    assert!(
+        !controller.contains("provider_sessions: BTreeMap<String, PluginCapabilityInvocation>")
+    );
+    assert!(!controller.contains("pub struct ProviderRuntimeStreamService"));
+    assert!(!component_host.contains("pub struct ProviderRuntimeStreamOwner"));
+    assert!(!services.contains("pub struct ProviderRuntimeStreamOwner"));
+    assert!(!services.contains("pub struct ProviderRuntimeStreamState"));
+    assert!(services.contains("state: Arc<Mutex<ProviderRuntimeStreamState>>"));
+
+    let sources = rust_sources(&root)?
+        .into_iter()
+        .map(|path| fs::read_to_string(&path).map(|source| (path, source)))
+        .collect::<Result<Vec<_>, _>>()?;
+    let owner_declarations =
+        production_source_occurrences(&sources, "pub struct ProviderRuntimeStreamService");
+    assert_eq!(
+        owner_declarations.len(),
+        1,
+        "Task412 must retain exactly one public production stream service: {owner_declarations:?}"
+    );
+    assert!(
+        production_source_occurrences(&sources, "pub struct ProviderRuntimeStreamOwner").is_empty()
+    );
+    assert_eq!(
+        production_source_occurrences(&sources, "struct ProviderRuntimeStreamOwner").len(),
+        1,
+        "Task412 raw stream owner must remain one private implementation detail"
+    );
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("ownership policy has no concerns")?;
+    let stream_concern = concerns
+        .iter()
+        .find(|concern| {
+            concern.get("concern").and_then(serde_json::Value::as_str)
+                == Some("provider_runtime_stream_sessions")
+        })
+        .ok_or("Task412 stream ownership concern is missing")?;
+    assert_eq!(
+        stream_concern
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some("comfy_runtime::ProviderRuntimeStreamService")
+    );
+    let definition_names = stream_concern
+        .get("definitions")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("Task412 stream concern has no definitions")?
+        .iter()
+        .filter_map(|definition| definition.get("qualified")?.as_str())
+        .collect::<BTreeSet<_>>();
+    for required in [
+        "comfy_runtime::ProviderRuntimeStreamService",
+        "comfy_runtime::ProviderRuntimeStreamOwner",
+        "comfy_runtime::ProviderRuntimeActivationGrant",
+        "comfy_runtime::ProviderRuntimeActivationGrantSource",
+        "comfy_runtime::ProviderRuntimeActuationProposal",
+        "comfy_runtime::ProviderRuntimeAuthorityInput",
+        "comfy_runtime::ProviderRuntimeProgressProjection",
+        "comfy_runtime::materialize_provider_invocation_result_v2",
+    ] {
+        assert!(
+            definition_names.contains(required),
+            "Task412 ownership definitions lack {required}"
+        );
+    }
+    let mapping_names = stream_concern
+        .get("required_mappings")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("Task412 stream concern has no mappings")?
+        .iter()
+        .filter_map(|mapping| mapping.get("name")?.as_str())
+        .collect::<BTreeSet<_>>();
+    for required in [
+        "task412-runtime-authority-is-host-checked-and-provider-derived",
+        "task412-stream-service-retains-complete-v1-v2-lifecycle",
+        "task412-raw-owner-remains-private-behind-service-lock",
+        "task412-actuation-proposal-binds-authority-body-uploads-cost-and-idempotency",
+        "task412-controller-shares-service-and-delegates-v1-cleanup",
+        "task412-root-exports-runtime-stream-authority",
+        "task412-v2-materialization-validates-before-canonical-projection",
+        "task412-ownership-oracle-proves-single-owner-and-root-export",
+    ] {
+        assert!(
+            mapping_names.contains(required),
+            "Task412 ownership mappings lack {required}"
+        );
+    }
+
+    let task = "comfy-parity-provider-runtime-stream-progress-foundation";
+    for concern_name in [
+        "plugin_signature_verification",
+        "provider_request_authorization",
+        "provider_result_receipts",
+        "provider_runtime_stream_sessions",
+    ] {
+        let concern = concerns
+            .iter()
+            .find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str) == Some(concern_name)
+            })
+            .ok_or("Task412 extended ownership concern is missing")?;
+        assert!(
+            concern
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| tasks
+                    .iter()
+                    .any(|candidate| candidate.as_str() == Some(task))),
+            "Task412 is not mapped to {concern_name}"
+        );
+    }
+    for (concern_name, required_definitions, required_mappings) in [
+        (
+            "plugin_signature_verification",
+            &[(
+                "comfy_runtime::ProviderManifestAuthorizationV2",
+                "sealed_authorization",
+            )][..],
+            &["task412-provider-v2-outer-and-inner-signatures-precede-authorization"][..],
+        ),
+        (
+            "provider_request_authorization",
+            &[(
+                "comfy_runtime::ProviderRuntimeAuthorityInput",
+                "sealed_authorization",
+            )][..],
+            &["task412-runtime-authority-is-host-checked-and-provider-derived"][..],
+        ),
+        (
+            "provider_result_receipts",
+            &[
+                (
+                    "comfy_runtime::ProviderRuntimeReceiptIdentityV2",
+                    "canonical_identity",
+                ),
+                (
+                    "comfy_runtime::ProviderRuntimeReceiptV2",
+                    "sealed_authorization",
+                ),
+                (
+                    "comfy_runtime::ProviderRuntimeReceiptIssuerV2",
+                    "related_owner",
+                ),
+                (
+                    "comfy_runtime::ProviderRuntimeReceiptVerifierV2",
+                    "canonical",
+                ),
+                (
+                    "comfy_runtime::VerifiedProviderRuntimeReceiptV2",
+                    "sealed_authorization",
+                ),
+            ][..],
+            &[
+                "task412-runtime-receipts-use-a-distinct-sealed-v2-domain",
+                "task412-stream-owner-issues-the-exact-terminal-receipt",
+            ][..],
+        ),
+    ] {
+        let concern = concerns
+            .iter()
+            .find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str) == Some(concern_name)
+            })
+            .ok_or("Task412 extended ownership concern is missing")?;
+        let definitions = concern
+            .get("definitions")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("Task412 extended concern has no definitions")?;
+        for (qualified, role) in required_definitions {
+            assert!(
+                definitions.iter().any(|definition| {
+                    definition
+                        .get("qualified")
+                        .and_then(serde_json::Value::as_str)
+                        == Some(*qualified)
+                        && definition.get("role").and_then(serde_json::Value::as_str) == Some(*role)
+                }),
+                "Task412 {concern_name} lacks {qualified}/{role}"
+            );
+        }
+        let mappings = concern
+            .get("required_mappings")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("Task412 extended concern has no mappings")?;
+        for mapping_name in required_mappings {
+            assert!(
+                mappings.iter().any(|mapping| {
+                    mapping.get("name").and_then(serde_json::Value::as_str) == Some(*mapping_name)
+                }),
+                "Task412 {concern_name} lacks {mapping_name}"
+            );
+        }
+    }
+    let provider_receipts = concerns
+        .iter()
+        .find(|concern| {
+            concern.get("concern").and_then(serde_json::Value::as_str)
+                == Some("provider_result_receipts")
+        })
+        .ok_or("provider result receipt concern is missing")?;
+    assert_eq!(
+        provider_receipts
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some("comfy_runtime::{ProviderResultReceiptVerifier, ProviderRuntimeReceiptVerifierV2}")
     );
     Ok(())
 }

@@ -612,6 +612,8 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_plugin_host/src/capabilities.rs",
             provider_runtime_stream["writes"],
         )
+        self.assertIn("crates/comfy_model/tests/clip_tokenizer.rs", provider_runtime_stream["reads"])
+        self.assertIn("crates/comfy_model/tests/clip_tokenizer.rs", provider_runtime_stream["writes"])
         for path in (
             "crates/comfy_runtime/src/native_execution_controller.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
@@ -627,7 +629,9 @@ class ValidationGenerationTests(unittest.TestCase):
         ):
             self.assertIn(read_only_path, provider_runtime_stream["reads"])
             self.assertNotIn(read_only_path, provider_runtime_stream["writes"])
-        self.assertIn("ProviderRuntimeStreamOwner", provider_runtime_stream["done"])
+        self.assertIn("sole public ProviderRuntimeStreamService", provider_runtime_stream["done"])
+        self.assertIn("lock-private ProviderRuntimeStreamState", provider_runtime_stream["done"])
+        self.assertIn("no network, credential, purchase, charge, or actuator", provider_runtime_stream["done"])
         self.assertIn("Begin, Call, Resolve, Finish, Abort", provider_runtime_stream["done"])
         self.assertIn(
             "only the later component-host adapter task may construct",
@@ -642,6 +646,8 @@ class ValidationGenerationTests(unittest.TestCase):
             provider_runtime_stream["done"],
         )
         self.assertIn("comfy_plugin_host", provider_runtime_stream["validation_packages"])
+        self.assertIn("comfy_model", provider_runtime_stream["validation_packages"])
+        self.assertIn("tokenizer closure", provider_runtime_stream["done"])
         provider_input_host = tasks_by_id[
             "comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair"
         ]
