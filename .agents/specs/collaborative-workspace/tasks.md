@@ -2613,7 +2613,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 34. Port and complete workflows and approvals
 
-  - [ ] 34.1. Port workflow definition parsing and validation
+  - [x] 34.1. Port workflow definition parsing and validation
     - Parse versioned YAML definitions, conditions, steps, secrets references and bounded retry policy.
     - _Requirements: 13.1, 13.3_
     - _Capability IDs: CAP-027_
@@ -2621,6 +2621,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-workflow/**, projects/buzz/desktop/src/features/workflows/**_
     - _Writes: crates/collaboration_workflow/src/definition.rs_
     - _Validation: parser fixtures cover supported versions, invalid actions, secret literals and unbounded retries_
+    - _Discovered contradiction (2026-08-24): the planned standalone `definition.rs` write cannot compile or be consumed because `crates/collaboration_workflow` did not exist. The narrow correction adds only the crate manifest, descriptive crate root, workspace registration and dependency-boundary registration required to own and enforce the planned pure module. The Task 4.5 handoff also says Task 4.4 supplies definition/retry parser budgets, while the normative registry supplies only condition, delay/timeout, webhook and queue values. The parser therefore preserves those approved ceilings and adds conservative compile-time hard caps for the otherwise-unbounded hostile definition surface; raising any such cap remains subject to the registry's security-review rule._
+    - _Evidence: 2026-08-24 — added a pure domain parser for strict version-one YAML definitions with the five Buzz trigger classes, all seven Buzz action shapes, bounded conditions/templates, normalized cron validation, typed secret references and a closed finite exponential retry policy. Pre-parse scanning caps encoded bytes, YAML nodes and depth and rejects aliases, anchors, tags and multiple documents; typed validation rejects unknown fields/versions/triggers/actions, action-field smuggling, secret literals in declarations/sensitive headers/body assignments, undeclared secret references, secret-bearing conditions/destinations, duplicate or unsafe step IDs, invalid schedules/durations/timeouts and missing, infinite, zero-delay or over-ceiling retry parameters. Seven release fixtures pass for v1 compatibility, unknown versions/actions, literals versus references, retry limits, parser bombs, invalid cron and condition/field bounds. Warning-denied release Clippy passes; final dependency, inventory, specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 34.2. Add workflow definition, run and step schema
     - Create tenant/project-scoped definition versions, runs, steps and retry records with provenance.

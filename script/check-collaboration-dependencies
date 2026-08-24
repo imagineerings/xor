@@ -11,7 +11,7 @@ import subprocess
 import sys
 
 
-BOUNDARY_CRATES = ("collaboration_domain", "nostr_compat")
+BOUNDARY_CRATES = ("collaboration_domain", "collaboration_workflow", "nostr_compat")
 FORBIDDEN_PACKAGES = {
     "gpui": {
         "component",
@@ -141,7 +141,8 @@ for crate_name in BOUNDARY_CRATES:
 
 print(
     "Collaboration dependency boundary passed: "
-    "collaboration_domain=domain, nostr_compat=protocol-compatibility; "
+    "collaboration_domain=domain, collaboration_workflow=domain, "
+    "nostr_compat=protocol-compatibility; "
     "direct allowlists and resolved non-dev graphs are clean"
 )
 PY
