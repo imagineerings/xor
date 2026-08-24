@@ -443,6 +443,8 @@ impl WorkerSession {
             | WorkerMessage::RegistryDeploymentAck { .. }
             | WorkerMessage::RegistryDeploymentRejected { .. }
             | WorkerMessage::PluginCapabilityRequest { .. }
+            | WorkerMessage::ProviderStreamRequest { .. }
+            | WorkerMessage::ProviderStreamResponse { .. }
             | WorkerMessage::PluginResult { .. }
             | WorkerMessage::Fatal { .. } => return Err(WorkerSessionError::InvalidDirection),
         };
@@ -1985,6 +1987,32 @@ mod tests {
             )),
             Err(WorkerSessionError::InvalidDirection)
         );
+    }
+
+    #[test]
+    fn provider_stream_messages_are_rejected_until_the_canonical_bridge_is_active() {
+        let handle = comfy_types::WorkerProviderStreamHandle {
+            session_id: uuid::Uuid::from_u128(1),
+            session_generation: 1,
+            invocation: 1,
+            slot: 1,
+            generation: 1,
+        };
+        for message in [
+            WorkerMessage::ProviderStreamRequest {
+                call_id: 1,
+                request: comfy_types::WorkerProviderStreamRequest::CheckCancelled(handle),
+            },
+            WorkerMessage::ProviderStreamResponse {
+                call_id: 1,
+                response: comfy_types::WorkerProviderStreamResponse::Unit(Ok(())),
+            },
+        ] {
+            assert_eq!(
+                ready_session().handle(envelope(1, message)),
+                Err(WorkerSessionError::InvalidDirection)
+            );
+        }
     }
 
     #[test]

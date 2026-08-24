@@ -79,7 +79,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             | WorkerMessage::RegistryDeploymentChunk { .. }
             | WorkerMessage::RegistryDeploymentCommit { .. }
             | WorkerMessage::ExecutePlugin { .. }
-            | WorkerMessage::PluginCapabilityResponse { .. } => {
+            | WorkerMessage::PluginCapabilityResponse { .. }
+            | WorkerMessage::ProviderStreamResponse { .. } => {
                 return Err("fixture does not implement the component worker protocol".into());
             }
             WorkerMessage::HelloAck { .. }
@@ -90,6 +91,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             | WorkerMessage::RegistryDeploymentAck { .. }
             | WorkerMessage::RegistryDeploymentRejected { .. }
             | WorkerMessage::PluginCapabilityRequest { .. }
+            | WorkerMessage::ProviderStreamRequest { .. }
             | WorkerMessage::PluginResult { .. }
             | WorkerMessage::Fatal { .. } => {
                 return Err("supervisor sent a worker-only message".into());

@@ -8219,7 +8219,9 @@ fn run_ownership_validation(
                 && tensor_rocm_backend_production
                     .contains("properties.architecture().map(str::to_owned)")
                 && tensor_rocm_backend_production.contains("properties.has_fp16()")
-                && worker_protocol.contains("pub const WORKER_PROTOCOL_VERSION: u16 = 7;")
+                && worker_protocol.contains("pub const WORKER_PROTOCOL_VERSION: u16 = 8;")
+                && worker_protocol
+                    .contains("pub const PREVIOUS_WORKER_PROTOCOL_VERSION: u16 = 7;")
                 && worker_protocol
                     .contains("pub const LEGACY_WORKER_PROTOCOL_VERSION: u16 = 6;")
                 && worker_protocol.contains("pub struct WorkerNativeDeviceProperties")
@@ -19066,6 +19068,94 @@ fn val_ownership_task406_sdpose_head_projection_001() -> Result<(), Box<dyn std:
             })
             .count()
             >= 2
+    );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_task411_provider_worker_stream_protocol_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let protocol = fs::read_to_string(root.join("crates/comfy_types/src/worker_protocol.rs"))?;
+    let types_manifest = fs::read_to_string(root.join("crates/comfy_types/Cargo.toml"))?;
+    let worker = fs::read_to_string(root.join("crates/comfy_worker/src/supervisor.rs"))?;
+    let runtime = fs::read_to_string(root.join("crates/comfy_runtime/src/runtime_supervisor.rs"))?;
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs"),
+    )?;
+    for required in [
+        "pub const WORKER_PROTOCOL_VERSION: u16 = 8;",
+        "pub const PREVIOUS_WORKER_PROTOCOL_VERSION: u16 = 7;",
+        "pub const LEGACY_WORKER_PROTOCOL_VERSION: u16 = 6;",
+        "ProviderStreamRequest {",
+        "ProviderStreamResponse {",
+        "pub struct WorkerProviderStreamTransportValidator",
+        "pub fn checked_for_host_session(",
+        "pub fn revoke(&mut self)",
+        "postcard::take_from_bytes::<u16>(payload)",
+        "protocol_v8_preserves_every_pre_v8_worker_message_discriminant",
+        "every_provider_stream_message_shape_round_trips_through_the_worker_envelope",
+        "malformed_provider_stream_messages_fail_before_routing",
+    ] {
+        assert!(
+            protocol.contains(required),
+            "Task411 protocol lacks {required}"
+        );
+    }
+    let validator_declaration = protocol
+        .split_once("pub struct WorkerProviderStreamTransportValidator")
+        .map(|(prefix, _)| {
+            prefix
+                .rsplit_once("#[derive(")
+                .map_or(prefix, |(_, tail)| tail)
+        })
+        .ok_or("Task411 transport validator declaration is missing")?;
+    assert!(!validator_declaration.contains("Clone"));
+    assert!(types_manifest.contains("sha2.workspace = true"));
+    for (owner, source) in [
+        ("worker", worker),
+        ("runtime", runtime),
+        ("fixture", fixture),
+    ] {
+        assert!(
+            source.contains("ProviderStreamRequest"),
+            "{owner} lacks request gate"
+        );
+        assert!(
+            source.contains("ProviderStreamResponse"),
+            "{owner} lacks response gate"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let task = "comfy-parity-provider-worker-stream-protocol";
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks
+                            .iter()
+                            .any(|candidate| candidate.as_str() == Some(task))
+                    })
+                    && concern
+                        .get("allowed_adapters")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|adapters| {
+                            adapters.iter().any(|adapter| {
+                                adapter.as_str().is_some_and(|adapter| {
+                                    adapter.contains("WorkerProviderStreamTransportValidator")
+                                        && adapter.contains("host-issued session")
+                                })
+                            })
+                        })
+            }))
     );
     Ok(())
 }

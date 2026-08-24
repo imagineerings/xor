@@ -1864,7 +1864,7 @@
         "synchronize_device_exact_native"
       ],
       "allowed_adapters": [
-        "WorkerBackendCapabilities and WorkerNativeDeviceProperties are bounded private worker protocol 7 DTOs using operation-support schema 2 with checked bidirectional conversion to BackendCapabilityMatrix and canonical NativeDeviceProperties; the DTOs own only wire bounds, while protocol-6 and schema-1/V1 layouts remain rejected compatibility boundaries with pinned discriminants and cannot execute through a protocol-7 peer",
+        "WorkerBackendCapabilities and WorkerNativeDeviceProperties are bounded private worker protocol 8 DTOs using operation-support schema 2 with checked bidirectional conversion to BackendCapabilityMatrix and canonical NativeDeviceProperties; the DTOs own only wire bounds, while protocol-7, protocol-6, and schema-1/V1 layouts remain rejected compatibility boundaries with pinned discriminants and cannot execute through a protocol-8 peer",
         "RocmDeviceProperties is an ABI boundary DTO only; RuntimeAdapter maps its device name, total memory, version, architecture, and fp16 facts into NativeDeviceProperties::new, which remains the sole semantic validator",
         "NativeBackendBindingStatus reports ABI binding only and cannot advertise semantic support",
         "comfy_model::NativeExecutionRequirements is an immutable deduplicated operation-requirement adapter only; canonical admission must receive the actual TensorBackend and requested target, derive that instance's current matrix, and prove backend, matrix, requested device, dtype, layout, stream, event, and exact operation equality before effects; CLIP text, CLIP vision, NativeModule materialization/forward, VBAR casting, and loaded architecture construction cannot retain local admission owners or accept an arbitrary matrix as authority",
@@ -2039,7 +2039,7 @@
         {
           "name": "task104-worker-protocol-6-schema-2-preserves-v1-decode-only-boundary",
           "path": "crates/comfy_types/src/worker_protocol.rs",
-          "pattern": "(?=[\\s\\S]*WORKER_PROTOCOL_VERSION: u16 = 7)(?=[\\s\\S]*LEGACY_WORKER_PROTOCOL_VERSION: u16 = 6)(?=[\\s\\S]*WORKER_OPERATION_SUPPORT_VERSION: u16 = 2)(?=[\\s\\S]*LEGACY_WORKER_OPERATION_SUPPORT_VERSION: u16 = 1)(?=[\\s\\S]*pub struct WorkerNativeDeviceProperties)(?=[\\s\\S]*pub enum WorkerPrimitiveOperationV1)(?=[\\s\\S]*pub enum WorkerPrimitiveOperationV2)(?=[\\s\\S]*LinearAlgebra)"
+          "pattern": "(?=[\\s\\S]*WORKER_PROTOCOL_VERSION: u16 = 8)(?=[\\s\\S]*PREVIOUS_WORKER_PROTOCOL_VERSION: u16 = 7)(?=[\\s\\S]*LEGACY_WORKER_PROTOCOL_VERSION: u16 = 6)(?=[\\s\\S]*WORKER_OPERATION_SUPPORT_VERSION: u16 = 2)(?=[\\s\\S]*LEGACY_WORKER_OPERATION_SUPPORT_VERSION: u16 = 1)(?=[\\s\\S]*pub struct WorkerNativeDeviceProperties)(?=[\\s\\S]*pub enum WorkerPrimitiveOperationV1)(?=[\\s\\S]*pub enum WorkerPrimitiveOperationV2)(?=[\\s\\S]*LinearAlgebra)"
         },
         {
           "name": "worker-properties-map-through-canonical-native-device-validation",
@@ -2225,7 +2225,7 @@
         "VAL-OWNERSHIP-DOMAIN-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "Backend support, dtype, layout, device certification, validated native device properties, deterministic-operation certification, and library certification have one typed matrix; worker negotiation may serialize semantic support but cannot independently decide it. The private worker protocol is version 7 and operation-support schema 2; its bounded device-property DTO maps every field through canonical NativeDeviceProperties validation, protocol-6 peers are rejected before changed-payload decoding, exact schema-1/V1 discriminants remain pinned, and the V2 primitive conversion is exhaustive. RocmDeviceProperties is an ABI DTO whose device, name, memory, version, architecture, and fp16 facts are mapped without semantic validation into NativeDeviceProperties::new, the sole property validator. Task 43 CUDA/XPU adapters project exact facts, Task 44 reports cuDNN false because no current matrix row certifies that ABI, Task 47 and Task 65 map source set-device into the same explicit functional matrix selection, Task 65 CUDA/ROCm naming and all earlier names use the same property validator, and the remaining adapters only project caller-owned matrix facts. None probes a Python process, keeps process-global device state, or independently advertises support."
+      "decision_reason": "Backend support, dtype, layout, device certification, validated native device properties, deterministic-operation certification, and library certification have one typed matrix; worker negotiation may serialize semantic support but cannot independently decide it. The private worker protocol is version 8 and operation-support schema 2; its bounded device-property DTO maps every field through canonical NativeDeviceProperties validation, protocol-7 and protocol-6 peers are rejected before changed-payload decoding, exact schema-1/V1 discriminants remain pinned, and the V2 primitive conversion is exhaustive. RocmDeviceProperties is an ABI DTO whose device, name, memory, version, architecture, and fp16 facts are mapped without semantic validation into NativeDeviceProperties::new, the sole property validator. Task 43 CUDA/XPU adapters project exact facts, Task 44 reports cuDNN false because no current matrix row certifies that ABI, Task 47 and Task 65 map source set-device into the same explicit functional matrix selection, Task 65 CUDA/ROCm naming and all earlier names use the same property validator, and the remaining adapters only project caller-owned matrix facts. None probes a Python process, keeps process-global device state, or independently advertises support."
     },
     {
       "concern": "cancellation",
@@ -20443,6 +20443,7 @@
       ],
       "allowed_adapters": [
         "comfy_plugin_sdk network-provider capability is an ABI DTO mapped to ProviderPolicy authorization",
+        "comfy_types::WorkerProviderStreamTransportValidator owns only protocol-v8 wire bounds, sequence state, generation-scoped handle validation, incremental upload SHA-256, cancellation observation, and revocation; the later runtime bridge must look up its host-issued session identifier in a pre-existing sealed activation table before routing and cannot derive provider or authorization from worker fields",
         "provider implementations consume AuthorizedProviderRequest and own protocol execution plus transport-syntax conversion only; they cannot repeat scheme, authority, host, query, fragment, profile, subject, provider, endpoint, or credential authorization",
         "Task 20 binds checked provider and credential scopes to the authenticated plugin authorization and verified native component measurement before provider or secret effects"
       ],
@@ -20464,12 +20465,19 @@
           "qualified": "comfy_plugin_sdk::CapabilityRequest",
           "role": "boundary_dto",
           "symbol": "CapabilityRequest"
+        },
+        {
+          "path": "crates/comfy_types/src/worker_protocol.rs",
+          "qualified": "comfy_types::WorkerProviderStreamTransportValidator",
+          "role": "allowed_adapter",
+          "symbol": "WorkerProviderStreamTransportValidator"
         }
       ],
       "call_symbols": [
         "AuthorizedProviderRequest",
         "CapabilityRequest",
-        "ProviderPolicy"
+        "ProviderPolicy",
+        "WorkerProviderStreamTransportValidator"
       ],
       "required_mappings": [
         {
@@ -20486,7 +20494,8 @@
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-trust-foundation",
-        "comfy-parity-authoritative-domain-ownership"
+        "comfy-parity-authoritative-domain-ownership",
+        "comfy-parity-provider-worker-stream-protocol"
       ],
       "production_consumers": [
         "native provider services",
@@ -21426,7 +21435,7 @@
       "allowed_adapters": [
         "WorkerBackendSelection is a launch configuration DTO that carries the canonical profile decision but owns no backend resources, certification, capability facts, or fallback policy",
         "initialize_worker_backend is the focused CPU/ROCm/Metal/MLU/NPU/CUDA/XPU/DirectML construction adapter; comfy_runtime returns only certified retained runtime or session resources after signed-package verification and registry certification, then the worker's exact feature conjunction constructs the canonical semantic TensorBackend and pairs it with its BackendWorkspaceAuthority",
-        "WorkerSession owns one WorkerBackendSession for the process lifetime and maps its accepted BackendCapabilityMatrix plus canonical NativeDeviceProperties to bounded protocol-7 WorkerBackendCapabilities and WorkerNativeDeviceProperties DTOs",
+        "WorkerSession owns one WorkerBackendSession for the process lifetime and maps its accepted BackendCapabilityMatrix plus canonical NativeDeviceProperties to bounded protocol-8 WorkerBackendCapabilities and WorkerNativeDeviceProperties DTOs",
         "MLU, NPU, CUDA, XPU, and DirectML vendor sessions are focused native-resource adapters only; WorkerBackendSession remains the sole owner that retains their production semantic TensorBackend and paired BackendWorkspaceAuthority and performs readiness",
         "RuntimeSupervisor owns process negotiation and validates its requested readiness subset against the accepted instance matrix without constructing or mutating backend resources",
         "NativeExecutionController and GPUI project accepted device and memory facts but do not validate capability rows or own allocator state"
@@ -21572,7 +21581,7 @@
         "VAL-NATIVE-E2E-002",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "WorkerBackendSession is the only owner that pairs a selected Arc<dyn TensorBackend> with its non-cloneable BackendWorkspaceAuthority, runs the real workspace-reservation/allocation/transfer/event readiness transaction, and retains the backend resources for the worker process lifetime. TensorBackend::reserve_workspace is the object-safe canonical backend adapter to the existing backend-neutral lease transaction; durable returned tensors remain separately governed by the exact backend capacity owner. Protocol-7 WorkerBackendCapabilities and WorkerNativeDeviceProperties are bounded ABI DTOs that map explicitly through BackendCapabilityMatrix and NativeDeviceProperties, which alone validate semantic capability and device facts. Runtime configuration, certification factories, controllers, and GPUI are focused adapters that only project the accepted name, architecture, physical capacity, and effective ceiling; none may repeat readiness, capability validation, allocator state, workspace authorization, or fallback decisions."
+      "decision_reason": "WorkerBackendSession is the only owner that pairs a selected Arc<dyn TensorBackend> with its non-cloneable BackendWorkspaceAuthority, runs the real workspace-reservation/allocation/transfer/event readiness transaction, and retains the backend resources for the worker process lifetime. TensorBackend::reserve_workspace is the object-safe canonical backend adapter to the existing backend-neutral lease transaction; durable returned tensors remain separately governed by the exact backend capacity owner. Protocol-8 WorkerBackendCapabilities and WorkerNativeDeviceProperties are bounded ABI DTOs that map explicitly through BackendCapabilityMatrix and NativeDeviceProperties, which alone validate semantic capability and device facts. Runtime configuration, certification factories, controllers, and GPUI are focused adapters that only project the accepted name, architecture, physical capacity, and effective ceiling; none may repeat readiness, capability validation, allocator state, workspace authorization, or fallback decisions."
     },
     {
       "concern": "sqlite_runtime_operational_persistence",

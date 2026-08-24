@@ -1146,6 +1146,8 @@ impl From<&WorkerMessage> for RequestKind {
             | WorkerMessage::RegistryDeploymentRejected { .. }
             | WorkerMessage::PluginCapabilityRequest { .. }
             | WorkerMessage::PluginCapabilityResponse { .. }
+            | WorkerMessage::ProviderStreamRequest { .. }
+            | WorkerMessage::ProviderStreamResponse { .. }
             | WorkerMessage::PluginResult { .. }
             | WorkerMessage::Heartbeat
             | WorkerMessage::Fatal { .. } => Self::Other,
@@ -1341,6 +1343,18 @@ impl SupervisorShared {
                 if scope.kind == RequestKind::RegistryDeployment => {}
             WorkerMessage::RegistryDeploymentRejected { .. }
                 if scope.kind == RequestKind::RegistryDeployment => {}
+            WorkerMessage::ProviderStreamRequest { .. }
+            | WorkerMessage::ProviderStreamResponse { .. } => {
+                let error = RuntimeSupervisorError::Protocol(
+                    "provider stream routing is unavailable until the canonical bridge is active"
+                        .to_owned(),
+                );
+                self.snapshot.health = WorkerHealth::ProtocolIncompatible {
+                    reason: error.to_string(),
+                };
+                self.fail(&error);
+                return Err(error);
+            }
             WorkerMessage::Event { event }
                 if matches!(scope.kind, RequestKind::Execute | RequestKind::Cancel)
                     && postcard::from_bytes::<crate::NativeImageWorkerEvent>(event).is_ok_and(
@@ -2654,6 +2668,43 @@ mod tests {
             shared.snapshot.health,
             WorkerHealth::ProtocolIncompatible { .. }
         ));
+    }
+
+    #[test]
+    fn provider_stream_messages_are_rejected_until_the_canonical_bridge_is_active() {
+        for message in [
+            WorkerMessage::ProviderStreamRequest {
+                call_id: 1,
+                request: comfy_types::WorkerProviderStreamRequest::CheckCancelled(
+                    comfy_types::WorkerProviderStreamHandle {
+                        session_id: Uuid::from_u128(1),
+                        session_generation: 1,
+                        invocation: 1,
+                        slot: 1,
+                        generation: 1,
+                    },
+                ),
+            },
+            WorkerMessage::ProviderStreamResponse {
+                call_id: 1,
+                response: comfy_types::WorkerProviderStreamResponse::Unit(Ok(())),
+            },
+        ] {
+            let (mut shared, request_id) = shared();
+            let message = envelope(&shared, request_id, 0, message);
+            let error = shared
+                .accept(&message)
+                .expect_err("provider streaming is not routed before Task414");
+            assert!(matches!(
+                error,
+                RuntimeSupervisorError::Protocol(message)
+                    if message.contains("canonical bridge")
+            ));
+            assert!(matches!(
+                shared.snapshot.health,
+                WorkerHealth::ProtocolIncompatible { .. }
+            ));
+        }
     }
 
     #[test]

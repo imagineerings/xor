@@ -1,12 +1,14 @@
 use std::{collections::BTreeMap, num::NonZeroU64};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{AttemptId, DeviceKind, PromptId};
+use crate::{AttemptId, CancellationToken, DeviceKind, PromptId};
 
-pub const WORKER_PROTOCOL_VERSION: u16 = 7;
+pub const WORKER_PROTOCOL_VERSION: u16 = 8;
+pub const PREVIOUS_WORKER_PROTOCOL_VERSION: u16 = 7;
 pub const LEGACY_WORKER_PROTOCOL_VERSION: u16 = 6;
 pub const WORKER_REGISTRY_DEPLOYMENT_REJECTION_VERSION: u16 = 1;
 pub const MAX_WORKER_FRAME_BYTES: usize = 16 * 1024 * 1024;
@@ -29,6 +31,22 @@ pub const MAX_WORKER_PLUGIN_RESULT_BYTES: usize = 12 * 1024 * 1024;
 pub const MAX_WORKER_PLUGIN_DIAGNOSTIC_CHARS: usize = 4_096;
 pub const MAX_WORKER_FATAL_CODE_BYTES: usize = 128;
 pub const MAX_WORKER_FATAL_MESSAGE_BYTES: usize = 4_096;
+pub const MAX_WORKER_PROVIDER_HEADERS: usize = 256;
+pub const MAX_WORKER_PROVIDER_HEADER_NAME_BYTES: usize = 256;
+pub const MAX_WORKER_PROVIDER_HEADER_VALUE_BYTES: usize = 8 * 1024;
+pub const MAX_WORKER_PROVIDER_HEADER_BYTES: usize = 256 * 1024;
+pub const MAX_WORKER_PROVIDER_BODY_BYTES: u64 = 64 * 1024 * 1024;
+pub const MAX_WORKER_PROVIDER_CHUNK_BYTES: usize = 1024 * 1024;
+pub const MAX_WORKER_PROVIDER_NDJSON_LINE_BYTES: usize = 1024 * 1024;
+pub const MAX_WORKER_PROVIDER_WAIT_MILLISECONDS: u64 = 60_000;
+pub const MAX_WORKER_PROVIDER_UPLOADS: u32 = 128;
+pub const MAX_WORKER_PROVIDER_COST_REQUESTS: u32 = 64;
+pub const MAX_WORKER_PROVIDER_PROGRESS_TOTAL: u64 = 1_000_000_000;
+pub const MAX_WORKER_PROVIDER_PROGRESS_MESSAGE_BYTES: usize = 1024;
+pub const MAX_WORKER_PROVIDER_RECEIPT_BYTES: usize = 32 * 1024;
+pub const MAX_WORKER_PROVIDER_PENDING_CALLS: usize = 1;
+pub const MAX_WORKER_PROVIDER_ENDPOINT_BYTES: usize = 2_048;
+pub const MAX_WORKER_PROVIDER_SECRET_ID_BYTES: usize = 1_024;
 pub const WORKER_OPERATION_SUPPORT_VERSION: u16 = 2;
 pub const LEGACY_WORKER_OPERATION_SUPPORT_VERSION: u16 = 1;
 pub const WORKER_REGISTRY_DIGEST_DOMAIN: &[u8] = b"zed-comfy-worker-registry-v1";
@@ -1544,6 +1562,1168 @@ impl<'de> Deserialize<'de> for WorkerOutputProposal {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerProviderHttpMethod {
+    Delete,
+    Get,
+    Head,
+    Options,
+    Patch,
+    Post,
+    Put,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderHeader {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderInvocationContext {
+    pub session_id: Uuid,
+    pub session_generation: u64,
+    pub invocation: u64,
+    pub generation: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderStreamHandle {
+    pub session_id: Uuid,
+    pub session_generation: u64,
+    pub invocation: u64,
+    pub slot: u32,
+    pub generation: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderStreamingContract {
+    pub methods: Vec<WorkerProviderHttpMethod>,
+    pub maximum_headers: u16,
+    pub maximum_header_bytes: u32,
+    pub maximum_request_body_bytes: u64,
+    pub maximum_response_body_bytes: u64,
+    pub maximum_chunk_bytes: u32,
+    pub maximum_ndjson_line_bytes: u32,
+    pub maximum_wait_milliseconds: u64,
+    pub maximum_uploads: u32,
+    pub maximum_upload_body_bytes: u64,
+    pub maximum_cost_requests: u32,
+    pub maximum_progress_total: u64,
+    pub uploads: bool,
+    pub cost_requests: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderRequestHead {
+    pub endpoint: String,
+    pub secret_id: Option<String>,
+    pub method: WorkerProviderHttpMethod,
+    pub headers: Vec<WorkerProviderHeader>,
+    pub declared_body_bytes: Option<u64>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderRequestChunk {
+    pub handle: WorkerProviderStreamHandle,
+    pub sequence: u64,
+    pub bytes: Vec<u8>,
+    pub end: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderResponseHead {
+    pub status: u16,
+    pub headers: Vec<WorkerProviderHeader>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerProviderResponseChunk {
+    Binary(Vec<u8>),
+    Text(String),
+    NdjsonLine(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerProviderTerminal {
+    Completed(Vec<u8>),
+    Failed { code: String, message: String },
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerProviderResponseFrameEvent {
+    Head(WorkerProviderResponseHead),
+    Chunk(WorkerProviderResponseChunk),
+    Terminal(WorkerProviderTerminal),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderResponseFrame {
+    pub handle: WorkerProviderStreamHandle,
+    pub sequence: u64,
+    pub event: WorkerProviderResponseFrameEvent,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderWaitRequest {
+    pub handle: WorkerProviderStreamHandle,
+    pub after_sequence: Option<u64>,
+    pub timeout_milliseconds: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerProviderWaitOutcome {
+    Frame(WorkerProviderResponseFrame),
+    TimedOut,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderUploadRequest {
+    pub handle: WorkerProviderStreamHandle,
+    pub port_id: String,
+    pub media_type: String,
+    pub byte_length: u64,
+    pub content_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderCostRequest {
+    pub handle: WorkerProviderStreamHandle,
+    pub operation: String,
+    pub currency: String,
+    pub maximum_microunits: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderCostResponse {
+    pub accepted: bool,
+    pub approved_microunits: u64,
+    pub receipt: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderProgress {
+    pub handle: WorkerProviderStreamHandle,
+    pub sequence: u64,
+    pub completed: u64,
+    pub total: u64,
+    pub message: Option<String>,
+}
+
+#[derive(Clone, Debug, Error, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerProviderStreamError {
+    #[error("provider stream operation was cancelled")]
+    Cancelled,
+    #[error("provider stream operation timed out")]
+    TimedOut,
+    #[error("provider stream host failed")]
+    HostFailure,
+    #[error("provider streaming contract is invalid")]
+    InvalidContract,
+    #[error("provider stream handle is invalid")]
+    InvalidHandle,
+    #[error("provider stream handle belongs to a different stream")]
+    ForeignHandle,
+    #[error("provider stream handle was revoked")]
+    RevokedHandle,
+    #[error("provider HTTP method is invalid")]
+    InvalidMethod,
+    #[error("provider HTTP headers are invalid")]
+    InvalidHeaders,
+    #[error("provider stream body exceeds its bound")]
+    BodyLimit,
+    #[error("provider stream chunk exceeds its bound")]
+    ChunkLimit,
+    #[error("provider stream NDJSON line is invalid")]
+    InvalidNdjsonLine,
+    #[error("provider stream sequence is invalid")]
+    InvalidSequence,
+    #[error("provider stream operation order is invalid")]
+    InvalidOrder,
+    #[error("provider stream wait exceeds its bound")]
+    WaitLimit,
+    #[error("provider stream upload is invalid")]
+    InvalidUpload,
+    #[error("provider stream cost request is invalid")]
+    InvalidCostRequest,
+    #[error("provider stream progress is invalid")]
+    InvalidProgress,
+    #[error("provider stream terminal is invalid")]
+    InvalidTerminal,
+    #[error("provider invocation result is invalid")]
+    InvalidInvocationResult,
+    #[error("provider request authority is invalid")]
+    InvalidRequestAuthority,
+    #[error("provider stream session is foreign")]
+    ForeignSession,
+    #[error("provider stream belongs to a stale session generation")]
+    StaleSession,
+    #[error("provider stream belongs to a different invocation")]
+    ForeignInvocation,
+    #[error("provider stream belongs to a stale invocation generation")]
+    StaleGeneration,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerProviderStreamRequest {
+    StartRequest {
+        context: WorkerProviderInvocationContext,
+        head: WorkerProviderRequestHead,
+    },
+    WriteRequestChunk(WorkerProviderRequestChunk),
+    WaitResponse(WorkerProviderWaitRequest),
+    StartUpload(WorkerProviderUploadRequest),
+    WriteUploadChunk(WorkerProviderRequestChunk),
+    RequestCost(WorkerProviderCostRequest),
+    ReportProgress(WorkerProviderProgress),
+    CheckCancelled(WorkerProviderStreamHandle),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerProviderStreamResponse {
+    Stream(Result<WorkerProviderStreamHandle, WorkerProviderStreamError>),
+    Unit(Result<(), WorkerProviderStreamError>),
+    Wait(Result<WorkerProviderWaitOutcome, WorkerProviderStreamError>),
+    Cost(Result<WorkerProviderCostResponse, WorkerProviderStreamError>),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum WorkerProviderPendingResponse {
+    PrimaryStream,
+    UploadStream {
+        byte_length: u64,
+        content_sha256: String,
+    },
+    Unit,
+    Wait,
+    Cost {
+        maximum_microunits: u64,
+    },
+}
+
+#[derive(Debug)]
+struct WorkerProviderUploadState {
+    expected_bytes: u64,
+    expected_sha256: String,
+    received_bytes: u64,
+    next_sequence: u64,
+    digest: Sha256,
+    terminal: bool,
+}
+
+#[derive(Debug)]
+pub struct WorkerProviderStreamTransportValidator {
+    context: WorkerProviderInvocationContext,
+    contract: WorkerProviderStreamingContract,
+    handle: Option<WorkerProviderStreamHandle>,
+    pending: BTreeMap<u64, WorkerProviderPendingResponse>,
+    last_admitted_call_id: u64,
+    request_method: Option<WorkerProviderHttpMethod>,
+    declared_request_bytes: Option<u64>,
+    request_sequence: u64,
+    request_bytes: u64,
+    request_ended: bool,
+    response_sequence: u64,
+    response_bytes: u64,
+    response_head_seen: bool,
+    response_status: Option<u16>,
+    last_response_sequence: Option<u64>,
+    terminal: bool,
+    revoked: bool,
+    progress_sequence: u64,
+    progress_completed: u64,
+    progress_total: Option<u64>,
+    upload_count: u32,
+    upload_bytes: u64,
+    uploads: BTreeMap<WorkerProviderStreamHandle, WorkerProviderUploadState>,
+    cost_request_count: u32,
+    cancellation: CancellationToken,
+}
+
+impl WorkerProviderStreamTransportValidator {
+    pub fn checked_for_host_session(
+        expected_host_context: WorkerProviderInvocationContext,
+        contract: WorkerProviderStreamingContract,
+        cancellation: CancellationToken,
+    ) -> Result<Self, WorkerProviderStreamError> {
+        validate_provider_context(&expected_host_context)?;
+        validate_provider_contract(&contract)?;
+        Ok(Self {
+            context: expected_host_context,
+            contract,
+            handle: None,
+            pending: BTreeMap::new(),
+            last_admitted_call_id: 0,
+            request_method: None,
+            declared_request_bytes: None,
+            request_sequence: 0,
+            request_bytes: 0,
+            request_ended: false,
+            response_sequence: 0,
+            response_bytes: 0,
+            response_head_seen: false,
+            response_status: None,
+            last_response_sequence: None,
+            terminal: false,
+            revoked: false,
+            progress_sequence: 0,
+            progress_completed: 0,
+            progress_total: None,
+            upload_count: 0,
+            upload_bytes: 0,
+            uploads: BTreeMap::new(),
+            cost_request_count: 0,
+            cancellation,
+        })
+    }
+
+    pub fn validate_request(
+        &mut self,
+        call_id: u64,
+        request: &WorkerProviderStreamRequest,
+    ) -> Result<(), WorkerProviderStreamError> {
+        self.check_active()?;
+        if call_id == 0
+            || call_id <= self.last_admitted_call_id
+            || self.pending.len() >= MAX_WORKER_PROVIDER_PENDING_CALLS
+        {
+            return Err(WorkerProviderStreamError::InvalidOrder);
+        }
+        let pending = match request {
+            WorkerProviderStreamRequest::StartRequest { context, head } => {
+                self.validate_context(context)?;
+                if self.handle.is_some() || self.request_method.is_some() {
+                    return Err(WorkerProviderStreamError::InvalidOrder);
+                }
+                validate_provider_request_head(head, &self.contract)?;
+                self.request_method = Some(head.method);
+                self.declared_request_bytes = head.declared_body_bytes;
+                WorkerProviderPendingResponse::PrimaryStream
+            }
+            WorkerProviderStreamRequest::WriteRequestChunk(chunk) => {
+                self.validate_request_chunk(chunk)?;
+                WorkerProviderPendingResponse::Unit
+            }
+            WorkerProviderStreamRequest::WaitResponse(request) => {
+                self.validate_handle(request.handle)?;
+                if request.timeout_milliseconds == 0
+                    || request.timeout_milliseconds > self.contract.maximum_wait_milliseconds
+                    || request.timeout_milliseconds > MAX_WORKER_PROVIDER_WAIT_MILLISECONDS
+                {
+                    return Err(WorkerProviderStreamError::WaitLimit);
+                }
+                if request.after_sequence != self.last_response_sequence {
+                    return Err(WorkerProviderStreamError::InvalidSequence);
+                }
+                WorkerProviderPendingResponse::Wait
+            }
+            WorkerProviderStreamRequest::StartUpload(request) => {
+                self.validate_handle(request.handle)?;
+                if !self.contract.uploads {
+                    return Err(WorkerProviderStreamError::InvalidUpload);
+                }
+                validate_upload_request(request, &self.contract)?;
+                let reserved_uploads = self
+                    .pending
+                    .values()
+                    .filter(|pending| {
+                        matches!(pending, WorkerProviderPendingResponse::UploadStream { .. })
+                    })
+                    .count();
+                let reserved_bytes = self.pending.values().try_fold(0_u64, |total, pending| {
+                    let bytes = match pending {
+                        WorkerProviderPendingResponse::UploadStream { byte_length, .. } => {
+                            *byte_length
+                        }
+                        _ => 0,
+                    };
+                    total
+                        .checked_add(bytes)
+                        .ok_or(WorkerProviderStreamError::InvalidUpload)
+                })?;
+                let total_uploads = usize::try_from(self.upload_count)
+                    .map_err(|_| WorkerProviderStreamError::InvalidUpload)?
+                    .checked_add(reserved_uploads)
+                    .and_then(|count| count.checked_add(1))
+                    .ok_or(WorkerProviderStreamError::InvalidUpload)?;
+                let total_upload_bytes = self
+                    .upload_bytes
+                    .checked_add(reserved_bytes)
+                    .and_then(|bytes| bytes.checked_add(request.byte_length))
+                    .ok_or(WorkerProviderStreamError::InvalidUpload)?;
+                if total_uploads > self.contract.maximum_uploads as usize
+                    || total_uploads > MAX_WORKER_PROVIDER_UPLOADS as usize
+                    || total_upload_bytes > self.contract.maximum_upload_body_bytes
+                {
+                    return Err(WorkerProviderStreamError::InvalidUpload);
+                }
+                WorkerProviderPendingResponse::UploadStream {
+                    byte_length: request.byte_length,
+                    content_sha256: request.content_sha256.clone(),
+                }
+            }
+            WorkerProviderStreamRequest::WriteUploadChunk(chunk) => {
+                self.validate_upload_chunk(chunk)?;
+                WorkerProviderPendingResponse::Unit
+            }
+            WorkerProviderStreamRequest::RequestCost(request) => {
+                self.validate_handle(request.handle)?;
+                if !self.contract.cost_requests {
+                    return Err(WorkerProviderStreamError::InvalidCostRequest);
+                }
+                if !valid_dotted_identifier(&request.operation)
+                    || request.currency.len() != 3
+                    || !request
+                        .currency
+                        .bytes()
+                        .all(|byte| byte.is_ascii_uppercase())
+                    || request.maximum_microunits == 0
+                {
+                    return Err(WorkerProviderStreamError::InvalidCostRequest);
+                }
+                let reserved_costs = self
+                    .pending
+                    .values()
+                    .filter(|pending| matches!(pending, WorkerProviderPendingResponse::Cost { .. }))
+                    .count();
+                let total_costs = usize::try_from(self.cost_request_count)
+                    .map_err(|_| WorkerProviderStreamError::InvalidCostRequest)?
+                    .checked_add(reserved_costs)
+                    .and_then(|count| count.checked_add(1))
+                    .ok_or(WorkerProviderStreamError::InvalidCostRequest)?;
+                if total_costs > self.contract.maximum_cost_requests as usize
+                    || total_costs > MAX_WORKER_PROVIDER_COST_REQUESTS as usize
+                {
+                    return Err(WorkerProviderStreamError::InvalidCostRequest);
+                }
+                WorkerProviderPendingResponse::Cost {
+                    maximum_microunits: request.maximum_microunits,
+                }
+            }
+            WorkerProviderStreamRequest::ReportProgress(progress) => {
+                self.validate_progress(progress)?;
+                WorkerProviderPendingResponse::Unit
+            }
+            WorkerProviderStreamRequest::CheckCancelled(handle) => {
+                self.validate_handle(*handle)?;
+                WorkerProviderPendingResponse::Unit
+            }
+        };
+        self.pending.insert(call_id, pending);
+        self.last_admitted_call_id = call_id;
+        Ok(())
+    }
+
+    pub fn validate_response(
+        &mut self,
+        call_id: u64,
+        response: &WorkerProviderStreamResponse,
+    ) -> Result<(), WorkerProviderStreamError> {
+        self.check_active()?;
+        let expected = self
+            .pending
+            .get(&call_id)
+            .cloned()
+            .ok_or(WorkerProviderStreamError::InvalidOrder)?;
+        let kind_matches = matches!(
+            (&expected, response),
+            (
+                WorkerProviderPendingResponse::PrimaryStream
+                    | WorkerProviderPendingResponse::UploadStream { .. },
+                WorkerProviderStreamResponse::Stream(_)
+            ) | (
+                WorkerProviderPendingResponse::Unit,
+                WorkerProviderStreamResponse::Unit(_)
+            ) | (
+                WorkerProviderPendingResponse::Wait,
+                WorkerProviderStreamResponse::Wait(_)
+            ) | (
+                WorkerProviderPendingResponse::Cost { .. },
+                WorkerProviderStreamResponse::Cost(_)
+            )
+        );
+        if !kind_matches {
+            return Err(WorkerProviderStreamError::InvalidOrder);
+        }
+        let response_failed = match response {
+            WorkerProviderStreamResponse::Stream(result) => result.is_err(),
+            WorkerProviderStreamResponse::Unit(result) => result.is_err(),
+            WorkerProviderStreamResponse::Wait(result) => result.is_err(),
+            WorkerProviderStreamResponse::Cost(result) => result.is_err(),
+        };
+        if response_failed {
+            self.pending.remove(&call_id);
+            self.revoked = true;
+            return Ok(());
+        }
+        match (expected, response) {
+            (
+                WorkerProviderPendingResponse::PrimaryStream,
+                WorkerProviderStreamResponse::Stream(Ok(handle)),
+            ) => {
+                self.validate_handle_identity(*handle)?;
+                if handle.slot == 0 || self.handle.is_some() {
+                    return Err(WorkerProviderStreamError::InvalidHandle);
+                }
+                self.handle = Some(*handle);
+            }
+            (
+                WorkerProviderPendingResponse::UploadStream {
+                    byte_length,
+                    content_sha256,
+                },
+                WorkerProviderStreamResponse::Stream(Ok(handle)),
+            ) => {
+                self.validate_handle_identity(*handle)?;
+                if handle.slot == 0
+                    || self.handle == Some(*handle)
+                    || self.uploads.contains_key(handle)
+                {
+                    return Err(WorkerProviderStreamError::ForeignHandle);
+                }
+                let upload_count = self
+                    .upload_count
+                    .checked_add(1)
+                    .ok_or(WorkerProviderStreamError::InvalidUpload)?;
+                let upload_bytes = self
+                    .upload_bytes
+                    .checked_add(byte_length)
+                    .ok_or(WorkerProviderStreamError::InvalidUpload)?;
+                if upload_count > self.contract.maximum_uploads
+                    || upload_count > MAX_WORKER_PROVIDER_UPLOADS
+                    || upload_bytes > self.contract.maximum_upload_body_bytes
+                {
+                    return Err(WorkerProviderStreamError::InvalidUpload);
+                }
+                self.upload_count = upload_count;
+                self.upload_bytes = upload_bytes;
+                self.uploads.insert(
+                    *handle,
+                    WorkerProviderUploadState {
+                        expected_bytes: byte_length,
+                        expected_sha256: content_sha256,
+                        received_bytes: 0,
+                        next_sequence: 0,
+                        digest: Sha256::new(),
+                        terminal: false,
+                    },
+                );
+            }
+            (
+                WorkerProviderPendingResponse::Wait,
+                WorkerProviderStreamResponse::Wait(Ok(outcome)),
+            ) => match outcome {
+                WorkerProviderWaitOutcome::Frame(frame) => self.validate_response_frame(frame)?,
+                WorkerProviderWaitOutcome::TimedOut => {}
+                WorkerProviderWaitOutcome::Cancelled => {
+                    self.terminal = true;
+                    self.revoked = true;
+                }
+            },
+            (
+                WorkerProviderPendingResponse::Cost { maximum_microunits },
+                WorkerProviderStreamResponse::Cost(Ok(cost)),
+            ) => {
+                let accepted = cost.accepted
+                    && cost.approved_microunits != 0
+                    && cost.approved_microunits <= maximum_microunits
+                    && !cost.receipt.is_empty()
+                    && cost.receipt.len() <= MAX_WORKER_PROVIDER_RECEIPT_BYTES;
+                let denied =
+                    !cost.accepted && cost.approved_microunits == 0 && cost.receipt.is_empty();
+                if !accepted && !denied {
+                    return Err(WorkerProviderStreamError::InvalidCostRequest);
+                }
+                let cost_request_count = self
+                    .cost_request_count
+                    .checked_add(1)
+                    .ok_or(WorkerProviderStreamError::InvalidCostRequest)?;
+                if cost_request_count > self.contract.maximum_cost_requests
+                    || cost_request_count > MAX_WORKER_PROVIDER_COST_REQUESTS
+                {
+                    return Err(WorkerProviderStreamError::InvalidCostRequest);
+                }
+                self.cost_request_count = cost_request_count;
+            }
+            _ => {}
+        }
+        self.pending.remove(&call_id);
+        Ok(())
+    }
+
+    pub fn restart(
+        self,
+        context: WorkerProviderInvocationContext,
+        cancellation: CancellationToken,
+    ) -> Result<Self, WorkerProviderStreamError> {
+        validate_provider_context(&context)?;
+        if context.session_id == self.context.session_id
+            || context.session_generation <= self.context.session_generation
+        {
+            return Err(WorkerProviderStreamError::StaleSession);
+        }
+        if context.invocation == self.context.invocation
+            || context.generation <= self.context.generation
+        {
+            return Err(WorkerProviderStreamError::StaleGeneration);
+        }
+        let last_admitted_call_id = self.last_admitted_call_id;
+        let mut restarted =
+            Self::checked_for_host_session(context, self.contract.clone(), cancellation)?;
+        restarted.last_admitted_call_id = last_admitted_call_id;
+        Ok(restarted)
+    }
+
+    pub fn revoke(&mut self) {
+        self.pending.clear();
+        self.revoked = true;
+    }
+
+    fn check_active(&self) -> Result<(), WorkerProviderStreamError> {
+        if self.revoked {
+            Err(WorkerProviderStreamError::RevokedHandle)
+        } else if self.cancellation.is_cancelled() {
+            Err(WorkerProviderStreamError::Cancelled)
+        } else if self.terminal {
+            Err(WorkerProviderStreamError::InvalidOrder)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn validate_context(
+        &self,
+        context: &WorkerProviderInvocationContext,
+    ) -> Result<(), WorkerProviderStreamError> {
+        if context.session_id != self.context.session_id {
+            return Err(WorkerProviderStreamError::ForeignSession);
+        }
+        if context.session_generation != self.context.session_generation {
+            return Err(WorkerProviderStreamError::StaleSession);
+        }
+        if context.invocation != self.context.invocation {
+            return Err(WorkerProviderStreamError::ForeignInvocation);
+        }
+        if context.generation != self.context.generation {
+            return Err(WorkerProviderStreamError::StaleGeneration);
+        }
+        Ok(())
+    }
+
+    fn validate_handle_identity(
+        &self,
+        handle: WorkerProviderStreamHandle,
+    ) -> Result<(), WorkerProviderStreamError> {
+        if handle.session_id != self.context.session_id {
+            return Err(WorkerProviderStreamError::ForeignSession);
+        }
+        if handle.session_generation != self.context.session_generation {
+            return Err(WorkerProviderStreamError::StaleSession);
+        }
+        if handle.invocation != self.context.invocation {
+            return Err(WorkerProviderStreamError::ForeignInvocation);
+        }
+        if handle.generation != self.context.generation {
+            return Err(WorkerProviderStreamError::StaleGeneration);
+        }
+        Ok(())
+    }
+
+    fn validate_handle(
+        &self,
+        handle: WorkerProviderStreamHandle,
+    ) -> Result<(), WorkerProviderStreamError> {
+        self.validate_handle_identity(handle)?;
+        if handle.slot == 0 {
+            return Err(WorkerProviderStreamError::InvalidHandle);
+        }
+        if self.handle != Some(handle) {
+            return Err(WorkerProviderStreamError::ForeignHandle);
+        }
+        Ok(())
+    }
+
+    fn validate_request_chunk(
+        &mut self,
+        chunk: &WorkerProviderRequestChunk,
+    ) -> Result<(), WorkerProviderStreamError> {
+        self.validate_handle(chunk.handle)?;
+        if self.request_ended {
+            return Err(WorkerProviderStreamError::InvalidOrder);
+        }
+        if chunk.sequence != self.request_sequence {
+            return Err(WorkerProviderStreamError::InvalidSequence);
+        }
+        if chunk.bytes.is_empty() && !chunk.end {
+            return Err(WorkerProviderStreamError::ChunkLimit);
+        }
+        if !chunk.bytes.is_empty() {
+            validate_provider_chunk_bytes(&chunk.bytes, self.contract.maximum_chunk_bytes)?;
+        }
+        let next = self
+            .request_bytes
+            .checked_add(
+                u64::try_from(chunk.bytes.len())
+                    .map_err(|_| WorkerProviderStreamError::BodyLimit)?,
+            )
+            .ok_or(WorkerProviderStreamError::BodyLimit)?;
+        if next > self.contract.maximum_request_body_bytes
+            || (self.request_method == Some(WorkerProviderHttpMethod::Head) && next != 0)
+            || self
+                .declared_request_bytes
+                .is_some_and(|declared| next > declared)
+            || (chunk.end
+                && self
+                    .declared_request_bytes
+                    .is_some_and(|declared| next != declared))
+        {
+            return Err(WorkerProviderStreamError::BodyLimit);
+        }
+        self.request_bytes = next;
+        self.request_sequence = self
+            .request_sequence
+            .checked_add(1)
+            .ok_or(WorkerProviderStreamError::InvalidSequence)?;
+        self.request_ended = chunk.end;
+        Ok(())
+    }
+
+    fn validate_response_frame(
+        &mut self,
+        frame: &WorkerProviderResponseFrame,
+    ) -> Result<(), WorkerProviderStreamError> {
+        self.validate_handle(frame.handle)?;
+        if self.terminal {
+            return Err(WorkerProviderStreamError::InvalidOrder);
+        }
+        if frame.sequence != self.response_sequence {
+            return Err(WorkerProviderStreamError::InvalidSequence);
+        }
+        let mut response_bytes = self.response_bytes;
+        let mut response_head_seen = self.response_head_seen;
+        let mut response_status = self.response_status;
+        let mut terminal = self.terminal;
+        match &frame.event {
+            WorkerProviderResponseFrameEvent::Head(head) => {
+                if !self.request_ended
+                    || response_head_seen
+                    || frame.sequence != 0
+                    || !(200..=599).contains(&head.status)
+                {
+                    return Err(WorkerProviderStreamError::InvalidOrder);
+                }
+                validate_provider_headers(&head.headers, &self.contract)?;
+                response_head_seen = true;
+                response_status = Some(head.status);
+            }
+            WorkerProviderResponseFrameEvent::Chunk(chunk) => {
+                if !response_head_seen
+                    || self.request_method == Some(WorkerProviderHttpMethod::Head)
+                    || response_status.is_some_and(|status| matches!(status, 204 | 205 | 304))
+                {
+                    return Err(WorkerProviderStreamError::InvalidOrder);
+                }
+                let bytes = match chunk {
+                    WorkerProviderResponseChunk::Binary(bytes) => bytes.len(),
+                    WorkerProviderResponseChunk::Text(text) => text.len(),
+                    WorkerProviderResponseChunk::NdjsonLine(line) => {
+                        if line.len() > self.contract.maximum_ndjson_line_bytes as usize
+                            || line.len() > MAX_WORKER_PROVIDER_NDJSON_LINE_BYTES
+                            || line.contains('\n')
+                            || line.contains('\r')
+                            || serde_json::from_str::<serde_json::Value>(line).is_err()
+                        {
+                            return Err(WorkerProviderStreamError::InvalidNdjsonLine);
+                        }
+                        line.len()
+                    }
+                };
+                if bytes == 0
+                    || bytes > self.contract.maximum_chunk_bytes as usize
+                    || bytes > MAX_WORKER_PROVIDER_CHUNK_BYTES
+                {
+                    return Err(WorkerProviderStreamError::ChunkLimit);
+                }
+                let next = response_bytes
+                    .checked_add(
+                        u64::try_from(bytes).map_err(|_| WorkerProviderStreamError::BodyLimit)?,
+                    )
+                    .ok_or(WorkerProviderStreamError::BodyLimit)?;
+                if next > self.contract.maximum_response_body_bytes {
+                    return Err(WorkerProviderStreamError::BodyLimit);
+                }
+                response_bytes = next;
+            }
+            WorkerProviderResponseFrameEvent::Terminal(event_terminal) => {
+                validate_provider_terminal(
+                    event_terminal,
+                    self.request_ended,
+                    response_head_seen,
+                    self.uploads.values().all(|upload| upload.terminal)
+                        && !self.pending.values().any(|pending| {
+                            matches!(pending, WorkerProviderPendingResponse::UploadStream { .. })
+                        }),
+                )?;
+                terminal = true;
+            }
+        }
+        let response_sequence = frame
+            .sequence
+            .checked_add(1)
+            .ok_or(WorkerProviderStreamError::InvalidSequence)?;
+        self.response_bytes = response_bytes;
+        self.response_head_seen = response_head_seen;
+        self.response_status = response_status;
+        self.terminal = terminal;
+        self.revoked = terminal;
+        self.last_response_sequence = Some(frame.sequence);
+        self.response_sequence = response_sequence;
+        Ok(())
+    }
+
+    fn validate_upload_chunk(
+        &mut self,
+        chunk: &WorkerProviderRequestChunk,
+    ) -> Result<(), WorkerProviderStreamError> {
+        self.validate_handle_identity(chunk.handle)?;
+        let upload = self
+            .uploads
+            .get(&chunk.handle)
+            .ok_or(WorkerProviderStreamError::ForeignHandle)?;
+        if upload.terminal {
+            return Err(WorkerProviderStreamError::InvalidOrder);
+        }
+        if chunk.sequence != upload.next_sequence {
+            return Err(WorkerProviderStreamError::InvalidSequence);
+        }
+        if chunk.bytes.is_empty() && !chunk.end {
+            return Err(WorkerProviderStreamError::InvalidOrder);
+        }
+        if !chunk.bytes.is_empty() {
+            validate_provider_chunk_bytes(&chunk.bytes, self.contract.maximum_chunk_bytes)?;
+        }
+        let received_bytes = upload
+            .received_bytes
+            .checked_add(
+                u64::try_from(chunk.bytes.len())
+                    .map_err(|_| WorkerProviderStreamError::BodyLimit)?,
+            )
+            .ok_or(WorkerProviderStreamError::BodyLimit)?;
+        if received_bytes > upload.expected_bytes
+            || (chunk.end && received_bytes != upload.expected_bytes)
+        {
+            return Err(WorkerProviderStreamError::BodyLimit);
+        }
+        let next_sequence = chunk
+            .sequence
+            .checked_add(1)
+            .ok_or(WorkerProviderStreamError::InvalidSequence)?;
+        let mut digest = upload.digest.clone();
+        digest.update(&chunk.bytes);
+        if chunk.end && format!("{:x}", digest.clone().finalize()) != upload.expected_sha256 {
+            return Err(WorkerProviderStreamError::InvalidUpload);
+        }
+        let upload = self
+            .uploads
+            .get_mut(&chunk.handle)
+            .ok_or(WorkerProviderStreamError::ForeignHandle)?;
+        upload.received_bytes = received_bytes;
+        upload.next_sequence = next_sequence;
+        upload.digest = digest;
+        upload.terminal = chunk.end;
+        Ok(())
+    }
+
+    fn validate_progress(
+        &mut self,
+        progress: &WorkerProviderProgress,
+    ) -> Result<(), WorkerProviderStreamError> {
+        self.validate_handle(progress.handle)?;
+        if progress.sequence != self.progress_sequence
+            || progress.completed < self.progress_completed
+            || progress.completed > progress.total
+            || progress.total == 0
+            || progress.total > self.contract.maximum_progress_total
+            || progress.total > MAX_WORKER_PROVIDER_PROGRESS_TOTAL
+            || self
+                .progress_total
+                .is_some_and(|total| total != progress.total)
+            || progress.message.as_ref().is_some_and(|message| {
+                message.is_empty() || message.len() > MAX_WORKER_PROVIDER_PROGRESS_MESSAGE_BYTES
+            })
+        {
+            return Err(WorkerProviderStreamError::InvalidProgress);
+        }
+        self.progress_sequence = self
+            .progress_sequence
+            .checked_add(1)
+            .ok_or(WorkerProviderStreamError::InvalidProgress)?;
+        self.progress_completed = progress.completed;
+        self.progress_total = Some(progress.total);
+        Ok(())
+    }
+}
+
+fn validate_provider_context(
+    context: &WorkerProviderInvocationContext,
+) -> Result<(), WorkerProviderStreamError> {
+    if context.session_id.is_nil()
+        || context.session_generation == 0
+        || context.invocation == 0
+        || context.generation == 0
+    {
+        Err(WorkerProviderStreamError::InvalidHandle)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_provider_contract(
+    contract: &WorkerProviderStreamingContract,
+) -> Result<(), WorkerProviderStreamError> {
+    if contract.methods.is_empty()
+        || contract.methods.len() > 7
+        || contract
+            .methods
+            .windows(2)
+            .any(|methods| methods[0] >= methods[1])
+        || contract.maximum_headers == 0
+        || usize::from(contract.maximum_headers) > MAX_WORKER_PROVIDER_HEADERS
+        || contract.maximum_header_bytes == 0
+        || contract.maximum_header_bytes as usize > MAX_WORKER_PROVIDER_HEADER_BYTES
+        || contract.maximum_request_body_bytes == 0
+        || contract.maximum_request_body_bytes > MAX_WORKER_PROVIDER_BODY_BYTES
+        || contract.maximum_response_body_bytes == 0
+        || contract.maximum_response_body_bytes > MAX_WORKER_PROVIDER_BODY_BYTES
+        || contract.maximum_chunk_bytes == 0
+        || contract.maximum_chunk_bytes as usize > MAX_WORKER_PROVIDER_CHUNK_BYTES
+        || contract.maximum_ndjson_line_bytes == 0
+        || contract.maximum_ndjson_line_bytes > contract.maximum_chunk_bytes
+        || contract.maximum_ndjson_line_bytes as usize > MAX_WORKER_PROVIDER_NDJSON_LINE_BYTES
+        || contract.maximum_wait_milliseconds == 0
+        || contract.maximum_wait_milliseconds > MAX_WORKER_PROVIDER_WAIT_MILLISECONDS
+        || contract.maximum_uploads > MAX_WORKER_PROVIDER_UPLOADS
+        || contract.maximum_upload_body_bytes > MAX_WORKER_PROVIDER_BODY_BYTES
+        || contract.maximum_cost_requests > MAX_WORKER_PROVIDER_COST_REQUESTS
+        || contract.maximum_progress_total == 0
+        || contract.maximum_progress_total > MAX_WORKER_PROVIDER_PROGRESS_TOTAL
+        || contract.uploads
+            != (contract.maximum_uploads != 0 && contract.maximum_upload_body_bytes != 0)
+        || (!contract.uploads
+            && (contract.maximum_uploads != 0 || contract.maximum_upload_body_bytes != 0))
+        || contract.cost_requests != (contract.maximum_cost_requests != 0)
+    {
+        return Err(WorkerProviderStreamError::InvalidContract);
+    }
+    Ok(())
+}
+
+fn validate_provider_request_head(
+    head: &WorkerProviderRequestHead,
+    contract: &WorkerProviderStreamingContract,
+) -> Result<(), WorkerProviderStreamError> {
+    if !valid_provider_request_authority(&head.endpoint, MAX_WORKER_PROVIDER_ENDPOINT_BYTES)
+        || head.secret_id.as_deref().is_some_and(|secret_id| {
+            !valid_provider_request_authority(secret_id, MAX_WORKER_PROVIDER_SECRET_ID_BYTES)
+        })
+    {
+        return Err(WorkerProviderStreamError::InvalidRequestAuthority);
+    }
+    if !contract.methods.contains(&head.method) {
+        return Err(WorkerProviderStreamError::InvalidMethod);
+    }
+    validate_provider_headers(&head.headers, contract)?;
+    if head
+        .declared_body_bytes
+        .is_some_and(|bytes| bytes > contract.maximum_request_body_bytes)
+        || (head.method == WorkerProviderHttpMethod::Head
+            && head.declared_body_bytes.is_some_and(|bytes| bytes != 0))
+    {
+        return Err(WorkerProviderStreamError::BodyLimit);
+    }
+    Ok(())
+}
+
+fn validate_provider_headers(
+    headers: &[WorkerProviderHeader],
+    contract: &WorkerProviderStreamingContract,
+) -> Result<(), WorkerProviderStreamError> {
+    if headers.len() > usize::from(contract.maximum_headers)
+        || headers.len() > MAX_WORKER_PROVIDER_HEADERS
+    {
+        return Err(WorkerProviderStreamError::InvalidHeaders);
+    }
+    let mut total = 0_usize;
+    for header in headers {
+        if header.name.is_empty()
+            || header.name.len() > MAX_WORKER_PROVIDER_HEADER_NAME_BYTES
+            || !header.name.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric()
+                    || matches!(
+                        byte,
+                        b'!' | b'#'
+                            ..=b'\'' | b'*' | b'+' | b'-' | b'.' | b'^' | b'_' | b'`' | b'|' | b'~'
+                    )
+            })
+            || header.value.len() > MAX_WORKER_PROVIDER_HEADER_VALUE_BYTES
+            || header.value.bytes().any(|byte| {
+                byte == b'\r' || byte == b'\n' || byte == 0x7f || (byte < 0x20 && byte != b'\t')
+            })
+        {
+            return Err(WorkerProviderStreamError::InvalidHeaders);
+        }
+        total = total
+            .checked_add(header.name.len())
+            .and_then(|value| value.checked_add(header.value.len()))
+            .ok_or(WorkerProviderStreamError::InvalidHeaders)?;
+    }
+    if total > contract.maximum_header_bytes as usize || total > MAX_WORKER_PROVIDER_HEADER_BYTES {
+        return Err(WorkerProviderStreamError::InvalidHeaders);
+    }
+    Ok(())
+}
+
+fn validate_provider_chunk_bytes(
+    bytes: &[u8],
+    contract_maximum: u32,
+) -> Result<(), WorkerProviderStreamError> {
+    if bytes.is_empty()
+        || bytes.len() > contract_maximum as usize
+        || bytes.len() > MAX_WORKER_PROVIDER_CHUNK_BYTES
+    {
+        Err(WorkerProviderStreamError::ChunkLimit)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_upload_request(
+    request: &WorkerProviderUploadRequest,
+    contract: &WorkerProviderStreamingContract,
+) -> Result<(), WorkerProviderStreamError> {
+    if !valid_dotted_identifier(&request.port_id)
+        || !valid_media_type(&request.media_type)
+        || request.byte_length == 0
+        || request.byte_length > contract.maximum_request_body_bytes
+        || request.byte_length > contract.maximum_upload_body_bytes
+        || request.content_sha256.len() != 64
+        || !request
+            .content_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        Err(WorkerProviderStreamError::InvalidUpload)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_provider_terminal(
+    terminal: &WorkerProviderTerminal,
+    request_finished: bool,
+    response_started: bool,
+    uploads_finished: bool,
+) -> Result<(), WorkerProviderStreamError> {
+    match terminal {
+        WorkerProviderTerminal::Completed(receipt)
+            if !request_finished
+                || !response_started
+                || !uploads_finished
+                || receipt.is_empty()
+                || receipt.len() > MAX_WORKER_PROVIDER_RECEIPT_BYTES =>
+        {
+            Err(WorkerProviderStreamError::InvalidTerminal)
+        }
+        WorkerProviderTerminal::Failed { code, message }
+            if !valid_dotted_identifier(code)
+                || message.is_empty()
+                || message.len() > MAX_WORKER_PROVIDER_HEADER_VALUE_BYTES =>
+        {
+            Err(WorkerProviderStreamError::InvalidTerminal)
+        }
+        _ => Ok(()),
+    }
+}
+
+fn valid_provider_request_authority(value: &str, maximum_bytes: usize) -> bool {
+    !value.is_empty()
+        && value.len() <= maximum_bytes
+        && value.is_ascii()
+        && value.trim() == value
+        && value.bytes().all(|byte| byte.is_ascii_graphic())
+}
+
+fn valid_dotted_identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 256
+        && value.split('.').all(|segment| {
+            !segment.is_empty()
+                && segment.len() <= 64
+                && segment
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+                && segment
+                    .as_bytes()
+                    .first()
+                    .is_some_and(u8::is_ascii_alphanumeric)
+        })
+}
+
+fn valid_media_type(value: &str) -> bool {
+    let Some((kind, subtype)) = value.split_once('/') else {
+        return false;
+    };
+    !kind.is_empty()
+        && !subtype.is_empty()
+        && value.len() <= 256
+        && kind.bytes().all(valid_http_token_byte)
+        && subtype.bytes().all(valid_http_token_byte)
+}
+
+fn valid_http_token_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric()
+        || matches!(
+            byte,
+            b'!' | b'#'
+                | b'$'
+                | b'%'
+                | b'&'
+                | b'\''
+                | b'*'
+                | b'+'
+                | b'-'
+                | b'.'
+                | b'^'
+                | b'_'
+                | b'`'
+                | b'|'
+                | b'~'
+        )
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum WorkerMessage {
     Hello {
@@ -1603,6 +2783,14 @@ pub enum WorkerMessage {
     PluginResult {
         outcome: WorkerPluginExecutionOutcome,
     },
+    ProviderStreamRequest {
+        call_id: u64,
+        request: WorkerProviderStreamRequest,
+    },
+    ProviderStreamResponse {
+        call_id: u64,
+        response: WorkerProviderStreamResponse,
+    },
 }
 
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -1631,6 +2819,8 @@ pub enum WorkerProtocolError {
     OversizedPluginResult,
     #[error("worker plugin capability call identifier must be nonzero")]
     InvalidPluginCapabilityCallId,
+    #[error("invalid provider worker stream: {0}")]
+    InvalidProviderStream(WorkerProviderStreamError),
 }
 
 pub fn encode_worker_frame(message: &WorkerEnvelope) -> Result<Vec<u8>, WorkerProtocolError> {
@@ -1756,7 +2946,229 @@ fn validate_message_bounds(message: &WorkerMessage) -> Result<(), WorkerProtocol
                 "worker plugin trap diagnostic is invalid".to_owned(),
             ))
         }
+        WorkerMessage::ProviderStreamRequest { call_id, .. }
+        | WorkerMessage::ProviderStreamResponse { call_id, .. }
+            if *call_id == 0 =>
+        {
+            Err(WorkerProtocolError::InvalidProviderStream(
+                WorkerProviderStreamError::InvalidOrder,
+            ))
+        }
+        WorkerMessage::ProviderStreamRequest { request, .. } => {
+            validate_provider_stream_request_wire(request)
+                .map_err(WorkerProtocolError::InvalidProviderStream)
+        }
+        WorkerMessage::ProviderStreamResponse { response, .. } => {
+            validate_provider_stream_response_wire(response)
+                .map_err(WorkerProtocolError::InvalidProviderStream)
+        }
         _ => Ok(()),
+    }
+}
+
+fn validate_provider_stream_request_wire(
+    request: &WorkerProviderStreamRequest,
+) -> Result<(), WorkerProviderStreamError> {
+    match request {
+        WorkerProviderStreamRequest::StartRequest { context, head } => {
+            validate_provider_context(context)?;
+            validate_provider_request_head_global(head)
+        }
+        WorkerProviderStreamRequest::WriteRequestChunk(chunk) => {
+            validate_provider_handle_wire(chunk.handle)?;
+            if chunk.bytes.is_empty() && !chunk.end {
+                return Err(WorkerProviderStreamError::ChunkLimit);
+            }
+            if chunk.bytes.len() > MAX_WORKER_PROVIDER_CHUNK_BYTES {
+                return Err(WorkerProviderStreamError::ChunkLimit);
+            }
+            Ok(())
+        }
+        WorkerProviderStreamRequest::WriteUploadChunk(chunk) => {
+            validate_provider_handle_wire(chunk.handle)?;
+            if chunk.bytes.is_empty() && !chunk.end {
+                return Err(WorkerProviderStreamError::InvalidOrder);
+            }
+            if chunk.bytes.len() > MAX_WORKER_PROVIDER_CHUNK_BYTES {
+                return Err(WorkerProviderStreamError::ChunkLimit);
+            }
+            Ok(())
+        }
+        WorkerProviderStreamRequest::WaitResponse(request) => {
+            validate_provider_handle_wire(request.handle)?;
+            if request.timeout_milliseconds == 0
+                || request.timeout_milliseconds > MAX_WORKER_PROVIDER_WAIT_MILLISECONDS
+            {
+                return Err(WorkerProviderStreamError::WaitLimit);
+            }
+            Ok(())
+        }
+        WorkerProviderStreamRequest::StartUpload(request) => {
+            validate_provider_handle_wire(request.handle)?;
+            if !valid_dotted_identifier(&request.port_id)
+                || !valid_media_type(&request.media_type)
+                || request.byte_length == 0
+                || request.byte_length > MAX_WORKER_PROVIDER_BODY_BYTES
+                || request.content_sha256.len() != 64
+                || !request
+                    .content_sha256
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            {
+                return Err(WorkerProviderStreamError::InvalidUpload);
+            }
+            Ok(())
+        }
+        WorkerProviderStreamRequest::RequestCost(request) => {
+            validate_provider_handle_wire(request.handle)?;
+            if !valid_dotted_identifier(&request.operation)
+                || request.currency.len() != 3
+                || !request
+                    .currency
+                    .bytes()
+                    .all(|byte| byte.is_ascii_uppercase())
+                || request.maximum_microunits == 0
+            {
+                return Err(WorkerProviderStreamError::InvalidCostRequest);
+            }
+            Ok(())
+        }
+        WorkerProviderStreamRequest::ReportProgress(progress) => {
+            validate_provider_handle_wire(progress.handle)?;
+            if progress.total == 0
+                || progress.total > MAX_WORKER_PROVIDER_PROGRESS_TOTAL
+                || progress.completed > progress.total
+                || progress.message.as_ref().is_some_and(|message| {
+                    message.is_empty() || message.len() > MAX_WORKER_PROVIDER_PROGRESS_MESSAGE_BYTES
+                })
+            {
+                return Err(WorkerProviderStreamError::InvalidProgress);
+            }
+            Ok(())
+        }
+        WorkerProviderStreamRequest::CheckCancelled(handle) => {
+            validate_provider_handle_wire(*handle)
+        }
+    }
+}
+
+fn validate_provider_stream_response_wire(
+    response: &WorkerProviderStreamResponse,
+) -> Result<(), WorkerProviderStreamError> {
+    match response {
+        WorkerProviderStreamResponse::Stream(Ok(handle)) => validate_provider_handle_wire(*handle),
+        WorkerProviderStreamResponse::Wait(Ok(WorkerProviderWaitOutcome::Frame(frame))) => {
+            validate_provider_handle_wire(frame.handle)?;
+            match &frame.event {
+                WorkerProviderResponseFrameEvent::Head(head) => {
+                    if !(200..=599).contains(&head.status) {
+                        return Err(WorkerProviderStreamError::InvalidOrder);
+                    }
+                    validate_provider_headers_global(&head.headers)
+                }
+                WorkerProviderResponseFrameEvent::Chunk(chunk) => {
+                    validate_provider_response_chunk_global(chunk)
+                }
+                WorkerProviderResponseFrameEvent::Terminal(terminal) => {
+                    validate_provider_terminal(terminal, true, true, true)
+                }
+            }
+        }
+        WorkerProviderStreamResponse::Cost(Ok(cost)) => {
+            let accepted = cost.accepted
+                && cost.approved_microunits != 0
+                && !cost.receipt.is_empty()
+                && cost.receipt.len() <= MAX_WORKER_PROVIDER_RECEIPT_BYTES;
+            let denied = !cost.accepted && cost.approved_microunits == 0 && cost.receipt.is_empty();
+            if accepted || denied {
+                Ok(())
+            } else {
+                Err(WorkerProviderStreamError::InvalidCostRequest)
+            }
+        }
+        _ => Ok(()),
+    }
+}
+
+fn validate_provider_handle_wire(
+    handle: WorkerProviderStreamHandle,
+) -> Result<(), WorkerProviderStreamError> {
+    if handle.session_id.is_nil()
+        || handle.session_generation == 0
+        || handle.invocation == 0
+        || handle.slot == 0
+        || handle.generation == 0
+    {
+        Err(WorkerProviderStreamError::InvalidHandle)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_provider_headers_global(
+    headers: &[WorkerProviderHeader],
+) -> Result<(), WorkerProviderStreamError> {
+    validate_provider_headers(headers, &maximum_worker_provider_contract()?)
+}
+
+fn validate_provider_request_head_global(
+    head: &WorkerProviderRequestHead,
+) -> Result<(), WorkerProviderStreamError> {
+    validate_provider_request_head(head, &maximum_worker_provider_contract()?)
+}
+
+fn maximum_worker_provider_contract()
+-> Result<WorkerProviderStreamingContract, WorkerProviderStreamError> {
+    Ok(WorkerProviderStreamingContract {
+        methods: vec![
+            WorkerProviderHttpMethod::Delete,
+            WorkerProviderHttpMethod::Get,
+            WorkerProviderHttpMethod::Head,
+            WorkerProviderHttpMethod::Options,
+            WorkerProviderHttpMethod::Patch,
+            WorkerProviderHttpMethod::Post,
+            WorkerProviderHttpMethod::Put,
+        ],
+        maximum_headers: u16::try_from(MAX_WORKER_PROVIDER_HEADERS)
+            .map_err(|_| WorkerProviderStreamError::InvalidContract)?,
+        maximum_header_bytes: u32::try_from(MAX_WORKER_PROVIDER_HEADER_BYTES)
+            .map_err(|_| WorkerProviderStreamError::InvalidContract)?,
+        maximum_request_body_bytes: MAX_WORKER_PROVIDER_BODY_BYTES,
+        maximum_response_body_bytes: MAX_WORKER_PROVIDER_BODY_BYTES,
+        maximum_chunk_bytes: u32::try_from(MAX_WORKER_PROVIDER_CHUNK_BYTES)
+            .map_err(|_| WorkerProviderStreamError::InvalidContract)?,
+        maximum_ndjson_line_bytes: u32::try_from(MAX_WORKER_PROVIDER_NDJSON_LINE_BYTES)
+            .map_err(|_| WorkerProviderStreamError::InvalidContract)?,
+        maximum_wait_milliseconds: MAX_WORKER_PROVIDER_WAIT_MILLISECONDS,
+        maximum_uploads: 0,
+        maximum_upload_body_bytes: 0,
+        maximum_cost_requests: 0,
+        maximum_progress_total: MAX_WORKER_PROVIDER_PROGRESS_TOTAL,
+        uploads: false,
+        cost_requests: false,
+    })
+}
+
+fn validate_provider_response_chunk_global(
+    chunk: &WorkerProviderResponseChunk,
+) -> Result<(), WorkerProviderStreamError> {
+    let bytes = match chunk {
+        WorkerProviderResponseChunk::Binary(bytes) => bytes.len(),
+        WorkerProviderResponseChunk::Text(text) => text.len(),
+        WorkerProviderResponseChunk::NdjsonLine(line) => {
+            if line.contains(['\n', '\r'])
+                || line.len() > MAX_WORKER_PROVIDER_NDJSON_LINE_BYTES
+                || serde_json::from_str::<serde_json::Value>(line).is_err()
+            {
+                return Err(WorkerProviderStreamError::InvalidNdjsonLine);
+            }
+            line.len()
+        }
+    };
+    if bytes == 0 || bytes > MAX_WORKER_PROVIDER_CHUNK_BYTES {
+        Err(WorkerProviderStreamError::ChunkLimit)
+    } else {
+        Ok(())
     }
 }
 
@@ -1794,6 +3206,88 @@ mod tests {
     fn digest(byte: char) -> WorkerSha256Digest {
         WorkerSha256Digest::new(std::iter::repeat_n(byte, 64).collect::<String>())
             .expect("valid digest")
+    }
+
+    fn provider_context() -> WorkerProviderInvocationContext {
+        WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(1),
+            session_generation: 1,
+            invocation: 7,
+            generation: 3,
+        }
+    }
+
+    fn provider_handle(slot: u32) -> WorkerProviderStreamHandle {
+        let context = provider_context();
+        WorkerProviderStreamHandle {
+            session_id: context.session_id,
+            session_generation: context.session_generation,
+            invocation: context.invocation,
+            slot,
+            generation: context.generation,
+        }
+    }
+
+    fn provider_contract() -> WorkerProviderStreamingContract {
+        WorkerProviderStreamingContract {
+            methods: vec![
+                WorkerProviderHttpMethod::Get,
+                WorkerProviderHttpMethod::Post,
+            ],
+            maximum_headers: 4,
+            maximum_header_bytes: 1_024,
+            maximum_request_body_bytes: 1_024,
+            maximum_response_body_bytes: 1_024,
+            maximum_chunk_bytes: 128,
+            maximum_ndjson_line_bytes: 128,
+            maximum_wait_milliseconds: 1_000,
+            maximum_uploads: 1,
+            maximum_upload_body_bytes: 1_024,
+            maximum_cost_requests: 1,
+            maximum_progress_total: 100,
+            uploads: true,
+            cost_requests: true,
+        }
+    }
+
+    fn provider_head(declared_body_bytes: Option<u64>) -> WorkerProviderRequestHead {
+        WorkerProviderRequestHead {
+            endpoint: "https://api.provider.invalid/v1/generate".to_owned(),
+            secret_id: Some("provider.api-key".to_owned()),
+            method: WorkerProviderHttpMethod::Post,
+            headers: vec![WorkerProviderHeader {
+                name: "content-type".to_owned(),
+                value: "application/json".to_owned(),
+            }],
+            declared_body_bytes,
+        }
+    }
+
+    fn started_provider_validator(
+        cancellation: CancellationToken,
+    ) -> WorkerProviderStreamTransportValidator {
+        let mut validator = WorkerProviderStreamTransportValidator::checked_for_host_session(
+            provider_context(),
+            provider_contract(),
+            cancellation,
+        )
+        .expect("host-issued provider session is valid");
+        validator
+            .validate_request(
+                1,
+                &WorkerProviderStreamRequest::StartRequest {
+                    context: provider_context(),
+                    head: provider_head(Some(3)),
+                },
+            )
+            .expect("start request is valid");
+        validator
+            .validate_response(
+                1,
+                &WorkerProviderStreamResponse::Stream(Ok(provider_handle(1))),
+            )
+            .expect("host stream handle is valid");
+        validator
     }
 
     fn component_descriptor(
@@ -1892,6 +3386,860 @@ mod tests {
             let original = envelope(message);
             let frame = encode_worker_frame(&original).expect("encodable frame");
             assert_eq!(decode_worker_frame(&frame), Ok(original));
+        }
+    }
+
+    #[test]
+    fn protocol_v8_preserves_every_pre_v8_worker_message_discriminant() {
+        assert_eq!(WORKER_PROTOCOL_VERSION, 8);
+        assert_eq!(PREVIOUS_WORKER_PROTOCOL_VERSION, 7);
+        assert_eq!(LEGACY_WORKER_PROTOCOL_VERSION, 6);
+
+        let messages = vec![
+            WorkerMessage::Hello {
+                backend: cpu_backend(),
+            },
+            WorkerMessage::HelloAck {
+                accepted_backend: cpu_backend(),
+            },
+            WorkerMessage::Ready,
+            WorkerMessage::Execute { plan: vec![1] },
+            WorkerMessage::Cancel {
+                reason: "cancel".to_owned(),
+            },
+            WorkerMessage::Event { event: vec![1] },
+            WorkerMessage::OutputProposal {
+                proposal: WorkerOutputProposal::new(Uuid::from_u128(2), vec![1], vec![2])
+                    .expect("bounded proposal"),
+            },
+            WorkerMessage::Heartbeat,
+            WorkerMessage::Shutdown,
+            WorkerMessage::Fatal {
+                code: "fatal".to_owned(),
+                message: "message".to_owned(),
+            },
+            WorkerMessage::Lifecycle {
+                event: WorkerLifecycleEvent::ExecutionStarted,
+            },
+            WorkerMessage::RegistryDeploymentBegin {
+                deployment: deployment_begin(),
+            },
+            WorkerMessage::RegistryDeploymentChunk {
+                chunk: WorkerRegistryDeploymentChunk::new(
+                    WorkerRegistryGeneration::new(1).expect("generation"),
+                    0,
+                    WorkerComponentContent::Manifest,
+                    0,
+                    vec![1],
+                )
+                .expect("chunk"),
+            },
+            WorkerMessage::RegistryDeploymentCommit {
+                commit: WorkerRegistryDeploymentCommit::new(
+                    WorkerRegistryGeneration::new(1).expect("generation"),
+                    digest('c'),
+                ),
+            },
+            WorkerMessage::RegistryDeploymentAck {
+                acknowledgement: WorkerRegistryDeploymentAck::new(
+                    WorkerRegistryGeneration::new(1).expect("generation"),
+                    digest('c'),
+                    1,
+                )
+                .expect("acknowledgement"),
+            },
+            WorkerMessage::RegistryDeploymentRejected {
+                rejection: WorkerRegistryDeploymentRejection::new(
+                    WorkerRegistryGeneration::new(1).expect("generation"),
+                    digest('c'),
+                    WorkerRegistryDeploymentRejectionReason::InvalidCandidate,
+                ),
+            },
+            WorkerMessage::ExecutePlugin {
+                invocation: vec![1],
+            },
+            WorkerMessage::PluginCapabilityRequest {
+                call_id: 1,
+                request: vec![1],
+            },
+            WorkerMessage::PluginCapabilityResponse {
+                call_id: 1,
+                response: vec![1],
+            },
+            WorkerMessage::PluginResult {
+                outcome: WorkerPluginExecutionOutcome::Succeeded(vec![1]),
+            },
+        ];
+        for (discriminant, message) in messages.into_iter().enumerate() {
+            let bytes = postcard::to_stdvec(&message).expect("legacy variant serializes");
+            assert_eq!(bytes.first().copied(), u8::try_from(discriminant).ok());
+        }
+
+        let request = WorkerMessage::ProviderStreamRequest {
+            call_id: 1,
+            request: WorkerProviderStreamRequest::CheckCancelled(provider_handle(1)),
+        };
+        let response = WorkerMessage::ProviderStreamResponse {
+            call_id: 1,
+            response: WorkerProviderStreamResponse::Unit(Ok(())),
+        };
+        assert_eq!(postcard::to_stdvec(&request).expect("request")[0], 20);
+        assert_eq!(postcard::to_stdvec(&response).expect("response")[0], 21);
+    }
+
+    #[test]
+    fn every_provider_stream_message_shape_round_trips_through_the_worker_envelope() {
+        let upload_sha256 = format!("{:x}", Sha256::digest(b"abc"));
+        let requests = vec![
+            WorkerProviderStreamRequest::StartRequest {
+                context: provider_context(),
+                head: provider_head(Some(3)),
+            },
+            WorkerProviderStreamRequest::WriteRequestChunk(WorkerProviderRequestChunk {
+                handle: provider_handle(1),
+                sequence: 0,
+                bytes: b"abc".to_vec(),
+                end: true,
+            }),
+            WorkerProviderStreamRequest::WaitResponse(WorkerProviderWaitRequest {
+                handle: provider_handle(1),
+                after_sequence: None,
+                timeout_milliseconds: 10,
+            }),
+            WorkerProviderStreamRequest::StartUpload(WorkerProviderUploadRequest {
+                handle: provider_handle(1),
+                port_id: "image.output".to_owned(),
+                media_type: "application/octet-stream".to_owned(),
+                byte_length: 3,
+                content_sha256: upload_sha256,
+            }),
+            WorkerProviderStreamRequest::WriteUploadChunk(WorkerProviderRequestChunk {
+                handle: provider_handle(2),
+                sequence: 0,
+                bytes: b"abc".to_vec(),
+                end: true,
+            }),
+            WorkerProviderStreamRequest::RequestCost(WorkerProviderCostRequest {
+                handle: provider_handle(1),
+                operation: "image.generate".to_owned(),
+                currency: "USD".to_owned(),
+                maximum_microunits: 1,
+            }),
+            WorkerProviderStreamRequest::ReportProgress(WorkerProviderProgress {
+                handle: provider_handle(1),
+                sequence: 0,
+                completed: 1,
+                total: 2,
+                message: Some("working".to_owned()),
+            }),
+            WorkerProviderStreamRequest::CheckCancelled(provider_handle(1)),
+        ];
+        for (index, request) in requests.into_iter().enumerate() {
+            let original = envelope(WorkerMessage::ProviderStreamRequest {
+                call_id: u64::try_from(index).expect("bounded index") + 1,
+                request,
+            });
+            let frame = encode_worker_frame(&original).expect("provider request is encodable");
+            assert_eq!(decode_worker_frame(&frame), Ok(original));
+        }
+
+        let responses = vec![
+            WorkerProviderStreamResponse::Stream(Ok(provider_handle(1))),
+            WorkerProviderStreamResponse::Unit(Ok(())),
+            WorkerProviderStreamResponse::Wait(Ok(WorkerProviderWaitOutcome::Frame(
+                WorkerProviderResponseFrame {
+                    handle: provider_handle(1),
+                    sequence: 0,
+                    event: WorkerProviderResponseFrameEvent::Head(WorkerProviderResponseHead {
+                        status: 200,
+                        headers: Vec::new(),
+                    }),
+                },
+            ))),
+            WorkerProviderStreamResponse::Cost(Ok(WorkerProviderCostResponse {
+                accepted: true,
+                approved_microunits: 1,
+                receipt: vec![1],
+            })),
+        ];
+        for (index, response) in responses.into_iter().enumerate() {
+            let original = envelope(WorkerMessage::ProviderStreamResponse {
+                call_id: u64::try_from(index).expect("bounded index") + 1,
+                response,
+            });
+            let frame = encode_worker_frame(&original).expect("provider response is encodable");
+            assert_eq!(decode_worker_frame(&frame), Ok(original));
+        }
+    }
+
+    #[test]
+    fn malformed_provider_stream_messages_fail_before_routing() {
+        let cases = [
+            (
+                WorkerMessage::ProviderStreamRequest {
+                    call_id: 0,
+                    request: WorkerProviderStreamRequest::CheckCancelled(provider_handle(1)),
+                },
+                WorkerProviderStreamError::InvalidOrder,
+            ),
+            (
+                WorkerMessage::ProviderStreamRequest {
+                    call_id: 1,
+                    request: WorkerProviderStreamRequest::StartRequest {
+                        context: provider_context(),
+                        head: WorkerProviderRequestHead {
+                            endpoint: "https://invalid.example/\u{7f}".to_owned(),
+                            secret_id: None,
+                            method: WorkerProviderHttpMethod::Post,
+                            headers: Vec::new(),
+                            declared_body_bytes: None,
+                        },
+                    },
+                },
+                WorkerProviderStreamError::InvalidRequestAuthority,
+            ),
+            (
+                WorkerMessage::ProviderStreamRequest {
+                    call_id: 1,
+                    request: WorkerProviderStreamRequest::CheckCancelled(
+                        WorkerProviderStreamHandle {
+                            slot: 0,
+                            ..provider_handle(1)
+                        },
+                    ),
+                },
+                WorkerProviderStreamError::InvalidHandle,
+            ),
+            (
+                WorkerMessage::ProviderStreamRequest {
+                    call_id: 1,
+                    request: WorkerProviderStreamRequest::StartRequest {
+                        context: provider_context(),
+                        head: provider_head(Some(MAX_WORKER_PROVIDER_BODY_BYTES + 1)),
+                    },
+                },
+                WorkerProviderStreamError::BodyLimit,
+            ),
+            (
+                WorkerMessage::ProviderStreamRequest {
+                    call_id: 1,
+                    request: WorkerProviderStreamRequest::WriteRequestChunk(
+                        WorkerProviderRequestChunk {
+                            handle: provider_handle(1),
+                            sequence: 0,
+                            bytes: vec![0; MAX_WORKER_PROVIDER_CHUNK_BYTES + 1],
+                            end: true,
+                        },
+                    ),
+                },
+                WorkerProviderStreamError::ChunkLimit,
+            ),
+            (
+                WorkerMessage::ProviderStreamRequest {
+                    call_id: 1,
+                    request: WorkerProviderStreamRequest::RequestCost(WorkerProviderCostRequest {
+                        handle: provider_handle(1),
+                        operation: "invalid operation".to_owned(),
+                        currency: "USD".to_owned(),
+                        maximum_microunits: 1,
+                    }),
+                },
+                WorkerProviderStreamError::InvalidCostRequest,
+            ),
+            (
+                WorkerMessage::ProviderStreamRequest {
+                    call_id: 1,
+                    request: WorkerProviderStreamRequest::ReportProgress(WorkerProviderProgress {
+                        handle: provider_handle(1),
+                        sequence: 0,
+                        completed: 1,
+                        total: 0,
+                        message: None,
+                    }),
+                },
+                WorkerProviderStreamError::InvalidProgress,
+            ),
+            (
+                WorkerMessage::ProviderStreamResponse {
+                    call_id: 1,
+                    response: WorkerProviderStreamResponse::Wait(Ok(
+                        WorkerProviderWaitOutcome::Frame(WorkerProviderResponseFrame {
+                            handle: provider_handle(1),
+                            sequence: 1,
+                            event: WorkerProviderResponseFrameEvent::Chunk(
+                                WorkerProviderResponseChunk::NdjsonLine("not-json".to_owned()),
+                            ),
+                        }),
+                    )),
+                },
+                WorkerProviderStreamError::InvalidNdjsonLine,
+            ),
+        ];
+        for (message, expected) in cases {
+            assert_eq!(
+                encode_worker_frame(&envelope(message)),
+                Err(WorkerProtocolError::InvalidProviderStream(expected))
+            );
+        }
+    }
+
+    #[test]
+    fn provider_stream_transport_is_ordered_bounded_and_incremental() {
+        let mut validator = started_provider_validator(CancellationToken::default());
+        validator
+            .validate_request(
+                2,
+                &WorkerProviderStreamRequest::WriteRequestChunk(WorkerProviderRequestChunk {
+                    handle: provider_handle(1),
+                    sequence: 0,
+                    bytes: b"abc".to_vec(),
+                    end: true,
+                }),
+            )
+            .expect("declared request body completes");
+        assert_eq!(
+            validator.validate_request(
+                3,
+                &WorkerProviderStreamRequest::WaitResponse(WorkerProviderWaitRequest {
+                    handle: provider_handle(1),
+                    after_sequence: None,
+                    timeout_milliseconds: 1,
+                }),
+            ),
+            Err(WorkerProviderStreamError::InvalidOrder)
+        );
+        validator
+            .validate_response(2, &WorkerProviderStreamResponse::Unit(Ok(())))
+            .expect("request chunk acknowledgement");
+        assert_eq!(
+            validator.validate_request(
+                3,
+                &WorkerProviderStreamRequest::WriteRequestChunk(WorkerProviderRequestChunk {
+                    handle: provider_handle(1),
+                    sequence: 1,
+                    bytes: Vec::new(),
+                    end: true,
+                },),
+            ),
+            Err(WorkerProviderStreamError::InvalidOrder)
+        );
+        validator
+            .validate_request(
+                3,
+                &WorkerProviderStreamRequest::ReportProgress(WorkerProviderProgress {
+                    handle: provider_handle(1),
+                    sequence: 0,
+                    completed: 1,
+                    total: 2,
+                    message: Some("line\nretained".to_owned()),
+                }),
+            )
+            .expect("progress mirrors the SDK byte-only message bound");
+        validator
+            .validate_response(3, &WorkerProviderStreamResponse::Unit(Ok(())))
+            .expect("progress acknowledgement");
+
+        let frames = [
+            WorkerProviderResponseFrame {
+                handle: provider_handle(1),
+                sequence: 0,
+                event: WorkerProviderResponseFrameEvent::Head(WorkerProviderResponseHead {
+                    status: 200,
+                    headers: vec![WorkerProviderHeader {
+                        name: "content-type".to_owned(),
+                        value: "application/x-ndjson".to_owned(),
+                    }],
+                }),
+            },
+            WorkerProviderResponseFrame {
+                handle: provider_handle(1),
+                sequence: 1,
+                event: WorkerProviderResponseFrameEvent::Chunk(
+                    WorkerProviderResponseChunk::NdjsonLine("{\"value\":1}".to_owned()),
+                ),
+            },
+            WorkerProviderResponseFrame {
+                handle: provider_handle(1),
+                sequence: 2,
+                event: WorkerProviderResponseFrameEvent::Terminal(
+                    WorkerProviderTerminal::Completed(vec![7]),
+                ),
+            },
+        ];
+        for (index, frame) in frames.into_iter().enumerate() {
+            let call_id = u64::try_from(index).expect("index fits") + 4;
+            validator
+                .validate_request(
+                    call_id,
+                    &WorkerProviderStreamRequest::WaitResponse(WorkerProviderWaitRequest {
+                        handle: provider_handle(1),
+                        after_sequence: index
+                            .checked_sub(1)
+                            .and_then(|value| u64::try_from(value).ok()),
+                        timeout_milliseconds: 10,
+                    }),
+                )
+                .expect("wait sequence follows the last response");
+            validator
+                .validate_response(
+                    call_id,
+                    &WorkerProviderStreamResponse::Wait(Ok(WorkerProviderWaitOutcome::Frame(
+                        frame,
+                    ))),
+                )
+                .expect("response frame advances incrementally");
+            if index == 0 {
+                assert_eq!(
+                    validator.validate_request(
+                        8,
+                        &WorkerProviderStreamRequest::WaitResponse(WorkerProviderWaitRequest {
+                            handle: provider_handle(1),
+                            after_sequence: None,
+                            timeout_milliseconds: 10,
+                        },),
+                    ),
+                    Err(WorkerProviderStreamError::InvalidSequence)
+                );
+            }
+        }
+        assert_eq!(
+            validator.validate_request(
+                8,
+                &WorkerProviderStreamRequest::ReportProgress(WorkerProviderProgress {
+                    handle: provider_handle(1),
+                    sequence: 1,
+                    completed: 2,
+                    total: 2,
+                    message: None,
+                }),
+            ),
+            Err(WorkerProviderStreamError::RevokedHandle)
+        );
+    }
+
+    #[test]
+    fn provider_upload_sha_and_rejected_responses_are_atomic() {
+        let mut validator = started_provider_validator(CancellationToken::default());
+        validator
+            .validate_request(
+                2,
+                &WorkerProviderStreamRequest::StartUpload(WorkerProviderUploadRequest {
+                    handle: provider_handle(1),
+                    port_id: "image.output".to_owned(),
+                    media_type: "application/octet-stream".to_owned(),
+                    byte_length: 3,
+                    content_sha256: format!("{:x}", Sha256::digest(b"abc")),
+                }),
+            )
+            .expect("upload reservation is bounded");
+        assert_eq!(
+            validator.validate_request(
+                3,
+                &WorkerProviderStreamRequest::StartUpload(WorkerProviderUploadRequest {
+                    handle: provider_handle(1),
+                    port_id: "image.second".to_owned(),
+                    media_type: "application/octet-stream".to_owned(),
+                    byte_length: 1,
+                    content_sha256: format!("{:x}", Sha256::digest(b"x")),
+                }),
+            ),
+            Err(WorkerProviderStreamError::InvalidOrder)
+        );
+        validator
+            .validate_response(
+                2,
+                &WorkerProviderStreamResponse::Stream(Ok(provider_handle(2))),
+            )
+            .expect("unique upload handle is issued");
+        assert_eq!(
+            validator.validate_request(
+                3,
+                &WorkerProviderStreamRequest::StartUpload(WorkerProviderUploadRequest {
+                    handle: provider_handle(1),
+                    port_id: "image.second".to_owned(),
+                    media_type: "application/octet-stream".to_owned(),
+                    byte_length: 1,
+                    content_sha256: format!("{:x}", Sha256::digest(b"x")),
+                }),
+            ),
+            Err(WorkerProviderStreamError::InvalidUpload)
+        );
+        assert_eq!(
+            validator.validate_request(
+                4,
+                &WorkerProviderStreamRequest::WriteUploadChunk(WorkerProviderRequestChunk {
+                    handle: provider_handle(2),
+                    sequence: 0,
+                    bytes: Vec::new(),
+                    end: false,
+                },),
+            ),
+            Err(WorkerProviderStreamError::InvalidOrder)
+        );
+        let wrong = WorkerProviderRequestChunk {
+            handle: provider_handle(2),
+            sequence: 0,
+            bytes: b"abd".to_vec(),
+            end: true,
+        };
+        assert_eq!(
+            validator.validate_request(4, &WorkerProviderStreamRequest::WriteUploadChunk(wrong),),
+            Err(WorkerProviderStreamError::InvalidUpload)
+        );
+        validator
+            .validate_request(
+                4,
+                &WorkerProviderStreamRequest::WriteUploadChunk(WorkerProviderRequestChunk {
+                    handle: provider_handle(2),
+                    sequence: 0,
+                    bytes: b"abc".to_vec(),
+                    end: true,
+                }),
+            )
+            .expect("failed digest attempt did not mutate upload state");
+        assert_eq!(
+            validator.validate_request(
+                5,
+                &WorkerProviderStreamRequest::WaitResponse(WorkerProviderWaitRequest {
+                    handle: provider_handle(1),
+                    after_sequence: None,
+                    timeout_milliseconds: 1,
+                }),
+            ),
+            Err(WorkerProviderStreamError::InvalidOrder)
+        );
+        validator
+            .validate_response(
+                4,
+                &WorkerProviderStreamResponse::Unit(Err(WorkerProviderStreamError::HostFailure)),
+            )
+            .expect("typed host failure is a valid response");
+        assert_eq!(
+            validator.validate_request(
+                5,
+                &WorkerProviderStreamRequest::CheckCancelled(provider_handle(1)),
+            ),
+            Err(WorkerProviderStreamError::RevokedHandle)
+        );
+    }
+
+    #[test]
+    fn provider_stream_rejects_foreign_stale_cancelled_and_reused_sessions() {
+        let mut validator = started_provider_validator(CancellationToken::default());
+        let mut foreign = provider_handle(1);
+        foreign.session_id = Uuid::from_u128(99);
+        assert_eq!(
+            validator.validate_request(2, &WorkerProviderStreamRequest::CheckCancelled(foreign),),
+            Err(WorkerProviderStreamError::ForeignSession)
+        );
+        let mut stale = provider_handle(1);
+        stale.generation += 1;
+        assert_eq!(
+            validator.validate_request(2, &WorkerProviderStreamRequest::CheckCancelled(stale),),
+            Err(WorkerProviderStreamError::StaleGeneration)
+        );
+        assert!(matches!(
+            validator.restart(provider_context(), CancellationToken::default()),
+            Err(WorkerProviderStreamError::StaleSession)
+        ));
+
+        let rollback_generation = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(2),
+            session_generation: 2,
+            invocation: 8,
+            generation: 2,
+        };
+        assert!(matches!(
+            started_provider_validator(CancellationToken::default())
+                .restart(rollback_generation, CancellationToken::default(),),
+            Err(WorkerProviderStreamError::StaleGeneration)
+        ));
+        let fresh_context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(2),
+            session_generation: 2,
+            invocation: 8,
+            generation: 4,
+        };
+        let mut restarted = started_provider_validator(CancellationToken::default())
+            .restart(fresh_context.clone(), CancellationToken::default())
+            .expect("a strictly fresh host-issued session can restart transport state");
+        restarted
+            .validate_request(
+                2,
+                &WorkerProviderStreamRequest::StartRequest {
+                    context: fresh_context,
+                    head: provider_head(None),
+                },
+            )
+            .expect("fresh session preserves the call-id high-water mark");
+
+        let mut revoked = started_provider_validator(CancellationToken::default());
+        revoked.revoke();
+        assert_eq!(
+            revoked.validate_request(
+                2,
+                &WorkerProviderStreamRequest::CheckCancelled(provider_handle(1)),
+            ),
+            Err(WorkerProviderStreamError::RevokedHandle)
+        );
+
+        let cancellation = CancellationToken::default();
+        let mut cancelled = started_provider_validator(cancellation.clone());
+        assert!(cancellation.cancel());
+        assert_eq!(
+            cancelled.validate_request(
+                2,
+                &WorkerProviderStreamRequest::CheckCancelled(provider_handle(1)),
+            ),
+            Err(WorkerProviderStreamError::Cancelled)
+        );
+    }
+
+    #[test]
+    fn provider_stream_rejections_do_not_advance_ordered_state() {
+        let mut validator = started_provider_validator(CancellationToken::default());
+        let out_of_order = WorkerProviderRequestChunk {
+            handle: provider_handle(1),
+            sequence: 1,
+            bytes: b"abc".to_vec(),
+            end: true,
+        };
+        assert_eq!(
+            validator.validate_request(
+                2,
+                &WorkerProviderStreamRequest::WriteRequestChunk(out_of_order),
+            ),
+            Err(WorkerProviderStreamError::InvalidSequence)
+        );
+        validator
+            .validate_request(
+                2,
+                &WorkerProviderStreamRequest::WriteRequestChunk(WorkerProviderRequestChunk {
+                    handle: provider_handle(1),
+                    sequence: 0,
+                    bytes: b"abc".to_vec(),
+                    end: true,
+                }),
+            )
+            .expect("rejected sequence did not advance state");
+        assert_eq!(
+            validator.validate_response(
+                2,
+                &WorkerProviderStreamResponse::Cost(Ok(WorkerProviderCostResponse {
+                    accepted: false,
+                    approved_microunits: 0,
+                    receipt: Vec::new(),
+                })),
+            ),
+            Err(WorkerProviderStreamError::InvalidOrder)
+        );
+        validator
+            .validate_response(2, &WorkerProviderStreamResponse::Unit(Ok(())))
+            .expect("wrong response kind did not consume the pending call");
+        validator
+            .validate_request(
+                3,
+                &WorkerProviderStreamRequest::WaitResponse(WorkerProviderWaitRequest {
+                    handle: provider_handle(1),
+                    after_sequence: None,
+                    timeout_milliseconds: 1,
+                }),
+            )
+            .expect("first wait");
+        let chunk_before_head = WorkerProviderResponseFrame {
+            handle: provider_handle(1),
+            sequence: 0,
+            event: WorkerProviderResponseFrameEvent::Chunk(WorkerProviderResponseChunk::Binary(
+                vec![1],
+            )),
+        };
+        assert_eq!(
+            validator.validate_response(
+                3,
+                &WorkerProviderStreamResponse::Wait(Ok(WorkerProviderWaitOutcome::Frame(
+                    chunk_before_head,
+                ))),
+            ),
+            Err(WorkerProviderStreamError::InvalidOrder)
+        );
+        validator
+            .validate_response(
+                3,
+                &WorkerProviderStreamResponse::Wait(Ok(WorkerProviderWaitOutcome::Frame(
+                    WorkerProviderResponseFrame {
+                        handle: provider_handle(1),
+                        sequence: 0,
+                        event: WorkerProviderResponseFrameEvent::Head(WorkerProviderResponseHead {
+                            status: 200,
+                            headers: Vec::new(),
+                        }),
+                    },
+                ))),
+            )
+            .expect("rejected response did not advance state");
+    }
+
+    #[test]
+    fn provider_call_ids_are_monotonic_and_delayed_responses_cannot_ack_new_calls() {
+        let mut validator = started_provider_validator(CancellationToken::default());
+        let progress = WorkerProviderStreamRequest::ReportProgress(WorkerProviderProgress {
+            handle: provider_handle(1),
+            sequence: 0,
+            completed: 1,
+            total: 2,
+            message: None,
+        });
+        validator
+            .validate_request(2, &progress)
+            .expect("next call id is admitted");
+        validator
+            .validate_response(2, &WorkerProviderStreamResponse::Unit(Ok(())))
+            .expect("first progress completes");
+        assert_eq!(
+            validator.validate_request(2, &progress),
+            Err(WorkerProviderStreamError::InvalidOrder)
+        );
+
+        let next_progress = WorkerProviderStreamRequest::ReportProgress(WorkerProviderProgress {
+            handle: provider_handle(1),
+            sequence: 1,
+            completed: 2,
+            total: 2,
+            message: None,
+        });
+        validator
+            .validate_request(3, &next_progress)
+            .expect("fresh call id is admitted");
+        assert_eq!(
+            validator.validate_response(2, &WorkerProviderStreamResponse::Unit(Ok(()))),
+            Err(WorkerProviderStreamError::InvalidOrder)
+        );
+        validator
+            .validate_response(3, &WorkerProviderStreamResponse::Unit(Ok(())))
+            .expect("delayed response did not consume the current call");
+
+        let fresh_context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(2),
+            session_generation: 2,
+            invocation: 8,
+            generation: 4,
+        };
+        let mut restarted = started_provider_validator(CancellationToken::default())
+            .restart(fresh_context.clone(), CancellationToken::default())
+            .expect("fresh context restarts the call-id domain");
+        let start = WorkerProviderStreamRequest::StartRequest {
+            context: fresh_context,
+            head: provider_head(None),
+        };
+        assert_eq!(
+            restarted.validate_request(1, &start),
+            Err(WorkerProviderStreamError::InvalidOrder)
+        );
+        restarted
+            .validate_request(2, &start)
+            .expect("restart preserves the prior high-water mark");
+    }
+
+    #[test]
+    fn provider_contract_and_request_head_error_precedence_match_the_sdk() {
+        for (maximum_uploads, maximum_upload_body_bytes) in [(1, 0), (0, 1)] {
+            let mut contract = provider_contract();
+            contract.uploads = false;
+            contract.maximum_uploads = maximum_uploads;
+            contract.maximum_upload_body_bytes = maximum_upload_body_bytes;
+            assert!(matches!(
+                WorkerProviderStreamTransportValidator::checked_for_host_session(
+                    provider_context(),
+                    contract,
+                    CancellationToken::default(),
+                ),
+                Err(WorkerProviderStreamError::InvalidContract)
+            ));
+        }
+
+        let mut invalid = provider_head(Some(MAX_WORKER_PROVIDER_BODY_BYTES + 1));
+        invalid.endpoint.push('\u{7f}');
+        invalid.method = WorkerProviderHttpMethod::Put;
+        invalid.headers.push(WorkerProviderHeader {
+            name: "bad header".to_owned(),
+            value: "value".to_owned(),
+        });
+        assert_eq!(
+            validate_provider_request_head(&invalid, &provider_contract()),
+            Err(WorkerProviderStreamError::InvalidRequestAuthority)
+        );
+        invalid.endpoint = "https://api.provider.invalid/v1/generate".to_owned();
+        assert_eq!(
+            validate_provider_request_head(&invalid, &provider_contract()),
+            Err(WorkerProviderStreamError::InvalidMethod)
+        );
+        invalid.method = WorkerProviderHttpMethod::Post;
+        assert_eq!(
+            validate_provider_request_head(&invalid, &provider_contract()),
+            Err(WorkerProviderStreamError::InvalidHeaders)
+        );
+        invalid.headers.pop();
+        assert_eq!(
+            validate_provider_request_head(&invalid, &provider_contract()),
+            Err(WorkerProviderStreamError::BodyLimit)
+        );
+    }
+
+    #[test]
+    fn provider_worker_wire_matches_v2_authority_shape_and_excludes_authority_material() {
+        let source = include_str!("worker_protocol.rs");
+        let wit = include_str!("../../comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit");
+        for declaration in [
+            "endpoint: string",
+            "secret-id: option<string>",
+            "declared-body-bytes: option<u64>",
+            "after-sequence: option<u64>",
+            "timeout-milliseconds: u64",
+            "message: option<string>",
+            "content-sha256: string",
+        ] {
+            assert!(wit.contains(declaration));
+        }
+        let request_head = source
+            .find("pub struct WorkerProviderRequestHead")
+            .expect("request-head declaration");
+        let request_chunk = source[request_head..]
+            .find("pub struct WorkerProviderRequestChunk")
+            .map(|offset| request_head + offset)
+            .expect("request chunk declaration");
+        let request_head = &source[request_head..request_chunk];
+        let ordered_fields = [
+            "pub endpoint: String",
+            "pub secret_id: Option<String>",
+            "pub method: WorkerProviderHttpMethod",
+            "pub headers: Vec<WorkerProviderHeader>",
+            "pub declared_body_bytes: Option<u64>",
+        ];
+        let mut cursor = 0;
+        for field in ordered_fields {
+            let offset = request_head[cursor..]
+                .find(field)
+                .expect("request-head field is present in WIT order");
+            cursor += offset + field.len();
+        }
+        let provider_start = source
+            .find("pub enum WorkerProviderHttpMethod")
+            .expect("provider worker declarations");
+        let message_start = source
+            .find("pub enum WorkerMessage")
+            .expect("worker message declaration");
+        let wire = &source[provider_start..message_start];
+        for prohibited in [
+            "PathBuf",
+            "NativeOpaqueHandle",
+            "secret_bytes",
+            "provider_id",
+            "authorization_decision",
+        ] {
+            assert!(
+                !wire.contains(prohibited),
+                "prohibited wire field {prohibited}"
+            );
         }
     }
 
@@ -2125,34 +4473,47 @@ mod tests {
             payload.first().copied(),
             Some(WORKER_PROTOCOL_VERSION as u8)
         );
-        payload[0] = LEGACY_WORKER_PROTOCOL_VERSION as u8;
-        let mut frame = u32::try_from(payload.len())
-            .expect("fixture length fits")
-            .to_le_bytes()
-            .to_vec();
-        frame.extend_from_slice(&payload);
-        assert_eq!(
-            decode_worker_frame(&frame),
-            Err(WorkerProtocolError::UnsupportedVersion(
-                LEGACY_WORKER_PROTOCOL_VERSION
-            ))
-        );
+        for unsupported_version in [
+            PREVIOUS_WORKER_PROTOCOL_VERSION,
+            LEGACY_WORKER_PROTOCOL_VERSION,
+        ] {
+            payload[0] = unsupported_version as u8;
+            let mut frame = u32::try_from(payload.len())
+                .expect("fixture length fits")
+                .to_le_bytes()
+                .to_vec();
+            frame.extend_from_slice(&payload);
+            assert_eq!(
+                decode_worker_frame(&frame),
+                Err(WorkerProtocolError::UnsupportedVersion(unsupported_version))
+            );
+        }
     }
 
     #[test]
     fn legacy_protocol_is_rejected_before_changed_payload_decode() {
-        let payload = [LEGACY_WORKER_PROTOCOL_VERSION as u8, 0xff];
-        let mut frame = u32::try_from(payload.len())
-            .expect("fixture length fits")
-            .to_le_bytes()
-            .to_vec();
-        frame.extend_from_slice(&payload);
-        assert_eq!(
-            decode_worker_frame(&frame),
-            Err(WorkerProtocolError::UnsupportedVersion(
-                LEGACY_WORKER_PROTOCOL_VERSION
-            ))
-        );
+        for unsupported_version in [
+            0,
+            1,
+            LEGACY_WORKER_PROTOCOL_VERSION,
+            PREVIOUS_WORKER_PROTOCOL_VERSION,
+            WORKER_PROTOCOL_VERSION + 1,
+            255,
+            u16::MAX,
+        ] {
+            let mut payload = postcard::to_stdvec(&unsupported_version)
+                .expect("unsupported version serializes independently");
+            payload.push(0xff);
+            let mut frame = u32::try_from(payload.len())
+                .expect("fixture length fits")
+                .to_le_bytes()
+                .to_vec();
+            frame.extend_from_slice(&payload);
+            assert_eq!(
+                decode_worker_frame(&frame),
+                Err(WorkerProtocolError::UnsupportedVersion(unsupported_version))
+            );
+        }
     }
 
     #[test]
@@ -2548,7 +4909,7 @@ mod tests {
         let message = envelope(WorkerMessage::HelloAck {
             accepted_backend: backend,
         });
-        let frame = encode_worker_frame(&message).expect("properties encode in protocol 7");
+        let frame = encode_worker_frame(&message).expect("properties encode in protocol 8");
         assert_eq!(decode_worker_frame(&frame), Ok(message));
         assert_eq!(properties.name(), "Cambricon MLU fixture");
         assert_eq!(properties.total_memory_bytes(), 24 * 1024 * 1024);
