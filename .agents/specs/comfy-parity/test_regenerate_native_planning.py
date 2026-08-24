@@ -559,12 +559,27 @@ class ValidationGenerationTests(unittest.TestCase):
             self.assertNotIn(read_only_path, provider_runtime_stream["writes"])
         self.assertIn("ProviderRuntimeStreamOwner", provider_runtime_stream["done"])
         self.assertIn("Begin, Call, Resolve, Finish, Abort", provider_runtime_stream["done"])
+        self.assertIn(
+            "only the later Task413 component-host adapter may construct",
+            provider_runtime_stream["done"],
+        )
+        self.assertIn(
+            "no runtime API accepts a component-supplied provider identity",
+            provider_runtime_stream["done"],
+        )
         provider_component_stream = tasks_by_id[
             "comfy-parity-provider-component-host-stream-adapter"
         ]
         self.assertIn(
             "crates/comfy_runtime/src/plugin_services.rs",
             provider_component_stream["reads"],
+        )
+        self.assertIn(
+            "full sealed activation identity", provider_component_stream["done"]
+        )
+        self.assertIn(
+            "cannot construct or replace its authority",
+            provider_component_stream["done"],
         )
         provider_worker_bridge = tasks_by_id[
             "comfy-parity-provider-worker-stream-bridge"
