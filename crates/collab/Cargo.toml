@@ -124,6 +124,7 @@ language = { workspace = true, features = ["test-support"] }
 language_model = { workspace = true, features = ["test-support"] }
 livekit_client =  { workspace = true, features = ["test-support"] }
 lsp = { workspace = true, features = ["test-support"] }
+media = { workspace = true, features = ["collaboration"] }
 menu.workspace = true
 multi_buffer = { workspace = true, features = ["test-support"] }
 node_runtime.workspace = true
