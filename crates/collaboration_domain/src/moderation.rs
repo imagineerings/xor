@@ -30,6 +30,8 @@ pub enum ModerationReportReason {
     Spam,
     Profanity,
     IllegalContent,
+    Nudity,
+    Malware,
     Impersonation,
     Other,
 }
