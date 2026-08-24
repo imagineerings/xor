@@ -274,6 +274,7 @@ members = [
     #
 
     "services/push_gateway",
+    "services/pair_relay",
 
     #
     # Extensions
@@ -339,6 +340,7 @@ collab = { path = "crates/collab" }
 collaboration_domain = { path = "crates/collaboration_domain" }
 collaboration_workflow = { path = "crates/collaboration_workflow" }
 push_gateway = { path = "services/push_gateway" }
+pair_relay = { path = "services/pair_relay" }
 nostr_compat = { path = "crates/nostr_compat" }
 collab_ui = { path = "crates/collab_ui" }
 collections = { path = "crates/collections", version = "0.1.0" }
