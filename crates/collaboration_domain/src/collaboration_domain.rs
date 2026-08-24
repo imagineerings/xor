@@ -9,6 +9,7 @@ pub mod channel_invite;
 pub mod channel_metadata;
 pub mod ci_status;
 pub mod community;
+pub mod community_deletion;
 pub mod custom_emoji;
 pub mod dm;
 pub mod feedback;
@@ -96,6 +97,12 @@ pub use community::{
     Community, CommunityCommandContext, CommunityCommandOutcome, CommunityCreateFields,
     CommunityError, CommunityHost, CommunityIcon, CommunityIconUpdate, CommunityJoinPolicy,
     CommunityLifecycleState, CommunityRecordFields, CommunityUpdate, JoinPolicyVersion,
+};
+pub use community_deletion::{
+    CommunityDeletion, CommunityDeletionActiveState, CommunityDeletionAuthorityEvidence,
+    CommunityDeletionCommandOutcome, CommunityDeletionCompletion, CommunityDeletionError,
+    CommunityDeletionFailureReason, CommunityDeletionRecordFields, CommunityDeletionState,
+    CommunityDeletionTransition, DeletionEvidenceDigest, DeletionFenceGeneration,
 };
 pub use custom_emoji::{
     CustomEmoji, CustomEmojiAsset, CustomEmojiError, CustomEmojiPalette, CustomEmojiPaletteEntry,
