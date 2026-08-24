@@ -3654,6 +3654,7 @@ dependencies = [
  "livekit_client",
  "log",
  "lsp",
+ "media",
  "menu",
  "mp4",
  "multi_buffer",
