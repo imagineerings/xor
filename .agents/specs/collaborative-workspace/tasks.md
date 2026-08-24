@@ -2762,7 +2762,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Writes: crates/collab/tests/audit_chain.rs_
     - _Validation: `cargo test -p collab audit_chain` detects deletion, reorder, mutation and wrong imported head_
 
-  - [ ] 35.6. Implement the audit-chain repository
+  - [x] 35.6. Implement the audit-chain repository
     - Append one serialized per-community chain, read/export segments and reject stale or cross-tenant heads.
     - _Requirements: 6.1, 13.4_
     - _Capability IDs: CAP-005, CAP-028_
@@ -2770,6 +2770,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/collab/migrations/collaboration_audit.sql, crates/collaboration_domain/src/audit.rs_
     - _Writes: crates/collab/src/audit/repository.rs_
     - _Validation: concurrent writer tests preserve one valid chain and reject stale/cross-community heads_
+    - _Discovered contradiction (2026-08-24): the planned nested-only write cannot register the new service module, and efficient trusted-row reconstruction cannot derive a next canonical position from the domain API without replaying the entire chain. The narrow correction registers `audit::repository` and adds one validated `AuditChainPosition::after_stored_head` constructor that accepts only non-nil community, positive sequence and fixed hash; it adds no alternate hash implementation, event producer or global service wiring._
+    - _Evidence: 2026-08-24 — added a PostgreSQL-only AuditRepository that sets transaction-local tenant state, takes a namespaced transaction-scoped advisory lock per community, locks and compares the exact stored head, and commits the canonical entry plus insert/update head in one transaction. The advisory lock closes the two-genesis-writer gap where no head row exists yet; existing-head updates additionally carry sequence/hash CAS. Genesis and explicit Buzz bridges remain distinct. Bounded ordered reads hydrate every row through the canonical hash verifier, and typed export cursors start strictly after their recorded head and advance only through exact version/sequence/hash CAS. Cross-community heads/cursors fail before database work. Four focused tests pass concurrently scheduled winner/stale-loser behavior with one valid successor and zero loser insert, genesis/import distinction, ordered/mutated/reordered/cross-tenant hydration, and exact/stale/cross-tenant export cursors. A minimal harness compiled and tested the canonical source directly and passed warning-denied Clippy; the complete domain suite passed 158/158 with warning-denied release Clippy. `cargo check -p collab --lib` passed against the actual registered crate after the pinned WebRTC artifact became available. The heavier all-test build later exhausted disk while compiling unrelated test-support dependencies; only regenerable incremental and temporary harness caches were removed, restoring 13 GiB. Formatting, diff hygiene, dependency, inventory and canonical specification gates are recorded in the enclosing checkpoint commit._
 
 - [ ] 36. Port moderation and administration
 

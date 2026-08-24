@@ -473,14 +473,24 @@ impl AuditChainPosition {
 
     pub fn after(entry: &AuditEntry) -> Result<Self, AuditError> {
         entry.verify()?;
-        let next_sequence = entry
-            .sequence
+        Self::after_stored_head(entry.community_id, entry.sequence, entry.hash)
+    }
+
+    pub fn after_stored_head(
+        community_id: CommunityId,
+        sequence: u64,
+        hash: AuditHash,
+    ) -> Result<Self, AuditError> {
+        if community_id.as_uuid().is_nil() || sequence == 0 {
+            return Err(AuditError::InvalidCommunity);
+        }
+        let next_sequence = sequence
             .checked_add(1)
             .ok_or(AuditError::SequenceExhausted)?;
         Ok(Self {
-            community_id: entry.community_id,
+            community_id,
             next_sequence,
-            predecessor: AuditPredecessor::Entry(entry.hash),
+            predecessor: AuditPredecessor::Entry(hash),
         })
     }
 
@@ -897,5 +907,17 @@ mod tests {
             })
             .collect();
         assert_eq!(AuditFields::new(too_many), Err(AuditError::TooManyFields));
+        assert_eq!(
+            AuditChainPosition::after_stored_head(
+                CommunityId::from_uuid(Uuid::nil()),
+                1,
+                AuditHash::from_bytes([1; 32]),
+            ),
+            Err(AuditError::InvalidCommunity)
+        );
+        assert_eq!(
+            AuditChainPosition::after_stored_head(community(1), 0, AuditHash::from_bytes([1; 32]),),
+            Err(AuditError::InvalidCommunity)
+        );
     }
 }
