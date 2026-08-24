@@ -8138,14 +8138,14 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Blocked_by: comfy-parity-provider-namespace-binding-projection
   - Reads: crates/comfy_plugin_sdk/wit/comfy-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs
   - _Reads: crates/comfy_plugin_sdk/wit/comfy-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs
-  - Writes: crates/comfy_plugin_sdk/wit/comfy-provider-plugin-v2.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_sdk/src/type_ids.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs
-  - _Writes: crates/comfy_plugin_sdk/wit/comfy-provider-plugin-v2.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_sdk/src/type_ids.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs
+  - Writes: crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/wit/provider-v2/deps/comfy-plugin/comfy-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_sdk/src/type_ids.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs
+  - _Writes: crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/wit/provider-v2/deps/comfy-plugin/comfy-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_sdk/src/type_ids.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs
   - Requirements: 4.4, 6.4, 12.1, 12.2, 12.5, 18.1, 28.2, 32.2, 34.4, 37.5, 40.2, 41.3, 44.3
   - _Requirements: 4.4, 6.4, 12.1, 12.2, 12.5, 18.1, 28.2, 32.2, 34.4, 37.5, 40.2, 41.3, 44.3
   - Design: D8, D12, D13, D17, D18, D20, D21, D22, D29, D32, D34, D35, D39, D40, D41
   - Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_sdk -p comfy_plugin_host; cargo test --locked -p comfy_plugin_sdk --all-targets; cargo test --locked -p comfy_plugin_host --all-targets; ./script/clippy -p comfy_plugin_sdk -p comfy_plugin_host
   - _Validation: VAL-NODE-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_sdk -p comfy_plugin_host; cargo test --locked -p comfy_plugin_sdk --all-targets; cargo test --locked -p comfy_plugin_host --all-targets; ./script/clippy -p comfy_plugin_sdk -p comfy_plugin_host
-  - Done when: V1 fixtures remain byte-compatible and the existing host bindgens resolve the exact frozen v1 WIT file without parsing the separately versioned v2 package. V2 DTOs enforce invocation-scoped generation-checked handles, method/header/body/chunk/line/aggregate bounds, ordered terminal state, upload and cost parity between WIT and JSON schema, cancellation-aware waits, and monotonic bounded progress without paths, secrets, native handles, or accepted-but-ignored fields.
+  - Done when: V1 fixtures and the v2 package's frozen v1 dependency copy remain byte-compatible. Existing host bindgens resolve the exact frozen v1 WIT file without parsing v2, while a compile-time host bindgen independently resolves the standard separately versioned v2 package. V2 DTOs enforce invocation-scoped generation-checked handles, method/header/body/chunk/line/aggregate bounds, ordered terminal state, upload and cost parity between WIT and JSON schema, cancellation-aware waits, and monotonic bounded progress without paths, secrets, native handles, or accepted-but-ignored fields.
 
 - [ ] 410. Transport provider streams over the worker protocol
   - _id: comfy-parity-provider-worker-stream-protocol
@@ -8154,8 +8154,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Wave: 260
   - Dependencies: comfy-parity-provider-streaming-component-abi-v2
   - _Blocked_by: comfy-parity-provider-streaming-component-abi-v2
-  - Reads: crates/comfy_types/src/worker_protocol.rs, crates/comfy_plugin_sdk/wit/comfy-provider-plugin-v2.wit
-  - _Reads: crates/comfy_types/src/worker_protocol.rs, crates/comfy_plugin_sdk/wit/comfy-provider-plugin-v2.wit
+  - Reads: crates/comfy_types/src/worker_protocol.rs, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit
+  - _Reads: crates/comfy_types/src/worker_protocol.rs, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit
   - Writes: crates/comfy_types/src/worker_protocol.rs, crates/comfy_types/src/comfy_types.rs
   - _Writes: crates/comfy_types/src/worker_protocol.rs, crates/comfy_types/src/comfy_types.rs
   - Requirements: 4.4, 6.4, 12.1, 12.2, 12.5, 18.1, 28.2, 32.2, 34.4, 37.5, 40.2, 41.3, 44.3

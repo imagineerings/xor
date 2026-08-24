@@ -10442,13 +10442,14 @@ def provider_component_foundation_tasks(
             "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
         ],
         [
-            "crates/comfy_plugin_sdk/wit/comfy-provider-plugin-v2.wit",
+            "crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit",
+            "crates/comfy_plugin_sdk/wit/provider-v2/deps/comfy-plugin/comfy-plugin.wit",
             "crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json",
             "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
             "crates/comfy_plugin_sdk/src/type_ids.rs",
             "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
         ],
-        "V1 fixtures remain byte-compatible and the existing host bindgens resolve the exact frozen v1 WIT file without parsing the separately versioned v2 package. V2 DTOs enforce invocation-scoped generation-checked handles, method/header/body/chunk/line/aggregate bounds, ordered terminal state, upload and cost parity between WIT and JSON schema, cancellation-aware waits, and monotonic bounded progress without paths, secrets, native handles, or accepted-but-ignored fields.",
+        "V1 fixtures and the v2 package's frozen v1 dependency copy remain byte-compatible. Existing host bindgens resolve the exact frozen v1 WIT file without parsing v2, while a compile-time host bindgen independently resolves the standard separately versioned v2 package. V2 DTOs enforce invocation-scoped generation-checked handles, method/header/body/chunk/line/aggregate bounds, ordered terminal state, upload and cost parity between WIT and JSON schema, cancellation-aware waits, and monotonic bounded progress without paths, secrets, native handles, or accepted-but-ignored fields.",
         ["comfy_plugin_sdk", "comfy_plugin_host"],
         validation_packages=["comfy_plugin_sdk", "comfy_plugin_host"],
     )
@@ -10458,7 +10459,7 @@ def provider_component_foundation_tasks(
         "Extend the private worker protocol with bounded response heads, chunks, waits, progress, stream and session identities, preserving strict version rejection and keeping native handles, paths, and secret bytes outside the wire.",
         [
             "crates/comfy_types/src/worker_protocol.rs",
-            "crates/comfy_plugin_sdk/wit/comfy-provider-plugin-v2.wit",
+            "crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit",
         ],
         [
             "crates/comfy_types/src/worker_protocol.rs",
