@@ -433,6 +433,25 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertEqual(len(provider_shared_ids), 9)
         self.assertEqual(len(provider_vendor_ids), 33)
+        provider_projection = tasks_by_id[
+            "comfy-parity-provider-namespace-binding-projection"
+        ]
+        self.assertIn(
+            "crates/comfy_nodes/src/families/partner_three_d_02.rs",
+            provider_projection["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_nodes/src/families/partner_three_d_03.rs",
+            provider_projection["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_nodes/src/families/partner_three_d_02.rs",
+            provider_projection["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_nodes/src/families/partner_three_d_03.rs",
+            provider_projection["writes"],
+        )
         self.assertEqual(len(set(provider_vendor_ids)), 33)
         self.assertEqual(
             sum(nodes for _, nodes, _, _ in planning.PROVIDER_VENDOR_SPECS), 224
@@ -450,6 +469,22 @@ class ValidationGenerationTests(unittest.TestCase):
             ),
             224,
         )
+        provider_leaves = [
+            candidate
+            for candidate in tasks_by_id.values()
+            if candidate["id"].startswith("comfy-parity-native-nodes-")
+            and provider_closure_id in candidate["dependencies"]
+        ]
+        self.assertGreater(len(provider_leaves), 0)
+        for provider_leaf in provider_leaves:
+            self.assertIn(
+                "crates/comfy_nodes/src/provider_contracts.rs",
+                provider_leaf["reads"],
+            )
+            self.assertIn(
+                "no leaf owns a namespace literal or runtime rewrite",
+                provider_leaf["done"],
+            )
         self.assertEqual(
             tasks_by_id[provider_shared_ids[0]]["dependencies"],
             [

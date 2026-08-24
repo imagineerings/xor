@@ -10409,12 +10409,20 @@ def provider_component_foundation_tasks(
         "Compile the checked provider component catalog into one comfy_nodes projection and make generated bindings plus runtime activation consume that sole namespace owner. Replace per-node placeholder and legacy `comfy-api` namespaces without runtime string rewriting or mixed-vendor activation.",
         [
             ".agents/specs/comfy-parity/catalogs/provider-component-contracts.json",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/families/partner_three_d_02.rs",
+            "crates/comfy_nodes/src/families/partner_three_d_03.rs",
             "crates/comfy_nodes/src/registry_generator.rs",
+            "crates/comfy_runtime/src/executor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+            "crates/comfy_worker/src/plugin_runtime.rs",
         ],
         [
             "crates/comfy_nodes/src/provider_contracts.rs",
             "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_nodes/src/families/partner_three_d_02.rs",
+            "crates/comfy_nodes/src/families/partner_three_d_03.rs",
             "crates/comfy_nodes/tests/provider_contracts.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
         ],
@@ -16428,7 +16436,10 @@ def node_tasks(
                     "crates/comfy_runtime/src/native_audio_codec_service.rs",
                 ])
             if has_provider:
-                task_reads.append("crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs")
+                task_reads.extend([
+                    "crates/comfy_nodes/src/provider_contracts.rs",
+                    "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
+                ])
             if {"COMFY-NODE-0156", "COMFY-NODE-0224", "COMFY-NODE-0225"}.intersection(feature_ids):
                 task_dependencies.append("comfy-parity-hidream-o1-family-conditioning-adapter-consolidation")
                 task_reads.append("crates/comfy_model/src/hidream_o1_family.rs")
@@ -16448,6 +16459,8 @@ def node_tasks(
             ]
             task_validations = ["VAL-NODE-001", "VAL-NODE-002", "VAL-NODE-CLOSURE-001"]
             task_done = f"Every exactly assigned feature row ({exact_assignments}) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed."
+            if has_provider:
+                task_done += " Every provider-required binding delegates its feature and node identity to the checked comfy_nodes provider-contract projection; no leaf owns a namespace literal or runtime rewrite."
             if "COMFY-NODE-0133" in feature_ids:
                 task_reads.extend([
                     "projects/comfy/ComfyUI/comfy_extras/nodes_differential_diffusion.py",
