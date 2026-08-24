@@ -197,14 +197,13 @@ impl SearchProjectionOperation {
         if self.0.contract_version != SEARCH_DOCUMENT_CONTRACT_VERSION {
             return Err(SearchIndexerError::InvalidInput);
         }
-        if let SearchProjectionMutation::UpsertCommunity { title, body } = &self.0.mutation {
-            if title.len() > MAX_SEARCH_TITLE_BYTES
+        if let SearchProjectionMutation::UpsertCommunity { title, body } = &self.0.mutation
+            && (title.len() > MAX_SEARCH_TITLE_BYTES
                 || body.len() > MAX_SEARCH_BODY_BYTES
                 || title.contains('\0')
-                || body.contains('\0')
-            {
-                return Err(SearchIndexerError::InvalidInput);
-            }
+                || body.contains('\0'))
+        {
+            return Err(SearchIndexerError::InvalidInput);
         }
         Ok(())
     }
@@ -247,6 +246,25 @@ impl CollaborationSearchIndexer {
         tenant: &TenantContext,
         outbox_sequence: u64,
     ) -> Result<SearchIndexingOutcome, SearchIndexerError> {
+        self.index_outbox_sequence_with_retention_requirement(tenant, outbox_sequence, false)
+            .await
+    }
+
+    pub async fn index_retention_expiry_outbox_sequence(
+        &self,
+        tenant: &TenantContext,
+        outbox_sequence: u64,
+    ) -> Result<SearchIndexingOutcome, SearchIndexerError> {
+        self.index_outbox_sequence_with_retention_requirement(tenant, outbox_sequence, true)
+            .await
+    }
+
+    async fn index_outbox_sequence_with_retention_requirement(
+        &self,
+        tenant: &TenantContext,
+        outbox_sequence: u64,
+        require_retention_expiry: bool,
+    ) -> Result<SearchIndexingOutcome, SearchIndexerError> {
         let outbox_sequence = i64::try_from(outbox_sequence)
             .ok()
             .filter(|sequence| *sequence > 0)
@@ -275,6 +293,16 @@ impl CollaborationSearchIndexer {
                 return Ok(SearchIndexingOutcome::IgnoredTopic);
             }
             let operation = SearchProjectionOperation::decode(&record.payload)?;
+            if require_retention_expiry
+                && !matches!(
+                    &operation.0.mutation,
+                    SearchProjectionMutation::Exclude {
+                        reason: SearchExclusionReason::RetentionExpired
+                    }
+                )
+            {
+                return Err(SearchIndexerError::InvalidInput);
+            }
             apply_operation(&transaction, tenant, &record, &operation).await
         }
         .await;
