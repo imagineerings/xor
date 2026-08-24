@@ -282,6 +282,22 @@ impl JobExecutionRequest {
             prompt,
         })
     }
+
+    pub const fn identity(&self) -> JobIdentity {
+        self.identity
+    }
+
+    pub const fn executor_principal_id(&self) -> PrincipalId {
+        self.executor_principal_id
+    }
+
+    pub const fn channel_id(&self) -> Uuid {
+        self.channel_id
+    }
+
+    pub const fn thread_id(&self) -> Option<Uuid> {
+        self.thread_id
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
