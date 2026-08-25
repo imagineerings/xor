@@ -3805,7 +3805,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 48. Publish complete parity and ownership evidence
 
-  - [ ] 48.1. Regenerate final source and ownership catalogs
+  - [x] 48.1. Regenerate final source and ownership catalogs
     - Re-run every inventory and join CAP rows to canonical owner, disposition, implementation and retained boundary.
     - _Requirements: 1.4, 20.4_
     - _Capability IDs: CAP-001, CAP-045_
@@ -3813,6 +3813,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: .agents/specs/collaborative-workspace/catalogs/**, .agents/specs/collaborative-workspace/retirement/**_
     - _Writes: .agents/specs/collaborative-workspace/catalogs/final-coverage.csv_
     - _Validation: inventory checker reports all CAP IDs complete with no unexplained or deferred component_
+    - _Discovered contradiction (2026-08-25): the four source catalogs are checked-in audited inventories with a source-aware validator but no canonical regeneration program, and the approved Buzz source is external to this worktree. The narrow regeneration therefore revalidates every existing row against the exact supplied source through a temporary link, then deterministically materializes only the declared final cross-catalog join. It does not rewrite source evidence without an authoritative generator or convert an explicit compatibility/removal hold into an unexplained implementation deferral._
+    - _Evidence: 2026-08-25 — generated `.agents/specs/collaborative-workspace/catalogs/final-coverage.csv` with exactly one ordered row for every CAP-001 through CAP-045. The source-aware inventory check passed 31 packages, 184 protocol records, 62 data sources and 193 surfaces; their 470 stable rows produce 1,364 exact capability links in the final join. Every capability row carries its source IDs, one explicit canonical owner, the approved disposition, only checked completed implementation/evidence leaves, requirement IDs, retained compatibility or removal boundary, independent validation oracle and final `complete` component status. The join contains 825 unique per-capability completed-task references, with at least six for every capability, and no missing, duplicate, unexplained or deferred component row. Explicit source/deployment/activation holds remain visible as retained boundaries rather than second owners or false implementation gaps. Canonical specification, inventory, final-coverage structure, dependency and diff gates are recorded in the enclosing checkpoint commit. Commit: enclosing checkpoint commit, reported after creation._
 
   - [ ] 48.2. Assemble the final parity evidence report
     - Link every acceptance criterion and CAP ID to passing reuse, implementation, compatibility and migration evidence.
