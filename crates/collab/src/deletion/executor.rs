@@ -202,7 +202,7 @@ pub struct CommunityDeletionExecutionRecord {
 }
 
 impl CommunityDeletionExecutionRecord {
-    fn validate(
+    pub(crate) fn validate(
         &self,
         tenant: &TenantContext,
         deletion_id: AggregateId,
