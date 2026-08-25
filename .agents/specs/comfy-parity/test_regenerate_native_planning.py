@@ -1337,14 +1337,24 @@ class ValidationGenerationTests(unittest.TestCase):
             zed_baseline_correction["dependencies"],
             ["comfy-parity-provider-component-host-stream-adapter"],
         )
+        for baseline_outcome_gate in (
+            "two stale Zed test expectations and one redundant-clone lint baseline",
+            "without changing URL parsing, registered action behavior, or huddle rendering",
+        ):
+            self.assertIn(baseline_outcome_gate, zed_baseline_correction["outcome"])
         self.assertEqual(
             zed_baseline_correction["writes"],
-            ["crates/zed/src/zed/open_listener.rs", "crates/zed/src/zed.rs"],
+            [
+                "crates/zed/src/zed/open_listener.rs",
+                "crates/zed/src/zed.rs",
+                "crates/collab_ui/src/huddle.rs",
+            ],
         )
         for baseline_read in (
             "crates/zed/src/zed/open_listener.rs",
             "crates/zed/src/zed.rs",
             "crates/language_tools/src/language_tool_tree.rs",
+            "crates/collab_ui/src/huddle.rs",
         ):
             self.assertIn(baseline_read, zed_baseline_correction["reads"])
         for baseline_gate in (
@@ -1353,6 +1363,8 @@ class ValidationGenerationTests(unittest.TestCase):
             "language_tool_tree namespace",
             "no clone URL rewriting",
             "action registration",
+            "without a redundant Arc clone",
+            "huddle rendering",
         ):
             self.assertIn(baseline_gate, zed_baseline_correction["done"])
         baseline_validation = planning.task_validation_commands(zed_baseline_correction)
@@ -1360,6 +1372,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "test_parse_git_clone_url_with_encoding",
             "test_action_namespaces",
             "-p zed --features test-support --all-targets",
+            "./script/clippy -p comfy_runtime -p comfy_plugin_host -p comfy_ui -p zed",
         ):
             self.assertIn(baseline_command, baseline_validation)
         self.assertEqual(
