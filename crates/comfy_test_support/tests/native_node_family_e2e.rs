@@ -11,8 +11,8 @@ use comfy_model::{
     NativeUpscaleStateDictionaryLayout, NativeUpscaleUnavailableReason,
     SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration, compiled_native_upscale_contract,
     deterministic_reduced_depth_anything_3_checkpoint, mutate_reduced_depth_anything_3_checkpoint,
-    sdpose_heatmap_head_weight_manifest, sdpose_sd2_weight_manifest,
-    select_reduced_depth_anything_3_reference_for_fixture,
+    reduced_depth_anything_3_checkpoint_parity_for_fixture, sdpose_heatmap_head_weight_manifest,
+    sdpose_sd2_weight_manifest, select_reduced_depth_anything_3_reference_for_fixture,
 };
 use comfy_nodes::{
     NativePreparedEffectKind, NativeStoredModelPayload, NativeStructuredValue,
@@ -1486,6 +1486,85 @@ fn native_background_removal_fixture_executes_and_discriminates_source_phases()
     Ok(())
 }
 
+fn assert_depth_anything_3_checkpoint_projection(
+    oracle: &serde_json::Value,
+    profile: &str,
+    dtype: &str,
+    resource: &NativeDepthAnything3Resource,
+    cancellation: &CancellationToken,
+) -> Result<(), Box<dyn Error>> {
+    let expected = oracle
+        .pointer(&format!("/checkpoint_projection/{profile}/{dtype}"))
+        .ok_or("DA3 checkpoint projection oracle is missing")?;
+    assert_eq!(
+        expected.get("ordering").and_then(serde_json::Value::as_str),
+        Some("utf8-key-ascending")
+    );
+    let actual = reduced_depth_anything_3_checkpoint_parity_for_fixture(resource, cancellation)?;
+    assert_eq!(
+        u64::try_from(actual.states.len())?,
+        expected
+            .get("key_count")
+            .and_then(serde_json::Value::as_u64)
+            .ok_or("DA3 checkpoint projection key count is missing")?
+    );
+    assert_eq!(
+        actual.source_sha256,
+        expected
+            .get("source_sha256")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("DA3 checkpoint source digest is missing")?
+    );
+    assert_eq!(
+        actual.projected_f32_sha256,
+        expected
+            .get("projected_f32_sha256")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("DA3 projected checkpoint digest is missing")?
+    );
+    let expected_states = expected
+        .get("states")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("DA3 checkpoint state projection list is missing")?;
+    assert_eq!(actual.states.len(), expected_states.len());
+    for (actual, expected) in actual.states.iter().zip(expected_states) {
+        assert_eq!(
+            actual.key,
+            expected
+                .get("key")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("DA3 projected checkpoint key is missing")?
+        );
+        let expected_shape = expected
+            .get("shape")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("DA3 projected checkpoint shape is missing")?
+            .iter()
+            .map(|dimension| {
+                dimension
+                    .as_u64()
+                    .ok_or("DA3 projected checkpoint dimension is invalid")
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(actual.shape, expected_shape);
+        assert_eq!(
+            actual.source_sha256,
+            expected
+                .get("source_sha256")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("DA3 checkpoint state source digest is missing")?
+        );
+        assert_eq!(
+            actual.projected_f32_sha256,
+            expected
+                .get("projected_f32_sha256")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("DA3 checkpoint state projected digest is missing")?
+        );
+    }
+    Ok(())
+}
+
 #[test]
 fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry()
 -> Result<(), Box<dyn Error>> {
@@ -1683,9 +1762,9 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
     let image = ImageTensor::from_f32(&backend, &context, 1, 4, 4, 3, &image_values)?;
     let mut dtype_identities = BTreeSet::new();
     let mut f32_resource = None;
-    let mut low_precision_resources = Vec::new();
+    let mut resources = Vec::new();
     for dtype in [DType::F16, DType::Bf16, DType::F32] {
-        let resource = Arc::new(NativeDepthAnything3Resource::from_reduced_fixture(
+        let resource = NativeDepthAnything3Resource::from_reduced_fixture(
             &backend,
             deterministic_reduced_depth_anything_3_checkpoint(
                 &backend,
@@ -1695,55 +1774,37 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
                 &context,
             )?,
             &context,
-        )?);
-        dtype_identities.insert(resource.semantic_digest_sha256().to_owned());
-        if dtype == DType::F32 {
-            f32_resource = Some(resource);
-        } else {
-            low_precision_resources.push((dtype, resource));
-        }
-    }
-    assert_eq!(dtype_identities.len(), 3);
-    let resource = f32_resource.ok_or("F32 DA3 fixture was not retained")?;
-    let geometry = resource.execute(
-        &backend,
-        NativeDepthAnything3Invocation {
-            image: &image,
-            views_per_sample: 1,
-            process_resolution: 4,
-            resize_method: NativeDepthAnything3ResizeMethod::UpperBound,
-            reference_strategy: NativeDepthAnything3ReferenceStrategy::First,
-            use_ray_pose: false,
-            ransac_seed: 17,
-            extrinsics: None,
-            intrinsics: None,
-        },
-        &context,
-    )?;
-    assert_eq!(geometry.depth.descriptor().shape(), &[1, 4, 4]);
-    assert!(geometry.confidence.is_none());
-    assert_eq!(
-        geometry
-            .sky
-            .as_ref()
-            .map(|value| value.descriptor().shape()),
-        Some([1, 4, 4].as_slice())
-    );
-    assert_eq!(
-        tensor_bits(&geometry.depth, &context)?,
-        fixture_raw_bits(
-            oracle
-                .pointer("/reduced_dpt/depth/bits")
-                .ok_or("DA3 depth oracle is missing")?,
-        )?
-    );
-    for (dtype, resource) in &low_precision_resources {
+        )?;
         let dtype_name = match dtype {
             DType::F16 => "f16",
             DType::Bf16 => "bf16",
-            _ => return Err("unexpected DA3 low-precision dtype".into()),
+            DType::F32 => "f32",
+            _ => return Err("unexpected DA3 fixture dtype".into()),
         };
-        let low_precision = resource.execute(
+        assert_depth_anything_3_checkpoint_projection(
+            &oracle,
+            "dpt",
+            dtype_name,
+            &resource,
+            &cancellation,
+        )?;
+        let resource = Arc::new(resource);
+        dtype_identities.insert(resource.semantic_digest_sha256().to_owned());
+        if dtype == DType::F32 {
+            f32_resource = Some(resource.clone());
+        }
+        resources.push((dtype, resource));
+    }
+    assert_eq!(dtype_identities.len(), 3);
+    let resource = f32_resource.ok_or("F32 DA3 fixture was not retained")?;
+    for (dtype, resource) in &resources {
+        let dtype_name = match dtype {
+            DType::F16 => "f16",
+            DType::Bf16 => "bf16",
+            DType::F32 => "f32",
+            _ => return Err("unexpected DA3 execution dtype".into()),
+        };
+        let geometry = resource.execute(
             &backend,
             NativeDepthAnything3Invocation {
                 image: &image,
@@ -1758,23 +1819,33 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
             },
             &context,
         )?;
+        assert_eq!(geometry.depth.descriptor().shape(), &[1, 4, 4]);
+        assert!(geometry.confidence.is_none());
+        assert_eq!(
+            geometry
+                .sky
+                .as_ref()
+                .map(|value| value.descriptor().shape()),
+            Some([1, 4, 4].as_slice())
+        );
         for (actual, field) in [
-            (&low_precision.depth, "depth"),
+            (&geometry.depth, "depth"),
             (
-                low_precision
-                    .sky
-                    .as_ref()
-                    .ok_or("low-precision DA3 sky output is missing")?,
+                geometry.sky.as_ref().ok_or("DA3 sky output is missing")?,
                 "sky",
             ),
         ] {
-            let pointer = format!("/reduced_dpt/low_precision/{dtype_name}/{field}/bits");
+            let pointer = if *dtype == DType::F32 {
+                format!("/reduced_dpt/{field}/bits")
+            } else {
+                format!("/reduced_dpt/low_precision/{dtype_name}/{field}/bits")
+            };
             assert_eq!(
                 tensor_bits(actual, &context)?,
                 fixture_raw_bits(
                     oracle
                         .pointer(&pointer)
-                        .ok_or_else(|| format!("missing DA3 low-precision oracle {pointer}"))?,
+                        .ok_or_else(|| format!("missing DA3 execution oracle {pointer}"))?,
                 )?,
                 "{dtype_name} projected execution diverged"
             );
@@ -1875,6 +1946,7 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
         )?,
         &context,
     )?);
+    assert_depth_anything_3_checkpoint_projection(&oracle, "dualdpt", "f32", &dual, &cancellation)?;
     let dual_geometry = dual.execute(
         &backend,
         NativeDepthAnything3Invocation {

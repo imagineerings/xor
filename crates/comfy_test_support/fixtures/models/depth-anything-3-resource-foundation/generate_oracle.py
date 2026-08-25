@@ -8,7 +8,15 @@ import struct
 import sys
 from pathlib import Path
 
-from source_graph import Tensor, execute_dpt, execute_dpt_resized, execute_dualdpt, preprocess
+from source_graph import (
+    Tensor,
+    execute_dpt,
+    execute_dpt_resized,
+    execute_dualdpt,
+    make_state,
+    manifest,
+    preprocess,
+)
 
 ROOT = Path(__file__).resolve().parents[5]
 OUTPUT = Path(__file__).with_name("oracle.json")
@@ -238,6 +246,85 @@ def output_identity(outputs):
     return hashlib.sha256(raw).hexdigest()
 
 
+def state_bytes(tensor, source_dtype):
+    if source_dtype == "f16":
+        return b"".join(struct.pack("<e", value) for value in tensor.values)
+    if source_dtype == "bf16":
+        return b"".join(struct.pack("<H", bits(value) >> 16) for value in tensor.values)
+    return b"".join(struct.pack("<f", value) for value in tensor.values)
+
+
+def state_identity(domain, key, dtype, shape, raw):
+    digest = hashlib.sha256()
+    digest.update(domain)
+    encoded_key = key.encode("utf-8")
+    encoded_dtype = dtype.encode("ascii")
+    digest.update(len(encoded_key).to_bytes(8, "little"))
+    digest.update(encoded_key)
+    digest.update(len(encoded_dtype).to_bytes(8, "little"))
+    digest.update(encoded_dtype)
+    digest.update(len(shape).to_bytes(8, "little"))
+    for dimension in shape:
+        digest.update(dimension.to_bytes(8, "little"))
+    digest.update(len(raw).to_bytes(8, "little"))
+    digest.update(raw)
+    return digest.hexdigest()
+
+
+def checkpoint_projection(profile, source_dtype):
+    state = make_state(profile, source_dtype=source_dtype)
+    catalog_dtype = {
+        "f16": "float16",
+        "bf16": "bfloat16",
+        "f32": "float32",
+    }[source_dtype]
+    entries = []
+    source_aggregate = hashlib.sha256()
+    source_aggregate.update(b"zed.comfy.depth-anything-3.checkpoint-source-aggregate.v1\0")
+    projected_aggregate = hashlib.sha256()
+    projected_aggregate.update(
+        b"zed.comfy.depth-anything-3.checkpoint-projected-aggregate.v1\0"
+    )
+    specifications = sorted(manifest(profile), key=lambda specification: specification[0])
+    source_aggregate.update(len(specifications).to_bytes(8, "little"))
+    projected_aggregate.update(len(specifications).to_bytes(8, "little"))
+    for key, shape in specifications:
+        tensor = state[key]
+        source_raw = state_bytes(tensor, source_dtype)
+        projected_raw = b"".join(struct.pack("<f", value) for value in tensor.values)
+        source_sha256 = state_identity(
+            b"zed.comfy.depth-anything-3.checkpoint-source-state.v1\0",
+            key,
+            catalog_dtype,
+            shape,
+            source_raw,
+        )
+        projected_sha256 = state_identity(
+            b"zed.comfy.depth-anything-3.checkpoint-projected-state.v1\0",
+            key,
+            "float32",
+            shape,
+            projected_raw,
+        )
+        source_aggregate.update(source_sha256.encode("ascii"))
+        projected_aggregate.update(projected_sha256.encode("ascii"))
+        entries.append(
+            {
+                "key": key,
+                "shape": list(shape),
+                "source_sha256": source_sha256,
+                "projected_f32_sha256": projected_sha256,
+            }
+        )
+    return {
+        "ordering": "utf8-key-ascending",
+        "key_count": len(entries),
+        "source_sha256": source_aggregate.hexdigest(),
+        "projected_f32_sha256": projected_aggregate.hexdigest(),
+        "states": entries,
+    }
+
+
 def document():
     source_hashes_are_current()
     values = [f32((index + 1) / 64.0) for index in range(48)]
@@ -366,6 +453,13 @@ def document():
             "f16_projected_bits": [bits(f16_to_f32(f16_bits(value))) for value in conversion_values],
             "bf16_storage_bits": [bf16_bits(value) for value in conversion_values],
             "bf16_projected_bits": [bits(bf16_to_f32(bf16_bits(value))) for value in conversion_values],
+        },
+        "checkpoint_projection": {
+            profile: {
+                source_dtype: checkpoint_projection(profile, source_dtype)
+                for source_dtype in ["f32", "f16", "bf16"]
+            }
+            for profile in ["dpt", "dualdpt"]
         },
         "reference_fixture": {
             "token_bits": [[bits(value) for value in token] for token in tokens],

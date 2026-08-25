@@ -232,7 +232,11 @@ def linear(input_tensor, weight, bias):
         for out_lane in range(output_size):
             value = bias.get(out_lane) if bias is not None else f32(0.0)
             for lane in range(input_size):
-                value = fadd(value, fmul(input_tensor.values[row * input_size + lane], weight.get(out_lane, lane)))
+                value = fmadd(
+                    input_tensor.values[row * input_size + lane],
+                    weight.get(out_lane, lane),
+                    value,
+                )
             output.values[row * output_size + out_lane] = value
     return output
 
@@ -243,11 +247,16 @@ def layer_norm(input_tensor, weight, bias, epsilon):
     output = input_tensor.clone()
     for row in range(rows):
         values = input_tensor.values[row * width:(row + 1) * width]
-        mean = fdiv(fsum(values), width)
-        variance = fdiv(fsum(fmul(fsub(value, mean), fsub(value, mean)) for value in values), width)
-        inverse = f32(1.0 / math.sqrt(fadd(variance, epsilon)))
+        mean = f32(sum(float(value) for value in values) / width)
+        variance = (
+            sum((float(value) - float(mean)) ** 2 for value in values) / width
+        )
+        inverse = f32(1.0 / math.sqrt(variance + float(epsilon)))
         for lane, value in enumerate(values):
-            output.values[row * width + lane] = fadd(fmul(fmul(fsub(value, mean), inverse), weight.get(lane)), bias.get(lane))
+            normalized = fmul(fsub(value, mean), inverse)
+            output.values[row * width + lane] = fadd(
+                fmul(normalized, weight.get(lane)), bias.get(lane)
+            )
     return output
 
 
@@ -288,7 +297,18 @@ def conv2d(input_tensor, weight, bias=None, stride=1, padding=0):
                                 input_x = output_x * stride + kernel_x - padding
                                 if input_x < 0 or input_x >= input_width:
                                     continue
-                                value = fadd(value, fmul(input_tensor.get(batch_index, input_channel, input_y, input_x), weight.get(output_channel, input_channel, kernel_y, kernel_x)))
+                                value = fmadd(
+                                    input_tensor.get(
+                                        batch_index, input_channel, input_y, input_x
+                                    ),
+                                    weight.get(
+                                        output_channel,
+                                        input_channel,
+                                        kernel_y,
+                                        kernel_x,
+                                    ),
+                                    value,
+                                )
                     output.set(value, batch_index, output_channel, output_y, output_x)
     return output
 
@@ -319,36 +339,70 @@ def conv_transpose2d(input_tensor, weight, bias=None, stride=1, padding=0):
                                 output_x = input_x * stride + kernel_x - padding
                                 if output_x < 0 or output_x >= output_width:
                                     continue
-                                output.set(fadd(output.get(batch_index, output_channel, output_y, output_x), fmul(source, weight.get(input_channel, output_channel, kernel_y, kernel_x))), batch_index, output_channel, output_y, output_x)
+                                output.set(
+                                    fmadd(
+                                        source,
+                                        weight.get(
+                                            input_channel,
+                                            output_channel,
+                                            kernel_y,
+                                            kernel_x,
+                                        ),
+                                        output.get(
+                                            batch_index,
+                                            output_channel,
+                                            output_y,
+                                            output_x,
+                                        ),
+                                    ),
+                                    batch_index,
+                                    output_channel,
+                                    output_y,
+                                    output_x,
+                                )
     return output
 
 
 def bilinear(input_tensor, output_height, output_width, align_corners):
     batch, channels, input_height, input_width = input_tensor.shape
     output = Tensor((batch, channels, output_height, output_width), [0.0] * (batch * channels * output_height * output_width))
-    for output_y in range(output_height):
-        if align_corners and output_height > 1:
-            source_y = output_y * (input_height - 1) / (output_height - 1)
+
+    def axis_weights(input_extent, output_extent, output_coordinate):
+        inverse_scale = f32(input_extent / output_extent)
+        if align_corners and output_extent > 1:
+            coordinate = f32(
+                f32(output_coordinate)
+                * f32(input_extent - 1)
+                / f32(output_extent - 1)
+            )
         else:
-            source_y = (output_y + 0.5) * input_height / output_height - 0.5
-        source_y = max(0.0, min(input_height - 1, source_y))
-        low_y = int(math.floor(source_y))
-        high_y = min(low_y + 1, input_height - 1)
-        weight_y = f32(source_y - low_y)
-        for output_x in range(output_width):
-            if align_corners and output_width > 1:
-                source_x = output_x * (input_width - 1) / (output_width - 1)
-            else:
-                source_x = (output_x + 0.5) * input_width / output_width - 0.5
-            source_x = max(0.0, min(input_width - 1, source_x))
-            low_x = int(math.floor(source_x))
-            high_x = min(low_x + 1, input_width - 1)
-            weight_x = f32(source_x - low_x)
-            for batch_index in range(batch):
-                for channel in range(channels):
-                    top = fadd(input_tensor.get(batch_index, channel, low_y, low_x), fmul(fsub(input_tensor.get(batch_index, channel, low_y, high_x), input_tensor.get(batch_index, channel, low_y, low_x)), weight_x))
-                    bottom = fadd(input_tensor.get(batch_index, channel, high_y, low_x), fmul(fsub(input_tensor.get(batch_index, channel, high_y, high_x), input_tensor.get(batch_index, channel, high_y, low_x)), weight_x))
-                    output.set(fadd(top, fmul(fsub(bottom, top), weight_y)), batch_index, channel, output_y, output_x)
+            coordinate = fmadd(fadd(f32(output_coordinate), 0.5), inverse_scale, -0.5)
+        coordinate = max(0.0, min(input_extent - 1, coordinate))
+        low = int(math.floor(coordinate))
+        high = min(low + 1, input_extent - 1)
+        if low == high:
+            return [(low, f32(1.0))]
+        high_weight = f32(coordinate - low)
+        return [(low, fsub(1.0, high_weight)), (high, high_weight)]
+
+    for batch_index in range(batch):
+        for channel in range(channels):
+            for output_y in range(output_height):
+                y_weights = axis_weights(input_height, output_height, output_y)
+                for output_x in range(output_width):
+                    value = f32(0.0)
+                    for source_y, weight_y in y_weights:
+                        for source_x, weight_x in axis_weights(
+                            input_width, output_width, output_x
+                        ):
+                            value = fmadd(
+                                input_tensor.get(
+                                    batch_index, channel, source_y, source_x
+                                ),
+                                fmul(weight_y, weight_x),
+                                value,
+                            )
+                    output.set(value, batch_index, channel, output_y, output_x)
     return output
 
 

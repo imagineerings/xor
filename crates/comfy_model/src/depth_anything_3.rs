@@ -169,6 +169,23 @@ pub struct DepthAnything3FixtureMutation<'a> {
 }
 
 #[cfg(any(test, feature = "test-support"))]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DepthAnything3FixtureStateParity {
+    pub key: String,
+    pub shape: Vec<u64>,
+    pub source_sha256: String,
+    pub projected_f32_sha256: String,
+}
+
+#[cfg(any(test, feature = "test-support"))]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DepthAnything3FixtureCheckpointParity {
+    pub source_sha256: String,
+    pub projected_f32_sha256: String,
+    pub states: Vec<DepthAnything3FixtureStateParity>,
+}
+
+#[cfg(any(test, feature = "test-support"))]
 pub fn deterministic_reduced_depth_anything_3_checkpoint(
     backend: &CpuBackend,
     profile: DepthAnything3FixtureProfile,
@@ -273,6 +290,107 @@ pub fn deterministic_reduced_depth_anything_3_checkpoint(
         ordered_state,
         memory_budget_bytes,
     })
+}
+
+#[cfg(any(test, feature = "test-support"))]
+pub fn reduced_depth_anything_3_checkpoint_parity_for_fixture(
+    resource: &NativeDepthAnything3Resource,
+    cancellation: &CancellationToken,
+) -> Result<DepthAnything3FixtureCheckpointParity, NativeDepthAnything3Error> {
+    cancellation.check()?;
+    let mut states = Vec::new();
+    states
+        .try_reserve_exact(resource.source_state.len())
+        .map_err(|_| NativeDepthAnything3Error::Allocation)?;
+    let mut source_aggregate = Sha256::new();
+    source_aggregate.update(b"zed.comfy.depth-anything-3.checkpoint-source-aggregate.v1\0");
+    let mut projected_aggregate = Sha256::new();
+    projected_aggregate.update(b"zed.comfy.depth-anything-3.checkpoint-projected-aggregate.v1\0");
+    let state_count = u64::try_from(resource.source_state.len())
+        .map_err(|_| NativeDepthAnything3Error::ShapeOverflow)?;
+    source_aggregate.update(state_count.to_le_bytes());
+    projected_aggregate.update(state_count.to_le_bytes());
+    for (index, (key, source)) in resource.source_state.iter().enumerate() {
+        if index.is_multiple_of(16) {
+            cancellation.check()?;
+        }
+        let projected = resource
+            .execution_state
+            .get(key)
+            .ok_or_else(|| NativeDepthAnything3Error::MissingState(key.clone()))?;
+        let source_sha256 = fixture_state_identity_sha256(
+            b"zed.comfy.depth-anything-3.checkpoint-source-state.v1\0",
+            key,
+            source,
+            cancellation,
+        )?;
+        let projected_f32_sha256 = fixture_state_identity_sha256(
+            b"zed.comfy.depth-anything-3.checkpoint-projected-state.v1\0",
+            key,
+            projected,
+            cancellation,
+        )?;
+        source_aggregate.update(source_sha256.as_bytes());
+        projected_aggregate.update(projected_f32_sha256.as_bytes());
+        states.push(DepthAnything3FixtureStateParity {
+            key: key.clone(),
+            shape: source.descriptor().shape().to_vec(),
+            source_sha256,
+            projected_f32_sha256,
+        });
+    }
+    if resource.execution_state.len() != states.len() {
+        return Err(NativeDepthAnything3Error::SemanticStateChanged);
+    }
+    cancellation.check()?;
+    Ok(DepthAnything3FixtureCheckpointParity {
+        source_sha256: format!("{:x}", source_aggregate.finalize()),
+        projected_f32_sha256: format!("{:x}", projected_aggregate.finalize()),
+        states,
+    })
+}
+
+#[cfg(any(test, feature = "test-support"))]
+fn fixture_state_identity_sha256(
+    domain: &[u8],
+    key: &str,
+    tensor: &Tensor,
+    cancellation: &CancellationToken,
+) -> Result<String, NativeDepthAnything3Error> {
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    hasher.update(
+        u64::try_from(key.len())
+            .map_err(|_| NativeDepthAnything3Error::ShapeOverflow)?
+            .to_le_bytes(),
+    );
+    hasher.update(key.as_bytes());
+    let dtype = tensor.descriptor().dtype().catalog_name();
+    hasher.update(
+        u64::try_from(dtype.len())
+            .map_err(|_| NativeDepthAnything3Error::ShapeOverflow)?
+            .to_le_bytes(),
+    );
+    hasher.update(dtype.as_bytes());
+    hasher.update(
+        u64::try_from(tensor.descriptor().shape().len())
+            .map_err(|_| NativeDepthAnything3Error::ShapeOverflow)?
+            .to_le_bytes(),
+    );
+    for dimension in tensor.descriptor().shape() {
+        hasher.update(dimension.to_le_bytes());
+    }
+    let bytes = tensor.contiguous_bytes()?;
+    hasher.update(
+        u64::try_from(bytes.len())
+            .map_err(|_| NativeDepthAnything3Error::ShapeOverflow)?
+            .to_le_bytes(),
+    );
+    for chunk in bytes.chunks(64 * 1_024) {
+        cancellation.check()?;
+        hasher.update(chunk);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 #[cfg(any(test, feature = "test-support"))]

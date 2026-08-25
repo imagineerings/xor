@@ -241,8 +241,10 @@ pub use depth_anything_3::{
 };
 #[cfg(any(test, feature = "test-support"))]
 pub use depth_anything_3::{
-    DepthAnything3FixtureMutation, DepthAnything3FixtureProfile,
+    DepthAnything3FixtureCheckpointParity, DepthAnything3FixtureMutation,
+    DepthAnything3FixtureProfile, DepthAnything3FixtureStateParity,
     deterministic_reduced_depth_anything_3_checkpoint, mutate_reduced_depth_anything_3_checkpoint,
+    reduced_depth_anything_3_checkpoint_parity_for_fixture,
     select_reduced_depth_anything_3_reference_for_fixture,
 };
 pub use descriptor::{
