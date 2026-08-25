@@ -3251,7 +3251,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 42. Merge agent-first collaboration commands into Zed CLI
 
-  - [ ] 42.1. Define canonical CLI command and error contracts
+  - [x] 42.1. Define canonical CLI command and error contracts
     - Map Buzz command groups, global options, compact output and exit classes to Zed-owned operations.
     - _Requirements: 16.4, 18.1, 18.2_
     - _Capability IDs: CAP-038, CAP-042_
@@ -3259,8 +3259,10 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-cli/**, crates/cli/**, .agents/specs/collaborative-workspace/fixtures/clients/**_
     - _Writes: crates/cli/src/collaboration/contracts.rs_
     - _Validation: contract manifest accounts for every frozen command, option, output stream and exit code_
+    - _Discovered contradiction (2026-08-25): the planned leaf file cannot be compiled or consumed by later collaboration CLI ports without a parent module and Multiplayer-gated crate-root registration. The narrow correction adds `crates/cli/src/collaboration.rs` and the gated declaration in `crates/cli/src/cli.rs`; it adds no parser, command activation, transport, credential or Standard-build dependency._
+    - _Evidence: 2026-08-25 — added one typed manifest mapping all 22 frozen Buzz groups and 113 executable leaf command paths to ten Zed operation owners, including nested `repos protect` paths and the explicitly renamed social commands. The four global options preserve environment/default/secret and relay-command requirements; normalized JSON/default compact-read behavior, stdout/help, structured stderr, envelope fields, exit classes 0–5 and exact retryable relay statuses are retained. Four focused tests compare the manifest against the frozen Buzz parser/error sources and CLIENT-CLI fixtures, reject missing/duplicate commands and verify every stream, envelope, exit and retry class. The focused feature suite, repository-prescribed release/all-target/all-feature Clippy with warnings denied, default-feature release check, Standard depth-one dependency exclusion, formatting and diff hygiene passed._
 
-  - [ ] 42.2. Port identity and community CLI commands
+  - [x] 42.2. Port identity and community CLI commands
     - Implement profile, social, community, member and invite commands through canonical APIs.
     - _Requirements: 6.4, 7.1, 16.4_
     - _Capability IDs: CAP-007, CAP-008, CAP-038_
@@ -3268,8 +3270,10 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-cli/src/**, crates/cli/src/collaboration/contracts.rs_
     - _Writes: crates/cli/src/collaboration/community.rs_
     - _Validation: golden tests cover profile, membership, invite, permission, compact output and exit class_
+    - _Discovered contradiction (2026-08-25): delegating these commands through canonical APIs requires reading the profile, community, membership and channel-invite domain contracts that the planned read scope omitted, and the new file is unreachable without one parent-module declaration. The narrow correction adds those domain files to the read scope, registers only `collaboration::community`, and records living design/task evidence. It adds no parser, transport, authorization reducer, persistence, signer, token generator or Standard-build edge._
+    - _Evidence: 2026-08-25 — added fifteen Multiplayer-only profile, social-list, community, member and invite request variants carrying canonical IDs, validated domain values, exact operation attribution and optimistic versions through one injected executor. Stable projections preserve full and compact profile JSON, community/member/social records and mutation receipts. Invite creation is the sole success path that emits its executor-generated bearer; command/receipt debug output and every error redact it. Denied, absent, unavailable, unknown-completion, unexpected and stale outcomes use the common structured envelope, exit classes 1–5 and exact retry semantics, while mismatched executor outcomes fail closed. Six golden tests passed profile JSON/compact, social and member reads, invite output/redaction, permission and full exit matrix, operation/version forwarding and invalid-result handling. The warning-denied release/all-target/all-feature CLI Clippy gate passed._
 
-  - [ ] 42.3. Port message and thread CLI commands
+  - [x] 42.3. Port message and thread CLI commands
     - Implement message, reply, edit, delete, reaction, pin, bookmark and scheduled-message commands.
     - _Requirements: 9.1, 9.2, 16.4_
     - _Capability IDs: CAP-011, CAP-038_
@@ -3277,6 +3281,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-cli/src/**, crates/cli/src/collaboration/contracts.rs_
     - _Writes: crates/cli/src/collaboration/messages.rs_
     - _Validation: golden tests cover paging, reply, edit/delete, reactions, schedules and stable errors_
+    - _Discovered contradiction (2026-08-25): the planned legacy/contract read scope cannot delegate message, reaction, marker, thread and schedule operations to their canonical owners or revalidate returned records without reading those domain contracts, and the new adapter is unreachable without parent-module registration. The narrow correction adds only those canonical reads, the `collaboration::messages` declaration and living evidence; it adds no parser, signer, mention resolver, authorization reducer, thread builder, scheduler worker, persistence or Standard-build edge._
+    - _Evidence: 2026-08-25 — added fifteen Multiplayer-only message get/list/search/thread, send/reply, edit/delete, reaction, pin/bookmark and scheduled-message request variants carrying canonical identifiers, bounded cursors, validated content/reaction values, operation IDs and optimistic versions through one injected executor. Message and schedule results are revalidated through their canonical aggregates before JSON output, deleted content is absent, pages retain stable time/event cursors, threads retain root/parent/depth, and all mutations return one resource/version receipt. Five focused golden tests passed paging, reply/edit/delete attribution, thread/reaction/marker shapes, scheduled state/versioning and the complete stable error matrix including fail-closed result mismatches. Repository-prescribed release/all-target/all-feature CLI Clippy passed with warnings denied._
 
   - [ ] 42.4. Port project and repository CLI commands
     - Implement project, repository, ref, clone and hosted-repository operations through canonical APIs.
