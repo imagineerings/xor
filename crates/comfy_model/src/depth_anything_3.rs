@@ -6378,6 +6378,67 @@ mod tests {
                 .into());
             }
         }
+        let confidence_activation = oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/auxiliary_confidence_activation_lane")
+            .ok_or("DA3 auxiliary confidence activation oracle is missing")?;
+        let confidence_index = confidence_activation
+            .get("confidence_index")
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or("DA3 auxiliary confidence index is missing")?;
+        let logit_index = confidence_activation
+            .get("logit_index")
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or("DA3 auxiliary confidence logit index is missing")?;
+        let logits = tensor_to_f32_with_context_exact_native(
+            &backend,
+            trace
+                .auxiliary_logits
+                .as_ref()
+                .ok_or("DA3 auxiliary confidence logits are unavailable")?,
+            &context,
+        )?;
+        let logit = logits
+            .get(logit_index)
+            .copied()
+            .ok_or("DA3 auxiliary confidence logit lane is unavailable")?;
+        let expected_bits = |field: &str| -> Result<u32, Box<dyn std::error::Error>> {
+            Ok(confidence_activation
+                .get(field)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or_else(|| format!("DA3 auxiliary confidence {field} is missing"))?)
+        };
+        assert_eq!(logit.to_bits(), expected_bits("logit_bits")?);
+        let python_double_exp = expected_bits("python_double_exp_bits")?;
+        let libc_expf = expected_bits("libc_expf_bits")?;
+        assert_ne!(
+            python_double_exp, libc_expf,
+            "DA3 auxiliary confidence expf discriminator was washed out"
+        );
+        assert_eq!(logit.exp().to_bits(), libc_expf);
+        let confidence = tensor_to_f32_with_context_exact_native(
+            &backend,
+            trace
+                .raw_ray_confidence
+                .as_ref()
+                .ok_or("DA3 auxiliary confidence tensor is unavailable")?,
+            &context,
+        )?;
+        assert_eq!(
+            confidence
+                .get(confidence_index)
+                .copied()
+                .ok_or("DA3 auxiliary confidence lane is unavailable")?
+                .to_bits(),
+            expected_bits("libc_expp1_bits")?
+        );
+        assert_ne!(
+            expected_bits("python_double_expp1_bits")?,
+            expected_bits("libc_expp1_bits")?,
+            "DA3 auxiliary confidence exp-plus-one discriminator was washed out"
+        );
         let phases = [
             ("positioned", trace.auxiliary_positioned),
             ("convolution_3_0", trace.auxiliary_convolution),

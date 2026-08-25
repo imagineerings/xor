@@ -12,6 +12,8 @@ LIBC.cosf.argtypes = [ctypes.c_float]
 LIBC.cosf.restype = ctypes.c_float
 LIBC.powf.argtypes = [ctypes.c_float, ctypes.c_float]
 LIBC.powf.restype = ctypes.c_float
+LIBC.expf.argtypes = [ctypes.c_float]
+LIBC.expf.restype = ctypes.c_float
 
 MASK64 = (1 << 64) - 1
 RAY_POSE_RNG_ADDRESS = {
@@ -66,6 +68,10 @@ def fcos(value):
 
 def fpow(left, right):
     return f32(LIBC.powf(ctypes.c_float(f32(left)), ctypes.c_float(f32(right))))
+
+
+def fexp(value):
+    return f32(LIBC.expf(ctypes.c_float(f32(value))))
 
 
 def project_storage(value, source_dtype):
@@ -431,7 +437,7 @@ def erf_approximation(value):
     polynomial = fsub(fmul(polynomial, t), f32(0.284_496_72))
     polynomial = fadd(fmul(polynomial, t), f32(0.254_829_6))
     polynomial = fmul(polynomial, t)
-    exponential = f32(math.exp(fmul(fmul(-1.0, absolute), absolute)))
+    exponential = fexp(fmul(fmul(-1.0, absolute), absolute))
     return fmul(sign, fsub(1.0, fmul(polynomial, exponential)))
 
 
@@ -614,7 +620,7 @@ def attention(query, key, value, batch, tokens, heads, head_dimension):
                         score = fadd(score, fmul(query.get(batch_index, query_index, offset), key.get(batch_index, key_index, offset)))
                     scores.append(fmul(score, scale))
                 maximum = max(scores)
-                exponentials = [f32(math.exp(fsub(score, maximum))) for score in scores]
+                exponentials = [fexp(fsub(score, maximum)) for score in scores]
                 denominator = fsum(exponentials)
                 probabilities = [fdiv(item, denominator) for item in exponentials]
                 for lane in range(head_dimension):
@@ -1061,9 +1067,9 @@ def depth_head(state, features, height=4, width=4, profile="dpt", use_ray=False,
     for batch_index in range(logits.shape[0]):
         for y in range(height):
             for x in range(width):
-                depth_values.append(f32(math.exp(logits.get(batch_index, 0, y, x))))
+                depth_values.append(fexp(logits.get(batch_index, 0, y, x)))
                 if logits.shape[1] > 1:
-                    confidence_values.append(fadd(f32(math.exp(logits.get(batch_index, logits.shape[1] - 1, y, x))), 1.0))
+                    confidence_values.append(fadd(fexp(logits.get(batch_index, logits.shape[1] - 1, y, x)), 1.0))
     depth = Tensor((logits.shape[0], 1, height, width), depth_values)
     confidence = Tensor((logits.shape[0], 1, height, width), confidence_values) if confidence_values else None
     sky = None
@@ -1111,7 +1117,7 @@ def depth_head(state, features, height=4, width=4, profile="dpt", use_ray=False,
             for y in range(last.shape[2]):
                 for x in range(last.shape[3]):
                     ray_values.extend(last.get(flat, channel, y, x) for channel in range(6))
-                    ray_confidence_values.append(fadd(f32(math.exp(last.get(flat, 6, y, x))), 1.0))
+                    ray_confidence_values.append(fadd(fexp(last.get(flat, 6, y, x)), 1.0))
         ray = Tensor((last.shape[0], last.shape[2], last.shape[3], 6), ray_values)
         ray_confidence = Tensor((last.shape[0], last.shape[2], last.shape[3]), ray_confidence_values)
         if head_trace is not None:

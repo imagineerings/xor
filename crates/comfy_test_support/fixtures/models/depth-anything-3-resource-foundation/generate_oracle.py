@@ -15,6 +15,7 @@ from source_graph import (
     execute_dpt_resized,
     execute_dualdpt,
     fatan,
+    fexp,
     make_state,
     manifest,
     preprocess,
@@ -550,6 +551,20 @@ def document():
         for phase in prefix_phase_order
     ]
     ray_trace["auxiliary_position_lane"] = auxiliary_head_trace["position_lane"]
+    confidence_index = 33
+    confidence_logit_index = 6 * 16 * 16 + confidence_index
+    confidence_logit = auxiliary_head_trace["logits"].values[confidence_logit_index]
+    python_double_exponential = f32(math.exp(confidence_logit))
+    libc_exponential = fexp(confidence_logit)
+    ray_trace["auxiliary_confidence_activation_lane"] = {
+        "confidence_index": confidence_index,
+        "logit_index": confidence_logit_index,
+        "logit_bits": bits(confidence_logit),
+        "python_double_exp_bits": bits(python_double_exponential),
+        "libc_expf_bits": bits(libc_exponential),
+        "python_double_expp1_bits": bits(fadd(python_double_exponential, 1.0)),
+        "libc_expp1_bits": bits(fadd(libc_exponential, 1.0)),
+    }
     ray_trace["auxiliary_head_phases"] = {
         phase: tensor_document(auxiliary_head_trace[phase])
         for phase in [
