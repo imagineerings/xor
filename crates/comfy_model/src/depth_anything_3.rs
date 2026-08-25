@@ -497,6 +497,13 @@ pub fn select_reduced_depth_anything_3_reference_for_fixture(
 }
 
 #[cfg(any(test, feature = "test-support"))]
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "test consumer is the reduced DINOv2 fixture suite"
+    )
+)]
 pub(crate) fn execute_reduced_dino2_ordinary_for_fixture(
     backend: &CpuBackend,
     image: &ImageTensor,

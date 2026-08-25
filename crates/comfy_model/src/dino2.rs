@@ -265,7 +265,7 @@ impl NativeDino2Backbone {
     }
 
     #[cfg_attr(
-        not(any(test, feature = "test-support")),
+        not(test),
         expect(
             dead_code,
             reason = "production consumer is comfy-parity-native-moge-resource-foundation"
@@ -654,7 +654,7 @@ impl NativeDino2Execution<'_> {
     }
 
     #[cfg_attr(
-        not(any(test, feature = "test-support")),
+        not(test),
         expect(
             dead_code,
             reason = "production consumer is comfy-parity-native-moge-resource-foundation"
@@ -692,7 +692,7 @@ impl NativeDino2Execution<'_> {
     }
 
     #[cfg_attr(
-        not(any(test, feature = "test-support")),
+        not(test),
         expect(
             dead_code,
             reason = "production consumer is comfy-parity-native-moge-resource-foundation"
@@ -1889,7 +1889,6 @@ fn drop_first_token(
 }
 
 #[allow(clippy::too_many_arguments)]
-
 fn add_state(
     states: &mut Vec<NativeDino2StateSpecification>,
     key: &str,
@@ -2230,7 +2229,7 @@ mod tests {
                     .ok_or("mask-token identity is missing")?
             );
             assert_eq!(
-                u64::try_from(source.storage_byte_len())?,
+                source.storage_byte_len(),
                 expected["storage_bytes"]
                     .as_u64()
                     .ok_or("mask-token storage size is missing")?
@@ -2395,12 +2394,15 @@ mod tests {
             swiglu: false,
             output_layers: [0, 1, 2, 3],
         })?;
-        for key in ["native.backbone.encoder.layer.0.unknown.weight"] {
-            let error = backbone
-                .project_state_tensor(&backend, key, &input, &context)
-                .expect_err("unknown DINOv2 state must fail");
-            assert!(matches!(error, NativeDino2Error::UnexpectedState(_)));
-        }
+        let error = backbone
+            .project_state_tensor(
+                &backend,
+                "native.backbone.encoder.layer.0.unknown.weight",
+                &input,
+                &context,
+            )
+            .expect_err("unknown DINOv2 state must fail");
+        assert!(matches!(error, NativeDino2Error::UnexpectedState(_)));
         let error = backbone
             .project_state_tensor(
                 &backend,
