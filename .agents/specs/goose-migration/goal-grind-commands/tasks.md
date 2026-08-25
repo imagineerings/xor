@@ -1,5 +1,7 @@
 # Implementation Plan: Goal and Grind Commands
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Approach
 
 Implement one dependency-ordered increment at a time. The persistent goal is established before any automatic loop; the reusable grind-turn contract is established before orchestration; cancellation/lifecycle semantics are completed before UI integration and final persistence regressions.

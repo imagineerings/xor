@@ -1,3 +1,4 @@
+#[cfg(feature = "agentic")]
 use agent_settings::AgentSettings;
 use collections::{HashMap, HashSet};
 use editor::{
@@ -6,19 +7,28 @@ use editor::{
     display_map::{BlockContext, BlockPlacement, BlockProperties, BlockStyle, CustomBlockId},
 };
 use gpui::{
-    App, ClickEvent, Context, Empty, Entity, InteractiveElement as _, ParentElement as _,
-    Subscription, Task, WeakEntity,
+    App, Context, Entity, InteractiveElement as _, ParentElement as _, Subscription, Task,
+    WeakEntity,
 };
+#[cfg(feature = "agentic")]
+use gpui::{ClickEvent, Empty};
 use language::{Anchor, Buffer, BufferId};
+use project::{ConflictRegion, ConflictSet, ConflictSetUpdate};
+#[cfg(feature = "agentic")]
 use project::{
-    ConflictRegion, ConflictSet, ConflictSetUpdate, Project,
+    Project,
     git_store::{GitStore, GitStoreEvent, RepositoryEvent},
 };
+#[cfg(feature = "agentic")]
 use settings::Settings;
 use std::{ops::Range, sync::Arc};
-use ui::{ButtonLike, Divider, Tooltip, prelude::*};
+use ui::prelude::*;
+#[cfg(feature = "agentic")]
+use ui::{ButtonLike, Divider, Tooltip};
 use util::debug_panic;
+#[cfg(feature = "agentic")]
 use workspace::{HideStatusItem, StatusItemView, Workspace, item::ItemHandle};
+#[cfg(feature = "agentic")]
 use zed_actions::agent::{
     ConflictContent, ResolveConflictedFilesWithAgent, ResolveConflictsWithAgent,
 };
@@ -327,9 +337,9 @@ fn render_conflict_buttons(
     editor: WeakEntity<Editor>,
     cx: &mut BlockContext,
 ) -> AnyElement {
+    #[cfg(feature = "agentic")]
     let is_ai_enabled = AgentSettings::get_global(cx).enabled(cx);
-
-    h_flex()
+    let buttons = h_flex()
         .id(cx.block_id)
         .h(cx.line_height)
         .ml(cx.margins.gutter.width)
@@ -377,6 +387,7 @@ fn render_conflict_buttons(
             Button::new("both", "Use Both")
                 .label_size(LabelSize::Small)
                 .on_click({
+                    #[cfg(feature = "agentic")]
                     let editor = editor.clone();
                     let conflict = conflict.clone();
                     let ours = conflict.ours.clone();
@@ -392,58 +403,60 @@ fn render_conflict_buttons(
                         .detach()
                     }
                 }),
-        )
-        .when(is_ai_enabled, |this| {
-            this.child(Divider::vertical()).child(
-                Button::new("resolve-with-agent", "Resolve with Agent")
-                    .label_size(LabelSize::Small)
-                    .start_icon(
-                        Icon::new(IconName::ZedAssistant)
-                            .size(IconSize::Small)
-                            .color(Color::Muted),
-                    )
-                    .on_click({
-                        let conflict = conflict.clone();
-                        move |_, window, cx| {
-                            let content = editor
-                                .update(cx, |editor, cx| {
-                                    let multibuffer = editor.buffer().read(cx);
-                                    let buffer_id = conflict.ours.end.buffer_id;
-                                    let buffer = multibuffer.buffer(buffer_id)?;
-                                    let buffer_read = buffer.read(cx);
-                                    let snapshot = buffer_read.snapshot();
-                                    let conflict_text = snapshot
-                                        .text_for_range(conflict.range.clone())
-                                        .collect::<String>();
-                                    let file_path = buffer_read
-                                        .file()
-                                        .and_then(|file| file.as_local())
-                                        .map(|f| f.abs_path(cx).to_string_lossy().to_string())
-                                        .unwrap_or_default();
-                                    Some(ConflictContent {
-                                        file_path,
-                                        conflict_text,
-                                        ours_branch_name: conflict.ours_branch_name.to_string(),
-                                        theirs_branch_name: conflict.theirs_branch_name.to_string(),
-                                    })
+        );
+    #[cfg(feature = "agentic")]
+    let buttons = buttons.when(is_ai_enabled, |this| {
+        this.child(Divider::vertical()).child(
+            Button::new("resolve-with-agent", "Resolve with Agent")
+                .label_size(LabelSize::Small)
+                .start_icon(
+                    Icon::new(IconName::ZedAssistant)
+                        .size(IconSize::Small)
+                        .color(Color::Muted),
+                )
+                .on_click({
+                    let conflict = conflict.clone();
+                    move |_, window, cx| {
+                        let content = editor
+                            .update(cx, |editor, cx| {
+                                let multibuffer = editor.buffer().read(cx);
+                                let buffer_id = conflict.ours.end.buffer_id;
+                                let buffer = multibuffer.buffer(buffer_id)?;
+                                let buffer_read = buffer.read(cx);
+                                let snapshot = buffer_read.snapshot();
+                                let conflict_text = snapshot
+                                    .text_for_range(conflict.range.clone())
+                                    .collect::<String>();
+                                let file_path = buffer_read
+                                    .file()
+                                    .and_then(|file| file.as_local())
+                                    .map(|f| f.abs_path(cx).to_string_lossy().to_string())
+                                    .unwrap_or_default();
+                                Some(ConflictContent {
+                                    file_path,
+                                    conflict_text,
+                                    ours_branch_name: conflict.ours_branch_name.to_string(),
+                                    theirs_branch_name: conflict.theirs_branch_name.to_string(),
                                 })
-                                .ok()
-                                .flatten();
-                            if let Some(content) = content {
-                                window.dispatch_action(
-                                    Box::new(ResolveConflictsWithAgent {
-                                        conflicts: vec![content],
-                                    }),
-                                    cx,
-                                );
-                            }
+                            })
+                            .ok()
+                            .flatten();
+                        if let Some(content) = content {
+                            window.dispatch_action(
+                                Box::new(ResolveConflictsWithAgent {
+                                    conflicts: vec![content],
+                                }),
+                                cx,
+                            );
                         }
-                    }),
-            )
-        })
-        .into_any()
+                    }
+                }),
+        )
+    });
+    buttons.into_any()
 }
 
+#[cfg(feature = "agentic")]
 fn collect_conflicted_file_paths(project: &Project, cx: &App) -> Vec<String> {
     let git_store = project.git_store().read(cx);
     let mut paths = Vec::new();
@@ -518,6 +531,7 @@ pub(crate) fn resolve_conflict(
     })
 }
 
+#[cfg(feature = "agentic")]
 pub struct MergeConflictIndicator {
     project: Entity<Project>,
     conflicted_paths: Vec<String>,
@@ -526,6 +540,7 @@ pub struct MergeConflictIndicator {
     _subscription: Subscription,
 }
 
+#[cfg(feature = "agentic")]
 impl MergeConflictIndicator {
     pub fn new(workspace: &Workspace, cx: &mut Context<Self>) -> Self {
         let project = workspace.project().clone();
@@ -557,11 +572,7 @@ impl MergeConflictIndicator {
                 | GitStoreEvent::RepositoryUpdated(_, RepositoryEvent::StatusesChanged, _)
         );
 
-        let agent_settings = AgentSettings::get_global(cx);
-        if !agent_settings.enabled(cx)
-            || !agent_settings.show_merge_conflict_indicator
-            || !conflicts_changed
-        {
+        if !merge_conflict_agent_enabled(cx) || !conflicts_changed {
             return;
         }
 
@@ -603,14 +614,10 @@ impl MergeConflictIndicator {
     }
 }
 
+#[cfg(feature = "agentic")]
 impl Render for MergeConflictIndicator {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let agent_settings = AgentSettings::get_global(cx);
-        if !agent_settings.enabled(cx)
-            || !agent_settings.show_merge_conflict_indicator
-            || self.conflicted_paths.is_empty()
-            || self.dismissed
-        {
+        if !merge_conflict_agent_enabled(cx) || self.conflicted_paths.is_empty() || self.dismissed {
             return Empty.into_any_element();
         }
 
@@ -678,6 +685,13 @@ impl Render for MergeConflictIndicator {
     }
 }
 
+#[cfg(feature = "agentic")]
+fn merge_conflict_agent_enabled(cx: &App) -> bool {
+    let settings = AgentSettings::get_global(cx);
+    settings.enabled(cx) && settings.show_merge_conflict_indicator
+}
+
+#[cfg(feature = "agentic")]
 impl StatusItemView for MergeConflictIndicator {
     fn set_active_pane_item(
         &mut self,

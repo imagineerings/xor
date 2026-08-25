@@ -41,7 +41,7 @@ async-channel.workspace = true
 agent_servers.workspace = true
 agent_settings.workspace = true
 agent_skills.workspace = true
-ai_onboarding.workspace = true
+ai_onboarding = { workspace = true, features = ["agentic"] }
 anyhow.workspace = true
 heapless.workspace = true
 audio = { workspace = true, optional = true }
@@ -56,7 +56,7 @@ command_palette_hooks.workspace = true
 component.workspace = true
 context_server.workspace = true
 db.workspace = true
-editor.workspace = true
+editor = { workspace = true, features = ["agentic"] }
 eval_utils = { workspace = true, optional = true }
 extension.workspace = true
 extension_host.workspace = true
@@ -66,7 +66,7 @@ fs.workspace = true
 futures.workspace = true
 fuzzy.workspace = true
 git.workspace = true
-git_ui.workspace = true
+git_ui = { workspace = true, features = ["agentic"] }
 gpui.workspace = true
 gpui_tokio.workspace = true
 html_to_markdown.workspace = true
@@ -111,7 +111,7 @@ streaming_diff.workspace = true
 task.workspace = true
 telemetry.workspace = true
 terminal.workspace = true
-terminal_view.workspace = true
+terminal_view = { workspace = true, features = ["agentic"] }
 text.workspace = true
 theme.workspace = true
 theme_settings.workspace = true
@@ -123,9 +123,9 @@ url.workspace = true
 util.workspace = true
 uuid.workspace = true
 watch.workspace = true
-workspace.workspace = true
+workspace = { workspace = true, features = ["agentic"] }
 git_ui_core.workspace = true
-zed_actions.workspace = true
+zed_actions = { workspace = true, features = ["agentic"] }
 image.workspace = true
 reqwest_client = { workspace = true, optional = true }
 

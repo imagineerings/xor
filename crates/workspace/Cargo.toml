@@ -23,6 +23,8 @@ path = "tests/collaborative_workspace.rs"
 required-features = ["test-support", "multiplayer-tools"]
 
 [features]
+default = []
+agentic = ["dep:agent_settings", "zed_actions/agentic"]
 multiplayer-tools = []
 test-support = [
     "client/test-support",
@@ -38,7 +40,7 @@ test-support = [
 
 [dependencies]
 any_vec.workspace = true
-agent_settings.workspace = true
+agent_settings = { workspace = true, optional = true }
 anyhow.workspace = true
 async-recursion.workspace = true
 client.workspace = true

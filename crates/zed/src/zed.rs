@@ -22,7 +22,9 @@ pub mod visual_tests;
 #[cfg(target_os = "windows")]
 pub(crate) mod windows_only_instance;
 
+#[cfg(feature = "agentic")]
 use agent_settings::{UserAgentsMdState, init_user_agents_md};
+#[cfg(feature = "agentic")]
 use agent_ui::AgentDiffToolbar;
 #[cfg(feature = "multiplayer-tools")]
 use agent_ui::AgentPanel;
@@ -42,7 +44,6 @@ use editor::{Editor, MultiBuffer};
 use extension_host::ExtensionStore;
 use feature_flags::{FeatureFlagAppExt as _, PanicFeatureFlag};
 use fs::Fs;
-use futures::FutureExt as _;
 use futures::{StreamExt, channel::mpsc, select_biased};
 use git_ui::branch_diff::BranchDiffToolbar;
 use git_ui::commit_view::CommitViewToolbar;
@@ -53,12 +54,14 @@ use git_ui::project_diff::ProjectDiffToolbar;
 use git_ui::solo_diff_view::{SoloDiffGitToolbar, SoloDiffStyleToolbar};
 use git_ui::staged_diff::StagedDiffToolbar;
 use git_ui::unstaged_diff::UnstagedDiffToolbar;
+#[cfg(feature = "agentic")]
+use gpui::AsyncWindowContext;
 use gpui::{
-    Action, App, AppContext as _, AsyncWindowContext, ClipboardItem, Context, DismissEvent,
-    Element, Entity, FocusHandle, Focusable, Image, ImageFormat, KeyBinding, ParentElement,
-    PathPromptOptions, PromptLevel, ReadGlobal, SharedString, Size, Task, TaskExt, TitlebarOptions,
-    UpdateGlobal, WeakEntity, Window, WindowBounds, WindowHandle, WindowKind, WindowOptions,
-    actions, image_cache, img, point, px, retain_all,
+    Action, App, AppContext as _, ClipboardItem, Context, DismissEvent, Element, Entity,
+    FocusHandle, Focusable, Image, ImageFormat, KeyBinding, ParentElement, PathPromptOptions,
+    PromptLevel, ReadGlobal, SharedString, Size, Task, TaskExt, TitlebarOptions, UpdateGlobal,
+    WeakEntity, Window, WindowBounds, WindowHandle, WindowKind, WindowOptions, actions,
+    image_cache, img, point, px, retain_all,
 };
 #[cfg(feature = "multiplayer-tools")]
 use gpui::{EntityId, Subscription};
@@ -93,6 +96,7 @@ use settings::{
     SettingsFile, SettingsStore, VIM_KEYMAP_PATH, initial_local_debug_tasks_content,
     initial_project_settings_content, initial_tasks_content, update_settings_file,
 };
+#[cfg(feature = "agentic")]
 use sidebar::Sidebar;
 #[cfg(debug_assertions)]
 use workspace::workspace_error::{ErrorAction, ErrorSeverity, WorkspaceError};
@@ -116,6 +120,8 @@ use uuid::Uuid;
 use vim_mode_setting::VimModeSetting;
 use workspace::notifications::{NotificationId, dismiss_app_notification, show_app_notification};
 
+#[cfg(feature = "agentic")]
+use workspace::Panel;
 #[cfg(feature = "multiplayer-tools")]
 use workspace::collaborative_composer::CollaborativeComposerRegistration;
 #[cfg(feature = "multiplayer-tools")]
@@ -126,9 +132,9 @@ use workspace::collaborative_participants::{
 #[cfg(feature = "multiplayer-tools")]
 use workspace::collaborative_review::CollaborativeReviewRegistration;
 use workspace::{
-    AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Panel, Toast, Workspace,
-    WorkspaceSettings, create_and_open_local_file,
-    notifications::simple_message_notification::MessageNotification, open_new,
+    AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Toast, Workspace, WorkspaceSettings,
+    create_and_open_local_file, notifications::simple_message_notification::MessageNotification,
+    open_new,
 };
 use workspace::{
     CloseIntent, CloseProject, CloseWindow, RestoreBanner, with_active_or_new_workspace,
@@ -1546,23 +1552,27 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
                 .unwrap_or(true)
         });
 
-        let window_handle = window.window_handle();
-        let multi_workspace_handle = cx.entity();
-        cx.subscribe_in(
-            &multi_workspace_handle,
-            window,
-            |this, _multi_workspace, event: &workspace::MultiWorkspaceEvent, window, cx| {
-                let workspace::MultiWorkspaceEvent::ActiveWorkspaceChanged { source_workspace } =
-                    event
-                else {
-                    return;
-                };
+        #[cfg(feature = "agentic")]
+        {
+            let window_handle = window.window_handle();
+            let multi_workspace_handle = cx.entity();
+            cx.subscribe_in(
+                &multi_workspace_handle,
+                window,
+                |this, _multi_workspace, event: &workspace::MultiWorkspaceEvent, window, cx| {
+                    let workspace::MultiWorkspaceEvent::ActiveWorkspaceChanged {
+                        source_workspace,
+                    } = event
+                    else {
+                        return;
+                    };
 
-                let active_workspace = this.workspace().clone();
-                let source_workspace = source_workspace.clone();
-                active_workspace.update(cx, |workspace, cx| {
-                    if let Some(ref source) = source_workspace {
-                        if let Some(panel) = workspace.panel::<agent_ui::AgentPanel>(cx) {
+                    let active_workspace = this.workspace().clone();
+                    let source_workspace = source_workspace.clone();
+                    active_workspace.update(cx, |workspace, cx| {
+                        if let Some(ref source) = source_workspace
+                            && let Some(panel) = workspace.panel::<agent_ui::AgentPanel>(cx)
+                        {
                             panel.update(cx, |panel, cx| {
                                 panel.initialize_from_source_workspace_if_needed(
                                     source.clone(),
@@ -1571,26 +1581,26 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
                                 );
                             });
                         }
-                    }
 
-                    ensure_agent_panel_for_workspace(workspace, source_workspace, window, cx)
-                        .detach_and_log_err(cx);
-                });
-            },
-        )
-        .detach();
-
-        cx.defer(move |cx| {
-            window_handle
-                .update(cx, |_, window, cx| {
-                    let sidebar =
-                        cx.new(|cx| Sidebar::new(multi_workspace_handle.clone(), window, cx));
-                    multi_workspace_handle.update(cx, |multi_workspace, cx| {
-                        multi_workspace.register_sidebar(sidebar, cx);
+                        ensure_agent_panel_for_workspace(workspace, source_workspace, window, cx)
+                            .detach_and_log_err(cx);
                     });
-                })
-                .ok();
-        });
+                },
+            )
+            .detach();
+
+            cx.defer(move |cx| {
+                window_handle
+                    .update(cx, |_, window, cx| {
+                        let sidebar =
+                            cx.new(|cx| Sidebar::new(multi_workspace_handle.clone(), window, cx));
+                        multi_workspace_handle.update(cx, |multi_workspace, cx| {
+                            multi_workspace.register_sidebar(sidebar, cx);
+                        });
+                    })
+                    .ok();
+            });
+        }
     })
     .detach();
 
@@ -1721,6 +1731,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
         let line_ending_indicator =
             cx.new(|_| line_ending_selector::LineEndingIndicator::default());
         let git_blame_status = cx.new(|_| git_ui::GitBlameStatus::default());
+        #[cfg(feature = "agentic")]
         let merge_conflict_indicator =
             cx.new(|cx| git_ui::MergeConflictIndicator::new(workspace, cx));
         workspace.status_bar().update(cx, |status_bar, cx| {
@@ -1729,6 +1740,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
             status_bar.add_left_item(diagnostic_summary, window, cx);
             status_bar.add_left_item(active_file_name, window, cx);
             status_bar.add_left_item(git_blame_status, window, cx);
+            #[cfg(feature = "agentic")]
             status_bar.add_left_item(merge_conflict_indicator, window, cx);
             status_bar.add_left_item(activity_indicator, window, cx);
             status_bar.add_right_item(edit_prediction_ui, window, cx);
@@ -1936,13 +1948,18 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
             add_panel_when_ready(channels_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(debug_panel, workspace_handle.clone(), cx.clone()),
             comfy_panels,
-            initialize_agent_panel(workspace_handle, cx.clone()).map(|r| r.log_err()),
         );
+
+        #[cfg(feature = "agentic")]
+        initialize_agent_panel(workspace_handle, cx.clone())
+            .await
+            .log_err();
 
         anyhow::Ok(())
     })
 }
 
+#[cfg(feature = "agentic")]
 fn setup_or_teardown_ai_panel<P: Panel>(
     workspace: &mut Workspace,
     window: &mut Window,
@@ -1979,6 +1996,7 @@ fn setup_or_teardown_ai_panel<P: Panel>(
     }
 }
 
+#[cfg(feature = "agentic")]
 fn ensure_agent_panel_for_workspace(
     workspace: &mut Workspace,
     source_workspace: Option<WeakEntity<Workspace>>,
@@ -2003,6 +2021,7 @@ fn ensure_agent_panel_for_workspace(
     })
 }
 
+#[cfg(feature = "agentic")]
 async fn initialize_agent_panel(
     workspace_handle: WeakEntity<Workspace>,
     mut cx: AsyncWindowContext,
@@ -2535,6 +2554,7 @@ fn register_actions(
         });
     }
 
+    #[cfg(feature = "agentic")]
     workspace.register_action(sidebar::dump_workspace_info);
 
     #[cfg(debug_assertions)]
@@ -2611,8 +2631,11 @@ fn initialize_pane(
             toolbar.add_item(lsp_log_item, window, cx);
             let dap_log_item = cx.new(|_| debugger_tools::DapLogToolbarItemView::new());
             toolbar.add_item(dap_log_item, window, cx);
-            let acp_tools_item = cx.new(|_| acp_tools::AcpToolsToolbarItemView::new());
-            toolbar.add_item(acp_tools_item, window, cx);
+            #[cfg(feature = "agentic")]
+            {
+                let acp_tools_item = cx.new(|_| acp_tools::AcpToolsToolbarItemView::new());
+                toolbar.add_item(acp_tools_item, window, cx);
+            }
             let telemetry_log_item =
                 cx.new(|cx| telemetry_log::TelemetryLogToolbarItemView::new(window, cx));
             toolbar.add_item(telemetry_log_item, window, cx);
@@ -2636,8 +2659,11 @@ fn initialize_pane(
             toolbar.add_item(solo_diff_git_toolbar, window, cx);
             let commit_view_toolbar = cx.new(|_| CommitViewToolbar::new());
             toolbar.add_item(commit_view_toolbar, window, cx);
-            let agent_diff_toolbar = cx.new(AgentDiffToolbar::new);
-            toolbar.add_item(agent_diff_toolbar, window, cx);
+            #[cfg(feature = "agentic")]
+            {
+                let agent_diff_toolbar = cx.new(AgentDiffToolbar::new);
+                toolbar.add_item(agent_diff_toolbar, window, cx);
+            }
             let basedpyright_banner = cx.new(|cx| BasedPyrightBanner::new(workspace, cx));
             toolbar.add_item(basedpyright_banner, window, cx);
             let image_view_toolbar = cx.new(|_| image_viewer::ImageViewToolbarControls::new());
@@ -3278,6 +3304,7 @@ fn init_reduce_motion(cx: &mut App) {
 ///
 /// The file itself is loaded into [`agent_settings::UserAgentsMd`] for inclusion
 /// in prompts.
+#[cfg(feature = "agentic")]
 pub fn watch_user_agents_md(fs: Arc<dyn fs::Fs>, cx: &mut App) {
     struct UserAgentsMdParseError;
     let notification_id = NotificationId::unique::<UserAgentsMdParseError>();
@@ -3534,7 +3561,7 @@ pub fn load_default_keymap(cx: &mut App) {
     let vim_enabled =
         VimModeSetting::get_global(cx).0 || vim_mode_setting::HelixModeSetting::get_global(cx).0;
     for (asset_path, source) in builtin_keymap_assets(base_keymap, vim_enabled) {
-        match KeymapFile::load_asset(asset_path, Some(source), cx) {
+        match load_builtin_keymap_asset(asset_path, source, cx) {
             Ok(key_bindings) => cx.bind_keys(filter_disabled_ai_bindings(key_bindings, cx)),
             Err(error) => {
                 log::error!("Failed to load built-in keymap {asset_path:?}: {error:#}");
@@ -3543,6 +3570,23 @@ pub fn load_default_keymap(cx: &mut App) {
     }
 }
 
+fn load_builtin_keymap_asset(
+    asset_path: &str,
+    source: KeybindSource,
+    cx: &App,
+) -> anyhow::Result<Vec<KeyBinding>> {
+    #[cfg(feature = "agentic")]
+    let key_bindings = KeymapFile::load_asset(asset_path, Some(source), cx)?;
+    #[cfg(not(feature = "agentic"))]
+    let mut key_bindings = KeymapFile::load_asset_allow_partial_failure(asset_path, cx)?;
+    #[cfg(not(feature = "agentic"))]
+    for key_binding in &mut key_bindings {
+        key_binding.set_meta(source.meta());
+    }
+    Ok(key_bindings)
+}
+
+#[cfg(feature = "agentic")]
 const AI_ACTION_NAMESPACES: &[&str] = &[
     "acp::",
     "agent::",
@@ -3552,6 +3596,9 @@ const AI_ACTION_NAMESPACES: &[&str] = &[
     "zeta::",
 ];
 
+#[cfg(not(feature = "agentic"))]
+const AI_ACTION_NAMESPACES: &[&str] = &["acp::", "agent::", "assistant::", "inline_assistant::"];
+
 fn is_ai_keybinding(binding: &KeyBinding) -> bool {
     let name = binding.action().name();
     AI_ACTION_NAMESPACES
@@ -3560,7 +3607,7 @@ fn is_ai_keybinding(binding: &KeyBinding) -> bool {
 }
 
 fn filter_disabled_ai_bindings(bindings: Vec<KeyBinding>, cx: &App) -> Vec<KeyBinding> {
-    if !DisableAiSettings::get_global(cx).disable_ai {
+    if cfg!(feature = "agentic") && !DisableAiSettings::get_global(cx).disable_ai {
         return bindings;
     }
     bindings
@@ -4046,6 +4093,7 @@ mod tests {
     use node_runtime::NodeRuntime;
     use pretty_assertions::{assert_eq, assert_ne};
     use project::{Project, ProjectPath};
+    #[cfg(feature = "agentic")]
     use prompt_store::PromptBuilder;
     use remote::RemoteClient;
     use remote_server::{HeadlessAppState, HeadlessProject};
@@ -7904,16 +7952,38 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(actions_without_namespace, Vec::<&str>::new());
 
+            #[cfg(not(feature = "agentic"))]
+            for action_name in [
+                "editor::CancelEditReviewComment",
+                "editor::ConfirmEditReviewComment",
+                "editor::DeleteReviewComment",
+                "editor::EditReviewComment",
+                "editor::SendReviewToAgent",
+                "editor::SubmitDiffReviewComment",
+                "editor::ToggleReviewCommentsExpanded",
+                "zed::AcpRegistry",
+            ] {
+                assert!(
+                    !all_actions.contains(&action_name),
+                    "agentic action registered in disabled build: {action_name}"
+                );
+            }
+
             let expected_namespaces = vec![
                 "action",
                 "activity_indicator",
+                #[cfg(feature = "agentic")]
                 "agent",
+                #[cfg(feature = "agentic")]
                 "agents_sidebar",
                 "app_menu",
+                #[cfg(feature = "agentic")]
                 "assistant",
+                #[cfg(feature = "agentic")]
                 "assistant2",
                 "auto_update",
                 "branch_picker",
+                #[cfg(feature = "agentic")]
                 "bedrock",
                 "branches",
                 "buffer_search",
@@ -7950,11 +8020,13 @@ mod tests {
                 "highlights_tree_view",
                 "icon_theme_selector",
                 "image_viewer",
+                #[cfg(feature = "agentic")]
                 "inline_assistant",
                 "journal",
                 "keymap_editor",
                 "keystroke_input",
                 "language_selector",
+                "language_tool_tree",
                 "welcome",
                 "line_ending_selector",
                 "lsp_tool",
@@ -7979,6 +8051,7 @@ mod tests {
                 "search",
                 "settings_editor",
                 "settings_profile_selector",
+                #[cfg(feature = "agentic")]
                 "skill_creator",
                 "snippets",
                 "stash_picker",
@@ -8200,28 +8273,35 @@ mod tests {
             );
             image_viewer::init(cx);
             language_model::init(cx);
-            client::RefreshLlmTokenListener::register(
-                app_state.client.clone(),
-                app_state.user_store.clone(),
-                cx,
-            );
-            language_models::init(app_state.user_store.clone(), app_state.client.clone(), cx);
-            web_search::init(cx);
-            web_search_providers::init(app_state.client.clone(), app_state.user_store.clone(), cx);
-            let prompt_builder = PromptBuilder::load(app_state.fs.clone(), false, cx);
-            project::AgentRegistryStore::init_global(
-                cx,
-                app_state.fs.clone(),
-                app_state.client.http_client(),
-            );
-            agent_ui::init(
-                app_state.fs.clone(),
-                prompt_builder,
-                app_state.languages.clone(),
-                true,
-                false,
-                cx,
-            );
+            #[cfg(feature = "agentic")]
+            {
+                client::RefreshLlmTokenListener::register(
+                    app_state.client.clone(),
+                    app_state.user_store.clone(),
+                    cx,
+                );
+                language_models::init(app_state.user_store.clone(), app_state.client.clone(), cx);
+                web_search::init(cx);
+                web_search_providers::init(
+                    app_state.client.clone(),
+                    app_state.user_store.clone(),
+                    cx,
+                );
+                let prompt_builder = PromptBuilder::load(app_state.fs.clone(), false, cx);
+                project::AgentRegistryStore::init_global(
+                    cx,
+                    app_state.fs.clone(),
+                    app_state.client.http_client(),
+                );
+                agent_ui::init(
+                    app_state.fs.clone(),
+                    prompt_builder,
+                    app_state.languages.clone(),
+                    true,
+                    false,
+                    cx,
+                );
+            }
 
             repl::init(app_state.fs.clone(), cx);
             repl::notebook::init(cx);
@@ -8488,6 +8568,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "agentic")]
     #[gpui::test]
     async fn test_disable_ai_filters_keybindings(cx: &mut gpui::TestAppContext) {
         let _app_state = init_keymap_test(cx);

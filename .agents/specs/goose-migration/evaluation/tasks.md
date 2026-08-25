@@ -1,5 +1,7 @@
 # Implementation Plan: Evaluation Framework
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Overview
 
 Implement structured evaluation capabilities: Harbor eval framework (`crates/eval_harbor/`), Open Model Gym for model comparison, enhanced scenario tests in `crates/agent/`, and benchmark scripts.

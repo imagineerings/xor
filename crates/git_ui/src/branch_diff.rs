@@ -1,20 +1,23 @@
+#[cfg(feature = "agentic")]
+use crate::project_diff::{ReviewDiff, render_send_review_to_agent_button};
 use crate::{
     branch_picker,
     diff_multibuffer::DiffMultibuffer,
-    project_diff::{
-        self, CompareWithBranch, DeployBranchDiff, ProjectDiff, ReviewDiff,
-        render_send_review_to_agent_button,
-    },
+    project_diff::{self, CompareWithBranch, DeployBranchDiff, ProjectDiff},
 };
+#[cfg(feature = "agentic")]
 use agent_settings::AgentSettings;
 use anyhow::{Context as _, Result, anyhow};
-use editor::{
-    Addon, Editor, EditorEvent, RestoreOnlyDiffHunkDelegate, SplittableEditor,
-    actions::SendReviewToAgent,
-};
-use git::{repository::DiffType, status::FileStatus};
+#[cfg(feature = "agentic")]
+use editor::actions::SendReviewToAgent;
+use editor::{Addon, Editor, EditorEvent, RestoreOnlyDiffHunkDelegate, SplittableEditor};
+#[cfg(feature = "agentic")]
+use git::repository::DiffType;
+use git::status::FileStatus;
+#[cfg(feature = "agentic")]
+use gpui::Action;
 use gpui::{
-    Action, AnyElement, App, AppContext as _, Entity, EventEmitter, FocusHandle, Focusable, Render,
+    AnyElement, App, AppContext as _, Entity, EventEmitter, FocusHandle, Focusable, Render,
     SharedString, Subscription, Task, WeakEntity,
 };
 use language::{BufferId, Capability};
@@ -25,7 +28,9 @@ use project::{
         diff_buffer_list::{self, DiffBase},
     },
 };
-use settings::{GitDiffBaseSetting, Settings};
+use settings::GitDiffBaseSetting;
+#[cfg(feature = "agentic")]
+use settings::Settings;
 use std::{
     any::{Any, TypeId},
     sync::Arc,
@@ -38,6 +43,7 @@ use workspace::{
     notifications::NotifyTaskExt,
     searchable::SearchableItemHandle,
 };
+#[cfg(feature = "agentic")]
 use zed_actions::agent::ReviewBranchDiff;
 
 /// The workspace item for a branch (merge-base) diff: "Changes since {branch}".
@@ -403,6 +409,7 @@ impl BranchDiff {
         });
     }
 
+    #[cfg(feature = "agentic")]
     fn review_diff(&mut self, _: &ReviewDiff, window: &mut Window, cx: &mut Context<Self>) {
         let DiffBase::Merge { base_ref } = self.diff_base(cx).clone() else {
             return;
@@ -657,11 +664,12 @@ impl Item for BranchDiff {
 }
 
 impl Render for BranchDiff {
+    #[cfg_attr(not(feature = "agentic"), allow(unused_variables))]
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .size_full()
-            .on_action(cx.listener(Self::review_diff))
-            .child(self.diff.clone())
+        let view = div().size_full();
+        #[cfg(feature = "agentic")]
+        let view = view.on_action(cx.listener(Self::review_diff));
+        view.child(self.diff.clone())
     }
 }
 
@@ -740,6 +748,7 @@ impl BranchDiffToolbar {
         self.branch_diff.as_ref()?.upgrade()
     }
 
+    #[cfg(feature = "agentic")]
     fn dispatch_action(&self, action: &dyn Action, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(branch_diff) = self.branch_diff(cx) {
             branch_diff.focus_handle(cx).focus(window, cx);
@@ -784,7 +793,9 @@ impl Render for BranchDiffToolbar {
         let Some(branch_diff) = self.branch_diff(cx) else {
             return div();
         };
+        #[cfg(feature = "agentic")]
         let focus_handle = branch_diff.focus_handle(cx);
+        #[cfg(feature = "agentic")]
         let review_count = branch_diff
             .read(cx)
             .diff
@@ -822,11 +833,9 @@ impl Render for BranchDiffToolbar {
             .multibuffer()
             .read(cx)
             .is_empty();
-        let is_ai_enabled = AgentSettings::get_global(cx).enabled(cx);
-
-        let show_review_button = !is_multibuffer_empty && is_ai_enabled;
-
-        h_flex()
+        #[cfg(feature = "agentic")]
+        let show_review_button = !is_multibuffer_empty && AgentSettings::get_global(cx).enabled(cx);
+        let toolbar = h_flex()
             .my_neg_1()
             .py_1()
             .gap_1p5()
@@ -897,7 +906,9 @@ impl Render for BranchDiffToolbar {
                         ),
                         Tooltip::text("Select Base Branch"),
                     ),
-            )
+            );
+        #[cfg(feature = "agentic")]
+        let toolbar = toolbar
             .when(show_review_button, |this| {
                 let focus_handle = focus_handle.clone();
                 this.child(Divider::vertical()).child(
@@ -929,7 +940,8 @@ impl Render for BranchDiffToolbar {
                         }),
                     ),
                 )
-            })
+            });
+        toolbar
     }
 }
 

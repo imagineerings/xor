@@ -3,7 +3,10 @@ use crate::git_panel::{
     GitPanel, commit_message_editor, commit_title_exceeds_limit, git_commit_editor_style,
 };
 use crate::git_panel_settings::GitPanelSettings;
-use git::{Amend, Commit, GenerateCommitMessage, Signoff, SkipHooks};
+#[cfg(feature = "agentic")]
+use git::GenerateCommitMessage;
+use git::{Amend, Commit, Signoff, SkipHooks};
+#[cfg(feature = "agentic")]
 use project::DisableAiSettings;
 use settings::Settings;
 use ui::{
@@ -619,12 +622,21 @@ impl Render for CommitModal {
             .on_action(cx.listener(Self::increase_font_size))
             .on_action(cx.listener(Self::decrease_font_size))
             .on_action(cx.listener(Self::reset_font_size))
-            .when(!DisableAiSettings::get_global(cx).disable_ai, |this| {
-                this.on_action(cx.listener(|this, _: &GenerateCommitMessage, _, cx| {
-                    this.git_panel.update(cx, |panel, cx| {
-                        panel.generate_commit_message(cx);
+            .map(|this| {
+                #[cfg(feature = "agentic")]
+                {
+                    this.when(!DisableAiSettings::get_global(cx).disable_ai, |this| {
+                        this.on_action(cx.listener(|this, _: &GenerateCommitMessage, _, cx| {
+                            this.git_panel.update(cx, |panel, cx| {
+                                panel.generate_commit_message(cx);
+                            })
+                        }))
                     })
-                }))
+                }
+                #[cfg(not(feature = "agentic"))]
+                {
+                    this
+                }
             })
             .on_action(
                 cx.listener(|this, _: &zed_actions::git::Branch, window, cx| {

@@ -1,23 +1,33 @@
 use std::sync::Arc;
+#[cfg(feature = "agentic")]
 use std::time::Duration;
 
-use client::{Client, TelemetrySettings, UserStore, zed_urls};
+#[cfg(feature = "agentic")]
+use client::{Client, zed_urls};
+use client::{TelemetrySettings, UserStore};
+#[cfg(feature = "agentic")]
 use cloud_api_types::Plan;
+#[cfg(feature = "agentic")]
 use collections::HashMap;
 use fs::Fs;
-use gpui::{Action, Animation, AnimationExt, App, Entity, IntoElement, TaskExt, pulsating_between};
+use gpui::{Action, App, Entity, IntoElement};
+#[cfg(feature = "agentic")]
+use gpui::{Animation, AnimationExt, TaskExt, pulsating_between};
+#[cfg(feature = "agentic")]
 use project::agent_server_store::AllAgentServersSettings;
 use project::project_settings::ProjectSettings;
+#[cfg(feature = "agentic")]
 use project::{AgentRegistryStore, RegistryAgent};
-use settings::{
-    BaseKeymap, CustomAgentServerSettings, Settings, SettingsStore, update_settings_file,
-};
+use settings::{BaseKeymap, Settings, update_settings_file};
+#[cfg(feature = "agentic")]
+use settings::{CustomAgentServerSettings, SettingsStore};
 use theme::{Appearance, SystemAppearance, ThemeRegistry};
 use theme_settings::{ThemeAppearanceMode, ThemeName, ThemeSelection, ThemeSettings};
+#[cfg(feature = "agentic")]
+use ui::AgentSetupButton;
 use ui::{
-    AgentSetupButton, Divider, StatefulInteractiveElement, SwitchField, TintColor,
-    ToggleButtonGroup, ToggleButtonGroupSize, ToggleButtonSimple, ToggleButtonWithIcon, Tooltip,
-    prelude::*,
+    Divider, StatefulInteractiveElement, SwitchField, TintColor, ToggleButtonGroup,
+    ToggleButtonGroupSize, ToggleButtonSimple, ToggleButtonWithIcon, Tooltip, prelude::*,
 };
 use vim_mode_setting::VimModeSetting;
 
@@ -536,9 +546,11 @@ fn render_import_settings_section(tab_index: &mut isize, cx: &mut App) -> impl I
         .child(h_flex().gap_1().child(vscode).child(cursor))
 }
 
+#[cfg(feature = "agentic")]
 pub(crate) const FEATURED_AGENT_IDS: &[&str] =
     &["claude-acp", "codex-acp", "github-copilot-cli", "cursor"];
 
+#[cfg(feature = "agentic")]
 fn render_registry_agent_button(
     agent: &RegistryAgent,
     installed: bool,
@@ -598,6 +610,7 @@ fn render_registry_agent_button(
         })
 }
 
+#[cfg(feature = "agentic")]
 fn render_zed_agent_button(user_store: &Entity<UserStore>, cx: &mut App) -> impl IntoElement {
     let client = Client::global(cx);
     let status = *client.status().borrow();
@@ -670,6 +683,7 @@ fn render_zed_agent_button(user_store: &Entity<UserStore>, cx: &mut App) -> impl
         })
 }
 
+#[cfg(feature = "agentic")]
 fn render_ai_section(user_store: &Entity<UserStore>, cx: &mut App) -> impl IntoElement {
     let registry_agents = AgentRegistryStore::try_global(cx)
         .map(|store| store.read(cx).agents().to_vec())
@@ -715,7 +729,7 @@ fn render_ai_section(user_store: &Entity<UserStore>, cx: &mut App) -> impl IntoE
 pub(crate) fn render_basics_page(user_store: &Entity<UserStore>, cx: &mut App) -> impl IntoElement {
     let mut tab_index = 0;
 
-    v_flex()
+    let page = v_flex()
         .id("basics-page")
         .gap_6()
         .child(crate::workspace_choice::render_workspace_choice(
@@ -723,9 +737,12 @@ pub(crate) fn render_basics_page(user_store: &Entity<UserStore>, cx: &mut App) -
             cx,
         ))
         .child(render_theme_section(&mut tab_index, cx))
-        .child(render_base_keymap_section(&mut tab_index, cx))
-        .child(render_ai_section(user_store, cx))
-        .child(render_import_settings_section(&mut tab_index, cx))
+        .child(render_base_keymap_section(&mut tab_index, cx));
+    #[cfg(feature = "agentic")]
+    let page = page.child(render_ai_section(user_store, cx));
+    #[cfg(not(feature = "agentic"))]
+    let _ = user_store;
+    page.child(render_import_settings_section(&mut tab_index, cx))
         .child(render_vim_mode_switch(&mut tab_index, cx))
         .child(render_worktree_auto_trust_switch(&mut tab_index, cx))
         .child(Divider::horizontal().color(ui::DividerColor::BorderVariant))

@@ -13,6 +13,7 @@ path = "src/ai_onboarding.rs"
 
 [features]
 default = []
+agentic = ["zed_actions/agentic"]
 
 [dependencies]
 client.workspace = true

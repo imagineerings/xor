@@ -1,5 +1,7 @@
 # Implementation Plan: Developer Context and Commands
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Approach
 
 Extend the current native-agent flow in place. Commands are added to the catalog and dispatcher that already serve autocomplete; local results use the existing `AcpThread` conversation; developer context remains in `UserAgentsMd`, `ProjectContext`, and the existing skill integration; roots remain owned by `Project` and worktrees; lifecycle work is limited to missing regressions for `pending_sessions` and `ThreadStore`.

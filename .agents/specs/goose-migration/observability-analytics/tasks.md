@@ -1,5 +1,7 @@
 # Implementation Plan: Observability and Analytics
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Overview
 
 Extend zed's observability infrastructure with Langfuse tracing, OpenTelemetry OTLP export, an observation layer, rate limiter, PostHog analytics, token counter, and tool monitoring.

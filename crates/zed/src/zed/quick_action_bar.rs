@@ -1,6 +1,7 @@
 mod preview;
 mod repl_menu;
 
+#[cfg(feature = "agentic")]
 use agent_settings::AgentSettings;
 use editor::actions::{
     AddSelectionAbove, AddSelectionBelow, CodeActionSource, DuplicateLineDown, GoToDiagnostic,
@@ -15,10 +16,9 @@ use gpui::{
     FocusHandle, Focusable, InteractiveElement, ParentElement, Render, Styled, Subscription,
     WeakEntity, Window, anchored, deferred, point,
 };
-use project::{
-    DisableAiSettings,
-    project_settings::{DiagnosticSeverity, ProjectSettings},
-};
+#[cfg(feature = "agentic")]
+use project::DisableAiSettings;
+use project::project_settings::{DiagnosticSeverity, ProjectSettings};
 use search::{BufferSearchBar, buffer_search};
 use settings::{GitDiffBaseSetting, Settings, SettingsStore, update_settings_file};
 use ui::{
@@ -30,13 +30,15 @@ use workspace::item::ItemBufferKind;
 use workspace::{
     ToolbarItemEvent, ToolbarItemLocation, ToolbarItemView, Workspace, item::ItemHandle,
 };
-use zed_actions::{agent::AddSelectionToThread, assistant::InlineAssist, outline::ToggleOutline};
+use zed_actions::outline::ToggleOutline;
+#[cfg(feature = "agentic")]
+use zed_actions::{agent::AddSelectionToThread, assistant::InlineAssist};
 
 const MAX_CODE_ACTION_MENU_LINES: u32 = 16;
 
 pub struct QuickActionBar {
     _inlay_hints_enabled_subscription: Option<Subscription>,
-    _ai_settings_subscription: Subscription,
+    _ai_settings_subscription: Option<Subscription>,
     active_item: Option<Box<dyn ItemHandle>>,
     buffer_search_bar: Entity<BufferSearchBar>,
     show: bool,
@@ -51,23 +53,30 @@ impl QuickActionBar {
         workspace: &Workspace,
         cx: &mut Context<Self>,
     ) -> Self {
-        let mut was_agent_enabled = AgentSettings::get_global(cx).enabled(cx);
-        let mut was_agent_button = AgentSettings::get_global(cx).button;
+        #[cfg(feature = "agentic")]
+        let ai_settings_subscription = {
+            let mut was_agent_enabled = AgentSettings::get_global(cx).enabled(cx);
+            let mut was_agent_button = AgentSettings::get_global(cx).button;
+            cx.observe_global::<SettingsStore>(move |_, cx| {
+                let agent_settings = AgentSettings::get_global(cx);
+                let is_agent_enabled = agent_settings.enabled(cx);
 
-        let ai_settings_subscription = cx.observe_global::<SettingsStore>(move |_, cx| {
-            let agent_settings = AgentSettings::get_global(cx);
-            let is_agent_enabled = agent_settings.enabled(cx);
-
-            if was_agent_enabled != is_agent_enabled || was_agent_button != agent_settings.button {
-                was_agent_enabled = is_agent_enabled;
-                was_agent_button = agent_settings.button;
-                cx.notify();
-            }
-        });
+                if was_agent_enabled != is_agent_enabled
+                    || was_agent_button != agent_settings.button
+                {
+                    was_agent_enabled = is_agent_enabled;
+                    was_agent_button = agent_settings.button;
+                    cx.notify();
+                }
+            })
+        };
 
         let mut this = Self {
             _inlay_hints_enabled_subscription: None,
-            _ai_settings_subscription: ai_settings_subscription,
+            #[cfg(feature = "agentic")]
+            _ai_settings_subscription: Some(ai_settings_subscription),
+            #[cfg(not(feature = "agentic"))]
+            _ai_settings_subscription: None,
             active_item: None,
             buffer_search_bar,
             show: true,
@@ -160,6 +169,7 @@ impl Render for QuickActionBar {
             )
         });
 
+        #[cfg(feature = "agentic")]
         let assistant_button = QuickActionBarButton::new(
             "toggle inline assistant",
             IconName::ZedAssistant,
@@ -247,12 +257,14 @@ impl Render for QuickActionBar {
                 .read(cx)
                 .snapshot(cx)
                 .has_diff_hunks();
+            #[cfg(feature = "agentic")]
             let has_selection = editor.update(cx, |editor, cx| {
                 editor.has_non_empty_selection(&editor.display_snapshot(cx))
             });
 
             let focus = editor.focus_handle(cx);
 
+            #[cfg(feature = "agentic")]
             let disable_ai = DisableAiSettings::get_global(cx).disable_ai;
 
             PopoverMenu::new("editor-selections-dropdown")
@@ -268,7 +280,8 @@ impl Render for QuickActionBar {
                 .menu(move |window, cx| {
                     let focus = focus.clone();
                     let menu = ContextMenu::build(window, cx, move |menu, _, _| {
-                        menu.context(focus.clone())
+                        let menu = menu
+                            .context(focus.clone())
                             .action("Select All", Box::new(SelectAll))
                             .action(
                                 "Select Next Occurrence",
@@ -289,15 +302,16 @@ impl Render for QuickActionBar {
                                 Box::new(AddSelectionBelow {
                                     skip_soft_wrap: true,
                                 }),
+                            );
+                        #[cfg(feature = "agentic")]
+                        let menu = menu.when(!disable_ai, |this| {
+                            this.separator().action_disabled_when(
+                                !has_selection,
+                                "Add to Agent Thread",
+                                Box::new(AddSelectionToThread),
                             )
-                            .when(!disable_ai, |this| {
-                                this.separator().action_disabled_when(
-                                    !has_selection,
-                                    "Add to Agent Thread",
-                                    Box::new(AddSelectionToThread),
-                                )
-                            })
-                            .separator()
+                        });
+                        menu.separator()
                             .action("Go to Symbol", Box::new(ToggleOutline))
                             .action("Go to Line/Column", Box::new(ToggleGoToLine))
                             .separator()
@@ -703,17 +717,18 @@ impl Render for QuickActionBar {
                 })
         };
 
-        h_flex()
+        let bar = h_flex()
             .id("quick action bar")
             .gap(DynamicSpacing::Base01.rems(cx))
             .children(self.render_repl_menu(cx))
             .children(self.render_preview_button(cx))
-            .children(search_button)
-            .when(
-                AgentSettings::get_global(cx).enabled(cx) && AgentSettings::get_global(cx).button,
-                |bar| bar.child(assistant_button),
-            )
-            .children(code_actions_dropdown)
+            .children(search_button);
+        #[cfg(feature = "agentic")]
+        let bar = bar.when(
+            AgentSettings::get_global(cx).enabled(cx) && AgentSettings::get_global(cx).button,
+            |bar| bar.child(assistant_button),
+        );
+        bar.children(code_actions_dropdown)
             .children(editor_selections_dropdown)
             .child(editor_settings_dropdown)
     }

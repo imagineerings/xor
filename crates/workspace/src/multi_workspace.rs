@@ -6,9 +6,12 @@ use gpui::{
     ManagedView, MouseButton, Pixels, Render, Subscription, Task, TaskExt, WeakEntity, Window,
     WindowId, actions, deferred, px,
 };
+#[cfg(feature = "agentic")]
+use project::DisableAiSettings;
+use project::Project;
 pub use project::ProjectGroupKey;
-use project::{DisableAiSettings, Project};
 use remote::RemoteConnectionOptions;
+#[cfg(feature = "agentic")]
 use settings::Settings;
 pub use settings::SidebarSide;
 use std::cell::Cell;
@@ -18,10 +21,14 @@ use std::rc::Rc;
 use ui::prelude::*;
 use util::ResultExt;
 use util::path_list::PathList;
+#[cfg(feature = "agentic")]
 use zed_actions::agents_sidebar::ToggleThreadSwitcher;
 
+#[cfg(feature = "agentic")]
 use agent_settings::AgentSettings;
+#[cfg(feature = "agentic")]
 use settings::SidebarDockPosition;
+#[cfg(feature = "agentic")]
 use ui::{ContextMenu, right_click_menu};
 
 const SIDEBAR_RESIZE_HANDLE_SIZE: Pixels = px(6.0);
@@ -33,6 +40,7 @@ use crate::{
     persistence::model::MultiWorkspaceState,
 };
 
+#[cfg(feature = "agentic")]
 actions!(
     multi_workspace,
     [
@@ -52,6 +60,12 @@ actions!(
         PreviousThread,
         /// Creates a new thread in the current workspace.
         NewThread,
+    ]
+);
+
+actions!(
+    multi_workspace,
+    [
         /// Moves the active project to a new window.
         MoveProjectToNewWindow,
     ]
@@ -63,6 +77,7 @@ pub struct SidebarRenderState {
     pub side: SidebarSide,
 }
 
+#[cfg(feature = "agentic")]
 pub fn sidebar_side_context_menu(
     id: impl Into<ElementId>,
     cx: &App,
@@ -353,6 +368,7 @@ impl MultiWorkspace {
             }
         });
         let quit_subscription = cx.on_app_quit(Self::app_will_quit);
+        #[cfg(feature = "agentic")]
         let settings_subscription = cx.observe_global_in::<settings::SettingsStore>(window, {
             let mut previous_multi_workspace_enabled = !DisableAiSettings::get_global(cx)
                 .disable_ai
@@ -371,6 +387,12 @@ impl MultiWorkspace {
         workspace.update(cx, |workspace, cx| {
             workspace.set_multi_workspace(weak_self, active_workspace_id.clone(), cx);
         });
+        let subscriptions = vec![
+            release_subscription,
+            quit_subscription,
+            #[cfg(feature = "agentic")]
+            settings_subscription,
+        ];
         Self {
             window_id: window.window_handle().window_id(),
             held: vec![HeldWorkspace {
@@ -385,11 +407,7 @@ impl MultiWorkspace {
             sidebar_overlay: None,
             pending_removal_tasks: Vec::new(),
             _serialize_task: None,
-            _subscriptions: vec![
-                release_subscription,
-                quit_subscription,
-                settings_subscription,
-            ],
+            _subscriptions: subscriptions,
             previous_focus_handle: None,
         }
     }
@@ -433,8 +451,14 @@ impl MultiWorkspace {
             .map_or(false, |s| s.is_threads_list_view_active(cx))
     }
 
+    #[cfg(feature = "agentic")]
     pub fn multi_workspace_enabled(&self, cx: &App) -> bool {
         !DisableAiSettings::get_global(cx).disable_ai && AgentSettings::get_global(cx).enabled
+    }
+
+    #[cfg(not(feature = "agentic"))]
+    pub fn multi_workspace_enabled(&self, _cx: &App) -> bool {
+        true
     }
 
     pub fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1391,6 +1415,7 @@ impl MultiWorkspace {
 
     /// Collapses to a single workspace, discarding all groups.
     /// Used when multi-workspace is disabled by settings.
+    #[cfg(feature = "agentic")]
     fn collapse_to_single_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.sidebar_open {
             self.close_sidebar(window, cx);
@@ -2193,112 +2218,113 @@ impl Render for MultiWorkspace {
         let workspace_key_context = workspace.update(cx, |workspace, cx| workspace.key_context(cx));
         let root = workspace.update(cx, |workspace, cx| workspace.actions(h_flex(), window, cx));
 
+        let root = root
+            .key_context(workspace_key_context)
+            .relative()
+            .size_full()
+            .font(ui_font)
+            .text_color(text_color)
+            .on_action(cx.listener(Self::close_window));
+        #[cfg(feature = "agentic")]
+        let root = root.when(self.multi_workspace_enabled(cx), |this| {
+            this.on_action(cx.listener(
+                |this: &mut Self, _: &ToggleWorkspaceSidebar, window, cx| {
+                    this.toggle_sidebar(window, cx);
+                },
+            ))
+            .on_action(
+                cx.listener(|this: &mut Self, _: &CloseWorkspaceSidebar, window, cx| {
+                    this.close_sidebar_action(window, cx);
+                }),
+            )
+            .on_action(
+                cx.listener(|this: &mut Self, _: &FocusWorkspaceSidebar, window, cx| {
+                    this.focus_sidebar(window, cx);
+                }),
+            )
+            .on_action(cx.listener(
+                |this: &mut Self, action: &ToggleThreadSwitcher, window, cx| {
+                    if let Some(sidebar) = &this.sidebar {
+                        sidebar.toggle_thread_switcher(action.select_last, window, cx);
+                    }
+                },
+            ))
+            .on_action(cx.listener(|this: &mut Self, _: &NextProject, window, cx| {
+                if let Some(sidebar) = &this.sidebar {
+                    sidebar.cycle_project(true, window, cx);
+                }
+            }))
+            .on_action(
+                cx.listener(|this: &mut Self, _: &PreviousProject, window, cx| {
+                    if let Some(sidebar) = &this.sidebar {
+                        sidebar.cycle_project(false, window, cx);
+                    }
+                }),
+            )
+            .on_action(cx.listener(|this: &mut Self, _: &NextThread, window, cx| {
+                if let Some(sidebar) = &this.sidebar {
+                    sidebar.cycle_thread(true, window, cx);
+                }
+            }))
+            .on_action(cx.listener(
+                |this: &mut Self, _: &PreviousThread, window, cx| {
+                    if let Some(sidebar) = &this.sidebar {
+                        sidebar.cycle_thread(false, window, cx);
+                    }
+                },
+            ))
+        });
+        let root = root.when(self.project_group_keys().len() >= 2, |el| {
+            el.on_action(
+                cx.listener(|this: &mut Self, _: &MoveProjectToNewWindow, window, cx| {
+                    let key = this.project_group_key_for_workspace(this.workspace(), cx);
+                    this.open_project_group_in_new_window(&key, window, cx)
+                        .detach_and_log_err(cx);
+                }),
+            )
+        });
         client_side_decorations(
-            root.key_context(workspace_key_context)
-                .relative()
-                .size_full()
-                .font(ui_font)
-                .text_color(text_color)
-                .on_action(cx.listener(Self::close_window))
-                .when(self.multi_workspace_enabled(cx), |this| {
-                    this.on_action(cx.listener(
-                        |this: &mut Self, _: &ToggleWorkspaceSidebar, window, cx| {
-                            this.toggle_sidebar(window, cx);
-                        },
-                    ))
-                    .on_action(cx.listener(
-                        |this: &mut Self, _: &CloseWorkspaceSidebar, window, cx| {
-                            this.close_sidebar_action(window, cx);
-                        },
-                    ))
-                    .on_action(cx.listener(
-                        |this: &mut Self, _: &FocusWorkspaceSidebar, window, cx| {
-                            this.focus_sidebar(window, cx);
-                        },
-                    ))
-                    .on_action(cx.listener(
-                        |this: &mut Self, action: &ToggleThreadSwitcher, window, cx| {
-                            if let Some(sidebar) = &this.sidebar {
-                                sidebar.toggle_thread_switcher(action.select_last, window, cx);
-                            }
-                        },
-                    ))
-                    .on_action(cx.listener(|this: &mut Self, _: &NextProject, window, cx| {
-                        if let Some(sidebar) = &this.sidebar {
-                            sidebar.cycle_project(true, window, cx);
-                        }
-                    }))
-                    .on_action(
-                        cx.listener(|this: &mut Self, _: &PreviousProject, window, cx| {
-                            if let Some(sidebar) = &this.sidebar {
-                                sidebar.cycle_project(false, window, cx);
-                            }
-                        }),
-                    )
-                    .on_action(cx.listener(|this: &mut Self, _: &NextThread, window, cx| {
-                        if let Some(sidebar) = &this.sidebar {
-                            sidebar.cycle_thread(true, window, cx);
-                        }
-                    }))
-                    .on_action(
-                        cx.listener(|this: &mut Self, _: &PreviousThread, window, cx| {
-                            if let Some(sidebar) = &this.sidebar {
-                                sidebar.cycle_thread(false, window, cx);
-                            }
-                        }),
-                    )
-                    .when(self.project_group_keys().len() >= 2, |el| {
-                        el.on_action(cx.listener(
-                            |this: &mut Self, _: &MoveProjectToNewWindow, window, cx| {
-                                let key =
-                                    this.project_group_key_for_workspace(this.workspace(), cx);
-                                this.open_project_group_in_new_window(&key, window, cx)
-                                    .detach_and_log_err(cx);
+            root.when(show_sidebar, |this| {
+                this.on_drag_move(cx.listener(
+                    move |this: &mut Self, e: &DragMoveEvent<DraggedSidebar>, window, cx| {
+                        let new_width = if sidebar_on_right {
+                            window.bounds().size.width - e.event.position.x
+                        } else {
+                            e.event.position.x
+                        };
+                        this.resize_rendered_sidebar(
+                            new_width,
+                            collaborative_workspace,
+                            window,
+                            cx,
+                        );
+                    },
+                ))
+            })
+            .children(left_sidebar)
+            .child(
+                div()
+                    .flex()
+                    .flex_1()
+                    .size_full()
+                    .overflow_hidden()
+                    .child(self.workspace().clone()),
+            )
+            .children(right_sidebar)
+            .child(self.workspace().read(cx).modal_layer.clone())
+            .children(self.sidebar_overlay.as_ref().map(|view| {
+                deferred(div().absolute().size_full().inset_0().occlude().child(
+                    v_flex().h(px(0.0)).top_20().items_center().child(
+                        h_flex().occlude().child(view.clone()).on_mouse_down(
+                            MouseButton::Left,
+                            |_, _, cx| {
+                                cx.stop_propagation();
                             },
-                        ))
-                    })
-                })
-                .when(show_sidebar, |this| {
-                    this.on_drag_move(cx.listener(
-                        move |this: &mut Self, e: &DragMoveEvent<DraggedSidebar>, window, cx| {
-                            let new_width = if sidebar_on_right {
-                                window.bounds().size.width - e.event.position.x
-                            } else {
-                                e.event.position.x
-                            };
-                            this.resize_rendered_sidebar(
-                                new_width,
-                                collaborative_workspace,
-                                window,
-                                cx,
-                            );
-                        },
-                    ))
-                })
-                .children(left_sidebar)
-                .child(
-                    div()
-                        .flex()
-                        .flex_1()
-                        .size_full()
-                        .overflow_hidden()
-                        .child(self.workspace().clone()),
-                )
-                .children(right_sidebar)
-                .child(self.workspace().read(cx).modal_layer.clone())
-                .children(self.sidebar_overlay.as_ref().map(|view| {
-                    deferred(div().absolute().size_full().inset_0().occlude().child(
-                        v_flex().h(px(0.0)).top_20().items_center().child(
-                            h_flex().occlude().child(view.clone()).on_mouse_down(
-                                MouseButton::Left,
-                                |_, _, cx| {
-                                    cx.stop_propagation();
-                                },
-                            ),
                         ),
-                    ))
-                    .with_priority(2)
-                })),
+                    ),
+                ))
+                .with_priority(2)
+            })),
             window,
             cx,
         )

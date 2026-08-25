@@ -12,8 +12,12 @@ workspace = true
 path = "src/diagnostics.rs"
 doctest = false
 
+[features]
+default = []
+agentic = ["dep:agent_settings", "zed_actions/agentic"]
+
 [dependencies]
-agent_settings.workspace = true
+agent_settings = { workspace = true, optional = true }
 anyhow.workspace = true
 collections.workspace = true
 component.workspace = true

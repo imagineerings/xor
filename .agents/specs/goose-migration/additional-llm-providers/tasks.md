@@ -1,5 +1,7 @@
 # Implementation Plan: Additional LLM Providers
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Overview
 
 Implement the 18+ provider integrations from goose that don't yet exist in zed, following the patterns established in `crates/language_models/src/provider/`. Work is grouped: first the shared infrastructure (registry, declarative providers, ACP adapter), then individual providers by category.

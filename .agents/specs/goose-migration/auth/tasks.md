@@ -1,5 +1,7 @@
 # Tasks: Authentication and CI OIDC Proxy
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 - [ ] 1. Reconcile browser and MCP OAuth with the existing callback server
   - Route loopback ownership through `oauth_callback_server`
   - Implement state, timeout, cancellation, exchange, error propagation, and safe success/error pages

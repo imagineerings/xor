@@ -82,6 +82,7 @@ impl SettingsInputField {
         self
     }
 
+    #[cfg(feature = "agentic")]
     pub fn clear_on_confirm(mut self) -> Self {
         self.clear_on_confirm = true;
         self
@@ -92,6 +93,7 @@ impl SettingsInputField {
         self
     }
 
+    #[cfg(feature = "agentic")]
     pub fn action_slot(mut self, action: impl IntoElement) -> Self {
         self.action_slot = Some(action.into_any_element());
         self
@@ -102,11 +104,13 @@ impl SettingsInputField {
         self
     }
 
+    #[cfg(feature = "agentic")]
     pub fn with_buffer_font(mut self) -> Self {
         self.use_buffer_font = true;
         self
     }
 
+    #[cfg(feature = "agentic")]
     pub fn color(mut self, color: Color) -> Self {
         self.color = Some(color);
         self

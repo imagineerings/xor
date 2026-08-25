@@ -905,12 +905,6 @@ actions!(
         /// Toggles diff display for selected hunks.
         #[action(deprecated_aliases = ["editor::ToggleHunkDiff"])]
         ToggleSelectedDiffHunks,
-        /// Stores the diff review comment locally (for later batch submission).
-        SubmitDiffReviewComment,
-        /// Toggles the expanded state of the comments section in the overlay.
-        ToggleReviewCommentsExpanded,
-        /// Sends all stored review comments to the Agent panel.
-        SendReviewToAgent,
         /// Toggles the selection menu.
         ToggleSelectionMenu,
         /// Toggles soft wrap mode.
@@ -958,6 +952,19 @@ pub struct GoToDefinition {
     pub open_results_in: Option<OpenResultsIn>,
 }
 
+#[cfg(feature = "agentic")]
+actions!(
+    editor,
+    [
+        /// Stores the diff review comment locally (for later batch submission).
+        SubmitDiffReviewComment,
+        /// Toggles the expanded state of the comments section in the overlay.
+        ToggleReviewCommentsExpanded,
+        /// Sends all stored review comments to the Agent panel.
+        SendReviewToAgent,
+    ]
+);
+
 /// Goes to the implementation of the symbol at cursor.
 #[derive(PartialEq, Clone, Default, Deserialize, JsonSchema, Action)]
 #[action(namespace = editor)]
@@ -992,6 +999,7 @@ impl Default for FindAllReferences {
 }
 
 /// Edits a stored review comment inline.
+#[cfg(feature = "agentic")]
 #[derive(PartialEq, Clone, Deserialize, JsonSchema, Action)]
 #[action(namespace = editor)]
 #[serde(deny_unknown_fields)]
@@ -1000,6 +1008,7 @@ pub struct EditReviewComment {
 }
 
 /// Deletes a stored review comment.
+#[cfg(feature = "agentic")]
 #[derive(PartialEq, Clone, Deserialize, JsonSchema, Action)]
 #[action(namespace = editor)]
 #[serde(deny_unknown_fields)]
@@ -1008,6 +1017,7 @@ pub struct DeleteReviewComment {
 }
 
 /// Confirms an inline edit of a review comment.
+#[cfg(feature = "agentic")]
 #[derive(PartialEq, Clone, Deserialize, JsonSchema, Action)]
 #[action(namespace = editor)]
 #[serde(deny_unknown_fields)]
@@ -1016,6 +1026,7 @@ pub struct ConfirmEditReviewComment {
 }
 
 /// Cancels an inline edit of a review comment.
+#[cfg(feature = "agentic")]
 #[derive(PartialEq, Clone, Deserialize, JsonSchema, Action)]
 #[action(namespace = editor)]
 #[serde(deny_unknown_fields)]

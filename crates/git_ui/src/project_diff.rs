@@ -7,9 +7,11 @@ use crate::{
 };
 use anyhow::{Context as _, Result};
 use buffer_diff::DiffHunkSecondaryStatus;
+#[cfg(feature = "agentic")]
+use editor::actions::SendReviewToAgent;
 use editor::{
     Editor, EditorEvent, SplittableEditor, UncommittedDiffHunkDelegate,
-    actions::{GoToHunk, GoToPreviousHunk, SendReviewToAgent},
+    actions::{GoToHunk, GoToPreviousHunk},
 };
 use git::{Commit, StageAll, StageAndNext, ToggleStaged, UnstageAll, UnstageAndNext};
 use gpui::{
@@ -50,11 +52,18 @@ actions!(
         DiffHead,
         /// Adds files to the git staging area.
         Add,
-        /// Opens a new agent thread with the branch diff for review.
-        ReviewDiff,
         LeaderAndFollower,
         /// Compare with a specific branch
         CompareWithBranch,
+    ]
+);
+
+#[cfg(feature = "agentic")]
+actions!(
+    git,
+    [
+        /// Opens a new agent thread with the branch diff for review.
+        ReviewDiff,
     ]
 );
 
@@ -304,6 +313,7 @@ impl ProjectDiff {
     }
 
     /// Returns the total count of review comments across all hunks/files.
+    #[cfg(feature = "agentic")]
     pub fn total_review_comment_count(&self, cx: &App) -> usize {
         self.diff.read(cx).total_review_comment_count()
     }
@@ -804,6 +814,7 @@ impl Render for ProjectDiffToolbar {
         };
         let focus_handle = project_diff.focus_handle(cx);
         let button_states = project_diff.read(cx).button_states(cx);
+        #[cfg(feature = "agentic")]
         let review_count = project_diff.read(cx).total_review_comment_count(cx);
 
         let (additions, deletions) = project_diff.read(cx).calculate_changed_lines(cx);
@@ -811,7 +822,7 @@ impl Render for ProjectDiffToolbar {
 
         let stage_all_button_width = rems(5.);
 
-        h_flex()
+        let toolbar = h_flex()
             .my_neg_1()
             .py_1()
             .gap_1p5()
@@ -947,19 +958,22 @@ impl Render for ProjectDiffToolbar {
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.dispatch_action(&Commit, window, cx);
                     })),
+            );
+        #[cfg(feature = "agentic")]
+        let toolbar = toolbar.when(review_count > 0, |el| {
+            el.child(Divider::vertical()).child(
+                render_send_review_to_agent_button(review_count, &focus_handle).on_click(
+                    cx.listener(|this, _, window, cx| {
+                        this.dispatch_action(&SendReviewToAgent, window, cx)
+                    }),
+                ),
             )
-            .when(review_count > 0, |el| {
-                el.child(Divider::vertical()).child(
-                    render_send_review_to_agent_button(review_count, &focus_handle).on_click(
-                        cx.listener(|this, _, window, cx| {
-                            this.dispatch_action(&SendReviewToAgent, window, cx)
-                        }),
-                    ),
-                )
-            })
+        });
+        toolbar
     }
 }
 
+#[cfg(feature = "agentic")]
 pub(crate) fn render_send_review_to_agent_button(
     review_count: usize,
     focus_handle: &FocusHandle,

@@ -1,12 +1,18 @@
+#[cfg(feature = "agentic")]
 mod agent_api_keys_onboarding;
+#[cfg(feature = "agentic")]
 mod agent_panel_onboarding_card;
+#[cfg(feature = "agentic")]
 mod agent_panel_onboarding_content;
 mod edit_prediction_onboarding_content;
 mod plan_definitions;
 mod young_account_banner;
 
+#[cfg(feature = "agentic")]
 pub use agent_api_keys_onboarding::{ApiKeysWithProviders, ApiKeysWithoutProviders};
+#[cfg(feature = "agentic")]
 pub use agent_panel_onboarding_card::AgentPanelOnboardingCard;
+#[cfg(feature = "agentic")]
 pub use agent_panel_onboarding_content::AgentPanelOnboarding;
 use cloud_api_types::Plan;
 pub use edit_prediction_onboarding_content::EditPredictionOnboarding;
@@ -17,7 +23,9 @@ use std::sync::Arc;
 
 use client::{Client, UserStore, zed_urls};
 use gpui::{AnyElement, Entity, IntoElement, ParentElement, TaskExt};
-use ui::{Divider, RegisterComponent, Tooltip, Vector, VectorName, prelude::*};
+#[cfg(feature = "agentic")]
+use ui::RegisterComponent;
+use ui::{Divider, Tooltip, Vector, VectorName, prelude::*};
 
 #[derive(PartialEq)]
 pub enum SignInStatus {
@@ -38,7 +46,8 @@ impl From<client::Status> for SignInStatus {
     }
 }
 
-#[derive(RegisterComponent, IntoElement)]
+#[cfg_attr(feature = "agentic", derive(RegisterComponent))]
+#[derive(IntoElement)]
 pub struct SimAiOnboarding {
     pub sign_in_status: SignInStatus,
     pub plan: Option<Plan>,
@@ -396,6 +405,7 @@ impl RenderOnce for SimAiOnboarding {
     }
 }
 
+#[cfg(feature = "agentic")]
 impl Component for SimAiOnboarding {
     fn scope() -> ComponentScope {
         ComponentScope::Onboarding

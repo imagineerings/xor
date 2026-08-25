@@ -41,6 +41,7 @@ use workspace::{
 };
 
 use anyhow::{Result, anyhow};
+#[cfg(feature = "agentic")]
 use zed_actions::assistant::InlineAssist;
 
 const TERMINAL_PANEL_KEY: &str = "TerminalPanel";
@@ -86,6 +87,7 @@ pub struct TerminalPanel {
     pending_serialization: Task<Option<()>>,
     pending_terminals_to_add: usize,
     deferred_tasks: HashMap<TaskId, Task<()>>,
+    #[cfg(feature = "agentic")]
     assistant_enabled: bool,
     active: bool,
 }
@@ -104,6 +106,7 @@ impl TerminalPanel {
             pending_serialization: Task::ready(None),
             pending_terminals_to_add: 0,
             deferred_tasks: HashMap::default(),
+            #[cfg(feature = "agentic")]
             assistant_enabled: false,
             active: false,
         };
@@ -111,6 +114,7 @@ impl TerminalPanel {
         terminal_panel
     }
 
+    #[cfg(feature = "agentic")]
     pub fn set_assistant_enabled(&mut self, enabled: bool, cx: &mut Context<Self>) {
         self.assistant_enabled = enabled;
         for pane in self.center.panes() {
@@ -123,6 +127,7 @@ impl TerminalPanel {
         terminal_pane: &Entity<Pane>,
         cx: &mut Context<Self>,
     ) {
+        #[cfg(feature = "agentic")]
         let assistant_enabled = self.assistant_enabled;
         terminal_pane.update(cx, |pane, cx| {
             pane.set_render_tab_bar_buttons(cx, move |pane, window, cx| {
@@ -141,41 +146,38 @@ impl TerminalPanel {
                     return (None, None);
                 }
                 let focus_handle = pane.focus_handle(cx);
-                let right_children = h_flex()
-                    .gap(DynamicSpacing::Base02.rems(cx))
-                    .child(
-                        PopoverMenu::new("terminal-tab-bar-popover-menu")
-                            .trigger_with_tooltip(
-                                IconButton::new("plus", IconName::Plus).icon_size(IconSize::Small),
-                                Tooltip::text("New…"),
-                            )
-                            .anchor(Anchor::TopRight)
-                            .with_handle(pane.new_item_context_menu_handle.clone())
-                            .menu(move |window, cx| {
-                                let focus_handle = focus_handle.clone();
-                                let menu = ContextMenu::build(window, cx, |menu, _, _| {
-                                    menu.context(focus_handle.clone())
-                                        .action(
-                                            "New Terminal",
-                                            workspace::NewTerminal::default().boxed_clone(),
-                                        )
-                                        // We want the focus to go back to terminal panel once task modal is dismissed,
-                                        // hence we focus that first. Otherwise, we'd end up without a focused element, as
-                                        // context menu will be gone the moment we spawn the modal.
-                                        .action(
-                                            "Spawn Task",
-                                            zed_actions::Spawn::modal().boxed_clone(),
-                                        )
-                                });
+                let right_children = h_flex().gap(DynamicSpacing::Base02.rems(cx)).child(
+                    PopoverMenu::new("terminal-tab-bar-popover-menu")
+                        .trigger_with_tooltip(
+                            IconButton::new("plus", IconName::Plus).icon_size(IconSize::Small),
+                            Tooltip::text("New…"),
+                        )
+                        .anchor(Anchor::TopRight)
+                        .with_handle(pane.new_item_context_menu_handle.clone())
+                        .menu(move |window, cx| {
+                            let focus_handle = focus_handle.clone();
+                            let menu = ContextMenu::build(window, cx, |menu, _, _| {
+                                menu.context(focus_handle.clone())
+                                    .action(
+                                        "New Terminal",
+                                        workspace::NewTerminal::default().boxed_clone(),
+                                    )
+                                    // We want the focus to go back to terminal panel once task modal is dismissed,
+                                    // hence we focus that first. Otherwise, we'd end up without a focused element, as
+                                    // context menu will be gone the moment we spawn the modal.
+                                    .action("Spawn Task", zed_actions::Spawn::modal().boxed_clone())
+                            });
 
-                                Some(menu)
-                            }),
-                    )
-                    .when(assistant_enabled, |this| {
-                        this.when_some(split_context.clone(), |this, focus_handle| {
-                            this.child(InlineAssistTabBarButton { focus_handle })
-                        })
+                            Some(menu)
+                        }),
+                );
+                #[cfg(feature = "agentic")]
+                let right_children = right_children.when(assistant_enabled, |this| {
+                    this.when_some(split_context.clone(), |this, focus_handle| {
+                        this.child(InlineAssistTabBarButton { focus_handle })
                     })
+                });
+                let right_children = right_children
                     .child(
                         PopoverMenu::new("terminal-pane-tab-bar-split")
                             .trigger_with_tooltip(
@@ -1211,6 +1213,7 @@ impl TerminalPanel {
         self.active_pane.read(cx).items_len() == 0 && self.pending_terminals_to_add == 0
     }
 
+    #[cfg(feature = "agentic")]
     pub fn assistant_enabled(&self) -> bool {
         self.assistant_enabled
     }
@@ -1875,11 +1878,13 @@ impl workspace::TerminalProvider for TerminalProvider {
     }
 }
 
+#[cfg(feature = "agentic")]
 #[derive(IntoElement)]
 struct InlineAssistTabBarButton {
     focus_handle: FocusHandle,
 }
 
+#[cfg(feature = "agentic")]
 impl RenderOnce for InlineAssistTabBarButton {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         let focus_handle = self.focus_handle;
@@ -2212,6 +2217,7 @@ mod tests {
         });
     }
 
+    #[cfg(feature = "agentic")]
     #[gpui::test]
     async fn test_inline_assist_tooltip_shows_keybinding_of_active_terminal(
         cx: &mut TestAppContext,

@@ -17,21 +17,26 @@ use crate::{branch_picker, picker_prompt, render_remote_button};
 use crate::{
     git_panel_settings::GitPanelSettings, git_status_icon, repository_selector::RepositorySelector,
 };
+#[cfg(feature = "agentic")]
 use agent_settings::{AgentSettings, UserAgentsMd};
 use anyhow::Context as _;
 use askpass::AskPassDelegate;
+#[cfg(feature = "agentic")]
 use client::zed_urls;
 use collections::{BTreeMap, HashMap, HashSet};
 use db::kvp::KeyValueStore;
 use editor::{Editor, EditorElement, EditorMode, MultiBuffer, MultiBufferOffset, SizingBehavior};
 use editor::{EditorStyle, RewrapOptions};
 use file_icons::FileIcons;
+#[cfg(feature = "agentic")]
 use futures::StreamExt as _;
 use futures::channel::oneshot::Canceled;
 use git::Oid;
 use git::commit::ParsedCommitMessage;
+#[cfg(feature = "agentic")]
+use git::repository::DiffType;
 use git::repository::{
-    Branch, CommitData, CommitDetails, CommitOptions, CommitSummary, DiffType, FetchOptions,
+    Branch, CommitData, CommitDetails, CommitOptions, CommitSummary, FetchOptions,
     GitCommitTemplate, GitCommitter, InitialGraphCommitData, LogOrder, LogSource, PushOptions,
     Remote, RemoteCommandOutput, ResetMode, Upstream, UpstreamTracking, UpstreamTrackingStatus,
     get_git_committer,
@@ -46,15 +51,17 @@ use git::{
     StashAll, StashApply, StashPop, ToggleFillCommitEditor, TrashUntrackedFiles, UnstageAll,
     ViewFile, parse_git_remote_url,
 };
+#[cfg(feature = "agentic")]
+use gpui::AsyncApp;
 use gpui::{
-    AbsoluteLength, Action, Anchor, AnyElement, AsyncApp, AsyncWindowContext, ClickEvent,
-    ClipboardItem, DismissEvent, Empty, Entity, EventEmitter, FocusHandle, Focusable, KeyContext,
-    MouseButton, MouseDownEvent, Pixels, Point, PromptLevel, ScrollStrategy, Subscription, Task,
-    TaskExt, TextStyle, UniformListScrollHandle, WeakEntity, actions, anchored, deferred,
-    uniform_list,
+    AbsoluteLength, Action, Anchor, AnyElement, AsyncWindowContext, ClickEvent, ClipboardItem,
+    DismissEvent, Empty, Entity, EventEmitter, FocusHandle, Focusable, KeyContext, MouseButton,
+    MouseDownEvent, Pixels, Point, PromptLevel, ScrollStrategy, Subscription, Task, TaskExt,
+    TextStyle, UniformListScrollHandle, WeakEntity, actions, anchored, deferred, uniform_list,
 };
 use itertools::Itertools;
 use language::{Buffer, BufferEvent, File};
+#[cfg(feature = "agentic")]
 use language_model::{
     CompletionIntent, ConfiguredModel, Event as LanguageModelEvent, LanguageModelRegistry,
     LanguageModelRequest, LanguageModelRequestMessage, Role,
@@ -71,6 +78,7 @@ use project::{
     },
     project_settings::{GitPathStyle, ProjectSettings},
 };
+#[cfg(feature = "agentic")]
 use prompt_store::RULES_FILE_NAMES;
 
 use serde::{Deserialize, Serialize};
@@ -88,14 +96,18 @@ use std::{sync::Arc, time::Duration, usize};
 use strum::{IntoEnumIterator, VariantNames};
 use theme_settings::ThemeSettings;
 use time::OffsetDateTime;
+#[cfg(feature = "agentic")]
+use ui::TintColor;
 use ui::{
     ButtonLike, Checkbox, Chip, ContextMenu, ContextMenuEntry, Divider, DocumentationSide,
     ElevationIndex, IndentGuideColors, KeyBinding, PopoverMenu, PopoverMenuHandle,
-    ProjectEmptyState, ScrollAxes, Scrollbars, SplitButton, Tab, TintColor, Tooltip, WithScrollbar,
+    ProjectEmptyState, ScrollAxes, Scrollbars, SplitButton, Tab, Tooltip, WithScrollbar,
     prelude::*,
 };
 use util::paths::PathStyle;
-use util::{ResultExt, TryFutureExt, markdown::MarkdownInlineCode, maybe, rel_path::RelPath};
+#[cfg(any(feature = "agentic", test))]
+use util::rel_path::RelPath;
+use util::{ResultExt, TryFutureExt, markdown::MarkdownInlineCode, maybe};
 use workspace::SERIALIZATION_THROTTLE_TIME;
 use workspace::{
     Item, ModalView, Workspace,
@@ -1047,7 +1059,7 @@ pub struct GitPanel {
     history_keyboard_nav: bool,
     _commit_message_buffer_subscription: Option<Subscription>,
     _repo_subscriptions: Vec<Subscription>,
-    _settings_subscription: Subscription,
+    _settings_subscription: Option<Subscription>,
     git_access: Option<GitAccess>,
 }
 
@@ -1234,7 +1246,9 @@ impl GitPanel {
 
             let scroll_handle = UniformListScrollHandle::new();
 
+            #[cfg(feature = "agentic")]
             let mut was_ai_enabled = AgentSettings::get_global(cx).enabled(cx);
+            #[cfg(feature = "agentic")]
             let _settings_subscription = cx.observe_global::<SettingsStore>(move |_, cx| {
                 let is_ai_enabled = AgentSettings::get_global(cx).enabled(cx);
                 if was_ai_enabled != is_ai_enabled {
@@ -1243,7 +1257,9 @@ impl GitPanel {
                 }
             });
 
+            #[cfg(feature = "agentic")]
             let registry = LanguageModelRegistry::global(cx);
+            #[cfg(feature = "agentic")]
             cx.subscribe(&registry, |_, _, event, cx| match event {
                 LanguageModelEvent::CommitMessageModelChanged
                 | LanguageModelEvent::DefaultModelChanged
@@ -1348,7 +1364,10 @@ impl GitPanel {
                 history_keyboard_nav: false,
                 _commit_message_buffer_subscription: None,
                 _repo_subscriptions: Vec::new(),
-                _settings_subscription,
+                #[cfg(feature = "agentic")]
+                _settings_subscription: Some(_settings_subscription),
+                #[cfg(not(feature = "agentic"))]
+                _settings_subscription: None,
                 git_access: None,
             };
 
@@ -3269,6 +3288,7 @@ impl GitPanel {
         Some(format!("{} {}", action_text, file_name))
     }
 
+    #[cfg(feature = "agentic")]
     fn generate_commit_message_action(
         &mut self,
         _: &git::GenerateCommitMessage,
@@ -3368,6 +3388,7 @@ impl GitPanel {
         compressed
     }
 
+    #[cfg(feature = "agentic")]
     async fn load_project_rules(
         project: &Entity<Project>,
         repo_work_dir: &Arc<Path>,
@@ -3414,6 +3435,7 @@ impl GitPanel {
         }
     }
 
+    #[cfg(feature = "agentic")]
     fn build_commit_message_prompt(
         prompt: &str,
         user_agents_md: Option<&str>,
@@ -3458,6 +3480,7 @@ impl GitPanel {
     }
 
     /// Generates a commit message using an LLM.
+    #[cfg(feature = "agentic")]
     pub fn generate_commit_message(&mut self, cx: &mut Context<Self>) {
         if !self.can_commit() || !AgentSettings::get_global(cx).enabled(cx) {
             return;
@@ -5263,6 +5286,7 @@ impl GitPanel {
             .detach_and_log_err(cx);
     }
 
+    #[cfg(feature = "agentic")]
     fn show_commit_message_error<E>(weak_this: &WeakEntity<Self>, err: &E, cx: &mut AsyncApp)
     where
         E: std::fmt::Debug + std::fmt::Display,
@@ -5429,6 +5453,7 @@ impl GitPanel {
             })
     }
 
+    #[cfg(feature = "agentic")]
     pub(crate) fn render_generate_commit_message_button(
         &self,
         cx: &Context<Self>,
@@ -5501,6 +5526,14 @@ impl GitPanel {
         };
 
         Some(button.into_any_element())
+    }
+
+    #[cfg(not(feature = "agentic"))]
+    pub(crate) fn render_generate_commit_message_button(
+        &self,
+        _cx: &Context<Self>,
+    ) -> Option<AnyElement> {
+        None
     }
 
     pub(crate) fn render_co_authors(&self, cx: &Context<Self>) -> Option<AnyElement> {
@@ -8172,8 +8205,10 @@ impl GitPanel {
     }
 }
 
+#[cfg(feature = "agentic")]
 struct GenerateCommitMessageConfigurationTooltip;
 
+#[cfg(feature = "agentic")]
 impl Render for GenerateCommitMessageConfigurationTooltip {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         ui::tooltip_container(cx, |container, _cx| {
@@ -8288,7 +8323,16 @@ impl Render for GitPanel {
                     .on_action(cx.listener(Self::add_to_gitignore))
                     .on_action(cx.listener(Self::add_to_git_info_exclude))
                     .on_action(cx.listener(Self::clean_all))
-                    .on_action(cx.listener(Self::generate_commit_message_action))
+                    .map(|this| {
+                        #[cfg(feature = "agentic")]
+                        {
+                            this.on_action(cx.listener(Self::generate_commit_message_action))
+                        }
+                        #[cfg(not(feature = "agentic"))]
+                        {
+                            this
+                        }
+                    })
                     .on_action(cx.listener(Self::stash_all))
                     .on_action(cx.listener(Self::stash_pop))
             })

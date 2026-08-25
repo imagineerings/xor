@@ -1,5 +1,7 @@
 # Implementation Plan: Dictation (Speech-to-Text)
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Overview
 
 Implement the dictation system with microphone capture (extending `crates/audio/`), local Whisper inference using `candle`, and pluggable cloud dictation providers. The dictation service is in a new `crates/dictation/` crate.

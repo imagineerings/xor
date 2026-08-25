@@ -13,12 +13,19 @@ name = "git_ui"
 path = "src/git_ui.rs"
 
 [features]
+default = []
+agentic = [
+    "dep:agent_settings",
+    "dep:language_model",
+    "dep:prompt_store",
+    "zed_actions/agentic",
+]
 multiplayer-tools = ["dep:collaboration_domain", "workspace/multiplayer-tools"]
 test-support = ["multi_buffer/test-support", "remote_connection/test-support"]
 call = ["dep:call"]
 
 [dependencies]
-agent_settings.workspace = true
+agent_settings = { workspace = true, optional = true }
 anyhow.workspace = true
 askpass.workspace = true
 async-channel.workspace = true
@@ -39,7 +46,7 @@ git.workspace = true
 gpui.workspace = true
 itertools.workspace = true
 language.workspace = true
-language_model.workspace = true
+language_model = { workspace = true, optional = true }
 log.workspace = true
 markdown.workspace = true
 menu.workspace = true
@@ -48,7 +55,7 @@ notifications.workspace = true
 panel.workspace = true
 picker.workspace = true
 project.workspace = true
-prompt_store.workspace = true
+prompt_store = { workspace = true, optional = true }
 rand.workspace = true
 release_channel.workspace = true
 remote_connection.workspace = true

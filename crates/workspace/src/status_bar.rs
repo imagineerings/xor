@@ -1,7 +1,6 @@
-use crate::{
-    ItemHandle, MultiWorkspace, Pane, SidebarSide, ToggleWorkspaceSidebar,
-    sidebar_side_context_menu,
-};
+use crate::{ItemHandle, MultiWorkspace, Pane, SidebarSide};
+#[cfg(feature = "agentic")]
+use crate::{ToggleWorkspaceSidebar, sidebar_side_context_menu};
 #[cfg(feature = "multiplayer-tools")]
 use crate::{
     collaborative_participants::{
@@ -11,15 +10,21 @@ use crate::{
         CollaborativeStatus, CollaborativeStatusProjection, CollaborativeTaskPhase,
     },
 };
+#[cfg(feature = "agentic")]
+use gpui::Anchor;
 use gpui::{
-    Anchor, AnyView, App, Context, Decorations, Entity, FocusHandle, Focusable, IntoElement,
-    ParentElement, Render, Role, SharedString, Styled, Subscription, WeakEntity, Window,
+    AnyView, App, Context, Decorations, Entity, FocusHandle, Focusable, IntoElement, ParentElement,
+    Render, Role, SharedString, Styled, Subscription, WeakEntity, Window,
 };
 use project::Project;
 use settings::{SettingsContent, update_settings_file};
 use std::{any::TypeId, sync::Arc};
 use theme::CLIENT_SIDE_DECORATION_ROUNDING;
-use ui::{ContextMenu, Divider, IconPosition, Indicator, Tooltip, prelude::*, right_click_menu};
+#[cfg(any(feature = "agentic", feature = "multiplayer-tools"))]
+use ui::Divider;
+use ui::{ContextMenu, IconPosition, prelude::*, right_click_menu};
+#[cfg(feature = "agentic")]
+use ui::{Indicator, Tooltip};
 
 /// Describes how a status-bar item can be hidden by the user.
 ///
@@ -84,7 +89,9 @@ trait StatusItemViewHandle: Send {
 struct SidebarStatus {
     open: bool,
     side: SidebarSide,
+    #[cfg(feature = "agentic")]
     has_notifications: bool,
+    #[cfg(feature = "agentic")]
     show_toggle: bool,
 }
 
@@ -99,7 +106,9 @@ impl SidebarStatus {
                 Self {
                     open: mw.sidebar_open() && enabled,
                     side: mw.sidebar_side(cx),
+                    #[cfg(feature = "agentic")]
                     has_notifications: mw.sidebar_has_notifications(cx),
+                    #[cfg(feature = "agentic")]
                     show_toggle: enabled,
                 }
             })
@@ -206,12 +215,15 @@ impl Render for StatusBar {
 }
 
 impl StatusBar {
+    #[cfg_attr(not(feature = "agentic"), allow(unused_variables))]
     fn render_left_tools(
         &self,
         sidebar: &SidebarStatus,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let tools = h_flex().gap_1().min_w_0().overflow_x_hidden().when(
+        let tools = h_flex().gap_1().min_w_0().overflow_x_hidden();
+        #[cfg(feature = "agentic")]
+        let tools = tools.when(
             sidebar.show_toggle && !sidebar.open && sidebar.side == SidebarSide::Left,
             |this| this.child(self.render_sidebar_toggle(sidebar, cx)),
         );
@@ -244,6 +256,7 @@ impl StatusBar {
         )
     }
 
+    #[cfg_attr(not(feature = "agentic"), allow(unused_variables))]
     fn render_right_tools(
         &self,
         sidebar: &SidebarStatus,
@@ -269,12 +282,15 @@ impl StatusBar {
                 this.child(CollaborativeParticipantStatus::new(participant_state))
             },
         );
-        tools.when(
+        #[cfg(feature = "agentic")]
+        let tools = tools.when(
             sidebar.show_toggle && !sidebar.open && sidebar.side == SidebarSide::Right,
             |this| this.child(self.render_sidebar_toggle(sidebar, cx)),
-        )
+        );
+        tools
     }
 
+    #[cfg(feature = "agentic")]
     fn render_sidebar_toggle(
         &self,
         sidebar: &SidebarStatus,

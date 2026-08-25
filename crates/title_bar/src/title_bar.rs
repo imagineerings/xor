@@ -7,6 +7,7 @@ mod update_version;
 
 use crate::application_menu::{ApplicationMenu, show_menus};
 use crate::plan_chip::PlanChip;
+#[cfg(feature = "agentic")]
 use agent_settings::{AgentSettings, WindowLayout};
 use arrayvec::ArrayVec;
 use git_ui_core::worktree_picker::WorktreePicker;
@@ -24,6 +25,7 @@ use crate::application_menu::{
 use auto_update::AutoUpdateStatus;
 use call::ActiveCall;
 use client::{Client, UserStore, zed_urls};
+#[cfg(feature = "agentic")]
 use command_palette_hooks::CommandPaletteFilter;
 
 use gpui::{
@@ -38,16 +40,21 @@ use project::{
     trusted_worktrees::TrustedWorktrees,
 };
 use remote::RemoteConnectionOptions;
-use settings::{Settings as _, SettingsStore};
+use settings::Settings as _;
+#[cfg(feature = "agentic")]
+use settings::SettingsStore;
 
+#[cfg(feature = "agentic")]
 use std::any::TypeId;
 use std::sync::Arc;
 use std::time::Duration;
 use theme::ActiveTheme;
 use title_bar_settings::TitleBarSettings;
+#[cfg(feature = "agentic")]
+use ui::ContextMenuEntry;
 use ui::{
-    Avatar, ButtonLike, ContextMenu, ContextMenuEntry, IconWithIndicator, Indicator, PopoverMenu,
-    PopoverMenuHandle, TintColor, Tooltip, prelude::*, utils::platform_title_bar_height,
+    Avatar, ButtonLike, ContextMenu, IconWithIndicator, Indicator, PopoverMenu, PopoverMenuHandle,
+    TintColor, Tooltip, prelude::*, utils::platform_title_bar_height,
 };
 use update_version::UpdateVersion;
 use util::ResultExt;
@@ -78,6 +85,7 @@ actions!(
     ]
 );
 
+#[cfg(feature = "agentic")]
 actions!(
     workspace,
     [
@@ -91,10 +99,12 @@ actions!(
 pub fn init(cx: &mut App) {
     platform_title_bar::PlatformTitleBar::init(cx);
 
-    update_layout_action_filter(cx);
-
-    cx.observe_global::<SettingsStore>(update_layout_action_filter)
-        .detach();
+    #[cfg(feature = "agentic")]
+    {
+        update_layout_action_filter(cx);
+        cx.observe_global::<SettingsStore>(update_layout_action_filter)
+            .detach();
+    }
 
     cx.observe_new(|workspace: &mut Workspace, window, cx| {
         let Some(window) = window else {
@@ -104,13 +114,16 @@ pub fn init(cx: &mut App) {
         let item = cx.new(|cx| TitleBar::new("title-bar", workspace, multi_workspace, window, cx));
         workspace.set_titlebar_item(item.into(), window, cx);
 
-        workspace.register_action(|_workspace, _: &UseClassicLayout, _window, cx| {
-            set_window_layout(WindowLayout::Editor(None), cx);
-        });
+        #[cfg(feature = "agentic")]
+        {
+            workspace.register_action(|_workspace, _: &UseClassicLayout, _window, cx| {
+                set_window_layout(WindowLayout::Editor(None), cx);
+            });
 
-        workspace.register_action(|_workspace, _: &UseAgenticLayout, _window, cx| {
-            set_window_layout(WindowLayout::Agent(None), cx);
-        });
+            workspace.register_action(|_workspace, _: &UseAgenticLayout, _window, cx| {
+                set_window_layout(WindowLayout::Agent(None), cx);
+            });
+        }
 
         workspace.register_action(|workspace, _: &SimulateUpdateAvailable, _window, cx| {
             if let Some(titlebar) = workspace
@@ -174,6 +187,7 @@ pub fn init(cx: &mut App) {
 
 /// Hides or shows the panel layout actions in the command palette based on
 /// whether AI is currently disabled.
+#[cfg(feature = "agentic")]
 fn update_layout_action_filter(cx: &mut App) {
     let disable_ai = project::DisableAiSettings::get_global(cx).disable_ai;
     let layout_actions = [
@@ -189,6 +203,7 @@ fn update_layout_action_filter(cx: &mut App) {
     });
 }
 
+#[cfg(feature = "agentic")]
 fn set_window_layout(layout: WindowLayout, cx: &App) {
     let fs = <dyn fs::Fs>::global(cx);
     drop(AgentSettings::set_layout(layout, fs, cx));
@@ -1268,151 +1283,178 @@ impl TitleBar {
                 let user_store = user_store.clone();
                 let workspace = workspace.clone();
 
-                let ai_enabled = !project::DisableAiSettings::get_global(cx).disable_ai;
-                let current_layout = AgentSettings::get_layout(cx);
-                let is_editor = matches!(current_layout, WindowLayout::Editor(_));
-                let is_agent = matches!(current_layout, WindowLayout::Agent(_));
-                let is_custom = matches!(current_layout, WindowLayout::Custom(_));
+                #[cfg(feature = "agentic")]
+                let panel_layout = {
+                    let current_layout = AgentSettings::get_layout(cx);
+                    (
+                        !project::DisableAiSettings::get_global(cx).disable_ai,
+                        matches!(current_layout, WindowLayout::Editor(_)),
+                        matches!(current_layout, WindowLayout::Agent(_)),
+                        matches!(current_layout, WindowLayout::Custom(_)),
+                    )
+                };
 
                 ContextMenu::build(window, cx, |menu, _, _cx| {
-                    menu.when(is_signed_in, |this| {
-                        let username = username.clone();
-                        this.custom_entry(
-                            move |_window, _cx| {
-                                let username = username.clone().unwrap_or_default();
+                    let this = menu
+                        .when(is_signed_in, |this| {
+                            let username = username.clone();
+                            this.custom_entry(
+                                move |_window, _cx| {
+                                    let username = username.clone().unwrap_or_default();
 
-                                h_flex()
-                                    .w_full()
-                                    .justify_between()
-                                    .child(Label::new(username))
-                                    .into_any_element()
-                            },
-                            move |_, cx| {
-                                cx.open_url(&zed_urls::account_url(cx));
-                            },
-                        )
-                        .separator()
-                    })
-                    .when(show_update_button, |this| {
-                        this.custom_entry(
-                            move |_window, _cx| {
-                                h_flex()
-                                    .w_full()
-                                    .gap_1()
-                                    .justify_between()
-                                    .child(Label::new("Restart to update Zed").color(Color::Accent))
-                                    .child(
-                                        Icon::new(IconName::Download)
-                                            .size(IconSize::Small)
-                                            .color(Color::Accent),
-                                    )
-                                    .into_any_element()
-                            },
-                            move |_, cx| {
-                                workspace::reload(cx);
-                            },
-                        )
-                        .separator()
-                    })
-                    .map(|this| {
-                        let mut this = this.header("Organization");
+                                    h_flex()
+                                        .w_full()
+                                        .justify_between()
+                                        .child(Label::new(username))
+                                        .into_any_element()
+                                },
+                                move |_, cx| {
+                                    cx.open_url(&zed_urls::account_url(cx));
+                                },
+                            )
+                            .separator()
+                        })
+                        .when(show_update_button, |this| {
+                            this.custom_entry(
+                                move |_window, _cx| {
+                                    h_flex()
+                                        .w_full()
+                                        .gap_1()
+                                        .justify_between()
+                                        .child(
+                                            Label::new("Restart to update Zed")
+                                                .color(Color::Accent),
+                                        )
+                                        .child(
+                                            Icon::new(IconName::Download)
+                                                .size(IconSize::Small)
+                                                .color(Color::Accent),
+                                        )
+                                        .into_any_element()
+                                },
+                                move |_, cx| {
+                                    workspace::reload(cx);
+                                },
+                            )
+                            .separator()
+                        })
+                        .map(|this| {
+                            let mut this = this.header("Organization");
 
-                        for (organization, plan) in &organizations {
-                            let organization = organization.clone();
-                            let plan = *plan;
+                            for (organization, plan) in &organizations {
+                                let organization = organization.clone();
+                                let plan = *plan;
 
-                            let is_current =
-                                current_organization
-                                    .as_ref()
-                                    .is_some_and(|current_organization| {
+                                let is_current = current_organization.as_ref().is_some_and(
+                                    |current_organization| {
                                         current_organization.id == organization.id
-                                    });
-
-                            this = this.custom_entry(
-                                {
-                                    let organization = organization.clone();
-                                    move |_window, _cx| {
-                                        h_flex()
-                                            .w_full()
-                                            .gap_4()
-                                            .justify_between()
-                                            .child(
-                                                h_flex()
-                                                    .gap_1()
-                                                    .child(Label::new(&organization.name))
-                                                    .when(is_current, |this| {
-                                                        this.child(
-                                                            Icon::new(IconName::Check)
-                                                                .color(Color::Accent),
-                                                        )
-                                                    }),
-                                            )
-                                            .children(plan.map(|plan| PlanChip::new(plan)))
-                                            .into_any_element()
-                                    }
-                                },
-                                {
-                                    let user_store = user_store.clone();
-                                    let organization = organization.clone();
-                                    let workspace = workspace.clone();
-                                    move |window, cx| {
-                                        let task = user_store.update(cx, |user_store, cx| {
-                                            user_store
-                                                .set_current_organization(organization.clone(), cx)
-                                        });
-                                        task.detach_and_notify_err(workspace.clone(), window, cx);
-                                    }
-                                },
-                            );
-                        }
-
-                        this.separator()
-                    })
-                    .action("Settings", zed_actions::OpenSettings.boxed_clone())
-                    .action("Keymap", Box::new(zed_actions::OpenKeymap))
-                    .action(
-                        "Themes…",
-                        zed_actions::theme_selector::Toggle::default().boxed_clone(),
-                    )
-                    .action(
-                        "Icon Themes…",
-                        zed_actions::icon_theme_selector::Toggle::default().boxed_clone(),
-                    )
-                    .action(
-                        "Extensions",
-                        zed_actions::Extensions::default().boxed_clone(),
-                    )
-                    .when(ai_enabled, |menu| {
-                        menu.separator()
-                            .submenu("Panel Layout", move |menu, _window, _cx| {
-                                menu.toggleable_entry(
-                                    "Classic",
-                                    is_editor,
-                                    IconPosition::Start,
-                                    Some(UseClassicLayout.boxed_clone()),
-                                    move |window, cx| {
-                                        window.dispatch_action(UseClassicLayout.boxed_clone(), cx);
                                     },
-                                )
-                                .toggleable_entry(
-                                    "Agentic",
-                                    is_agent,
-                                    IconPosition::Start,
-                                    Some(UseAgenticLayout.boxed_clone()),
-                                    move |window, cx| {
-                                        window.dispatch_action(UseAgenticLayout.boxed_clone(), cx);
+                                );
+
+                                this = this.custom_entry(
+                                    {
+                                        let organization = organization.clone();
+                                        move |_window, _cx| {
+                                            h_flex()
+                                                .w_full()
+                                                .gap_4()
+                                                .justify_between()
+                                                .child(
+                                                    h_flex()
+                                                        .gap_1()
+                                                        .child(Label::new(&organization.name))
+                                                        .when(is_current, |this| {
+                                                            this.child(
+                                                                Icon::new(IconName::Check)
+                                                                    .color(Color::Accent),
+                                                            )
+                                                        }),
+                                                )
+                                                .children(plan.map(|plan| PlanChip::new(plan)))
+                                                .into_any_element()
+                                        }
                                     },
-                                )
-                                .when(is_custom, |menu| {
-                                    menu.item(
-                                        ContextMenuEntry::new("Custom")
-                                            .toggleable(IconPosition::Start, true)
-                                            .disabled(true),
+                                    {
+                                        let user_store = user_store.clone();
+                                        let organization = organization.clone();
+                                        let workspace = workspace.clone();
+                                        move |window, cx| {
+                                            let task = user_store.update(cx, |user_store, cx| {
+                                                user_store.set_current_organization(
+                                                    organization.clone(),
+                                                    cx,
+                                                )
+                                            });
+                                            task.detach_and_notify_err(
+                                                workspace.clone(),
+                                                window,
+                                                cx,
+                                            );
+                                        }
+                                    },
+                                );
+                            }
+
+                            this.separator()
+                        })
+                        .action("Settings", zed_actions::OpenSettings.boxed_clone())
+                        .action("Keymap", Box::new(zed_actions::OpenKeymap))
+                        .action(
+                            "Themes…",
+                            zed_actions::theme_selector::Toggle::default().boxed_clone(),
+                        )
+                        .action(
+                            "Icon Themes…",
+                            zed_actions::icon_theme_selector::Toggle::default().boxed_clone(),
+                        )
+                        .action(
+                            "Extensions",
+                            zed_actions::Extensions::default().boxed_clone(),
+                        );
+                    #[cfg(feature = "agentic")]
+                    let this = this.when_some(
+                        Some(panel_layout),
+                        |menu, (ai_enabled, is_editor, is_agent, is_custom)| {
+                            if !ai_enabled {
+                                return menu;
+                            }
+                            menu.separator()
+                                .submenu("Panel Layout", move |menu, _window, _cx| {
+                                    menu.toggleable_entry(
+                                        "Classic",
+                                        is_editor,
+                                        IconPosition::Start,
+                                        Some(UseClassicLayout.boxed_clone()),
+                                        move |window, cx| {
+                                            window.dispatch_action(
+                                                UseClassicLayout.boxed_clone(),
+                                                cx,
+                                            );
+                                        },
                                     )
+                                    .toggleable_entry(
+                                        "Agentic",
+                                        is_agent,
+                                        IconPosition::Start,
+                                        Some(UseAgenticLayout.boxed_clone()),
+                                        move |window, cx| {
+                                            window.dispatch_action(
+                                                UseAgenticLayout.boxed_clone(),
+                                                cx,
+                                            );
+                                        },
+                                    )
+                                    .when(is_custom, |menu| {
+                                        menu.item(
+                                            ContextMenuEntry::new("Custom")
+                                                .toggleable(IconPosition::Start, true)
+                                                .disabled(true),
+                                        )
+                                    })
                                 })
-                            })
-                    })
-                    .when(is_signed_in, |this| {
+                        },
+                    );
+                    this.when(is_signed_in, |this| {
                         this.separator()
                             .action("Sign Out", client::SignOut.boxed_clone())
                     })

@@ -8,10 +8,12 @@ use crate::{
 };
 use gpui::prelude::FluentBuilder;
 use gpui::{Context, DismissEvent, Entity, Focusable as _, Pixels, Point, Subscription, Window};
+#[cfg(feature = "agentic")]
 use project::DisableAiSettings;
 use std::ops::Range;
 use text::PointUtf16;
 use workspace::OpenInTerminal;
+#[cfg(feature = "agentic")]
 use zed_actions::agent::AddSelectionToThread;
 use zed_actions::preview::{
     markdown::OpenPreview as OpenMarkdownPreview, svg::OpenPreview as OpenSvgPreview,
@@ -220,6 +222,7 @@ pub fn deploy_context_menu(
         let evaluate_selection = window.is_action_available(&EvaluateSelectedText, cx);
         let run_to_cursor = window.is_action_available(&RunToCursor, cx);
         let format_selections = window.is_action_available(&FormatSelections, cx);
+        #[cfg(feature = "agentic")]
         let disable_ai = DisableAiSettings::is_ai_disabled_for_buffer(
             editor.buffer.read(cx).as_singleton().as_ref(),
             cx,
@@ -279,10 +282,12 @@ pub fn deploy_context_menu(
                         deployed_from: None,
                         quick_launch: false,
                     }),
-                )
-                .when(!disable_ai && has_selections, |this| {
-                    this.action("Add to Agent Thread", Box::new(AddSelectionToThread))
-                })
+                );
+            #[cfg(feature = "agentic")]
+            let builder = builder.when(!disable_ai && has_selections, |this| {
+                this.action("Add to Agent Thread", Box::new(AddSelectionToThread))
+            });
+            let builder = builder
                 .separator()
                 .action("Cut", Box::new(Cut))
                 .action("Copy", Box::new(Copy))

@@ -67,12 +67,17 @@ mod workspace_presentation_actions;
 mod workspace_settings;
 
 pub use dock::Panel;
+#[cfg(feature = "agentic")]
+pub use multi_workspace::sidebar_side_context_menu;
+#[cfg(feature = "agentic")]
 pub use multi_workspace::{
-    CloseWorkspaceSidebar, DraggedSidebar, FocusWorkspaceSidebar, MoveProjectToNewWindow,
-    MultiWorkspace, MultiWorkspaceEvent, NewThread, NextProject, NextThread, PreviousProject,
-    PreviousThread, ProjectGroup, ProjectGroupKey, RemovalIntent, SerializedProjectGroupState,
-    Sidebar, SidebarEvent, SidebarHandle, SidebarRenderState, SidebarSide, ToggleWorkspaceSidebar,
-    sidebar_side_context_menu,
+    CloseWorkspaceSidebar, FocusWorkspaceSidebar, NewThread, NextProject, NextThread,
+    PreviousProject, PreviousThread, ToggleWorkspaceSidebar,
+};
+pub use multi_workspace::{
+    DraggedSidebar, MoveProjectToNewWindow, MultiWorkspace, MultiWorkspaceEvent, ProjectGroup,
+    ProjectGroupKey, RemovalIntent, SerializedProjectGroupState, Sidebar, SidebarEvent,
+    SidebarHandle, SidebarRenderState, SidebarSide,
 };
 pub use multiplayer_capability::{
     MULTIPLAYER_TOOLS_CAPABILITY, MultiplayerCapabilityAdvertisement, MultiplayerCapabilityError,

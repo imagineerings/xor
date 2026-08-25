@@ -1,5 +1,7 @@
 # Implementation Plan: Recipe System
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Overview
 
 Add recipe behavior at the narrowest existing agent/session integration point, separating it into a crate only if implementation review shows multiple existing consumers need a stable library boundary. Reuse Zed's prompt, credentials, settings, git/HTTP, deeplink, session, permission, and executor services.

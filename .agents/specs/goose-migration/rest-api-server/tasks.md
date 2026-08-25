@@ -1,5 +1,7 @@
 # Implementation Plan: ACP Server Transport
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Approach
 
 These tasks are conditional on approval of a standalone ACP server. They add adapters around existing Zed owners; they do not create the previously proposed REST/OpenAPI server.

@@ -1,5 +1,7 @@
 # Implementation Plan: Desktop UI (GPUI Equivalents)
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Overview
 
 Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared sessions, and ACP connection status within zed's existing desktop UI architecture. No Electron/React code is ported — all UI is native GPUI.
