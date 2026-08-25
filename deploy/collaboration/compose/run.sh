@@ -53,6 +53,8 @@ smoke() {
   trap cleanup_smoke EXIT
   docker compose -p "${smoke_project}" --env-file .env.smoke "${smoke_files[@]}" up --detach --wait
   docker compose -p "${smoke_project}" --env-file .env.smoke "${smoke_files[@]}" --profile validation run --rm --no-deps collaboration-readiness
+  cleanup_smoke
+  trap - EXIT
 }
 
 case "${1:-help}" in

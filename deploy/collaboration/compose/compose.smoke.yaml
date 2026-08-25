@@ -19,7 +19,8 @@ services:
   postgres:
     image: busybox:1.37.0-musl
     entrypoint: ["sh", "-euc"]
-    command: ["exec httpd -f -p 5432"]
+    command:
+      - mkdir -p /www; printf 'ok\n' >/www/index.html; exec httpd -f -p 5432 -h /www
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5432"]
       interval: 1s
@@ -30,7 +31,8 @@ services:
   redis:
     image: busybox:1.37.0-musl
     entrypoint: ["sh", "-euc"]
-    command: ["exec httpd -f -p 6379"]
+    command:
+      - mkdir -p /www; printf 'ok\n' >/www/index.html; exec httpd -f -p 6379 -h /www
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:6379"]
       interval: 1s
@@ -42,7 +44,8 @@ services:
     image: busybox:1.37.0-musl
     ports: !reset []
     entrypoint: ["sh", "-euc"]
-    command: ["exec httpd -f -p 9000"]
+    command:
+      - mkdir -p /www; printf 'ok\n' >/www/index.html; exec httpd -f -p 9000 -h /www
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000"]
       interval: 1s
