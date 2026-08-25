@@ -5,6 +5,7 @@ pub mod auth;
 pub mod collaboration_command;
 pub mod compatibility;
 pub mod db;
+pub mod deletion;
 pub mod entities;
 pub mod env;
 pub mod executor;
