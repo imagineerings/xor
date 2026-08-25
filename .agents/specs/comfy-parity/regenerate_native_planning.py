@@ -9676,6 +9676,7 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
             "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
             "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/tensor_creation_01.rs",
         ],
         [
             "crates/comfy_model/src/depth_anything_3.rs",

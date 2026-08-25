@@ -292,6 +292,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_tensor/src/ops/random_number_generation_01.rs",
             "crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs",
             "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/tensor_creation_01.rs",
         ):
             self.assertIn(path, depth_anything_task["reads"])
         self.assertIn(
