@@ -1341,8 +1341,18 @@ class ValidationGenerationTests(unittest.TestCase):
                 "crates/comfy_ui/src/execution_model.rs",
                 "crates/zed/src/comfy_plugin_services.rs",
                 "crates/zed/src/zed.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ],
         )
+        for ownership_path in (
+            ".agents/specs/comfy-parity/generate_ownership_catalog.py",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(ownership_path, provider_bridge_bootstrap["reads"])
         for read_only_bootstrap_path in (
             "crates/comfy_ui/src/comfy_ui.rs",
             "crates/zed/src/comfy_cli.rs",
@@ -1355,9 +1365,16 @@ class ValidationGenerationTests(unittest.TestCase):
             "replacement is accepted only after the prior controller has shut down or dropped",
             "exposes no service, grant, context, source, or constructor getter",
             "before any provider-v2 admission, envelope, instantiation, input, or request",
+            "exactly one production ProviderRuntimeStreamService::new() site",
+            "replaces the controller's public service and activation-grant getters",
+            "weak lifecycle consumer with no second table or authority",
             "headless CLI remains conformance_in_process with no attachment and no provider-v2 admission",
         ):
             self.assertIn(bootstrap_gate, provider_bridge_bootstrap["done"])
+        self.assertIn(
+            "val_ownership_task412_provider_runtime_stream_progress_001",
+            planning.task_validation_commands(provider_bridge_bootstrap),
+        )
         provider_worker_bridge = tasks_by_id[
             "comfy-parity-provider-worker-stream-bridge"
         ]
