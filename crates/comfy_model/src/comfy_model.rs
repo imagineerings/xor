@@ -18,6 +18,7 @@ pub mod controlnet;
 pub mod cosmos_family;
 pub mod depth_anything_3;
 pub mod descriptor;
+mod dino2;
 pub mod flux_chroma_family;
 pub mod formats;
 pub mod frame_interpolation;

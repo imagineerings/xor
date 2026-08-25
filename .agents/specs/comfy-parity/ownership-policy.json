@@ -6961,6 +6961,106 @@
       "decision_reason": "The focused diffusion kernels map canonical Tensor storage and CpuBackend allocation into model-slice equations. Shared linear and convolution mechanics delegate to the canonical operator-indirection tensor owner, while layer norm, group norm, and SiLU delegate to the canonical functional activation/normalization owner; diffusion retains only Tensor-specific shape projection, upload/download, and model-equation composition. It introduces no duplicate kernel, storage, allocation, cancellation, memory-planning, cache, persistence, or transaction service."
     },
     {
+      "concern": "native_dinov2_backbone_execution",
+      "canonical_owner": "comfy_model::dino2::NativeDino2Backbone",
+      "owner_files": [
+        "crates/comfy_model/src/dino2.rs"
+      ],
+      "owner_symbols": [
+        "NativeDino2Backbone"
+      ],
+      "allowed_adapters": [
+        "comfy_model::NativeDepthAnything3Resource retains DA3 resource identity, complete state residency, invocation, geometry, payload, persistence, and restart authority while delegating every DINO state projection and execution phase to NativeDino2Backbone",
+        "future comfy_model::moge may consume NativeDino2Backbone but is not a Task391 production callsite and owns no DINO transformer, position, attention, or intermediate-feature equation",
+        "the pure-standard-library DINO fixture is an independent development-reference oracle and confers no production state, tensor, storage, mutation, callsite, or consumer authority"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/dino2.rs",
+          "qualified": "comfy_model::dino2::NativeDino2Backbone",
+          "role": "canonical",
+          "symbol": "NativeDino2Backbone"
+        },
+        {
+          "path": "crates/comfy_model/src/depth_anything_3.rs",
+          "qualified": "comfy_model::NativeDepthAnything3Resource",
+          "role": "adapter",
+          "symbol": "NativeDepthAnything3Resource"
+        }
+      ],
+      "call_symbols": [
+        "NativeDino2Backbone",
+        "NativeDepthAnything3Resource"
+      ],
+      "required_mappings": [
+        {
+          "name": "dinov2-module-remains-crate-private",
+          "path": "crates/comfy_model/src/comfy_model.rs",
+          "pattern": "mod dino2;"
+        },
+        {
+          "name": "da3-projects-dino-state-through-owner",
+          "path": "crates/comfy_model/src/depth_anything_3.rs",
+          "pattern": "backbone\\.project_state_tensor"
+        },
+        {
+          "name": "da3-executes-through-owner",
+          "path": "crates/comfy_model/src/depth_anything_3.rs",
+          "pattern": "get_intermediate_layers_da3"
+        },
+        {
+          "name": "owner-implements-ordinary-and-da3-routes",
+          "path": "crates/comfy_model/src/dino2.rs",
+          "pattern": "pub\\(crate\\) fn get_intermediate_layers_da3\\([\\s\\S]*pub\\(crate\\) fn get_intermediate_layers\\("
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-dinov2-backbone-owner-foundation"
+      ],
+      "production_consumers": [
+        "comfy_model::NativeDepthAnything3Resource"
+      ],
+      "requirements": [
+        "Requirement 6.3",
+        "Requirement 7.2",
+        "Requirement 18.1",
+        "Requirement 26.2",
+        "Requirement 28.2",
+        "Requirement 31.5",
+        "Requirement 34.2",
+        "Requirement 34.6",
+        "Requirement 35.2",
+        "Requirement 37.5",
+        "Requirement 38.3",
+        "Requirement 41.2",
+        "Requirement 44.1",
+        "Requirement 44.3"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeDino2Backbone is the only native owner of DINOv2 state schema, checked storage projection, position interpolation, transformer execution, and intermediate extraction. DA3 is a resource adapter; MoGe remains a future non-authoritative consumer until its later task."
+    },
+    {
       "concern": "native_execution_cache",
       "canonical_owner": "comfy_runtime::NativeCache",
       "owner_files": [

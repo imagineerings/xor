@@ -5,7 +5,6 @@ use comfy_tensor::{
     generated_activation_normalization_functional_01::{
         FunctionalError, GeluApproximation, gelu_with_context_exact_native,
         layer_norm_with_context_exact_native, relu_with_context_exact_native,
-        silu_tensor_with_context_exact_native,
     },
     generated_comfy_operator_indirection_01::{
         OperatorIndirectionError, cast_to_with_context_exact_native,
@@ -73,9 +72,11 @@ use crate::{
     ModelProbe,
     attention::{
         AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionRequest,
-        RotaryFrequencyLayout, RotaryPairLayout, RotaryPositionSequence, RotaryPositions,
-        RotaryScaling, RotaryTableRequest, apply_rotary_table, precompute_rotary_table,
         scaled_dot_product_attention_with_context,
+    },
+    dino2::{
+        NativeDino2Backbone, NativeDino2Configuration, NativeDino2Error,
+        NativeDino2ReferenceStrategy,
     },
     generated_depthanything3_comfy_model_0075::{
         DepthAnything3Backbone, DepthAnything3Configuration, DepthAnything3Head,
@@ -471,7 +472,17 @@ pub fn select_reduced_depth_anything_3_reference_for_fixture(
     if views == 0 || !class_tokens.len().is_multiple_of(views) {
         return Err(NativeDepthAnything3Error::ShapeOverflow);
     }
-    select_reference_indices(
+    let strategy = match strategy {
+        NativeDepthAnything3ReferenceStrategy::First => NativeDino2ReferenceStrategy::First,
+        NativeDepthAnything3ReferenceStrategy::Middle => NativeDino2ReferenceStrategy::Middle,
+        NativeDepthAnything3ReferenceStrategy::SaddleBalanced => {
+            NativeDino2ReferenceStrategy::SaddleBalanced
+        }
+        NativeDepthAnything3ReferenceStrategy::SaddleSimRange => {
+            NativeDino2ReferenceStrategy::SaddleSimRange
+        }
+    };
+    crate::dino2::select_reference_indices(
         class_tokens,
         1,
         views,
@@ -483,6 +494,98 @@ pub fn select_reduced_depth_anything_3_reference_for_fixture(
     .into_iter()
     .next()
     .ok_or(NativeDepthAnything3Error::ShapeOverflow)
+}
+
+#[cfg(any(test, feature = "test-support"))]
+pub(crate) fn execute_reduced_dino2_ordinary_for_fixture(
+    backend: &CpuBackend,
+    image: &ImageTensor,
+    source_dtype: DType,
+    mutation: Option<DepthAnything3FixtureMutation<'_>>,
+    memory_budget_bytes: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<
+    (
+        Vec<crate::dino2::NativeDino2Feature>,
+        crate::dino2::NativeDino2Feature,
+    ),
+    NativeDepthAnything3Error,
+> {
+    const MASK_TOKEN_KEY: &str = "native.backbone.embeddings.mask_token";
+    let mut checkpoint = deterministic_reduced_depth_anything_3_checkpoint(
+        backend,
+        DepthAnything3FixtureProfile::Dpt,
+        source_dtype,
+        memory_budget_bytes,
+        context,
+    )?;
+    if let Some(mutation) = mutation
+        .as_ref()
+        .filter(|mutation| mutation.state_key != MASK_TOKEN_KEY)
+    {
+        mutate_reduced_depth_anything_3_checkpoint(
+            backend,
+            &mut checkpoint,
+            mutation.clone(),
+            context,
+        )?;
+    }
+    let resource =
+        NativeDepthAnything3Resource::from_reduced_fixture(backend, checkpoint, context)?;
+    let image = preprocess_image(backend, image, 4, 4, context)?;
+    let mut configuration = resource.configuration;
+    configuration.qknorm_start = None;
+    configuration.alternate_attention_start = None;
+    configuration.rope_start = None;
+    configuration.concatenate_camera_token = false;
+    configuration.head_dimension = configuration.hidden_size;
+    let backbone = native_dino2_backbone_with_mask_token(configuration, true)?;
+    let mut execution_state = BTreeMap::new();
+    let mut resident_bytes = resource.resident_bytes;
+    for specification in backbone.state_manifest()? {
+        let is_mask_token = specification.key == MASK_TOKEN_KEY;
+        let tensor = if is_mask_token {
+            let mut values = [-0.035_f32, -0.0025, 0.03, -0.01];
+            if let Some(mutation) = mutation
+                .as_ref()
+                .filter(|mutation| mutation.state_key == MASK_TOKEN_KEY)
+            {
+                let value = values
+                    .get_mut(mutation.lane)
+                    .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
+                *value += mutation.delta;
+            }
+            let source = tensor_from_f32_with_context_exact_native(
+                backend,
+                &specification.shape,
+                &values,
+                source_dtype,
+                DeviceId::CPU,
+                context,
+            )?;
+            backbone.project_state_tensor(backend, &specification.key, &source, context)?
+        } else {
+            resource
+                .execution_state
+                .get(&specification.key)
+                .ok_or_else(|| NativeDepthAnything3Error::MissingState(specification.key.clone()))?
+                .clone()
+        };
+        if is_mask_token {
+            resident_bytes = resident_bytes
+                .checked_add(tensor.storage_byte_len())
+                .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
+        }
+        execution_state.insert(specification.key, tensor);
+    }
+    let execution = backbone.bind(
+        &execution_state,
+        resource.memory_budget_bytes,
+        resident_bytes,
+    );
+    let intermediates = execution.get_intermediate_layers(backend, &image, 1, context)?;
+    let forward = execution.forward(backend, &image, 1, context)?;
+    Ok((intermediates, forward))
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -682,20 +785,25 @@ impl NativeDepthAnything3Resource {
             });
         }
 
+        let backbone = native_dino2_backbone(configuration)?;
         let mut execution_state = BTreeMap::new();
         for (index, (key, tensor)) in source_state.iter().enumerate() {
             if index.is_multiple_of(16) {
                 context.check()?;
             }
-            let projected = cast_to_with_context_exact_native(
-                backend,
-                tensor,
-                DType::F32,
-                DeviceId::CPU,
-                false,
-                true,
-                context,
-            )?;
+            let projected = if backbone.owns_state_key(key) {
+                backbone.project_state_tensor(backend, key, tensor, context)?
+            } else {
+                cast_to_with_context_exact_native(
+                    backend,
+                    tensor,
+                    DType::F32,
+                    DeviceId::CPU,
+                    false,
+                    true,
+                    context,
+                )?
+            };
             execution_state.insert(key.clone(), projected);
         }
         validate_f32_execution_state(
@@ -1357,14 +1465,6 @@ pub enum NativeDepthAnything3Error {
 }
 
 #[derive(Clone, Debug)]
-struct BackboneFeature {
-    patch_values: Vec<f32>,
-    camera_values: Vec<f32>,
-    patches: usize,
-    channels: usize,
-}
-
-#[derive(Clone, Debug)]
 struct DepthHeadOutput {
     depth: Tensor,
     confidence: Option<Tensor>,
@@ -1445,6 +1545,43 @@ struct DepthAnything3RansacViewTrace {
 impl From<comfy_types::CancellationError> for NativeDepthAnything3Error {
     fn from(_: comfy_types::CancellationError) -> Self {
         Self::Cancelled
+    }
+}
+
+impl From<crate::dino2::NativeDino2Error> for NativeDepthAnything3Error {
+    fn from(error: crate::dino2::NativeDino2Error) -> Self {
+        match error {
+            NativeDino2Error::Cancelled => Self::Cancelled,
+            NativeDino2Error::UnsupportedArchitecture => Self::UnsupportedArchitecture,
+            NativeDino2Error::InvalidImage(message) => Self::InvalidImage(message),
+            NativeDino2Error::MissingState(key) => Self::MissingState(key),
+            NativeDino2Error::UnexpectedState(key) => Self::UnexpectedState(key),
+            NativeDino2Error::StateShape {
+                key,
+                expected,
+                actual,
+                actual_dtype,
+            } => Self::StateShape {
+                key,
+                expected,
+                actual,
+                actual_dtype,
+            },
+            NativeDino2Error::ShapeOverflow => Self::ShapeOverflow,
+            NativeDino2Error::Allocation => Self::Allocation,
+            NativeDino2Error::OutOfMemory { required, budget } => {
+                Self::OutOfMemory { required, budget }
+            }
+            NativeDino2Error::SemanticStateChanged => Self::SemanticStateChanged,
+            NativeDino2Error::Tensor(error) => Self::Tensor(error),
+            NativeDino2Error::Operator(error) => Self::Operator(error),
+            NativeDino2Error::Functional(error) => Self::Functional(error),
+            NativeDino2Error::ElementwiseSixteen(error) => Self::ElementwiseSixteen(error),
+            NativeDino2Error::NeuralFunctional(error) => Self::NeuralFunctional(error),
+            NativeDino2Error::ShapeLayoutThree(error) => Self::ShapeLayoutThree(error),
+            NativeDino2Error::Spatial(error) => Self::Spatial(error),
+            NativeDino2Error::Attention(error) => Self::Attention(error),
+        }
     }
 }
 
@@ -1782,236 +1919,33 @@ fn execute_backbone(
     reference_strategy: NativeDepthAnything3ReferenceStrategy,
     camera_token: Option<&[f32]>,
     context: &ExecutionContext<'_>,
-) -> Result<Vec<BackboneFeature>, NativeDepthAnything3Error> {
-    context.check()?;
-    let image_shape = shape_usize(image)?;
-    if image_shape.len() != 4 || image_shape[0] != batch * views || image_shape[1] != 3 {
-        return Err(NativeDepthAnything3Error::InvalidImage(
-            "preprocessed image geometry changed".to_owned(),
-        ));
-    }
-    let patch = usize_from(resource.configuration.patch_size)?;
-    let hidden = usize_from(resource.configuration.hidden_size)?;
-    let patch_tensor = convolution(
-        resource,
-        backend,
-        image,
-        "native.backbone.embeddings.patch_embeddings.projection",
-        patch,
-        0,
-        false,
-        context,
-    )?;
-    let patch_shape = shape_usize(&patch_tensor)?;
-    let patch_height = *patch_shape
-        .get(2)
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-    let patch_width = *patch_shape
-        .get(3)
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-    let patches = patch_height
-        .checked_mul(patch_width)
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-    let patch_values = tensor_to_f32_with_context_exact_native(
-        backend,
-        &tensor_permute_exact_native(&patch_tensor, &[0, 2, 3, 1], context.cancellation)?,
-        context,
-    )?;
-    let cls = tensor_values(
-        resource.execution_tensor("native.backbone.embeddings.cls_token")?,
-        context.cancellation,
-    )?;
-    let positions =
-        interpolated_position_embeddings(resource, backend, patch_height, patch_width, context)?;
-    let tokens = patches
-        .checked_add(1)
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-    let mut values = filled_f32(
-        batch
-            .checked_mul(views)
-            .and_then(|value| value.checked_mul(tokens))
-            .and_then(|value| value.checked_mul(hidden))
-            .ok_or(NativeDepthAnything3Error::ShapeOverflow)?,
-        0.0,
-    )?;
-    for flat_view in 0..batch * views {
-        context.check()?;
-        for channel in 0..hidden {
-            values[(flat_view * tokens) * hidden + channel] = cls[channel] + positions[channel];
+) -> Result<Vec<crate::dino2::NativeDino2Feature>, NativeDepthAnything3Error> {
+    let backbone = native_dino2_backbone(resource.configuration)?;
+    let reference_strategy = match reference_strategy {
+        NativeDepthAnything3ReferenceStrategy::First => NativeDino2ReferenceStrategy::First,
+        NativeDepthAnything3ReferenceStrategy::Middle => NativeDino2ReferenceStrategy::Middle,
+        NativeDepthAnything3ReferenceStrategy::SaddleBalanced => {
+            NativeDino2ReferenceStrategy::SaddleBalanced
         }
-        for patch_index in 0..patches {
-            for channel in 0..hidden {
-                let destination = ((flat_view * tokens + patch_index + 1) * hidden) + channel;
-                values[destination] = patch_values
-                    [(flat_view * patches + patch_index) * hidden + channel]
-                    + positions[(patch_index + 1) * hidden + channel];
-            }
+        NativeDepthAnything3ReferenceStrategy::SaddleSimRange => {
+            NativeDino2ReferenceStrategy::SaddleSimRange
         }
-    }
-
-    let mut local_values = values.clone();
-    let mut reference_indices = None;
-    let mut outputs = Vec::new();
-    outputs
-        .try_reserve_exact(resource.configuration.output_layers.len())
-        .map_err(|_| NativeDepthAnything3Error::Allocation)?;
-    for layer in 0..resource.configuration.layer_count {
-        context.check()?;
-        if resource
-            .configuration
-            .alternate_attention_start
-            .is_some_and(|start| layer + 1 == start)
-            && views >= 3
-            && camera_token.is_none()
-        {
-            let indices = select_reference_indices(
-                &values,
-                batch,
-                views,
-                tokens,
-                hidden,
-                reference_strategy,
-                context.cancellation,
-            )?;
-            reorder_views_in_place(
-                &mut values,
-                batch,
-                views,
-                tokens,
-                hidden,
-                &indices,
-                false,
-                context.cancellation,
-            )?;
-            reorder_views_in_place(
-                &mut local_values,
-                batch,
-                views,
-                tokens,
-                hidden,
-                &indices,
-                false,
-                context.cancellation,
-            )?;
-            reference_indices = Some(indices);
-        }
-        if resource
-            .configuration
-            .alternate_attention_start
-            .is_some_and(|start| layer == start)
-        {
-            inject_learned_camera_tokens(
-                resource,
-                &mut values,
-                batch,
-                views,
-                tokens,
-                hidden,
-                camera_token,
-                context.cancellation,
-            )?;
-        }
-        let global = resource
-            .configuration
-            .alternate_attention_start
-            .is_some_and(|start| layer >= start && layer % 2 == 1);
-        if global {
-            values = transformer_block(
-                resource,
-                backend,
-                &values,
-                batch,
-                views * tokens,
-                hidden,
-                layer,
-                patch_height,
-                patch_width,
-                views,
-                true,
-                context,
-            )?;
-        } else {
-            values = transformer_block(
-                resource,
-                backend,
-                &values,
-                batch * views,
-                tokens,
-                hidden,
-                layer,
-                patch_height,
-                patch_width,
-                1,
-                false,
-                context,
-            )?;
-            local_values.clone_from(&values);
-        }
-        if resource.configuration.output_layers.contains(&layer) {
-            let mut output_values = if resource.configuration.concatenate_camera_token {
-                concatenate_last_dimension(
-                    &local_values,
-                    &values,
-                    batch * views * tokens,
-                    hidden,
-                    context.cancellation,
-                )?
-            } else {
-                values.clone()
-            };
-            let channels = if resource.configuration.concatenate_camera_token {
-                hidden * 2
-            } else {
-                hidden
-            };
-            if let Some(indices) = reference_indices.as_ref() {
-                reorder_views_in_place(
-                    &mut output_values,
-                    batch,
-                    views,
-                    tokens,
-                    channels,
-                    indices,
-                    true,
-                    context.cancellation,
-                )?;
-            }
-            let camera_values = collect_token(
-                &output_values,
-                batch * views,
-                tokens,
-                channels,
-                0,
-                context.cancellation,
-            )?;
-            let normalized = final_backbone_norm(
-                resource,
-                backend,
-                &output_values,
-                batch * views,
-                tokens,
-                channels,
-                hidden,
-                context,
-            )?;
-            outputs.push(BackboneFeature {
-                patch_values: drop_first_token(
-                    &normalized,
-                    batch * views,
-                    tokens,
-                    channels,
-                    context.cancellation,
-                )?,
-                camera_values,
-                patches,
-                channels,
-            });
-        }
-    }
-    if outputs.len() != 4 {
-        return Err(NativeDepthAnything3Error::UnsupportedArchitecture);
-    }
-    Ok(outputs)
+    };
+    Ok(backbone
+        .bind_parent_preflighted(
+            &resource.execution_state,
+            resource.memory_budget_bytes,
+            resource.resident_bytes,
+        )
+        .get_intermediate_layers_da3(
+            backend,
+            image,
+            batch,
+            views,
+            reference_strategy,
+            camera_token,
+            context,
+        )?)
 }
 
 fn convolution(
@@ -2052,417 +1986,6 @@ fn convolution(
             context,
         )?
     })
-}
-
-fn interpolated_position_embeddings(
-    resource: &NativeDepthAnything3Resource,
-    backend: &CpuBackend,
-    patch_height: usize,
-    patch_width: usize,
-    context: &ExecutionContext<'_>,
-) -> Result<Vec<f32>, NativeDepthAnything3Error> {
-    let tensor = resource.execution_tensor("native.backbone.embeddings.position_embeddings")?;
-    let shape = shape_usize(tensor)?;
-    let hidden = usize_from(resource.configuration.hidden_size)?;
-    let source_patches = shape
-        .get(1)
-        .copied()
-        .and_then(|tokens| tokens.checked_sub(1))
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-    let source_side = integer_square_root(source_patches);
-    if source_side * source_side != source_patches {
-        return Err(NativeDepthAnything3Error::UnsupportedArchitecture);
-    }
-    let values = tensor_values(tensor, context.cancellation)?;
-    if source_side == patch_height && source_side == patch_width {
-        return Ok(values);
-    }
-    let patch_values = values
-        .get(hidden..)
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-    let patch_tensor = tensor_from_f32_with_context_exact_native(
-        backend,
-        &[
-            1,
-            u64::try_from(source_side).map_err(|_| NativeDepthAnything3Error::ShapeOverflow)?,
-            u64::try_from(source_side).map_err(|_| NativeDepthAnything3Error::ShapeOverflow)?,
-            u64::try_from(hidden).map_err(|_| NativeDepthAnything3Error::ShapeOverflow)?,
-        ],
-        patch_values,
-        DType::F32,
-        DeviceId::CPU,
-        context,
-    )?;
-    let patch_tensor =
-        tensor_permute_exact_native(&patch_tensor, &[0, 3, 1, 2], context.cancellation)?;
-    let resized = interpolate_tensor_with_context_exact_native(
-        backend,
-        &patch_tensor,
-        &InterpolateConfiguration {
-            output_size: None,
-            scale_factor: Some(vec![
-                (patch_height as f64 + 0.1) / source_side as f64,
-                (patch_width as f64 + 0.1) / source_side as f64,
-            ]),
-            mode: InterpolateMode::Bicubic,
-            align_corners: Some(false),
-            recompute_scale_factor: None,
-            antialias: false,
-        },
-        context,
-    )?;
-    if spatial_size(&resized)? != (patch_height, patch_width) {
-        return Err(NativeDepthAnything3Error::ShapeOverflow);
-    }
-    let resized = tensor_permute_exact_native(&resized, &[0, 2, 3, 1], context.cancellation)?;
-    let resized = tensor_to_f32_with_context_exact_native(backend, &resized, context)?;
-    let mut output = Vec::new();
-    output
-        .try_reserve_exact(hidden + resized.len())
-        .map_err(|_| NativeDepthAnything3Error::Allocation)?;
-    output.extend_from_slice(
-        values
-            .get(..hidden)
-            .ok_or(NativeDepthAnything3Error::ShapeOverflow)?,
-    );
-    output.extend_from_slice(&resized);
-    Ok(output)
-}
-
-fn transformer_block(
-    resource: &NativeDepthAnything3Resource,
-    backend: &CpuBackend,
-    input: &[f32],
-    batch: usize,
-    tokens: usize,
-    hidden: usize,
-    layer: usize,
-    patch_height: usize,
-    patch_width: usize,
-    view_groups: usize,
-    global_positions: bool,
-    context: &ExecutionContext<'_>,
-) -> Result<Vec<f32>, NativeDepthAnything3Error> {
-    let prefix = format!("native.backbone.encoder.layer.{layer}");
-    let normalized = layer_norm_values(
-        resource,
-        backend,
-        input,
-        &[batch, tokens, hidden],
-        &format!("{prefix}.norm1"),
-        1.0e-6,
-        context,
-    )?;
-    let mut query = linear_values(
-        resource,
-        backend,
-        &normalized,
-        &[batch, tokens, hidden],
-        &format!("{prefix}.attention.attention.query"),
-        context,
-    )?;
-    let mut key = linear_values(
-        resource,
-        backend,
-        &normalized,
-        &[batch, tokens, hidden],
-        &format!("{prefix}.attention.attention.key"),
-        context,
-    )?;
-    let value = linear_values(
-        resource,
-        backend,
-        &normalized,
-        &[batch, tokens, hidden],
-        &format!("{prefix}.attention.attention.value"),
-        context,
-    )?;
-    let heads = usize_from(resource.configuration.attention_heads)?;
-    let head_dimension = hidden
-        .checked_div(heads)
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-    if resource
-        .configuration
-        .qknorm_start
-        .is_some_and(|start| layer >= start)
-    {
-        query = layer_norm_values(
-            resource,
-            backend,
-            &query,
-            &[batch, tokens, heads, head_dimension],
-            &format!("{prefix}.attention.q_norm"),
-            1.0e-6,
-            context,
-        )?;
-        key = layer_norm_values(
-            resource,
-            backend,
-            &key,
-            &[batch, tokens, heads, head_dimension],
-            &format!("{prefix}.attention.k_norm"),
-            1.0e-6,
-            context,
-        )?;
-    }
-    if resource
-        .configuration
-        .rope_start
-        .is_some_and(|start| layer >= start)
-    {
-        let (y_positions, x_positions) = rotary_positions(
-            batch,
-            tokens,
-            patch_height,
-            patch_width,
-            view_groups,
-            global_positions,
-        )?;
-        query = apply_da3_rotary(
-            &query,
-            batch,
-            tokens,
-            heads,
-            head_dimension,
-            &y_positions,
-            &x_positions,
-            context.cancellation,
-        )?;
-        key = apply_da3_rotary(
-            &key,
-            batch,
-            tokens,
-            heads,
-            head_dimension,
-            &y_positions,
-            &x_positions,
-            context.cancellation,
-        )?;
-    }
-    let attended = scaled_dot_product_attention_with_context(
-        backend,
-        AttentionRequest {
-            backend: AttentionBackend::PytorchSdp,
-            fallback: AttentionFallbackPolicy::AllowExactNative,
-            batch,
-            query_tokens: tokens,
-            key_tokens: tokens,
-            heads,
-            head_dimension,
-            value_dimension: head_dimension,
-            scale: None,
-            workspace_limit_bytes: resource
-                .memory_budget_bytes
-                .saturating_sub(resource.resident_bytes)
-                .try_into()
-                .unwrap_or(usize::MAX),
-        },
-        &query,
-        &key,
-        &value,
-        None,
-        context,
-    )?
-    .values;
-    let projected = linear_values(
-        resource,
-        backend,
-        &attended,
-        &[batch, tokens, hidden],
-        &format!("{prefix}.attention.output.dense"),
-        context,
-    )?;
-    let scaled = multiply_by_state(
-        resource,
-        backend,
-        &projected,
-        &[batch, tokens, hidden],
-        &format!("{prefix}.layer_scale1.lambda1"),
-        context,
-    )?;
-    let residual = add_value_slices(backend, input, &scaled, context)?;
-    let normalized = layer_norm_values(
-        resource,
-        backend,
-        &residual,
-        &[batch, tokens, hidden],
-        &format!("{prefix}.norm2"),
-        1.0e-6,
-        context,
-    )?;
-    let feed_forward = if resource.configuration.backbone == DepthAnything3Backbone::VitGiant {
-        swiglu_values(
-            resource,
-            backend,
-            &normalized,
-            batch,
-            tokens,
-            hidden,
-            &prefix,
-            context,
-        )?
-    } else {
-        let projected = linear_values(
-            resource,
-            backend,
-            &normalized,
-            &[batch, tokens, hidden],
-            &format!("{prefix}.mlp.fc1"),
-            context,
-        )?;
-        let activated = gelu_with_context_exact_native(
-            backend,
-            &projected,
-            GeluApproximation::None,
-            DeviceId::CPU,
-            context,
-        )?;
-        linear_values(
-            resource,
-            backend,
-            &activated,
-            &[batch, tokens, hidden * 4],
-            &format!("{prefix}.mlp.fc2"),
-            context,
-        )?
-    };
-    let scaled = multiply_by_state(
-        resource,
-        backend,
-        &feed_forward,
-        &[batch, tokens, hidden],
-        &format!("{prefix}.layer_scale2.lambda1"),
-        context,
-    )?;
-    add_value_slices(backend, &residual, &scaled, context)
-}
-
-fn rotary_positions(
-    _batch: usize,
-    tokens: usize,
-    patch_height: usize,
-    patch_width: usize,
-    view_groups: usize,
-    global: bool,
-) -> Result<(Vec<usize>, Vec<usize>), NativeDepthAnything3Error> {
-    let patches = patch_height
-        .checked_mul(patch_width)
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-    let per_view_tokens = patches
-        .checked_add(1)
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-    if tokens != per_view_tokens * view_groups {
-        return Err(NativeDepthAnything3Error::ShapeOverflow);
-    }
-    let mut y_positions = Vec::new();
-    let mut x_positions = Vec::new();
-    y_positions
-        .try_reserve_exact(tokens)
-        .map_err(|_| NativeDepthAnything3Error::Allocation)?;
-    x_positions
-        .try_reserve_exact(tokens)
-        .map_err(|_| NativeDepthAnything3Error::Allocation)?;
-    for _ in 0..view_groups {
-        y_positions.push(0);
-        x_positions.push(0);
-        for patch in 0..patches {
-            if global {
-                y_positions.push(1);
-                x_positions.push(1);
-            } else {
-                y_positions.push(patch / patch_width + 1);
-                x_positions.push(patch % patch_width + 1);
-            }
-        }
-    }
-    Ok((y_positions, x_positions))
-}
-
-#[allow(clippy::too_many_arguments)]
-fn apply_da3_rotary(
-    values: &[f32],
-    batch: usize,
-    tokens: usize,
-    heads: usize,
-    head_dimension: usize,
-    y_positions: &[usize],
-    x_positions: &[usize],
-    cancellation: &CancellationToken,
-) -> Result<Vec<f32>, NativeDepthAnything3Error> {
-    let axis_dimension = head_dimension / 2;
-    if !head_dimension.is_multiple_of(4)
-        || y_positions.len() != tokens
-        || x_positions.len() != tokens
-        || values.len() != batch * tokens * heads * head_dimension
-    {
-        return Err(NativeDepthAnything3Error::UnsupportedArchitecture);
-    }
-    let axis_count = batch * tokens * heads * axis_dimension;
-    let mut vertical = filled_f32(axis_count, 0.0)?;
-    let mut horizontal = filled_f32(axis_count, 0.0)?;
-    for row in 0..batch * tokens * heads {
-        if row.is_multiple_of(4_096) {
-            cancellation.check()?;
-        }
-        vertical[row * axis_dimension..(row + 1) * axis_dimension]
-            .copy_from_slice(&values[row * head_dimension..row * head_dimension + axis_dimension]);
-        horizontal[row * axis_dimension..(row + 1) * axis_dimension].copy_from_slice(
-            &values[row * head_dimension + axis_dimension..(row + 1) * head_dimension],
-        );
-    }
-    let vertical_table = precompute_rotary_table(
-        RotaryTableRequest {
-            positions: RotaryPositions::Scalar(RotaryPositionSequence::Unsigned(y_positions)),
-            rotary_dimension: axis_dimension,
-            axis_dimensions: &[],
-            theta: 100.0,
-            scaling: RotaryScaling::None,
-            frequency_layout: RotaryFrequencyLayout::Global,
-        },
-        cancellation,
-    )?;
-    let horizontal_table = precompute_rotary_table(
-        RotaryTableRequest {
-            positions: RotaryPositions::Scalar(RotaryPositionSequence::Unsigned(x_positions)),
-            rotary_dimension: axis_dimension,
-            axis_dimensions: &[],
-            theta: 100.0,
-            scaling: RotaryScaling::None,
-            frequency_layout: RotaryFrequencyLayout::Global,
-        },
-        cancellation,
-    )?;
-    let vertical = apply_rotary_table(
-        &vertical,
-        batch,
-        tokens,
-        heads,
-        axis_dimension,
-        &vertical_table,
-        RotaryPairLayout::SplitHalf,
-        cancellation,
-    )?;
-    let horizontal = apply_rotary_table(
-        &horizontal,
-        batch,
-        tokens,
-        heads,
-        axis_dimension,
-        &horizontal_table,
-        RotaryPairLayout::SplitHalf,
-        cancellation,
-    )?;
-    let mut output = filled_f32(values.len(), 0.0)?;
-    for row in 0..batch * tokens * heads {
-        if row.is_multiple_of(4_096) {
-            cancellation.check()?;
-        }
-        output[row * head_dimension..row * head_dimension + axis_dimension]
-            .copy_from_slice(&vertical[row * axis_dimension..(row + 1) * axis_dimension]);
-        output[row * head_dimension + axis_dimension..(row + 1) * head_dimension]
-            .copy_from_slice(&horizontal[row * axis_dimension..(row + 1) * axis_dimension]);
-    }
-    Ok(output)
 }
 
 fn layer_norm_values(
@@ -2554,68 +2077,6 @@ fn multiply_by_state(
     )?)
 }
 
-fn swiglu_values(
-    resource: &NativeDepthAnything3Resource,
-    backend: &CpuBackend,
-    input: &[f32],
-    batch: usize,
-    tokens: usize,
-    hidden: usize,
-    prefix: &str,
-    context: &ExecutionContext<'_>,
-) -> Result<Vec<f32>, NativeDepthAnything3Error> {
-    let projected = linear_values(
-        resource,
-        backend,
-        input,
-        &[batch, tokens, hidden],
-        &format!("{prefix}.mlp.weights_in"),
-        context,
-    )?;
-    let intermediate = projected
-        .len()
-        .checked_div(batch * tokens * 2)
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-    let mut first = filled_f32(batch * tokens * intermediate, 0.0)?;
-    let mut second = filled_f32(first.len(), 0.0)?;
-    for row in 0..batch * tokens {
-        context.check()?;
-        let source = row * intermediate * 2;
-        let destination = row * intermediate;
-        first[destination..destination + intermediate]
-            .copy_from_slice(&projected[source..source + intermediate]);
-        second[destination..destination + intermediate]
-            .copy_from_slice(&projected[source + intermediate..source + intermediate * 2]);
-    }
-    let first = tensor_from_f32_with_context_exact_native(
-        backend,
-        &shape_u64(&[batch, tokens, intermediate])?,
-        &first,
-        DType::F32,
-        DeviceId::CPU,
-        context,
-    )?;
-    let first = silu_tensor_with_context_exact_native(backend, &first, context)?;
-    let second = tensor_from_f32_with_context_exact_native(
-        backend,
-        &shape_u64(&[batch, tokens, intermediate])?,
-        &second,
-        DType::F32,
-        DeviceId::CPU,
-        context,
-    )?;
-    let product = mul_method_with_context_exact_native(backend, &first, &second, context)?;
-    let product = tensor_to_f32_with_context_exact_native(backend, &product, context)?;
-    linear_values(
-        resource,
-        backend,
-        &product,
-        &[batch, tokens, intermediate],
-        &format!("{prefix}.mlp.weights_out"),
-        context,
-    )
-}
-
 fn add_value_slices(
     backend: &CpuBackend,
     left: &[f32],
@@ -2654,318 +2115,10 @@ fn add_value_slices(
     )?)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn select_reference_indices(
-    values: &[f32],
-    batch: usize,
-    views: usize,
-    tokens: usize,
-    channels: usize,
-    strategy: NativeDepthAnything3ReferenceStrategy,
-    cancellation: &CancellationToken,
-) -> Result<Vec<usize>, NativeDepthAnything3Error> {
-    let mut selected = Vec::new();
-    selected
-        .try_reserve_exact(batch)
-        .map_err(|_| NativeDepthAnything3Error::Allocation)?;
-    for batch_index in 0..batch {
-        cancellation.check()?;
-        match strategy {
-            NativeDepthAnything3ReferenceStrategy::First => selected.push(0),
-            NativeDepthAnything3ReferenceStrategy::Middle => selected.push(views / 2),
-            NativeDepthAnything3ReferenceStrategy::SaddleBalanced
-            | NativeDepthAnything3ReferenceStrategy::SaddleSimRange => {
-                let mut normalized = filled_f32(views * channels, 0.0)?;
-                let mut norms = filled_f32(views, 0.0)?;
-                let mut variances = filled_f32(views, 0.0)?;
-                for view in 0..views {
-                    let offset = ((batch_index * views + view) * tokens) * channels;
-                    let class = values
-                        .get(offset..offset + channels)
-                        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-                    let norm = class.iter().map(|value| value * value).sum::<f32>().sqrt();
-                    norms[view] = norm;
-                    let divisor = norm;
-                    for channel in 0..channels {
-                        normalized[view * channels + channel] = class[channel] / divisor;
-                    }
-                    let mean = normalized[view * channels..(view + 1) * channels]
-                        .iter()
-                        .copied()
-                        .sum::<f32>()
-                        / channels as f32;
-                    variances[view] = normalized[view * channels..(view + 1) * channels]
-                        .iter()
-                        .map(|value| (value - mean) * (value - mean))
-                        .sum::<f32>()
-                        / channels.saturating_sub(1).max(1) as f32;
-                }
-                let mut similarities = filled_f32(views, 0.0)?;
-                let mut similarity_ranges = filled_f32(views, 0.0)?;
-                for view in 0..views {
-                    let mut minimum = f32::INFINITY;
-                    let mut maximum = f32::NEG_INFINITY;
-                    for other in 0..views {
-                        let dot = (0..channels)
-                            .map(|channel| {
-                                normalized[view * channels + channel]
-                                    * normalized[other * channels + channel]
-                            })
-                            .sum::<f32>();
-                        similarities[view] += dot - if view == other { 1.0 } else { 0.0 };
-                        let without_diagonal = dot - if view == other { 1.0 } else { 0.0 };
-                        minimum = minimum.min(without_diagonal);
-                        maximum = maximum.max(without_diagonal);
-                    }
-                    similarities[view] /= views.saturating_sub(1).max(1) as f32;
-                    similarity_ranges[view] = maximum - minimum;
-                }
-                if strategy == NativeDepthAnything3ReferenceStrategy::SaddleSimRange {
-                    let mut reference = 0;
-                    for view in 1..views {
-                        if similarity_ranges[view] > similarity_ranges[reference] {
-                            reference = view;
-                        }
-                    }
-                    selected.push(reference);
-                    continue;
-                }
-                normalize_metric(&mut similarities);
-                normalize_metric(&mut norms);
-                normalize_metric(&mut variances);
-                let reference = (0..views)
-                    .min_by(|left, right| {
-                        let left_score = (similarities[*left] - 0.5).abs()
-                            + (norms[*left] - 0.5).abs()
-                            + (variances[*left] - 0.5).abs();
-                        let right_score = (similarities[*right] - 0.5).abs()
-                            + (norms[*right] - 0.5).abs()
-                            + (variances[*right] - 0.5).abs();
-                        left_score.total_cmp(&right_score)
-                    })
-                    .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-                selected.push(reference);
-            }
-        }
-    }
-    Ok(selected)
-}
-
-fn normalize_metric(values: &mut [f32]) {
-    let minimum = values.iter().copied().fold(f32::INFINITY, f32::min);
-    let maximum = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    for value in values {
-        *value = (*value - minimum) / (maximum - minimum + 1.0e-8);
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn reorder_views_in_place(
-    values: &mut Vec<f32>,
-    batch: usize,
-    views: usize,
-    tokens: usize,
-    channels: usize,
-    references: &[usize],
-    restore: bool,
-    cancellation: &CancellationToken,
-) -> Result<(), NativeDepthAnything3Error> {
-    let mut output = filled_f32(values.len(), 0.0)?;
-    let view_stride = tokens
-        .checked_mul(channels)
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-    for batch_index in 0..batch {
-        cancellation.check()?;
-        let reference = *references
-            .get(batch_index)
-            .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-        if reference >= views {
-            return Err(NativeDepthAnything3Error::ShapeOverflow);
-        }
-        for destination in 0..views {
-            let source = if restore {
-                if destination < reference {
-                    destination + 1
-                } else if destination == reference {
-                    0
-                } else {
-                    destination
-                }
-            } else if destination == 0 {
-                reference
-            } else if destination <= reference {
-                destination - 1
-            } else {
-                destination
-            };
-            let source_offset = (batch_index * views + source) * view_stride;
-            let destination_offset = (batch_index * views + destination) * view_stride;
-            output[destination_offset..destination_offset + view_stride]
-                .copy_from_slice(&values[source_offset..source_offset + view_stride]);
-        }
-    }
-    *values = output;
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn inject_learned_camera_tokens(
-    resource: &NativeDepthAnything3Resource,
-    values: &mut [f32],
-    batch: usize,
-    views: usize,
-    tokens: usize,
-    channels: usize,
-    computed: Option<&[f32]>,
-    cancellation: &CancellationToken,
-) -> Result<(), NativeDepthAnything3Error> {
-    let learned = if computed.is_none() {
-        Some(tensor_values(
-            resource.execution_tensor("native.backbone.embeddings.camera_token")?,
-            cancellation,
-        )?)
-    } else {
-        None
-    };
-    for batch_index in 0..batch {
-        cancellation.check()?;
-        for view in 0..views {
-            let destination = ((batch_index * views + view) * tokens) * channels;
-            let source_values = if let Some(computed) = computed {
-                let source = (batch_index * views + view) * channels;
-                computed
-                    .get(source..source + channels)
-                    .ok_or(NativeDepthAnything3Error::ShapeOverflow)?
-            } else {
-                let learned = learned
-                    .as_ref()
-                    .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-                let source = if view == 0 { 0 } else { channels };
-                &learned[source..source + channels]
-            };
-            values[destination..destination + channels].copy_from_slice(source_values);
-        }
-    }
-    Ok(())
-}
-
-fn concatenate_last_dimension(
-    left: &[f32],
-    right: &[f32],
-    rows: usize,
-    channels: usize,
-    cancellation: &CancellationToken,
-) -> Result<Vec<f32>, NativeDepthAnything3Error> {
-    if left.len() != rows * channels || right.len() != left.len() {
-        return Err(NativeDepthAnything3Error::ShapeOverflow);
-    }
-    let mut output = filled_f32(rows * channels * 2, 0.0)?;
-    for row in 0..rows {
-        if row.is_multiple_of(1_024) {
-            cancellation.check()?;
-        }
-        let destination = row * channels * 2;
-        output[destination..destination + channels]
-            .copy_from_slice(&left[row * channels..(row + 1) * channels]);
-        output[destination + channels..destination + channels * 2]
-            .copy_from_slice(&right[row * channels..(row + 1) * channels]);
-    }
-    Ok(output)
-}
-
-fn collect_token(
-    values: &[f32],
-    batch: usize,
-    tokens: usize,
-    channels: usize,
-    token: usize,
-    cancellation: &CancellationToken,
-) -> Result<Vec<f32>, NativeDepthAnything3Error> {
-    let mut output = filled_f32(batch * channels, 0.0)?;
-    for row in 0..batch {
-        if row.is_multiple_of(1_024) {
-            cancellation.check()?;
-        }
-        let source = (row * tokens + token) * channels;
-        output[row * channels..(row + 1) * channels]
-            .copy_from_slice(&values[source..source + channels]);
-    }
-    Ok(output)
-}
-
-fn final_backbone_norm(
-    resource: &NativeDepthAnything3Resource,
-    backend: &CpuBackend,
-    values: &[f32],
-    batch: usize,
-    tokens: usize,
-    channels: usize,
-    hidden: usize,
-    context: &ExecutionContext<'_>,
-) -> Result<Vec<f32>, NativeDepthAnything3Error> {
-    if channels == hidden {
-        return layer_norm_values(
-            resource,
-            backend,
-            values,
-            &[batch, tokens, hidden],
-            "native.backbone.layernorm",
-            1.0e-6,
-            context,
-        );
-    }
-    if channels != hidden * 2 {
-        return Err(NativeDepthAnything3Error::ShapeOverflow);
-    }
-    let mut left = filled_f32(batch * tokens * hidden, 0.0)?;
-    let mut right = filled_f32(left.len(), 0.0)?;
-    for row in 0..batch * tokens {
-        context.check()?;
-        left[row * hidden..(row + 1) * hidden]
-            .copy_from_slice(&values[row * channels..row * channels + hidden]);
-        right[row * hidden..(row + 1) * hidden]
-            .copy_from_slice(&values[row * channels + hidden..(row + 1) * channels]);
-    }
-    let right = layer_norm_values(
-        resource,
-        backend,
-        &right,
-        &[batch, tokens, hidden],
-        "native.backbone.layernorm",
-        1.0e-6,
-        context,
-    )?;
-    concatenate_last_dimension(&left, &right, batch * tokens, hidden, context.cancellation)
-}
-
-fn drop_first_token(
-    values: &[f32],
-    batch: usize,
-    tokens: usize,
-    channels: usize,
-    cancellation: &CancellationToken,
-) -> Result<Vec<f32>, NativeDepthAnything3Error> {
-    let patches = tokens
-        .checked_sub(1)
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-    let mut output = filled_f32(batch * patches * channels, 0.0)?;
-    for row in 0..batch {
-        if row.is_multiple_of(1_024) {
-            cancellation.check()?;
-        }
-        let source = (row * tokens + 1) * channels;
-        let destination = row * patches * channels;
-        output[destination..destination + patches * channels]
-            .copy_from_slice(&values[source..source + patches * channels]);
-    }
-    Ok(output)
-}
-
-#[allow(clippy::too_many_arguments)]
 fn execute_depth_head(
     resource: &NativeDepthAnything3Resource,
     backend: &CpuBackend,
-    features: &[BackboneFeature],
+    features: &[crate::dino2::NativeDino2Feature],
     batch: usize,
     views: usize,
     height: usize,
@@ -5108,23 +4261,6 @@ fn filled_f32(length: usize, value: f32) -> Result<Vec<f32>, NativeDepthAnything
     Ok(output)
 }
 
-fn integer_square_root(value: usize) -> usize {
-    if value < 2 {
-        return value;
-    }
-    let mut low = 1_usize;
-    let mut high = value / 2 + 1;
-    while low + 1 < high {
-        let middle = low + (high - low) / 2;
-        if middle <= value / middle {
-            low = middle;
-        } else {
-            high = middle;
-        }
-    }
-    low
-}
-
 fn configuration_from_native_state(
     state: &BTreeMap<String, Tensor>,
 ) -> Result<DepthAnything3Configuration, NativeDepthAnything3Error> {
@@ -5152,108 +4288,15 @@ fn depth_anything_3_state_manifest(
         DepthAnything3ExecutionProfile::production(profile.configuration)?;
     }
     let configuration = &profile.configuration;
-    let hidden = usize_from(configuration.hidden_size)?;
-    let image = usize_from(configuration.image_size)?;
-    let patch = usize_from(configuration.patch_size)?;
-    let mut states = Vec::new();
-    add_conv(
-        &mut states,
-        "native.backbone.embeddings.patch_embeddings.projection",
-        hidden,
-        3,
-        patch,
-        true,
-    )?;
-    add_state(
-        &mut states,
-        "native.backbone.embeddings.position_embeddings",
-        &[1, (image / patch) * (image / patch) + 1, hidden],
-    )?;
-    add_state(
-        &mut states,
-        "native.backbone.embeddings.cls_token",
-        &[1, 1, hidden],
-    )?;
-    if configuration.concatenate_camera_token {
-        add_state(
-            &mut states,
-            "native.backbone.embeddings.camera_token",
-            &[1, 2, hidden],
-        )?;
-    }
-    let swiglu = configuration.backbone == DepthAnything3Backbone::VitGiant;
-    for layer in 0..configuration.layer_count {
-        let prefix = format!("native.backbone.encoder.layer.{layer}");
-        add_affine(&mut states, &format!("{prefix}.norm1"), hidden)?;
-        for name in ["query", "key", "value"] {
-            add_linear(
-                &mut states,
-                &format!("{prefix}.attention.attention.{name}"),
-                hidden,
-                hidden,
-                true,
-            )?;
-        }
-        add_linear(
-            &mut states,
-            &format!("{prefix}.attention.output.dense"),
-            hidden,
-            hidden,
-            true,
-        )?;
-        if configuration
-            .qknorm_start
-            .is_some_and(|start| layer >= start)
-        {
-            let head = hidden / usize_from(configuration.attention_heads)?;
-            add_affine(&mut states, &format!("{prefix}.attention.q_norm"), head)?;
-            add_affine(&mut states, &format!("{prefix}.attention.k_norm"), head)?;
-        }
-        add_state(
-            &mut states,
-            &format!("{prefix}.layer_scale1.lambda1"),
-            &[hidden],
-        )?;
-        add_state(
-            &mut states,
-            &format!("{prefix}.layer_scale2.lambda1"),
-            &[hidden],
-        )?;
-        add_affine(&mut states, &format!("{prefix}.norm2"), hidden)?;
-        if swiglu {
-            let intermediate = (hidden * 4 * 2 / 3).div_ceil(8) * 8;
-            add_linear(
-                &mut states,
-                &format!("{prefix}.mlp.weights_in"),
-                intermediate * 2,
-                hidden,
-                true,
-            )?;
-            add_linear(
-                &mut states,
-                &format!("{prefix}.mlp.weights_out"),
-                hidden,
-                intermediate,
-                true,
-            )?;
-        } else {
-            add_linear(
-                &mut states,
-                &format!("{prefix}.mlp.fc1"),
-                hidden * 4,
-                hidden,
-                true,
-            )?;
-            add_linear(
-                &mut states,
-                &format!("{prefix}.mlp.fc2"),
-                hidden,
-                hidden * 4,
-                true,
-            )?;
-        }
-    }
-    add_affine(&mut states, "native.backbone.layernorm", hidden)?;
+    let backbone = native_dino2_backbone(*configuration)?;
+    let mut states = backbone
+        .state_manifest()?
+        .into_iter()
+        .map(|state| StateSpecification {
+            key: state.key,
+            shape: state.shape,
+        })
+        .collect::<Vec<_>>();
     add_head_manifest(&mut states, configuration)?;
     if configuration.has_camera_encoder {
         add_camera_encoder_manifest(&mut states, configuration)?;
@@ -5262,6 +4305,34 @@ fn depth_anything_3_state_manifest(
         add_camera_decoder_manifest(&mut states, configuration)?;
     }
     Ok(states)
+}
+
+fn native_dino2_backbone(
+    configuration: DepthAnything3Configuration,
+) -> Result<NativeDino2Backbone, NativeDepthAnything3Error> {
+    native_dino2_backbone_with_mask_token(configuration, false)
+}
+
+fn native_dino2_backbone_with_mask_token(
+    configuration: DepthAnything3Configuration,
+    use_mask_token: bool,
+) -> Result<NativeDino2Backbone, NativeDepthAnything3Error> {
+    let [output0, output1, output2, output3] = configuration.output_layers;
+    Ok(NativeDino2Backbone::new(NativeDino2Configuration {
+        prefix: "native.backbone",
+        hidden: usize_from(configuration.hidden_size)?,
+        layer_count: configuration.layer_count,
+        attention_heads: usize_from(configuration.attention_heads)?,
+        patch: usize_from(configuration.patch_size)?,
+        image: usize_from(configuration.image_size)?,
+        qknorm_start: configuration.qknorm_start,
+        alternate_attention_start: configuration.alternate_attention_start,
+        rope_start: configuration.rope_start,
+        concatenate_camera_token: configuration.concatenate_camera_token,
+        use_mask_token,
+        swiglu: configuration.backbone == DepthAnything3Backbone::VitGiant,
+        output_layers: [output0, output1, output2, output3],
+    })?)
 }
 
 fn add_head_manifest(
@@ -7371,7 +6442,7 @@ mod tests {
                 "{name} Lanczos preprocessing diverged"
             );
         }
-        let rotated = apply_da3_rotary(
+        let rotated = crate::dino2::apply_da3_rotary(
             &[0.75, -0.25, 0.5, 1.25],
             1,
             1,

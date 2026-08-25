@@ -425,6 +425,187 @@ fn task390_depth_anything_tensor_oracle_is_only_a_development_reference()
     Ok(())
 }
 
+#[test]
+fn task391_dinov2_has_one_crate_private_backbone_owner() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let crate_root = fs::read_to_string(root.join("crates/comfy_model/src/comfy_model.rs"))?;
+    let owner = fs::read_to_string(root.join("crates/comfy_model/src/dino2.rs"))?;
+    let da3 = fs::read_to_string(root.join("crates/comfy_model/src/depth_anything_3.rs"))?;
+    let moge = fs::read_to_string(root.join("projects/comfy/ComfyUI/comfy/ldm/moge/model.py"))?;
+    assert!(crate_root.lines().any(|line| line == "mod dino2;"));
+    assert!(!crate_root.contains("pub mod dino2;"));
+    assert_eq!(owner.matches("struct NativeDino2Backbone").count(), 1);
+    for required in [
+        "state_manifest",
+        "project_state_tensor",
+        "interpolated_position_embeddings",
+        "transformer_block",
+        "get_intermediate_layers(",
+        "get_intermediate_layers_da3(",
+        "forward(",
+        "apply_da3_rotary",
+        "select_reference_indices",
+    ] {
+        assert!(owner.contains(required), "DINOv2 owner lacks {required}");
+    }
+    for forbidden in [
+        "fn interpolated_position_embeddings(",
+        "fn transformer_block(",
+        "fn apply_da3_rotary(",
+        "fn select_reference_indices(",
+    ] {
+        assert!(
+            !da3.contains(forbidden),
+            "DA3 retains DINO equation {forbidden}"
+        );
+    }
+    assert!(da3.contains("backbone.project_state_tensor"));
+    assert!(da3.contains("get_intermediate_layers_da3"));
+    assert!(!moge.contains("NativeDino2Backbone"));
+    assert!(moge.contains("\"mask_token\":              \"embeddings.mask_token\""));
+    assert!(owner.contains("use_mask_token"));
+    assert!(owner.contains("embeddings.mask_token"));
+
+    let fixture =
+        root.join("crates/comfy_test_support/fixtures/models/dinov2-backbone-owner-foundation");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(fixture.join("oracle.json"))?)?;
+    let manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(fixture.join("manifest.json"))?)?;
+    let provenance: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(fixture.join("provenance.json"))?)?;
+    assert_eq!(
+        oracle.get("format").and_then(serde_json::Value::as_str),
+        Some("dinov2-backbone-owner-foundation-v1")
+    );
+    assert!(oracle.get("ordinary_routes").is_some());
+    let ordinary_mutations = oracle["ordinary_mutations"]
+        .as_object()
+        .ok_or("DINOv2 ordinary mutations are missing")?;
+    assert_eq!(ordinary_mutations.len(), 8);
+    assert_eq!(
+        ordinary_mutations
+            .values()
+            .filter(|mutation| mutation["changes_output"].as_bool() == Some(false))
+            .count(),
+        1
+    );
+    assert!(oracle.get("forward_unused_mask_token").is_some());
+    assert_eq!(
+        oracle["ordinary_mutations"]["forward_unused_mask_token"]["changes_output"].as_bool(),
+        Some(false)
+    );
+    assert!(oracle.get("da3_reference_fixture").is_some());
+    assert!(oracle.get("storage_projection").is_some());
+    assert_eq!(
+        oracle
+            .get("pinned_sources")
+            .and_then(serde_json::Value::as_object)
+            .map(serde_json::Map::len),
+        Some(4)
+    );
+    let generator_sha256 = file_sha256(&fixture.join("generate_oracle.py"))?;
+    let oracle_sha256 = file_sha256(&fixture.join("oracle.json"))?;
+    let manifest_sha256 = file_sha256(&fixture.join("manifest.json"))?;
+    let source_graph_sha256 = file_sha256(
+        &root.join(
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/source_graph.py",
+        ),
+    )?;
+    let da3_oracle_sha256 = file_sha256(
+        &root.join(
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/oracle.json",
+        ),
+    )?;
+    let da3_oracle: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/oracle.json",
+        ),
+    )?)?;
+    for document in [&oracle, &manifest, &provenance] {
+        assert_eq!(
+            document["generator_sha256"].as_str(),
+            Some(generator_sha256.as_str())
+        );
+        assert_eq!(
+            document["source_graph_sha256"].as_str(),
+            Some(source_graph_sha256.as_str())
+        );
+        assert_eq!(
+            document["da3_oracle_sha256"].as_str(),
+            Some(da3_oracle_sha256.as_str())
+        );
+    }
+    assert_eq!(
+        manifest["oracle_sha256"].as_str(),
+        Some(oracle_sha256.as_str())
+    );
+    assert_eq!(
+        provenance["oracle_sha256"].as_str(),
+        Some(oracle_sha256.as_str())
+    );
+    assert_eq!(
+        provenance["manifest_sha256"].as_str(),
+        Some(manifest_sha256.as_str())
+    );
+    assert!(
+        provenance["cross_check"]
+            .as_str()
+            .is_some_and(|value| value.contains("alias-residency") && value.contains("lifecycle"))
+    );
+    assert_eq!(
+        oracle["da3_reference_fixture"],
+        da3_oracle["reference_fixture"]
+    );
+    assert_eq!(
+        oracle["storage_projection"],
+        da3_oracle["storage_projection"]
+    );
+    assert!(da3.contains("reduced_da3_admission_is_atomic_and_alias_aware"));
+    assert!(da3.contains("reconstruct_checkpoint"));
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy["concerns"]
+        .as_array()
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern["concern"].as_str() == Some("native_dinov2_backbone_execution")
+            })
+        })
+        .ok_or("DINOv2 ownership concern is missing")?;
+    assert_eq!(
+        concern["canonical_owner"].as_str(),
+        Some("comfy_model::dino2::NativeDino2Backbone")
+    );
+    assert_eq!(
+        concern["production_consumers"].as_array().map(Vec::len),
+        Some(1)
+    );
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let row = parse_csv_records(&catalog)?
+        .into_iter()
+        .find(|record| {
+            record
+                .first()
+                .is_some_and(|value| value == "native_dinov2_backbone_execution")
+        })
+        .ok_or("DINOv2 ownership catalog row is missing")?;
+    assert!(
+        row.iter()
+            .any(|field| field == "authoritative_owner_confirmed")
+    );
+    assert!(
+        row.iter()
+            .any(|field| field.contains("canonical@crates/comfy_model/src/dino2.rs"))
+    );
+    Ok(())
+}
+
 fn accounted_pending_ownership_rows(
     ownership_catalog: &str,
     policy_concerns: &[serde_json::Value],
