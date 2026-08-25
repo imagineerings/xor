@@ -3670,7 +3670,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 46. Execute shadow reads and authoritative cutover tooling
 
-  - [ ] 46.1. Implement aggregate cutover checkpoint records
+  - [x] 46.1. Implement aggregate cutover checkpoint records
     - Persist phase, tenant/aggregate, authority, cursors, hashes and last reversible boundary.
     - _Requirements: 2.2, 2.3, 17.4_
     - _Capability IDs: CAP-005, CAP-045_
@@ -3678,6 +3678,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: .agents/specs/collaborative-workspace/migration-plan.md, crates/collab/src/migration/buzz/checkpoint.rs_
     - _Writes: crates/collab/src/migration/cutover_checkpoint.rs_
     - _Validation: tests reject authority advancement without required hashes/gates and permit idempotent resume_
+    - _Discovered contradiction (2026-08-25): the planned standalone source file cannot compile or be consumed by the dependent shadow/rollback leaves without registration in `migration.rs`, while the leaf authorizes no database migration and reusing the Buzz import-checkpoint tables would conflate import progress with authority routing. The narrow correction adds crate registration and a typed injected durable compare-and-set store contract plus living design traceability; it adds no second data owner, storage schema, shadow worker, mirror, routing switch, rollback command or deployment activation._
+    - _Evidence: 2026-08-25 — added a tenant-scoped aggregate cutover checkpoint that persists optimistic version, exact Phase 0–8 state, legacy/canonical authority, independent sequence plus content-hash cursors, optional immutable source/target hashes, four immutable qualification/shadow/rollback-snapshot/write-window evidence hashes, a complete pre-switch reversible snapshot and the exact last operation receipt. Cursor, phase, integrity and gate evidence cannot regress; normal resume cannot move canonical authority back to legacy. Legacy-to-canonical advancement is permitted only at Phase 4 or later with equal cursors, matching nonzero hashes, all four gate fingerprints and an atomically captured bounded legacy boundary. Typed record reconstruction rejects invalid persisted combinations, tenant mismatch fails before storage, compare-and-set outcome uncertainty reloads and accepts only the exact next record, exact operation retry returns the stored version and changed operation reuse conflicts. Five focused Collab unit tests passed missing hash/gate/boundary rejection, cursor/hash divergence, persisted-record round trip, idempotent operation reuse, one durable CAS and cross-tenant pre-storage rejection. The repository Clippy script downloaded its pinned WebRTC artifact and checked the Collab library before an unrelated pre-existing redundant clone in `buzz_object_git_metadata_import.rs` failed its forced all-target pass; the focused warning-denied release Collab library Clippy passed without modifying that test. Living documentation now distinguishes import progress from aggregate authority routing. Formatting, dependency, inventory, diff and canonical specification gates are recorded in the enclosing checkpoint commit. Commit: enclosing checkpoint commit, reported after creation._
 
   - [ ] 46.2. Implement read-only shadow comparison
     - Compare legacy and canonical results by tenant/query/cursor/overlay without influencing served responses.
