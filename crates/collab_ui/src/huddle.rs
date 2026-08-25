@@ -644,7 +644,7 @@ impl Render for HuddleWorkspaceView {
                             }),
                     ),
             )
-            .when_some(snapshot.clone(), |this, snapshot| {
+            .when_some(snapshot, |this, snapshot| {
                 this.child(render_participants(&snapshot))
                     .child(render_reactions(&snapshot))
                     .children(render_availability(&snapshot, cx))
