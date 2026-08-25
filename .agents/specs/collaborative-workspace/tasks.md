@@ -3251,7 +3251,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 42. Merge agent-first collaboration commands into Zed CLI
 
-  - [ ] 42.1. Define canonical CLI command and error contracts
+  - [x] 42.1. Define canonical CLI command and error contracts
     - Map Buzz command groups, global options, compact output and exit classes to Zed-owned operations.
     - _Requirements: 16.4, 18.1, 18.2_
     - _Capability IDs: CAP-038, CAP-042_
@@ -3259,6 +3259,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-cli/**, crates/cli/**, .agents/specs/collaborative-workspace/fixtures/clients/**_
     - _Writes: crates/cli/src/collaboration/contracts.rs_
     - _Validation: contract manifest accounts for every frozen command, option, output stream and exit code_
+    - _Discovered contradiction (2026-08-25): the planned leaf file cannot be compiled or consumed by later collaboration CLI ports without a parent module and Multiplayer-gated crate-root registration. The narrow correction adds `crates/cli/src/collaboration.rs` and the gated declaration in `crates/cli/src/cli.rs`; it adds no parser, command activation, transport, credential or Standard-build dependency._
+    - _Evidence: 2026-08-25 — added one typed manifest mapping all 22 frozen Buzz groups and 113 executable leaf command paths to ten Zed operation owners, including nested `repos protect` paths and the explicitly renamed social commands. The four global options preserve environment/default/secret and relay-command requirements; normalized JSON/default compact-read behavior, stdout/help, structured stderr, envelope fields, exit classes 0–5 and exact retryable relay statuses are retained. Four focused tests compare the manifest against the frozen Buzz parser/error sources and CLIENT-CLI fixtures, reject missing/duplicate commands and verify every stream, envelope, exit and retry class. The focused feature suite, repository-prescribed release/all-target/all-feature Clippy with warnings denied, default-feature release check, Standard depth-one dependency exclusion, formatting and diff hygiene passed._
 
   - [ ] 42.2. Port identity and community CLI commands
     - Implement profile, social, community, member and invite commands through canonical APIs.
