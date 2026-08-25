@@ -946,13 +946,16 @@ impl NativeDepthAnything3Resource {
         backend: &CpuBackend,
         invocation: NativeDepthAnything3Invocation<'_>,
         context: &ExecutionContext<'_>,
-    ) -> Result<DepthAnything3ExecutionTrace, NativeDepthAnything3Error> {
+    ) -> Result<
+        (NativeDepthAnything3Geometry, DepthAnything3ExecutionTrace),
+        NativeDepthAnything3Error,
+    > {
         let mut trace = DepthAnything3ExecutionTrace {
             stop_before_ray_pose: true,
             ..Default::default()
         };
-        self.execute_internal(backend, invocation, context, Some(&mut trace))?;
-        Ok(trace)
+        let geometry = self.execute_internal(backend, invocation, context, Some(&mut trace))?;
+        Ok((geometry, trace))
     }
 
     fn execute_internal(
@@ -6055,7 +6058,7 @@ mod tests {
             })
             .collect::<Result<Vec<_>, _>>()?;
         let image = ImageTensor::from_f32(&backend, &context, 3, 4, 4, 3, &multiview_values)?;
-        let trace = resource.execute_pre_geometry_head_with_test_trace(
+        let (_, trace) = resource.execute_pre_geometry_head_with_test_trace(
             &backend,
             NativeDepthAnything3Invocation {
                 image: &image,
@@ -6508,6 +6511,129 @@ mod tests {
                 .into());
             }
         }
+        let mutation = oracle
+            .pointer("/full_path_mutations/dual_auxiliary_ray")
+            .ok_or("DA3 auxiliary ray mutation oracle is missing")?;
+        let mut mutated_checkpoint = deterministic_reduced_depth_anything_3_checkpoint(
+            &backend,
+            DepthAnything3FixtureProfile::DualDpt,
+            DType::F32,
+            workspace_bytes,
+            &context,
+        )?;
+        mutate_reduced_depth_anything_3_checkpoint(
+            &backend,
+            &mut mutated_checkpoint,
+            DepthAnything3FixtureMutation {
+                state_key: mutation
+                    .get("state_key")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or("DA3 auxiliary ray mutation key is missing")?,
+                lane: mutation
+                    .get("lane")
+                    .and_then(serde_json::Value::as_u64)
+                    .and_then(|value| usize::try_from(value).ok())
+                    .ok_or("DA3 auxiliary ray mutation lane is missing")?,
+                delta: mutation
+                    .get("delta_bits")
+                    .and_then(serde_json::Value::as_u64)
+                    .and_then(|value| u32::try_from(value).ok())
+                    .map(f32::from_bits)
+                    .ok_or("DA3 auxiliary ray mutation delta is missing")?,
+            },
+            &context,
+        )?;
+        let mutated_resource = NativeDepthAnything3Resource::from_reduced_fixture(
+            &backend,
+            mutated_checkpoint,
+            &context,
+        )?;
+        let (mutated_geometry, mutated_trace) = mutated_resource
+            .execute_pre_geometry_head_with_test_trace(
+                &backend,
+                NativeDepthAnything3Invocation {
+                    image: &image,
+                    views_per_sample: 3,
+                    process_resolution: 4,
+                    resize_method: NativeDepthAnything3ResizeMethod::LowerBound,
+                    reference_strategy: NativeDepthAnything3ReferenceStrategy::SaddleSimRange,
+                    use_ray_pose: true,
+                    ransac_seed: 17,
+                    extrinsics: None,
+                    intrinsics: None,
+                },
+                &context,
+            )?;
+        let mutated_confidence = mutated_geometry
+            .confidence
+            .as_ref()
+            .ok_or("DA3 mutated main confidence is unavailable")?;
+        let mutated_ray = mutated_trace
+            .raw_ray
+            .as_ref()
+            .ok_or("DA3 mutated raw ray is unavailable")?;
+        let mutated_ray_confidence = mutated_trace
+            .raw_ray_confidence
+            .as_ref()
+            .ok_or("DA3 mutated raw ray confidence is unavailable")?;
+        for (phase, actual) in [
+            ("depth", &mutated_geometry.depth),
+            ("confidence", mutated_confidence),
+            ("raw_ray", mutated_ray),
+            ("raw_ray_confidence", mutated_ray_confidence),
+        ] {
+            let actual = tensor_to_f32_with_context_exact_native(&backend, actual, &context)?
+                .into_iter()
+                .map(f32::to_bits)
+                .collect::<Vec<_>>();
+            let expected = mutation
+                .get(phase)
+                .and_then(|value| value.get("bits"))
+                .and_then(serde_json::Value::as_array)
+                .ok_or("DA3 auxiliary ray mutation phase is missing")?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_u64()
+                        .and_then(|value| u32::try_from(value).ok())
+                        .ok_or("DA3 auxiliary ray mutation bit is invalid")
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            if actual.len() != expected.len() {
+                return Err(format!(
+                    "DA3 auxiliary ray mutation {phase} length: actual {}, expected {}",
+                    actual.len(),
+                    expected.len()
+                )
+                .into());
+            }
+            if let Some((index, (actual, expected))) = actual
+                .iter()
+                .zip(&expected)
+                .enumerate()
+                .find(|(_, (actual, expected))| actual != expected)
+            {
+                return Err(format!(
+                    "DA3 auxiliary ray mutation {phase}[{index}]: actual {actual:#010x}, expected {expected:#010x}"
+                )
+                .into());
+            }
+        }
+        let baseline_ray = oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/pre_geometry_ray/bits")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("DA3 baseline raw ray oracle is missing")?;
+        let mutated_ray_bits = mutation
+            .pointer("/raw_ray/bits")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("DA3 mutated raw ray oracle is missing")?;
+        assert_ne!(mutated_ray_bits, baseline_ray);
+        assert_eq!(
+            mutation
+                .get("source_raw_ray_changed")
+                .and_then(serde_json::Value::as_bool),
+            Some(true)
+        );
         Ok(())
     }
 

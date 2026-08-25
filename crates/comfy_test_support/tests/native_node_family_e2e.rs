@@ -2705,46 +2705,250 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
             "dual" => (&multiview, 3, None, false, &context),
             _ => return Err(format!("unknown DA3 mutation execution {execution}").into()),
         };
-        let geometry = mutated.execute(
-            &backend,
-            NativeDepthAnything3Invocation {
-                image: input,
-                views_per_sample: views,
-                process_resolution: 4,
-                resize_method: NativeDepthAnything3ResizeMethod::LowerBound,
-                reference_strategy: NativeDepthAnything3ReferenceStrategy::SaddleSimRange,
-                use_ray_pose: use_ray,
-                ransac_seed: 17,
-                extrinsics: camera.map(|camera| camera.0),
-                intrinsics: camera.map(|camera| camera.1),
-            },
-            execution_context,
-        )?;
+        let invocation = NativeDepthAnything3Invocation {
+            image: input,
+            views_per_sample: views,
+            process_resolution: 4,
+            resize_method: NativeDepthAnything3ResizeMethod::LowerBound,
+            reference_strategy: NativeDepthAnything3ReferenceStrategy::SaddleSimRange,
+            use_ray_pose: use_ray,
+            ransac_seed: 17,
+            extrinsics: camera.map(|camera| camera.0),
+            intrinsics: camera.map(|camera| camera.1),
+        };
+        let (geometry, mutation_trace) = if execution == "ray" {
+            let (geometry, trace) =
+                mutated.execute_with_test_trace(&backend, invocation, execution_context)?;
+            (geometry, Some(trace))
+        } else {
+            (
+                mutated.execute(&backend, invocation, execution_context)?,
+                None,
+            )
+        };
         let actual_identity = public_geometry_identity(&geometry, execution_context)?;
-        assert_eq!(
-            Some(actual_identity.as_str()),
-            mutation
-                .get("output_identity_sha256")
-                .and_then(serde_json::Value::as_str),
-            "DA3 mutation {name} diverged from the source-equation oracle"
-        );
-        let baseline_identity = match execution {
-            "dpt" => oracle.pointer("/reduced_dpt/output_identity_sha256"),
-            "camera" => oracle.pointer("/reduced_dualdpt/supplied_camera_output_identity_sha256"),
-            "ray" => oracle.pointer("/reduced_dualdpt/ray_output_identity_sha256"),
-            _ => oracle.pointer("/reduced_dualdpt/output_identity_sha256"),
+        if execution != "ray" {
+            assert_eq!(
+                Some(actual_identity.as_str()),
+                mutation
+                    .get("output_identity_sha256")
+                    .and_then(serde_json::Value::as_str),
+                "DA3 mutation {name} diverged from the source-equation oracle"
+            );
         }
-        .and_then(serde_json::Value::as_str)
-        .ok_or("DA3 mutation baseline identity is missing")?;
         let changes_output = mutation
             .get("changes_output")
             .and_then(serde_json::Value::as_bool)
             .ok_or("DA3 mutation disposition is missing")?;
-        assert_eq!(
-            actual_identity != baseline_identity,
-            changes_output,
-            "{name}"
-        );
+        if execution == "ray" {
+            assert!(changes_output, "{name}");
+            let trace = mutation_trace
+                .as_ref()
+                .ok_or("DA3 ray mutation trace is unavailable")?;
+            let confidence = geometry
+                .confidence
+                .as_ref()
+                .ok_or("DA3 ray mutation confidence is unavailable")?;
+            for (phase, actual) in [
+                ("depth", &geometry.depth),
+                ("confidence", confidence),
+                ("raw_ray", &trace.raw_ray),
+                ("raw_ray_confidence", &trace.raw_ray_confidence),
+            ] {
+                require_exact_fixture_bits(
+                    &format!("DA3 ray mutation {phase}"),
+                    &tensor_bits(actual, execution_context)?,
+                    &fixture_raw_bits(
+                        mutation
+                            .get(phase)
+                            .and_then(|value| value.get("bits"))
+                            .ok_or("DA3 ray mutation exact phase is missing")?,
+                    )?,
+                )?;
+            }
+            assert_ne!(
+                tensor_bits(&trace.raw_ray, execution_context)?,
+                tensor_bits(&ray_trace.raw_ray, &ray_context)?,
+                "DA3 ray mutation must change the production raw ray"
+            );
+            assert_eq!(
+                mutation
+                    .get("source_raw_ray_changed")
+                    .and_then(serde_json::Value::as_bool),
+                Some(true)
+            );
+            assert_eq!(
+                mutation
+                    .get("source_geometry_changed")
+                    .and_then(serde_json::Value::as_bool),
+                Some(true)
+            );
+            let expected_trace = mutation
+                .get("ransac_trace")
+                .ok_or("DA3 ray mutation RANSAC trace is missing")?;
+            let expected_samples = expected_trace
+                .get("samples")
+                .and_then(Value::as_array)
+                .ok_or("DA3 ray mutation samples are missing")?
+                .iter()
+                .map(|row| {
+                    row.as_array()
+                        .ok_or("DA3 ray mutation sample row is invalid")?
+                        .iter()
+                        .map(|value| value.as_u64().ok_or("DA3 ray mutation sample is invalid"))
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            assert_eq!(trace.ransac_samples, expected_samples);
+            let expected_views = expected_trace
+                .get("views")
+                .and_then(Value::as_array)
+                .ok_or("DA3 ray mutation view traces are missing")?;
+            assert_eq!(trace.ransac_views.len(), expected_views.len());
+            for (actual, expected) in trace.ransac_views.iter().zip(expected_views) {
+                let candidates = expected
+                    .get("candidate_indices")
+                    .and_then(Value::as_array)
+                    .ok_or("DA3 ray mutation candidates are missing")?
+                    .iter()
+                    .map(|value| {
+                        value
+                            .as_u64()
+                            .ok_or("DA3 ray mutation candidate is invalid")
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                assert_eq!(actual.candidate_indices, candidates);
+                assert_eq!(
+                    actual.best_iteration,
+                    expected
+                        .get("best_iteration")
+                        .and_then(Value::as_u64)
+                        .ok_or("DA3 ray mutation best iteration is missing")?
+                );
+                assert_eq!(
+                    actual.best_inliers.len() as u64,
+                    expected
+                        .get("best_inlier_count")
+                        .and_then(Value::as_u64)
+                        .ok_or("DA3 ray mutation inlier count is missing")?
+                );
+                assert_eq!(
+                    u64::from(actual.best_score_bits),
+                    expected
+                        .get("best_score_bits")
+                        .and_then(Value::as_u64)
+                        .ok_or("DA3 ray mutation best score is missing")?
+                );
+                assert_eq!(
+                    actual.fallback,
+                    expected
+                        .get("fallback")
+                        .and_then(Value::as_bool)
+                        .ok_or("DA3 ray mutation fallback is missing")?
+                );
+                let inlier_domain = expected
+                    .get("best_inliers_sha256_domain")
+                    .and_then(Value::as_str)
+                    .ok_or("DA3 ray mutation inlier domain is missing")?;
+                assert_eq!(
+                    index_rows_sha256(inlier_domain, std::slice::from_ref(&actual.best_inliers)),
+                    expected
+                        .get("best_inliers_sha256")
+                        .and_then(Value::as_str)
+                        .ok_or("DA3 ray mutation inlier SHA is missing")?
+                );
+                for (phase, actual_values) in [
+                    (
+                        "normalized_homography_bits",
+                        actual.normalized_homography.as_slice(),
+                    ),
+                    (
+                        "homography_post_sign_bits",
+                        actual.signed_homography.as_slice(),
+                    ),
+                    ("rotation_bits", actual.rotation.as_slice()),
+                    ("lower_bits", actual.lower.as_slice()),
+                    ("c2w_pre_inverse_bits", actual.c2w_pre_inverse.as_slice()),
+                ] {
+                    let expected_values = fixture_raw_bits(
+                        expected
+                            .get(phase)
+                            .ok_or("DA3 ray mutation continuous phase is missing")?,
+                    )?
+                    .into_iter()
+                    .map(f32::from_bits)
+                    .collect::<Vec<_>>();
+                    assert_eq!(actual_values.len(), expected_values.len());
+                    for (lane, (actual, expected)) in actual_values
+                        .iter()
+                        .copied()
+                        .zip(expected_values)
+                        .enumerate()
+                    {
+                        let tolerance = 2.5e-3_f32.max(expected.abs() * 2.5e-3);
+                        assert!(
+                            (actual - expected).abs() <= tolerance,
+                            "DA3 ray mutation {phase}[{lane}]: {actual} != {expected}"
+                        );
+                    }
+                }
+            }
+            for (actual, field) in [
+                (
+                    geometry
+                        .extrinsics
+                        .as_ref()
+                        .ok_or("DA3 mutated ray extrinsics are missing")?,
+                    "extrinsics",
+                ),
+                (
+                    geometry
+                        .intrinsics
+                        .as_ref()
+                        .ok_or("DA3 mutated ray intrinsics are missing")?,
+                    "intrinsics",
+                ),
+            ] {
+                let actual = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+                    &backend,
+                    actual,
+                    execution_context,
+                )?;
+                let expected = fixture_raw_bits(
+                    mutation
+                        .pointer(&format!("/geometry/{field}/bits"))
+                        .ok_or("DA3 ray mutation geometry is missing")?,
+                )?
+                .into_iter()
+                .map(f32::from_bits)
+                .collect::<Vec<_>>();
+                assert_eq!(actual.len(), expected.len());
+                for (lane, (actual, expected)) in actual.into_iter().zip(expected).enumerate() {
+                    let tolerance = 2.5e-3_f32.max(expected.abs() * 2.5e-3);
+                    assert!(
+                        (actual - expected).abs() <= tolerance,
+                        "DA3 ray mutation {field}[{lane}]: {actual} != {expected}"
+                    );
+                }
+            }
+            let baseline_actual_identity = public_geometry_identity(&ray_geometry, &ray_context)?;
+            assert_ne!(actual_identity, baseline_actual_identity, "{name}");
+        } else {
+            let baseline_identity = match execution {
+                "dpt" => oracle.pointer("/reduced_dpt/output_identity_sha256"),
+                "camera" => {
+                    oracle.pointer("/reduced_dualdpt/supplied_camera_output_identity_sha256")
+                }
+                _ => oracle.pointer("/reduced_dualdpt/output_identity_sha256"),
+            }
+            .and_then(serde_json::Value::as_str)
+            .ok_or("DA3 mutation baseline identity is missing")?;
+            assert_eq!(
+                actual_identity != baseline_identity,
+                changes_output,
+                "{name}"
+            );
+        }
         if !changes_output {
             let baseline_digest = match profile {
                 DepthAnything3FixtureProfile::Dpt => resource.semantic_digest_sha256(),

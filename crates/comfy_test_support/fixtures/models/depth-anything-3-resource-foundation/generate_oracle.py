@@ -612,12 +612,20 @@ def document():
     }
     mutation_documents = {}
     for name, (profile, mutation) in mutations.items():
+        mutation_ray_trace = None
         if profile == "dpt":
             outputs = execute_dpt(values, mutation)
         elif profile == "camera":
             outputs = execute_dualdpt(multiview_values, mutation=mutation, camera_inputs=(camera_extrinsics, camera_intrinsics))
         elif profile == "ray":
-            outputs = execute_dualdpt(multiview_values, mutation=mutation, use_ray=True)
+            mutation_head_trace = {}
+            outputs = execute_dualdpt(
+                multiview_values,
+                mutation=mutation,
+                use_ray=True,
+                head_trace=mutation_head_trace,
+            )
+            mutation_ray_trace = ransac_trace_document(outputs[2], outputs[3], 3)
         else:
             outputs = execute_dualdpt(multiview_values, mutation=mutation)
         mutation_documents[name] = {
@@ -625,9 +633,24 @@ def document():
             "state_key": mutation[0],
             "lane": mutation[1],
             "delta_bits": bits(mutation[2]),
-            "output_identity_sha256": output_identity(outputs),
             "changes_output": name != "dual_unused_retained",
         }
+        if mutation_ray_trace is not None:
+            mutation_documents[name].update(
+                {
+                    "depth": tensor_document(outputs[0]),
+                    "confidence": tensor_document(outputs[1]),
+                    "raw_ray": tensor_document(outputs[2]),
+                    "raw_ray_confidence": tensor_document(outputs[3]),
+                    "ransac_trace": mutation_ray_trace,
+                    "geometry": geometry_document(outputs[4]),
+                    "source_raw_ray_changed": outputs[2].values != dual_ray[2].values,
+                    "source_geometry_changed": geometry_document(outputs[4])
+                    != geometry_document(dual_ray[4]),
+                }
+            )
+        else:
+            mutation_documents[name]["output_identity_sha256"] = output_identity(outputs)
     return {
         "format": DOMAIN,
         "generator_command": "PYTHONDONTWRITEBYTECODE=1 python3 crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/generate_oracle.py",
