@@ -165,7 +165,7 @@ pub struct NativeDepthAnything3TestTrace {
 
 #[cfg(any(test, feature = "test-support"))]
 #[doc(hidden)]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct NativeDepthAnything3RansacViewTrace {
     pub candidate_indices: Vec<u64>,
     pub best_iteration: u64,
