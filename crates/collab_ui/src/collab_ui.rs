@@ -16,6 +16,8 @@ pub mod huddle_controls;
 #[cfg(feature = "multiplayer-tools")]
 pub mod inbox_pulse;
 #[cfg(feature = "multiplayer-tools")]
+pub mod mesh_compute;
+#[cfg(feature = "multiplayer-tools")]
 pub mod message_reconciliation;
 #[cfg(feature = "multiplayer-tools")]
 pub mod message_timeline;
