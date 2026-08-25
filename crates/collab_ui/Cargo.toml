@@ -22,6 +22,7 @@ multiplayer-tools = [
     "dep:git_ui",
     "dep:nostr_compat",
     "dep:qrcode",
+    "dep:remote",
     "dep:zeroize",
     "agent_ui/multiplayer-tools",
     "git_ui/multiplayer-tools",
@@ -63,6 +64,7 @@ notifications.workspace = true
 picker.workspace = true
 project.workspace = true
 qrcode = { workspace = true, optional = true }
+remote = { workspace = true, optional = true }
 release_channel.workspace = true
 rpc.workspace = true
 serde.workspace = true
@@ -73,6 +75,7 @@ smol.workspace = true
 telemetry.workspace = true
 theme.workspace = true
 theme_settings.workspace = true
+thiserror.workspace = true
 time.workspace = true
 title_bar.workspace = true
 ui.workspace = true
@@ -89,6 +92,7 @@ collections = { workspace = true, features = ["test-support"] }
 db = { workspace = true, features = ["test-support"] }
 editor = { workspace = true, features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }
+iroh-base.workspace = true
 notifications = { workspace = true, features = ["test-support"] }
 
 project = { workspace = true, features = ["test-support"] }
