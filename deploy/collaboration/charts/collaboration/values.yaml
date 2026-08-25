@@ -34,7 +34,7 @@ migration:
     pullPolicy: IfNotPresent
   secretName: ""
   databaseUrlKey: COLLABORATION_DATABASE_URL
-  requiredSchemaVersion: "20260824000500"
+  requiredSchemaVersion: "20260825000100"
   activeDeadlineSeconds: 300
   backoffLimit: 2
   resources:

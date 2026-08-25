@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "schemaFloor": "0",
-  "schemaCeiling": "20260824000500",
+  "schemaCeiling": "20260825000100",
   "rollbackBoundary": "service-activation",
   "migrations": [
     {
@@ -123,6 +123,12 @@
       "name": "collaboration_moderation",
       "up": { "file": "20260824000500_collaboration_moderation.up.sql", "sha256": "86929038c28347b619a42fbded8196c0702f7a87d5dc5179ec2e9ed7dce05658" },
       "down": { "file": "20260824000500_collaboration_moderation.down.sql", "sha256": "9ccf02ef725171211e706da8e813b70ae5102053c8af8ef4f1160dfc3e1576d7" }
+    },
+    {
+      "version": "20260825000100",
+      "name": "collaboration_workflow_scheduler_admission",
+      "up": { "file": "20260825000100_collaboration_workflow_scheduler_admission.up.sql", "sha256": "1452124d13a5cd26395e904bebd033c6201508ac570db397dd30abd1461dbf3f" },
+      "down": { "file": "20260825000100_collaboration_workflow_scheduler_admission.down.sql", "sha256": "a7b1e2116cb17c9c4b94930fbdec4348dc8e06ea11f274a4011cd369aabfcf1f" }
     }
   ]
 }
