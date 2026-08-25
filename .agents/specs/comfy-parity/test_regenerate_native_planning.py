@@ -89,7 +89,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 721)
+        self.assertEqual(len(tasks), 722)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -684,6 +684,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-provider-runtime-stream-progress-foundation",
             "comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair",
             "comfy-parity-provider-runtime-component-activation-preflight-foundation",
+            "comfy-parity-provider-runtime-worker-context-preflight-repair",
             "comfy-parity-provider-component-host-stream-adapter",
             "comfy-parity-provider-worker-stream-bridge",
             "comfy-parity-provider-deployment-lifecycle",
@@ -699,7 +700,7 @@ class ValidationGenerationTests(unittest.TestCase):
         provider_closure_id = (
             "comfy-parity-native-partner-provider-components-foundation"
         )
-        self.assertEqual(len(provider_shared_ids), 13)
+        self.assertEqual(len(provider_shared_ids), 14)
         self.assertEqual(len(provider_vendor_ids), 33)
         provider_projection = tasks_by_id[
             "comfy-parity-provider-namespace-binding-projection"
@@ -962,19 +963,53 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("No public primitive-field evidence constructor", provider_activation_preflight["done"])
         self.assertIn("can be swapped", provider_activation_preflight["done"])
         self.assertIn(
-            "Task419 owns the first executable capsule success",
+            "comfy-parity-provider-worker-stream-bridge owns the first executable capsule success",
             provider_activation_preflight["done"],
         )
         self.assertIn(
             "no public or feature-gated test authority factory",
             provider_activation_preflight["done"],
         )
+        provider_context_preflight = tasks_by_id[
+            "comfy-parity-provider-runtime-worker-context-preflight-repair"
+        ]
+        self.assertEqual(
+            provider_context_preflight["dependencies"],
+            ["comfy-parity-provider-runtime-component-activation-preflight-foundation"],
+        )
+        self.assertEqual(
+            provider_context_preflight["writes"],
+            [
+                "crates/comfy_runtime/src/plugin_services.rs",
+                "crates/comfy_plugin_host/src/component_host.rs",
+            ],
+        )
+        self.assertIn(
+            "crates/comfy_types/src/worker_protocol.rs",
+            provider_context_preflight["reads"],
+        )
+        self.assertNotIn(
+            "crates/comfy_types/src/worker_protocol.rs",
+            provider_context_preflight["writes"],
+        )
+        for context_preflight_gate in (
+            "NativeProviderWorkerRequest",
+            "postcard bytes remain unchanged",
+            "WorkerProviderInvocationContext",
+            "context-free preflight overload is removed",
+            "private non-cloneable capsule field only after success",
+            "no second context selector",
+            "atomically revokes",
+            "Legacy wire hash and byte fixtures remain frozen",
+            "creates no app-to-worker v2 envelope",
+        ):
+            self.assertIn(context_preflight_gate, provider_context_preflight["done"])
         provider_component_stream = tasks_by_id[
             "comfy-parity-provider-component-host-stream-adapter"
         ]
         self.assertEqual(
             provider_component_stream["dependencies"],
-            ["comfy-parity-provider-runtime-component-activation-preflight-foundation"],
+            ["comfy-parity-provider-runtime-worker-context-preflight-repair"],
         )
         self.assertIn(
             "crates/comfy_runtime/src/plugin_services.rs",
@@ -1002,6 +1037,14 @@ class ValidationGenerationTests(unittest.TestCase):
             "worker bridge owns the first production valid-grant issuance",
             provider_component_stream["done"],
         )
+        for component_route_gate in (
+            "capacity-one typed WorkerProviderStreamRequest",
+            "nonblocking enqueue",
+            "canonical WorkerProviderStreamTransportValidator",
+            "no public/default transport trait",
+            "Every legacy v1 preparation",
+        ):
+            self.assertIn(component_route_gate, provider_component_stream["done"])
         self.assertIn(
             "crates/comfy_plugin_host/src/private_worker.rs",
             provider_component_stream["reads"],
@@ -1041,9 +1084,17 @@ class ValidationGenerationTests(unittest.TestCase):
             provider_worker_bridge["writes"],
         )
         self.assertIn(
-            "native controller mints and registers the one-use runtime activation grant",
+            "app-side native controller allocates the WorkerProviderInvocationContext",
             provider_worker_bridge["done"],
         )
+        for worker_bridge_context_gate in (
+            "passes that exact context into the consuming component-host preflight",
+            "distinct app-to-worker provider-v2 invocation envelope",
+            "NativeProviderWorkerRequest::Begin bytes remain unchanged",
+            "canonical transport validator only from that envelope",
+            "No public raw-field constructor",
+        ):
+            self.assertIn(worker_bridge_context_gate, provider_worker_bridge["done"])
         self.assertIn(
             "first valid-grant end-to-end success path",
             provider_worker_bridge["done"],
