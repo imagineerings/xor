@@ -3727,6 +3727,7 @@ dependencies = [
  "channel",
  "chrono",
  "client",
+ "collab",
  "collaboration_domain",
  "collections",
  "db",
@@ -12639,6 +12640,7 @@ dependencies = [
  "thiserror 2.0.17",
  "url",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -13778,6 +13780,21 @@ checksum = "30d5b2194ed13191c1999ae0704b7839fb18384fa22e49b57eeaa97d79ce40da"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "pair_relay"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "base64 0.22.1",
+ "futures 0.3.32",
+ "nostr",
+ "nostr_compat",
+ "secp256k1",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
