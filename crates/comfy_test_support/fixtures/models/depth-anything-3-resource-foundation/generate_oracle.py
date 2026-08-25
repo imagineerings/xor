@@ -25,6 +25,7 @@ from source_graph import (
 ROOT = Path(__file__).resolve().parents[5]
 OUTPUT = Path(__file__).with_name("oracle.json")
 DOMAIN = "zed.comfy.depth-anything-3-reduced-oracle.v1"
+AUXILIARY_HEAD_PHASE_DOMAIN = "zed.comfy.depth-anything-3.auxiliary-head-phase.v1"
 SOURCES = {
     "projects/comfy/ComfyUI/comfy_extras/nodes_depth_anything_3.py": "adfce28637b6904a08596aa23e22502d20089bc28fff6bcdaabe0b3c35fb7f02",
     "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/model.py": "6f05ba0c22a34304f6bd6cde7e6dd26ceef474a99ad51d6632940f8d2decf6b0",
@@ -227,6 +228,30 @@ def tensor_document(tensor):
         "shape": list(tensor.shape),
         "bits": [bits(value) for value in tensor.values],
         "raw_f32_sha256": hashlib.sha256(raw).hexdigest(),
+    }
+
+
+def tensor_phase_summary(phase, tensor):
+    raw = b"".join(struct.pack("<f", value) for value in tensor.values)
+    digest = hashlib.sha256()
+    encoded_domain = AUXILIARY_HEAD_PHASE_DOMAIN.encode("ascii")
+    encoded_phase = phase.encode("ascii")
+    digest.update(len(encoded_domain).to_bytes(8, "little"))
+    digest.update(encoded_domain)
+    digest.update(len(encoded_phase).to_bytes(8, "little"))
+    digest.update(encoded_phase)
+    digest.update(len(tensor.shape).to_bytes(8, "little"))
+    for dimension in tensor.shape:
+        digest.update(dimension.to_bytes(8, "little"))
+    digest.update(len(raw).to_bytes(8, "little"))
+    digest.update(raw)
+    return {
+        "phase": phase,
+        "shape": list(tensor.shape),
+        "raw_f32_sha256_domain": AUXILIARY_HEAD_PHASE_DOMAIN,
+        "raw_f32_sha256": digest.hexdigest(),
+        "first_bits": [bits(value) for value in tensor.values[:8]],
+        "last_bits": [bits(value) for value in tensor.values[-8:]],
     }
 
 
@@ -501,9 +526,40 @@ def document():
         head_trace=auxiliary_head_trace,
     )
     ray_trace = ransac_trace_document(dual_ray[2], dual_ray[3], 3)
+    prefix_phase_order = [
+        "resized_0",
+        "resized_1",
+        "resized_2",
+        "resized_3",
+        "refinenet4_aux",
+        "refinenet3_aux",
+        "refinenet2_aux",
+        "refinenet1_aux",
+        "output_conv1_aux_0",
+        "output_conv1_aux_1",
+        "output_conv1_aux_2",
+        "output_conv1_aux_3_conv_0",
+        "output_conv1_aux_3_conv_1",
+        "output_conv1_aux_3_conv_2",
+        "output_conv1_aux_3_conv_3",
+        "output_conv1_aux_3_conv_4",
+        "output_conv1_aux_3",
+    ]
+    ray_trace["auxiliary_head_prefix_phases"] = [
+        tensor_phase_summary(phase, auxiliary_head_trace[phase])
+        for phase in prefix_phase_order
+    ]
     ray_trace["auxiliary_head_phases"] = {
-        phase: tensor_document(tensor)
-        for phase, tensor in auxiliary_head_trace.items()
+        phase: tensor_document(auxiliary_head_trace[phase])
+        for phase in [
+            "positioned",
+            "convolution_3_0",
+            "normalized",
+            "relu",
+            "logits",
+            "ray",
+            "confidence",
+        ]
     }
     ray_fixture_state = make_state("dualdpt")
     ray_trace["fixture_state"] = [

@@ -965,17 +965,28 @@ def depth_head(state, features, height=4, width=4, profile="dpt", use_ray=False,
             tensor = convolution(state, tensor, "native.head.resize_layers.3", 2, 1)
         tensor = convolution(state, tensor, f"native.head.scratch.layer{index + 1}_rn", 1, 1)
         resized.append(tensor)
+    if head_trace is not None:
+        for index, tensor in enumerate(resized):
+            head_trace[f"resized_{index}"] = tensor.clone()
     main = fusion(state, resized[3], None, "native.head.scratch.refinenet4", resized[2].shape[2:])
     auxiliary = [fusion(state, resized[3], None, "native.head.scratch.refinenet4_aux", resized[2].shape[2:])] if use_ray else None
+    if head_trace is not None and auxiliary is not None:
+        head_trace["refinenet4_aux"] = auxiliary[-1].clone()
     main = fusion(state, main, resized[2], "native.head.scratch.refinenet3", resized[1].shape[2:])
     if auxiliary is not None:
         auxiliary.append(fusion(state, auxiliary[-1], resized[2], "native.head.scratch.refinenet3_aux", resized[1].shape[2:]))
+        if head_trace is not None:
+            head_trace["refinenet3_aux"] = auxiliary[-1].clone()
     main = fusion(state, main, resized[1], "native.head.scratch.refinenet2", resized[0].shape[2:])
     if auxiliary is not None:
         auxiliary.append(fusion(state, auxiliary[-1], resized[1], "native.head.scratch.refinenet2_aux", resized[0].shape[2:]))
+        if head_trace is not None:
+            head_trace["refinenet2_aux"] = auxiliary[-1].clone()
     main = fusion(state, main, resized[0], "native.head.scratch.refinenet1")
     if auxiliary is not None:
         auxiliary.append(fusion(state, auxiliary[-1], resized[0], "native.head.scratch.refinenet1_aux"))
+        if head_trace is not None:
+            head_trace["refinenet1_aux"] = auxiliary[-1].clone()
     fused = convolution(state, main, "native.head.scratch.output_conv1", 1, 1)
     fused = bilinear(fused, height, width, True)
     if profile == "dualdpt":
@@ -1002,7 +1013,11 @@ def depth_head(state, features, height=4, width=4, profile="dpt", use_ray=False,
         for level, tensor in enumerate(auxiliary):
             for index in range(5):
                 tensor = convolution(state, tensor, f"native.head.scratch.output_conv1_aux.{level}.{index}", 1, 1)
+                if head_trace is not None and level == 3:
+                    head_trace[f"output_conv1_aux_3_conv_{index}"] = tensor.clone()
             processed.append(tensor)
+            if head_trace is not None:
+                head_trace[f"output_conv1_aux_{level}"] = tensor.clone()
         last = position_embedding(processed[-1], width, height)
         if head_trace is not None:
             head_trace["positioned"] = last.clone()

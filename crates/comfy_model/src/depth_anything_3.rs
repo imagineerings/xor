@@ -1373,6 +1373,10 @@ struct DepthHeadOutput {
 #[derive(Clone, Debug, Default)]
 struct DepthAnything3ExecutionTrace {
     stop_before_ray_pose: bool,
+    auxiliary_resized: Vec<Tensor>,
+    auxiliary_fusion: Vec<Tensor>,
+    auxiliary_processed: Vec<Tensor>,
+    auxiliary_selected_convolutions: Vec<Tensor>,
     auxiliary_positioned: Option<Tensor>,
     auxiliary_convolution: Option<Tensor>,
     auxiliary_normalized: Option<Tensor>,
@@ -3027,6 +3031,11 @@ fn execute_depth_head(
             context,
         )?);
     }
+    if let Some(trace) = trace.as_deref_mut()
+        && trace.stop_before_ray_pose
+    {
+        trace.auxiliary_resized = resized.clone();
+    }
     let mut main = fusion_block(
         resource,
         backend,
@@ -3037,7 +3046,7 @@ fn execute_depth_head(
         context,
     )?;
     let mut auxiliary = if use_ray_pose {
-        Some(vec![fusion_block(
+        let first = fusion_block(
             resource,
             backend,
             &resized[3],
@@ -3045,7 +3054,13 @@ fn execute_depth_head(
             "native.head.scratch.refinenet4_aux",
             Some(spatial_size(&resized[2])?),
             context,
-        )?])
+        )?;
+        if let Some(trace) = trace.as_deref_mut()
+            && trace.stop_before_ray_pose
+        {
+            trace.auxiliary_fusion.push(first.clone());
+        }
+        Some(vec![first])
     } else {
         None
     };
@@ -3079,6 +3094,11 @@ fn execute_depth_head(
                 },
                 context,
             )?;
+            if let Some(trace) = trace.as_deref_mut()
+                && trace.stop_before_ray_pose
+            {
+                trace.auxiliary_fusion.push(next.clone());
+            }
             auxiliary.push(next);
         }
     }
@@ -3180,6 +3200,17 @@ fn execute_depth_head(
                     false,
                     context,
                 )?;
+                if level == 3
+                    && let Some(trace) = trace.as_deref_mut()
+                    && trace.stop_before_ray_pose
+                {
+                    trace.auxiliary_selected_convolutions.push(tensor.clone());
+                }
+            }
+            if let Some(trace) = trace.as_deref_mut()
+                && trace.stop_before_ray_pose
+            {
+                trace.auxiliary_processed.push(tensor.clone());
             }
             processed.push(tensor);
         }
@@ -5919,6 +5950,152 @@ mod tests {
             },
             &context,
         )?;
+        let mut prefix_phases = Vec::new();
+        for (stage, tensor) in trace.auxiliary_resized.into_iter().enumerate() {
+            prefix_phases.push((format!("resized_{stage}"), tensor));
+        }
+        for (phase, tensor) in [
+            "refinenet4_aux",
+            "refinenet3_aux",
+            "refinenet2_aux",
+            "refinenet1_aux",
+        ]
+        .into_iter()
+        .zip(trace.auxiliary_fusion)
+        {
+            prefix_phases.push((phase.to_owned(), tensor));
+        }
+        let mut processed = trace.auxiliary_processed.into_iter();
+        for level in 0..3 {
+            prefix_phases.push((
+                format!("output_conv1_aux_{level}"),
+                processed
+                    .next()
+                    .ok_or("DA3 auxiliary processed phase is unavailable")?,
+            ));
+        }
+        for (convolution, tensor) in trace
+            .auxiliary_selected_convolutions
+            .into_iter()
+            .enumerate()
+        {
+            prefix_phases.push((format!("output_conv1_aux_3_conv_{convolution}"), tensor));
+        }
+        prefix_phases.push((
+            "output_conv1_aux_3".to_owned(),
+            processed
+                .next()
+                .ok_or("DA3 selected auxiliary processed phase is unavailable")?,
+        ));
+        if processed.next().is_some() {
+            return Err("DA3 auxiliary processed phase count changed".into());
+        }
+        let expected_prefix_phases = oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/auxiliary_head_prefix_phases")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("DA3 auxiliary head prefix phase oracle is missing")?;
+        if prefix_phases.len() != expected_prefix_phases.len() {
+            return Err(format!(
+                "DA3 auxiliary head prefix phase count: actual {}, expected {}",
+                prefix_phases.len(),
+                expected_prefix_phases.len()
+            )
+            .into());
+        }
+        for ((phase, actual), expected) in prefix_phases.into_iter().zip(expected_prefix_phases) {
+            if expected.get("phase").and_then(serde_json::Value::as_str) != Some(phase.as_str()) {
+                return Err(format!("DA3 auxiliary head phase order changed at {phase}").into());
+            }
+            let expected_shape = expected
+                .get("shape")
+                .and_then(serde_json::Value::as_array)
+                .ok_or("DA3 auxiliary head prefix shape is missing")?
+                .iter()
+                .map(|value| value.as_u64().ok_or("DA3 auxiliary head shape is invalid"))
+                .collect::<Result<Vec<_>, _>>()?;
+            if actual.descriptor().shape() != expected_shape {
+                return Err(format!(
+                    "DA3 auxiliary head {phase} shape: actual {:?}, expected {expected_shape:?}",
+                    actual.descriptor().shape()
+                )
+                .into());
+            }
+            let values = tensor_to_f32_with_context_exact_native(&backend, &actual, &context)?;
+            let bits = values.iter().copied().map(f32::to_bits).collect::<Vec<_>>();
+            let expected_edge_bits = |field: &str| -> Result<Vec<u32>, Box<dyn std::error::Error>> {
+                Ok(expected
+                    .get(field)
+                    .and_then(serde_json::Value::as_array)
+                    .ok_or_else(|| format!("DA3 auxiliary head {phase} {field} is missing"))?
+                    .iter()
+                    .map(|value| {
+                        value
+                            .as_u64()
+                            .and_then(|value| u32::try_from(value).ok())
+                            .ok_or_else(|| format!("DA3 auxiliary head {phase} {field} is invalid"))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?)
+            };
+            let first = bits.iter().copied().take(8).collect::<Vec<_>>();
+            let last = bits
+                .iter()
+                .copied()
+                .rev()
+                .take(8)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>();
+            let expected_first = expected_edge_bits("first_bits")?;
+            let expected_last = expected_edge_bits("last_bits")?;
+            for (edge, actual, expected) in [
+                ("first", &first, &expected_first),
+                ("last", &last, &expected_last),
+            ] {
+                if let Some((index, (actual, expected))) = actual
+                    .iter()
+                    .zip(expected)
+                    .enumerate()
+                    .find(|(_, (actual, expected))| actual != expected)
+                {
+                    return Err(format!(
+                        "DA3 auxiliary head {phase} {edge}[{index}]: actual {actual:#010x}, expected {expected:#010x}"
+                    )
+                    .into());
+                }
+            }
+            let domain = expected
+                .get("raw_f32_sha256_domain")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("DA3 auxiliary head SHA domain is missing")?;
+            let mut digest = Sha256::new();
+            digest.update((domain.len() as u64).to_le_bytes());
+            digest.update(domain.as_bytes());
+            digest.update((phase.len() as u64).to_le_bytes());
+            digest.update(phase.as_bytes());
+            digest.update((actual.descriptor().shape().len() as u64).to_le_bytes());
+            for dimension in actual.descriptor().shape() {
+                digest.update(dimension.to_le_bytes());
+            }
+            let raw_bytes = u64::try_from(bits.len())?
+                .checked_mul(4)
+                .ok_or("DA3 auxiliary head raw byte count overflowed")?;
+            digest.update(raw_bytes.to_le_bytes());
+            for value in bits {
+                digest.update(value.to_le_bytes());
+            }
+            let actual_digest = format!("{:x}", digest.finalize());
+            let expected_digest = expected
+                .get("raw_f32_sha256")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("DA3 auxiliary head SHA is missing")?;
+            if actual_digest != expected_digest {
+                return Err(format!(
+                    "DA3 auxiliary head {phase} raw F32 SHA: actual {actual_digest}, expected {expected_digest}"
+                )
+                .into());
+            }
+        }
         let phases = [
             ("positioned", trace.auxiliary_positioned),
             ("convolution_3_0", trace.auxiliary_convolution),

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "oracle_domain": "zed.comfy.depth-anything-3-reduced-oracle.v1",
-  "generator_sha256": "cf81815d645d9733f0760de82c9db46e8bc96a20fd2baecec1f82a28e230cd58",
-  "source_graph_sha256": "a27c2a735bfc6e4e2be80d42ee1083d0e24ebaff2c6fde0381c029ea22be4105",
-  "oracle_sha256": "47aed10b96548c282b4b180dbc755b6f74641db659961c6bf54772ca1c0823d8",
+  "generator_sha256": "dcb1743ba4fc932e54148f20f1bf97bdbef8d2426f7c2eb40582235e48c6eee8",
+  "source_graph_sha256": "bf00d5021e3a2967c31b5cba3bc6f1a15a709b798442d392f90589963682b7eb",
+  "oracle_sha256": "8f05020fb511a991c3e428f86ea7a00a76c15f6dd550f89005ccdfa4be894d0d",
   "profiles": [
     {
       "name": "reduced-dpt",
