@@ -1377,6 +1377,7 @@ struct DepthAnything3ExecutionTrace {
     auxiliary_fusion: Vec<Tensor>,
     auxiliary_processed: Vec<Tensor>,
     auxiliary_selected_convolutions: Vec<Tensor>,
+    auxiliary_position_lane: Option<DepthAnything3PositionLaneTrace>,
     auxiliary_positioned: Option<Tensor>,
     auxiliary_convolution: Option<Tensor>,
     auxiliary_normalized: Option<Tensor>,
@@ -1386,6 +1387,35 @@ struct DepthAnything3ExecutionTrace {
     raw_ray_confidence: Option<Tensor>,
     ransac_samples: Vec<Vec<usize>>,
     ransac_views: Vec<DepthAnything3RansacViewTrace>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct DepthAnything3PositionLaneTrace {
+    x_coordinate_bits: Vec<u32>,
+    y_coordinate_bits: Vec<u32>,
+    batch: usize,
+    channel: usize,
+    y: usize,
+    x: usize,
+    exponent_ratio_bits: u32,
+    positive_power_bits: u32,
+    reciprocal_bits: u32,
+    negative_power_bits: u32,
+    frequency_bits: u32,
+    discriminator_ratio_bits: u32,
+    discriminator_positive_power_bits: u32,
+    discriminator_reciprocal_bits: u32,
+    discriminator_negative_power_bits: u32,
+    position_bits: u32,
+    phase_bits: u32,
+    sine_bits: u32,
+    cosine_bits: u32,
+    selected_trig: &'static str,
+    selected_trig_bits: u32,
+    ratio_bits: u32,
+    embedding_bits: u32,
+    input_bits: u32,
+    output_bits: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -3217,10 +3247,26 @@ fn execute_depth_head(
         let mut last = processed
             .pop()
             .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
-        last = add_stateless_position_embedding(backend, &last, width, height, context)?;
+        let capture_position_lane = trace
+            .as_deref()
+            .is_some_and(|trace| trace.stop_before_ray_pose);
+        let mut position_lane = DepthAnything3PositionLaneTrace::default();
+        last = if capture_position_lane {
+            add_stateless_position_embedding_internal(
+                backend,
+                &last,
+                width,
+                height,
+                context,
+                Some(&mut position_lane),
+            )?
+        } else {
+            add_stateless_position_embedding(backend, &last, width, height, context)?
+        };
         if let Some(trace) = trace.as_deref_mut()
             && trace.stop_before_ray_pose
         {
+            trace.auxiliary_position_lane = Some(position_lane);
             trace.auxiliary_positioned = Some(last.clone());
         }
         let last = convolution(
@@ -3352,6 +3398,24 @@ fn add_stateless_position_embedding(
     source_height: usize,
     context: &ExecutionContext<'_>,
 ) -> Result<Tensor, NativeDepthAnything3Error> {
+    add_stateless_position_embedding_internal(
+        backend,
+        input,
+        source_width,
+        source_height,
+        context,
+        None,
+    )
+}
+
+fn add_stateless_position_embedding_internal(
+    backend: &CpuBackend,
+    input: &Tensor,
+    source_width: usize,
+    source_height: usize,
+    context: &ExecutionContext<'_>,
+    mut lane_trace: Option<&mut DepthAnything3PositionLaneTrace>,
+) -> Result<Tensor, NativeDepthAnything3Error> {
     let shape = shape_usize(input)?;
     let [batch, channels, height, width] = shape.as_slice() else {
         return Err(NativeDepthAnything3Error::ShapeOverflow);
@@ -3386,14 +3450,57 @@ fn add_stateless_position_embedding(
                         (y_position, channel - axis_channels)
                     };
                     let half = axis_channels / 2;
-                    let frequency = 100.0_f32.powf(-((local % half) as f32) / half as f32);
-                    let value = if local < half {
-                        (position * frequency).sin()
+                    let exponent_ratio = (local % half) as f32 / half as f32;
+                    let positive_power = 100.0_f32.powf(exponent_ratio);
+                    let reciprocal = 1.0 / positive_power;
+                    let negative_power = 100.0_f32.powf(-exponent_ratio);
+                    let frequency = reciprocal;
+                    let phase = position * frequency;
+                    let (selected_trig, trig) = if local < half {
+                        ("sin", phase.sin())
                     } else {
-                        (position * frequency).cos()
-                    } * 0.1;
+                        ("cos", phase.cos())
+                    };
+                    let value = trig * 0.1;
                     embedding[((batch_index * channels + channel) * height + y) * width + x] =
                         value;
+                    if batch_index == 0
+                        && channel == 0
+                        && y == 0
+                        && x == 0
+                        && let Some(trace) = lane_trace.as_deref_mut()
+                    {
+                        trace.x_coordinate_bits =
+                            x_coordinates.iter().map(|value| value.to_bits()).collect();
+                        trace.y_coordinate_bits =
+                            y_coordinates.iter().map(|value| value.to_bits()).collect();
+                        trace.batch = batch_index;
+                        trace.channel = channel;
+                        trace.y = y;
+                        trace.x = x;
+                        trace.exponent_ratio_bits = exponent_ratio.to_bits();
+                        trace.positive_power_bits = positive_power.to_bits();
+                        trace.reciprocal_bits = reciprocal.to_bits();
+                        trace.negative_power_bits = negative_power.to_bits();
+                        trace.frequency_bits = frequency.to_bits();
+                        let discriminator_ratio = 1.0_f32 / 3.0;
+                        let discriminator_positive_power = 100.0_f32.powf(discriminator_ratio);
+                        trace.discriminator_ratio_bits = discriminator_ratio.to_bits();
+                        trace.discriminator_positive_power_bits =
+                            discriminator_positive_power.to_bits();
+                        trace.discriminator_reciprocal_bits =
+                            (1.0_f32 / discriminator_positive_power).to_bits();
+                        trace.discriminator_negative_power_bits =
+                            100.0_f32.powf(-discriminator_ratio).to_bits();
+                        trace.position_bits = position.to_bits();
+                        trace.phase_bits = phase.to_bits();
+                        trace.sine_bits = phase.sin().to_bits();
+                        trace.cosine_bits = phase.cos().to_bits();
+                        trace.selected_trig = selected_trig;
+                        trace.selected_trig_bits = trig.to_bits();
+                        trace.ratio_bits = 0.1_f32.to_bits();
+                        trace.embedding_bits = value.to_bits();
+                    }
                 }
             }
         }
@@ -3406,13 +3513,26 @@ fn add_stateless_position_embedding(
         DeviceId::CPU,
         context,
     )?;
-    Ok(add_method_with_context_exact_native(
+    let output = add_method_with_context_exact_native(
         backend,
         input,
         ElementwiseOperand::Tensor(&embedding),
         1.0,
         context,
-    )?)
+    )?;
+    if let Some(trace) = lane_trace {
+        trace.input_bits = tensor_to_f32_with_context_exact_native(backend, input, context)?
+            .first()
+            .copied()
+            .ok_or(NativeDepthAnything3Error::ShapeOverflow)?
+            .to_bits();
+        trace.output_bits = tensor_to_f32_with_context_exact_native(backend, &output, context)?
+            .first()
+            .copied()
+            .ok_or(NativeDepthAnything3Error::ShapeOverflow)?
+            .to_bits();
+    }
+    Ok(output)
 }
 
 fn stateless_position_coordinates(
@@ -6092,6 +6212,168 @@ mod tests {
             if actual_digest != expected_digest {
                 return Err(format!(
                     "DA3 auxiliary head {phase} raw F32 SHA: actual {actual_digest}, expected {expected_digest}"
+                )
+                .into());
+            }
+        }
+        let position_lane = trace
+            .auxiliary_position_lane
+            .ok_or("DA3 auxiliary position lane trace is unavailable")?;
+        let expected_position_lane = oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/auxiliary_position_lane")
+            .ok_or("DA3 auxiliary position lane oracle is missing")?;
+        for (field, actual) in [
+            ("x_coordinate_bits", &position_lane.x_coordinate_bits),
+            ("y_coordinate_bits", &position_lane.y_coordinate_bits),
+        ] {
+            let expected = expected_position_lane
+                .get(field)
+                .and_then(serde_json::Value::as_array)
+                .ok_or("DA3 position coordinate oracle is missing")?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_u64()
+                        .and_then(|value| u32::try_from(value).ok())
+                        .ok_or("DA3 position coordinate bit is invalid")
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            if actual.len() != expected.len() {
+                return Err(format!(
+                    "DA3 auxiliary position {field} length: actual {}, expected {}",
+                    actual.len(),
+                    expected.len()
+                )
+                .into());
+            }
+            if let Some((index, (actual, expected))) = actual
+                .iter()
+                .zip(&expected)
+                .enumerate()
+                .find(|(_, (actual, expected))| actual != expected)
+            {
+                return Err(format!(
+                    "DA3 auxiliary position {field}[{index}]: actual {actual:#010x}, expected {expected:#010x}"
+                )
+                .into());
+            }
+        }
+        for (field, actual) in [
+            ("batch", position_lane.batch),
+            ("channel", position_lane.channel),
+            ("y", position_lane.y),
+            ("x", position_lane.x),
+        ] {
+            let expected = expected_position_lane
+                .get(field)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|value| usize::try_from(value).ok())
+                .ok_or("DA3 auxiliary position lane index is missing")?;
+            if actual != expected {
+                return Err(format!(
+                    "DA3 auxiliary position {field}: actual {actual}, expected {expected}"
+                )
+                .into());
+            }
+        }
+        for (field, actual) in [
+            ("exponent_ratio_bits", position_lane.exponent_ratio_bits),
+            ("positive_power_bits", position_lane.positive_power_bits),
+            ("reciprocal_bits", position_lane.reciprocal_bits),
+            ("negative_power_bits", position_lane.negative_power_bits),
+            ("frequency_bits", position_lane.frequency_bits),
+            (
+                "discriminator_ratio_bits",
+                position_lane.discriminator_ratio_bits,
+            ),
+            (
+                "discriminator_positive_power_bits",
+                position_lane.discriminator_positive_power_bits,
+            ),
+            (
+                "discriminator_reciprocal_bits",
+                position_lane.discriminator_reciprocal_bits,
+            ),
+            (
+                "discriminator_negative_power_bits",
+                position_lane.discriminator_negative_power_bits,
+            ),
+            ("position_bits", position_lane.position_bits),
+            ("phase_bits", position_lane.phase_bits),
+        ] {
+            let expected = expected_position_lane
+                .get(field)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or("DA3 auxiliary position scalar oracle is missing")?;
+            if actual != expected {
+                return Err(format!(
+                    "DA3 auxiliary position {field}: actual {actual:#010x}, expected {expected:#010x}"
+                )
+                .into());
+            }
+        }
+        for (function, actual, source_field, libc_field) in [
+            (
+                "sin",
+                position_lane.sine_bits,
+                "python_double_sine_bits",
+                "libc_sine_bits",
+            ),
+            (
+                "cos",
+                position_lane.cosine_bits,
+                "python_double_cosine_bits",
+                "libc_cosine_bits",
+            ),
+        ] {
+            let source = expected_position_lane
+                .get(source_field)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or("DA3 source position transcendental is missing")?;
+            let libc = expected_position_lane
+                .get(libc_field)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or("DA3 libc position transcendental is missing")?;
+            if actual != libc {
+                return Err(format!(
+                    "DA3 auxiliary position {function}: actual {actual:#010x}, source-graph {source:#010x}, pinned-libc {libc:#010x}"
+                )
+                .into());
+            }
+            if function == "sin" && source == libc {
+                return Err("DA3 auxiliary position sinf discriminator was washed out".into());
+            }
+        }
+        if position_lane.discriminator_reciprocal_bits
+            == position_lane.discriminator_negative_power_bits
+        {
+            return Err("DA3 reciprocal-positive-pow discriminator was washed out".into());
+        }
+        if expected_position_lane
+            .get("selected_trig")
+            .and_then(serde_json::Value::as_str)
+            != Some(position_lane.selected_trig)
+        {
+            return Err("DA3 auxiliary position selected transcendental changed".into());
+        }
+        for (field, actual) in [
+            ("selected_trig_bits", position_lane.selected_trig_bits),
+            ("ratio_bits", position_lane.ratio_bits),
+            ("embedding_bits", position_lane.embedding_bits),
+            ("input_bits", position_lane.input_bits),
+            ("output_bits", position_lane.output_bits),
+        ] {
+            let expected = expected_position_lane
+                .get(field)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or("DA3 auxiliary position result oracle is missing")?;
+            if actual != expected {
+                return Err(format!(
+                    "DA3 auxiliary position {field}: actual {actual:#010x}, expected {expected:#010x}"
                 )
                 .into());
             }

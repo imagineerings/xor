@@ -549,6 +549,7 @@ def document():
         tensor_phase_summary(phase, auxiliary_head_trace[phase])
         for phase in prefix_phase_order
     ]
+    ray_trace["auxiliary_position_lane"] = auxiliary_head_trace["position_lane"]
     ray_trace["auxiliary_head_phases"] = {
         phase: tensor_document(auxiliary_head_trace[phase])
         for phase in [

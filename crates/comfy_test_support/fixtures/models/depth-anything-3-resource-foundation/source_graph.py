@@ -6,6 +6,12 @@ import struct
 LIBC = ctypes.CDLL(None)
 LIBC.atanf.argtypes = [ctypes.c_float]
 LIBC.atanf.restype = ctypes.c_float
+LIBC.sinf.argtypes = [ctypes.c_float]
+LIBC.sinf.restype = ctypes.c_float
+LIBC.cosf.argtypes = [ctypes.c_float]
+LIBC.cosf.restype = ctypes.c_float
+LIBC.powf.argtypes = [ctypes.c_float, ctypes.c_float]
+LIBC.powf.restype = ctypes.c_float
 
 MASK64 = (1 << 64) - 1
 RAY_POSE_RNG_ADDRESS = {
@@ -48,6 +54,18 @@ def fdiv(left, right):
 
 def fatan(value):
     return f32(LIBC.atanf(ctypes.c_float(f32(value))))
+
+
+def fsin(value):
+    return f32(LIBC.sinf(ctypes.c_float(f32(value))))
+
+
+def fcos(value):
+    return f32(LIBC.cosf(ctypes.c_float(f32(value))))
+
+
+def fpow(left, right):
+    return f32(LIBC.powf(ctypes.c_float(f32(left)), ctypes.c_float(f32(right))))
 
 
 def project_storage(value, source_dtype):
@@ -917,7 +935,7 @@ def fusion(state, input_tensor, residual, prefix, target=None):
     return convolution(state, output, prefix + ".out_conv")
 
 
-def position_embedding(input_tensor, source_width, source_height):
+def position_embedding(input_tensor, source_width, source_height, lane_trace=None):
     batch, channels, height, width = input_tensor.shape
     aspect = source_width / source_height
     diagonal = math.sqrt(aspect * aspect + 1.0)
@@ -935,13 +953,58 @@ def position_embedding(input_tensor, source_width, source_height):
     for batch_index in range(batch):
         for channel in range(channels):
             local = channel if channel < axis_channels else channel - axis_channels
-            frequency = f32(100.0 ** (-f32(local % half) / f32(half)))
+            exponent_ratio = fdiv(f32(local % half), f32(half))
+            positive_power = fpow(100.0, exponent_ratio)
+            reciprocal = fdiv(1.0, positive_power)
+            negative_power = fpow(100.0, f32(-exponent_ratio))
+            frequency = reciprocal
             for y in range(height):
                 for x in range(width):
                     position = xs[x] if channel < axis_channels else ys[y]
                     phase = fmul(position, frequency)
-                    embedding = fmul(f32(math.sin(phase) if local < half else math.cos(phase)), 0.1)
-                    output.set(fadd(input_tensor.get(batch_index, channel, y, x), embedding), batch_index, channel, y, x)
+                    python_double_sine = f32(math.sin(phase))
+                    python_double_cosine = f32(math.cos(phase))
+                    sine = fsin(phase)
+                    cosine = fcos(phase)
+                    selected = sine if local < half else cosine
+                    embedding = fmul(selected, 0.1)
+                    input_value = input_tensor.get(batch_index, channel, y, x)
+                    output_value = fadd(input_value, embedding)
+                    output.set(output_value, batch_index, channel, y, x)
+                    if lane_trace is not None and batch_index == 0 and channel == 0 and y == 0 and x == 0:
+                        discriminator_ratio = fdiv(1.0, 3.0)
+                        discriminator_positive_power = fpow(100.0, discriminator_ratio)
+                        lane_trace.update(
+                            {
+                                "x_coordinate_bits": [struct.unpack("<I", struct.pack("<f", value))[0] for value in xs],
+                                "y_coordinate_bits": [struct.unpack("<I", struct.pack("<f", value))[0] for value in ys],
+                                "batch": batch_index,
+                                "channel": channel,
+                                "y": y,
+                                "x": x,
+                                "exponent_ratio_bits": struct.unpack("<I", struct.pack("<f", exponent_ratio))[0],
+                                "positive_power_bits": struct.unpack("<I", struct.pack("<f", positive_power))[0],
+                                "reciprocal_bits": struct.unpack("<I", struct.pack("<f", reciprocal))[0],
+                                "negative_power_bits": struct.unpack("<I", struct.pack("<f", negative_power))[0],
+                                "frequency_bits": struct.unpack("<I", struct.pack("<f", frequency))[0],
+                                "discriminator_ratio_bits": struct.unpack("<I", struct.pack("<f", discriminator_ratio))[0],
+                                "discriminator_positive_power_bits": struct.unpack("<I", struct.pack("<f", discriminator_positive_power))[0],
+                                "discriminator_reciprocal_bits": struct.unpack("<I", struct.pack("<f", fdiv(1.0, discriminator_positive_power)))[0],
+                                "discriminator_negative_power_bits": struct.unpack("<I", struct.pack("<f", fpow(100.0, f32(-discriminator_ratio))))[0],
+                                "position_bits": struct.unpack("<I", struct.pack("<f", position))[0],
+                                "phase_bits": struct.unpack("<I", struct.pack("<f", phase))[0],
+                                "python_double_sine_bits": struct.unpack("<I", struct.pack("<f", python_double_sine))[0],
+                                "python_double_cosine_bits": struct.unpack("<I", struct.pack("<f", python_double_cosine))[0],
+                                "libc_sine_bits": struct.unpack("<I", struct.pack("<f", sine))[0],
+                                "libc_cosine_bits": struct.unpack("<I", struct.pack("<f", cosine))[0],
+                                "selected_trig": "sin" if local < half else "cos",
+                                "selected_trig_bits": struct.unpack("<I", struct.pack("<f", selected))[0],
+                                "ratio_bits": struct.unpack("<I", struct.pack("<f", f32(0.1)))[0],
+                                "embedding_bits": struct.unpack("<I", struct.pack("<f", embedding))[0],
+                                "input_bits": struct.unpack("<I", struct.pack("<f", input_value))[0],
+                                "output_bits": struct.unpack("<I", struct.pack("<f", output_value))[0],
+                            }
+                        )
     return output
 
 
@@ -1018,8 +1081,15 @@ def depth_head(state, features, height=4, width=4, profile="dpt", use_ray=False,
             processed.append(tensor)
             if head_trace is not None:
                 head_trace[f"output_conv1_aux_{level}"] = tensor.clone()
-        last = position_embedding(processed[-1], width, height)
+        position_lane_trace = {} if head_trace is not None else None
+        last = position_embedding(
+            processed[-1],
+            width,
+            height,
+            position_lane_trace,
+        )
         if head_trace is not None:
+            head_trace["position_lane"] = position_lane_trace
             head_trace["positioned"] = last.clone()
         last = convolution(state, last, "native.head.scratch.output_conv2_aux.3.0", 1, 1)
         if head_trace is not None:

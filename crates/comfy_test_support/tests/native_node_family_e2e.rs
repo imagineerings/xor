@@ -1634,7 +1634,7 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
             .get("transcendental_boundary")
             .and_then(serde_json::Value::as_str),
         Some(
-            "F32 atan oracle bits call the pinned macOS host libc atanf through Python ctypes; they are not claimed portable to another libc or platform."
+            "F32 camera atan and DPT positional sin/cos/pow oracle bits call the pinned macOS host libc atanf/sinf/cosf/powf through Python ctypes; they are not claimed portable to another libc or platform."
         )
     );
     let expected_sources = BTreeMap::from([
