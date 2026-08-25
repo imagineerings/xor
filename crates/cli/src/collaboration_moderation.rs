@@ -10,6 +10,8 @@ use collaboration_domain::{
 };
 use serde_json::{Value, json};
 
+use crate::collaboration::contracts::{ErrorClass, error_contract};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ModerationCliVerb {
     Report,
@@ -113,41 +115,30 @@ pub fn execute_moderation_command(
             Some(output) => ModerationCliExecution::success(output),
             None => error_output(
                 verb,
-                "service_error",
                 "moderation_cli_invalid_outcome",
-                false,
-                4,
+                ErrorClass::Unexpected,
             ),
         },
-        Err(error) => {
-            let (category, retryable, exit_code) = error_contract(error);
-            error_output(
-                verb,
-                category,
-                error.diagnostic_code(),
-                retryable,
-                exit_code,
-            )
-        }
+        Err(error) => error_output(verb, error.diagnostic_code(), common_error_class(error)),
     }
 }
 
 fn error_output(
     verb: ModerationCliVerb,
-    category: &'static str,
     error_code: &'static str,
-    retryable: bool,
-    exit_code: i32,
+    error_class: ErrorClass,
 ) -> ModerationCliExecution {
+    let contract = error_contract(error_class);
     ModerationCliExecution::failure(
         json!({
             "command": verb.as_str(),
-            "error": category,
+            "error": contract.category,
             "error_code": error_code,
+            "message": error_code,
             "ok": false,
-            "retryable": retryable,
+            "retryable": contract.retryable,
         }),
-        exit_code,
+        contract.exit_class as i32,
     )
 }
 
@@ -252,16 +243,16 @@ fn hex_bytes(bytes: &[u8]) -> String {
     encoded
 }
 
-const fn error_contract(error: ModerationOperatorError) -> (&'static str, bool, i32) {
+const fn common_error_class(error: ModerationOperatorError) -> ErrorClass {
     match error {
-        ModerationOperatorError::InvalidRequest => ("user_error", false, 1),
-        ModerationOperatorError::Unavailable => ("service_unavailable", true, 2),
-        ModerationOperatorError::PartialFailure => ("partial_failure", false, 2),
+        ModerationOperatorError::InvalidRequest => ErrorClass::Usage,
+        ModerationOperatorError::Unavailable => ErrorClass::Network { retryable: true },
+        ModerationOperatorError::PartialFailure => ErrorClass::DeliveryUnknown,
         ModerationOperatorError::AuthorizationDenied | ModerationOperatorError::TenantMismatch => {
-            ("authorization_denied", false, 3)
+            ErrorClass::Authorization
         }
-        ModerationOperatorError::InvalidBackendResponse => ("service_error", false, 4),
-        ModerationOperatorError::StaleAction => ("conflict", false, 5),
+        ModerationOperatorError::InvalidBackendResponse => ErrorClass::Unexpected,
+        ModerationOperatorError::StaleAction => ErrorClass::Conflict,
     }
 }
 
@@ -513,7 +504,7 @@ mod tests {
             (
                 ModerationOperatorError::AuthorizationDenied,
                 3,
-                "authorization_denied",
+                "auth_error",
                 "moderation_operator_denied",
             ),
             (
@@ -538,7 +529,7 @@ mod tests {
             assert_eq!(
                 execution.stderr,
                 format!(
-                    "{{\"command\":\"list\",\"error\":\"{category}\",\"error_code\":\"{error_code}\",\"ok\":false,\"retryable\":false}}\n"
+                    "{{\"command\":\"list\",\"error\":\"{category}\",\"error_code\":\"{error_code}\",\"message\":\"{error_code}\",\"ok\":false,\"retryable\":false}}\n"
                 )
             );
         }
@@ -579,7 +570,7 @@ mod tests {
         assert_eq!(execution.exit_code, 4);
         assert_eq!(
             execution.stderr,
-            "{\"command\":\"list\",\"error\":\"service_error\",\"error_code\":\"moderation_cli_invalid_outcome\",\"ok\":false,\"retryable\":false}\n"
+            "{\"command\":\"list\",\"error\":\"error\",\"error_code\":\"moderation_cli_invalid_outcome\",\"message\":\"moderation_cli_invalid_outcome\",\"ok\":false,\"retryable\":false}\n"
         );
     }
 
