@@ -3592,7 +3592,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 45. Run full compatibility, security and scale gates
 
-  - [ ] 45.1. Run independent protocol differential gates
+  - [x] 45.1. Run independent protocol differential gates
     - Execute signed-event, relay, custom NIP, Git, media, pairing and client protocol fixtures against both paths.
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 20.2_
     - _Capability IDs: CAP-001, CAP-002, CAP-019, CAP-031, CAP-033, CAP-044_
@@ -3600,6 +3600,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-conformance/**, .agents/specs/collaborative-workspace/fixtures/**_
     - _Writes: test-results/collaborative-workspace/protocol-gate.md_
     - _Validation: independent oracle reports no unexplained semantic or failure-frame divergence_
+    - _Discovered contradiction (2026-08-25): the retained Buzz checkout exposes an independent trace checker and frozen protocol/client artifacts, not a second deployable instance of every retired service and client, while the migrated web, mobile and administration harnesses intentionally use injected canonical boundaries. The narrow gate therefore triangulates the independent Buzz checker and frozen artifacts, consolidated production codecs/adapters and explicit reference implementations such as `git http-backend`; it does not claim production HTTP, physical-device, external-provider, availability or scale coverage owned by later gates._
+    - _Evidence: 2026-08-25 — published `test-results/collaborative-workspace/protocol-gate.md` from source `fcb49ae0458962bf0e86044aedb7a6a99ec8a684`. The production-independent Buzz replay checker passed 22 Rust checks and the independent Python oracle passed 25 signed-event, replaceable-head, privacy, mixed-version, wire and relay cases. The complete consolidated protocol suite passed 91 `nostr_compat` tests and 24 Collab NIP-01/11/29/42/45/50/98 ingress, HTTP, authentication, subscription and reconnect tests. Focused independent gates passed multitenant 1/1, Git 3/3, media 2/2, pairing 4/4 and standalone CLI shim 6/6. Frozen/migrated web, mobile and administration matrices passed 4/4, 4/4 and 5/5, and all 28 frozen client contracts passed. Negative mutations covered signature/identifier tampering, malformed and oversized frames, unsupported versions, privacy and tenant leaks, pre-storage Git denial, missing/divergent media observations, pairing replay/cancel/expiry/corrupt QR/recovery and client compatibility rejection before mutation. The Git and pairing commands passed unchanged after allowing only their loopback listeners; no production service or data was contacted. Repository formatting, dependency, inventory, report structure, diff and canonical specification gates passed. No unexplained semantic or failure-frame divergence remains within the declared corpus. Commit: enclosing checkpoint commit, reported after creation._
 
   - [ ] 45.2. Run cross-boundary security gates
     - Execute tenant, auth, key, provider, webhook, media, push, huddle, mesh and logging negative suites.
