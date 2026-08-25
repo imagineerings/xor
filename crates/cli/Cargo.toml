@@ -35,6 +35,7 @@ dialoguer.workspace = true
 ipc-channel = "0.19"
 parking_lot.workspace = true
 paths.workspace = true
+product_flavor.workspace = true
 release_channel.workspace = true
 serde.workspace = true
 serde_json = { workspace = true, optional = true }

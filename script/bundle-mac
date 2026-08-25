@@ -27,9 +27,7 @@ else
     set --
 fi
 
-# This must match the team in the provisioning profile.
-IDENTITY="Simtropolis, Inc."
-APPLE_NOTARIZATION_TEAM="MQ55VZLNZQ"
+IDENTITY="${MACOS_SIGNING_IDENTITY:-}"
 
 # Function for displaying help info
 help_info() {
@@ -90,16 +88,27 @@ fi
 
 
 # Get release channel
-pushd crates/zed
-channel=$(<RELEASE_CHANNEL)
+channel="${ZED_RELEASE_CHANNEL:-$(<crates/zed/RELEASE_CHANNEL)}"
 export ZED_RELEASE_CHANNEL="${channel}"
-popd
 
 export ZED_BUNDLE=true
 
-cargo_bundle_version=$(cargo -q bundle --help 2>&1 | head -n 1 || echo "")
-if [ "$cargo_bundle_version" != "cargo-bundle v0.6.1-zed" ]; then
-    cargo install cargo-bundle --git https://github.com/simtropolis/cargo-bundle.git --branch zed-deploy
+required_product_variables=(
+    ZED_PRODUCT_ID ZED_PRODUCT_DISPLAY_NAME ZED_PRODUCT_EXECUTABLE
+    ZED_PRODUCT_BUNDLE_ID ZED_PRODUCT_URL_SCHEME ZED_PRODUCT_ICON_SET
+    ZED_PRODUCT_APP_FEATURES ZED_PRODUCT_REMOTE_FEATURES ZED_PRODUCT_ARTIFACT_NAME
+)
+for variable_name in "${required_product_variables[@]}"; do
+    if [[ -z "${!variable_name:-}" ]]; then
+        echo "Missing resolved product variable: ${variable_name}. Run cargo xtask bundle --product <id>." >&2
+        exit 1
+    fi
+done
+cargo_target_dir="${CARGO_TARGET_DIR:-target}"
+
+cargo_bundle_version=$(cargo bundle --version 2>/dev/null || echo "")
+if [ "$cargo_bundle_version" != "cargo-bundle 0.11.0" ]; then
+    cargo install cargo-bundle --version 0.11.0 --locked
 fi
 
 # Deal with versions of macOS that don't include libstdc++ headers
@@ -134,36 +143,47 @@ if [[ "$comfy" = true ]]; then
         zed_build_features="${zed_build_features},zed/rust-tools"
     fi
     cargo build ${build_flag} --package zed --package cli --package comfy_worker --features "${zed_build_features}" --target $target_triple
-elif [[ "$rust_tools" = true ]]; then
-    cargo build ${build_flag} --package zed --package cli --features zed/rust-tools --target $target_triple
 else
-    cargo build ${build_flag} --package zed --package cli --target $target_triple
+    application_features=$(printf 'zed/%s,' ${ZED_PRODUCT_APP_FEATURES//,/ } | sed 's/,$//')
+    cargo build ${build_flag} --package zed --package cli --no-default-features --features "${application_features}" --target "$target_triple"
 fi
 # Build remote_server in separate invocation to prevent feature unification from other crates
 # from influencing dynamic libraries required by it.
-if [[ "$rust_tools" = true ]]; then
-    cargo build ${build_flag} --package remote_server --features rust-tools --target $target_triple
+if [[ -n "${ZED_PRODUCT_REMOTE_FEATURES}" ]]; then
+    cargo build ${build_flag} --package remote_server --no-default-features --features "${ZED_PRODUCT_REMOTE_FEATURES}" --target "$target_triple"
 else
-    cargo build ${build_flag} --package remote_server --target $target_triple
+    cargo build ${build_flag} --package remote_server --no-default-features --target "$target_triple"
 fi
 
 echo "Creating application bundle"
 pushd crates/zed
-cp Cargo.toml Cargo.toml.backup
-sed \
-    -i.backup \
-    "s/package.metadata.bundle-${channel}/package.metadata.bundle/" \
-    Cargo.toml
-
-if [[ "$rust_tools" = true ]]; then
-    app_path=$(cargo bundle ${build_flag} --features rust-tools --target $target_triple --select-workspace-root | xargs)
-else
-    app_path=$(cargo bundle ${build_flag} --target $target_triple --select-workspace-root | xargs)
-fi
-
-mv Cargo.toml.backup Cargo.toml
+app_path=$(cargo bundle ${build_flag} --no-default-features --features "${ZED_PRODUCT_APP_FEATURES}" --target "$target_triple" | xargs)
 popd
 echo "Bundled ${app_path}"
+
+product_app_path="$(dirname "${app_path}")/${ZED_PRODUCT_DISPLAY_NAME}.app"
+if [[ "${app_path}" != "${product_app_path}" ]]; then
+    rm -rf "${product_app_path}"
+    mv "${app_path}" "${product_app_path}"
+    app_path="${product_app_path}"
+fi
+plist="${app_path}/Contents/Info.plist"
+mv "${app_path}/Contents/MacOS/zed" "${app_path}/Contents/MacOS/${ZED_PRODUCT_EXECUTABLE}"
+/usr/libexec/PlistBuddy -c "Set :CFBundleName ${ZED_PRODUCT_DISPLAY_NAME}" "${plist}"
+/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${ZED_PRODUCT_DISPLAY_NAME}" "${plist}"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${ZED_PRODUCT_BUNDLE_ID}" "${plist}"
+/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable ${ZED_PRODUCT_EXECUTABLE}" "${plist}"
+/usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" "${plist}" || true
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "${plist}"
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "${plist}"
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "${plist}"
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string ${ZED_PRODUCT_URL_SCHEME}" "${plist}"
+cp "${ZED_PRODUCT_ICON_SET}/app-icon.png" "${app_path}/Contents/Resources/product-app-icon.png"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile product-app-icon.png" "${plist}"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "${plist}")" == "${ZED_PRODUCT_DISPLAY_NAME}" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "${plist}")" == "${ZED_PRODUCT_BUNDLE_ID}" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "${plist}")" == "${ZED_PRODUCT_EXECUTABLE}" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "${plist}")" == "${ZED_PRODUCT_URL_SCHEME}" ]]
 
 # DocumentTypes.plist references CFBundleTypeIconFile "Document", so the bundle must contain Document.icns.
 # We use the app icon as a placeholder document icon for now.
@@ -176,7 +196,7 @@ else
     echo "cargo::warning=Missing ${document_icon_source}; macOS document icons may not appear in Finder."
 fi
 
-if [[ -n "${MACOS_CERTIFICATE:-}" && -n "${MACOS_CERTIFICATE_PASSWORD:-}" && -n "${APPLE_NOTARIZATION_KEY:-}" && -n "${APPLE_NOTARIZATION_KEY_ID:-}" && -n "${APPLE_NOTARIZATION_ISSUER_ID:-}" ]]; then
+if [[ -z "${ZED_DISABLE_SIGNING:-}" && -n "${IDENTITY}" && -n "${MACOS_CERTIFICATE:-}" && -n "${MACOS_CERTIFICATE_PASSWORD:-}" && -n "${APPLE_NOTARIZATION_KEY:-}" && -n "${APPLE_NOTARIZATION_KEY_ID:-}" && -n "${APPLE_NOTARIZATION_ISSUER_ID:-}" ]]; then
     can_code_sign=true
 
     echo "Setting up keychain for code signing..."
@@ -254,9 +274,6 @@ function sign_app_binaries() {
     echo "Downloading git binary"
     download_git "${target_triple}" "${app_path}/Contents/MacOS/git"
 
-    # Note: The app identifier for our development builds is the same as the app identifier for nightly.
-    cp crates/zed/contents/$channel/embedded.provisionprofile "${app_path}/Contents/"
-
     if [[ $can_code_sign = true ]]; then
         echo "Code signing binaries"
         # sequence of codesign commands modeled after this example: https://developer.apple.com/forums/thread/701514
@@ -265,7 +282,7 @@ function sign_app_binaries() {
             /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/comfy-worker" -v
         fi
         /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/git" -v
-        /usr/bin/codesign --deep --force --timestamp --options runtime --entitlements crates/zed/resources/zed.entitlements --sign "$IDENTITY" "${app_path}/Contents/MacOS/zed" -v
+        /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/${ZED_PRODUCT_EXECUTABLE}" -v
         /usr/bin/codesign --force --timestamp --options runtime --entitlements crates/zed/resources/zed.entitlements --sign "$IDENTITY" "${app_path}" -v
     else
         echo "One or more of the following variables are missing: MACOS_CERTIFICATE, MACOS_CERTIFICATE_PASSWORD, APPLE_NOTARIZATION_KEY, APPLE_NOTARIZATION_KEY_ID, APPLE_NOTARIZATION_ISSUER_ID"
@@ -274,11 +291,8 @@ function sign_app_binaries() {
         echo "This bundle is being signed without all entitlements, some features (e.g. universal links) will not work"
         echo "====== WARNING ======"
 
-        # NOTE: if you need to test universal links you have a few paths forward:
-        # - create a PR and tag it with the `run-bundling` label, and download the .dmg file from there.
-        # - get a signing key for the MQ55VZLNZQ team from Nathan.
-        # - create your own signing key, and update references to MQ55VZLNZQ to your own team ID
-        # then comment out this line.
+        # Development bundles use ad-hoc signing and omit the production-only
+        # associated-domains entitlement.
         cat crates/zed/resources/zed.entitlements | sed '/com.apple.developer.associated-domains/,+1d' > "${app_path}/Contents/Resources/zed.entitlements"
 
         codesign --force --deep --entitlements "${app_path}/Contents/Resources/zed.entitlements" --sign ${MACOS_SIGNING_KEY:- -} "${app_path}" -v
@@ -305,9 +319,9 @@ function sign_app_binaries() {
             echo "$app_path"
         fi
     else
-        dmg_target_directory="target/${target_triple}/${target_dir}"
+        dmg_target_directory="${cargo_target_dir}/${target_triple}/${target_dir}"
         dmg_source_directory="${dmg_target_directory}/dmg"
-        dmg_file_path="${dmg_target_directory}/Zed-${arch_suffix}.dmg"
+        dmg_file_path="${cargo_target_dir}/release/${ZED_PRODUCT_ARTIFACT_NAME}"
         xcode_bin_dir_path="$(xcode-select -p)/usr/bin"
 
         rm -rf ${dmg_source_directory}
@@ -319,7 +333,8 @@ function sign_app_binaries() {
         ln -s /Applications ${dmg_source_directory}
 
         echo "Creating final DMG at ${dmg_file_path} using ${dmg_source_directory}"
-        hdiutil create -volname Zed -srcfolder "${dmg_source_directory}" -ov -format UDZO "${dmg_file_path}"
+        mkdir -p "$(dirname "${dmg_file_path}")"
+        hdiutil create -volname "${ZED_PRODUCT_DISPLAY_NAME}" -srcfolder "${dmg_source_directory}" -ov -format UDZO "${dmg_file_path}"
 
         # If someone runs this bundle script locally, a symlink will be placed in `dmg_source_directory`.
         # This symlink causes CPU issues with Zed if the Zed codebase is the project being worked on, so we simply remove it for now.
@@ -354,52 +369,12 @@ function sign_binary() {
     fi
 }
 
-function upload_debug_symbols() {
-    if [ "$local_install" = true ]; then
-        echo "local install; skipping sentry upload."
-    elif [[ -n "${SENTRY_AUTH_TOKEN:-}" ]]; then
-        echo "Uploading zed debug symbols to sentry..."
-        exe_path="target/${target_triple}/release/Zed"
-        if ! dsymutil --flat "target/${target_triple}/${target_dir}/zed" 2> target/dsymutil.log; then
-            echo "dsymutil failed"
-            cat target/dsymutil.log
-            exit 1
-        fi
-        if ! dsymutil --flat "target/${target_triple}/${target_dir}/remote_server" 2> target/dsymutil.log; then
-            echo "dsymutil failed"
-            cat target/dsymutil.log
-            exit 1
-        fi
-        # note: this uploads the unstripped binary which is needed because it contains
-        # .eh_frame data for stack unwinding. see https://github.com/getsentry/symbolic/issues/783
-        # Try uploading up to 3 times
-        for attempt in 1 2 3; do
-            echo "Sentry upload attempt $attempt..."
-            if sentry-cli debug-files upload --include-sources --wait -p zed -o zed-dev \
-                "target/${target_triple}/${target_dir}/zed.dwarf" \
-                "target/${target_triple}/${target_dir}/remote_server.dwarf"; then
-                break
-            else
-                echo "Sentry upload failed on attempt $attempt"
-                if [ $attempt -eq 3 ]; then
-                    echo "All sentry upload attempts failed"
-                    exit 1
-                fi
-            fi
-        done
-    else
-        echo "missing SENTRY_AUTH_TOKEN. skipping sentry upload."
-    fi
-}
-
-upload_debug_symbols
-
-cp target/${target_triple}/${target_dir}/zed "${app_path}/Contents/MacOS/zed"
-cp target/${target_triple}/${target_dir}/cli "${app_path}/Contents/MacOS/cli"
+cp "${cargo_target_dir}/${target_triple}/${target_dir}/zed" "${app_path}/Contents/MacOS/${ZED_PRODUCT_EXECUTABLE}"
+cp "${cargo_target_dir}/${target_triple}/${target_dir}/cli" "${app_path}/Contents/MacOS/cli"
 if [[ "$comfy" = true ]]; then
     cp target/${target_triple}/${target_dir}/comfy-worker "${app_path}/Contents/MacOS/comfy-worker"
 fi
 sign_app_binaries
 
-sign_binary "target/$target_triple/release/remote_server"
-gzip -f --stdout --best target/$target_triple/release/remote_server > target/zed-remote-server-macos-$arch_suffix.gz
+sign_binary "${cargo_target_dir}/${target_triple}/release/remote_server"
+gzip -f --stdout --best "${cargo_target_dir}/${target_triple}/release/remote_server" > "${cargo_target_dir}/${ZED_PRODUCT_ID}-remote-server-macos-$arch_suffix.gz"

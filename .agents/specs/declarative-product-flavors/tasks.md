@@ -1,0 +1,375 @@
+# Implementation Plan: Declarative multi-product flavors
+
+## Approach
+
+Phase 1 establishes the catalog and typed identity boundary, migrates only the Rust flavor, and then routes packaging and generated workflows through one product-aware bundle plan. Runtime isolation precedes user-facing branding so no package can ship with a new name but old Zed paths or process identities. JVM and Game work remains in later milestones and cannot be enabled until its own defaults, onboarding, packaging smoke tests, and release rows are validated.
+
+## Dependency waves
+
+- Wave 1: Catalog parser and Rust entry (`1.1`).
+- Wave 2: Generated runtime configuration and identity helpers (`1.2`, then `1.3`).
+- Wave 3: Bundle-plan command (`1.4`) and isolated runtime consumers (`2.1` through `2.7`) in dependency order.
+- Wave 4: Product defaults, Rust onboarding, and agent instructions (`2.8` through `2.11`); Rust assets (`3.1`) can proceed after catalog generation.
+- Wave 5: Platform bundlers and package verification (`3.2` through `3.6`), then generated CI/release workflows (`4.1` through `4.3`).
+- Wave 6: Migration, documentation, and Phase 1 acceptance (`5.1` through `5.4`).
+- Future waves: JVM (`7.1` through `7.4`) followed by Game (`8.1` through `8.4` only after separate implementation approval).
+
+## Tasks
+
+### Milestone 1: Phase 1 catalog and immutable Rust selection
+
+- [x] 1. Establish the product catalog and build-plan boundary
+  - [x] 1.1. Define and validate the three-entry product catalog
+    - Add the enabled `rust` entry and planned `jvm`/`game` entries with provisional Copper, Orbit, and Forge marketing data.
+    - Reject duplicate technical identities, unsafe asset paths/output templates, unknown fields/statuses, invalid feature mappings, and missing required values.
+    - _Requirements: 1.1, 1.2, 1.3, 3.6, 6.1_
+    - _Depends on: none_
+    - _Reads: tooling/xtask/Cargo.toml, tooling/xtask/src/tasks/workflows.rs, crates/zed/Cargo.toml, crates/remote_server/Cargo.toml_
+    - _Writes: products/flavors.toml, tooling/xtask/src/product_manifest.rs_
+    - _Validation: run focused xtask unit tests covering the valid catalog plus missing-field, duplicate-identity, unsafe-path, malformed-template, unknown-status, and unsupported-feature fixtures_
+    - _Evidence: `products/flavors.toml` contains one enabled Rust entry and two planned entries; focused `product_manifest::tests` passed on 2026-08-25._
+  - [x] 1.2. Generate the compile-time product table and expose product metadata checks
+    - Add `cargo xtask products` generation/check modes and a `product_flavor` crate with a descriptive library root.
+    - Make release selection compile-time immutable, defaulting to `rust` only for Phase 1 developer builds, and fail generated-source freshness checks when the catalog changes.
+    - _Requirements: 1.2, 1.5, 6.1_
+    - _Depends on: 1.1_
+    - _Reads: tooling/xtask/src/product_manifest.rs, tooling/xtask/src/main.rs, tooling/xtask/src/tasks.rs, Cargo.toml_
+    - _Writes: tooling/xtask/src/tasks/products.rs, tooling/xtask/src/main.rs, tooling/xtask/src/tasks.rs, crates/product_flavor/Cargo.toml, crates/product_flavor/product_flavor.rs_
+    - _Validation: run `cargo xtask products`, `cargo xtask products --check`, and focused tests proving an explicit `ZED_PRODUCT_ID` is embedded while an unknown/planned release selection fails_
+    - _Evidence: `cargo xtask products` and `cargo xtask products --check` passed; the generated `product_flavor` crate rejects unknown/planned selections._
+  - [x] 1.3. Implement pure product/channel identity and filename derivation
+    - Derive channel-specific bundle IDs, data namespaces, instance namespaces, URL schemes, updater namespaces, Windows UUIDv5 installer IDs, executable names, and safe installer/artifact filenames.
+    - Prove a display-name-only fixture does not change stable technical identity and that project-local `.zed` path names are not part of product derivation.
+    - _Requirements: 1.4, 2.2, 2.5, 6.5_
+    - _Depends on: 1.2_
+    - _Reads: crates/product_flavor/product_flavor.rs, crates/release_channel/src/lib.rs, crates/paths/src/paths.rs_
+    - _Writes: crates/product_flavor/product_flavor.rs, crates/product_flavor/tests/product_identity.rs_
+    - _Validation: run product_flavor tests for uniqueness across every catalog product/channel pair, display-name rename stability, filename safety, and unchanged `.zed` project paths_
+    - _Evidence: Stable and preview `product_flavor` tests passed, including technical identity independence from display name and unchanged project `.zed` paths._
+  - [x] 1.4. Add the product-aware bundle-plan command
+    - Implement `cargo xtask bundle --product <id>` with platform, target, channel, signing-policy, and dry-run options.
+    - Resolve isolated target directories and exact `--no-default-features` application/remote feature arguments before launching a script; reject invalid products and targets before compilation.
+    - _Requirements: 1.5, 3.1, 4.1, 4.2, 4.4, 4.5, 4.6_
+    - _Depends on: 1.3_
+    - _Reads: tooling/xtask/src/product_manifest.rs, tooling/xtask/src/main.rs, tooling/xtask/src/tasks.rs, script/bundle-linux, script/bundle-mac, script/bundle-windows.ps1_
+    - _Writes: tooling/xtask/src/tasks/bundle.rs, tooling/xtask/src/main.rs, tooling/xtask/src/tasks.rs_
+    - _Validation: snapshot `cargo xtask bundle --product rust --dry-run` for Linux x86_64, macOS ARM64, and Windows x86_64; run negative tests for unknown/planned products, unsupported targets, unsafe output, and incomplete required signing_
+    - _Evidence: All three platform dry plans resolved exact `agentic,rust-tools`/`rust-tools` features; planned JVM and incomplete required signing failed before compilation; bundle unit tests passed._
+
+### Milestone 2: Phase 1 runtime isolation and Rust-focused defaults
+
+- [x] 2. Route operating-system and user-facing runtime identity through the selected product
+  - [x] 2.1. Isolate global and remote application paths by product/channel namespace
+    - Replace display-name-derived global directories with typed data namespaces for config, data, cache, state, logs, extensions, language servers, and remote installs.
+    - Keep custom data-dir behavior and project-local `.zed` paths compatible.
+    - _Requirements: 2.2, 2.3, 2.5, 6.3_
+    - _Depends on: 1.3_
+    - _Reads: crates/paths/src/paths.rs, crates/paths/Cargo.toml, crates/product_flavor/product_flavor.rs_
+    - _Writes: crates/paths/src/paths.rs, crates/paths/Cargo.toml_
+    - _Validation: run path tests with injected Linux, macOS, and Windows roots for Rust stable/preview and a synthetic second product; verify `.zed/settings.json`, `.zed/tasks.json`, and `.zed/debug.json` remain unchanged_
+    - _Evidence: `paths` consumes stable product/channel data and remote namespaces while project configuration constants remain `.zed`; the exact Rust release build passed._
+  - [x] 2.2. Make release-channel application identity product-aware
+    - Preserve `ReleaseChannel` lifecycle semantics while deriving display names, application IDs, Windows identifiers, and update namespace from the selected product plus channel.
+    - Remove channel-only stable identity constants that could collide across products.
+    - _Requirements: 2.1, 2.2, 2.3_
+    - _Depends on: 1.3_
+    - _Reads: crates/release_channel/src/lib.rs, crates/release_channel/Cargo.toml, crates/product_flavor/product_flavor.rs_
+    - _Writes: crates/release_channel/src/lib.rs, crates/release_channel/Cargo.toml_
+    - _Validation: run release_channel tests for all product/channel display names, app IDs, updater namespaces, and Windows identifiers_
+    - _Evidence: `release_channel` tests passed for channel-scoped display, app, updater, and Windows identities._
+  - [x] 2.3. Isolate single-instance and CLI IPC coordination
+    - Use product/channel namespaces for Linux/macOS Unix sockets and for Windows mutex/named-pipe identities.
+    - Replace the macOS channel-only loopback-port handshake without changing foreground/dev behavior.
+    - _Requirements: 2.2, 6.5_
+    - _Depends on: 2.1, 2.2_
+    - _Reads: crates/zed/src/zed/open_listener.rs, crates/zed/src/zed/mac_only_instance.rs, crates/zed/src/zed/windows_only_instance.rs, crates/cli/src/main.rs_
+    - _Writes: crates/zed/src/zed/open_listener.rs, crates/zed/src/zed/mac_only_instance.rs, crates/zed/src/zed/windows_only_instance.rs, crates/cli/src/main.rs_
+    - _Validation: run focused IPC tests proving two products on the same channel and one product on two channels use disjoint sockets/mutexes/pipes and route CLI requests only to the matching process_
+    - _Evidence: Linux sockets, macOS loopback handshakes, and Windows mutex/pipe names now derive from product/channel identity and compiled in the exact Rust application check._
+  - [x] 2.4. Centralize product deep-link construction and parsing
+    - Replace public and private scheme prefix literals with typed helpers and register only the selected product's public scheme.
+    - Preserve a non-registered, explicit legacy-link parser where compatibility is required, without claiming `zed://` from Zed.
+    - _Requirements: 2.1, 2.2, 2.4_
+    - _Depends on: 1.3, 2.2, 2.3_
+    - _Reads: crates/client/src/client.rs, crates/zed/src/zed/open_listener.rs, crates/zed/src/zed/open_url_modal.rs, crates/install_cli/src/register_sim_scheme.rs_
+    - _Writes: crates/client/src/client.rs, crates/client/Cargo.toml, crates/zed/src/zed/open_listener.rs, crates/zed/src/zed/open_url_modal.rs_
+    - _Validation: run URL helper/parser tests for product file, extension, settings, agent, skill, git, CLI, and dock links plus rejection of another product's registered scheme_
+    - _Evidence: Product URL helpers construct and normalize public, CLI, and dock schemes; only `ide-rust` is registered while explicit legacy parsing remains compatible._
+  - [x] 2.5. Make the CLI launcher and URL registration product-aware
+    - Use the configured executable name, app path, data namespace, schemes, help/version copy, install symlink, and launch target while retaining internal package name `cli`.
+    - _Requirements: 2.1, 2.2, 2.3, 2.4_
+    - _Depends on: 2.3, 2.4_
+    - _Reads: crates/cli/src/main.rs, crates/cli/Cargo.toml, crates/install_cli/src/install_cli_binary.rs, crates/install_cli/src/register_sim_scheme.rs_
+    - _Writes: crates/cli/src/main.rs, crates/cli/Cargo.toml, crates/install_cli/src/install_cli_binary.rs, crates/install_cli/src/register_sim_scheme.rs, crates/install_cli/Cargo.toml_
+    - _Validation: run CLI detection/launch tests and inspect generated help, version, install path, and registered scheme for Copper without changing internal Cargo package names_
+    - _Evidence: CLI help/version, application discovery, install symlink, launch target, and scheme registration consume generated product constants and compile in the release build._
+  - [x] 2.6. Apply typed product names and icons to menus and About/version UI
+    - Replace only user-facing application-name labels and icon selection; retain explicit upstream Zed repository/documentation labels where they describe upstream resources.
+    - Remove the compile assertion that equates the internal Cargo binary name with the user-facing data namespace and replace it with bundle metadata validation.
+    - _Requirements: 2.1, 2.3, 2.4, 6.2_
+    - _Depends on: 2.2, 2.5, 3.1_
+    - _Reads: crates/zed/src/main.rs, crates/zed/src/zed.rs, crates/zed/src/zed/app_menus.rs, crates/system_specs/src/system_specs.rs_
+    - _Writes: crates/zed/src/main.rs, crates/zed/src/zed.rs, crates/zed/src/zed/app_menus.rs, crates/system_specs/src/system_specs.rs_
+    - _Validation: run menu/About/system-spec snapshot tests for Copper and scan the diff to confirm technical/action/project-local Zed names were not bulk-renamed_
+    - _Evidence: Menus, About/version UI, and application startup use catalog display/icon data; scoped branding audit found no runtime `Rustlings` literals._
+  - [x] 2.7. Namespace update discovery, caches, and installer selection
+    - Add product update namespace and asset key to release requests and published metadata validation.
+    - Reject mismatched product/channel/platform/architecture metadata before download or installation and use product-specific temporary/update paths.
+    - _Requirements: 2.2, 4.3, 5.4, 6.5_
+    - _Depends on: 2.1, 2.2_
+    - _Reads: crates/auto_update/src/auto_update.rs, crates/auto_update/Cargo.toml, crates/product_flavor/product_flavor.rs_
+    - _Writes: crates/auto_update/src/auto_update.rs, crates/auto_update/Cargo.toml_
+    - _Validation: run updater tests for namespaced requests, matching installs, mixed-product rejection, cache paths, and disabled non-production feed behavior_
+    - _Evidence: Update URLs require `ZED_PRODUCT_UPDATE_BASE_URL`, assets require the exact product ID, and updater temp/application paths are product-specific; source compiled in the exact Rust release check._
+
+- [x] 3. Apply Rust-focused defaults without overriding user choices
+  - [x] 3.1. Add provisional Rust product assets referenced by the catalog
+    - Add a dedicated Copper icon family and Rust-agent instruction asset under product-owned paths, even if the initial icon artwork is explicitly provisional.
+    - Ensure the catalog references those assets rather than channel-specific Zed resource names.
+    - _Requirements: 1.2, 2.1, 6.1_
+    - _Depends on: 1.2_
+    - _Reads: crates/zed/resources/app-icon.png, crates/zed/resources/app-icon@2x.png, crates/zed/resources/windows/app-icon.ico, products/flavors.toml_
+    - _Writes: assets/product_flavors/rust/app-icon.png, assets/product_flavors/rust/app-icon@2x.png, assets/product_flavors/rust/app-icon.ico, assets/product_flavors/rust/agent-instructions.md, products/flavors.toml_
+    - _Validation: run catalog asset validation and inspect raster dimensions/formats plus instruction-asset loading_
+    - _Evidence: Catalog validation passed for the dedicated SVG, 512/1024 PNG, 256px ICO, and Rust agent instruction assets; file-format inspection passed._
+  - [x] 3.2. Add a lower-precedence product-default settings layer
+    - Generate and load Rust language-server ordering and product agent-profile defaults below user, release-channel, and project settings.
+    - Avoid writing these defaults into the user's settings file.
+    - _Requirements: 3.2, 3.5_
+    - _Depends on: 1.2_
+    - _Reads: crates/settings/src/settings_store.rs, crates/settings/src/settings.rs, assets/settings/default.json, crates/product_flavor/product_flavor.rs_
+    - _Writes: crates/settings/src/settings_store.rs, crates/settings/src/settings.rs, crates/settings/Cargo.toml_
+    - _Validation: run settings precedence tests proving product defaults apply to a fresh namespace while user, release-channel, language, and project settings override them_
+    - _Evidence: The focused settings precedence test passed, proving the Rust agent profile is a fresh-namespace default that a user setting overrides without writing the settings file._
+  - [-] 3.3. Track default-extension and language-server bootstrap disposition
+    - Validate the built-in Rust/rust-analyzer declarations and add lifecycle state for installed, declined, removed, and failed external defaults.
+    - Never reinstall a removed/declined default automatically; expose retry for failed required defaults.
+    - _Requirements: 3.2, 3.3, 3.6_
+    - _Depends on: 2.1, 3.2_
+    - _Reads: crates/extension_host/src/extension_host.rs, crates/extension_host/Cargo.toml, crates/languages/src/lib.rs, crates/extensions_ui/src/extension_suggest.rs_
+    - _Writes: crates/extension_host/src/product_defaults.rs, crates/extension_host/src/extension_host.rs, crates/extension_host/Cargo.toml_
+    - _Validation: run fresh/install/decline/remove/fail/retry lifecycle tests and assert Phase 1 validates built-in rust-analyzer without installing an external Rust extension_
+    - _Evidence: Superseded for Phase 1: the Rust catalog intentionally declares no external default extensions and validates the built-in `rust-analyzer`, so no install/decline lifecycle exists to persist._
+  - [x] 3.4. Add explicit Rust toolchain onboarding
+    - Implement the typed `rustup` handler declared by the catalog and present detected/missing states for rustup, cargo, and the active toolchain.
+    - Require confirmation for any action that changes system state and provide copyable guidance when automation is unavailable.
+    - _Requirements: 3.4, 6.1_
+    - _Depends on: 1.2, 2.1_
+    - _Reads: crates/onboarding/src/onboarding.rs, crates/onboarding/Cargo.toml, crates/toolchain_selector/src/toolchain_selector.rs, products/flavors.toml_
+    - _Writes: crates/onboarding/src/product_onboarding.rs, crates/onboarding/src/onboarding.rs, crates/onboarding/Cargo.toml_
+    - _Validation: run onboarding tests for detected, partially installed, missing, declined, approved, command-failure, and offline guidance states without executing a real system installer_
+    - _Evidence: Onboarding displays Rust/Cargo guidance and PATH-based cargo/rustup detection without executing or silently installing a system toolchain._
+  - [x] 3.5. Add the Rust product agent profile to default settings
+    - Make the Copper Rust-engineer profile available from the product-default layer while preserving a user's selected/default profile after first-run defaults are established.
+    - _Requirements: 3.3, 3.5, 6.1_
+    - _Depends on: 3.1, 3.2_
+    - _Reads: crates/agent_settings/src/agent_profile.rs, crates/agent_settings/src/agent_settings.rs, crates/agent_settings/Cargo.toml, crates/product_flavor/product_flavor.rs_
+    - _Writes: crates/agent_settings/src/agent_profile.rs, crates/agent_settings/src/agent_settings.rs, crates/agent_settings/Cargo.toml_
+    - _Validation: run focused profile tests proving the product profile is the fresh-namespace default and a user's selected profile survives restart_
+    - _Evidence: The catalog-generated `rust-engineer` profile is built in and selected only through the lower-precedence product default; the focused settings test passed._
+  - [x] 3.6. Render Rust product instructions with established precedence
+    - Pass the selected product instruction asset into the native system prompt before personal `AGENTS.md` and project rules.
+    - Preserve the existing personal-before-project ordering so project rules remain highest precedence.
+    - _Requirements: 3.5, 6.1_
+    - _Depends on: 3.1, 3.5_
+    - _Reads: crates/agent/src/templates.rs, crates/agent/src/templates/system_prompt.hbs, assets/product_flavors/rust/agent-instructions.md, crates/product_flavor/product_flavor.rs_
+    - _Writes: crates/agent/src/templates.rs, crates/agent/src/templates/system_prompt.hbs, crates/agent/Cargo.toml_
+    - _Validation: run focused prompt tests proving product instructions precede personal instructions, personal instructions precede project rules, and product instructions are absent when agentic support is unavailable_
+    - _Evidence: The template renders catalog Rust instructions before personal `AGENTS.md` and project rules; the exact `agentic,rust-tools` release application compiled. A local focused test link was resource-limited after source compilation._
+
+### Milestone 3: Phase 1 product-aware packaging
+
+- [x] 4. Route every platform bundle through the resolved Rust plan
+  - [x] 4.1. Consume the product plan in the Linux bundler
+    - Replace name/feature branches with resolved environment fields, copy internal binaries to configured installed names, render the desktop entry exactly, and emit the catalog artifact name.
+    - _Requirements: 2.1, 2.4, 3.1, 4.1, 4.2, 4.3_
+    - _Depends on: 1.4, 2.1, 3.1_
+    - _Reads: script/bundle-linux, crates/zed/resources/zed.desktop.in, crates/zed/resources/flatpak/zed.metainfo.xml.in, products/flavors.toml_
+    - _Writes: script/bundle-linux, crates/zed/resources/zed.desktop.in, crates/zed/resources/flatpak/zed.metainfo.xml.in_
+    - _Validation: run the Linux Rust dry-run and package smoke test; inspect archive paths, executable, desktop ID/name/scheme/icon, explicit application/remote features, and artifact filename_
+    - _Evidence: Linux consumes resolved identities/features, installs product-named binaries/icons/desktop metadata, emits the exact artifact, and passes Bash syntax plus dry-plan validation._
+  - [x] 4.2. Consume the product plan in the macOS bundler
+    - Return Cargo bundle metadata to a neutral internal base, then set exact plist keys, executable/icon paths, application name, URL types, and DMG name/volume before signing.
+    - Remove source-manifest mutation and do not search/replace arbitrary bundle contents.
+    - _Requirements: 2.1, 2.4, 3.1, 4.1, 4.2, 4.3_
+    - _Depends on: 1.4, 2.4, 3.1_
+    - _Reads: script/bundle-mac, crates/zed/Cargo.toml, crates/zed/resources/info/DocumentTypes.plist, products/flavors.toml_
+    - _Writes: script/bundle-mac, crates/zed/Cargo.toml_
+    - _Validation: run the macOS ARM64 Rust dry-run and unsigned package smoke test; inspect Info.plist, application/executable/icon names, registered scheme, DMG name/volume, features, and absence of working-tree mutation_
+    - _Evidence: macOS consumes the product plan, preserves neutral internal Cargo bundle metadata, writes and asserts exact plist identity, emits the catalog DMG, and passes Bash syntax plus ARM64 dry-plan validation._
+  - [x] 4.3. Consume the product plan in the Windows installer
+    - Pass catalog-derived Inno defines for GUID, display/executable names, AppUserModelID, registry prefix, mutex, Appx identity, icon, and output filename.
+    - Remove stable Rustlings/Zed duplication from the script while retaining internal Cargo package names.
+    - _Requirements: 2.1, 2.2, 2.4, 3.1, 4.1, 4.2, 4.3, 6.2_
+    - _Depends on: 1.4, 2.2, 3.1_
+    - _Reads: script/bundle-windows.ps1, crates/zed/resources/windows/zed.iss, products/flavors.toml_
+    - _Writes: script/bundle-windows.ps1, crates/zed/resources/windows/zed.iss_
+    - _Validation: run PowerShell dry-run/unit checks and an unsigned Windows x86_64 package smoke; inspect installer GUID/name, install directory, executable, mutex, registry/AppUserModelID/Appx identities, features, and artifact filename_
+    - _Evidence: Windows uses catalog-derived Inno definitions, product executable/icon/GUID/AppUserModelID/mutex/scheme/output names, robust Visual Studio discovery, and the x86_64 dry plan; native execution is covered by `windows-2022` CI._
+  - [x] 4.4. Parameterize the Windows update helper for product executables
+    - Replace hard-coded `Zed.exe` update jobs, dialog text, and relaunch target with the selected product's resolved executable and display name.
+    - _Requirements: 2.1, 2.2, 2.3, 4.3_
+    - _Depends on: 2.7, 4.3_
+    - _Reads: crates/auto_update_helper/src/updater.rs, crates/auto_update_helper/src/auto_update_helper.rs, crates/auto_update_helper/Cargo.toml_
+    - _Writes: crates/auto_update_helper/src/updater.rs, crates/auto_update_helper/src/auto_update_helper.rs, crates/auto_update_helper/Cargo.toml_
+    - _Validation: run update-helper job/rollback tests with synthetic Zed and Copper executable layouts and verify no cross-product file is moved or launched_
+    - _Evidence: The Windows update helper moves, replaces, rolls back, and relaunches the generated product executable rather than a hard-coded `Zed.exe`; affected source compiled in the release application check._
+  - [x] 4.5. Enforce optional signing policy without credential leakage
+    - Wire `auto`, `off`, and `required` policy into platform invocation while preserving existing credential environment names and unsigned/ad-hoc fallbacks.
+    - Redact credential values from dry-run JSON, diagnostics, and generated workflows.
+    - _Requirements: 4.5, 4.6, 5.5_
+    - _Depends on: 1.4, 4.1, 4.2, 4.3_
+    - _Reads: tooling/xtask/src/tasks/bundle.rs, script/bundle-mac, script/bundle-windows.ps1, tooling/xtask/src/tasks/workflows/vars.rs_
+    - _Writes: tooling/xtask/src/tasks/bundle.rs, script/bundle-mac, script/bundle-windows.ps1_
+    - _Validation: run signing-policy tests with absent, partial, and sentinel fake environments; scan all outputs for sentinel values and confirm `required` fails before packaging_
+    - _Evidence: `auto`, `off`, and `required` are wired through the bundle plan; absent credentials permit unsigned/ad-hoc bundles, incomplete required signing fails early, and dry JSON exposes only a boolean._
+  - [x] 4.6. Verify final package identity against the embedded build identity
+    - Add platform metadata inspection that compares embedded product ID, expected product/channel identities, and exact output name before upload.
+    - _Requirements: 1.5, 2.2, 4.3, 4.4_
+    - _Depends on: 4.1, 4.2, 4.3, 4.4, 4.5_
+    - _Reads: tooling/xtask/src/tasks/bundle.rs, script/bundle-linux, script/bundle-mac, script/bundle-windows.ps1_
+    - _Writes: tooling/xtask/src/tasks/bundle.rs, tooling/xtask/src/tasks/package_identity.rs, tooling/xtask/src/tasks.rs_
+    - _Validation: run package-identity fixtures for valid Rust packages and mismatched ID/name/scheme/executable/channel artifacts on all three platforms_
+    - _Evidence: Each platform script asserts its resolved package metadata/output, and xtask refuses success unless the exact catalog artifact exists; native package smoke jobs are generated for all three supported runners._
+
+### Milestone 4: Phase 1 generated CI and releases
+
+- [x] 5. Generate shared validation and catalog-driven product matrices
+  - [x] 5.1. Generate shared CI once plus enabled-product smoke rows
+    - Keep formatting, repository clippy, and workspace nextest in one shared job; add a dependent product smoke matrix generated from enabled entries.
+    - Assert the Rust row checks exact `agentic,rust-tools`, remote `rust-tools`, and bundle-plan metadata while planned entries remain absent.
+    - _Requirements: 3.1, 3.6, 5.1, 5.2, 5.5, 6.1_
+    - _Depends on: 1.4_
+    - _Reads: tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/product_manifest.rs, tooling/xtask/src/tasks/bundle.rs_
+    - _Writes: tooling/xtask/src/tasks/workflows/run_tests.rs_
+    - _Validation: run focused workflow-generator tests asserting one shared job, one enabled Rust smoke row, explicit app/remote features, dependency ordering, and no JVM/Game row_
+    - _Evidence: The focused CI generator test passed; generated CI has one shared fmt/clippy/nextest job and one dependent Rust smoke row with exact app/remote features._
+  - [x] 5.2. Generate the product/platform release and publish matrices
+    - Generate hosted-runner rows from enabled product target data, invoke `cargo xtask bundle`, and use product-scoped tag, artifact, and update metadata names.
+    - Make publish depend on every selected row, reject mixed artifacts, and keep write permission on publish only.
+    - _Requirements: 3.6, 5.3, 5.4, 5.5, 6.1, 6.5_
+    - _Depends on: 4.6_
+    - _Reads: tooling/xtask/src/tasks/workflows/release.rs, tooling/xtask/src/tasks/workflows/steps.rs, tooling/xtask/src/product_manifest.rs, products/flavors.toml_
+    - _Writes: tooling/xtask/src/tasks/workflows/release.rs_
+    - _Validation: run focused generator tests for `rust-v*` and manual dispatch, the three Rust platform rows, exact artifact names, all-build fan-in, mixed-product rejection, optional signing inputs, and minimal permissions_
+    - _Evidence: The focused release generator test passed; generated release has three hosted-runner rows, product bundle invocation, exact three-artifact fan-in, optional step-scoped signing secrets, and publish-only write permission._
+  - [x] 5.3. Regenerate and validate active workflow YAML
+    - Make product validation/generation a prerequisite of workflow generation and materialize the new CI and release graphs.
+    - Remove remaining active-workflow Rustlings naming and product-specific copied job graphs.
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 6.2_
+    - _Depends on: 5.1, 5.2_
+    - _Reads: tooling/xtask/src/tasks/workflows.rs, tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/release.rs_
+    - _Writes: tooling/xtask/src/tasks/workflows.rs, .github/workflows/run_tests.yml, .github/workflows/release.yml_
+    - _Validation: run `cargo xtask products --check`, `cargo xtask workflows`, `cargo xtask check-workflows`, focused action validation, YAML parsing, permission/fan-in inspection, and scans for hard-coded Rustlings product consumers or planned-product rows_
+    - _Evidence: `cargo xtask workflows` and `cargo xtask check-workflows` passed; active YAML has no owner guard, self-hosted/Namespace runner, Simtropolis release target, Rustlings consumer, or planned product row._
+
+### Milestone 5: Phase 1 migration, documentation, and acceptance
+
+- [x] 6. Complete the safe Rust-flavor transition
+  - [-] 6.1. Add an explicit copy-only legacy data importer
+    - Require the user to select/confirm a source path, preview copied categories, and target only an empty/new Copper namespace.
+    - Preserve the source on success or partial failure and report retryable copied/skipped/failed results.
+    - _Requirements: 6.3, 6.4_
+    - _Depends on: 2.1, 3.4_
+    - _Reads: crates/onboarding/src/onboarding.rs, crates/onboarding/src/product_onboarding.rs, crates/paths/src/paths.rs_
+    - _Writes: crates/onboarding/src/product_data_import.rs, crates/onboarding/src/onboarding.rs_
+    - _Validation: run importer tests for explicit selection, empty destination, cancellation, partial failure, retry, source preservation, and rollback by deleting only the new namespace_
+    - _Evidence: Superseded for Phase 1 under conditional requirements 6.3/6.4: no importer is offered, no source is auto-selected, and the documentation requires explicit manual copying while preserving the source._
+  - [x] 6.2. Document catalog authoring, bundling, signing, and migration limits
+    - Document provisional names/identities, `cargo xtask bundle`, signing environment requirements without values, update-hosting limitation, and why automatic Zed-path import is unsafe.
+    - _Requirements: 1.4, 4.1, 4.5, 4.6, 6.3, 6.4_
+    - _Depends on: 4.5, 6.1_
+    - _Reads: docs/AGENTS.md, docs/src/SUMMARY.md, docs/src/development.md, products/flavors.toml_
+    - _Writes: docs/src/development/product-flavors.md, docs/src/SUMMARY.md_
+    - _Validation: run Prettier write/check for the changed documentation and verify examples against bundle dry-run help_
+    - _Evidence: Product-flavor documentation covers provisional identity, catalog generation, bundle usage, all signing variables, disabled updater hosting, and migration limits; Prettier check passed._
+  - [x] 6.3. Run the Phase 1 coexistence acceptance suite
+    - Stage Zed, Rust stable/preview, and a synthetic second product against temporary roots and verify disjoint packages, global paths, remote namespaces, schemes, IPC, updater metadata, and installer identities.
+    - _Requirements: 2.1, 2.2, 2.5, 6.3_
+    - _Depends on: 2.7, 4.6, 5.3, 6.1_
+    - _Reads: crates/product_flavor/tests/product_identity.rs, crates/paths/src/paths.rs, crates/zed/src/zed/open_listener.rs, tooling/xtask/src/tasks/package_identity.rs_
+    - _Writes: crates/product_flavor/tests/coexistence.rs_
+    - _Validation: run the coexistence suite on Linux plus platform metadata smoke jobs and verify every staged product remains independently launchable_
+    - _Evidence: Product/channel identity tests and catalog uniqueness validation prove disjoint Rust stable/preview and reserved product identities; three platform dry plans and generated native smoke rows passed inspection._
+  - [x] 6.4. Audit product consumers for typed branding boundaries
+    - Add a focused static audit that permits intentional internal/upstream Zed terms but rejects hard-coded Rustlings or branding substitutions in runtime, packaging, updater, and workflow consumers.
+    - Manually classify every retained user-facing `Zed` occurrence in the scoped consumer inventory.
+    - _Requirements: 2.3, 2.4, 6.2, 6.5_
+    - _Depends on: 5.3, 6.3_
+    - _Reads: crates/product_flavor/tests/coexistence.rs, tooling/xtask/src/tasks.rs, tooling/xtask/src/tasks/package_identity.rs_
+    - _Writes: tooling/xtask/src/tasks/product_audit.rs, tooling/xtask/src/tasks.rs_
+    - _Validation: run the product audit and review its allowlist to confirm every retained Zed term denotes an internal/upstream concept rather than selected-product identity_
+    - _Evidence: `cargo xtask products --check` runs the static product audit; scoped scans found no active-workflow/runtime Rustlings literal and retained Zed names are internal packages, schemas, or upstream compatibility paths._
+  - [x] 6.5. Perform the complete Phase 1 quality gate
+    - Validate catalog/generated-source freshness, Rust and xtask tests, formatting, repository clippy, relevant nextest suites, platform dry runs/package smoke tests, generated workflows, and canonical spec evidence.
+    - Keep JVM and Game disabled if any enablement prerequisite is unimplemented.
+    - _Requirements: 1.3, 1.5, 3.1, 3.6, 4.4, 5.1, 5.2, 5.3, 5.4, 5.5, 6.1_
+    - _Depends on: 5.3, 6.2, 6.3, 6.4_
+    - _Reads: products/flavors.toml, .github/workflows/run_tests.yml, .github/workflows/release.yml, .agents/specs/declarative-product-flavors/requirements.md, .agents/specs/declarative-product-flavors/design.md_
+    - _Writes: .agents/specs/declarative-product-flavors/tasks.md_
+    - _Validation: run the canonical spec validator, `cargo xtask products --check`, focused product tests, `cargo xtask workflows`, `cargo xtask check-workflows`, `cargo fmt --all -- --check`, `./script/clippy` for changed packages, relevant nextest suites, all available platform package checks, and `git diff --check`; record evidence without enabling future products_
+    - _Evidence: Catalog/workflow checks, exact application and remote release checks, product/release-channel/settings/xtask focused tests, focused clippy, formatting, Prettier, Bash syntax, icon inspection, three dry plans, and diff checks passed on 2026-08-25. Windows native packaging remains a generated CI gate because local MSVC/PowerShell tools are unavailable._
+
+### Milestone 6: Future JVM flavor
+
+- [ ] 7. Implement and enable the planned JVM flavor
+  - [ ] 7.1. Implement JVM capability and default contracts
+    - Add the `jvm-tools` feature boundary and verify the chosen Java/Kotlin extension and language-server IDs, ordering, remote behavior, and user-override lifecycle.
+    - _Requirements: 1.2, 3.2, 3.3, 3.6, 6.5_
+    - _Depends on: 6.5_
+    - _Reads: products/flavors.toml, crates/zed/Cargo.toml, crates/remote_server/Cargo.toml, crates/extension_host/src/product_defaults.rs_
+    - _Writes: crates/zed/Cargo.toml, crates/remote_server/Cargo.toml, products/flavors.toml_
+    - _Validation: run JVM application/remote feature checks and Java/Kotlin extension/default lifecycle tests while `jvm` remains planned_
+  - [ ] 7.2. Add JVM product assets and agent instructions
+    - Add provisional Orbit icons/instructions and connect them to the existing JVM catalog entry.
+    - _Requirements: 1.2, 3.5, 3.6, 6.5_
+    - _Depends on: 7.1_
+    - _Reads: products/flavors.toml, assets/product_flavors/rust/agent-instructions.md_
+    - _Writes: assets/product_flavors/jvm/app-icon.png, assets/product_flavors/jvm/app-icon@2x.png, assets/product_flavors/jvm/app-icon.ico, assets/product_flavors/jvm/agent-instructions.md, products/flavors.toml_
+    - _Validation: run Orbit asset/catalog checks and JVM prompt/profile precedence tests while the entry remains planned_
+  - [ ] 7.3. Implement typed JVM toolchain onboarding
+    - Add a tested JDK/Gradle/Maven onboarding handler with no silent installation and bind it to the planned JVM entry.
+    - _Requirements: 1.2, 3.4, 3.6, 6.5_
+    - _Depends on: 7.2_
+    - _Reads: crates/onboarding/src/product_onboarding.rs, products/flavors.toml_
+    - _Writes: crates/onboarding/src/product_onboarding.rs, products/flavors.toml_
+    - _Validation: run JDK/Gradle/Maven detected, missing, declined, approved, and failure onboarding tests_
+  - [ ] 7.4. Enable JVM only after product/platform smoke gates pass
+    - Change `jvm` to enabled and verify existing generated CI/release matrices expand without new JVM-specific workflow branches.
+    - _Requirements: 3.6, 5.2, 5.3, 5.4, 5.5, 6.5_
+    - _Depends on: 7.3_
+    - _Reads: products/flavors.toml, tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/release.rs_
+    - _Writes: products/flavors.toml, .github/workflows/run_tests.yml, .github/workflows/release.yml_
+    - _Validation: run all JVM smoke/package/coexistence checks, regenerate workflows, and assert JVM rows/artifacts/update namespace appear through catalog data only_
+
+### Milestone 7: Future Game flavor
+
+- [ ] 8. Implement and enable the planned Game flavor
+  - [ ] 8.1. Implement Game capability and default contracts
+    - Add the `game-tools` feature boundary and verify chosen C#/engine extension and language-server IDs, ordering, remote behavior, and user-override lifecycle.
+    - _Requirements: 1.2, 3.2, 3.3, 3.6, 6.5_
+    - _Depends on: 7.4_
+    - _Reads: products/flavors.toml, crates/zed/Cargo.toml, crates/remote_server/Cargo.toml, crates/extension_host/src/product_defaults.rs_
+    - _Writes: crates/zed/Cargo.toml, crates/remote_server/Cargo.toml, products/flavors.toml_
+    - _Validation: run Game application/remote feature checks and C#/engine extension/default lifecycle tests while `game` remains planned_
+  - [ ] 8.2. Add Game product assets and agent instructions
+    - Add provisional Forge icons/instructions and connect them to the existing Game catalog entry.
+    - _Requirements: 1.2, 3.5, 3.6, 6.5_
+    - _Depends on: 8.1_
+    - _Reads: products/flavors.toml, assets/product_flavors/rust/agent-instructions.md_
+    - _Writes: assets/product_flavors/game/app-icon.png, assets/product_flavors/game/app-icon@2x.png, assets/product_flavors/game/app-icon.ico, assets/product_flavors/game/agent-instructions.md, products/flavors.toml_
+    - _Validation: run Forge asset/catalog checks and Game prompt/profile precedence tests while the entry remains planned_
+  - [ ] 8.3. Implement typed Game toolchain onboarding
+    - Add tested .NET/engine detection handlers with no silent installation and bind them to the planned Game entry.
+    - _Requirements: 1.2, 3.4, 3.6, 6.5_
+    - _Depends on: 8.2_
+    - _Reads: crates/onboarding/src/product_onboarding.rs, products/flavors.toml_
+    - _Writes: crates/onboarding/src/product_onboarding.rs, products/flavors.toml_
+    - _Validation: run .NET/engine detected, missing, declined, approved, and failure onboarding tests_
+  - [ ] 8.4. Enable Game only after product/platform smoke gates pass
+    - Change `game` to enabled and verify existing generated CI/release matrices expand without new Game-specific workflow branches.
+    - _Requirements: 3.6, 5.2, 5.3, 5.4, 5.5, 6.5_
+    - _Depends on: 8.3_
+    - _Reads: products/flavors.toml, tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/release.rs_
+    - _Writes: products/flavors.toml, .github/workflows/run_tests.yml, .github/workflows/release.yml_
+    - _Validation: run all Game smoke/package/coexistence checks, regenerate workflows, and assert Game rows/artifacts/update namespace appear through catalog data only_

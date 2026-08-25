@@ -18,4 +18,5 @@ path = "src/paths.rs"
 const_format.workspace = true
 dirs.workspace = true
 ignore.workspace = true
+product_flavor.workspace = true
 util.workspace = true

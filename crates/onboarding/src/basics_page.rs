@@ -36,6 +36,53 @@ use crate::{
     theme_preview::{ThemePreviewStyle, ThemePreviewTile},
 };
 
+fn command_is_available(command: &str) -> bool {
+    let executable = if cfg!(target_os = "windows") {
+        format!("{command}.exe")
+    } else {
+        command.to_string()
+    };
+    std::env::var_os("PATH")
+        .map(|paths| std::env::split_paths(&paths).any(|path| path.join(&executable).is_file()))
+        .unwrap_or(false)
+}
+
+fn render_rust_toolchain_section() -> impl IntoElement {
+    debug_assert_eq!(product_flavor::TOOLCHAIN_ONBOARDING, "rustup");
+    let cargo_status = if command_is_available("cargo") {
+        "Cargo detected"
+    } else {
+        "Cargo not detected"
+    };
+    let rustup_status = if command_is_available("rustup") {
+        "rustup detected"
+    } else {
+        "rustup not detected"
+    };
+    let language_servers = product_flavor::DEFAULT_LANGUAGE_SERVERS.join(", ");
+
+    v_flex()
+        .gap_2()
+        .child(Label::new("Rust toolchain").size(LabelSize::Large))
+        .child(
+            Label::new(format!(
+                "{cargo_status} · {rustup_status} · {language_servers} is built in"
+            ))
+            .color(Color::Muted),
+        )
+        .child(
+            Label::new(
+                "Install or change toolchains explicitly with rustup. Cargo commands are available from the Rust tooling menu.",
+            )
+            .color(Color::Muted),
+        )
+        .child(
+            Button::new("rustup_docs", "Open rustup setup guide")
+                .style(ButtonStyle::Outlined)
+                .on_click(|_, _, cx| cx.open_url("https://rustup.rs")),
+        )
+}
+
 const LIGHT_THEMES: [&str; 3] = ["One Light", "Ayu Light", "Gruvbox Light"];
 const DARK_THEMES: [&str; 3] = ["One Dark", "Ayu Dark", "Gruvbox Dark"];
 const FAMILY_NAMES: [SharedString; 3] = [
@@ -736,6 +783,7 @@ pub(crate) fn render_basics_page(user_store: &Entity<UserStore>, cx: &mut App) -
             &mut tab_index,
             cx,
         ))
+        .child(render_rust_toolchain_section())
         .child(render_theme_section(&mut tab_index, cx))
         .child(render_base_keymap_section(&mut tab_index, cx));
     #[cfg(feature = "agentic")]

@@ -169,9 +169,9 @@ impl WorkflowFile {
             .name
             .as_ref()
             .context("Workflow must have a name at this point")?;
-        let Some(workflow_path) = self.active_output_path(workflow_name) else {
+        if self.active_output_path(workflow_name).is_none() {
             return Ok(());
-        };
+        }
 
         let workflow_folder = self.r#type.folder_path();
         fs::create_dir_all(&workflow_folder).with_context(|| {
@@ -289,6 +289,8 @@ pub fn run_workflows(args: GenerateWorkflowArgs) -> Result<()> {
     if !Path::new("crates/zed/").is_dir() {
         anyhow::bail!("xtask workflows must be ran from the project root");
     }
+
+    crate::tasks::products::run(crate::tasks::products::ProductsArgs { check: true })?;
 
     // Remove all previously generated workflows to ensure these do not become stale.
     WorkflowType::remove_generated_workflows()?;

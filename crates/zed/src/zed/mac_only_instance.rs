@@ -28,12 +28,13 @@ fn address() -> SocketAddr {
     // 44338, 44438, and 44538 for the preview, stable, and nightly channels,
     // respectively. User 502 will use ports 44339, 44439, and 44539 for the preview,
     // stable, and nightly channels, respectively.
-    let port = match *release_channel::RELEASE_CHANNEL {
-        ReleaseChannel::Dev => 43737,
-        ReleaseChannel::Preview => 43737 + USER_BLOCK,
-        ReleaseChannel::Stable => 43737 + (2 * USER_BLOCK),
-        ReleaseChannel::Nightly => 43737 + (3 * USER_BLOCK),
-    };
+    let port = product_flavor::INSTANCE_PORT_OFFSET
+        + match *release_channel::RELEASE_CHANNEL {
+            ReleaseChannel::Dev => 43737,
+            ReleaseChannel::Preview => 43737 + USER_BLOCK,
+            ReleaseChannel::Stable => 43737 + (2 * USER_BLOCK),
+            ReleaseChannel::Nightly => 43737 + (3 * USER_BLOCK),
+        };
     let mut user_port = port;
     let mut sys = System::new_all();
     sys.refresh_all();
@@ -71,12 +72,15 @@ fn get_uid_as_u32(uid: &sysinfo::Uid) -> u32 {
 }
 
 fn instance_handshake() -> &'static str {
-    match *release_channel::RELEASE_CHANNEL {
-        ReleaseChannel::Dev => "Zed Editor Dev Instance Running",
-        ReleaseChannel::Nightly => "Zed Editor Nightly Instance Running",
-        ReleaseChannel::Preview => "Zed Editor Preview Instance Running",
-        ReleaseChannel::Stable => "Zed Editor Stable Instance Running",
-    }
+    static HANDSHAKE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+        product_flavor::instance_namespace(match *release_channel::RELEASE_CHANNEL {
+            ReleaseChannel::Dev => product_flavor::Channel::Dev,
+            ReleaseChannel::Nightly => product_flavor::Channel::Nightly,
+            ReleaseChannel::Preview => product_flavor::Channel::Preview,
+            ReleaseChannel::Stable => product_flavor::Channel::Stable,
+        })
+    });
+    &HANDSHAKE
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

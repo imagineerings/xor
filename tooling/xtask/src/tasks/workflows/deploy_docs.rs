@@ -36,14 +36,6 @@ impl DocsChannel {
             Self::Stable => "docs",
         }
     }
-
-    pub(crate) fn channel_name(&self) -> &'static str {
-        match self {
-            Self::Nightly => "nightly",
-            Self::Preview => "preview",
-            Self::Stable => "stable",
-        }
-    }
 }
 
 pub(crate) fn lychee_link_check(dir: &str) -> Step<Use> {
@@ -156,18 +148,6 @@ fn docs_deploy_steps(job: Job, project_name: &StepOutput) -> Job {
         .add_step(upload_install_script())
         .add_step(deploy_docs_worker())
         .add_step(upload_wrangler_logs())
-}
-
-pub(crate) fn check_docs() -> NamedJob {
-    NamedJob {
-        name: "check_docs".to_owned(),
-        job: docs_build_steps(
-            release_job(&[]).add_step(steps::harden_runner()),
-            None,
-            DocsChannel::Stable.channel_name(),
-            DocsChannel::Stable.site_url(),
-        ),
-    }
 }
 
 fn resolve_channel_step(

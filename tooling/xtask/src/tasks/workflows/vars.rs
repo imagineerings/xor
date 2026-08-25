@@ -115,26 +115,10 @@ impl PathCondition {
             set_by_step: Default::default(),
         }
     }
-    pub fn inverted(name: &'static str, pattern: &'static str) -> Self {
-        Self {
-            name,
-            pattern,
-            invert: true,
-            set_by_step: Default::default(),
-        }
-    }
-
     pub fn and_always<'a>(&'a self) -> PathContextCondition<'a> {
         PathContextCondition {
             condition: self,
             run_in_merge_queue: true,
-        }
-    }
-
-    pub fn and_not_in_merge_queue<'a>(&'a self) -> PathContextCondition<'a> {
-        PathContextCondition {
-            condition: self,
-            run_in_merge_queue: false,
         }
     }
 }
