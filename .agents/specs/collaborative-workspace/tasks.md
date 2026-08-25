@@ -3385,7 +3385,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 43. Repoint web, mobile and admin clients with version negotiation
 
-  - [ ] 43.1. Publish the compatibility matrix and negotiation contract
+  - [x] 43.1. Publish the compatibility matrix and negotiation contract
     - Record desktop, mobile, web, CLI, admin, service, protocol and schema minimum/maximum versions.
     - _Requirements: 18.1, 18.2_
     - _Capability IDs: CAP-038, CAP-039, CAP-040, CAP-041, CAP-042_
@@ -3393,6 +3393,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: .agents/specs/collaborative-workspace/fixtures/clients/**, .agents/specs/collaborative-workspace/migration-plan.md_
     - _Writes: docs/collaboration/compatibility.md_
     - _Validation: matrix checker rejects gaps, ambiguous write compatibility and unsupported schema combinations_
+    - _Evidence: 2026-08-25 — published compatibility policy version one with closed inclusive ranges for six desktop/mobile/web/CLI/admin clients, four canonical or retained-adapter services, nine HTTP/RPC/Nostr/CLI/pairing/ciphertext/push/audio protocols and three canonical/source schema families. Every client names an exact direct or adapter read/write route, selected service/protocol/schema set and a pre-tenant `upgrade_required` write failure; service startup and rollback fail closed below or above their declared schema window, Buzz schema 30 is import-only and wildcard or inferred compatibility is prohibited. The negotiation contract defines supported/read-only/upgrade-required outcomes, non-enumerating HTTP/Nostr/CLI errors, renegotiation triggers and the evidence required for future policy changes. The matrix checker passed all rows and rejected independently mutated missing-client, ambiguous-write and unknown-schema combinations; the frozen client checker passed all 28 source contracts._
 
   - [ ] 43.2. Implement common client feature negotiation endpoints
     - Return supported features/minimum versions before incompatible writes across Nostr and HTTP clients.
