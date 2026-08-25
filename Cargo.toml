@@ -289,6 +289,7 @@ members = [
     # Tooling
     #
 
+    "tools/collaboration_migrate",
     "tools/git_credential_nostr",
     "tools/git_sign_nostr",
     "tooling/compliance",
