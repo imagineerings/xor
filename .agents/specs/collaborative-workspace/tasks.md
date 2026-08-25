@@ -3532,6 +3532,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/deploy/compose/**, projects/buzz/deploy/local/**, deploy/**_
     - _Writes: deploy/collaboration/compose/*_
     - _Validation: Compose configuration renders, starts healthy in isolation and supports documented prior-image rollback_
+    - _Discovered contradiction (2026-08-25): the planned deployment-only write must bind Task 44.1's canonical names while `main.rs` still deserializes the established Collab runtime names, and a fresh database cannot pass the real service readiness probe before Task 44.4 supplies canonical migration jobs. The narrow composition therefore emits equal canonical/runtime dependency values, documents the temporary alias boundary, and uses a clearly validation-only BusyBox override to exercise actual Compose health ordering without claiming release-binary or schema readiness. Task 44.1 also rejects plaintext non-loopback object endpoints, so Collab shares MinIO's container network namespace and uses true `127.0.0.1` object transport rather than weakening endpoint admission._
 
   - [ ] 44.3. Consolidate Helm and Kubernetes resources
     - Translate services, migrations, ingress, autoscaling, disruption, storage and network policy to Zed ownership.
