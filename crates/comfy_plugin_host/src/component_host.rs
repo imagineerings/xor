@@ -17,8 +17,9 @@ use comfy_runtime::{
 use comfy_types::{
     CancellationToken, MAX_WORKER_COMPONENT_CHUNK_BYTES,
     MAX_WORKER_PLUGIN_CAPABILITY_PAYLOAD_BYTES, MAX_WORKER_PLUGIN_INVOCATION_BYTES,
-    WorkerComponentContent, WorkerComponentDescriptor, WorkerRegistryDeploymentBegin,
-    WorkerRegistryDeploymentChunk, WorkerRegistryGeneration, WorkerSha256Digest,
+    WorkerComponentContent, WorkerComponentDescriptor, WorkerProviderInvocationContext,
+    WorkerRegistryDeploymentBegin, WorkerRegistryDeploymentChunk, WorkerRegistryGeneration,
+    WorkerSha256Digest,
 };
 use extension_host::{ComponentLifecycleAdapter, ComponentRuntime, InstalledComponent};
 use sha2::{Digest, Sha256};
@@ -660,6 +661,7 @@ pub struct PreparedPluginInvocation {
 #[allow(dead_code)]
 struct PreflightedProviderComponentCapsule {
     grant: PreflightedProviderRuntimeActivationGrant,
+    worker_context: WorkerProviderInvocationContext,
     plugin: InstalledVerifiedPlugin,
     generation: VerifiedComponentGeneration,
     node_id: Arc<str>,
@@ -671,11 +673,11 @@ impl PreflightedProviderComponentCapsule {
     fn new(
         host: &ComponentHost,
         grant: ProviderRuntimeActivationGrant,
+        worker_context: WorkerProviderInvocationContext,
         worker_start: &comfy_runtime::NativeProviderWorkerSessionStart,
         manifest_authorization: ProviderManifestAuthorizationV2,
     ) -> Result<Self, ComponentHostError> {
         let plugin = host.installed_plugin(&worker_start.extension_id)?;
-        let lease = host.begin_invocation_lease(&plugin)?;
         let generation = host.verified_generation()?;
         let deployment = generation.worker_deployment_plan()?;
         let node_id: Arc<str> = Arc::from(worker_start.node_id.as_str());
@@ -690,15 +692,22 @@ impl PreflightedProviderComponentCapsule {
             )));
         }
         let grant = grant
-            .preflight_installed_component(&deployment, worker_start, manifest_authorization)
+            .preflight_installed_component(
+                &worker_context,
+                &deployment,
+                worker_start,
+                manifest_authorization,
+            )
             .map_err(|error| match error {
                 PluginServiceError::Cancelled => ComponentHostError::Cancelled,
                 error => ComponentHostError::ExecutionBoundary(format!(
                     "provider component activation preflight failed: {error}"
                 )),
             })?;
+        let lease = host.begin_invocation_lease(&plugin)?;
         Ok(Self {
             grant,
+            worker_context,
             plugin,
             generation,
             node_id,
@@ -723,29 +732,51 @@ mod activation_preflight_tests {
                     .next()
             })
             .expect("private provider component capsule is missing");
-        for retained in ["grant:", "plugin:", "generation:", "node_id:", "_lease:"] {
+        for retained in [
+            "grant:",
+            "worker_context:",
+            "plugin:",
+            "generation:",
+            "node_id:",
+            "_lease:",
+        ] {
             assert!(fields.contains(retained));
         }
         assert!(!fields.contains("pub "));
         let capsule = source
             .split("impl PreflightedProviderComponentCapsule")
             .nth(1)
-            .and_then(|source| source.split("impl PreparedPluginInvocation").next())
+            .and_then(|source| source.split("#[cfg(test)]").next())
             .expect("private provider component capsule implementation is missing");
+        let constructor_signature = capsule
+            .split("fn new(")
+            .nth(1)
+            .and_then(|source| source.split(") -> Result").next())
+            .expect("private capsule constructor signature is missing");
+        assert_eq!(constructor_signature.matches("worker_context").count(), 1);
+        assert_eq!(
+            constructor_signature
+                .matches("WorkerProviderInvocationContext")
+                .count(),
+            1
+        );
         assert!(capsule.contains("let plugin = host.installed_plugin"));
-        assert!(capsule.contains("let lease = host.begin_invocation_lease"));
         assert!(capsule.contains("let generation = host.verified_generation"));
         assert!(capsule.contains("let deployment = generation.worker_deployment_plan"));
         let compact_capsule = capsule.split_whitespace().collect::<String>();
         assert!(compact_capsule.contains("plugin.manifest().nodes.iter().any"));
+        assert!(compact_capsule.contains(
+            "grant.preflight_installed_component(&worker_context,&deployment,worker_start,manifest_authorization)"
+        ));
         assert!(capsule.contains(&call));
+        assert!(capsule.contains("&worker_context"));
         let ordered = [
             "let plugin = host.installed_plugin",
-            "let lease = host.begin_invocation_lease",
             "let generation = host.verified_generation",
             "let deployment = generation.worker_deployment_plan",
             "node.id == node_id.as_ref()",
             call.as_str(),
+            "let lease = host.begin_invocation_lease",
             "Ok(Self",
         ];
         let mut previous = 0;
