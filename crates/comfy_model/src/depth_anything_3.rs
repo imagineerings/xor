@@ -963,7 +963,7 @@ impl NativeDepthAnything3Resource {
         backend: &CpuBackend,
         invocation: NativeDepthAnything3Invocation<'_>,
         context: &ExecutionContext<'_>,
-        mut trace: Option<&mut DepthAnything3ExecutionTrace>,
+        trace: Option<&mut DepthAnything3ExecutionTrace>,
     ) -> Result<NativeDepthAnything3Geometry, NativeDepthAnything3Error> {
         self.validate(context.cancellation)?;
         context.check()?;
@@ -1076,7 +1076,7 @@ impl NativeDepthAnything3Resource {
             invocation.use_ray_pose,
             invocation.ransac_seed,
             context,
-            trace.as_deref_mut(),
+            trace,
         )?;
         project_geometry(
             backend,
@@ -3344,7 +3344,7 @@ fn execute_depth_head(
                     views,
                     ransac_seed,
                     context,
-                    trace.as_deref_mut(),
+                    trace,
                 )?
             }
         } else if resource.configuration.has_camera_decoder && views > 1 {
@@ -5214,7 +5214,7 @@ fn depth_anything_3_state_manifest(
         )?;
         add_affine(&mut states, &format!("{prefix}.norm2"), hidden)?;
         if swiglu {
-            let intermediate = ((hidden * 4 * 2 / 3) + 7) / 8 * 8;
+            let intermediate = (hidden * 4 * 2 / 3).div_ceil(8) * 8;
             add_linear(
                 &mut states,
                 &format!("{prefix}.mlp.weights_in"),
@@ -5751,10 +5751,10 @@ fn resident_tensor_bytes<'a>(
     states: impl IntoIterator<Item = &'a BTreeMap<String, Tensor>>,
     cancellation: &CancellationToken,
 ) -> Result<u64, NativeDepthAnything3Error> {
-    Ok(resident_tensor_allocations(states, cancellation)?
+    resident_tensor_allocations(states, cancellation)?
         .into_iter()
         .try_fold(0_u64, |total, (_, bytes)| total.checked_add(bytes))
-        .ok_or(NativeDepthAnything3Error::ShapeOverflow)?)
+        .ok_or(NativeDepthAnything3Error::ShapeOverflow)
 }
 
 fn conservative_projected_resident_bytes(
