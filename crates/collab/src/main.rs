@@ -60,6 +60,9 @@ async fn main() -> Result<()> {
             let mut app = Router::new()
                 .route("/", get(handle_root))
                 .route("/healthz", get(handle_liveness_probe))
+                .merge(collab::compatibility::http_router(Arc::new(
+                    collab::compatibility::CompatibilityPolicy::current(),
+                )))
                 .layer(Extension(mode));
 
             let listener = TcpListener::bind(format!("0.0.0.0:{}", config.http_port))

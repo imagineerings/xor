@@ -3,6 +3,7 @@ pub mod api;
 pub mod audit;
 pub mod auth;
 pub mod collaboration_command;
+pub mod compatibility;
 pub mod db;
 pub mod entities;
 pub mod env;
