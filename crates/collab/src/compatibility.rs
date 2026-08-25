@@ -20,8 +20,8 @@ const MAX_FEATURES: usize = 32;
 const COLLAB_SERVICE_MINIMUM_VERSION: &str = "0.44.0";
 const COLLAB_SERVICE_MAXIMUM_VERSION: &str = "0.44.0";
 const COLLAB_SCHEMA_ID: &str = "canonical-collaboration-postgres";
-const COLLAB_SCHEMA_MINIMUM_VERSION: u64 = 20_260_824_000_500;
-const COLLAB_SCHEMA_MAXIMUM_VERSION: u64 = 20_260_824_000_500;
+const COLLAB_SCHEMA_MINIMUM_VERSION: u64 = 20_260_825_000_100;
+const COLLAB_SCHEMA_MAXIMUM_VERSION: u64 = 20_260_825_000_100;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]

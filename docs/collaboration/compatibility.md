@@ -21,9 +21,9 @@ The policy applies to Multiplayer builds. Standard Zed does not include the coll
 
 | Service | Supported versions | Stored schema |
 | --- | --- | --- |
-| Collab | 0.44.0 | Canonical collaboration Postgres 20260824000500 |
-| Buzz relay adapter | 0.1.0 | Canonical collaboration Postgres 20260824000500 |
-| Push gateway | 0.1.0 | Canonical push Postgres 20260822000200–20260824000500 |
+| Collab | 0.44.0 | Canonical collaboration Postgres 20260825000100 |
+| Buzz relay adapter | 0.1.0 | Canonical collaboration Postgres 20260825000100 |
+| Push gateway | 0.1.0 | Canonical push Postgres 20260822000200–20260825000100 |
 | Pair relay | 0.1.0 | None |
 
 | Protocol | Supported versions | Write-bearing |
@@ -167,8 +167,8 @@ The JSON block is normative. Release tooling must parse the block whose `matrix_
   "schemas": [
     {
       "id": "canonical-collaboration-postgres",
-      "minimum_version": "20260824000500",
-      "maximum_version": "20260824000500",
+      "minimum_version": "20260825000100",
+      "maximum_version": "20260825000100",
       "writers": ["collab@0.44.0"],
       "below_minimum": "service_not_ready",
       "above_maximum": "binary_schema_incompatible"
@@ -176,7 +176,7 @@ The JSON block is normative. Release tooling must parse the block whose `matrix_
     {
       "id": "canonical-push-postgres",
       "minimum_version": "20260822000200",
-      "maximum_version": "20260824000500",
+      "maximum_version": "20260825000100",
       "writers": ["push-gateway@0.1.0", "collab@0.44.0"],
       "below_minimum": "service_not_ready",
       "above_maximum": "binary_schema_incompatible"
