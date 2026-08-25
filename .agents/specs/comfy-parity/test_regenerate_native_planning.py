@@ -875,6 +875,11 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-general-video-v1.json",
             "crates/comfy_runtime/src/native_ffi_elf.rs",
             "crates/comfy_model/src/artifact_index.rs",
+            "crates/comfy_worker/src/memory_modes.rs",
+            "crates/comfy_worker/src/memory_planner.rs",
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
             "crates/comfy_media/src/video.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_runtime/src/executor.rs",
@@ -882,10 +887,16 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_test_support/fixtures/video/codec-general-video-abi/manifest.json",
             "crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json",
             "crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json",
+            ".agents/specs/comfy-parity/generate_ownership_catalog.py",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ):
             self.assertIn(path, video_package_task["reads"])
         for path in (
             "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_model/src/artifact_index.rs",
+            "crates/comfy_worker/src/memory_modes.rs",
             "crates/comfy_test_support/src/bin/generate_video_codec_package_bootstrap_fixture.rs",
             "crates/comfy_test_support/tests/video_codec_package_bootstrap.rs",
             "crates/comfy_test_support/fixtures/video/codec-package-bootstrap",
@@ -898,23 +909,54 @@ class ValidationGenerationTests(unittest.TestCase):
             "six-library/78-symbol catalog",
             "inspect_elf64_dynamic_contract",
             "no second ELF parser",
-            "all four worker NativeImageExecutor constructor branches consume the same certified inspected closure",
+            "cancellable bounded private-file capture",
+            "captures bounded metadata and each native image one at a time",
+            "never buffers the whole package",
+            "sole retained codec actor consumes the one non-cloneable certified inspected closure",
+            "ports issued by that same actor",
+            "reserved fixture signer",
+            "reserved fixture public-key fingerprint",
+            "cfg(test or test-support)",
+            "recaptures the initially excluded coverage and receipt byte-for-byte",
+            "coverage-only or receipt-only mutation",
+            "MemoryPlanRequest::codec_bytes",
+            "MemoryReservationKind::Codec",
+            "No package-local planner, allocator, retry policy, or BackendMemorySnapshot baseline inflation",
+            "one shared unsafe loader projection",
+            "all six version functions including avfilter_version",
+            "24 supplemental pointers privately for Task563",
+            "port interfaces can reach only their historical symbol subset",
             "ReviewedGeneralVideoCodecDeclarations alone remains UncertifiedFfi",
             "historical five-library/54-symbol catalog",
-            "Fixture signing keys and roots are test-only",
+            "without a host compiler, subprocess, download, credential, or production private key",
         ):
             self.assertIn(phrase, video_package_task["done"])
+        self.assertNotIn(
+            "all four worker NativeImageExecutor constructor branches consume the same certified inspected closure",
+            video_package_task["done"],
+        )
+        self.assertNotIn("worker backend baseline", video_package_task["done"])
+        self.assertEqual(
+            video_package_task["criterion_ids"],
+            ["28.6", "31.5", "41.4", "41.5", "44.3"],
+        )
         video_package_validation = planning.task_validation_commands(
             video_package_task
         )
         for command in (
             "generate_video_codec_package_bootstrap_fixture -- --check",
+            "-p comfy_model artifact_root_cancellable_private_capture",
+            "cargo test --locked -p comfy_model --all-targets",
             "general_video_codec_package_bootstrap",
             "--test video_codec_package_bootstrap",
             "-p comfy_worker video_codec_package_bootstrap",
-            "val_ownership_task559_video_codec_package_bootstrap_001",
+            "val_ownership_task562_video_codec_package_bootstrap_001",
         ):
             self.assertIn(command, video_package_validation)
+        self.assertNotIn(
+            "val_ownership_task559_video_codec_package_bootstrap_001",
+            video_package_validation,
+        )
         video_closure = tasks_by_id["comfy-parity-native-video-execution-foundation"]
         self.assertEqual(
             video_closure["dependencies"],
