@@ -39,7 +39,7 @@ run_migration() {
   shift
   docker run --rm --network "$network" \
     --env "DATABASE_URL=postgres://postgres:migration-canary@${postgres}:5432/${database}" \
-    --env COLLABORATION_REQUIRED_SCHEMA_VERSION=20260824000500 \
+    --env COLLABORATION_REQUIRED_SCHEMA_VERSION=20260825000100 \
     "$image" "$@"
 }
 
@@ -53,20 +53,20 @@ fi
 run_migration collaboration up --target-version 20260820000500
 run_migration collaboration verify | grep -q 'current=20260820000500.*applied=6'
 run_migration collaboration up
-run_migration collaboration verify | grep -q 'current=20260824000500.*applied=20'
+run_migration collaboration verify | grep -q 'current=20260825000100.*applied=21'
 run_migration collaboration up | grep -q 'migration_up_applied=0'
 
-run_migration collaboration down --target-version 20260824000400
+run_migration collaboration down --target-version 20260824000500
 table_after_down=$(docker exec "$postgres" psql --username postgres --dbname collaboration --tuples-only --no-align \
-  --command "SELECT to_regclass('public.collaboration_moderation_actions') IS NULL")
+  --command "SELECT to_regclass('public.collaboration_workflow_ready_queue_index') IS NULL")
 [[ "$table_after_down" == "t" ]]
 run_migration collaboration up
-run_migration collaboration seal --expected-version 20260824000500
-if run_migration collaboration down --target-version 20260824000400 >/dev/null 2>&1; then
+run_migration collaboration seal --expected-version 20260825000100
+if run_migration collaboration down --target-version 20260824000500 >/dev/null 2>&1; then
   echo "rollback crossed the sealed compatibility boundary" >&2
   exit 1
 fi
-run_migration collaboration status | grep -q 'rollback_floor=20260824000500'
+run_migration collaboration status | grep -q 'rollback_floor=20260825000100'
 
 docker exec "$postgres" createdb --username postgres drift
 run_migration drift up --target-version 20260815000100

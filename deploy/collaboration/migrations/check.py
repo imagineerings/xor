@@ -24,10 +24,10 @@ def main() -> None:
     document = json.loads(MANIFEST.read_text())
     require(document["formatVersion"] == 1, "migration format changed")
     require(document["schemaFloor"] == "0", "schema floor changed")
-    require(document["schemaCeiling"] == "20260824000500", "schema ceiling changed")
+    require(document["schemaCeiling"] == "20260825000100", "schema ceiling changed")
     require(document["rollbackBoundary"] == "service-activation", "rollback boundary changed")
     migrations = document["migrations"]
-    require(len(migrations) == 20, "migration inventory changed")
+    require(len(migrations) == 21, "migration inventory changed")
     versions = [migration["version"] for migration in migrations]
     require(versions == sorted(set(versions)), "migration order is not strict")
     require(versions[-1] == document["schemaCeiling"], "ceiling is not the final migration")
@@ -67,7 +67,7 @@ def main() -> None:
         capture_output=True,
         text=True,
     )
-    require("count=20 ceiling=20260824000500" in validation.stdout, "runner rejected manifest")
+    require("count=21 ceiling=20260825000100" in validation.stdout, "runner rejected manifest")
 
     mismatched_environment = os.environ.copy()
     mismatched_environment["COLLABORATION_REQUIRED_SCHEMA_VERSION"] = "20260824000400"

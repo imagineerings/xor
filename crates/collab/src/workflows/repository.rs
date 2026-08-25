@@ -10,6 +10,11 @@ use serde_json::Value as JsonValue;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use super::scheduler::{
+    SELECT_QUEUE_OBSERVATION_SQL, WorkflowCapacityScope, WorkflowQueueObservation,
+    capacity_scope_from_database_error,
+};
+
 const SET_TENANT_SQL: &str = "SELECT set_config('app.community_id', $1, true) AS app_community_id";
 const SELECT_DEFINITION_VERSION_SQL: &str = r#"
 SELECT
@@ -963,6 +968,8 @@ pub enum WorkflowRepositoryError {
     LeaseUnavailable,
     #[error("workflow run lease generation is no longer authoritative")]
     LeaseFenceLost,
+    #[error("workflow scheduler capacity is unavailable for {0:?}")]
+    CapacityUnavailable(WorkflowCapacityScope),
     #[error("workflow repository record is invalid")]
     InvalidRecord,
     #[error("workflow definition could not be encoded")]
@@ -1173,7 +1180,7 @@ impl WorkflowRepository {
             transaction
                 .execute(insert_run_statement(request, &context_json)?)
                 .await
-                .map_err(WorkflowRepositoryError::Unavailable)?;
+                .map_err(map_scheduler_database_error)?;
             for (index, (step, operation_id)) in definition
                 .definition
                 .steps()
@@ -1373,7 +1380,7 @@ impl WorkflowRepository {
             transaction
                 .execute(insert_lease_statement(request, generation)?)
                 .await
-                .map_err(WorkflowRepositoryError::Unavailable)?;
+                .map_err(map_scheduler_database_error)?;
             Ok(WorkflowRunLeaseAcquisition {
                 outcome: WorkflowStoreOutcome::Applied,
                 lease: WorkflowRunLease {
@@ -1478,11 +1485,63 @@ impl WorkflowRepository {
         finish_transaction(transaction, result).await
     }
 
+    pub(super) async fn observe_queue(
+        &self,
+        tenant: &TenantContext,
+        now_millis: u64,
+    ) -> Result<WorkflowQueueObservation, WorkflowRepositoryError> {
+        let transaction = self.begin().await?;
+        let result = async {
+            set_tenant(&transaction, tenant.community_id()).await?;
+            let row = transaction
+                .query_one(Statement::from_sql_and_values(
+                    DatabaseBackend::Postgres,
+                    SELECT_QUEUE_OBSERVATION_SQL,
+                    [tenant.community_id().as_uuid().into()],
+                ))
+                .await
+                .map_err(WorkflowRepositoryError::Unavailable)?
+                .ok_or(WorkflowRepositoryError::InvalidRecord)?;
+            let community_queue_depth =
+                u32::try_from(row_value::<i64>(&row, "community_queue_depth")?)
+                    .map_err(|_| WorkflowRepositoryError::InvalidRecord)?;
+            let deployment_queue_depth =
+                u32::try_from(row_value::<i64>(&row, "deployment_queue_depth")?)
+                    .map_err(|_| WorkflowRepositoryError::InvalidRecord)?;
+            let community_oldest_at_millis =
+                parse_optional_millis(row_value(&row, "community_oldest_at_millis")?)?;
+            let deployment_oldest_at_millis =
+                parse_optional_millis(row_value(&row, "deployment_oldest_at_millis")?)?;
+            let oldest_queued_at_millis =
+                match (community_oldest_at_millis, deployment_oldest_at_millis) {
+                    (Some(community), Some(deployment)) => Some(community.min(deployment)),
+                    (Some(community), None) => Some(community),
+                    (None, Some(deployment)) => Some(deployment),
+                    (None, None) => None,
+                };
+            Ok(WorkflowQueueObservation {
+                community_queue_depth,
+                deployment_queue_depth,
+                oldest_queued_seconds: oldest_queued_at_millis
+                    .map(|queued_at| now_millis.saturating_sub(queued_at) / 1_000),
+            })
+        }
+        .await;
+        finish_transaction(transaction, result).await
+    }
+
     async fn begin(&self) -> Result<DatabaseTransaction, WorkflowRepositoryError> {
         self.connection
             .begin()
             .await
             .map_err(WorkflowRepositoryError::Unavailable)
+    }
+}
+
+fn map_scheduler_database_error(error: DbErr) -> WorkflowRepositoryError {
+    match capacity_scope_from_database_error(&error) {
+        Some(scope) => WorkflowRepositoryError::CapacityUnavailable(scope),
+        None => WorkflowRepositoryError::Unavailable(error),
     }
 }
 

@@ -82,7 +82,7 @@ rollback_args=(
   "${production_args[@]}"
   -f "$chart/values-rollback.yaml"
   --set rollback.targetImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-  --set-string rollback.maximumSchemaVersion=20260824000500
+  --set-string rollback.maximumSchemaVersion=20260825000100
 )
 helm lint "$chart" "${rollback_args[@]}" >/dev/null
 helm template collaboration "$chart" "${rollback_args[@]}" >"$rollback_output"
@@ -210,7 +210,7 @@ if helm template collaboration "$chart" "${active_args[@]}" --set persistence.gi
 fi
 grep -q 'multiple replicas with persistent Git storage require ReadWriteMany' "$error_output"
 
-if helm template collaboration "$chart" "${production_args[@]}" -f "$chart/values-rollback.yaml" --set-string rollback.maximumSchemaVersion=20260824000500 >"$error_output" 2>&1; then
+if helm template collaboration "$chart" "${production_args[@]}" -f "$chart/values-rollback.yaml" --set-string rollback.maximumSchemaVersion=20260825000100 >"$error_output" 2>&1; then
   echo "expected a rollback without a target digest to fail" >&2
   exit 1
 fi
