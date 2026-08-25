@@ -3797,6 +3797,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "collaboration_migrate"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "collab",
+ "collaboration_domain",
+ "sha2 0.10.9",
+ "thiserror 2.0.17",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "collaboration_workflow"
 version = "0.1.0"
 dependencies = [
