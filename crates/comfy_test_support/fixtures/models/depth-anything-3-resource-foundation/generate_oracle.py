@@ -258,6 +258,57 @@ def ransac_trace_document(ray, confidence, views):
         view_trace["view"] = view
     trace["pre_geometry_ray"] = tensor_document(ray)
     trace["pre_geometry_confidence"] = tensor_document(confidence)
+    values_per_view = len(confidence.values) // views
+    ray_values_per_view = len(ray.values) // views
+    admission_views = []
+    for view in range(views):
+        confidence_values = confidence.values[
+            view * values_per_view : (view + 1) * values_per_view
+        ]
+        if (
+            len(confidence_values) != 256
+            or any(not math.isfinite(value) or value <= 0.0 for value in confidence_values)
+            or len({bits(value) for value in confidence_values}) != len(confidence_values)
+        ):
+            raise ValueError("reduced ray confidence must contain 256 finite positive bit-distinct values per view")
+        sorted_values = sorted(confidence_values)
+        adjacent_ulp_gaps = [
+            bits(right) - bits(left)
+            for left, right in zip(sorted_values, sorted_values[1:])
+        ]
+        adjacent_value_gaps = [
+            fsub(right, left)
+            for left, right in zip(sorted_values, sorted_values[1:])
+        ]
+        ray_values = ray.values[
+            view * ray_values_per_view : (view + 1) * ray_values_per_view
+        ]
+        z_values = ray_values[2::6]
+        if len(z_values) != 256 or any(
+            not math.isfinite(value) or abs(value) <= 1.0e-4 for value in z_values
+        ):
+            raise ValueError("reduced ray z lanes must all be finite and source-valid")
+        admission_views.append(
+            {
+                "view": view,
+                "confidence_count": len(confidence_values),
+                "confidence_all_finite_positive": True,
+                "confidence_all_bit_distinct": True,
+                "minimum_adjacent_ulp_gap": min(adjacent_ulp_gaps),
+                "minimum_adjacent_value_gap_bits": bits(min(adjacent_value_gaps)),
+                "ray_z_all_valid": True,
+                "minimum_ray_z_abs_bits": bits(min(abs(value) for value in z_values)),
+            }
+        )
+    trace["admission"] = {
+        "candidate_count": len(trace["views"][0]["candidate_indices"]),
+        "confidence_ordering": {
+            "source": "torch.argsort(descending=True, stable=False-default)",
+            "native_owner": "argsort_with_context_exact_native(descending=true, stable=false)",
+            "tied_order_pinned": False,
+        },
+        "views": admission_views,
+    }
     trace["geometry"] = geometry_document(geometry)
     changed_seed_samples = ransac_samples(len(trace["views"][0]["candidate_indices"]), 18)
     changed_address = dict(RAY_POSE_RNG_ADDRESS)

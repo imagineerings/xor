@@ -291,6 +291,17 @@ pub fn deterministic_reduced_depth_anything_3_checkpoint(
             values[0] = 0.75;
             values[1] = 1.0;
         }
+        if specification.key == "native.head.scratch.output_conv2_aux.3.5.weight" {
+            let value = values
+                .get_mut(194)
+                .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
+            *value += 1.0;
+        }
+        if specification.key == "native.head.scratch.output_conv2_aux.3.5.bias" {
+            *values
+                .get_mut(2)
+                .ok_or(NativeDepthAnything3Error::ShapeOverflow)? = 1.0e-4;
+        }
         ordered_state.push((
             specification.key,
             tensor_from_f32_with_context_exact_native(

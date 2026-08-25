@@ -236,6 +236,10 @@ def state_values(state_index, count, key):
         values[3] = f32(1.0)
     if key == "native.cam_dec.fc_fov.0.bias":
         values[:] = [f32(0.75), f32(1.0)]
+    if key == "native.head.scratch.output_conv2_aux.3.5.weight":
+        values[194] = fadd(values[194], 1.0)
+    if key == "native.head.scratch.output_conv2_aux.3.5.bias":
+        values[2] = f32(1.0e-4)
     return values
 
 

@@ -2240,6 +2240,139 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
             "{pointer}: pre-geometry ray phase diverged"
         );
     }
+    let raw_ray_values = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+        &backend,
+        &ray_trace.raw_ray,
+        &ray_context,
+    )?;
+    let raw_confidence_values = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+        &backend,
+        &ray_trace.raw_ray_confidence,
+        &ray_context,
+    )?;
+    let admission = oracle
+        .pointer("/reduced_dualdpt/ray_pose_trace/admission")
+        .ok_or("DA3 ray-pose admission trace is missing")?;
+    assert_eq!(
+        admission.get("candidate_count").and_then(Value::as_u64),
+        Some(76)
+    );
+    assert_eq!(
+        admission
+            .pointer("/confidence_ordering/source")
+            .and_then(Value::as_str),
+        Some("torch.argsort(descending=True, stable=False-default)")
+    );
+    assert_eq!(
+        admission
+            .pointer("/confidence_ordering/native_owner")
+            .and_then(Value::as_str),
+        Some("argsort_with_context_exact_native(descending=true, stable=false)")
+    );
+    assert_eq!(
+        admission
+            .pointer("/confidence_ordering/tied_order_pinned")
+            .and_then(Value::as_bool),
+        Some(false)
+    );
+    let admission_views = admission
+        .get("views")
+        .and_then(Value::as_array)
+        .ok_or("DA3 ray-pose admission views are missing")?;
+    assert_eq!(admission_views.len(), 3);
+    for (view, expected) in admission_views.iter().enumerate() {
+        let confidence_start = view * 256;
+        let confidence_end = confidence_start + 256;
+        let confidence = raw_confidence_values
+            .get(confidence_start..confidence_end)
+            .ok_or("DA3 ray confidence view is unavailable")?;
+        assert_eq!(
+            expected.get("confidence_count").and_then(Value::as_u64),
+            Some(256)
+        );
+        assert_eq!(
+            expected
+                .get("confidence_all_finite_positive")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        assert_eq!(
+            expected
+                .get("confidence_all_bit_distinct")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        assert!(
+            confidence
+                .iter()
+                .all(|value| value.is_finite() && *value > 0.0)
+        );
+        let mut sorted_confidence = confidence.to_vec();
+        sorted_confidence.sort_by(f32::total_cmp);
+        assert!(
+            sorted_confidence
+                .windows(2)
+                .all(|pair| pair[0].to_bits() != pair[1].to_bits())
+        );
+        let minimum_ulp_gap = sorted_confidence
+            .windows(2)
+            .map(|pair| pair[1].to_bits() - pair[0].to_bits())
+            .min()
+            .ok_or("DA3 ray confidence ULP gap is unavailable")?;
+        let minimum_value_gap = sorted_confidence
+            .windows(2)
+            .map(|pair| pair[1] - pair[0])
+            .min_by(f32::total_cmp)
+            .ok_or("DA3 ray confidence value gap is unavailable")?;
+        assert_eq!(
+            u64::from(minimum_ulp_gap),
+            expected
+                .get("minimum_adjacent_ulp_gap")
+                .and_then(Value::as_u64)
+                .ok_or("DA3 ray confidence ULP gap oracle is missing")?
+        );
+        assert_eq!(
+            u64::from(minimum_value_gap.to_bits()),
+            expected
+                .get("minimum_adjacent_value_gap_bits")
+                .and_then(Value::as_u64)
+                .ok_or("DA3 ray confidence value gap oracle is missing")?
+        );
+        let ray_start = view * 256 * 6;
+        let ray_end = ray_start + 256 * 6;
+        let ray_z = raw_ray_values
+            .get(ray_start..ray_end)
+            .ok_or("DA3 ray view is unavailable")?
+            .chunks_exact(6)
+            .map(|ray| {
+                ray.get(2)
+                    .copied()
+                    .ok_or("DA3 ray z lane is unavailable")
+                    .map(f32::abs)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(ray_z.len(), 256);
+        assert_eq!(
+            expected.get("ray_z_all_valid").and_then(Value::as_bool),
+            Some(true)
+        );
+        assert!(
+            ray_z
+                .iter()
+                .all(|value| value.is_finite() && *value > 1.0e-4)
+        );
+        let minimum_ray_z = ray_z
+            .into_iter()
+            .min_by(f32::total_cmp)
+            .ok_or("DA3 ray z minimum is unavailable")?;
+        assert_eq!(
+            u64::from(minimum_ray_z.to_bits()),
+            expected
+                .get("minimum_ray_z_abs_bits")
+                .and_then(Value::as_u64)
+                .ok_or("DA3 ray z minimum oracle is missing")?
+        );
+    }
     let expected_samples = oracle
         .pointer("/reduced_dualdpt/ray_pose_trace/samples")
         .and_then(Value::as_array)
