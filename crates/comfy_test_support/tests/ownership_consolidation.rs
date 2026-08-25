@@ -333,6 +333,97 @@ fn parse_csv_records(csv: &str) -> Result<Vec<Vec<String>>, String> {
     Ok(records)
 }
 
+#[test]
+fn task390_depth_anything_tensor_oracle_is_only_a_development_reference()
+-> Result<(), Box<dyn std::error::Error>> {
+    const ORACLE_PATH: &str = "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/source_graph.py";
+    const CONCERNS: [&str; 3] = [
+        "tensor_logical_identity",
+        "tensor_mutation_lineage",
+        "tensor_storage_descriptors_and_views",
+    ];
+
+    let root = repository_root()?;
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let policy_concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("ownership policy has no concerns")?;
+    for concern_name in CONCERNS {
+        let concern = policy_concerns
+            .iter()
+            .find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str) == Some(concern_name)
+            })
+            .ok_or_else(|| format!("ownership policy has no {concern_name} concern"))?;
+        let matching_definitions = concern
+            .get("definitions")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| format!("{concern_name} has no definitions"))?
+            .iter()
+            .filter(|definition| {
+                definition.get("path").and_then(serde_json::Value::as_str) == Some(ORACLE_PATH)
+                    && definition.get("symbol").and_then(serde_json::Value::as_str)
+                        == Some("Tensor")
+                    && definition.get("role").and_then(serde_json::Value::as_str)
+                        == Some("development_reference")
+            })
+            .count();
+        assert_eq!(
+            matching_definitions, 1,
+            "{concern_name} oracle role drifted"
+        );
+        assert!(
+            concern
+                .get("allowed_adapters")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|adapters| adapters.iter().any(|adapter| {
+                    adapter.as_str().is_some_and(|adapter| {
+                        adapter.contains("pure-standard-library reduced Depth Anything 3")
+                            && adapter.contains(
+                                "owns no Rust Tensor identity, storage, or mutation authority",
+                            )
+                    })
+                })),
+            "{concern_name} lacks the test-oracle authority boundary"
+        );
+    }
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let mut records = parse_csv_records(&catalog)?.into_iter();
+    let header = records.next().ok_or("ownership catalog has no header")?;
+    let column = |name: &str| {
+        header
+            .iter()
+            .position(|candidate| candidate == name)
+            .ok_or_else(|| format!("ownership catalog has no {name} column"))
+    };
+    let concern_column = column("concern")?;
+    let status_column = column("current_status")?;
+    let competing_column = column("competing_symbols")?;
+    let definitions_column = column("definition_hits")?;
+    let consumers_column = column("production_consumers")?;
+    let calls_column = column("production_call_sites")?;
+    let rows = records
+        .map(|row| (row[concern_column].clone(), row))
+        .collect::<BTreeMap<_, _>>();
+    for concern_name in CONCERNS {
+        let row = rows
+            .get(concern_name)
+            .ok_or_else(|| format!("ownership catalog has no {concern_name} row"))?;
+        assert_eq!(row[status_column], "authoritative_owner_confirmed");
+        assert!(row[competing_column].is_empty());
+        assert!(row[definitions_column].contains(&format!("development_reference@{ORACLE_PATH}:")));
+        assert!(!row[consumers_column].contains(ORACLE_PATH));
+        assert!(!row[calls_column].contains(ORACLE_PATH));
+    }
+    Ok(())
+}
+
 fn accounted_pending_ownership_rows(
     ownership_catalog: &str,
     policy_concerns: &[serde_json::Value],

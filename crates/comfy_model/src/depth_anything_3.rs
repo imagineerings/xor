@@ -1422,6 +1422,13 @@ struct DepthAnything3PositionLaneTrace {
 }
 
 #[derive(Clone, Debug)]
+#[cfg_attr(
+    not(any(test, feature = "test-support")),
+    expect(
+        dead_code,
+        reason = "fields are projected by the exact Depth Anything 3 test trace"
+    )
+)]
 struct DepthAnything3RansacViewTrace {
     candidate_indices: Vec<usize>,
     best_iteration: usize,

@@ -24106,13 +24106,20 @@
       "allowed_adapters": [
         "StorageId identifies only a physical backing allocation and cannot key autograd participation, saved-value identity, gradient publication, or checkpoint state",
         "Rust handle clones, views, detach, and data aliases preserve the canonical logical TensorId while true copies and fresh factory outputs receive a checked new identity",
-        "SavedTensor and AutogradTape read TensorId through immutable Tensor accessors and cannot construct, replace, or persist a parallel logical identity"
+        "SavedTensor and AutogradTape read TensorId through immutable Tensor accessors and cannot construct, replace, or persist a parallel logical identity",
+        "The pure-standard-library reduced Depth Anything 3 source-equation oracle defines only development-reference tensor values and owns no Rust Tensor identity, storage, or mutation authority"
       ],
       "definitions": [
         {
           "path": "crates/comfy_tensor/src/comfy_tensor.rs",
           "qualified": "comfy_tensor::Tensor",
           "role": "canonical",
+          "symbol": "Tensor"
+        },
+        {
+          "path": "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/source_graph.py",
+          "qualified": "depth_anything_3_source_graph::Tensor",
+          "role": "development_reference",
           "symbol": "Tensor"
         },
         {
@@ -24200,13 +24207,20 @@
       "allowed_adapters": [
         "TensorWrite is the unique mutable lease and increments the Tensor-owned shared MutationLineage exactly once before exposing mutable bytes",
         "Storage copy-on-write may replace the physical allocation but must preserve the shared mutation lineage for every logical alias",
-        "SavedTensor and CheckpointRecord retain immutable mutation witnesses and delegate comparison to Tensor; they own no version counter or increment path"
+        "SavedTensor and CheckpointRecord retain immutable mutation witnesses and delegate comparison to Tensor; they own no version counter or increment path",
+        "The pure-standard-library reduced Depth Anything 3 source-equation oracle defines only development-reference tensor values and owns no Rust Tensor identity, storage, or mutation authority"
       ],
       "definitions": [
         {
           "path": "crates/comfy_tensor/src/comfy_tensor.rs",
           "qualified": "comfy_tensor::Tensor",
           "role": "canonical",
+          "symbol": "Tensor"
+        },
+        {
+          "path": "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/source_graph.py",
+          "qualified": "depth_anything_3_source_graph::Tensor",
+          "role": "development_reference",
           "symbol": "Tensor"
         },
         {
@@ -25274,13 +25288,20 @@
         "Task 86 extends TensorDescriptor with the sole compatible-stride reshaped_view and checked reinterpreted_dtype_view validators; view, flatten, unsqueeze, movedim, and expand adapters build or request checked descriptors and Tensor alone admits read-only aliases, while CpuBackend alone owns flatten fallback copies",
         "Task 87 extends TensorDescriptor with the sole general permuted_view validator; permute, unbind, view_as, reshape, flatten, movedim, and stack adapters request canonical descriptors or Task 86 helpers and never admit aliases or own copy publication",
         "Task 88 method permute and transpose delegate Task 87's canonical descriptor adapter, squeeze requests a checked TensorDescriptor and Task 86 reshape inverse, method split delegates Task 60 read-only aliases, and functional pad stages private geometry into CpuBackend workspace before one fresh canonical publication",
-        "Task 91 clone, contiguous, copy_, numpy, and memory-format adapters use TensorDescriptor for layout admission, Tensor for host/storage identity, TensorWrite for the sole transactional mutation commit, and expose only an immutable NativeArrayView borrow."
+        "Task 91 clone, contiguous, copy_, numpy, and memory-format adapters use TensorDescriptor for layout admission, Tensor for host/storage identity, TensorWrite for the sole transactional mutation commit, and expose only an immutable NativeArrayView borrow.",
+        "The pure-standard-library reduced Depth Anything 3 source-equation oracle defines only development-reference tensor values and owns no Rust Tensor identity, storage, or mutation authority"
       ],
       "definitions": [
         {
           "path": "crates/comfy_tensor/src/comfy_tensor.rs",
           "qualified": "comfy_tensor::Tensor",
           "role": "canonical",
+          "symbol": "Tensor"
+        },
+        {
+          "path": "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/source_graph.py",
+          "qualified": "depth_anything_3_source_graph::Tensor",
+          "role": "development_reference",
           "symbol": "Tensor"
         },
         {

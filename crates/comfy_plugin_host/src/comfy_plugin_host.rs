@@ -343,24 +343,18 @@ impl ProviderV2StreamRouteCall {
 }
 
 #[derive(Debug)]
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 pub(crate) struct ProviderV2BoundStartCall {
     call_id: u64,
     reply: SyncSender<WorkerProviderStreamResponse>,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 impl ProviderV2BoundStartCall {
     pub(crate) fn respond(
@@ -727,12 +721,9 @@ fn provider_v2_stream_route() -> (ProviderV2StreamRoute, ProviderV2StreamRouteRe
     )
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 fn worker_streaming_contract(
     contract: &ProviderStreamingContractV2,
@@ -794,12 +785,9 @@ fn sdk_provider_streaming_contract(
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 fn worker_http_method(method: ProviderHttpMethodV2) -> WorkerProviderHttpMethod {
     match method {
@@ -813,12 +801,9 @@ fn worker_http_method(method: ProviderHttpMethodV2) -> WorkerProviderHttpMethod 
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 fn sdk_request_head(head: &WorkerProviderRequestHead) -> ProviderRequestHeadV2 {
     ProviderRequestHeadV2 {
@@ -1019,12 +1004,9 @@ fn wit_provider_input_error(error: WorkerProviderStreamError) -> WitInvocationEr
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 fn sdk_provider_invocation_result(
     result: provider_v2_wit_contract::zed::comfy_provider_plugin::types::InvocationResult,
@@ -1076,12 +1058,9 @@ pub struct ProviderInvocationResult {
 
 pub struct ProviderV2InvocationProposal {
     result: ProviderInvocationResultV2,
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-        )
+    #[expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
     )]
     runtime: ProviderV2RuntimeHost,
 }
@@ -1091,12 +1070,9 @@ impl ProviderV2InvocationProposal {
         &self.result
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-        )
+    #[expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
     )]
     pub(crate) fn into_parts(self) -> (ProviderInvocationResultV2, ProviderV2RuntimeHost) {
         (self.result, self.runtime)
@@ -1253,12 +1229,9 @@ impl WasmPluginInstance {
         Ok(manifest_projection)
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-        )
+    #[expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
     )]
     pub(crate) fn invoke_provider_v2(
         mut self,
@@ -1694,12 +1667,9 @@ impl PluginHost {
         self.make_wasm_store(Some(invocation), None)
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-        )
+    #[expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
     )]
     fn new_wasm_provider_v2_store(
         &self,
@@ -1742,12 +1712,9 @@ impl PluginHost {
         Ok(instance)
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-        )
+    #[expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
     )]
     pub(crate) fn instantiate_provider_component_v2(
         &self,
@@ -2218,12 +2185,9 @@ impl InvocationHost {
         })
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-        )
+    #[expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
     )]
     fn finish_provider_v2_inputs(mut self) -> Result<(), InvocationError> {
         self.check_active()?;

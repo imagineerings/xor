@@ -108,12 +108,9 @@ struct VerifiedPlugin {
     manifest: Arc<PluginManifest>,
     authorization: Arc<PluginAuthorization>,
     provider_manifest_v2: Option<Arc<ProviderPluginManifestV2>>,
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-        )
+    #[expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
     )]
     provider_authorization_v2: Option<Arc<ProviderManifestAuthorizationV2>>,
     compiled: Arc<crate::CompiledPlugin>,
@@ -666,23 +663,17 @@ impl InstalledVerifiedPlugin {
         self.inner.provider_manifest_v2.is_some()
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-        )
+    #[expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
     )]
     pub(crate) fn provider_manifest_v2(&self) -> Option<&ProviderPluginManifestV2> {
         self.inner.provider_manifest_v2.as_deref()
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-        )
+    #[expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
     )]
     pub(crate) fn provider_authorization_v2(&self) -> Option<&ProviderManifestAuthorizationV2> {
         self.inner.provider_authorization_v2.as_deref()
@@ -771,12 +762,9 @@ impl PreflightedProviderComponentCapsule {
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 pub(crate) struct PreparedProviderV2Invocation {
     grant: Option<PreflightedProviderRuntimeActivationGrant>,
@@ -792,12 +780,9 @@ pub(crate) struct PreparedProviderV2Invocation {
     _lease: InvocationLease,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 pub(crate) struct ProviderV2ComponentInvocation {
     instance: WasmPluginInstance,
@@ -807,12 +792,9 @@ pub(crate) struct ProviderV2ComponentInvocation {
     _lease: InvocationLease,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 pub(crate) struct ProviderV2AppRoute {
     grant: Option<PreflightedProviderRuntimeActivationGrant>,
@@ -821,12 +803,9 @@ pub(crate) struct ProviderV2AppRoute {
     route: crate::ProviderV2StreamRouteReceiver,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 impl PreflightedProviderComponentCapsule {
     pub(crate) fn prepare_stream_route(
@@ -859,12 +838,9 @@ impl PreflightedProviderComponentCapsule {
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 impl PreparedProviderV2Invocation {
     pub(crate) fn into_execution(
@@ -903,12 +879,9 @@ impl PreparedProviderV2Invocation {
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 impl ProviderV2ComponentInvocation {
     pub(crate) fn invoke(self) -> Result<crate::ProviderV2InvocationProposal, ComponentHostError> {
@@ -918,12 +891,9 @@ impl ProviderV2ComponentInvocation {
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 impl ProviderV2AppRoute {
     pub(crate) fn bind_start_request(

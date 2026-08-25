@@ -393,6 +393,10 @@ class ValidationGenerationTests(unittest.TestCase):
             "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/transform.py",
             "projects/comfy/ComfyUI/comfy/image_encoders/dino2.py",
             "projects/comfy/ComfyUI/comfy/model_detection.py",
+            ".agents/specs/comfy-parity/generate_ownership_catalog.py",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
             "crates/comfy_tensor/src/ops/linear_algebra_01.rs",
             "crates/comfy_tensor/src/ops/linear_algebra_02.rs",
             "crates/comfy_tensor/src/ops/random_number_generation_01.rs",
@@ -405,6 +409,12 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation",
             depth_anything_task["writes"],
         )
+        for path in (
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(path, depth_anything_task["writes"])
         self.assertIn(
             "pure-standard-library source-equation oracle", depth_anything_task["done"]
         )
@@ -414,6 +424,10 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("storage-to-F32 execution projection", depth_anything_task["done"])
         self.assertIn("instead of duplicating kernels", depth_anything_task["done"])
         self.assertIn("model-detection/configuration owner", depth_anything_task["done"])
+        self.assertIn(
+            "development-reference independent test oracle",
+            depth_anything_task["done"],
+        )
         depth_anything_validation = planning.task_validation_commands(
             depth_anything_task
         )
@@ -421,6 +435,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "generate_oracle.py --check",
             "cargo test --locked -p comfy_model depth_anything_3",
             "native_node_family_e2e depth_anything_3",
+            "ownership_consolidation val_ownership_001",
         ):
             self.assertIn(command, depth_anything_validation)
         for path in (
