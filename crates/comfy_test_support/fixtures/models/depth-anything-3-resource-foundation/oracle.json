@@ -12992,7 +12992,7 @@
       "delta_bits": 1048576000,
       "execution": "dpt",
       "lane": 0,
-      "output_identity_sha256": "7ab5eaaa64ffb38b38711b30b673cf6d197a504fce5d61872dd57ab3f4d71029",
+      "output_identity_sha256": "90854ea2043a3f32639111886970b481ce6b6df909443d67751ef092a7618ea0",
       "state_key": "native.head.scratch.output_conv2.2.bias"
     },
     "dpt_local_attention": {
@@ -13008,7 +13008,7 @@
       "delta_bits": 1048576000,
       "execution": "dpt",
       "lane": 0,
-      "output_identity_sha256": "4f544c3ad564fe31332904a904511b9e13fbca3000e61daa826dec86eb2e8aaa",
+      "output_identity_sha256": "f866eac01a82e8583c27bede4c7f98208487d04b891fa0e44cd67038122e0727",
       "state_key": "native.head.scratch.sky_output_conv2.2.weight"
     },
     "dual_auxiliary_ray": {
@@ -13032,7 +13032,7 @@
       "delta_bits": 1048576000,
       "execution": "camera",
       "lane": 0,
-      "output_identity_sha256": "c082776d3822725ebfaa5fdc0d73fac40b04ed55589bde69c7e1986edf32ef67",
+      "output_identity_sha256": "a7165447a9921b072225da129f4a1db1f20b4922570ce4a00b5178b26a5abadd",
       "state_key": "native.cam_enc.pose_branch.fc1.weight"
     },
     "dual_global_attention": {
@@ -13299,7 +13299,7 @@
             4
           ]
         },
-        "output_identity_sha256": "5d6e71abb5e27462a40cc67eba984884806ebb483b56b76e2f2e7f3d6c90d4ad",
+        "output_identity_sha256": "d9e972dcd50207d07bc9de32d25de9c2ed12d5b43e715971f9e8f0b865d7d04c",
         "preprocessed": {
           "bits": [
             3221719997,
@@ -13531,14 +13531,14 @@
           "bits": [
             814695894,
             0,
-            807964699,
+            807964698,
             0,
             0,
             0,
             0,
             0
           ],
-          "raw_f32_sha256": "f3095ca27ab69ac5525cd8937d0c5f9b53bd14de615c1555f537a5e408455f3e",
+          "raw_f32_sha256": "0e4b28eadd0344ed14956d61959b2ecc56b2682fa7eec133808f151d09b65f6f",
           "shape": [
             1,
             1,
@@ -13876,27 +13876,27 @@
             4
           ]
         },
-        "output_identity_sha256": "9f62f3074276432b96d998c7514c3e63e8ccb649e00f200c89aa8cf7c2c77028",
+        "output_identity_sha256": "71fbf9304546f3c19996d8a94e5a9b3a6b4a41cc9d1d45c31f14ce1a2cddce28",
         "sky": {
           "bits": [
-            777906846,
+            777906832,
             0,
             799876235,
-            787348400,
+            787348404,
             0,
-            786130953,
+            786130977,
             0,
             0,
             797554025,
-            779917760,
+            779917721,
             0,
             0,
             0,
-            798678327,
+            798678326,
             0,
             0
           ],
-          "raw_f32_sha256": "3ff7e1f673019e32496b8d59db4fc2bb4dd9097f0c4ef74cae3b81d24a128bdb",
+          "raw_f32_sha256": "a05afb48d1096283904b00dbd3d6d8db6b012911cbb18a260999909c11a41209",
           "shape": [
             1,
             1,
@@ -13963,27 +13963,27 @@
         }
       }
     },
-    "output_identity_sha256": "24b64b8863abd10d4b681ef91886c3da4603ad95586cf1c14bf96b43ffa26120",
+    "output_identity_sha256": "dad5d464ed96ab9ce1b42d106b38a0126e1b2e5e52f60dcb18377423d0d4a3b8",
     "sky": {
       "bits": [
-        777613402,
+        777613385,
         0,
-        799866698,
-        787780247,
+        799866699,
+        787780240,
         0,
-        785461325,
-        0,
-        0,
-        797625179,
-        779307860,
+        785461335,
         0,
         0,
+        797625182,
+        779307852,
         0,
-        798782763,
+        0,
+        0,
+        798782761,
         0,
         0
       ],
-      "raw_f32_sha256": "9f6da01cce21ff50525c8765738d157afab03aecdf2f192b029efbdeb9deee09",
+      "raw_f32_sha256": "7716e333152f14d50b4f5f02b68980d333d19fb6d4acd97eec22205fb089e4b2",
       "shape": [
         1,
         1,
@@ -15241,43 +15241,43 @@
       "extrinsics": {
         "bits": [
           1065353216,
-          884787008,
+          884787006,
           3012477050,
-          3033139152,
-          3032270656,
+          3033139151,
+          3032270654,
           1065353216,
           3021254866,
-          878931860,
+          878931858,
           864993396,
           873771220,
           1065353216,
           865382613,
           1065353216,
-          866687017,
-          2984905856,
-          3013615315,
-          3014170665,
+          866687019,
+          2984905893,
+          3013615319,
+          3014170667,
           1065353216,
-          2999373136,
-          860596918,
-          837422204,
-          851889488,
+          2999373141,
+          860596919,
+          837422241,
+          851889493,
           1065353216,
-          843500881,
+          843500886,
           1065353216,
-          893907636,
-          3020906295,
-          3042090703,
-          3041391284,
+          893907637,
+          3020906299,
+          3042090706,
+          3041391285,
           1065353216,
-          3029773316,
-          888107272,
-          873422633,
-          882289672,
+          3029773320,
+          888107276,
+          873422637,
+          882289676,
           1065353216,
-          873901069
+          873901073
         ],
-        "raw_f32_sha256": "7656266d0e3478e26b372edaabeb298d25972170243991871330a6ebb0cbfc1e",
+        "raw_f32_sha256": "40960c94a930d3c5c957373eeb97bd4f5259a75a80fd6fe9410a55078b3acb28",
         "shape": [
           1,
           3,
@@ -15442,7 +15442,7 @@
         4
       ]
     },
-    "supplied_camera_output_identity_sha256": "1684757f80c1028ff0b0e1f85227b4e353ffed8335b0354e15756e2ee51debc6"
+    "supplied_camera_output_identity_sha256": "548e8fe9c70d9e398a2563253e869a877e8f3b9c15d83c0b4d88fc2b2f82a7c8"
   },
   "reference_fixture": {
     "balanced_scores_bits": [
@@ -15538,7 +15538,7 @@
     1068042232,
     1069789858
   ],
-  "source_graph_sha256": "31df90b28155cca40bf2d8adbf271e6891ae9e3e90a5e8aa9ad8448b11a96bd5",
+  "source_graph_sha256": "33baee5eaa6892b69392c28ff09b77710faae80af1d5d1156cff64cd9d12cbe0",
   "storage_projection": {
     "bf16_projected_bits": [
       0,

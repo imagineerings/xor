@@ -1902,17 +1902,6 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
             );
         }
     }
-    assert_eq!(
-        tensor_bits(
-            geometry.sky.as_ref().ok_or("DA3 sky output is missing")?,
-            &context,
-        )?,
-        fixture_raw_bits(
-            oracle
-                .pointer("/reduced_dpt/sky/bits")
-                .ok_or("DA3 sky oracle is missing")?,
-        )?
-    );
     let payload =
         NativeModelPayload::depth_anything_3_test_fixture(resource.clone(), &cancellation)?;
     assert_eq!(

@@ -261,8 +261,31 @@ def layer_norm(input_tensor, weight, bias, epsilon):
     return output
 
 
+def erf_approximation(value):
+    value = f32(value)
+    if math.isnan(value):
+        return value
+    if math.isinf(value):
+        return f32(math.copysign(1.0, value))
+    sign = f32(math.copysign(1.0, value))
+    absolute = abs(value)
+    t = fdiv(1.0, fadd(1.0, fmul(f32(0.327_591_1), absolute)))
+    polynomial = fsub(fmul(f32(1.061_405_4), t), f32(1.453_152_1))
+    polynomial = fadd(fmul(polynomial, t), f32(1.421_413_8))
+    polynomial = fsub(fmul(polynomial, t), f32(0.284_496_72))
+    polynomial = fadd(fmul(polynomial, t), f32(0.254_829_6))
+    polynomial = fmul(polynomial, t)
+    exponential = f32(math.exp(fmul(fmul(-1.0, absolute), absolute)))
+    return fmul(sign, fsub(1.0, fmul(polynomial, exponential)))
+
+
 def gelu(input_tensor):
-    return Tensor(input_tensor.shape, [f32(0.5 * value * (1.0 + math.erf(value / math.sqrt(2.0)))) for value in input_tensor.values])
+    coefficient = f32(2.0 ** -0.5)
+    output = []
+    for value in input_tensor.values:
+        inner = erf_approximation(fmul(value, coefficient))
+        output.append(fmul(fmul(0.5, value), fadd(1.0, inner)))
+    return Tensor(input_tensor.shape, output)
 
 
 def relu(input_tensor):
