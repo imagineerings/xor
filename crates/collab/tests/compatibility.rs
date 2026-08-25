@@ -52,6 +52,9 @@ async fn supported_http_client_receives_write_admission() {
     assert_eq!(response.error, None);
     assert_eq!(response.reason, None);
     assert_eq!(response.minimum_client_version.as_deref(), Some("0.0.0+1"));
+    assert_eq!(response.schema.current_version, "20260825000100");
+    assert_eq!(response.schema.minimum_version, "20260825000100");
+    assert_eq!(response.schema.maximum_version, "20260825000100");
     let admission = policy.admit_write(&request).expect("write admission");
     assert_eq!(admission.policy_version(), 1);
     assert_eq!(admission.client_id(), "buzz-mobile");
@@ -169,7 +172,7 @@ fn nostr_negotiation_uses_closed_supported_and_upgrade_frames() {
 #[test]
 fn invalid_runtime_schema_and_malformed_requests_fail_closed() {
     let incompatible_policy =
-        CompatibilityPolicy::for_runtime(Version::new(0, 44, 0), 20_260_824_000_499);
+        CompatibilityPolicy::for_runtime(Version::new(0, 44, 0), 20_260_824_000_500);
     let valid = request(
         "zed-desktop",
         "1.16.2",

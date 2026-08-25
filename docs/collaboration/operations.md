@@ -125,7 +125,7 @@ helm template "$COLLABORATION_RELEASE_NAME" \
 Review the render for immutable runtime and migration digests, HTTPS endpoints,
 one explicit Ingress or Gateway attachment, separate runtime/DDL Secrets,
 private monitoring, bounded resources, required network ranges, persistent Git
-storage, and a schema requirement equal to `20260824000500`. Do not attach the
+storage, and a schema requirement equal to `20260825000100`. Do not attach the
 route or apply the manifest during preflight.
 
 ### 3. Verify migration and observability contracts
@@ -196,7 +196,7 @@ manual approved recovery or rehearsal, the equivalent command is:
 
 ```sh
 DATABASE_URL="$COLLABORATION_DDL_DATABASE_URL" \
-COLLABORATION_REQUIRED_SCHEMA_VERSION=20260824000500 \
+COLLABORATION_REQUIRED_SCHEMA_VERSION=20260825000100 \
   deploy/collaboration/migrations/migrate.py up
 DATABASE_URL="$COLLABORATION_DDL_DATABASE_URL" \
   deploy/collaboration/migrations/migrate.py verify
@@ -255,7 +255,7 @@ checksums match that recorded artifact:
 ```sh
 DATABASE_URL="$COLLABORATION_DDL_DATABASE_URL" \
   deploy/collaboration/migrations/migrate.py seal \
-  --expected-version 20260824000500
+  --expected-version 20260825000100
 ```
 
 Sealing is the schema point of no return. It requires explicit approval and
