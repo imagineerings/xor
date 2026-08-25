@@ -1,4 +1,5 @@
 pub mod agents;
+pub mod channels;
 pub mod community;
 pub mod contracts;
 pub mod git;
