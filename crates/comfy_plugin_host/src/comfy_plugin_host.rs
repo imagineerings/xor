@@ -279,12 +279,26 @@ enum WasmBindings {
 }
 
 #[derive(Debug)]
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 pub(crate) struct ProviderV2StreamRouteCall {
     call_id: u64,
     request: WorkerProviderStreamRequest,
     reply: SyncSender<WorkerProviderStreamResponse>,
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 impl ProviderV2StreamRouteCall {
     pub(crate) fn call_id(&self) -> u64 {
         self.call_id
@@ -329,11 +343,25 @@ impl ProviderV2StreamRouteCall {
 }
 
 #[derive(Debug)]
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 pub(crate) struct ProviderV2BoundStartCall {
     call_id: u64,
     reply: SyncSender<WorkerProviderStreamResponse>,
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 impl ProviderV2BoundStartCall {
     pub(crate) fn respond(
         self,
@@ -353,6 +381,13 @@ impl ProviderV2BoundStartCall {
 }
 
 #[derive(Debug)]
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 pub(crate) enum ProviderV2StreamRouteMessage {
     Request(ProviderV2StreamRouteCall),
     Revoke {
@@ -360,12 +395,26 @@ pub(crate) enum ProviderV2StreamRouteMessage {
     },
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 pub(crate) struct ProviderV2StreamRouteReceiver {
     receiver: Receiver<ProviderV2StreamRouteMessage>,
     revoke_receiver: Receiver<ProviderV2StreamRouteMessage>,
     revoked: Arc<AtomicBool>,
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 impl ProviderV2StreamRouteReceiver {
     pub(crate) fn try_receive(&self) -> Result<ProviderV2StreamRouteMessage, TryRecvError> {
         if self.revoked.load(Ordering::Acquire) {
@@ -410,6 +459,13 @@ pub(crate) struct ProviderV2RuntimeHost {
 }
 
 impl ProviderV2RuntimeHost {
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+        )
+    )]
     fn checked_from_certified_capsule(
         context: WorkerProviderInvocationContext,
         contract: WorkerProviderStreamingContract,
@@ -546,6 +602,13 @@ impl ProviderV2RuntimeHost {
         }
     }
 
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+        )
+    )]
     fn ensure_completed(&self) -> Result<(), WorkerProviderStreamError> {
         if let Some(error) = &self.terminal_failure {
             return Err(error.clone());
@@ -639,6 +702,13 @@ fn worker_response_terminal_disposition(
     }
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 fn provider_v2_stream_route() -> (ProviderV2StreamRoute, ProviderV2StreamRouteReceiver) {
     let (sender, receiver) = sync_channel(MAX_WORKER_PROVIDER_PENDING_CALLS);
     let (revoke_sender, revoke_receiver) = sync_channel(1);
@@ -657,6 +727,13 @@ fn provider_v2_stream_route() -> (ProviderV2StreamRoute, ProviderV2StreamRouteRe
     )
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 fn worker_streaming_contract(
     contract: &ProviderStreamingContractV2,
 ) -> WorkerProviderStreamingContract {
@@ -717,6 +794,13 @@ fn sdk_provider_streaming_contract(
     }
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 fn worker_http_method(method: ProviderHttpMethodV2) -> WorkerProviderHttpMethod {
     match method {
         ProviderHttpMethodV2::Delete => WorkerProviderHttpMethod::Delete,
@@ -729,6 +813,13 @@ fn worker_http_method(method: ProviderHttpMethodV2) -> WorkerProviderHttpMethod 
     }
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 fn sdk_request_head(head: &WorkerProviderRequestHead) -> ProviderRequestHeadV2 {
     ProviderRequestHeadV2 {
         endpoint: head.endpoint.clone(),
@@ -878,6 +969,13 @@ fn wit_provider_stream_error(
     }
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 fn worker_provider_stream_error(
     error: provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError,
 ) -> WorkerProviderStreamError {
@@ -921,6 +1019,13 @@ fn wit_provider_input_error(error: WorkerProviderStreamError) -> WitInvocationEr
     }
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 fn sdk_provider_invocation_result(
     result: provider_v2_wit_contract::zed::comfy_provider_plugin::types::InvocationResult,
     invocation: &Option<InvocationHost>,
@@ -971,6 +1076,13 @@ pub struct ProviderInvocationResult {
 
 pub struct ProviderV2InvocationProposal {
     result: ProviderInvocationResultV2,
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+        )
+    )]
     runtime: ProviderV2RuntimeHost,
 }
 
@@ -979,6 +1091,13 @@ impl ProviderV2InvocationProposal {
         &self.result
     }
 
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+        )
+    )]
     pub(crate) fn into_parts(self) -> (ProviderInvocationResultV2, ProviderV2RuntimeHost) {
         (self.result, self.runtime)
     }
@@ -1134,6 +1253,13 @@ impl WasmPluginInstance {
         Ok(manifest_projection)
     }
 
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+        )
+    )]
     pub(crate) fn invoke_provider_v2(
         mut self,
         node_id: &str,
@@ -1568,6 +1694,13 @@ impl PluginHost {
         self.make_wasm_store(Some(invocation), None)
     }
 
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+        )
+    )]
     fn new_wasm_provider_v2_store(
         &self,
         invocation: InvocationHost,
@@ -1609,6 +1742,13 @@ impl PluginHost {
         Ok(instance)
     }
 
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+        )
+    )]
     pub(crate) fn instantiate_provider_component_v2(
         &self,
         plugin: &CompiledPlugin,
@@ -2078,6 +2218,13 @@ impl InvocationHost {
         })
     }
 
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+        )
+    )]
     fn finish_provider_v2_inputs(mut self) -> Result<(), InvocationError> {
         self.check_active()?;
         self.check_cancellation()?;
@@ -4408,7 +4555,7 @@ mod tests {
     }
 
     #[test]
-    fn provider_v2_non_start_operations_revoke_before_route_enqueue()
+    fn provider_v2_non_start_operations_validate_before_route_enqueue()
     -> Result<(), WorkerProviderStreamError> {
         let requests = vec![
             WorkerProviderStreamRequest::WriteRequestChunk(WorkerProviderRequestChunk {
@@ -4455,7 +4602,7 @@ mod tests {
             let (mut runtime, receiver) = checked_provider_runtime(CancellationToken::default())?;
             assert_eq!(
                 runtime.exchange(request),
-                Err(WorkerProviderStreamError::InvalidOrder)
+                Err(WorkerProviderStreamError::ForeignHandle)
             );
             assert!(runtime.route.revoked.load(Ordering::Acquire));
             assert!(matches!(
@@ -4494,7 +4641,7 @@ mod tests {
                 invocation: None,
                 provider_runtime: Some(runtime),
             };
-            assert_eq!(
+            assert!(matches!(
                 Host::start_request(
                     &mut state,
                     context,
@@ -4510,7 +4657,7 @@ mod tests {
                     },
                 ),
                 Err(StreamError::InvalidRequestAuthority)
-            );
+            ));
             let runtime = state
                 .provider_runtime
                 .as_ref()
@@ -4578,30 +4725,55 @@ mod tests {
     fn provider_v2_completed_route_blocks_late_calls_and_drop_revokes() -> Result<(), Box<dyn Error>>
     {
         let (mut runtime, receiver) = started_provider_runtime(CancellationToken::default())?;
+        runtime.validator.validate_request(
+            2,
+            &WorkerProviderStreamRequest::WriteRequestChunk(WorkerProviderRequestChunk {
+                handle: provider_handle(1),
+                sequence: 0,
+                bytes: vec![1, 2, 3],
+                end: true,
+            }),
+        )?;
+        runtime
+            .validator
+            .validate_response(2, &WorkerProviderStreamResponse::Unit(Ok(())))?;
+        runtime.next_call_id = 3;
         let revoked = Arc::new(AtomicBool::new(false));
         let revoked_for_thread = revoked.clone();
         let worker = std::thread::spawn(move || -> Result<(), WorkerProviderStreamError> {
-            let request = loop {
-                match receiver.try_receive() {
-                    Ok(message) => break message,
-                    Err(TryRecvError::Empty) => std::thread::yield_now(),
-                    Err(TryRecvError::Disconnected) => {
-                        return Err(WorkerProviderStreamError::RevokedHandle);
+            for sequence in 0..2 {
+                let request = loop {
+                    match receiver.try_receive() {
+                        Ok(message) => break message,
+                        Err(TryRecvError::Empty) => std::thread::yield_now(),
+                        Err(TryRecvError::Disconnected) => {
+                            return Err(WorkerProviderStreamError::RevokedHandle);
+                        }
                     }
-                }
-            };
-            let ProviderV2StreamRouteMessage::Request(call) = request else {
-                return Err(WorkerProviderStreamError::InvalidOrder);
-            };
-            call.respond(WorkerProviderStreamResponse::Wait(Ok(
-                WorkerProviderWaitOutcome::Frame(WorkerProviderResponseFrame {
-                    handle: provider_handle(1),
-                    sequence: 0,
-                    event: WorkerProviderResponseFrameEvent::Terminal(
-                        WorkerProviderTerminal::Completed(vec![4, 2, 1]),
-                    ),
-                }),
-            )))?;
+                };
+                let ProviderV2StreamRouteMessage::Request(call) = request else {
+                    return Err(WorkerProviderStreamError::InvalidOrder);
+                };
+                let event = if sequence == 0 {
+                    WorkerProviderResponseFrameEvent::Head(
+                        comfy_types::WorkerProviderResponseHead {
+                            status: 200,
+                            headers: Vec::new(),
+                        },
+                    )
+                } else {
+                    WorkerProviderResponseFrameEvent::Terminal(WorkerProviderTerminal::Completed(
+                        vec![4, 2, 1],
+                    ))
+                };
+                call.respond(WorkerProviderStreamResponse::Wait(Ok(
+                    WorkerProviderWaitOutcome::Frame(WorkerProviderResponseFrame {
+                        handle: provider_handle(1),
+                        sequence,
+                        event,
+                    }),
+                )))?;
+            }
             loop {
                 match receiver.try_receive() {
                     Ok(ProviderV2StreamRouteMessage::Revoke { reply }) => {
@@ -4626,6 +4798,21 @@ mod tests {
                 WorkerProviderWaitRequest {
                     handle: provider_handle(1),
                     after_sequence: None,
+                    timeout_milliseconds: 10,
+                },
+            )),
+            Ok(WorkerProviderStreamResponse::Wait(Ok(
+                WorkerProviderWaitOutcome::Frame(WorkerProviderResponseFrame {
+                    event: WorkerProviderResponseFrameEvent::Head(_),
+                    ..
+                })
+            )))
+        ));
+        assert!(matches!(
+            runtime.exchange(WorkerProviderStreamRequest::WaitResponse(
+                WorkerProviderWaitRequest {
+                    handle: provider_handle(1),
+                    after_sequence: Some(0),
                     timeout_milliseconds: 10,
                 },
             )),
@@ -5013,7 +5200,7 @@ mod tests {
     fn provider_v2_adapter_source_contains_no_runtime_service_or_public_transport_authority() {
         let source = include_str!("comfy_plugin_host.rs");
         let route = source
-            .split("struct ProviderV2StreamRoute")
+            .split("struct ProviderV2StreamRoute {")
             .nth(1)
             .and_then(|source| source.split("pub struct ProviderInvocationResult").next())
             .expect("provider-v2 route source must exist");

@@ -108,6 +108,13 @@ struct VerifiedPlugin {
     manifest: Arc<PluginManifest>,
     authorization: Arc<PluginAuthorization>,
     provider_manifest_v2: Option<Arc<ProviderPluginManifestV2>>,
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+        )
+    )]
     provider_authorization_v2: Option<Arc<ProviderManifestAuthorizationV2>>,
     compiled: Arc<crate::CompiledPlugin>,
     manifest_bytes: Arc<[u8]>,
@@ -659,10 +666,24 @@ impl InstalledVerifiedPlugin {
         self.inner.provider_manifest_v2.is_some()
     }
 
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+        )
+    )]
     pub(crate) fn provider_manifest_v2(&self) -> Option<&ProviderPluginManifestV2> {
         self.inner.provider_manifest_v2.as_deref()
     }
 
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+        )
+    )]
     pub(crate) fn provider_authorization_v2(&self) -> Option<&ProviderManifestAuthorizationV2> {
         self.inner.provider_authorization_v2.as_deref()
     }
@@ -750,6 +771,13 @@ impl PreflightedProviderComponentCapsule {
     }
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 pub(crate) struct PreparedProviderV2Invocation {
     grant: Option<PreflightedProviderRuntimeActivationGrant>,
     worker_context: WorkerProviderInvocationContext,
@@ -764,6 +792,13 @@ pub(crate) struct PreparedProviderV2Invocation {
     _lease: InvocationLease,
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 pub(crate) struct ProviderV2ComponentInvocation {
     instance: WasmPluginInstance,
     node_id: Arc<str>,
@@ -772,6 +807,13 @@ pub(crate) struct ProviderV2ComponentInvocation {
     _lease: InvocationLease,
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 pub(crate) struct ProviderV2AppRoute {
     grant: Option<PreflightedProviderRuntimeActivationGrant>,
     worker_context: WorkerProviderInvocationContext,
@@ -779,6 +821,13 @@ pub(crate) struct ProviderV2AppRoute {
     route: crate::ProviderV2StreamRouteReceiver,
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 impl PreflightedProviderComponentCapsule {
     pub(crate) fn prepare_stream_route(
         self,
@@ -810,6 +859,13 @@ impl PreflightedProviderComponentCapsule {
     }
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 impl PreparedProviderV2Invocation {
     pub(crate) fn into_execution(
         self,
@@ -847,6 +903,13 @@ impl PreparedProviderV2Invocation {
     }
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 impl ProviderV2ComponentInvocation {
     pub(crate) fn invoke(self) -> Result<crate::ProviderV2InvocationProposal, ComponentHostError> {
         self.instance
@@ -855,6 +918,13 @@ impl ProviderV2ComponentInvocation {
     }
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )
+)]
 impl ProviderV2AppRoute {
     pub(crate) fn bind_start_request(
         &mut self,
@@ -903,8 +973,12 @@ mod activation_preflight_tests {
     #[test]
     fn provider_component_capsule_is_the_only_preflight_callsite() {
         let source = include_str!("component_host.rs");
+        let production = source
+            .split("#[cfg(test)]\nmod activation_preflight_tests")
+            .next()
+            .expect("component host production source is missing");
         let call = [".preflight_installed_", "component("].concat();
-        assert_eq!(source.matches(&call).count(), 1);
+        assert_eq!(production.matches(&call).count(), 1);
         let fields = source
             .split("struct PreflightedProviderComponentCapsule")
             .nth(1)
@@ -952,7 +1026,7 @@ mod activation_preflight_tests {
         let compact_capsule = capsule.split_whitespace().collect::<String>();
         assert!(compact_capsule.contains("plugin.manifest().nodes.iter().any"));
         assert!(compact_capsule.contains(
-            "grant.preflight_installed_component(&worker_context,&deployment,worker_start,manifest_authorization)"
+            "grant.preflight_installed_component(&worker_context,&deployment,worker_start,manifest_authorization.clone(),)"
         ));
         assert!(capsule.contains(&call));
         assert!(capsule.contains("&worker_context"));
@@ -1083,17 +1157,29 @@ mod activation_preflight_tests {
         assert!(compact.contains("self.plugin_host.begin_invocation(self.plugin.manifest(),self.plugin.authorization(),self.node_id.as_ref()"));
         assert!(compact.contains("&self.plugin.inner.compiled,invocation,self.runtime"));
 
+        let production_source = source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("component-host production source must exist");
         let host_source = include_str!("comfy_plugin_host.rs");
+        let production_host_source = host_source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("plugin-host production source must exist");
         assert_eq!(
-            source.matches("instantiate_provider_component_v2(").count()
-                + host_source
+            production_source
+                .matches("instantiate_provider_component_v2(")
+                .count()
+                + production_host_source
                     .matches("instantiate_provider_component_v2(")
                     .count(),
             2,
             "v2 instantiation must have one definition and one production callsite"
         );
-        assert!(host_source.contains("pub(crate) fn instantiate_provider_component_v2("));
-        assert!(!host_source.contains("pub fn instantiate_provider_component_v2("));
+        assert!(
+            production_host_source.contains("pub(crate) fn instantiate_provider_component_v2(")
+        );
+        assert!(!production_host_source.contains("pub fn instantiate_provider_component_v2("));
     }
 }
 

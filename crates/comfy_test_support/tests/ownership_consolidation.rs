@@ -9258,7 +9258,15 @@ fn run_ownership_validation(
                 && runtime_plugin_services_production
                     .contains(".provider_policy\n            .authorize(")
                 && !plugin_host_production_capabilities.contains("provider_policy: ProviderPolicy")
-                && !plugin_component_host.contains("ProviderPolicy")
+                && plugin_component_host.matches("ProviderPolicy").count() == 2
+                && plugin_component_host.contains("policy: &ProviderPolicy")
+                && plugin_component_host.contains("pub(crate) fn bind_start_request(")
+                && plugin_component_host
+                    .contains(".bind(&crate::sdk_request_head(&head), policy)")
+                && !plugin_component_host.contains("provider_policy: ProviderPolicy")
+                && !plugin_component_host.contains("ProviderPolicy::new(")
+                && !plugin_component_host.contains("ProviderPolicy::default(")
+                && !plugin_component_host.contains(".authorize(")
                 && !plugin_private_worker.contains("ProviderPolicy")
                 && zed_plugin_services.contains(".uri(request.endpoint())")
                 && !zed_plugin_services.contains("validated_provider_url")

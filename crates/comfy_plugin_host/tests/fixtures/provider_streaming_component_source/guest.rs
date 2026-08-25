@@ -157,7 +157,7 @@ impl provider_node::Guest for ProviderStreamingComponent {
 
 fn manifest_projection() -> plugin_types::ManifestProjection {
     plugin_types::ManifestProjection {
-        component_world: "zed:comfy-provider-plugin@2.0.0".to_owned(),
+        component_world: "zed:comfy-provider-plugin@1.0.0".to_owned(),
         schema_version: 1,
         identifier: "zed.comfy.provider.fixture".to_owned(),
         plugin_version: version(1, 0, 0),
@@ -191,7 +191,32 @@ fn manifest_projection() -> plugin_types::ManifestProjection {
             cache: plugin_types::CachePolicy::Never,
             effects: plugin_types::EffectPolicy::Provider,
         }],
-        capabilities: Vec::new(),
+        capabilities: vec![
+            plugin_types::CapabilityRequest {
+                kind: plugin_types::CapabilityKind::ProviderUpload,
+                scope: "fixture|https://fixture.invalid/v2/stream".to_owned(),
+                quota: plugin_types::CapabilityQuota {
+                    maximum_operations: 1,
+                    maximum_request_bytes: 4096,
+                    maximum_response_bytes: 1,
+                    maximum_total_bytes: 4096,
+                    maximum_handles: 1,
+                    timeout_milliseconds: 1000,
+                },
+            },
+            plugin_types::CapabilityRequest {
+                kind: plugin_types::CapabilityKind::ProviderCost,
+                scope: "fixture|https://fixture.invalid/v2/stream".to_owned(),
+                quota: plugin_types::CapabilityQuota {
+                    maximum_operations: 1,
+                    maximum_request_bytes: 512,
+                    maximum_response_bytes: 32781,
+                    maximum_total_bytes: 33293,
+                    maximum_handles: 1,
+                    timeout_milliseconds: 1000,
+                },
+            },
+        ],
         ui: Vec::new(),
         routes: Vec::new(),
         legacy_mappings: Vec::new(),
