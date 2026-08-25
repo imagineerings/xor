@@ -274,6 +274,46 @@ class ValidationGenerationTests(unittest.TestCase):
         latent_upscale_task = tasks_by_id[
             "comfy-parity-native-latent-upscale-model-resource-foundation"
         ]
+        depth_anything_task = tasks_by_id[
+            "comfy-parity-native-depth-anything-3-resource-foundation"
+        ]
+        for path in (
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/model.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/preprocess.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/dpt.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/camera.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/ray_pose.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/reference_view_selector.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/transform.py",
+            "projects/comfy/ComfyUI/comfy/image_encoders/dino2.py",
+            "crates/comfy_tensor/src/ops/linear_algebra_01.rs",
+            "crates/comfy_tensor/src/ops/linear_algebra_02.rs",
+            "crates/comfy_tensor/src/ops/random_number_generation_01.rs",
+            "crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+        ):
+            self.assertIn(path, depth_anything_task["reads"])
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation",
+            depth_anything_task["writes"],
+        )
+        self.assertIn(
+            "pure-standard-library source-equation oracle", depth_anything_task["done"]
+        )
+        self.assertIn(
+            "versioned RANSAC random-number phase", depth_anything_task["done"]
+        )
+        self.assertIn("storage-to-F32 execution projection", depth_anything_task["done"])
+        self.assertIn("instead of duplicating kernels", depth_anything_task["done"])
+        depth_anything_validation = planning.task_validation_commands(
+            depth_anything_task
+        )
+        for command in (
+            "generate_oracle.py --check",
+            "cargo test --locked -p comfy_model depth_anything_3",
+            "native_node_family_e2e depth_anything_3",
+        ):
+            self.assertIn(command, depth_anything_validation)
         for path in (
             "projects/comfy/ComfyUI/comfy_extras/nodes_lt_upsampler.py",
             "projects/comfy/ComfyUI/comfy/ldm/hunyuan_video/upsampler.py",
@@ -579,6 +619,47 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         for previous, current in zip(video_phases, video_phases[1:]):
             self.assertEqual(tasks_by_id[current]["dependencies"], [previous])
+        video_package_task = tasks_by_id[
+            "comfy-parity-native-video-codec-package-bootstrap-foundation"
+        ]
+        for path in (
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-general-video-v1.json",
+            "crates/comfy_model/src/artifact_index.rs",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_test_support/fixtures/video/codec-general-video-abi/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json",
+        ):
+            self.assertIn(path, video_package_task["reads"])
+        for path in (
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_test_support/src/bin/generate_video_codec_package_bootstrap_fixture.rs",
+            "crates/comfy_test_support/tests/video_codec_package_bootstrap.rs",
+            "crates/comfy_test_support/fixtures/video/codec-package-bootstrap",
+        ):
+            self.assertIn(path, video_package_task["writes"])
+        for phrase in (
+            "six-library/78-symbol catalog",
+            "ReviewedGeneralVideoCodecDeclarations alone remains UncertifiedFfi",
+            "historical five-library/54-symbol catalog",
+            "Fixture signing keys and roots are test-only",
+        ):
+            self.assertIn(phrase, video_package_task["done"])
+        video_package_validation = planning.task_validation_commands(
+            video_package_task
+        )
+        for command in (
+            "generate_video_codec_package_bootstrap_fixture -- --check",
+            "general_video_codec_package_bootstrap",
+            "--test video_codec_package_bootstrap",
+            "-p comfy_worker video_codec_package_bootstrap",
+            "val_ownership_task558_video_codec_package_bootstrap_001",
+        ):
+            self.assertIn(command, video_package_validation)
         video_closure = tasks_by_id["comfy-parity-native-video-execution-foundation"]
         self.assertEqual(
             video_closure["dependencies"],
