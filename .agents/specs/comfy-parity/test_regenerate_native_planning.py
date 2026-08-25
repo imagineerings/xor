@@ -164,7 +164,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 724)
+        self.assertEqual(len(tasks), 725)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -929,6 +929,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-provider-runtime-component-activation-preflight-foundation",
             "comfy-parity-provider-runtime-worker-context-preflight-repair",
             "comfy-parity-provider-component-host-stream-adapter",
+            "comfy-parity-zed-all-target-baseline-assertion-correction",
             "comfy-parity-provider-controller-owned-worker-bridge-bootstrap",
             "comfy-parity-provider-worker-stream-bridge",
             "comfy-parity-provider-deployment-lifecycle",
@@ -944,7 +945,7 @@ class ValidationGenerationTests(unittest.TestCase):
         provider_closure_id = (
             "comfy-parity-native-partner-provider-components-foundation"
         )
-        self.assertEqual(len(provider_shared_ids), 15)
+        self.assertEqual(len(provider_shared_ids), 16)
         self.assertEqual(len(provider_vendor_ids), 33)
         provider_projection = tasks_by_id[
             "comfy-parity-provider-namespace-binding-projection"
@@ -1329,9 +1330,41 @@ class ValidationGenerationTests(unittest.TestCase):
         provider_bridge_bootstrap = tasks_by_id[
             "comfy-parity-provider-controller-owned-worker-bridge-bootstrap"
         ]
+        zed_baseline_correction = tasks_by_id[
+            "comfy-parity-zed-all-target-baseline-assertion-correction"
+        ]
+        self.assertEqual(
+            zed_baseline_correction["dependencies"],
+            ["comfy-parity-provider-component-host-stream-adapter"],
+        )
+        self.assertEqual(
+            zed_baseline_correction["writes"],
+            ["crates/zed/src/zed/open_listener.rs", "crates/zed/src/zed.rs"],
+        )
+        for baseline_read in (
+            "crates/zed/src/zed/open_listener.rs",
+            "crates/zed/src/zed.rs",
+            "crates/language_tools/src/language_tool_tree.rs",
+        ):
+            self.assertIn(baseline_read, zed_baseline_correction["reads"])
+        for baseline_gate in (
+            "exact input repository URL",
+            "sim.git",
+            "language_tool_tree namespace",
+            "no clone URL rewriting",
+            "action registration",
+        ):
+            self.assertIn(baseline_gate, zed_baseline_correction["done"])
+        baseline_validation = planning.task_validation_commands(zed_baseline_correction)
+        for baseline_command in (
+            "test_parse_git_clone_url_with_encoding",
+            "test_action_namespaces",
+            "-p zed --features test-support --all-targets",
+        ):
+            self.assertIn(baseline_command, baseline_validation)
         self.assertEqual(
             provider_bridge_bootstrap["dependencies"],
-            ["comfy-parity-provider-component-host-stream-adapter"],
+            ["comfy-parity-zed-all-target-baseline-assertion-correction"],
         )
         self.assertEqual(
             provider_bridge_bootstrap["writes"],

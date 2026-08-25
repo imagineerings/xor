@@ -11026,6 +11026,23 @@ def provider_component_foundation_tasks(
         ["comfy_plugin_host"],
     )
     append_shared(
+        "comfy-parity-zed-all-target-baseline-assertion-correction",
+        "Correct the Zed all-target baseline assertions",
+        "Repair two stale Zed test expectations so the provider bootstrap and later native execution leaves retain an executable all-target validation boundary without changing URL parsing or registered action behavior.",
+        [
+            "crates/zed/src/zed/open_listener.rs",
+            "crates/zed/src/zed.rs",
+            "crates/language_tools/src/language_tool_tree.rs",
+        ],
+        [
+            "crates/zed/src/zed/open_listener.rs",
+            "crates/zed/src/zed.rs",
+        ],
+        "The percent-decoded Git clone test expects the exact input repository URL returned by the existing parser, including the sim.git repository name, and the exhaustive action-namespace test includes the already registered language_tool_tree namespace in sorted order. Focused differentials prove no clone URL rewriting, action registration, dispatch, provider, runtime, or production behavior changes; the complete Zed test-support all-target suite is green.",
+        ["zed"],
+        validation_packages=["zed"],
+    )
+    append_shared(
         "comfy-parity-provider-controller-owned-worker-bridge-bootstrap",
         "Attach the controller-owned provider bridge",
         "Attach exactly one live NativeExecutionController-owned provider bridge capability to the desktop private-worker executor without creating a second stream table, and keep headless provider-v2 fail-closed until the deployment lifecycle supplies the same attachment.",
@@ -21398,6 +21415,17 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "cargo check --locked -p comfy_runtime -p comfy_plugin_host -p comfy_ui -p zed",
             "cargo test --locked -p comfy_runtime -p comfy_plugin_host -p comfy_ui -p zed --all-targets",
             "./script/clippy -p comfy_runtime -p comfy_plugin_host -p comfy_ui -p zed",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-zed-all-target-baseline-assertion-correction":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p zed --features test-support test_parse_git_clone_url_with_encoding -- --nocapture",
+            "cargo test --locked -p zed --features test-support test_action_namespaces -- --nocapture",
+            "cargo test --locked -p zed --features test-support --all-targets",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
