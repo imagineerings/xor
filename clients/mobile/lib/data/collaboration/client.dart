@@ -12,6 +12,8 @@ const _requiredFeatures = [
   'messages',
   'direct-messages',
   'media',
+  'pairing',
+  'push',
 ];
 
 class MobileTransportRequest {

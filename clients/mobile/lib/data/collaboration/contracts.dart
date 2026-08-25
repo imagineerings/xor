@@ -7,7 +7,14 @@ const mobileStateSchemaVersion = 1;
 
 enum MobileCompatibilityAccess { read, write }
 
-enum MobileEntityKind { channel, message, directMessage, media }
+enum MobileEntityKind {
+  channel,
+  message,
+  directMessage,
+  readState,
+  searchResult,
+  media,
+}
 
 enum MobileCollaborationErrorKind {
   upgradeRequired,
