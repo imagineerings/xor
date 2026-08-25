@@ -46,6 +46,12 @@ class ValidationGenerationTests(unittest.TestCase):
         inherited_v3_presentation_id = (
             "comfy-parity-native-node-inherited-v3-presentation-catalog-correction"
         )
+        v3_presentation_catalog_closure_id = (
+            "comfy-parity-native-node-v3-presentation-catalog-closure"
+        )
+        dependency_ledger_lock_repair_id = (
+            "comfy-parity-native-backend-dependency-ledger-current-lock-repair"
+        )
         value_id = "comfy-parity-native-node-compute-value-foundation"
         latent_bundle_id = "comfy-parity-native-latent-bundle-foundation"
         asset_id = "comfy-parity-native-node-asset-effect-foundation"
@@ -83,7 +89,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 719)
+        self.assertEqual(len(tasks), 721)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -107,9 +113,54 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[inherited_v3_presentation_id]["done"],
         )
         self.assertEqual(
+            tasks_by_id[v3_presentation_catalog_closure_id]["dependencies"],
+            [inherited_v3_presentation_id],
+        )
+        self.assertTrue(tasks_by_id[v3_presentation_catalog_closure_id]["locked"])
+        self.assertTrue(tasks_by_id[v3_presentation_catalog_closure_id]["feature_scoped"])
+        self.assertIn(
+            "COMFY-NODE-0047",
+            tasks_by_id[v3_presentation_catalog_closure_id]["done"],
+        )
+        self.assertIn(
+            "every non-null portable display name",
+            tasks_by_id[v3_presentation_catalog_closure_id]["done"],
+        )
+        self.assertIn(
+            "crates/comfy_nodes/src/provider_contracts.rs",
+            tasks_by_id[v3_presentation_catalog_closure_id]["writes"],
+        )
+        center_crop_commands = planning.task_validation_commands(
+            tasks_by_id[v3_presentation_catalog_closure_id]
+        )
+        for command in (
+            "generated_registry_is_comprehensive_and_preserves_union_frontend_types",
+            "test_generate_node_contract_catalog.py",
+            "regenerate_all.py --check-twice",
+        ):
+            self.assertIn(command, center_crop_commands)
+        dependency_ledger_task = tasks_by_id[dependency_ledger_lock_repair_id]
+        self.assertEqual(
+            dependency_ledger_task["dependencies"],
+            ["comfy-parity-provider-runtime-component-activation-preflight-foundation"],
+        )
+        self.assertEqual(
+            dependency_ledger_task["writes"],
+            [
+                ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ],
+        )
+        self.assertNotIn("Cargo.lock", dependency_ledger_task["writes"])
+        self.assertIn(
+            "native_foundation",
+            planning.task_validation_commands(dependency_ledger_task),
+        )
+        self.assertEqual(
             tasks_by_id[value_id]["dependencies"],
             [
-                inherited_v3_presentation_id,
+                v3_presentation_catalog_closure_id,
                 compute_id,
                 "comfy-parity-model-detection-any-of-key-selector-consolidation",
             ],
@@ -520,7 +571,11 @@ class ValidationGenerationTests(unittest.TestCase):
         ]
         self.assertEqual(
             tasks_by_id[video_phases[0]]["dependencies"],
-            ["comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation"],
+            [
+                "comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation",
+                v3_presentation_catalog_closure_id,
+                dependency_ledger_lock_repair_id,
+            ],
         )
         for previous, current in zip(video_phases, video_phases[1:]):
             self.assertEqual(tasks_by_id[current]["dependencies"], [previous])
@@ -788,6 +843,9 @@ class ValidationGenerationTests(unittest.TestCase):
             [
                 "crates/comfy_runtime/src/plugin_services.rs",
                 "crates/comfy_plugin_host/src/component_host.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ],
         )
         for preflight_read in (
@@ -3539,8 +3597,10 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(waves[schema_id], waves[foundation_id] + 1)
         self.assertEqual(waves[inherited_v3_presentation_id], waves[schema_id] + 1)
         self.assertEqual(
-            waves[value_id], waves[inherited_v3_presentation_id] + 1
+            waves[v3_presentation_catalog_closure_id],
+            waves[inherited_v3_presentation_id] + 1,
         )
+        self.assertEqual(waves[value_id], waves[v3_presentation_catalog_closure_id] + 1)
         self.assertEqual(waves[latent_bundle_id], waves[value_id] + 1)
         self.assertEqual(waves[asset_id], waves[latent_bundle_id] + 1)
         self.assertEqual(

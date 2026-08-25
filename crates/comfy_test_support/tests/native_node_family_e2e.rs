@@ -1,13 +1,14 @@
 use comfy_media::{PngLimits, encode_png_frame};
 use comfy_model::{
-    NATIVE_UPSCALE_ADMITTED_ARCHITECTURE_COUNT, NATIVE_UPSCALE_ARCHITECTURE_COUNT,
-    NATIVE_UPSCALE_CONTRACT_SHA256, NativeFrameInterpolationModel, NativeLatentUpscaleCheckpoint,
-    NativeLatentUpscaleModelResource, NativeModelPayload, NativeSdPoseHeatmapHead,
-    NativeSdPoseModel, NativeSdPoseSd2Denoiser, NativeUpscaleContractError,
-    NativeUpscaleModelError, NativeUpscaleModelResource, NativeUpscaleStateDictionaryLayout,
-    NativeUpscaleUnavailableReason, SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration,
-    compiled_native_upscale_contract, sdpose_heatmap_head_weight_manifest,
-    sdpose_sd2_weight_manifest,
+    BackgroundRemovalFixtureMutation, NATIVE_UPSCALE_ADMITTED_ARCHITECTURE_COUNT,
+    NATIVE_UPSCALE_ARCHITECTURE_COUNT, NATIVE_UPSCALE_CONTRACT_SHA256,
+    NativeBackgroundRemovalError, NativeBackgroundRemovalResource, NativeFrameInterpolationModel,
+    NativeLatentUpscaleCheckpoint, NativeLatentUpscaleModelResource, NativeModelPayload,
+    NativeModelPayloadError, NativeSdPoseHeatmapHead, NativeSdPoseModel, NativeSdPoseSd2Denoiser,
+    NativeUpscaleContractError, NativeUpscaleModelError, NativeUpscaleModelResource,
+    NativeUpscaleStateDictionaryLayout, NativeUpscaleUnavailableReason,
+    SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration, compiled_native_upscale_contract,
+    sdpose_heatmap_head_weight_manifest, sdpose_sd2_weight_manifest,
 };
 use comfy_nodes::{
     NativePreparedEffectKind, NativeStoredModelPayload, NativeStructuredValue,
@@ -53,6 +54,14 @@ const SDPOSE_FIXTURE_ARTIFACT: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const UPSCALE_MODEL_RESOURCE_FIXTURE: &str =
     include_str!("../fixtures/models/upscale-model-resource-foundation/contract.json");
+const BACKGROUND_REMOVAL_RESOURCE_FIXTURE: &str =
+    include_str!("../fixtures/models/background-removal-resource-foundation/manifest.json");
+const BACKGROUND_REMOVAL_RESOURCE_ORACLE: &str =
+    include_str!("../fixtures/models/background-removal-resource-foundation/oracle.json");
+const BACKGROUND_REMOVAL_RESOURCE_PROVENANCE: &str =
+    include_str!("../fixtures/models/background-removal-resource-foundation/provenance.json");
+const BACKGROUND_REMOVAL_RESOURCE_GENERATOR: &str =
+    include_str!("../fixtures/models/background-removal-resource-foundation/generate_oracle.py");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1010,6 +1019,455 @@ fn native_latent_upscale_model_fixture_oracles_are_complete_and_consumed()
         &tensor_bits(&reversed_order)?[..4],
         &tensor_bits(&unnormalized)?[..4]
     );
+    Ok(())
+}
+
+#[test]
+fn native_background_removal_fixture_executes_and_discriminates_source_phases()
+-> Result<(), Box<dyn Error>> {
+    let fixture: serde_json::Value = serde_json::from_str(BACKGROUND_REMOVAL_RESOURCE_FIXTURE)?;
+    let oracle: serde_json::Value = serde_json::from_str(BACKGROUND_REMOVAL_RESOURCE_ORACLE)?;
+    let provenance: serde_json::Value =
+        serde_json::from_str(BACKGROUND_REMOVAL_RESOURCE_PROVENANCE)?;
+    assert_eq!(
+        fixture
+            .get("oracle_domain")
+            .and_then(serde_json::Value::as_str),
+        Some("zed.comfy.background-removal-source-profile.v1")
+    );
+    assert_eq!(
+        fixture
+            .get("source_sha256")
+            .and_then(serde_json::Value::as_str),
+        Some(comfy_model::BIREFNET_SOURCE_SHA256)
+    );
+    assert_eq!(
+        oracle.get("format").and_then(serde_json::Value::as_str),
+        Some("zed.comfy.background-removal-reduced-oracle.v1")
+    );
+    let generator_sha256 = format!(
+        "{:x}",
+        Sha256::digest(BACKGROUND_REMOVAL_RESOURCE_GENERATOR.as_bytes())
+    );
+    let oracle_sha256 = format!(
+        "{:x}",
+        Sha256::digest(BACKGROUND_REMOVAL_RESOURCE_ORACLE.as_bytes())
+    );
+    for document in [&fixture, &oracle, &provenance] {
+        assert_eq!(
+            document
+                .get("generator_sha256")
+                .and_then(serde_json::Value::as_str),
+            Some(generator_sha256.as_str())
+        );
+    }
+    for document in [&fixture, &provenance] {
+        assert_eq!(
+            document
+                .get("oracle_sha256")
+                .and_then(serde_json::Value::as_str),
+            Some(oracle_sha256.as_str())
+        );
+    }
+    for field in ["generator_command", "platform", "python"] {
+        let oracle_value = oracle
+            .get(field)
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or("background-removal oracle provenance field is missing")?;
+        assert_eq!(
+            provenance.get(field).and_then(serde_json::Value::as_str),
+            Some(oracle_value)
+        );
+    }
+    assert!(
+        oracle
+            .get("f32_rule")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|value| !value.is_empty())
+    );
+    let expected_sources = BTreeMap::from([
+        (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_bg_removal.py",
+            comfy_model::NODES_BACKGROUND_REMOVAL_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/bg_removal_model.py",
+            comfy_model::BACKGROUND_REMOVAL_MODEL_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/background_removal/birefnet.py",
+            comfy_model::BIREFNET_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/background_removal/birefnet.json",
+            comfy_model::BIREFNET_CONFIG_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/clip_model.py",
+            comfy_model::CLIP_MODEL_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            comfy_model::COMFY_OPS_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            comfy_model::MODEL_MANAGEMENT_SOURCE_SHA256,
+        ),
+    ]);
+    for document in [&oracle, &provenance] {
+        let pinned_sources = document
+            .get("pinned_sources")
+            .and_then(serde_json::Value::as_object)
+            .ok_or("background-removal pinned sources are missing")?;
+        assert_eq!(pinned_sources.len(), expected_sources.len());
+        for (path, expected_sha256) in &expected_sources {
+            assert_eq!(
+                pinned_sources
+                    .get(*path)
+                    .and_then(serde_json::Value::as_str),
+                Some(*expected_sha256)
+            );
+        }
+    }
+    let input_shape = fixture
+        .get("input_shape")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("background-removal input shape is missing")?
+        .iter()
+        .map(|value| value.as_u64().ok_or("invalid input-shape dimension"))
+        .collect::<Result<Vec<_>, _>>()?;
+    let output_shape = fixture
+        .get("output_shape")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("background-removal output shape is missing")?
+        .iter()
+        .map(|value| value.as_u64().ok_or("invalid output-shape dimension"))
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(input_shape, vec![1, 3, 5, 4]);
+    assert_eq!(output_shape, vec![1, 3, 5]);
+    assert_eq!(oracle.get("input_shape"), fixture.get("input_shape"));
+    assert_eq!(oracle.get("output_shape"), fixture.get("output_shape"));
+    let input = fixture
+        .get("input_rgba")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("background-removal input fixture is missing")?
+        .iter()
+        .map(|value| {
+            value
+                .as_f64()
+                .map(|value| value as f32)
+                .ok_or("background-removal input value is invalid")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let expected_bits = fixture_raw_bits(
+        oracle
+            .get("output_bits")
+            .ok_or("background-removal oracle output is missing")?,
+    )?;
+    assert_eq!(
+        fixture_raw_bits(
+            fixture
+                .get("baseline_output_bits")
+                .ok_or("background-removal output fixture is missing")?,
+        )?,
+        expected_bits
+    );
+    let expected_raw_f32_sha256 = oracle
+        .get("raw_f32_sha256")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("background-removal raw-output hash is missing")?;
+    for document in [&fixture, &provenance] {
+        assert_eq!(
+            document
+                .get("raw_f32_sha256")
+                .and_then(serde_json::Value::as_str),
+            Some(expected_raw_f32_sha256)
+        );
+    }
+    let required_mutations = fixture
+        .get("required_mutations")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("background-removal mutation fixture is missing")?
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .ok_or("background-removal mutation is invalid")
+        })
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    assert_eq!(
+        required_mutations,
+        BTreeSet::from([
+            "aspp-dilated-branch",
+            "aspp-global-pool",
+            "deform-mask",
+            "deform-offset",
+            "relative-position-index",
+            "shifted-window-block",
+            "unused-decoder-head",
+        ])
+    );
+    let mutation_oracles = oracle
+        .get("mutations")
+        .and_then(serde_json::Value::as_object)
+        .ok_or("background-removal mutation oracles are missing")?;
+    assert_eq!(
+        mutation_oracles
+            .keys()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>(),
+        required_mutations
+    );
+    for (name, mutation_oracle) in mutation_oracles {
+        let mutation_bits = fixture_raw_bits(
+            mutation_oracle
+                .get("output_bits")
+                .ok_or("background-removal mutation output is missing")?,
+        )?;
+        assert_eq!(
+            mutation_bits != expected_bits,
+            name != "unused-decoder-head",
+            "{name} is not a discriminating source-equation oracle"
+        );
+        let mut mutation_hasher = Sha256::new();
+        for bits in &mutation_bits {
+            mutation_hasher.update(f32::from_bits(*bits).to_le_bytes());
+        }
+        assert_eq!(
+            format!("{:x}", mutation_hasher.finalize()),
+            mutation_oracle
+                .get("raw_f32_sha256")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("background-removal mutation hash is missing")?
+        );
+    }
+
+    let workspace_bytes = 512 * 1024 * 1024;
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(workspace_bytes)?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority.authorize_workspace(workspace_bytes)?,
+        &cancellation,
+    );
+    let image = ImageTensor::from_f32(&backend, &context, 1, 3, 5, 4, &input)?;
+    let resource = Arc::new(
+        NativeBackgroundRemovalResource::deterministic_reduced_test_fixture(
+            &backend,
+            &context,
+            BackgroundRemovalFixtureMutation::None,
+        )?,
+    );
+    let output = resource.encode_image(&backend, &image, &context)?;
+    let output_values =
+        comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+            &backend,
+            &output,
+            &context,
+        )?;
+    let output_bits = output_values
+        .iter()
+        .map(|value| value.to_bits())
+        .collect::<Vec<_>>();
+    let mut raw_output_hasher = Sha256::new();
+    for value in &output_values {
+        raw_output_hasher.update(value.to_le_bytes());
+    }
+    let actual_raw_f32_sha256 = format!("{:x}", raw_output_hasher.finalize());
+    assert_eq!(actual_raw_f32_sha256, expected_raw_f32_sha256);
+    assert_eq!(output.descriptor().shape(), output_shape.as_slice());
+    assert!(
+        output_values
+            .iter()
+            .all(|value| (0.0..=1.0).contains(value))
+    );
+    assert_eq!(
+        output_bits, expected_bits,
+        "background-removal baseline bits were {output_bits:?}"
+    );
+
+    let mut alpha_mutation = input.clone();
+    for alpha in alpha_mutation.iter_mut().skip(3).step_by(4) {
+        *alpha = 1.0 - *alpha;
+    }
+    let alpha_output = resource.encode_image(
+        &backend,
+        &ImageTensor::from_f32(&backend, &context, 1, 3, 5, 4, &alpha_mutation)?,
+        &context,
+    )?;
+    assert_eq!(
+        comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+            &backend,
+            &alpha_output,
+            &context,
+        )?
+        .iter()
+        .map(|value| value.to_bits())
+        .collect::<Vec<_>>(),
+        output_bits
+    );
+
+    let mut rgb_mutation = input.clone();
+    rgb_mutation[0] = 0.75;
+    let rgb_output = resource.encode_image(
+        &backend,
+        &ImageTensor::from_f32(&backend, &context, 1, 3, 5, 4, &rgb_mutation)?,
+        &context,
+    )?;
+    let rgb_bits = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+        &backend,
+        &rgb_output,
+        &context,
+    )?
+    .iter()
+    .map(|value| value.to_bits())
+    .collect::<Vec<_>>();
+    assert_ne!(rgb_bits, output_bits);
+
+    let mut ordered_batch = input.clone();
+    ordered_batch.extend_from_slice(&rgb_mutation);
+    let mut reversed_batch = rgb_mutation.clone();
+    reversed_batch.extend_from_slice(&input);
+    let ordered = resource.encode_image(
+        &backend,
+        &ImageTensor::from_f32(&backend, &context, 2, 3, 5, 4, &ordered_batch)?,
+        &context,
+    )?;
+    let reversed = resource.encode_image(
+        &backend,
+        &ImageTensor::from_f32(&backend, &context, 2, 3, 5, 4, &reversed_batch)?,
+        &context,
+    )?;
+    let ordered_bits = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+        &backend,
+        &ordered,
+        &context,
+    )?
+    .iter()
+    .map(|value| value.to_bits())
+    .collect::<Vec<_>>();
+    let reversed_bits = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+        &backend,
+        &reversed,
+        &context,
+    )?
+    .iter()
+    .map(|value| value.to_bits())
+    .collect::<Vec<_>>();
+    assert_eq!(&ordered_bits[..15], output_bits.as_slice());
+    assert_eq!(&ordered_bits[15..], rgb_bits.as_slice());
+    assert_eq!(&reversed_bits[..15], rgb_bits.as_slice());
+    assert_eq!(&reversed_bits[15..], output_bits.as_slice());
+
+    for (mutation, mutation_name, changes_output) in [
+        (
+            BackgroundRemovalFixtureMutation::ShiftedWindowBlock,
+            "shifted-window-block",
+            true,
+        ),
+        (
+            BackgroundRemovalFixtureMutation::RelativePositionIndex,
+            "relative-position-index",
+            true,
+        ),
+        (
+            BackgroundRemovalFixtureMutation::DeformOffset,
+            "deform-offset",
+            true,
+        ),
+        (
+            BackgroundRemovalFixtureMutation::DeformMask,
+            "deform-mask",
+            true,
+        ),
+        (
+            BackgroundRemovalFixtureMutation::AsppDilatedBranch,
+            "aspp-dilated-branch",
+            true,
+        ),
+        (
+            BackgroundRemovalFixtureMutation::AsppGlobalPool,
+            "aspp-global-pool",
+            true,
+        ),
+        (
+            BackgroundRemovalFixtureMutation::UnusedDecoderHead,
+            "unused-decoder-head",
+            false,
+        ),
+    ] {
+        let mutated = NativeBackgroundRemovalResource::deterministic_reduced_test_fixture(
+            &backend, &context, mutation,
+        )?;
+        assert_ne!(
+            mutated.semantic_digest_sha256(),
+            resource.semantic_digest_sha256(),
+            "{mutation:?} did not change resource identity"
+        );
+        let mutated_output = mutated.encode_image(&backend, &image, &context)?;
+        let mutated_bits = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+            &backend,
+            &mutated_output,
+            &context,
+        )?
+        .iter()
+        .map(|value| value.to_bits())
+        .collect::<Vec<_>>();
+        let expected_mutated_bits = fixture_raw_bits(
+            mutation_oracles
+                .get(mutation_name)
+                .and_then(|value| value.get("output_bits"))
+                .ok_or("background-removal mutation oracle is missing")?,
+        )?;
+        assert_eq!(
+            mutated_bits, expected_mutated_bits,
+            "{mutation:?} diverged from the independent source-equation oracle"
+        );
+        assert_eq!(
+            mutated_bits != output_bits,
+            changes_output,
+            "{mutation:?} output disposition changed"
+        );
+    }
+
+    let payload =
+        NativeModelPayload::background_removal_test_fixture(resource.clone(), &cancellation)?;
+    assert_eq!(
+        payload
+            .background_removal_resource()
+            .ok_or("background-removal resource projection is missing")?
+            .semantic_digest_sha256(),
+        resource.semantic_digest_sha256()
+    );
+    assert_eq!(
+        payload.resident_parts()?.resident_bytes()?,
+        payload.resident_bytes()
+    );
+
+    let memory_before_cancellation = backend.memory_snapshot();
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    assert!(matches!(
+        resource.encode_image(
+            &backend,
+            &image,
+            &backend.execution_context(
+                StreamId::DEFAULT,
+                authority.authorize_workspace(workspace_bytes)?,
+                &cancelled,
+            ),
+        ),
+        Err(NativeBackgroundRemovalError::Cancelled)
+    ));
+    assert!(matches!(
+        NativeModelPayload::background_removal_test_fixture(resource, &cancelled),
+        Err(NativeModelPayloadError::Tensor(
+            comfy_tensor::TensorError::Cancelled
+        ))
+    ));
+    assert_eq!(backend.memory_snapshot(), memory_before_cancellation);
     Ok(())
 }
 

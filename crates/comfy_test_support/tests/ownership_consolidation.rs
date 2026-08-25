@@ -5,14 +5,14 @@ use comfy_plugin_host::AssetPluginCapabilityServices;
 use comfy_plugin_sdk::{CapabilityKind, CapabilityQuota, CapabilityRequest};
 use comfy_runtime::{
     AssetIdentity, AssetNamespace, AssetOperation, Capability, ExternalNavigationPolicy,
-    ProviderManifestAuthorizationV2, ProviderRuntimeActivationGrant,
-    ProviderRuntimeActivationGrantSource, ProviderRuntimeActuationProposal,
-    ProviderRuntimeAuthorityInput, ProviderRuntimeProgressProjection,
-    ProviderRuntimeReceiptIdentityV2, ProviderRuntimeReceiptIssuerV2, ProviderRuntimeReceiptV2,
-    ProviderRuntimeReceiptVerifierV2, ProviderRuntimeStreamService,
-    VerifiedProviderRuntimeReceiptV2, authorize_native_output_committer,
-    authorize_native_output_ui, authorize_native_plugin_asset_broker,
-    open_native_profile_asset_service,
+    PreflightedProviderRuntimeActivationGrant, ProviderManifestAuthorizationV2,
+    ProviderRuntimeActivationGrant, ProviderRuntimeActivationGrantSource,
+    ProviderRuntimeActuationProposal, ProviderRuntimeAuthorityInput,
+    ProviderRuntimeProgressProjection, ProviderRuntimeReceiptIdentityV2,
+    ProviderRuntimeReceiptIssuerV2, ProviderRuntimeReceiptV2, ProviderRuntimeReceiptVerifierV2,
+    ProviderRuntimeStreamService, VerifiedProviderRuntimeReceiptV2,
+    authorize_native_output_committer, authorize_native_output_ui,
+    authorize_native_plugin_asset_broker, open_native_profile_asset_service,
 };
 use comfy_tensor::{
     BackendCapabilityMatrix, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext, StreamId,
@@ -14393,7 +14393,8 @@ fn val_ownership_native_video_codec_reviewed_abi_001() -> Result<(), Box<dyn std
     }
 
     let trust = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
-    assert!(trust.contains("native_video_codec_abi::{video_codec_library_contracts"));
+    assert!(trust.contains("native_video_codec_abi::{"));
+    assert!(trust.contains("video_codec_library_contracts,"));
     assert!(!trust.contains("const VIDEO_CODEC_AVCODEC_SYMBOLS"));
 
     let verifier =
@@ -19358,6 +19359,7 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
 
     assert_root_export::<ProviderManifestAuthorizationV2>();
     assert_root_export::<ProviderRuntimeActivationGrant>();
+    assert_root_export::<PreflightedProviderRuntimeActivationGrant>();
     assert_root_export::<ProviderRuntimeActivationGrantSource>();
     assert_root_export::<ProviderRuntimeActuationProposal>();
     assert_root_export::<ProviderRuntimeAuthorityInput>();
@@ -19389,6 +19391,7 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
     }
     for required in [
         "ProviderRuntimeActivationGrantSource",
+        "PreflightedProviderRuntimeActivationGrant",
         "ProviderRuntimeActuationProposal",
         "ProviderRuntimeAuthorityInput",
         "ProviderRuntimeProgressProjection",
@@ -19495,6 +19498,7 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
         "comfy_runtime::ProviderRuntimeStreamService",
         "comfy_runtime::ProviderRuntimeStreamOwner",
         "comfy_runtime::ProviderRuntimeActivationGrant",
+        "comfy_runtime::PreflightedProviderRuntimeActivationGrant",
         "comfy_runtime::ProviderRuntimeActivationGrantSource",
         "comfy_runtime::ProviderRuntimeActuationProposal",
         "comfy_runtime::ProviderRuntimeAuthorityInput",
@@ -19550,6 +19554,27 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
                     .iter()
                     .any(|candidate| candidate.as_str() == Some(task))),
             "Task412 is not mapped to {concern_name}"
+        );
+    }
+    let preflight_task = "comfy-parity-provider-runtime-component-activation-preflight-foundation";
+    for concern_name in [
+        "provider_request_authorization",
+        "provider_runtime_stream_sessions",
+    ] {
+        let concern = concerns
+            .iter()
+            .find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str) == Some(concern_name)
+            })
+            .ok_or("Task417 ownership concern is missing")?;
+        assert!(
+            concern
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| tasks
+                    .iter()
+                    .any(|candidate| candidate.as_str() == Some(preflight_task))),
+            "Task417 is not mapped to {concern_name}"
         );
     }
     for (concern_name, required_definitions, required_mappings) in [

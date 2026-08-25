@@ -8713,7 +8713,7 @@ def native_node_inherited_v3_presentation_catalog_correction_task(
         "Project inherited V3 node presentation overrides exactly",
         [4, 6, 7, 16, 32, 41, 44],
         [8, 20, 32, 34, 39, 41],
-        ["VAL-CATALOG-001", "VAL-NODE-001", "VAL-NODE-REGISTRY-001"],
+        ["VAL-CATALOG-001", "VAL-NODE-001", "VAL-NODE-REGISTRY-001", "VAL-PLUGIN-HOST-001"],
         "Correct the authoritative backend-node and schema-v2 catalogs so inherited V3 subclasses project their own presentation assignments instead of retaining those assignments only as provenance.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
@@ -8733,6 +8733,60 @@ def native_node_inherited_v3_presentation_catalog_correction_task(
             "crates/comfy_nodes/src/registry_generator.rs",
         ],
         "COMFY-NODE-0542 and COMFY-NODE-0543 retain their source identifiers and experimental availability while backend display names exactly include `(DEPRECATED)` and portable schema presentation sets both `is_deprecated` and `is_experimental`. The generic inherited/class-override projection is source-ordered, limited to recognized node options, deterministic, and covered by catalog and registry validation without weakening descriptor equality.",
+        dependency,
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["4.1", "4.2", "4.3", "6.1", "6.2", "16.3", "32.1", "32.3", "41.2", "44.2"],
+    )
+
+
+def native_node_v3_presentation_catalog_closure_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-node-v3-presentation-catalog-closure",
+        "Close inherited V3 node presentation catalog drift",
+        [4, 6, 7, 16, 32, 41, 44],
+        [8, 20, 32, 34, 39, 41],
+        ["VAL-CATALOG-001", "VAL-NODE-001", "VAL-NODE-REGISTRY-001"],
+        "Correct every remaining authoritative backend-node row whose inherited V3 class presentation disagrees with the already source-verified portable schema projection.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_hunyuan.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_context_windows.py",
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+            ".agents/specs/comfy-parity/catalogs/provider-component-contracts.json",
+            ".agents/specs/comfy-parity/generate_node_contract_catalog.py",
+            "crates/comfy_nodes/src/registry_generator.rs",
+            "crates/comfy_nodes/src/provider_contracts.rs",
+            "crates/comfy_nodes/src/families/image_batch_01.rs",
+            "crates/comfy_nodes/src/families/image_color_01.rs",
+            "crates/comfy_nodes/src/families/text_01.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_plugin_host/tests/component_contract.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_component_source/guest.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_component",
+        ],
+        [
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+            ".agents/specs/comfy-parity/catalogs/provider-component-contracts.json",
+            ".agents/specs/comfy-parity/catalogs/source-snapshot-manifest.json",
+            ".agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "crates/comfy_nodes/src/provider_contracts.rs",
+            "crates/comfy_nodes/src/families/image_batch_01.rs",
+            "crates/comfy_nodes/src/families/image_color_01.rs",
+            "crates/comfy_nodes/src/families/text_01.rs",
+            "crates/comfy_plugin_host/tests/component_contract.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_component_source/guest.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_component",
+        ],
+        "The finite source-pinned set COMFY-NODE-0002, COMFY-NODE-0003, COMFY-NODE-0047, COMFY-NODE-0159, COMFY-NODE-0249, COMFY-NODE-0252, COMFY-NODE-0366, COMFY-NODE-0405, COMFY-NODE-0407, COMFY-NODE-0456, COMFY-NODE-0504, COMFY-NODE-0620, COMFY-NODE-0649, COMFY-NODE-0673, COMFY-NODE-0674, COMFY-NODE-0701, and COMFY-NODE-0760 keeps each exact source identifier while projecting its inherited class display_name into both the authoritative backend-node row and portable schema presentation. A generic regression requires every non-null portable display name to equal its CSV projection, and the provider catalog fingerprint and generated runtime registry accept the corrected rows. The checked provider-component fixture uses one complete authoritative vendor namespace, preserves dynamic-combo source identity across the plugin adapter, and is re-sealed to the resulting canonical provider contract and binding-set identities. Strict regeneration is byte-identical twice; no fallback or unrelated node presentation changes.",
         dependency,
         locked=True,
         feature_scoped=True,
@@ -10749,10 +10803,16 @@ def provider_component_foundation_tasks(
             "crates/comfy_plugin_host/src/component_host.rs",
             "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
             "crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [
             "crates/comfy_runtime/src/plugin_services.rs",
             "crates/comfy_plugin_host/src/component_host.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         "ProviderRuntimeActivationGrant::preflight_installed_component consumes a claimed opaque grant, checks sealed cancellation before and after validation, and compares the exact registry generation and digest, component generation and digest, provider outer-signing-payload digest and independently verified inner authorization identity, authorization-generation digest, binding generation and set digest, node identity, and compiled-plan digest. It returns a distinct non-cloneable PreflightedProviderRuntimeActivationGrant. Every failure atomically revokes the one-use claim. Only the preflighted grant exposes the later consuming bind for a checked request head and ProviderPolicy; the raw grant no longer exposes bind, fields, constructors, registration, provider identity, or authority material. A private component-host PreflightedProviderComponentCapsule retains that grant together with the exact selected InstalledVerifiedPlugin, current VerifiedComponentGeneration, and node identity. Its private constructor derives evidence only from those installed objects, and the later adapter must instantiate only by consuming the capsule without accepting a second plugin, component generation, or node. No public primitive-field evidence constructor or capsule getter exists, the runtime wildcard export remains unchanged, and repository ownership asserts exactly one production preflight callsite. Same-crate runtime tests independently mutate every sealed field, typed worker-session-start field, outer streaming contract, inner authorization, binding membership, and cancellation, and prove every failed preflight revokes the claim and cannot be retried. Component-host source tests prove the sole callsite retains and consumes the exact installed plugin, current generation, authorization, and node, orders preflight before begin_invocation, input state, read, take, node creation, or guest code, and accepts no second selector or getter through which those objects can be swapped. Raw mint and registration stay crate-private, so Task419 owns the first executable capsule success, second-claim, and instantiation anti-swap proof; this task adds no public or feature-gated test authority factory.",
         ["comfy_runtime", "comfy_plugin_host"],
@@ -13813,8 +13873,38 @@ def native_video_component_h264_mp4_10bit_backing_foundation_task(
     )
 
 
+def native_backend_dependency_ledger_current_lock_repair_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-backend-dependency-ledger-current-lock-repair",
+        "Refresh the native backend dependency ledger lock identity",
+        [18, 31, 41, 44],
+        [11, 25, 31, 41],
+        ["VAL-FOUNDATION-001", "VAL-NATIVE-BOUNDARY-001", "VAL-OWNERSHIP-001"],
+        "Refresh the canonical native-backend dependency ledger after serialized upstream workspace dependency changes without changing any Comfy adapter dependency, feature, source, target, or availability claim.",
+        [
+            "Cargo.lock",
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
+            "crates/comfy_test_support/tests/native_foundation.rs",
+        ],
+        [
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "The ledger's full Cargo.lock SHA-256 equals the checked-in lockfile after the latest serialized upstream workspace dependency update. Every canonical Comfy backend adapter package, version, source, target, feature, rationale, and typed-unavailable disposition remains unchanged, no Cargo manifest or lockfile is written by this repair, and the exact native-foundation dependency and native-boundary tests pass with locked resolution.",
+        dependency,
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["18.1", "31.5", "41.2", "44.3"],
+    )
+
+
 def native_video_execution_precursor_tasks(
     dependency: str,
+    catalog_dependency: str,
 ) -> list[dict[str, object]]:
     tasks: list[dict[str, object]] = []
 
@@ -13828,7 +13918,11 @@ def native_video_execution_precursor_tasks(
         criterion_ids: list[str],
         registered_source_edits: list[str],
     ) -> None:
-        previous = dependency if not tasks else str(tasks[-1]["id"])
+        dependencies = (
+            [dependency, catalog_dependency]
+            if not tasks
+            else [str(tasks[-1]["id"])]
+        )
         tasks.append(
             task(
                 identifier,
@@ -13848,7 +13942,7 @@ def native_video_execution_precursor_tasks(
                 reads,
                 writes,
                 done,
-                [previous],
+                dependencies,
                 locked=True,
                 criterion_ids=criterion_ids,
                 registered_source_edits=registered_source_edits,
@@ -17763,8 +17857,18 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(node_schema_foundation["id"])
         )
     )
+    v3_presentation_catalog_closure = (
+        native_node_v3_presentation_catalog_closure_task(
+            str(inherited_v3_presentation_catalog_correction["id"])
+        )
+    )
+    native_backend_dependency_ledger_lock_repair = (
+        native_backend_dependency_ledger_current_lock_repair_task(
+            "comfy-parity-provider-runtime-component-activation-preflight-foundation"
+        )
+    )
     node_compute_foundation = native_node_compute_value_foundation_task(
-        str(inherited_v3_presentation_catalog_correction["id"]), compute_integration
+        str(v3_presentation_catalog_closure["id"]), compute_integration
     )
     latent_bundle_foundation = native_latent_bundle_foundation_task(
         str(node_compute_foundation["id"])
@@ -18248,7 +18352,14 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         )
     )
     video_execution_precursors = native_video_execution_precursor_tasks(
-        str(video_component_h264_mp4_10bit_backing_foundation["id"])
+        str(video_component_h264_mp4_10bit_backing_foundation["id"]),
+        str(v3_presentation_catalog_closure["id"]),
+    )
+    video_execution_precursors[0]["dependencies"] = list(
+        dict.fromkeys(
+            list(video_execution_precursors[0]["dependencies"])
+            + [str(native_backend_dependency_ledger_lock_repair["id"])]
+        )
     )
     video_foundation = native_video_execution_foundation_task(
         str(video_execution_precursors[-1]["id"])
@@ -18383,6 +18494,8 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             node_runtime_foundation,
             node_schema_foundation,
             inherited_v3_presentation_catalog_correction,
+            v3_presentation_catalog_closure,
+            native_backend_dependency_ledger_lock_repair,
             node_compute_foundation,
             latent_bundle_foundation,
             node_asset_effect_foundation,
@@ -20959,6 +21072,14 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
             "git diff --check",
         ])
+    if identifier == "comfy-parity-native-backend-dependency-ledger-current-lock-repair":
+        commands.extend([
+            "cargo test --locked -p comfy_test_support --test native_foundation -- --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
     if identifier == "comfy-parity-native-spandrel-image-model-contract-foundation":
         commands.extend([
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_generate_spandrel_image_model_contract.py",
@@ -20987,6 +21108,20 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+        ])
+    if identifier == "comfy-parity-native-node-v3-presentation-catalog-closure":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p comfy_nodes val_node_001 -- --nocapture",
+            "cargo test --locked -p comfy_nodes val_node_registry_001 -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_execution_controller::tests::generated_registry_is_comprehensive_and_preserves_union_frontend_types --lib -- --exact --nocapture",
+            "cargo test --locked -p comfy_plugin_host --test component_contract provider_fixture_contract_matches_the_generated_paid_descriptor -- --exact --nocapture",
+            "cargo test --locked -p comfy_plugin_host --test component_contract provider_component_activation_publishes_one_exact_registry_bundle_and_rolls_back_rejection -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
         ])
     if identifier == "comfy-parity-native-node-compute-value-foundation":
         commands.extend([

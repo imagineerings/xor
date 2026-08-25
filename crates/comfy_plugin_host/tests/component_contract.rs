@@ -251,30 +251,40 @@ fn signed_host_and_manifest(
 
 fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> {
     let registry = TypeRegistry::built_in()?;
-    let input_port = port(
-        &registry,
-        "audio",
-        PortDirection::Input,
-        "Audio",
-        PortCardinality::Singular,
-        PortPresence::Required,
-    )?;
+    let input_ports = [
+        ("prompt", "String", PortPresence::Required),
+        ("model", "COMFY_DYNAMICCOMBO_V3", PortPresence::Required),
+        ("seed", "Int", PortPresence::Required),
+        ("system_prompt", "String", PortPresence::Optional),
+    ]
+    .into_iter()
+    .map(|(id, source_type, presence)| {
+        port(
+            &registry,
+            id,
+            PortDirection::Input,
+            source_type,
+            PortCardinality::Singular,
+            presence,
+        )
+    })
+    .collect::<Result<Vec<_>, _>>()?;
     let output_port = port(
         &registry,
         "output_0",
         PortDirection::Output,
-        "Audio",
+        "String",
         PortCardinality::Singular,
         PortPresence::Required,
     )?;
     let mut provider_binding = ProviderBindingSet {
         schema_version: PROVIDER_BINDING_SCHEMA_VERSION,
-        implementation_namespace: "zed.comfy.provider.comfy-node-0141".to_owned(),
+        implementation_namespace: "zed.comfy.provider.openrouter".to_owned(),
         bindings_sha256: "0".repeat(64),
         bindings: vec![ProviderBindingClaim {
-            feature_id: "COMFY-NODE-0141".to_owned(),
-            node_id: "ElevenLabsAudioIsolation".to_owned(),
-            contract_sha256: "48dd482033f7ca2bb6baa83e9a9cde25c8e7f896a15acd31821d37451423106b"
+            feature_id: "COMFY-NODE-0466".to_owned(),
+            node_id: "OpenRouterLLMNode".to_owned(),
+            contract_sha256: "9f9e252f2dc4b6827fe12c30f29979d8aafc956ed76ddda414b3d65e9d21f0c9"
                 .to_owned(),
             transport_schema: "zed:comfy-provider-transport@1".parse()?,
             materializer_schema: "zed:comfy-provider-materializer@1".parse()?,
@@ -283,7 +293,7 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
     provider_binding.bindings_sha256 = provider_binding.canonical_bindings_sha256()?;
     Ok(PluginManifest {
         schema_version: 1,
-        identifier: "zed.comfy.provider.comfy-node-0141".to_owned(),
+        identifier: "zed.comfy.provider.openrouter".to_owned(),
         plugin_version: ApiVersion::new(1, 0, 0),
         api: ApiRequirement {
             major: 1,
@@ -304,11 +314,11 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
         },
         provider_binding: Some(provider_binding),
         nodes: vec![PluginNode {
-            id: "ElevenLabsAudioIsolation".to_owned(),
+            id: "OpenRouterLLMNode".to_owned(),
             version: ApiVersion::new(1, 0, 0),
-            display_name: "ElevenLabs Voice Isolation".to_owned(),
-            category: "partner/audio/ElevenLabs".to_owned(),
-            ports: vec![input_port, output_port],
+            display_name: "OpenRouter LLM".to_owned(),
+            category: "partner/text/OpenRouter".to_owned(),
+            ports: input_ports.into_iter().chain([output_port]).collect(),
             determinism: DeterminismPolicy::External,
             cache: CachePolicy::Never,
             effects: EffectPolicy::Provider,
@@ -428,22 +438,29 @@ fn tensor_value(identifier: &str) -> Result<PluginValue, Box<dyn Error>> {
 
 fn provider_invocation_inputs() -> Result<InvocationInputs, Box<dyn Error>> {
     let registry = TypeRegistry::built_in()?;
-    let audio = PluginValue::tensor(
-        registry.resolve("Audio")?.clone(),
-        TensorValue::new(
-            TensorDescriptor::contiguous(
-                vec![1, 1, 32],
-                DType::F32,
-                DeviceId::CPU,
-                StreamId::DEFAULT,
-            )?,
-            128,
-            "1".repeat(64),
-        )?,
-        &registry,
-    )?;
     let mut inputs = InvocationInputs::default();
-    inputs.set_present("audio", vec![audio]);
+    for (name, source_type, value) in [
+        (
+            "prompt",
+            "String",
+            ScalarValue::String("fixture prompt".to_owned()),
+        ),
+        (
+            "model",
+            "COMFY_DYNAMICCOMBO_V3",
+            ScalarValue::String("openai/gpt-5".to_owned()),
+        ),
+        ("seed", "Int", ScalarValue::Integer(1)),
+    ] {
+        inputs.set_present(
+            name,
+            vec![PluginValue::scalar(
+                registry.resolve(source_type)?.clone(),
+                value,
+                &registry,
+            )?],
+        );
+    }
     Ok(inputs)
 }
 
@@ -1028,7 +1045,7 @@ fn provider_world_preflights_signed_bindings_and_returns_typed_outputs()
     let invocation = host.begin_invocation(
         &manifest,
         &authorization,
-        "ElevenLabsAudioIsolation",
+        "OpenRouterLLMNode",
         provider_invocation_inputs()?,
         empty_services(),
         CancellationToken::default(),
@@ -1042,7 +1059,7 @@ fn provider_world_preflights_signed_bindings_and_returns_typed_outputs()
             .ok_or("provider binding disappeared")?
     );
     let request = scalar_value("provider-output")?.abi_bytes()?;
-    let result = instance.invoke_provider("ElevenLabsAudioIsolation", &request)?;
+    let result = instance.invoke_provider("OpenRouterLLMNode", &request)?;
     assert!(result.outputs.is_empty());
     assert!(result.output_presence.is_empty());
     assert_eq!(result.receipts(), &[b"provider-fixture-receipt".to_vec()]);
@@ -1055,15 +1072,14 @@ fn provider_world_preflights_signed_bindings_and_returns_typed_outputs()
     let invocation = host.begin_invocation(
         &manifest,
         &authorization,
-        "ElevenLabsAudioIsolation",
+        "OpenRouterLLMNode",
         provider_invocation_inputs()?,
         resources()?,
         CancellationToken::default(),
     )?;
     let instance = host.instantiate_component(&compiled, invocation)?;
-    let request =
-        ProviderTransportRequest::checked("ElevenLabsAudioIsolation", Vec::new())?.to_bytes()?;
-    let result = instance.invoke_provider("ElevenLabsAudioIsolation", &request)?;
+    let request = ProviderTransportRequest::checked("OpenRouterLLMNode", Vec::new())?.to_bytes()?;
+    let result = instance.invoke_provider("OpenRouterLLMNode", &request)?;
     assert_eq!(
         result.receipts(),
         &[b"host-owned-provider-receipt".to_vec()]
@@ -1077,14 +1093,14 @@ fn provider_fixture_contract_matches_the_generated_paid_descriptor() -> Result<(
     let registry = comfy_runtime::generated_native_node_registry_projection(None)?;
     let contract = registry
         .provider_binding_contract_sha256(
-            "ElevenLabsAudioIsolation",
+            "OpenRouterLLMNode",
             "zed:comfy-provider-transport@1",
             "zed:comfy-provider-materializer@1",
         )?
         .ok_or("paid provider contract is absent")?;
     assert_eq!(
         contract,
-        "48dd482033f7ca2bb6baa83e9a9cde25c8e7f896a15acd31821d37451423106b"
+        "9f9e252f2dc4b6827fe12c30f29979d8aafc956ed76ddda414b3d65e9d21f0c9"
     );
     let manifest = provider_manifest("0".repeat(64))?;
     assert_eq!(
@@ -1092,7 +1108,7 @@ fn provider_fixture_contract_matches_the_generated_paid_descriptor() -> Result<(
             .provider_binding
             .ok_or("provider binding set is absent")?
             .bindings_sha256,
-        "6edd3643bc5577d66f7bd6765e970142448aab383476e1fc7d084c00ae988ae8"
+        "ca1e5cb11d6d456dd26c354a5f4cf00188414854587002e8137694758270d00f"
     );
     Ok(())
 }
@@ -1154,13 +1170,13 @@ fn provider_world_rejects_malformed_cancelled_and_wrong_class_requests()
 
     for (class_type, request, cancellation, expected) in [
         (
-            "ElevenLabsAudioIsolation",
+            "OpenRouterLLMNode",
             b"invalid-provider-receipt".to_vec(),
             CancellationToken::default(),
             "invalid result receipt set",
         ),
         (
-            "ElevenLabsAudioIsolation",
+            "OpenRouterLLMNode",
             b"guest-authored-output".to_vec(),
             CancellationToken::default(),
             "attempted to author materialized output metadata",
@@ -1175,7 +1191,7 @@ fn provider_world_rejects_malformed_cancelled_and_wrong_class_requests()
         let invocation = host.begin_invocation(
             &manifest,
             &authorization,
-            "ElevenLabsAudioIsolation",
+            "OpenRouterLLMNode",
             provider_invocation_inputs()?,
             empty_services(),
             cancellation,
@@ -1191,7 +1207,7 @@ fn provider_world_rejects_malformed_cancelled_and_wrong_class_requests()
     let invocation = host.begin_invocation(
         &manifest,
         &authorization,
-        "ElevenLabsAudioIsolation",
+        "OpenRouterLLMNode",
         provider_invocation_inputs()?,
         empty_services(),
         cancellation.clone(),
@@ -1199,10 +1215,7 @@ fn provider_world_rejects_malformed_cancelled_and_wrong_class_requests()
     let instance = host.instantiate_component(&compiled, invocation)?;
     cancellation.cancel();
     assert!(matches!(
-        instance.invoke_provider(
-            "ElevenLabsAudioIsolation",
-            &scalar_value("value")?.abi_bytes()?
-        ),
+        instance.invoke_provider("OpenRouterLLMNode", &scalar_value("value")?.abi_bytes()?),
         Err(PluginError::Invocation(InvocationError::Cancelled))
     ));
     Ok(())
@@ -2488,35 +2501,33 @@ fn provider_component_activation_publishes_one_exact_registry_bundle_and_rolls_b
     assert_eq!(
         bundle
             .registry()
-            .binding_declared_disposition("ElevenLabsAudioIsolation"),
+            .binding_declared_disposition("OpenRouterLLMNode"),
         Some(comfy_nodes::NativeNodeBindingDisposition::ProviderRequired)
     );
     assert_eq!(
-        bundle
-            .registry()
-            .binding_disposition("ElevenLabsAudioIsolation"),
+        bundle.registry().binding_disposition("OpenRouterLLMNode"),
         Some(comfy_nodes::NativeNodeBindingDisposition::Executable)
     );
     assert_eq!(
         bundle
             .registry()
-            .provider_binding_is_activated("ElevenLabsAudioIsolation"),
+            .provider_binding_is_activated("OpenRouterLLMNode"),
         Some(true)
     );
     assert_eq!(
         bundle
             .registry()
-            .binding_declared_disposition("ElevenLabsAudioIsolation")
+            .binding_declared_disposition("OpenRouterLLMNode")
             .ok_or("provider binding is absent")?,
         comfy_nodes::NativeNodeBindingDisposition::ProviderRequired
     );
     assert_eq!(
         bundle
             .registry()
-            .binding_implementation_namespace("ElevenLabsAudioIsolation"),
-        Some("zed.comfy.provider.comfy-node-0141")
+            .binding_implementation_namespace("OpenRouterLLMNode"),
+        Some("zed.comfy.provider.openrouter")
     );
-    assert!(bundle.registry().node("ElevenLabsAudioIsolation").is_some());
+    assert!(bundle.registry().node("OpenRouterLLMNode").is_some());
     let pin = bundle
         .provider_registry()
         .ok_or("provider registry pin is absent")?;
@@ -2555,16 +2566,11 @@ fn provider_component_activation_publishes_one_exact_registry_bundle_and_rolls_b
     smol::block_on(router.synchronize(Vec::new()))?;
     let removed = router.active_execution_registry_bundle()?;
     assert!(removed.provider_registry().is_none());
-    assert!(
-        removed
-            .registry()
-            .node("ElevenLabsAudioIsolation")
-            .is_none()
-    );
+    assert!(removed.registry().node("OpenRouterLLMNode").is_none());
     assert_eq!(
         removed
             .registry()
-            .binding_declared_disposition("ElevenLabsAudioIsolation"),
+            .binding_declared_disposition("OpenRouterLLMNode"),
         Some(comfy_nodes::NativeNodeBindingDisposition::ProviderRequired)
     );
     Ok(())

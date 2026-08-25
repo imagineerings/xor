@@ -20699,7 +20699,7 @@
         {
           "name": "task412-runtime-authority-is-host-checked-and-provider-derived",
           "path": "crates/comfy_runtime/src/plugin_services.rs",
-          "pattern": "ProviderRuntimeActivationGrant[\\s\\S]*pub fn bind\\([\\s\\S]*ProviderRuntimeAuthorityInput[\\s\\S]*provider_binding\\(\\)[\\s\\S]*implementation_namespace[\\s\\S]*provider_policy[\\s\\S]*\\.authorize\\("
+          "pattern": "impl ProviderRuntimeActivationGrant[\\s\\S]*pub fn preflight_installed_component\\([\\s\\S]*PreflightedProviderRuntimeActivationGrant[\\s\\S]*impl PreflightedProviderRuntimeActivationGrant[\\s\\S]*pub fn bind\\([\\s\\S]*ProviderRuntimeAuthorityInput[\\s\\S]*provider_binding\\(\\)[\\s\\S]*implementation_namespace[\\s\\S]*provider_policy[\\s\\S]*\\.authorize\\("
         },
         {
           "name": "zed-provider-actuator-consumes-sealed-endpoint-without-policy-revalidation",
@@ -20712,7 +20712,8 @@
         "comfy-parity-trust-foundation",
         "comfy-parity-authoritative-domain-ownership",
         "comfy-parity-provider-worker-stream-protocol",
-        "comfy-parity-provider-runtime-stream-progress-foundation"
+        "comfy-parity-provider-runtime-stream-progress-foundation",
+        "comfy-parity-provider-runtime-component-activation-preflight-foundation"
       ],
       "production_consumers": [
         "native provider services",
@@ -20902,6 +20903,12 @@
         },
         {
           "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "qualified": "comfy_runtime::PreflightedProviderRuntimeActivationGrant",
+          "role": "sealed_authorization",
+          "symbol": "PreflightedProviderRuntimeActivationGrant"
+        },
+        {
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
           "qualified": "comfy_runtime::ProviderRuntimeActivationGrantSource",
           "role": "related_owner",
           "symbol": "ProviderRuntimeActivationGrantSource"
@@ -20936,6 +20943,7 @@
         "ProviderRuntimeActuationProposal",
         "ProviderRuntimeActivationGrant",
         "ProviderRuntimeActivationGrantSource",
+        "PreflightedProviderRuntimeActivationGrant",
         "ProviderRuntimeAuthorityInput",
         "ProviderRuntimeProgressProjection",
         "ProviderRuntimeStreamService",
@@ -20949,7 +20957,7 @@
         {
           "name": "task412-runtime-authority-is-host-checked-and-provider-derived",
           "path": "crates/comfy_runtime/src/plugin_services.rs",
-          "pattern": "ProviderRuntimeActivationGrant[\\s\\S]*pub fn bind\\([\\s\\S]*ProviderRuntimeAuthorityInput[\\s\\S]*provider_binding\\(\\)[\\s\\S]*implementation_namespace[\\s\\S]*provider_policy[\\s\\S]*\\.authorize\\("
+          "pattern": "impl ProviderRuntimeActivationGrant[\\s\\S]*pub fn preflight_installed_component\\([\\s\\S]*PreflightedProviderRuntimeActivationGrant[\\s\\S]*impl PreflightedProviderRuntimeActivationGrant[\\s\\S]*pub fn bind\\([\\s\\S]*ProviderRuntimeAuthorityInput[\\s\\S]*provider_binding\\(\\)[\\s\\S]*implementation_namespace[\\s\\S]*provider_policy[\\s\\S]*\\.authorize\\("
         },
         {
           "name": "task412-stream-service-retains-complete-v1-v2-lifecycle",
@@ -20989,7 +20997,8 @@
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
-        "comfy-parity-provider-runtime-stream-progress-foundation"
+        "comfy-parity-provider-runtime-stream-progress-foundation",
+        "comfy-parity-provider-runtime-component-activation-preflight-foundation"
       ],
       "production_consumers": [
         "native provider capability-envelope sessions",

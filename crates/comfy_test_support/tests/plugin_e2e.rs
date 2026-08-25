@@ -6,7 +6,6 @@ use comfy_api::{
     NativeHeadlessService, NativeRuntimeApiHost, NativeRuntimeHttpServices, WebSocketLimits,
     security::{ApiSecurityConfig, ArtifactIdempotencySnapshotStore},
 };
-use comfy_media::NativeAudioPayload;
 use comfy_model::NativeModelPayload;
 use comfy_nodes::NodeRegistry as CatalogNodeRegistry;
 use comfy_nodes::{
@@ -52,9 +51,8 @@ use comfy_runtime::{
 };
 use comfy_sampler::{NativeConditioningPayload, NativeDiffusionPayload};
 use comfy_tensor::{
-    CpuWorkspaceAuthority, DType as TensorDType, DeviceId as TensorDeviceId, ImageTensor,
-    NativeTensorPayload, NativeTensorRole, RngAlgorithm, RngProfileVersion, ScratchReservation,
-    StreamId as TensorStreamId, TensorDescriptor as NativeTensorDescriptor,
+    CpuWorkspaceAuthority, ImageTensor, NativeTensorPayload, NativeTensorRole, RngAlgorithm,
+    RngProfileVersion, ScratchReservation, StreamId as TensorStreamId,
 };
 use comfy_test_support::NativeDiffusionFixture;
 use comfy_types::{AttemptId, HttpMethod, NodeId, PromptId, WorkerId};
@@ -323,30 +321,40 @@ fn manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> 
 
 fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> {
     let registry = TypeRegistry::built_in()?;
-    let input_port = port(
-        &registry,
-        "audio",
-        PortDirection::Input,
-        "Audio",
-        PortCardinality::Singular,
-        PortPresence::Required,
-    )?;
+    let input_ports = [
+        ("prompt", "String", PortPresence::Required),
+        ("model", "COMFY_DYNAMICCOMBO_V3", PortPresence::Required),
+        ("seed", "Int", PortPresence::Required),
+        ("system_prompt", "String", PortPresence::Optional),
+    ]
+    .into_iter()
+    .map(|(id, source_type, presence)| {
+        port(
+            &registry,
+            id,
+            PortDirection::Input,
+            source_type,
+            PortCardinality::Singular,
+            presence,
+        )
+    })
+    .collect::<Result<Vec<_>, _>>()?;
     let output_port = port(
         &registry,
         "output_0",
         PortDirection::Output,
-        "Audio",
+        "String",
         PortCardinality::Singular,
         PortPresence::Required,
     )?;
     let mut provider_binding = ProviderBindingSet {
         schema_version: PROVIDER_BINDING_SCHEMA_VERSION,
-        implementation_namespace: "zed.comfy.provider.comfy-node-0141".to_owned(),
+        implementation_namespace: "zed.comfy.provider.openrouter".to_owned(),
         bindings_sha256: "0".repeat(64),
         bindings: vec![ProviderBindingClaim {
-            feature_id: "COMFY-NODE-0141".to_owned(),
-            node_id: "ElevenLabsAudioIsolation".to_owned(),
-            contract_sha256: "48dd482033f7ca2bb6baa83e9a9cde25c8e7f896a15acd31821d37451423106b"
+            feature_id: "COMFY-NODE-0466".to_owned(),
+            node_id: "OpenRouterLLMNode".to_owned(),
+            contract_sha256: "9f9e252f2dc4b6827fe12c30f29979d8aafc956ed76ddda414b3d65e9d21f0c9"
                 .to_owned(),
             transport_schema: "zed:comfy-provider-transport@1".parse()?,
             materializer_schema: "zed:comfy-provider-materializer@1".parse()?,
@@ -355,7 +363,7 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
     provider_binding.bindings_sha256 = provider_binding.canonical_bindings_sha256()?;
     Ok(PluginManifest {
         schema_version: 1,
-        identifier: "zed.comfy.provider.comfy-node-0141".to_owned(),
+        identifier: "zed.comfy.provider.openrouter".to_owned(),
         plugin_version: ApiVersion::new(1, 0, 0),
         api: ApiRequirement {
             major: 1,
@@ -376,11 +384,11 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
         },
         provider_binding: Some(provider_binding),
         nodes: vec![PluginNode {
-            id: "ElevenLabsAudioIsolation".to_owned(),
+            id: "OpenRouterLLMNode".to_owned(),
             version: ApiVersion::new(1, 0, 0),
-            display_name: "ElevenLabs Voice Isolation".to_owned(),
-            category: "partner/audio/ElevenLabs".to_owned(),
-            ports: vec![input_port, output_port],
+            display_name: "OpenRouter LLM".to_owned(),
+            category: "partner/text/OpenRouter".to_owned(),
+            ports: input_ports.into_iter().chain([output_port]).collect(),
             determinism: DeterminismPolicy::External,
             cache: CachePolicy::Never,
             effects: EffectPolicy::Provider,
@@ -993,16 +1001,21 @@ async fn exercise_provider_world_private_worker(
         .clone();
     let (_asset_directory, assets) = worker_plugin_assets()?;
     let clock = Arc::new(WorkerPluginClock::new(Instant::now()));
-    let output_payload = canonical_audio_payload(&[0.5, -0.25, 0.125, 0.0])?;
+    let type_registry = TypeRegistry::built_in()?;
+    let output_value = PluginValue::scalar(
+        type_registry.resolve("String")?.clone(),
+        ScalarValue::String("fixture response".to_owned()),
+        &type_registry,
+    )?;
     let response = ProviderTransportResponse::checked(
-        "ElevenLabsAudioIsolation",
+        "OpenRouterLLMNode",
         vec![ProviderTransportPort::checked(
             "output_0",
             true,
-            vec![ProviderTransportValue::from_native_payload(
-                "comfy:audio@1",
-                ValueFamily::Tensor,
-                &output_payload,
+            vec![ProviderTransportValue::checked(
+                "comfy:string@1",
+                ValueFamily::Scalar,
+                output_value.abi_bytes()?,
             )?],
         )?],
     )?
@@ -1072,7 +1085,7 @@ async fn exercise_provider_world_private_worker(
     let bundle = router.active_execution_registry_bundle()?;
     let registry = bundle.registry();
     let price_badge = registry
-        .descriptor("ElevenLabsAudioIsolation")
+        .descriptor("OpenRouterLLMNode")
         .and_then(|descriptor| descriptor.source_schema.as_ref())
         .and_then(|schema| schema.node.price_badge.clone())
         .ok_or("paid provider price badge is absent")?;
@@ -1085,7 +1098,7 @@ async fn exercise_provider_world_private_worker(
         "provider-cost-approval",
         COMPILED_PLAN_SHA256,
         "provider-cost-approval",
-        "ElevenLabsAudioIsolation",
+        "OpenRouterLLMNode",
         0,
         "0".repeat(64),
         manifest.identifier.clone(),
@@ -1099,7 +1112,7 @@ async fn exercise_provider_world_private_worker(
         TEST_PROFILE_ID,
         TEST_PROFILE_ID,
         COMPILED_PLAN_SHA256,
-        "ElevenLabsAudioIsolation",
+        "OpenRouterLLMNode",
         0,
         manifest.identifier.clone(),
         component_digest,
@@ -1121,27 +1134,39 @@ async fn exercise_provider_world_private_worker(
     let cancellation = CancellationToken::default();
     let generation = NativeHandleStoreGeneration::new()?;
     let store = generation.handle_store_for_attempt(attempt_id);
-    let input = canonical_audio_payload(&[0.0, 0.25, -0.5, 1.0])?;
-    let input_handle = store.publish(input, &cancellation)?;
     let context = provider_node_context(
         prompt_id,
         attempt_id,
-        NodeId("ElevenLabsAudioIsolation".to_owned()),
+        NodeId("OpenRouterLLMNode".to_owned()),
         cancellation.clone(),
         store.clone(),
         COMPILED_PLAN_SHA256,
     )?;
     let outcome = registry
-        .node("ElevenLabsAudioIsolation")
+        .node("OpenRouterLLMNode")
         .ok_or("provider binding is not executable")?
         .execute(
             context,
-            BTreeMap::from([(
-                "audio".to_owned(),
-                NativeValue::Handle {
-                    value: input_handle,
-                },
-            )]),
+            BTreeMap::from([
+                (
+                    "prompt".to_owned(),
+                    NativeValue::Primitive {
+                        value: NativePrimitive::String("fixture prompt".to_owned()),
+                    },
+                ),
+                (
+                    "model".to_owned(),
+                    NativeValue::Primitive {
+                        value: NativePrimitive::String("openai/gpt-5".to_owned()),
+                    },
+                ),
+                (
+                    "seed".to_owned(),
+                    NativeValue::Primitive {
+                        value: NativePrimitive::Integer(1),
+                    },
+                ),
+            ]),
         )
         .await?;
     let NodeOutcome::Values {
@@ -1151,57 +1176,49 @@ async fn exercise_provider_world_private_worker(
         return Err("provider node returned a non-value outcome".into());
     };
     assert!(effects.is_empty());
-    let [
-        NativeValue::Handle {
-            value: output_handle,
-        },
-    ] = outputs.as_slice()
-    else {
-        return Err("provider output was not one canonical audio handle".into());
-    };
-    let resolved = store.resolve(
-        output_handle,
-        &NativeHandleType::new(comfy_nodes::NativeHandleKind::Audio, "AUDIO")?,
-        &cancellation,
-    )?;
-    let NativeStoredPayload::Audio(audio) = resolved.as_ref() else {
-        return Err("provider output resolved to the wrong payload owner".into());
-    };
-    audio.validate()?;
-    assert_eq!(
-        audio.semantic_digest_sha256(),
-        match &output_payload {
-            NativeStoredPayload::Audio(expected) => expected.semantic_digest_sha256(),
-            _ => return Err("provider fixture output is not audio".into()),
-        }
-    );
+    assert!(matches!(
+        outputs.as_slice(),
+        [NativeValue::Primitive {
+            value: NativePrimitive::String(value),
+        }] if value == "fixture response"
+    ));
     assert_eq!(provider.calls.load(Ordering::Acquire), 1);
 
     let replay_generation = NativeHandleStoreGeneration::new()?;
     let replay_store =
         replay_generation.handle_store_for_attempt(AttemptId(Uuid::from_u128(0x2107_9003)));
-    let replay_input = replay_store.publish(
-        canonical_audio_payload(&[0.0, 0.25, -0.5, 1.0])?,
-        &CancellationToken::default(),
-    )?;
     let replay = registry
-        .node("ElevenLabsAudioIsolation")
+        .node("OpenRouterLLMNode")
         .ok_or("provider binding disappeared")?
         .execute(
             provider_node_context(
                 prompt_id,
                 AttemptId(Uuid::from_u128(0x2107_9003)),
-                NodeId("ElevenLabsAudioIsolation".to_owned()),
+                NodeId("OpenRouterLLMNode".to_owned()),
                 CancellationToken::default(),
                 replay_store,
                 COMPILED_PLAN_SHA256,
             )?,
-            BTreeMap::from([(
-                "audio".to_owned(),
-                NativeValue::Handle {
-                    value: replay_input,
-                },
-            )]),
+            BTreeMap::from([
+                (
+                    "prompt".to_owned(),
+                    NativeValue::Primitive {
+                        value: NativePrimitive::String("fixture prompt".to_owned()),
+                    },
+                ),
+                (
+                    "model".to_owned(),
+                    NativeValue::Primitive {
+                        value: NativePrimitive::String("openai/gpt-5".to_owned()),
+                    },
+                ),
+                (
+                    "seed".to_owned(),
+                    NativeValue::Primitive {
+                        value: NativePrimitive::Integer(1),
+                    },
+                ),
+            ]),
         )
         .await
         .expect_err("spent cost approval must deny replay before provider actuation");
@@ -1239,31 +1256,6 @@ fn canonical_image_payload(seed: u8) -> Result<NativeStoredPayload, Box<dyn Erro
     let image = ImageTensor::from_f32(&backend, &context, 1, 1, 1, 3, &[value, value, value])?;
     Ok(NativeStoredPayload::Tensor(Arc::new(
         NativeTensorPayload::from_image(NativeTensorRole::Image, image)?,
-    )))
-}
-
-fn canonical_audio_payload(values: &[f32]) -> Result<NativeStoredPayload, Box<dyn Error>> {
-    let bytes = values
-        .iter()
-        .flat_map(|value| value.to_ne_bytes())
-        .collect::<Vec<_>>();
-    let descriptor = NativeTensorDescriptor::contiguous(
-        vec![1, 1, u64::try_from(values.len())?],
-        TensorDType::F32,
-        TensorDeviceId::CPU,
-        TensorStreamId::DEFAULT,
-    )?;
-    let (backend, workspace_authority) =
-        CpuWorkspaceAuthority::create_backend(u64::try_from(bytes.len())?.saturating_add(64))?;
-    let cancellation = CancellationToken::default();
-    let context = backend.execution_context(
-        TensorStreamId::DEFAULT,
-        workspace_authority.authorize_workspace(0)?,
-        &cancellation,
-    );
-    let (waveform, _) = backend.upload_bytes(descriptor, &bytes, &context)?;
-    Ok(NativeStoredPayload::Audio(Arc::new(
-        NativeAudioPayload::checked(waveform, 48_000)?,
     )))
 }
 

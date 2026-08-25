@@ -8,8 +8,8 @@ use comfy_nodes::{
     NativeNodeContext, NativeNodeDescriptor, NativeNodeFailure, NativeNodeFailureKind,
     NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle, NativeOutputDescriptor,
     NativeOutputEffectRequest, NativeOutputNamespace, NativeOutputShape, NativePortCardinality,
-    NativePrimitive, NativeStoredPayload, NativeTypeUnion, NativeValue, NativeValueType,
-    native_plugin_source_type_projection,
+    NativePrimitive, NativeSourceValueClass, NativeStoredPayload, NativeTypeUnion, NativeValue,
+    NativeValueType, native_plugin_source_type_projection,
 };
 use comfy_plugin_sdk::{
     ArtifactValue, CachePolicy, DeterminismPolicy, EffectPolicy, ModelValue, PluginNode,
@@ -650,14 +650,17 @@ fn native_value_type(
     port: &PluginPort,
     family: ValueFamily,
 ) -> Result<NativeValueType, comfy_nodes::NativeNodeContractError> {
-    let value_type = native_plugin_source_type_projection(port.type_id.name())
-        .map_err(|error| {
-            comfy_nodes::NativeNodeContractError::InvalidSourceSchema(error.to_string())
-        })?
-        .value_type()
-        .map_err(|error| {
+    let projection =
+        native_plugin_source_type_projection(port.type_id.name()).map_err(|error| {
             comfy_nodes::NativeNodeContractError::InvalidSourceSchema(error.to_string())
         })?;
+    let value_type = if projection.value_class() == NativeSourceValueClass::SchemaScalar {
+        NativeValueType::NamedPreservedUnknown(projection.source_type().to_owned())
+    } else {
+        projection.value_type().map_err(|error| {
+            comfy_nodes::NativeNodeContractError::InvalidSourceSchema(error.to_string())
+        })?
+    };
     let representation_matches = match family {
         ValueFamily::Scalar => !matches!(value_type, NativeValueType::Handle(_)),
         ValueFamily::Tensor | ValueFamily::Artifact | ValueFamily::Model => {
