@@ -1334,12 +1334,16 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-zed-all-target-baseline-assertion-correction"
         ]
         self.assertEqual(
+            zed_baseline_correction["title"],
+            "Correct the Zed and collaboration all-target baselines",
+        )
+        self.assertEqual(
             zed_baseline_correction["dependencies"],
             ["comfy-parity-provider-component-host-stream-adapter"],
         )
         for baseline_outcome_gate in (
-            "two stale Zed test expectations and one redundant-clone lint baseline",
-            "without changing URL parsing, registered action behavior, or huddle rendering",
+            "two stale Zed test expectations, one redundant-clone lint baseline, and one test-support feature-coherence edge",
+            "without changing URL parsing, registered action behavior, remote connection behavior, or huddle rendering",
         ):
             self.assertIn(baseline_outcome_gate, zed_baseline_correction["outcome"])
         self.assertEqual(
@@ -1348,6 +1352,8 @@ class ValidationGenerationTests(unittest.TestCase):
                 "crates/zed/src/zed/open_listener.rs",
                 "crates/zed/src/zed.rs",
                 "crates/collab_ui/src/huddle.rs",
+                "crates/collab_ui/Cargo.toml",
+                "Cargo.lock",
             ],
         )
         for baseline_read in (
@@ -1355,6 +1361,11 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/zed/src/zed.rs",
             "crates/language_tools/src/language_tool_tree.rs",
             "crates/collab_ui/src/huddle.rs",
+            "crates/collab_ui/Cargo.toml",
+            "crates/remote_connection/Cargo.toml",
+            "crates/remote_connection/src/remote_connection.rs",
+            "Cargo.toml",
+            "Cargo.lock",
         ):
             self.assertIn(baseline_read, zed_baseline_correction["reads"])
         for baseline_gate in (
@@ -1365,6 +1376,12 @@ class ValidationGenerationTests(unittest.TestCase):
             "action registration",
             "without a redundant Arc clone",
             "huddle rendering",
+            "remote_connection/test-support",
+            "RemoteConnectionOptions::Mock remains exhaustively matched",
+            "without adding production mock behavior",
+            "Cargo.lock records only that collab_ui dev-graph edge",
+            "`remote_connection = { workspace = true, features = [\"test-support\"] }`",
+            "lists remote_connection in cargo-machete ignored solely because this direct dependency is a feature carrier",
         ):
             self.assertIn(baseline_gate, zed_baseline_correction["done"])
         baseline_validation = planning.task_validation_commands(zed_baseline_correction)
@@ -1373,6 +1390,13 @@ class ValidationGenerationTests(unittest.TestCase):
             "test_action_namespaces",
             "-p zed --features test-support --all-targets",
             "./script/clippy -p comfy_runtime -p comfy_plugin_host -p comfy_ui -p zed",
+            "cargo tree --locked -p collab_ui -e features -i remote_connection",
+            "cargo metadata --locked --format-version 1",
+            "cargo check --locked -p remote_connection --no-default-features",
+            "cargo check --locked -p collab_ui --all-targets",
+            "cargo test --locked -p collab_ui --features test-support --all-targets",
+            "cargo test --locked -p collab_ui --all-targets",
+            "./script/clippy -p comfy_runtime -p comfy_plugin_host -p comfy_ui -p zed -p collab_ui",
         ):
             self.assertIn(baseline_command, baseline_validation)
         self.assertEqual(

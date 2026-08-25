@@ -11027,22 +11027,29 @@ def provider_component_foundation_tasks(
     )
     append_shared(
         "comfy-parity-zed-all-target-baseline-assertion-correction",
-        "Correct the Zed all-target baseline assertions",
-        "Repair two stale Zed test expectations and one redundant-clone lint baseline so the provider bootstrap and later native execution leaves retain executable all-target and Clippy validation boundaries without changing URL parsing, registered action behavior, or huddle rendering.",
+        "Correct the Zed and collaboration all-target baselines",
+        "Repair two stale Zed test expectations, one redundant-clone lint baseline, and one test-support feature-coherence edge so the provider bootstrap and later native execution leaves retain executable all-target and Clippy validation boundaries without changing URL parsing, registered action behavior, remote connection behavior, or huddle rendering.",
         [
             "crates/zed/src/zed/open_listener.rs",
             "crates/zed/src/zed.rs",
             "crates/language_tools/src/language_tool_tree.rs",
             "crates/collab_ui/src/huddle.rs",
+            "crates/collab_ui/Cargo.toml",
+            "crates/remote_connection/Cargo.toml",
+            "crates/remote_connection/src/remote_connection.rs",
+            "Cargo.toml",
+            "Cargo.lock",
         ],
         [
             "crates/zed/src/zed/open_listener.rs",
             "crates/zed/src/zed.rs",
             "crates/collab_ui/src/huddle.rs",
+            "crates/collab_ui/Cargo.toml",
+            "Cargo.lock",
         ],
-        "The percent-decoded Git clone test expects the exact input repository URL returned by the existing parser, including the sim.git repository name, the exhaustive action-namespace test includes the already registered language_tool_tree namespace in sorted order, and the native huddle view consumes its already-owned optional snapshot without a redundant Arc clone. Focused differentials prove no clone URL rewriting, action registration, huddle rendering, dispatch, provider, runtime, or production behavior changes; the complete Zed test-support all-target suite and the provider bootstrap's scoped Clippy boundary are green.",
+        "The percent-decoded Git clone test expects the exact input repository URL returned by the existing parser, including the sim.git repository name, the exhaustive action-namespace test includes the already registered language_tool_tree namespace in sorted order, and the native huddle view consumes its already-owned optional snapshot without a redundant Arc clone. The collab_ui all-target dev graph declares `remote_connection = { workspace = true, features = [\"test-support\"] }` under dev-dependencies and lists remote_connection in cargo-machete ignored solely because this direct dependency is a feature carrier. That edge activates remote_connection/test-support alongside the already unified remote/test-support feature, so RemoteConnectionOptions::Mock remains exhaustively matched without adding production mock behavior or changing the remote connection enum, parser, modal equations, or normal dependency graph. Cargo.lock records only that collab_ui dev-graph edge. Focused differentials prove no clone URL rewriting, action registration, huddle rendering, dispatch, provider, runtime, remote connection, or production behavior changes; the complete Zed and collab_ui all-target suites and the provider bootstrap's scoped Clippy boundary are green.",
         ["zed"],
-        validation_packages=["zed"],
+        validation_packages=["zed", "collab_ui"],
     )
     append_shared(
         "comfy-parity-provider-controller-owned-worker-bridge-bootstrap",
@@ -21425,10 +21432,15 @@ def task_validation_commands(item: dict[str, object]) -> str:
     if identifier == "comfy-parity-zed-all-target-baseline-assertion-correction":
         commands.extend([
             "cargo fmt --all -- --check",
+            "cargo tree --locked -p collab_ui -e features -i remote_connection",
+            "cargo metadata --locked --format-version 1",
+            "cargo check --locked -p remote_connection --no-default-features",
+            "cargo check --locked -p collab_ui --all-targets",
+            "cargo test --locked -p collab_ui --features test-support --all-targets",
             "cargo test --locked -p zed --features test-support test_parse_git_clone_url_with_encoding -- --nocapture",
             "cargo test --locked -p zed --features test-support test_action_namespaces -- --nocapture",
             "cargo test --locked -p zed --features test-support --all-targets",
-            "./script/clippy -p comfy_runtime -p comfy_plugin_host -p comfy_ui -p zed",
+            "./script/clippy -p comfy_runtime -p comfy_plugin_host -p comfy_ui -p zed -p collab_ui",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
