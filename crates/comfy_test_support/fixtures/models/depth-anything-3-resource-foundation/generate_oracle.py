@@ -13,6 +13,7 @@ from source_graph import (
     execute_dpt,
     execute_dpt_resized,
     execute_dualdpt,
+    fatan,
     make_state,
     manifest,
     preprocess,
@@ -343,6 +344,7 @@ def document():
     height, width = 4, 8
     fx = fdiv(width / 2.0, max(f32(math.tan(fdiv(fov_width, 2.0))), f32(1.0e-6)))
     fy = fdiv(height / 2.0, max(f32(math.tan(fdiv(fov_height, 2.0))), f32(1.0e-6)))
+    atanf_input = fdiv(2.0, 2.25)
     dpt_depth, _, dpt_sky, _, _ = execute_dpt(values)
     nonsquare_values = [f32(((index * 11 + 3) % 29) / 28.0) for index in range(2 * 4 * 3)]
     nonsquare_cases = {}
@@ -490,6 +492,11 @@ def document():
             "width": width,
             "fov_bits": [bits(fov_height), bits(fov_width)],
             "intrinsics_diagonal_bits": [bits(fx), bits(fy), bits(1.0)],
+            "atanf_discriminator": {
+                "input_bits": bits(atanf_input),
+                "output_bits": bits(fatan(atanf_input)),
+                "python_double_cast_bits": bits(f32(math.atan(atanf_input))),
+            },
         },
         "reduced_dpt": {
             "depth": tensor_document(dpt_depth),

@@ -1603,6 +1603,14 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
             Some(source_graph_sha256.as_str())
         );
     }
+    assert_eq!(
+        provenance
+            .get("transcendental_boundary")
+            .and_then(serde_json::Value::as_str),
+        Some(
+            "F32 atan oracle bits call the pinned macOS host libc atanf through Python ctypes; they are not claimed portable to another libc or platform."
+        )
+    );
     let expected_sources = BTreeMap::from([
         (
             "projects/comfy/ComfyUI/comfy_extras/nodes_depth_anything_3.py",
@@ -2160,7 +2168,8 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
                 oracle
                     .pointer(pointer)
                     .ok_or_else(|| format!("missing DA3 supplied-camera oracle {pointer}"))?,
-            )?
+            )?,
+            "{pointer}: supplied-camera output diverged"
         );
     }
 

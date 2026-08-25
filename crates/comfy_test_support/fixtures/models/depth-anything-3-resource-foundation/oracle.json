@@ -105,6 +105,11 @@
     }
   },
   "camera_projection": {
+    "atanf_discriminator": {
+      "input_bits": 1063489081,
+      "output_bits": 1060767035,
+      "python_double_cast_bits": 1060767036
+    },
     "fov_bits": [
       1061158912,
       1065353216
@@ -13032,7 +13037,7 @@
       "delta_bits": 1048576000,
       "execution": "camera",
       "lane": 0,
-      "output_identity_sha256": "a7165447a9921b072225da129f4a1db1f20b4922570ce4a00b5178b26a5abadd",
+      "output_identity_sha256": "f22039eb640a4784a5e50cb5b518c860f328f014f2326ce28780859c863e195e",
       "state_key": "native.cam_enc.pose_branch.fc1.weight"
     },
     "dual_global_attention": {
@@ -15253,17 +15258,17 @@
           1065353216,
           865382613,
           1065353216,
-          866687019,
-          2984905893,
-          3013615319,
-          3014170667,
+          866687035,
+          2984906051,
+          3013615344,
+          3014170683,
           1065353216,
-          2999373141,
-          860596919,
-          837422241,
-          851889493,
+          2999373194,
+          860596938,
+          837422399,
+          851889546,
           1065353216,
-          843500886,
+          843500939,
           1065353216,
           893907637,
           3020906299,
@@ -15277,7 +15282,7 @@
           1065353216,
           873901073
         ],
-        "raw_f32_sha256": "40960c94a930d3c5c957373eeb97bd4f5259a75a80fd6fe9410a55078b3acb28",
+        "raw_f32_sha256": "76345baec2fb39555f4ace1ec11e4b819987e5f172fc5f22c9d5a64918a29433",
         "shape": [
           1,
           3,
@@ -15442,7 +15447,7 @@
         4
       ]
     },
-    "supplied_camera_output_identity_sha256": "548e8fe9c70d9e398a2563253e869a877e8f3b9c15d83c0b4d88fc2b2f82a7c8"
+    "supplied_camera_output_identity_sha256": "28515c74a5d2d98919f5a9ced1d7c0f8ae0bb7413bea2cf0e0484b8b24ec0aee"
   },
   "reference_fixture": {
     "balanced_scores_bits": [
@@ -15538,7 +15543,7 @@
     1068042232,
     1069789858
   ],
-  "source_graph_sha256": "33baee5eaa6892b69392c28ff09b77710faae80af1d5d1156cff64cd9d12cbe0",
+  "source_graph_sha256": "844f23f7de9cded2721390c29ba00f6fbec5f29e172c5a2bb1691a300bc47491",
   "storage_projection": {
     "bf16_projected_bits": [
       0,

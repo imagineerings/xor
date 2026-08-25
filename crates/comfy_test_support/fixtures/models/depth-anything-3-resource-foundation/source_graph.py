@@ -1,5 +1,11 @@
+import ctypes
 import math
 import struct
+
+
+LIBC = ctypes.CDLL(None)
+LIBC.atanf.argtypes = [ctypes.c_float]
+LIBC.atanf.restype = ctypes.c_float
 
 
 def f32(value):
@@ -24,6 +30,10 @@ def fmadd(left, right, addend):
 
 def fdiv(left, right):
     return f32(f32(left) / f32(right))
+
+
+def fatan(value):
+    return f32(LIBC.atanf(ctypes.c_float(f32(value))))
 
 
 def project_storage(value, source_dtype):
@@ -970,8 +980,8 @@ def encode_camera(state, extrinsics, intrinsics, height, width):
             rotation = [inverse.get(batch_index, view, row, column) for row in range(3) for column in range(3)]
             pose_values.extend(inverse.get(batch_index, view, row, 3) for row in range(3))
             pose_values.extend(rotation_to_quaternion(rotation))
-            pose_values.append(fmul(2.0, f32(math.atan(fdiv(height / 2.0, intrinsics.get(batch_index, view, 1, 1))))))
-            pose_values.append(fmul(2.0, f32(math.atan(fdiv(width / 2.0, intrinsics.get(batch_index, view, 0, 0))))))
+            pose_values.append(fmul(2.0, fatan(fdiv(height / 2.0, intrinsics.get(batch_index, view, 1, 1)))))
+            pose_values.append(fmul(2.0, fatan(fdiv(width / 2.0, intrinsics.get(batch_index, view, 0, 0)))))
     values = Tensor((batch, views, 9), pose_values)
     values = linear_state(state, values, "native.cam_enc.pose_branch.fc1")
     values = gelu(values)

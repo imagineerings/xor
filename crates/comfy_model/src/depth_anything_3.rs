@@ -5546,6 +5546,38 @@ mod tests {
     }
 
     #[test]
+    fn camera_field_of_view_uses_the_f32_atan_boundary() -> Result<(), Box<dyn std::error::Error>> {
+        let oracle: serde_json::Value = serde_json::from_str(include_str!(
+            "../../comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/oracle.json"
+        ))?;
+        let discriminator = oracle
+            .pointer("/camera_projection/atanf_discriminator")
+            .ok_or("DA3 atanf discriminator is missing")?;
+        let input = f32::from_bits(u32::try_from(
+            discriminator
+                .get("input_bits")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or("DA3 atanf input bits are missing")?,
+        )?);
+        let expected = u32::try_from(
+            discriminator
+                .get("output_bits")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or("DA3 atanf output bits are missing")?,
+        )?;
+        let double_cast = u32::try_from(
+            discriminator
+                .get("python_double_cast_bits")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or("DA3 double atanf output bits are missing")?,
+        )?;
+
+        assert_eq!(input.atan().to_bits(), expected);
+        assert_ne!(expected, double_cast);
+        Ok(())
+    }
+
+    #[test]
     fn reduced_da3_storage_projection_and_dpt_execution_are_checked()
     -> Result<(), Box<dyn std::error::Error>> {
         let workspace_bytes = 128 * 1024 * 1024;
