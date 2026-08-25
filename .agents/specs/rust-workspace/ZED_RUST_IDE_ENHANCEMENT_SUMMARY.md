@@ -65,7 +65,7 @@ Highest direct daily-user value: developers gain test hierarchy, status, duratio
 
 ## Detailed specifications
 
-- [Research and comparison matrix](.agents/specs/zed-rust-development-environment/research.md)
-- [Requirements](.agents/specs/zed-rust-development-environment/requirements.md)
-- [Architecture/design](.agents/specs/zed-rust-development-environment/design.md)
-- [Sequenced implementation tasks](.agents/specs/zed-rust-development-environment/tasks.md)
+- [Research and comparison matrix](research.md)
+- [Specification catalog](README.md)
+- [Architecture/design](design.md)
+- [Sequenced implementation tasks](tasks.md)
