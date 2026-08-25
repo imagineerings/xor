@@ -3684,7 +3684,8 @@ fn affine_inverse_3x4(
         context,
     )?;
     let inverse_translation_values = tensor_values(&inverse_translations, context.cancellation)?;
-    let inverse_rotation_values = tensor_values(&inverse_rotations, context.cancellation)?;
+    let inverse_rotation_values =
+        tensor_to_f32_with_context_exact_native(backend, &inverse_rotations, context)?;
     let mut output = filled_f32(count * 12, 0.0)?;
     for index in 0..count {
         context.check()?;
@@ -5509,6 +5510,40 @@ fn usize_from(value: u64) -> Result<usize, NativeDepthAnything3Error> {
 mod tests {
     use super::*;
     use comfy_tensor::{CpuWorkspaceAuthority, RetryRngPolicy, RngStreamAddress};
+
+    #[test]
+    fn affine_inverse_materializes_the_transposed_rotation_view()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let workspace_bytes = 1024 * 1024;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(workspace_bytes)?;
+        let cancellation = CancellationToken::default();
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(workspace_bytes)?,
+            &cancellation,
+        );
+        let affine = tensor_from_f32_with_context_exact_native(
+            &backend,
+            &[1, 1, 3, 4],
+            &[
+                1.0, 2.0, 3.0, 10.0, 4.0, 5.0, 6.0, 11.0, 7.0, 8.0, 9.0, 12.0,
+            ],
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )?;
+
+        let inverse = affine_inverse_3x4(&backend, &affine, &context)?;
+
+        assert_eq!(inverse.descriptor().shape(), &[1, 1, 3, 4]);
+        assert_eq!(
+            tensor_to_f32_with_context_exact_native(&backend, &inverse, &context)?,
+            [
+                1.0, 4.0, 7.0, -138.0, 2.0, 5.0, 8.0, -171.0, 3.0, 6.0, 9.0, -204.0,
+            ]
+        );
+        Ok(())
+    }
 
     #[test]
     fn reduced_da3_storage_projection_and_dpt_execution_are_checked()

@@ -2108,21 +2108,25 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
     };
     let camera_extrinsics = oracle_tensor("/camera_inputs/extrinsics/bits", &[1, 3, 3, 4])?;
     let camera_intrinsics = oracle_tensor("/camera_inputs/intrinsics/bits", &[1, 3, 3, 3])?;
-    let supplied_camera_geometry = dual.execute(
-        &backend,
-        NativeDepthAnything3Invocation {
-            image: &multiview,
-            views_per_sample: 3,
-            process_resolution: 4,
-            resize_method: NativeDepthAnything3ResizeMethod::LowerBound,
-            reference_strategy: NativeDepthAnything3ReferenceStrategy::SaddleSimRange,
-            use_ray_pose: false,
-            ransac_seed: 17,
-            extrinsics: Some(&camera_extrinsics),
-            intrinsics: Some(&camera_intrinsics),
-        },
-        &context,
-    )?;
+    let supplied_camera_geometry = dual
+        .execute(
+            &backend,
+            NativeDepthAnything3Invocation {
+                image: &multiview,
+                views_per_sample: 3,
+                process_resolution: 4,
+                resize_method: NativeDepthAnything3ResizeMethod::LowerBound,
+                reference_strategy: NativeDepthAnything3ReferenceStrategy::SaddleSimRange,
+                use_ray_pose: false,
+                ransac_seed: 17,
+                extrinsics: Some(&camera_extrinsics),
+                intrinsics: Some(&camera_intrinsics),
+            },
+            &context,
+        )
+        .map_err(|error| -> Box<dyn Error> {
+            format!("DA3 supplied-camera execution failed: {error}").into()
+        })?;
     for (actual, pointer) in [
         (
             &supplied_camera_geometry.depth,
