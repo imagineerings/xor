@@ -99,7 +99,7 @@ impl CanonicalOutboxMirrorItem {
         self.payload_hash
     }
 
-    fn receipt(&self) -> LegacyMirrorReceipt {
+    pub fn expected_receipt(&self) -> LegacyMirrorReceipt {
         LegacyMirrorReceipt {
             aggregate: self.aggregate,
             outbox_sequence: self.outbox_sequence,
@@ -235,7 +235,7 @@ where
         item: CanonicalOutboxMirrorItem,
     ) -> Result<LegacyMirrorOutcome, LegacyMirrorError> {
         validate_boundary(tenant, checkpoint, &item)?;
-        let expected_receipt = item.receipt();
+        let expected_receipt = item.expected_receipt();
         match self.writer.apply_canonical(tenant, &item).await {
             Ok(LegacyProjectionApplyOutcome::Applied(receipt)) => {
                 validate_receipt(&expected_receipt, &receipt)?;
@@ -493,7 +493,7 @@ mod tests {
                 return Err(LegacyProjectionWriteError::Unavailable);
             }
             if let Some(receipt) = state.receipts.get(&item.operation_id()) {
-                return if receipt == &item.receipt() {
+                return if receipt == &item.expected_receipt() {
                     Ok(LegacyProjectionApplyOutcome::AlreadyApplied(
                         receipt.clone(),
                     ))
@@ -513,7 +513,7 @@ mod tests {
                     last_applied_version: state.current_version,
                 });
             }
-            let receipt = item.receipt();
+            let receipt = item.expected_receipt();
             state.current_version = Some(item.authoritative_version());
             state.receipts.insert(item.operation_id(), receipt.clone());
             state.writes = state
