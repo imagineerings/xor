@@ -3513,7 +3513,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 44. Consolidate deployment, configuration and release pipelines
 
-  - [ ] 44.1. Define canonical collaboration service configuration
+  - [x] 44.1. Define canonical collaboration service configuration
     - Translate ADR-001 endpoints, database, Redis, object, Git, push, pair and mesh settings with validation/redaction.
     - _Requirements: 19.2, 19.4_
     - _Capability IDs: CAP-003, CAP-043_
@@ -3521,6 +3521,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/deploy/**, crates/collab/src/main.rs, .agents/specs/collaborative-workspace/decisions/adr-001-service-topology.md_
     - _Writes: crates/collab/src/collaboration_config.rs_
     - _Validation: config tests cover valid, missing secret, incompatible feature and redacted diagnostic_
+    - _Discovered contradiction (2026-08-25): the planned single-file write is not compiled or testable until Collab's library registers the module, and the current `main.rs` still deserializes its established runtime `Config` directly. The narrow correction adds only the required `lib.rs` registration and typed future deployment boundary; it does not switch serving startup, accept legacy `BUZZ_*` aliases, read a second database, run migrations, initialize clients or claim task 44.2's deployment binding._
+    - _Evidence: 2026-08-25 — added canonical environment parsing for the public endpoint, replica count, one secret Postgres writer plus optional reader, optional Redis, mandatory S3-compatible object settings, absolute Git workspace and hook secret, optional push gateway, optional NIP-AB relay and optional relay mesh. HTTPS/WSS is required outside loopback; identifiers, bucket, booleans, replica count and at most 32 unique mesh peers are bounded. Multi-replica Git requires its hook secret, mesh requires at least two replicas plus Redis/trust/peers and disabled features reject leftover settings. Four focused tests passed the complete valid topology, missing object secret, incompatible single-replica mesh and debug/error redaction canaries. `cargo check -p collab --lib`, the registered Collab unit suite and an exact-source warning-denied release/all-target Clippy harness passed; the disposable harness was removed. The repository wrapper was also attempted but exhausted disk while compiling unrelated AWS/media release dependencies before reaching this leaf, and its incomplete 607.8 MiB release output was removed. All 28 frozen client contracts, complete inventory, dependency, Rust formatting, diff and canonical specification gates passed._
 
   - [ ] 44.2. Consolidate local and Compose environments
     - Add canonical service dependencies, health ordering, volumes and rollback selection for development/self-hosting.
