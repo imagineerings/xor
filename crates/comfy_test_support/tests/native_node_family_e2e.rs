@@ -1508,20 +1508,6 @@ fn assert_depth_anything_3_checkpoint_projection(
             .and_then(serde_json::Value::as_u64)
             .ok_or("DA3 checkpoint projection key count is missing")?
     );
-    assert_eq!(
-        actual.source_sha256,
-        expected
-            .get("source_sha256")
-            .and_then(serde_json::Value::as_str)
-            .ok_or("DA3 checkpoint source digest is missing")?
-    );
-    assert_eq!(
-        actual.projected_f32_sha256,
-        expected
-            .get("projected_f32_sha256")
-            .and_then(serde_json::Value::as_str)
-            .ok_or("DA3 projected checkpoint digest is missing")?
-    );
     let expected_states = expected
         .get("states")
         .and_then(serde_json::Value::as_array)
@@ -1562,6 +1548,20 @@ fn assert_depth_anything_3_checkpoint_projection(
                 .ok_or("DA3 checkpoint state projected digest is missing")?
         );
     }
+    assert_eq!(
+        actual.source_sha256,
+        expected
+            .get("source_sha256")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("DA3 checkpoint source digest is missing")?
+    );
+    assert_eq!(
+        actual.projected_f32_sha256,
+        expected
+            .get("projected_f32_sha256")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("DA3 projected checkpoint digest is missing")?
+    );
     Ok(())
 }
 

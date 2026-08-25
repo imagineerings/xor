@@ -95,7 +95,8 @@ def state_values(state_index, count, key):
         elif key.endswith(".bias"):
             value = 0.0
         else:
-            value = (((state_index * 17 + value_index * 13) % 29) - 14) * 0.0025
+            lane = ((state_index * 17 + value_index * 13) % 29) - 14
+            value = fmul(f32(lane), f32(0.0025))
         values.append(f32(value))
     if key == "native.cam_dec.fc_qvec.bias":
         values[3] = f32(1.0)
