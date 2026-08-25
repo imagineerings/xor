@@ -2,7 +2,7 @@
   "f32_rule": "Every source f32 primitive is rounded with IEEE-754 little-endian pack/unpack; convolution, linear, interpolation, and deform accumulation use fused f32 multiply-add where the canonical source owner does. Transcendental results are bit-pinned to the recorded CPython/libm platform.",
   "format": "zed.comfy.background-removal-reduced-oracle.v1",
   "generator_command": "PYTHONDONTWRITEBYTECODE=1 python3 crates/comfy_test_support/fixtures/models/background-removal-resource-foundation/generate_oracle.py",
-  "generator_sha256": "03859ce08f07b0e3f54b8b1a1cd80f8b3840979f271c4f1794921e5877547bf9",
+  "generator_sha256": "097a5411d3c79e8b996fc058c113cc16ce27696839c006d66b4f75d260794921",
   "input_shape": [
     1,
     3,

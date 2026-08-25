@@ -66,7 +66,7 @@ impl ImageColorKind {
         match self {
             Self::RgbToYuv => "Image RGB to YUV",
             Self::YuvToRgb => "Image YUV to RGB",
-            Self::Normalize => "NormalizeImages",
+            Self::Normalize => "Normalize Image Colors",
         }
     }
 
@@ -830,7 +830,7 @@ mod tests {
             .iter()
             .find(|binding| binding.descriptor().class_type == "NormalizeImages")
             .ok_or("NormalizeImages binding is absent")?;
-        assert_eq!(normalize.presentation().display_name, "NormalizeImages");
+        assert_eq!(normalize.presentation().display_name, "Normalize Image Colors");
         assert_eq!(normalize.presentation().category, CATEGORY);
         assert_eq!(
             normalize.presentation().search_aliases,

@@ -1216,7 +1216,7 @@ fn upload_i64_tensor(
 ) -> Result<Tensor, NativeBackgroundRemovalError> {
     let mut bytes = Vec::new();
     bytes
-        .try_reserve_exact(values.len() * std::mem::size_of::<i64>())
+        .try_reserve_exact(std::mem::size_of_val(values))
         .map_err(|_| NativeBackgroundRemovalError::Allocation)?;
     for (index, value) in values.iter().enumerate() {
         if index.is_multiple_of(8_192) {
@@ -1437,13 +1437,13 @@ fn resident_state_bytes(
     state: &BTreeMap<String, Tensor>,
     cancellation: &CancellationToken,
 ) -> Result<u64, NativeBackgroundRemovalError> {
-    Ok(resident_tensor_allocations(state, cancellation)?
+    resident_tensor_allocations(state, cancellation)?
         .into_iter()
         .try_fold(0_u64, |total, (_, bytes)| {
             total
                 .checked_add(bytes)
                 .ok_or(NativeBackgroundRemovalError::ShapeOverflow)
-        })?)
+        })
 }
 
 fn resident_tensor_allocations(
@@ -3476,7 +3476,7 @@ mod tests {
             DeviceId::CPU,
             &context,
         )?;
-        let source_order = project_masks(&backend, &[logits.clone()], 3, 3, &context)?;
+        let source_order = project_masks(&backend, std::slice::from_ref(&logits), 3, 3, &context)?;
         let sigmoid_first = sigmoid_with_context_exact_native(&backend, &logits, &context)?;
         let resized_after_sigmoid = interpolate_tensor_with_context_exact_native(
             &backend,

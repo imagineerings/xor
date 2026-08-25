@@ -3760,7 +3760,8 @@ struct GeneralVideoCodecSourceDto {
     archive_sha256: String,
     signature_sha256: String,
     signing_key_fingerprint: String,
-    signature_verified: bool,
+    #[serde(rename = "signature_verified")]
+    reviewed_release_signature: bool,
     headers: BTreeMap<String, GeneralVideoCodecHeaderDto>,
 }
 
@@ -3808,7 +3809,8 @@ struct GeneralVideoCodecLibraryDto {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct GeneralVideoCodecClaimsDto {
-    official_release_signature_verified: bool,
+    #[serde(rename = "official_release_signature_verified")]
+    reviewed_official_release_signature: bool,
     reviewed_typed_declarations: bool,
     installed_ffmpeg_package: bool,
     loadable_native_library: bool,
@@ -3933,7 +3935,7 @@ fn validate_general_video_codec_abi(
         || source.signature_sha256
             != "9bd1689dce76b109034dcc4765a406e84e8799a2fd857b000c0a4d9744b70617"
         || source.signing_key_fingerprint != "FCF986EA15E6E293A5644F10B4322F04D67658D8"
-        || !source.signature_verified
+        || !source.reviewed_release_signature
         || compiler.compiler != "gcc 15.2.0"
         || compiler.compiler_target != "x86_64-linux-gnu"
         || compiler.oci_index_sha256
@@ -3954,7 +3956,7 @@ fn validate_general_video_codec_abi(
         || contract.runtime_loading
         || contract.runtime_symbol_resolution
         || contract.runtime_function_invocation
-        || !claims.official_release_signature_verified
+        || !claims.reviewed_official_release_signature
         || !claims.reviewed_typed_declarations
         || claims.installed_ffmpeg_package
         || claims.loadable_native_library

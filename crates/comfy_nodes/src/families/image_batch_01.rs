@@ -98,14 +98,14 @@ impl BatchKind {
         match self {
             Self::BatchImages => "Batch Images",
             Self::ImageBatch => "Batch Images (DEPRECATED)",
-            Self::Deduplicate => "ImageDeduplication",
+            Self::Deduplicate => "Deduplicate Images",
             Self::FromBatch => "Get Image from Batch",
-            Self::Grid => "ImageGrid",
+            Self::Grid => "Make Image Grid",
             Self::MergeTiles => "Merge List of Tiles to Image",
-            Self::MergeLists => "MergeImageLists",
+            Self::MergeLists => "Merge Image Lists (DEPRECATED)",
             Self::Rebatch => "Rebatch Images",
             Self::Repeat => "Repeat Image Batch",
-            Self::Shuffle => "ShuffleDataset",
+            Self::Shuffle => "Shuffle Images List",
         }
     }
 

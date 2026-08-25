@@ -51,7 +51,7 @@ def raw_f32_sha256(values):
     return hashlib.sha256(b"".join(struct.pack("<f", value) for value in values)).hexdigest()
 
 
-class Tensor:
+class OracleTensor:
     def __init__(self, shape, values):
         self.shape = tuple(shape)
         count = math.prod(shape)
@@ -124,7 +124,7 @@ def conv2d(tensor, prefix, output_channels, kernel, stride=1, padding=0, bias=Tr
                                 matrix_index = (((output_channel * input_channels + input_channel) * kernel + kernel_y) * kernel + kernel_x)
                                 value = fma32(source, matrix[matrix_index], value)
                     output[tensor_index([batch, output_channels, output_height, output_width], [batch_index, output_channel, output_y, output_x])] = value
-    return Tensor([batch, output_channels, output_height, output_width], output)
+    return OracleTensor([batch, output_channels, output_height, output_width], output)
 
 
 def linear(values, rows, input_width, prefix, output_width, bias=True):
@@ -196,20 +196,20 @@ def batch_norm(tensor, prefix):
                     index = tensor_index(tensor.shape, [batch_index, channel, y, x])
                     normalized = mul32(add32(tensor.values[index], -means[channel]), inverse)
                     output[index] = add32(mul32(normalized, scales[channel]), offsets[channel])
-    return Tensor(tensor.shape, output)
+    return OracleTensor(tensor.shape, output)
 
 
 def relu(tensor):
-    return Tensor(tensor.shape, [max(value, 0.0) for value in tensor.values])
+    return OracleTensor(tensor.shape, [max(value, 0.0) for value in tensor.values])
 
 
 def sigmoid(tensor, scale=1.0):
-    return Tensor(tensor.shape, [mul32(sigmoid_scalar(value), scale) for value in tensor.values])
+    return OracleTensor(tensor.shape, [mul32(sigmoid_scalar(value), scale) for value in tensor.values])
 
 
 def add_tensors(left, right):
     assert left.shape == right.shape
-    return Tensor(left.shape, [add32(a, b) for a, b in zip(left.values, right.values)])
+    return OracleTensor(left.shape, [add32(a, b) for a, b in zip(left.values, right.values)])
 
 
 def multiply_tensors(left, right):
@@ -227,7 +227,7 @@ def multiply_tensors(left, right):
                         values.append(mul32(left.values[left_index], right.values[right_index]))
     else:
         raise ValueError("unsupported broadcast")
-    return Tensor(left.shape, values)
+    return OracleTensor(left.shape, values)
 
 
 def concat_channels(tensors):
@@ -240,7 +240,7 @@ def concat_channels(tensors):
                 for y in range(height):
                     for x in range(width):
                         output.append(tensor.values[tensor_index(tensor.shape, [batch_index, channel, y, x])])
-    return Tensor([batch, output_channels, height, width], output)
+    return OracleTensor([batch, output_channels, height, width], output)
 
 
 def cubic_weight(distance):
@@ -306,7 +306,7 @@ def resize(tensor, output_height, output_width, mode, align_corners=False, antia
                             source = tensor.values[tensor_index(tensor.shape, [batch_index, channel, source_y, source_x])]
                             value = fma32(source, mul32(y_weight, x_weight), value)
                     output[tensor_index([batch, channels, output_height, output_width], [batch_index, channel, y, x])] = value
-    return Tensor([batch, channels, output_height, output_width], output)
+    return OracleTensor([batch, channels, output_height, output_width], output)
 
 
 def preprocess(rgba):
@@ -317,14 +317,14 @@ def preprocess(rgba):
     for channel in range(3):
         for pixel in range(15):
             nchw.append(rgb[pixel * 3 + channel])
-    tensor = resize(Tensor([1, 3, 3, 5], nchw), 8, 8, "bicubic", False, True)
+    tensor = resize(OracleTensor([1, 3, 3, 5], nchw), 8, 8, "bicubic", False, True)
     values = []
     for value in tensor.values:
         scaled = mul32(value, 255.0)
         clipped = min(max(scaled, 0.0), 255.0)
         rounded = f32(round(clipped))
         values.append(f32(rounded / f32(255.0)))
-    return Tensor(tensor.shape, values)
+    return OracleTensor(tensor.shape, values)
 
 
 def nchw_to_tokens(tensor):
@@ -340,7 +340,7 @@ def tokens_to_nchw(values, batch, height, width, channels):
             for x in range(width):
                 for c in range(channels):
                     output[tensor_index(shape, [b, c, y, x])] = values[((b * height + y) * width + x) * channels + c]
-    return Tensor(shape, output)
+    return OracleTensor(shape, output)
 
 
 def roll(tensor, shift):
@@ -353,7 +353,7 @@ def roll(tensor, shift):
                     destination = tensor_index(tensor.shape, [b, c, y, x])
                     source = tensor_index(tensor.shape, [b, c, (y - shift) % height, (x - shift) % width])
                     output[destination] = tensor.values[source]
-    return Tensor(tensor.shape, output)
+    return OracleTensor(tensor.shape, output)
 
 
 def relative_indices(window):
@@ -388,7 +388,7 @@ def attention(values, height, width, layer, block, channels, heads):
             for y in range(height):
                 for x in range(width):
                     padded[tensor_index([1, channels, padded_height, padded_width], [0, c, y, x])] = tensor.values[tensor_index(tensor.shape, [0, c, y, x])]
-        tensor = Tensor([1, channels, padded_height, padded_width], padded)
+        tensor = OracleTensor([1, channels, padded_height, padded_width], padded)
     if shift:
         tensor = roll(tensor, -shift)
     padded = nchw_to_tokens(tensor)
@@ -480,7 +480,7 @@ def attention(values, height, width, layer, block, channels, heads):
         for y in range(height):
             for x in range(width):
                 cropped.append(reversed_tensor.values[tensor_index(reversed_tensor.shape, [0, c, y, x])])
-    residual = add_tensors(tokens_to_nchw(values, 1, height, width, channels), Tensor([1, channels, height, width], cropped))
+    residual = add_tensors(tokens_to_nchw(values, 1, height, width, channels), OracleTensor([1, channels, height, width], cropped))
     residual_values = nchw_to_tokens(residual)
     hidden = layer_norm(residual_values, channels, prefix + ".norm2")
     hidden = linear(hidden, height * width, channels, prefix + ".mlp.fc1", channels * 4)
@@ -530,7 +530,7 @@ def adaptive_average(tensor):
                 for x in range(width):
                     total = add32(total, tensor.values[tensor_index(tensor.shape, [b, c, y, x])])
             output.append(f32(total / f32(height * width)))
-    return Tensor([batch, channels, 1, 1], output)
+    return OracleTensor([batch, channels, 1, 1], output)
 
 
 def bilinear_samples(height, width, y, x):
@@ -573,7 +573,7 @@ def deform_conv(tensor, offset, mask, prefix, output_channels, kernel, padding):
                                 matrix_index = (((output_channel * input_channels + input_channel) * kernel + kernel_y) * kernel + kernel_x)
                                 value = fma32(mul32(sample, modulation), matrix[matrix_index], value)
                     output[tensor_index([batch, output_channels, height, width], [b, output_channel, output_y, output_x])] = value
-    return Tensor([batch, output_channels, height, width], output)
+    return OracleTensor([batch, output_channels, height, width], output)
 
 
 def deformable_branch(tensor, prefix, kernel):
@@ -609,7 +609,7 @@ def split_patches(image, target_height, target_width):
                 for y in range(target_height):
                     for x in range(target_width):
                         values.append(image.values[tensor_index(image.shape, [0, channel, row * target_height + y, column * target_width + x])])
-            patches.append(Tensor([1, channels, target_height, target_width], values))
+            patches.append(OracleTensor([1, channels, target_height, target_width], values))
     return concat_channels(patches)
 
 

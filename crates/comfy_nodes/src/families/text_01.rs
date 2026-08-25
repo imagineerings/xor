@@ -84,14 +84,14 @@ impl TextKind {
 
     const fn display_name(self) -> &'static str {
         match self {
-            Self::AddPrefix => "AddTextPrefix",
-            Self::AddSuffix => "AddTextSuffix",
+            Self::AddPrefix => "Add Text Prefix (DEPRECATED)",
+            Self::AddSuffix => "Add Text Suffix (DEPRECATED)",
             Self::BuildIdeogramPrompt => "Build JSON Prompt (Ideogram)",
             Self::CaseConverter => "Convert Text Case",
             Self::ArrayToString => "Convert Array to String",
             Self::DictionaryToString => "Convert Dictionary to String",
             Self::JsonExtractString => "Extract Text from JSON",
-            Self::MergeTextLists => "MergeTextLists",
+            Self::MergeTextLists => "Merge Text Lists (DEPRECATED)",
             Self::RegexExtract => "Extract Text",
             Self::RegexMatch => "Match Text",
         }

@@ -736,14 +736,15 @@ mod activation_preflight_tests {
         assert!(capsule.contains("let lease = host.begin_invocation_lease"));
         assert!(capsule.contains("let generation = host.verified_generation"));
         assert!(capsule.contains("let deployment = generation.worker_deployment_plan"));
-        assert!(capsule.contains("plugin.manifest().nodes.iter().any"));
+        let compact_capsule = capsule.split_whitespace().collect::<String>();
+        assert!(compact_capsule.contains("plugin.manifest().nodes.iter().any"));
         assert!(capsule.contains(&call));
         let ordered = [
             "let plugin = host.installed_plugin",
             "let lease = host.begin_invocation_lease",
             "let generation = host.verified_generation",
             "let deployment = generation.worker_deployment_plan",
-            "plugin.manifest().nodes.iter().any",
+            "node.id == node_id.as_ref()",
             call.as_str(),
             "Ok(Self",
         ];

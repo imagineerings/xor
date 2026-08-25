@@ -2,7 +2,7 @@
   "classification": "source-fingerprinted provider component contract catalog",
   "input": {
     "backend_external_services_sha256": "77b53091c2e80e2cf67253d219a3549edf531ae1bceb204fd1be8841643df6c5",
-    "backend_node_contracts_sha256": "aeaf91d2b67633c9c0dbcba244307773161600c708534a207df1e6eb548481ce"
+    "backend_node_contracts_sha256": "f558795b1fb2e75ffb7b96815ebe8b5272572b39e0e3ee1187358c05037a8412"
   },
   "nodes": [
     {

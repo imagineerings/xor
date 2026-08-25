@@ -225,6 +225,46 @@ class NodeContractCatalogTests(unittest.TestCase):
             self.assertTrue(inherited_presentation["is_deprecated"])
             self.assertTrue(inherited_presentation["is_experimental"])
 
+        with generator.INPUT.open(newline="", encoding="utf-8") as backend_nodes_file:
+            rows_by_feature = {
+                row["feature_id"]: row for row in csv.DictReader(backend_nodes_file)
+            }
+        corrected_presentations = {
+            "COMFY-NODE-0002": "Add Text Prefix (DEPRECATED)",
+            "COMFY-NODE-0003": "Add Text Suffix (DEPRECATED)",
+            "COMFY-NODE-0047": "Crop Image (Center)",
+            "COMFY-NODE-0159": "Empty HunyuanVideo 1.0 Latent",
+            "COMFY-NODE-0249": "Deduplicate Images",
+            "COMFY-NODE-0252": "Make Image Grid",
+            "COMFY-NODE-0366": "Context Windows (Manual)",
+            "COMFY-NODE-0405": "Merge Image Lists (DEPRECATED)",
+            "COMFY-NODE-0407": "Merge Text Lists (DEPRECATED)",
+            "COMFY-NODE-0456": "Normalize Image Colors",
+            "COMFY-NODE-0504": "Crop Image (Random)",
+            "COMFY-NODE-0620": "Shuffle Images List",
+            "COMFY-NODE-0649": "Strip Whitespace (DEPRECATED)",
+            "COMFY-NODE-0673": "Convert Text to Lowercase (DEPRECATED)",
+            "COMFY-NODE-0674": "Convert Text to Uppercase (DEPRECATED)",
+            "COMFY-NODE-0701": "Truncate Text",
+            "COMFY-NODE-0760": "Context Windows (Manual)",
+        }
+        for feature_id, display_name in corrected_presentations.items():
+            row = rows_by_feature[feature_id]
+            presentation = self.contracts[feature_id]["schema"]["portable"][
+                "presentation"
+            ]
+            self.assertEqual(row["display_name"], display_name)
+            self.assertEqual(presentation["display_name"], display_name)
+
+        for feature_id, contract in self.contracts.items():
+            presentation = contract["schema"]["portable"]["presentation"]
+            if presentation["display_name"] is not None:
+                self.assertEqual(
+                    rows_by_feature[feature_id]["display_name"],
+                    presentation["display_name"],
+                    feature_id,
+                )
+
     def test_provider_disposition_uses_registered_api_identity_not_deprecation(self) -> None:
         deprecated_provider = self.contracts["COMFY-NODE-0462"]
         self.assertEqual(deprecated_provider["availability"], "deprecated/dead")
