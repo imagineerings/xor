@@ -116,6 +116,32 @@ fn fixture_raw_bits(value: &serde_json::Value) -> Result<Vec<u32>, Box<dyn Error
     Ok(output)
 }
 
+fn require_exact_fixture_bits(
+    phase: &str,
+    actual: &[u32],
+    expected: &[u32],
+) -> Result<(), Box<dyn Error>> {
+    if actual.len() != expected.len() {
+        return Err(format!(
+            "{phase}: actual length {}, expected {}",
+            actual.len(),
+            expected.len()
+        )
+        .into());
+    }
+    if let Some((index, (actual, expected))) = actual
+        .iter()
+        .zip(expected)
+        .enumerate()
+        .find(|(_, (actual, expected))| actual != expected)
+    {
+        return Err(
+            format!("{phase}[{index}]: actual {actual:#010x}, expected {expected:#010x}").into(),
+        );
+    }
+    Ok(())
+}
+
 fn sdpose_tensor(
     backend: &CpuBackend,
     shape: &[u64],
@@ -2230,15 +2256,15 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
             .collect::<Result<Vec<_>, _>>()?;
         expected_shape.insert(0, 1);
         assert_eq!(actual.descriptor().shape(), expected_shape);
-        assert_eq!(
-            tensor_bits(actual, &ray_context)?,
-            fixture_raw_bits(
+        require_exact_fixture_bits(
+            pointer,
+            &tensor_bits(actual, &ray_context)?,
+            &fixture_raw_bits(
                 oracle
                     .pointer(pointer)
                     .ok_or_else(|| format!("missing DA3 ray trace oracle {pointer}"))?,
             )?,
-            "{pointer}: pre-geometry ray phase diverged"
-        );
+        )?;
     }
     let raw_ray_values = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
         &backend,

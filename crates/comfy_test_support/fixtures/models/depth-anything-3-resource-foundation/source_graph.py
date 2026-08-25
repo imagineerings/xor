@@ -945,7 +945,7 @@ def position_embedding(input_tensor, source_width, source_height):
     return output
 
 
-def depth_head(state, features, height=4, width=4, profile="dpt", use_ray=False):
+def depth_head(state, features, height=4, width=4, profile="dpt", use_ray=False, head_trace=None):
     resized = []
     patch_height = height // 2
     patch_width = width // 2
@@ -1004,11 +1004,22 @@ def depth_head(state, features, height=4, width=4, profile="dpt", use_ray=False)
                 tensor = convolution(state, tensor, f"native.head.scratch.output_conv1_aux.{level}.{index}", 1, 1)
             processed.append(tensor)
         last = position_embedding(processed[-1], width, height)
+        if head_trace is not None:
+            head_trace["positioned"] = last.clone()
         last = convolution(state, last, "native.head.scratch.output_conv2_aux.3.0", 1, 1)
+        if head_trace is not None:
+            head_trace["convolution_3_0"] = last.clone()
         channels_last = Tensor((last.shape[0], last.shape[2], last.shape[3], last.shape[1]), [last.get(batch_index, channel, y, x) for batch_index in range(last.shape[0]) for y in range(last.shape[2]) for x in range(last.shape[3]) for channel in range(last.shape[1])])
         channels_last = norm_state(state, channels_last, "native.head.scratch.output_conv2_aux.3.2", f32(1.0e-5))
         last = Tensor(last.shape, [channels_last.get(batch_index, y, x, channel) for batch_index in range(last.shape[0]) for channel in range(last.shape[1]) for y in range(last.shape[2]) for x in range(last.shape[3])])
-        last = convolution(state, relu(last), "native.head.scratch.output_conv2_aux.3.5")
+        if head_trace is not None:
+            head_trace["normalized"] = last.clone()
+        last = relu(last)
+        if head_trace is not None:
+            head_trace["relu"] = last.clone()
+        last = convolution(state, last, "native.head.scratch.output_conv2_aux.3.5")
+        if head_trace is not None:
+            head_trace["logits"] = last.clone()
         ray_values = []
         ray_confidence_values = []
         for flat in range(last.shape[0]):
@@ -1018,6 +1029,9 @@ def depth_head(state, features, height=4, width=4, profile="dpt", use_ray=False)
                     ray_confidence_values.append(fadd(f32(math.exp(last.get(flat, 6, y, x))), 1.0))
         ray = Tensor((last.shape[0], last.shape[2], last.shape[3], 6), ray_values)
         ray_confidence = Tensor((last.shape[0], last.shape[2], last.shape[3]), ray_confidence_values)
+        if head_trace is not None:
+            head_trace["ray"] = ray.clone()
+            head_trace["confidence"] = ray_confidence.clone()
     return depth, confidence, sky, ray, ray_confidence
 
 
@@ -1366,13 +1380,13 @@ def ray_pose(ray, confidence, views):
     return ray_pose_with_trace(ray, confidence, views)[0]
 
 
-def execute_dualdpt(input_values, views=3, mutation=None, camera_inputs=None, use_ray=False, reference_strategy="saddle_sim_range", source_dtype="f32"):
+def execute_dualdpt(input_values, views=3, mutation=None, camera_inputs=None, use_ray=False, reference_strategy="saddle_sim_range", source_dtype="f32", head_trace=None):
     state = make_state("dualdpt", mutation, source_dtype)
     image = preprocess(input_values, batch=views)
     camera_token = None
     if camera_inputs is not None:
         camera_token = encode_camera(state, camera_inputs[0], camera_inputs[1], 4, 4)
     features, _, _ = backbone(state, image, "dualdpt", views, reference_strategy, camera_token)
-    depth, confidence, _, ray, ray_confidence = depth_head(state, features, profile="dualdpt", use_ray=use_ray)
+    depth, confidence, _, ray, ray_confidence = depth_head(state, features, profile="dualdpt", use_ray=use_ray, head_trace=head_trace)
     camera_geometry = ray_pose(ray, ray_confidence, views) if use_ray else decode_camera(state, features[-1][1], 4, 4)
     return depth, confidence, ray, ray_confidence, camera_geometry

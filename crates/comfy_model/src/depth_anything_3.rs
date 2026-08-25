@@ -940,6 +940,21 @@ impl NativeDepthAnything3Resource {
         ))
     }
 
+    #[cfg(test)]
+    fn execute_pre_geometry_head_with_test_trace(
+        &self,
+        backend: &CpuBackend,
+        invocation: NativeDepthAnything3Invocation<'_>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<DepthAnything3ExecutionTrace, NativeDepthAnything3Error> {
+        let mut trace = DepthAnything3ExecutionTrace {
+            stop_before_ray_pose: true,
+            ..Default::default()
+        };
+        self.execute_internal(backend, invocation, context, Some(&mut trace))?;
+        Ok(trace)
+    }
+
     fn execute_internal(
         &self,
         backend: &CpuBackend,
@@ -1357,6 +1372,12 @@ struct DepthHeadOutput {
 
 #[derive(Clone, Debug, Default)]
 struct DepthAnything3ExecutionTrace {
+    stop_before_ray_pose: bool,
+    auxiliary_positioned: Option<Tensor>,
+    auxiliary_convolution: Option<Tensor>,
+    auxiliary_normalized: Option<Tensor>,
+    auxiliary_relu: Option<Tensor>,
+    auxiliary_logits: Option<Tensor>,
     raw_ray: Option<Tensor>,
     raw_ray_confidence: Option<Tensor>,
     ransac_samples: Vec<Vec<usize>>,
@@ -3166,6 +3187,11 @@ fn execute_depth_head(
             .pop()
             .ok_or(NativeDepthAnything3Error::ShapeOverflow)?;
         last = add_stateless_position_embedding(backend, &last, width, height, context)?;
+        if let Some(trace) = trace.as_deref_mut()
+            && trace.stop_before_ray_pose
+        {
+            trace.auxiliary_positioned = Some(last.clone());
+        }
         let last = convolution(
             resource,
             backend,
@@ -3176,6 +3202,11 @@ fn execute_depth_head(
             false,
             context,
         )?;
+        if let Some(trace) = trace.as_deref_mut()
+            && trace.stop_before_ray_pose
+        {
+            trace.auxiliary_convolution = Some(last.clone());
+        }
         let last = layer_norm_nchw(
             resource,
             backend,
@@ -3183,7 +3214,17 @@ fn execute_depth_head(
             "native.head.scratch.output_conv2_aux.3.2",
             context,
         )?;
+        if let Some(trace) = trace.as_deref_mut()
+            && trace.stop_before_ray_pose
+        {
+            trace.auxiliary_normalized = Some(last.clone());
+        }
         let last = relu_tensor(backend, &last, context)?;
+        if let Some(trace) = trace.as_deref_mut()
+            && trace.stop_before_ray_pose
+        {
+            trace.auxiliary_relu = Some(last.clone());
+        }
         let last = convolution(
             resource,
             backend,
@@ -3194,6 +3235,11 @@ fn execute_depth_head(
             false,
             context,
         )?;
+        if let Some(trace) = trace.as_deref_mut()
+            && trace.stop_before_ray_pose
+        {
+            trace.auxiliary_logits = Some(last.clone());
+        }
         split_ray_output(backend, &last, batch, views, context)?
     } else {
         (None, None)
@@ -3204,16 +3250,23 @@ fn execute_depth_head(
                 trace.raw_ray = Some(ray.clone());
                 trace.raw_ray_confidence = Some(ray_confidence.clone());
             }
-            ray_pose_geometry(
-                backend,
-                ray,
-                ray_confidence,
-                batch,
-                views,
-                ransac_seed,
-                context,
-                trace.as_deref_mut(),
-            )?
+            if trace
+                .as_deref()
+                .is_some_and(|trace| trace.stop_before_ray_pose)
+            {
+                (None, None)
+            } else {
+                ray_pose_geometry(
+                    backend,
+                    ray,
+                    ray_confidence,
+                    batch,
+                    views,
+                    ransac_seed,
+                    context,
+                    trace.as_deref_mut(),
+                )?
+            }
         } else if resource.configuration.has_camera_decoder && views > 1 {
             decode_camera_geometry(
                 resource,
@@ -5775,6 +5828,166 @@ mod tests {
             ),
             "8732477ad3af2972b8280df320a79a17327300da47f918bdad66b78f4bf3b425"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn reduced_da3_auxiliary_head_trace_localizes_pre_geometry_drift()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let oracle: serde_json::Value = serde_json::from_str(include_str!(
+            "../../comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/oracle.json"
+        ))?;
+        let workspace_bytes = 256 * 1024 * 1024;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(workspace_bytes)?;
+        let cancellation = CancellationToken::default();
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(workspace_bytes)?,
+            &cancellation,
+        );
+        let resource = NativeDepthAnything3Resource::from_reduced_fixture(
+            &backend,
+            deterministic_reduced_depth_anything_3_checkpoint(
+                &backend,
+                DepthAnything3FixtureProfile::DualDpt,
+                DType::F32,
+                workspace_bytes,
+                &context,
+            )?,
+            &context,
+        )?;
+        for mutation in oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/fixture_state")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("DA3 ray fixture state trace is missing")?
+        {
+            let key = mutation
+                .get("key")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("DA3 ray fixture state key is missing")?;
+            let index = mutation
+                .get("index")
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|value| usize::try_from(value).ok())
+                .ok_or("DA3 ray fixture state index is missing")?;
+            let expected = mutation
+                .get("bits")
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or("DA3 ray fixture state bits are missing")?;
+            let values = tensor_to_f32_with_context_exact_native(
+                &backend,
+                resource.execution_tensor(key)?,
+                &context,
+            )?;
+            assert_eq!(
+                values
+                    .get(index)
+                    .copied()
+                    .ok_or("DA3 ray fixture state lane is unavailable")?
+                    .to_bits(),
+                expected,
+                "DA3 ray fixture state {key}[{index}] changed"
+            );
+        }
+        let multiview_values = oracle
+            .get("multiview_input_bits")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("DA3 multiview input oracle is missing")?
+            .iter()
+            .map(|value| {
+                value
+                    .as_u64()
+                    .and_then(|value| u32::try_from(value).ok())
+                    .map(f32::from_bits)
+                    .ok_or("DA3 multiview input bits are invalid")
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let image = ImageTensor::from_f32(&backend, &context, 3, 4, 4, 3, &multiview_values)?;
+        let trace = resource.execute_pre_geometry_head_with_test_trace(
+            &backend,
+            NativeDepthAnything3Invocation {
+                image: &image,
+                views_per_sample: 3,
+                process_resolution: 4,
+                resize_method: NativeDepthAnything3ResizeMethod::LowerBound,
+                reference_strategy: NativeDepthAnything3ReferenceStrategy::SaddleSimRange,
+                use_ray_pose: true,
+                ransac_seed: 17,
+                extrinsics: None,
+                intrinsics: None,
+            },
+            &context,
+        )?;
+        let phases = [
+            ("positioned", trace.auxiliary_positioned),
+            ("convolution_3_0", trace.auxiliary_convolution),
+            ("normalized", trace.auxiliary_normalized),
+            ("relu", trace.auxiliary_relu),
+            ("logits", trace.auxiliary_logits),
+            ("ray", trace.raw_ray),
+            ("confidence", trace.raw_ray_confidence),
+        ];
+        for (phase, actual) in phases {
+            let actual = actual.ok_or("DA3 auxiliary head phase is unavailable")?;
+            let expected = oracle
+                .pointer(&format!(
+                    "/reduced_dualdpt/ray_pose_trace/auxiliary_head_phases/{phase}"
+                ))
+                .ok_or("DA3 auxiliary head phase oracle is missing")?;
+            let mut expected_shape = expected
+                .get("shape")
+                .and_then(serde_json::Value::as_array)
+                .ok_or("DA3 auxiliary head phase shape is missing")?
+                .iter()
+                .map(|value| value.as_u64().ok_or("DA3 auxiliary head shape is invalid"))
+                .collect::<Result<Vec<_>, _>>()?;
+            if matches!(phase, "ray" | "confidence") {
+                expected_shape.insert(0, 1);
+            }
+            if actual.descriptor().shape() != expected_shape {
+                return Err(format!(
+                    "DA3 auxiliary head {phase} shape: actual {:?}, expected {expected_shape:?}",
+                    actual.descriptor().shape()
+                )
+                .into());
+            }
+            let actual_bits = tensor_to_f32_with_context_exact_native(&backend, &actual, &context)?
+                .into_iter()
+                .map(f32::to_bits)
+                .collect::<Vec<_>>();
+            let expected_bits = expected
+                .get("bits")
+                .and_then(serde_json::Value::as_array)
+                .ok_or("DA3 auxiliary head phase bits are missing")?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_u64()
+                        .and_then(|value| u32::try_from(value).ok())
+                        .ok_or("DA3 auxiliary head phase bit is invalid")
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            if actual_bits.len() != expected_bits.len() {
+                return Err(format!(
+                    "DA3 auxiliary head {phase} length: actual {}, expected {}",
+                    actual_bits.len(),
+                    expected_bits.len()
+                )
+                .into());
+            }
+            if let Some((index, (actual, expected))) = actual_bits
+                .iter()
+                .zip(&expected_bits)
+                .enumerate()
+                .find(|(_, (actual, expected))| actual != expected)
+            {
+                return Err(format!(
+                    "DA3 auxiliary head {phase}[{index}]: actual {actual:#010x}, expected {expected:#010x}"
+                )
+                .into());
+            }
+        }
         Ok(())
     }
 

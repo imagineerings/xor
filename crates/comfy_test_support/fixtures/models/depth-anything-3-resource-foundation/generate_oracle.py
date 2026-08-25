@@ -494,8 +494,38 @@ def document():
         for strategy in ["first", "middle", "saddle_balanced", "saddle_sim_range"]
     }
     dual_camera = execute_dualdpt(multiview_values, camera_inputs=(camera_extrinsics, camera_intrinsics))
-    dual_ray = execute_dualdpt(multiview_values, use_ray=True)
+    auxiliary_head_trace = {}
+    dual_ray = execute_dualdpt(
+        multiview_values,
+        use_ray=True,
+        head_trace=auxiliary_head_trace,
+    )
     ray_trace = ransac_trace_document(dual_ray[2], dual_ray[3], 3)
+    ray_trace["auxiliary_head_phases"] = {
+        phase: tensor_document(tensor)
+        for phase, tensor in auxiliary_head_trace.items()
+    }
+    ray_fixture_state = make_state("dualdpt")
+    ray_trace["fixture_state"] = [
+        {
+            "key": "native.head.scratch.output_conv2_aux.3.5.weight",
+            "index": 194,
+            "bits": bits(
+                ray_fixture_state[
+                    "native.head.scratch.output_conv2_aux.3.5.weight"
+                ].values[194]
+            ),
+        },
+        {
+            "key": "native.head.scratch.output_conv2_aux.3.5.bias",
+            "index": 2,
+            "bits": bits(
+                ray_fixture_state[
+                    "native.head.scratch.output_conv2_aux.3.5.bias"
+                ].values[2]
+            ),
+        },
+    ]
     mutations = {
         "dpt_local_attention": ("dpt", ("native.backbone.encoder.layer.0.attention.attention.query.weight", 0, 0.25)),
         "dpt_head": ("dpt", ("native.head.scratch.output_conv2.2.bias", 0, 0.25)),
