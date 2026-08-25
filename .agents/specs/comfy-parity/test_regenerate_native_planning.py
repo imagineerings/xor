@@ -7,9 +7,84 @@ from pathlib import Path
 from unittest.mock import patch
 
 import regenerate_native_planning as planning
+import validate_backend_dependencies as backend_dependencies
 
 
 class ValidationGenerationTests(unittest.TestCase):
+    def test_dependency_ledger_reopens_until_current_lock_allowlist_evidence_is_fresh(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository_root = Path(directory)
+            root = repository_root / ".agents" / "specs" / "comfy-parity"
+            root.mkdir(parents=True)
+            repository_root.joinpath("Cargo.lock").write_text(
+                "lock-v1\n", encoding="utf-8"
+            )
+            root.joinpath("validate_backend_dependencies.py").write_text(
+                "validator-v1\n", encoding="utf-8"
+            )
+            root.joinpath("tasks.md").write_text(
+                "- [x] 371. Refresh the native backend dependency ledger lock identity\n"
+                "  - _id: comfy-parity-native-backend-dependency-ledger-current-lock-repair\n"
+                "  - _validation_evidence: prior lock evidence\n",
+                encoding="utf-8",
+            )
+            with (
+                patch.object(planning, "ROOT", root),
+                patch.object(planning, "REPOSITORY_ROOT", repository_root),
+            ):
+                stale = planning.existing_task_annotations()[
+                    "comfy-parity-native-backend-dependency-ledger-current-lock-repair"
+                ]
+            self.assertFalse(stale["complete"])
+            self.assertIn("STALE AFTER CURRENT LOCK AND ALLOWLIST AUDIT", stale["evidence"])
+
+            with (
+                patch.object(planning, "ROOT", root),
+                patch.object(planning, "REPOSITORY_ROOT", repository_root),
+            ):
+                current_marker = planning.dependency_ledger_revalidation_marker()
+            root.joinpath("tasks.md").write_text(
+                "- [x] 371. Refresh the native backend dependency ledger lock identity\n"
+                "  - _id: comfy-parity-native-backend-dependency-ledger-current-lock-repair\n"
+                f"  - _validation_evidence: {current_marker} fresh evidence\n",
+                encoding="utf-8",
+            )
+            with (
+                patch.object(planning, "ROOT", root),
+                patch.object(planning, "REPOSITORY_ROOT", repository_root),
+            ):
+                fresh = planning.existing_task_annotations()[
+                    "comfy-parity-native-backend-dependency-ledger-current-lock-repair"
+                ]
+            self.assertTrue(fresh["complete"])
+
+            repository_root.joinpath("Cargo.lock").write_text(
+                "lock-v2\n", encoding="utf-8"
+            )
+            with (
+                patch.object(planning, "ROOT", root),
+                patch.object(planning, "REPOSITORY_ROOT", repository_root),
+            ):
+                changed_lock = planning.existing_task_annotations()[
+                    "comfy-parity-native-backend-dependency-ledger-current-lock-repair"
+                ]
+            self.assertFalse(changed_lock["complete"])
+
+            repository_root.joinpath("Cargo.lock").write_text(
+                "lock-v1\n", encoding="utf-8"
+            )
+            root.joinpath("validate_backend_dependencies.py").write_text(
+                "validator-v2\n", encoding="utf-8"
+            )
+            with (
+                patch.object(planning, "ROOT", root),
+                patch.object(planning, "REPOSITORY_ROOT", repository_root),
+            ):
+                changed_validator = planning.existing_task_annotations()[
+                    "comfy-parity-native-backend-dependency-ledger-current-lock-repair"
+                ]
+            self.assertFalse(changed_validator["complete"])
+
     def test_schema_foundation_reopens_until_source_identity_evidence_is_fresh(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -148,14 +223,45 @@ class ValidationGenerationTests(unittest.TestCase):
             dependency_ledger_task["writes"],
             [
                 ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+                ".agents/specs/comfy-parity/validate_backend_dependencies.py",
                 ".agents/specs/comfy-parity/regenerate_native_planning.py",
                 ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/tasks.md",
             ],
         )
         self.assertNotIn("Cargo.lock", dependency_ledger_task["writes"])
-        self.assertIn(
+        dependency_ledger_commands = planning.task_validation_commands(
+            dependency_ledger_task
+        )
+        for command in (
+            "validate_backend_dependencies.py",
+            "cargo metadata --locked --format-version 1",
             "native_foundation",
-            planning.task_validation_commands(dependency_ledger_task),
+            "val_native_boundary_001_packaged_release",
+        ):
+            self.assertIn(command, dependency_ledger_commands)
+        self.assertEqual(
+            backend_dependencies.AUTHORIZED_INTEGRATION_WRITES[
+                "comfy-parity-provider-worker-stream-protocol"
+            ],
+            {"Cargo.lock", "crates/comfy_types/Cargo.toml"},
+        )
+        media_dependency_writes = {
+            "Cargo.toml",
+            "Cargo.lock",
+            "crates/comfy_media/Cargo.toml",
+        }
+        self.assertEqual(
+            backend_dependencies.AUTHORIZED_INTEGRATION_WRITES[
+                "comfy-parity-native-visual-asset-decode-foundation"
+            ],
+            media_dependency_writes,
+        )
+        self.assertEqual(
+            backend_dependencies.AUTHORIZED_INTEGRATION_WRITES[
+                "comfy-parity-native-image-output-codec-effect-foundation"
+            ],
+            media_dependency_writes,
         )
         self.assertEqual(
             tasks_by_id[value_id]["dependencies"],
@@ -1037,6 +1143,20 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn(
             "worker bridge owns the first production valid-grant issuance",
             provider_component_stream["done"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            provider_component_stream["writes"],
+        )
+        for policy_adapter_gate in (
+            "may borrow the canonical runtime ProviderPolicy only while consuming the preflighted grant",
+            "owns no policy field, constructor, default, authorization equation, or second security decision",
+            "provider policy owner",
+        ):
+            self.assertIn(policy_adapter_gate, provider_component_stream["done"])
+        self.assertIn(
+            "val_ownership_domain_001",
+            planning.task_validation_commands(provider_component_stream),
         )
         for component_route_gate in (
             "capacity-one typed WorkerProviderStreamRequest",

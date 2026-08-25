@@ -10916,8 +10916,9 @@ def provider_component_foundation_tasks(
             "crates/comfy_plugin_host/tests/component_contract.rs",
             "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component",
             "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "Before exposing any provider-v8 invocation context, input, or guest state, the adapter consumes the private PreflightedProviderComponentCapsule whose app-issued WorkerProviderInvocationContext was exactly matched to the sealed runtime grant together with the verified signed invocation's full sealed activation identity, including registry generation and digest, component generation and digest, authorization-generation digest, binding-set digest, node identity, and compiled-plan digest. Verified outer and inner provider-v2 authorization and the signed streaming-contract digest remain bound to that activation; the host derives provider identity from the verified binding set. Components can reference a host-issued capability but cannot construct or replace its authority. Generated provider-v2 invocation-input-host methods delegate the existing canonical InvocationHost input methods, and returned outputs remain proposals for Task412's all-or-none materializer. The private prepared invocation retains the exact non-cloneable preflighted grant, context, plugin, generation, node, lease, and authorization; no second selector is accepted. Its hermetic test route uses a concrete capacity-one typed WorkerProviderStreamRequest plus one-shot WorkerProviderStreamResponse channel, nonblocking enqueue, checked bounded response polling, the canonical WorkerProviderStreamTransportValidator, and terminal revocation on full, cancellation, disconnect, malformed, foreign, stale, trap, abort, decode, materialization, or drop. A completed terminal Wait seals every later WIT route call but does not disarm revocation. The returned ProviderV2InvocationProposal remains armed and privately retains the exact runtime, checked context, and route; Task421 exposes no success disarm, completion token, completion setter, or arbitrary-receipt escape hatch. Dropping that proposal or runtime, splitting it without verified downstream finalization, or any failed, cancelled, trapped, decoded, or materialization path revokes. Only comfy-parity-provider-worker-stream-bridge may consume the exact armed proposal after its app-side ProviderRuntimeStreamService session has finished, its runtime receipt has been verified for that same session, and canonical all-or-none materialization has succeeded. It exposes no public/default transport trait, runtime stream service, ProviderPolicy, provider authority, secret, credential, actuator, purchase, charge, or direct worker-v8 production bridge. Every legacy v1 preparation, execution, provider, and conformance entrypoint rejects provider-v2 before input or guest exposure. Component contract tests prove missing-grant denial, exact claim-and-bind checks before every request, upload, cost, stream, and input operation, generation-scoped handle revocation, bounded response streaming and progress, traps, cancellation, armed proposal drop, and atomic output proposals. The adapter does not expose or invoke the crate-private raw grant constructor or registration seam; the later worker bridge owns the first production valid-grant issuance and end-to-end success proof. Missing or extra manifest claims, undeclared operations, stale handles, and worker loss cannot actuate or publish. Direct provider-v8 worker routing remains rejected until comfy-parity-provider-worker-stream-bridge.",
+        "Before exposing any provider-v8 invocation context, input, or guest state, the adapter consumes the private PreflightedProviderComponentCapsule whose app-issued WorkerProviderInvocationContext was exactly matched to the sealed runtime grant together with the verified signed invocation's full sealed activation identity, including registry generation and digest, component generation and digest, authorization-generation digest, binding-set digest, node identity, and compiled-plan digest. Verified outer and inner provider-v2 authorization and the signed streaming-contract digest remain bound to that activation; the host derives provider identity from the verified binding set. Components can reference a host-issued capability but cannot construct or replace its authority. Generated provider-v2 invocation-input-host methods delegate the existing canonical InvocationHost input methods, and returned outputs remain proposals for Task412's all-or-none materializer. The private prepared invocation retains the exact non-cloneable preflighted grant, context, plugin, generation, node, lease, and authorization; no second selector is accepted. Its hermetic test route uses a concrete capacity-one typed WorkerProviderStreamRequest plus one-shot WorkerProviderStreamResponse channel, nonblocking enqueue, checked bounded response polling, the canonical WorkerProviderStreamTransportValidator, and terminal revocation on full, cancellation, disconnect, malformed, foreign, stale, trap, abort, decode, materialization, or drop. A completed terminal Wait seals every later WIT route call but does not disarm revocation. The returned ProviderV2InvocationProposal remains armed and privately retains the exact runtime, checked context, and route; Task421 exposes no success disarm, completion token, completion setter, or arbitrary-receipt escape hatch. Dropping that proposal or runtime, splitting it without verified downstream finalization, or any failed, cancelled, trapped, decoded, or materialization path revokes. Only comfy-parity-provider-worker-stream-bridge may consume the exact armed proposal after its app-side ProviderRuntimeStreamService session has finished, its runtime receipt has been verified for that same session, and canonical all-or-none materialization has succeeded. The crate-private app-side bind adapter may borrow the canonical runtime ProviderPolicy only while consuming the preflighted grant; it owns no policy field, constructor, default, authorization equation, or second security decision. It exposes no public/default transport trait, runtime stream service, provider policy owner, provider authority, secret, credential, actuator, purchase, charge, or direct worker-v8 production bridge. Every legacy v1 preparation, execution, provider, and conformance entrypoint rejects provider-v2 before input or guest exposure. Component contract tests prove missing-grant denial, exact claim-and-bind checks before every request, upload, cost, stream, and input operation, generation-scoped handle revocation, bounded response streaming and progress, traps, cancellation, armed proposal drop, and atomic output proposals. The adapter does not expose or invoke the crate-private raw grant constructor or registration seam; the later worker bridge owns the first production valid-grant issuance and end-to-end success proof. Missing or extra manifest claims, undeclared operations, stale handles, and worker loss cannot actuate or publish. Direct provider-v8 worker routing remains rejected until comfy-parity-provider-worker-stream-bridge.",
         ["comfy_plugin_host"],
     )
     append_shared(
@@ -13963,10 +13964,12 @@ def native_backend_dependency_ledger_current_lock_repair_task(
         ],
         [
             ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
             ".agents/specs/comfy-parity/regenerate_native_planning.py",
             ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/tasks.md",
         ],
-        "The ledger's full Cargo.lock SHA-256 equals the checked-in lockfile after the latest serialized upstream workspace dependency update. Every canonical Comfy backend adapter package, version, source, target, feature, rationale, and typed-unavailable disposition remains unchanged, no Cargo manifest or lockfile is written by this repair, and the exact native-foundation dependency and native-boundary tests pass with locked resolution.",
+        "The ledger's full Cargo.lock SHA-256 equals the checked-in lockfile after the latest serialized upstream workspace dependency update. The canonical validator authorizes only the exact manifest and lockfile Write sets of the completed provider worker-stream protocol and the serial visual decode then image-output codec integration leaves, while rejecting every unscoped later dependency writer. Every canonical Comfy backend adapter package, version, source, target, feature, rationale, and typed-unavailable disposition remains unchanged, no Cargo manifest or lockfile is written by this repair, and the exact native-foundation dependency and packaged native-boundary tests pass with locked resolution.",
         dependency,
         locked=True,
         feature_scoped=True,
@@ -21193,7 +21196,18 @@ def task_validation_commands(item: dict[str, object]) -> str:
         ])
     if identifier == "comfy-parity-native-backend-dependency-ledger-current-lock-repair":
         commands.extend([
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/validate_backend_dependencies.py",
+            "cargo metadata --locked --format-version 1",
             "cargo test --locked -p comfy_test_support --test native_foundation -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_release_boundary val_native_boundary_001_packaged_release -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-provider-component-host-stream-adapter":
+        commands.extend([
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_domain_001 -- --exact --nocapture",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
@@ -22019,6 +22033,17 @@ def task_validation_commands(item: dict[str, object]) -> str:
     return "; ".join(commands)
 
 
+def dependency_ledger_revalidation_marker() -> str:
+    lock_sha256 = hashlib.sha256((REPOSITORY_ROOT / "Cargo.lock").read_bytes()).hexdigest()
+    validator_sha256 = hashlib.sha256(
+        (ROOT / "validate_backend_dependencies.py").read_bytes()
+    ).hexdigest()
+    return (
+        "POST-CURRENT-LOCK-ALLOWLIST-REVALIDATION "
+        f"lock={lock_sha256} validator={validator_sha256}"
+    )
+
+
 def existing_task_annotations() -> dict[str, dict[str, str | bool]]:
     path = ROOT / "tasks.md"
     if not path.is_file():
@@ -22081,6 +22106,25 @@ def existing_task_annotations() -> dict[str, dict[str, str | bool]]:
                     "  - _validation_evidence: "
                     + stale_marker
                     + "; the canonical `_io.py` type identities, nested MultiType/autogrow projection, and checked node-contract catalog changed after the prior evidence and require fresh catalog, descriptor, workflow, API, and registry validation. ",
+                    1,
+                )
+            annotations[identifier_match.group(1)] = {
+                "complete": False,
+                "evidence": evidence,
+            }
+            continue
+        if (
+            identifier_match.group(1)
+            == "comfy-parity-native-backend-dependency-ledger-current-lock-repair"
+            and dependency_ledger_revalidation_marker() not in evidence
+        ):
+            stale_marker = "STALE AFTER CURRENT LOCK AND ALLOWLIST AUDIT"
+            if evidence and stale_marker not in evidence:
+                evidence = evidence.replace(
+                    "  - _validation_evidence: ",
+                    "  - _validation_evidence: "
+                    + stale_marker
+                    + "; the Cargo.lock identity and exact serialized later-task dependency-write allowlist require fresh canonical validation. ",
                     1,
                 )
             annotations[identifier_match.group(1)] = {

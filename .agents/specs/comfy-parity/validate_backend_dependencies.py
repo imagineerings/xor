@@ -13,6 +13,84 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 SPECIFICATION_ROOT = Path(__file__).resolve().parent
 LEDGER_PATH = SPECIFICATION_ROOT / "catalogs" / "native-backend-dependencies.json"
 TASK_ID = "comfy-parity-vendor-dependency-lock"
+CERTIFICATION_TASK_ID = "comfy-parity-certify-device-apple-metal-mps-comfy-model-0015"
+CERTIFICATION_WRITES = {
+    "Cargo.lock",
+    "crates/comfy_runtime/Cargo.toml",
+    "crates/comfy_test_support/Cargo.toml",
+}
+AUTHORIZED_INTEGRATION_WRITES = {
+    "comfy-parity-native-node-runtime-foundation": {
+        "Cargo.lock",
+        "crates/comfy_nodes/Cargo.toml",
+    },
+    "comfy-parity-native-node-compute-value-foundation": {
+        "Cargo.lock",
+        "crates/comfy_nodes/Cargo.toml",
+        "crates/comfy_media/Cargo.toml",
+        "crates/comfy_plugin_host/Cargo.toml",
+        "crates/comfy_plugin_sdk/Cargo.toml",
+    },
+    "comfy-parity-native-node-asset-effect-foundation": {
+        "crates/comfy_media/Cargo.toml",
+    },
+    "comfy-parity-native-node-provider-invocation-foundation": {
+        "Cargo.lock",
+        "crates/comfy_plugin_host/Cargo.toml",
+        "crates/comfy_worker/Cargo.toml",
+    },
+    "comfy-parity-opt-in-product-build-boundary": {
+        "Cargo.lock",
+        "crates/extension_host/Cargo.toml",
+        "crates/zed/Cargo.toml",
+    },
+    "comfy-parity-native-text-value-regex-foundation": {
+        "Cargo.lock",
+        "crates/comfy_nodes/Cargo.toml",
+    },
+    "comfy-parity-provider-hermetic-component-harness": {
+        "crates/comfy_plugin_host/provider_components/Cargo.toml",
+    },
+    "comfy-parity-native-media-text-rendering-foundation": {
+        "Cargo.toml",
+        "Cargo.lock",
+        "crates/comfy_media/Cargo.toml",
+    },
+    "comfy-parity-native-shader-execution-foundation": {
+        "Cargo.toml",
+        "Cargo.lock",
+        "crates/comfy_tensor/Cargo.toml",
+    },
+    "comfy-parity-native-latent-bundle-foundation": {
+        "Cargo.toml",
+    },
+    "comfy-parity-native-qwen2-tokenizer-foundation": {
+        "Cargo.toml",
+        "Cargo.lock",
+        "crates/comfy_model/Cargo.toml",
+    },
+    "comfy-parity-native-sdpose-heatmap-projection-foundation": {
+        "Cargo.lock",
+        "crates/comfy_model/Cargo.toml",
+    },
+    "comfy-parity-native-frame-interpolate-node-foundation": {
+        "crates/comfy_nodes/Cargo.toml",
+    },
+    "comfy-parity-provider-worker-stream-protocol": {
+        "Cargo.lock",
+        "crates/comfy_types/Cargo.toml",
+    },
+    "comfy-parity-native-visual-asset-decode-foundation": {
+        "Cargo.toml",
+        "Cargo.lock",
+        "crates/comfy_media/Cargo.toml",
+    },
+    "comfy-parity-native-image-output-codec-effect-foundation": {
+        "Cargo.toml",
+        "Cargo.lock",
+        "crates/comfy_media/Cargo.toml",
+    },
+}
 
 ADAPTERS = (
     "corex",
@@ -463,70 +541,6 @@ def validate_later_task_writes() -> None:
     )
     if owner_index is None:
         raise ValidationError(f"{TASK_ID} is absent from tasks.md")
-    certification_task = "comfy-parity-certify-device-apple-metal-mps-comfy-model-0015"
-    certification_writes = {
-        "Cargo.lock",
-        "crates/comfy_runtime/Cargo.toml",
-        "crates/comfy_test_support/Cargo.toml",
-    }
-    authorized_integration_writes = {
-        "comfy-parity-native-node-runtime-foundation": {
-            "Cargo.lock",
-            "crates/comfy_nodes/Cargo.toml",
-        },
-        "comfy-parity-native-node-compute-value-foundation": {
-            "Cargo.lock",
-            "crates/comfy_nodes/Cargo.toml",
-            "crates/comfy_media/Cargo.toml",
-            "crates/comfy_plugin_host/Cargo.toml",
-            "crates/comfy_plugin_sdk/Cargo.toml",
-        },
-        "comfy-parity-native-node-asset-effect-foundation": {
-            "crates/comfy_media/Cargo.toml",
-        },
-        "comfy-parity-native-node-provider-invocation-foundation": {
-            "Cargo.lock",
-            "crates/comfy_plugin_host/Cargo.toml",
-            "crates/comfy_worker/Cargo.toml",
-        },
-        "comfy-parity-opt-in-product-build-boundary": {
-            "Cargo.lock",
-            "crates/extension_host/Cargo.toml",
-            "crates/zed/Cargo.toml",
-        },
-        "comfy-parity-native-text-value-regex-foundation": {
-            "Cargo.lock",
-            "crates/comfy_nodes/Cargo.toml",
-        },
-        "comfy-parity-provider-hermetic-component-harness": {
-            "crates/comfy_plugin_host/provider_components/Cargo.toml",
-        },
-        "comfy-parity-native-media-text-rendering-foundation": {
-            "Cargo.toml",
-            "Cargo.lock",
-            "crates/comfy_media/Cargo.toml",
-        },
-        "comfy-parity-native-shader-execution-foundation": {
-            "Cargo.toml",
-            "Cargo.lock",
-            "crates/comfy_tensor/Cargo.toml",
-        },
-        "comfy-parity-native-latent-bundle-foundation": {
-            "Cargo.toml",
-        },
-        "comfy-parity-native-qwen2-tokenizer-foundation": {
-            "Cargo.toml",
-            "Cargo.lock",
-            "crates/comfy_model/Cargo.toml",
-        },
-        "comfy-parity-native-sdpose-heatmap-projection-foundation": {
-            "Cargo.lock",
-            "crates/comfy_model/Cargo.toml",
-        },
-        "comfy-parity-native-frame-interpolate-node-foundation": {
-            "crates/comfy_nodes/Cargo.toml",
-        },
-    }
     violations = []
     for block in blocks[owner_index + 1 :]:
         heading = block.splitlines()[0] if block.splitlines() else "unknown task"
@@ -546,12 +560,12 @@ def validate_later_task_writes() -> None:
             for path in writes
             if path == "Cargo.toml" or path == "Cargo.lock" or path.endswith("/Cargo.toml")
         ]
-        if f"_id: {certification_task}" in block:
-            if set(forbidden) == certification_writes:
+        if f"_id: {CERTIFICATION_TASK_ID}" in block:
+            if set(forbidden) == CERTIFICATION_WRITES:
                 continue
             violations.append(
                 f"{heading}: expected exact certification dependency writes "
-                f"{sorted(certification_writes)}, found {sorted(forbidden)}"
+                f"{sorted(CERTIFICATION_WRITES)}, found {sorted(forbidden)}"
             )
             continue
         task_id = next(
@@ -562,8 +576,8 @@ def validate_later_task_writes() -> None:
             ),
             None,
         )
-        if task_id in authorized_integration_writes:
-            expected_writes = authorized_integration_writes[task_id]
+        if task_id in AUTHORIZED_INTEGRATION_WRITES:
+            expected_writes = AUTHORIZED_INTEGRATION_WRITES[task_id]
             if set(forbidden) == expected_writes:
                 continue
             violations.append(
