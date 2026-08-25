@@ -5,14 +5,15 @@ use comfy_plugin_host::AssetPluginCapabilityServices;
 use comfy_plugin_sdk::{CapabilityKind, CapabilityQuota, CapabilityRequest};
 use comfy_runtime::{
     AssetIdentity, AssetNamespace, AssetOperation, Capability, ExternalNavigationPolicy,
-    PreflightedProviderRuntimeActivationGrant, ProviderManifestAuthorizationV2,
-    ProviderRuntimeActivationGrant, ProviderRuntimeActivationGrantSource,
-    ProviderRuntimeActuationProposal, ProviderRuntimeAuthorityInput,
-    ProviderRuntimeProgressProjection, ProviderRuntimeReceiptIdentityV2,
-    ProviderRuntimeReceiptIssuerV2, ProviderRuntimeReceiptV2, ProviderRuntimeReceiptVerifierV2,
-    ProviderRuntimeStreamService, VerifiedProviderRuntimeReceiptV2,
-    authorize_native_output_committer, authorize_native_output_ui,
-    authorize_native_plugin_asset_broker, open_native_profile_asset_service,
+    NativeProviderWorkerBridgeAttachment, PreflightedProviderRuntimeActivationGrant,
+    ProviderManifestAuthorizationV2, ProviderRuntimeActivationGrant,
+    ProviderRuntimeActivationGrantSource, ProviderRuntimeActuationProposal,
+    ProviderRuntimeAuthorityInput, ProviderRuntimeProgressProjection,
+    ProviderRuntimeReceiptIdentityV2, ProviderRuntimeReceiptIssuerV2, ProviderRuntimeReceiptV2,
+    ProviderRuntimeReceiptVerifierV2, ProviderRuntimeStreamService,
+    VerifiedProviderRuntimeReceiptV2, authorize_native_output_committer,
+    authorize_native_output_ui, authorize_native_plugin_asset_broker,
+    open_native_profile_asset_service,
 };
 use comfy_tensor::{
     BackendCapabilityMatrix, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext, StreamId,
@@ -19468,6 +19469,7 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
     assert_root_export::<ProviderRuntimeReceiptV2>();
     assert_root_export::<ProviderRuntimeReceiptVerifierV2>();
     assert_root_export::<ProviderRuntimeStreamService>();
+    assert_root_export::<NativeProviderWorkerBridgeAttachment>();
     assert_root_export::<VerifiedProviderRuntimeReceiptV2>();
     let _materializer = comfy_runtime::materialize_provider_invocation_result_v2;
 
@@ -19478,6 +19480,8 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_execution_controller.rs"))?;
     let component_host =
         fs::read_to_string(root.join("crates/comfy_plugin_host/src/component_host.rs"))?;
+    let private_worker =
+        fs::read_to_string(root.join("crates/comfy_plugin_host/src/private_worker.rs"))?;
     for required in [
         "pub use plugin_services::*;",
         "pub use provider_materialization::*;",
@@ -19523,7 +19527,13 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
     for required in [
         "provider_streams: ProviderRuntimeStreamService",
         "ProviderRuntimeStreamService::new()",
-        "provider_runtime_stream_service",
+        "pub struct NativeProviderWorkerBridgeAttachment",
+        "Weak<NativeExecutionController>",
+        "provider_bridge_live: Arc<AtomicBool>",
+        "runner_provider_bridge_live",
+        "start_with_provider_worker_bridge",
+        "fn revoke_provider_worker_bridge",
+        "fn invalidate_provider_worker_bridge",
         "begin_legacy(",
         "call_legacy(",
         "resolve_legacy(",
@@ -19541,7 +19551,15 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
         !controller.contains("provider_sessions: BTreeMap<String, PluginCapabilityInvocation>")
     );
     assert!(!controller.contains("pub struct ProviderRuntimeStreamService"));
+    assert!(!controller.contains("pub fn provider_runtime_stream_service"));
+    assert!(!controller.contains("pub fn provider_runtime_activation_grants"));
     assert!(!component_host.contains("pub struct ProviderRuntimeStreamOwner"));
+    assert!(!private_worker.contains("ProviderRuntimeStreamService::new()"));
+    assert!(
+        private_worker.contains(
+            "provider_worker_bridge: Mutex<Option<NativeProviderWorkerBridgeAttachment>>"
+        )
+    );
     assert!(!services.contains("pub struct ProviderRuntimeStreamOwner"));
     assert!(!services.contains("pub struct ProviderRuntimeStreamState"));
     assert!(services.contains("state: Arc<Mutex<ProviderRuntimeStreamState>>"));
@@ -19556,6 +19574,34 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
         owner_declarations.len(),
         1,
         "Task412 must retain exactly one public production stream service: {owner_declarations:?}"
+    );
+    let controller_production = controller
+        .split_once("#[cfg(test)]\nmod tests")
+        .map_or(controller.as_str(), |(production, _)| production);
+    assert_eq!(
+        controller_production
+            .matches("ProviderRuntimeStreamService::new()")
+            .count(),
+        1,
+        "Task423 must retain exactly one controller production stream-service constructor"
+    );
+    assert!(services.contains(
+        "#[cfg(test)]\n    fn new() -> Self {\n        ProviderRuntimeStreamService::new().activation_grants()"
+    ));
+    let non_controller_constructors =
+        production_source_occurrences(&sources, "ProviderRuntimeStreamService::new()")
+            .into_iter()
+            .filter(|location| !location.contains("native_execution_controller.rs:"))
+            .collect::<Vec<_>>();
+    assert_eq!(
+        non_controller_constructors.len(),
+        1,
+        "Task423 found an unexpected non-controller stream-service constructor: {non_controller_constructors:?}"
+    );
+    assert!(
+        non_controller_constructors
+            .first()
+            .is_some_and(|location| location.contains("plugin_services.rs:"))
     );
     assert!(
         production_source_occurrences(&sources, "pub struct ProviderRuntimeStreamOwner").is_empty()
@@ -19602,6 +19648,8 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
         "comfy_runtime::ProviderRuntimeActuationProposal",
         "comfy_runtime::ProviderRuntimeAuthorityInput",
         "comfy_runtime::ProviderRuntimeProgressProjection",
+        "comfy_runtime::NativeProviderWorkerBridgeAttachment",
+        "comfy_plugin_host::PrivateWorkerPluginExecutor",
         "comfy_runtime::materialize_provider_invocation_result_v2",
     ] {
         assert!(
@@ -19622,6 +19670,7 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
         "task412-raw-owner-remains-private-behind-service-lock",
         "task412-actuation-proposal-binds-authority-body-uploads-cost-and-idempotency",
         "task412-controller-shares-service-and-delegates-v1-cleanup",
+        "task423-private-executor-retains-only-one-live-weak-controller-attachment",
         "task412-root-exports-runtime-stream-authority",
         "task412-v2-materialization-validates-before-canonical-projection",
         "task412-ownership-oracle-proves-single-owner-and-root-export",

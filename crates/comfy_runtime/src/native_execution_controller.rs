@@ -12,11 +12,11 @@ use crate::{
     OutputCommitError, OutputCommitReceipt, OutputCommitter, OutputExecutionScope, OutputMediaKind,
     OutputProposal, PluginServiceWireFailure, PluginServiceWireRequest, PreparedEffect,
     PreparedEffectRequest, PreparedOutput, ProfileId, PromptCompileError,
-    ProviderRuntimeActivationGrantSource, ProviderRuntimeStreamService, RuntimeCachePolicy,
-    RuntimeNodeDescriptor, RuntimeOutputDescriptor, RuntimeSupervisor, RuntimeSupervisorError,
-    SharedAssetService, SharedExecutionPresentationService, SharedOutputCommitter,
-    WorkerLaunchConfig, WorkerRegistryDeploymentPlan, WorkflowFormatDocument,
-    authorize_native_input_reader, authorize_native_output_committer, graph_to_prompt,
+    ProviderRuntimeStreamService, RuntimeCachePolicy, RuntimeNodeDescriptor,
+    RuntimeOutputDescriptor, RuntimeSupervisor, RuntimeSupervisorError, SharedAssetService,
+    SharedExecutionPresentationService, SharedOutputCommitter, WorkerLaunchConfig,
+    WorkerRegistryDeploymentPlan, WorkflowFormatDocument, authorize_native_input_reader,
+    authorize_native_output_committer, graph_to_prompt,
 };
 use chrono::{Local, Utc};
 #[cfg(test)]
@@ -131,8 +131,8 @@ use std::{
     ops::Deref,
     path::PathBuf,
     sync::{
-        Arc, OnceLock,
-        atomic::{AtomicU64, Ordering},
+        Arc, OnceLock, Weak,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     thread,
     time::{Duration, Instant},
@@ -6297,8 +6297,69 @@ pub struct NativeExecutionController {
     profile_id: ProfileId,
     provider_registry: Option<NativeProviderRegistryPin>,
     provider_streams: ProviderRuntimeStreamService,
+    provider_bridge_live: Arc<AtomicBool>,
     commands: async_channel::Sender<PreparedNativeCommand>,
     runner: Mutex<Option<thread::JoinHandle<()>>>,
+}
+
+pub struct NativeProviderWorkerBridgeAttachment {
+    controller: Weak<NativeExecutionController>,
+    profile_id: ProfileId,
+}
+
+impl NativeProviderWorkerBridgeAttachment {
+    pub fn bind_to_worker_profile(
+        self,
+        profile_id: ProfileId,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        let controller = self.controller.upgrade().ok_or_else(|| {
+            NativeImageRuntimeError::Execution(
+                "native provider worker bridge controller is unavailable".to_owned(),
+            )
+        })?;
+        if !controller.provider_bridge_live.load(Ordering::Acquire) {
+            return Err(NativeImageRuntimeError::Execution(
+                "native provider worker bridge controller has shut down".to_owned(),
+            ));
+        }
+        if self.profile_id != profile_id || controller.profile_id != profile_id {
+            return Err(NativeImageRuntimeError::Execution(
+                "native provider worker bridge belongs to a different profile".to_owned(),
+            ));
+        }
+        drop(controller);
+        Ok(self)
+    }
+
+    pub fn is_live(&self) -> bool {
+        self.controller
+            .upgrade()
+            .is_some_and(|controller| controller.provider_bridge_live.load(Ordering::Acquire))
+    }
+}
+
+impl Drop for NativeProviderWorkerBridgeAttachment {
+    fn drop(&mut self) {
+        if let Some(controller) = self.controller.upgrade() {
+            controller.revoke_provider_worker_bridge();
+        }
+    }
+}
+
+pub struct NativeExecutionControllerRegistration {
+    controller: Arc<NativeExecutionController>,
+    provider_worker_bridge: NativeProviderWorkerBridgeAttachment,
+}
+
+impl NativeExecutionControllerRegistration {
+    pub fn into_parts(
+        self,
+    ) -> (
+        Arc<NativeExecutionController>,
+        NativeProviderWorkerBridgeAttachment,
+    ) {
+        (self.controller, self.provider_worker_bridge)
+    }
 }
 
 struct PreparedNativeCommand {
@@ -6331,6 +6392,21 @@ impl Drop for NativePreparedExecutionActivation {
 }
 
 impl NativeExecutionController {
+    pub fn start_with_provider_worker_bridge(
+        config: NativeExecutionControllerConfig,
+        event_bus: ExecutionEventBus,
+    ) -> Result<NativeExecutionControllerRegistration, NativeImageRuntimeError> {
+        let controller = Self::start(config, event_bus)?;
+        let provider_worker_bridge = NativeProviderWorkerBridgeAttachment {
+            controller: Arc::downgrade(&controller),
+            profile_id: controller.profile_id,
+        };
+        Ok(NativeExecutionControllerRegistration {
+            controller,
+            provider_worker_bridge,
+        })
+    }
+
     pub fn start(
         config: NativeExecutionControllerConfig,
         event_bus: ExecutionEventBus,
@@ -6342,17 +6418,25 @@ impl NativeExecutionController {
         let (commands, receiver) = async_channel::bounded(NATIVE_CONTROLLER_CAPACITY);
         let profile_id = config.worker.profile_id;
         let provider_streams = ProviderRuntimeStreamService::new();
+        let provider_bridge_live = Arc::new(AtomicBool::new(true));
         let runner_provider_streams = provider_streams.clone();
+        let runner_cleanup_streams = provider_streams.clone();
+        let runner_provider_bridge_live = provider_bridge_live.clone();
         let runner = thread::Builder::new()
             .name("native-image-controller".to_owned())
             .spawn(move || {
-                if let Err(error) = smol::block_on(run_native_controller(
+                let result = smol::block_on(run_native_controller(
                     config,
                     event_bus,
                     receiver,
                     supervisor,
                     runner_provider_streams,
-                )) {
+                ));
+                invalidate_provider_worker_bridge(
+                    &runner_provider_bridge_live,
+                    &runner_cleanup_streams,
+                );
+                if let Err(error) = result {
                     eprintln!("native image execution controller stopped: {error}");
                 }
             })
@@ -6361,20 +6445,14 @@ impl NativeExecutionController {
             profile_id,
             provider_registry,
             provider_streams,
+            provider_bridge_live,
             commands,
             runner: Mutex::new(Some(runner)),
         }))
     }
 
-    pub fn provider_runtime_activation_grants(&self) -> ProviderRuntimeActivationGrantSource {
-        self.provider_streams.activation_grants()
-    }
-
-    pub fn provider_runtime_stream_service(&self) -> ProviderRuntimeStreamService {
-        self.provider_streams.clone()
-    }
-
     fn shutdown_and_join(&self) -> Result<(), ExecutionFailure> {
+        self.revoke_provider_worker_bridge();
         self.commands.close();
         let Some(runner) = self.runner.lock().take() else {
             return Ok(());
@@ -6386,6 +6464,19 @@ impl NativeExecutionController {
             )
             .with_origin(ExecutionFailureOrigin::Transport)
         })
+    }
+
+    fn revoke_provider_worker_bridge(&self) {
+        invalidate_provider_worker_bridge(&self.provider_bridge_live, &self.provider_streams);
+    }
+}
+
+fn invalidate_provider_worker_bridge(
+    live: &AtomicBool,
+    provider_streams: &ProviderRuntimeStreamService,
+) {
+    if live.swap(false, Ordering::AcqRel) {
+        provider_streams.revoke_all();
     }
 }
 
@@ -6471,6 +6562,7 @@ fn validate_plan_provider_registry(
 
 impl Drop for NativeExecutionController {
     fn drop(&mut self) {
+        self.revoke_provider_worker_bridge();
         self.commands.close();
         if let Some(runner) = self.runner.get_mut().take()
             && runner.join().is_err()
@@ -7744,6 +7836,97 @@ mod tests {
     use serde_json::json;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use tempfile::TempDir;
+
+    fn inactive_provider_bridge_controller(
+        profile_id: ProfileId,
+    ) -> Arc<NativeExecutionController> {
+        let (commands, receiver) = async_channel::bounded(1);
+        drop(receiver);
+        Arc::new(NativeExecutionController {
+            profile_id,
+            provider_registry: None,
+            provider_streams: ProviderRuntimeStreamService::new(),
+            provider_bridge_live: Arc::new(AtomicBool::new(true)),
+            commands,
+            runner: Mutex::new(None),
+        })
+    }
+
+    fn provider_bridge_attachment(
+        controller: &Arc<NativeExecutionController>,
+    ) -> NativeProviderWorkerBridgeAttachment {
+        NativeProviderWorkerBridgeAttachment {
+            controller: Arc::downgrade(controller),
+            profile_id: controller.profile_id,
+        }
+    }
+
+    #[test]
+    fn native_provider_worker_bridge_attachment_is_profile_bound_weak_and_one_lifecycle() {
+        let profile_id = ProfileId(Uuid::from_u128(0x4230));
+        let foreign_profile_id = ProfileId(Uuid::from_u128(0x4231));
+        let controller = inactive_provider_bridge_controller(profile_id);
+
+        let attachment = provider_bridge_attachment(&controller)
+            .bind_to_worker_profile(profile_id)
+            .expect("bind controller attachment to its worker profile");
+        assert!(attachment.is_live());
+
+        let foreign_controller = inactive_provider_bridge_controller(foreign_profile_id);
+        assert!(matches!(
+            provider_bridge_attachment(&foreign_controller).bind_to_worker_profile(profile_id),
+            Err(NativeImageRuntimeError::Execution(_))
+        ));
+        assert!(attachment.is_live());
+        assert!(
+            !foreign_controller
+                .provider_bridge_live
+                .load(Ordering::Acquire)
+        );
+
+        controller
+            .shutdown_and_join()
+            .expect("shut down controller while retaining a strong reference");
+        assert!(Arc::strong_count(&controller) >= 1);
+        assert!(!attachment.is_live());
+    }
+
+    #[test]
+    fn native_provider_worker_bridge_attachment_drop_revokes_before_controller_drop() {
+        let controller = inactive_provider_bridge_controller(ProfileId(Uuid::from_u128(0x4233)));
+        let attachment = provider_bridge_attachment(&controller);
+        assert!(attachment.is_live());
+        drop(attachment);
+        assert!(!controller.provider_bridge_live.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn native_provider_worker_bridge_attachment_runner_loss_revokes_with_controller_retained() {
+        let controller = inactive_provider_bridge_controller(ProfileId(Uuid::from_u128(0x4234)));
+        let attachment = provider_bridge_attachment(&controller);
+        let runner_live = controller.provider_bridge_live.clone();
+        let runner_streams = controller.provider_streams.clone();
+        thread::spawn(move || {
+            invalidate_provider_worker_bridge(&runner_live, &runner_streams);
+        })
+        .join()
+        .expect("simulate native controller runner exit");
+        assert!(Arc::strong_count(&controller) >= 1);
+        assert!(!attachment.is_live());
+    }
+
+    #[test]
+    fn native_provider_worker_bridge_attachment_registration_drop_revokes_its_controller() {
+        let profile_id = ProfileId(Uuid::from_u128(0x4232));
+        let controller = inactive_provider_bridge_controller(profile_id);
+        let observer = Arc::downgrade(&controller);
+        let registration = NativeExecutionControllerRegistration {
+            provider_worker_bridge: provider_bridge_attachment(&controller),
+            controller,
+        };
+        drop(registration);
+        assert!(observer.upgrade().is_none());
+    }
 
     #[test]
     fn sdpose_bounding_boxes_follow_source_truncation_clamping_and_empty_rules() {

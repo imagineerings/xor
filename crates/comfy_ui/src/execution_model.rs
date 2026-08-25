@@ -8,10 +8,11 @@ use comfy_runtime::{
     ExecutionFailure, ExecutionFailureOrigin, ExecutionOutput, ExecutionOutputAvailability,
     ExecutionPresentationError, ExecutionPresentationOwner, ExecutionPresentationService,
     ExecutionReconciliation, ExecutionSnapshot, ExecutionSnapshotStatus, NativeExecutionController,
-    NativeExecutionControllerConfig, NativeExecutionRegistryBundle, OperationEligibility,
-    ProfileId, RequestId, RetryPromptSource, SharedAssetService,
-    SharedExecutionPresentationService, WorkflowFormatDocument, authorize_native_output_ui,
-    generated_native_frontend_contracts, graph_to_prompt,
+    NativeExecutionControllerConfig, NativeExecutionRegistryBundle,
+    NativeProviderWorkerBridgeAttachment, OperationEligibility, ProfileId, RequestId,
+    RetryPromptSource, SharedAssetService, SharedExecutionPresentationService,
+    WorkflowFormatDocument, authorize_native_output_ui, generated_native_frontend_contracts,
+    graph_to_prompt,
 };
 use comfy_tensor::CancellationToken;
 use comfy_types::NodeId;
@@ -1372,7 +1373,7 @@ pub fn register_native_execution_services(
     config: NativeExecutionControllerConfig,
     bundle: Arc<NativeExecutionRegistryBundle>,
     cx: &mut App,
-) -> Result<(), NativeExecutionServiceError> {
+) -> Result<NativeProviderWorkerBridgeAttachment, NativeExecutionServiceError> {
     let profile_id = config.worker.profile_id;
     if bundle.profile_id() != profile_id
         || config.provider_registry.as_ref() != bundle.provider_registry()
@@ -1388,24 +1389,36 @@ pub fn register_native_execution_services(
     }
     let event_bus = ExecutionEventBus::new(EXECUTION_HISTORY_CAPACITY)
         .map_err(|error| NativeExecutionServiceError::Runtime(error.to_string()))?;
-    let controller = NativeExecutionController::start(config.clone(), event_bus.clone())
-        .map_err(|error| NativeExecutionServiceError::Runtime(error.to_string()))?;
+    let (controller, provider_worker_bridge) =
+        NativeExecutionController::start_with_provider_worker_bridge(
+            config.clone(),
+            event_bus.clone(),
+        )
+        .map_err(|error| NativeExecutionServiceError::Runtime(error.to_string()))?
+        .into_parts();
     let outputs = Arc::new(NativeOutputService::new(&config)?);
-    model
-        .update(cx, |model, cx| {
-            model.register_runtime_controller(controller, cx);
-            model.register_plan_provider(Arc::new(NativeGeneratedPlanProvider { bundle }), cx);
-            model.register_output_operation_handler(outputs, cx);
-            model.attach_profile_event_bus(profile_id, event_bus, cx);
-            model.set_snapshot_status(
-                profile_id,
-                ExecutionDataSource::Live,
-                ExecutionSnapshotStatus::Ready,
-                cx,
-            )
-        })
-        .map_err(|error| NativeExecutionServiceError::Model(error.to_string()))?;
-    Ok(())
+    let registration = model.update(cx, |model, cx| {
+        model.register_runtime_controller(controller, cx);
+        model.register_plan_provider(Arc::new(NativeGeneratedPlanProvider { bundle }), cx);
+        model.register_output_operation_handler(outputs, cx);
+        model.attach_profile_event_bus(profile_id, event_bus, cx);
+        model.set_snapshot_status(
+            profile_id,
+            ExecutionDataSource::Live,
+            ExecutionSnapshotStatus::Ready,
+            cx,
+        )
+    });
+    if let Err(error) = registration {
+        model.update(cx, |model, cx| {
+            model.clear_runtime_controller(cx);
+            model.clear_plan_provider(cx);
+            model.clear_output_reference_handler(cx);
+            model.clear_output_operation_handler(cx);
+        });
+        return Err(NativeExecutionServiceError::Model(error.to_string()));
+    }
+    Ok(provider_worker_bridge)
 }
 
 pub fn clear_native_execution_services(cx: &mut App) -> Result<(), NativeExecutionServiceError> {
@@ -1622,6 +1635,33 @@ mod tests {
     #[cfg(feature = "test-support")]
     use gpui::TestAppContext;
     use std::{fs, path::PathBuf};
+
+    #[test]
+    fn native_provider_worker_bridge_registration_returns_only_after_controller_registration() {
+        let source = include_str!("execution_model.rs");
+        let registration_start = source
+            .find("pub fn register_native_execution_services(")
+            .expect("native execution service registration");
+        let registration_end = source[registration_start..]
+            .find("pub fn clear_native_execution_services(")
+            .map(|offset| registration_start + offset)
+            .expect("native execution service clear boundary");
+        let registration = &source[registration_start..registration_end];
+        let start = registration
+            .find("NativeExecutionController::start_with_provider_worker_bridge")
+            .expect("controller-owned bridge startup");
+        let register = registration[start..]
+            .find("model.register_runtime_controller(controller, cx)")
+            .map(|offset| start + offset)
+            .expect("runtime controller registration");
+        let returned = registration[register..]
+            .find("Ok(provider_worker_bridge)")
+            .map(|offset| register + offset)
+            .expect("registered bridge return");
+        assert!(start < register && register < returned);
+        assert!(!registration.contains("provider_runtime_stream_service"));
+        assert!(!registration.contains("provider_runtime_activation_grants"));
+    }
 
     #[cfg(feature = "test-support")]
     struct AcceptingExecutionActuator;

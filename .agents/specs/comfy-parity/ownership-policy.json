@@ -20876,7 +20876,7 @@
         "ProviderRuntimeStreamService"
       ],
       "allowed_adapters": [
-        "NativeExecutionController constructs and shares the sole ProviderRuntimeStreamService, and delegates the existing v1 provider capability envelope only through its crate-owned legacy methods",
+        "NativeExecutionController constructs the sole ProviderRuntimeStreamService, delegates the existing v1 provider capability envelope only through crate-owned legacy methods, and exports only one opaque non-cloneable weak lifecycle attachment for the private executor",
         "comfy_plugin_sdk::ProviderStreamValidatorV2 remains the typed ABI-state validator and owns no runtime authorization or live session table",
         "comfy_runtime::materialize_provider_invocation_result_v2 maps a receipt-verified complete DTO to one canonical response and cannot publish a partial result",
         "The later component-host adapter alone claims a runtime-minted one-use activation grant and consumes it to bind a checked ProviderRuntimeAuthorityInput; worker and component fields cannot mint authority",
@@ -20937,6 +20937,18 @@
           "role": "allowed_adapter",
           "symbol": "materialize_provider_invocation_result_v2",
           "pattern": "^pub fn materialize_provider_invocation_result_v2\\("
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "qualified": "comfy_runtime::NativeProviderWorkerBridgeAttachment",
+          "role": "allowed_adapter",
+          "symbol": "NativeProviderWorkerBridgeAttachment"
+        },
+        {
+          "path": "crates/comfy_plugin_host/src/private_worker.rs",
+          "qualified": "comfy_plugin_host::PrivateWorkerPluginExecutor",
+          "role": "allowed_adapter",
+          "symbol": "PrivateWorkerPluginExecutor"
         }
       ],
       "call_symbols": [
@@ -20947,6 +20959,7 @@
         "ProviderRuntimeAuthorityInput",
         "ProviderRuntimeProgressProjection",
         "ProviderRuntimeStreamService",
+        "NativeProviderWorkerBridgeAttachment",
         "materialize_provider_invocation_result_v2"
       ],
       "call_path_prefixes": [
@@ -20977,7 +20990,12 @@
         {
           "name": "task412-controller-shares-service-and-delegates-v1-cleanup",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "provider_streams: ProviderRuntimeStreamService[\\s\\S]*ProviderRuntimeStreamService::new\\(\\)[\\s\\S]*provider_runtime_stream_service[\\s\\S]*\\.begin_legacy\\([\\s\\S]*\\.call_legacy\\([\\s\\S]*\\.resolve_legacy\\([\\s\\S]*\\.finish_legacy\\([\\s\\S]*abort_legacy\\([\\s\\S]*fn abort_provider_sessions\\([\\s\\S]*provider_streams\\.revoke_all\\("
+          "pattern": "provider_streams: ProviderRuntimeStreamService[\\s\\S]*provider_bridge_live: Arc<AtomicBool>[\\s\\S]*pub struct NativeProviderWorkerBridgeAttachment[\\s\\S]*Weak<NativeExecutionController>[\\s\\S]*provider_bridge_live\\.load\\(Ordering::Acquire\\)[\\s\\S]*pub fn start_with_provider_worker_bridge\\([\\s\\S]*ProviderRuntimeStreamService::new\\(\\)[\\s\\S]*runner_provider_bridge_live[\\s\\S]*invalidate_provider_worker_bridge\\([\\s\\S]*fn revoke_provider_worker_bridge\\([\\s\\S]*fn invalidate_provider_worker_bridge\\([\\s\\S]*live\\.swap\\(false, Ordering::AcqRel\\)[\\s\\S]*\\.begin_legacy\\([\\s\\S]*\\.call_legacy\\([\\s\\S]*\\.resolve_legacy\\([\\s\\S]*\\.finish_legacy\\([\\s\\S]*abort_legacy\\([\\s\\S]*fn abort_provider_sessions\\([\\s\\S]*provider_streams\\.revoke_all\\("
+        },
+        {
+          "name": "task423-private-executor-retains-only-one-live-weak-controller-attachment",
+          "path": "crates/comfy_plugin_host/src/private_worker.rs",
+          "pattern": "provider_worker_bridge: Mutex<Option<NativeProviderWorkerBridgeAttachment>>[\\s\\S]*pub fn attach_provider_worker_bridge\\([\\s\\S]*bind_to_worker_profile\\([\\s\\S]*is_some_and\\(NativeProviderWorkerBridgeAttachment::is_live\\)[\\s\\S]*\\*current = Some\\(attachment\\)"
         },
         {
           "name": "task412-root-exports-runtime-stream-authority",
@@ -20998,7 +21016,8 @@
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-provider-runtime-stream-progress-foundation",
-        "comfy-parity-provider-runtime-component-activation-preflight-foundation"
+        "comfy-parity-provider-runtime-component-activation-preflight-foundation",
+        "comfy-parity-provider-controller-owned-worker-bridge-bootstrap"
       ],
       "production_consumers": [
         "native provider capability-envelope sessions",

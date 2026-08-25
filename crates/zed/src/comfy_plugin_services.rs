@@ -22,6 +22,7 @@ use std::{
 
 pub struct SimComfyPluginServices {
     pub boundary: ComponentExecutionBoundary,
+    private_worker_executor: Arc<PrivateWorkerPluginExecutor>,
     broker: PluginCapabilityBroker,
     principal_id: String,
     receipt_issuer: Arc<ProviderResultReceiptIssuer>,
@@ -49,6 +50,10 @@ impl SimComfyPluginServices {
 
     pub fn cost_authority(&self) -> Arc<ProviderCostApprovalAuthority> {
         self.cost_authority.clone()
+    }
+
+    pub(crate) fn private_worker_executor(&self) -> Arc<PrivateWorkerPluginExecutor> {
+        self.private_worker_executor.clone()
     }
 }
 
@@ -93,18 +98,18 @@ pub fn private_worker_services(
     );
     let receipt_lifetime = Duration::from_secs(5 * 60);
     let principal_id = launch.profile_id.0.to_string();
-    let boundary = ComponentExecutionBoundary::private_worker(
-        PrivateWorkerPluginExecutor::new_with_provider_authorities(
-            launch,
-            broker.clone(),
-            principal_id.clone(),
-            receipt_issuer.clone(),
-            receipt_lifetime,
-            cost_authority.clone(),
-        )?,
-    );
+    let private_worker_executor = PrivateWorkerPluginExecutor::new_with_provider_authorities(
+        launch,
+        broker.clone(),
+        principal_id.clone(),
+        receipt_issuer.clone(),
+        receipt_lifetime,
+        cost_authority.clone(),
+    )?;
+    let boundary = ComponentExecutionBoundary::private_worker(private_worker_executor.clone());
     Ok(SimComfyPluginServices {
         boundary,
+        private_worker_executor,
         broker,
         principal_id,
         receipt_issuer,
