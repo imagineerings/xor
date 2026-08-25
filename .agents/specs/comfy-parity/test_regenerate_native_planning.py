@@ -286,6 +286,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/reference_view_selector.py",
             "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/transform.py",
             "projects/comfy/ComfyUI/comfy/image_encoders/dino2.py",
+            "projects/comfy/ComfyUI/comfy/model_detection.py",
             "crates/comfy_tensor/src/ops/linear_algebra_01.rs",
             "crates/comfy_tensor/src/ops/linear_algebra_02.rs",
             "crates/comfy_tensor/src/ops/random_number_generation_01.rs",
@@ -305,6 +306,7 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn("storage-to-F32 execution projection", depth_anything_task["done"])
         self.assertIn("instead of duplicating kernels", depth_anything_task["done"])
+        self.assertIn("model-detection/configuration owner", depth_anything_task["done"])
         depth_anything_validation = planning.task_validation_commands(
             depth_anything_task
         )
