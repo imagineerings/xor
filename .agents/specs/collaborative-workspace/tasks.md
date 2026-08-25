@@ -3552,7 +3552,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Writes: deploy/collaboration/migrations/*_
     - _Validation: dry run applies, resumes, detects checksum drift and rolls back before compatibility boundary_
 
-  - [ ] 44.5. Add health, metrics and redacted logging dashboards
+  - [x] 44.5. Add health, metrics and redacted logging dashboards
     - Expose readiness, queue, projection drift, replica freshness, compatibility and migration state without content.
     - _Requirements: 19.3, 19.5_
     - _Capability IDs: CAP-006, CAP-028, CAP-043_
@@ -3560,6 +3560,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/collab/src/{freshness,audit}/**, projects/buzz/deploy/**_
     - _Writes: deploy/collaboration/observability/*_
     - _Validation: smoke tests assert every stop/rollback signal is exported and private fixture content is absent_
+    - _Discovered contradiction (2026-08-25): Buzz's usage dashboards emit stable per-community labels, which conflicts with the accepted operational registry's closed low-cardinality deployment labels, and this deployment-only write cannot manufacture runtime emitters for target metrics whose load/security evidence is explicitly assigned to Tasks 45.4–45.5. The narrow correction generates content-free deployment consumers from all normative `OL-*` rows, prohibits tenant selectors and leaves metric emission/enforcement with each named canonical owner and later verification leaf._
+    - _Evidence: 2026-08-25 — generated four immutable access-controlled Grafana dashboards from all 55 operational-limit rows, including readiness, queue/backpressure, projection drift, replica freshness, compatibility, migration, redaction and disabled-client-telemetry state. Added 16 page-level Prometheus rules covering every automatic stop/rollback condition with one closed action and dashboard owner. Added a private 30s/15s metrics contract plus a 10,000-series ceiling, closed label set, allowlisted structured fields, unknown-field drop, 64 KiB record bound, 14-day retention, repeated-error sampling and unchanged disabled client telemetry. The deterministic checker passed render parity, all-row/required-metric/signal coverage and logging policy; independent in-memory mutations proved missing-signal and frozen private-content leakage are rejected, and Ruby parsed the generated rule YAML. Dependency, inventory, frozen-client, formatting, diff and canonical specification gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 44.6. Consolidate build, signing and release workflows
     - Move service/client/package artifacts to Zed conventions with signed manifests and compatibility metadata.
