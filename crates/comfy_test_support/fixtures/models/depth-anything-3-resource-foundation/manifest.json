@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "oracle_domain": "zed.comfy.depth-anything-3-reduced-oracle.v1",
+  "generator_sha256": "d59512e3e7637d9c8645ea017d7058f753c982d8fb72f19d8317b691feb80d90",
+  "source_graph_sha256": "dfb0fd569d07da0fb9426d2a2850aa8bf37b61d8541087cb5d9b29aed5b9ddad",
+  "oracle_sha256": "5937aa826dcd17992a2bf749beef5457f4dd118d0925fc0f41bba6d876762cd0",
+  "profiles": [
+    {
+      "name": "reduced-dpt",
+      "artifact_sha256": "31fb08778cfcab7adce81435b4799fe4b70aceb134c008106b03924de804b34f",
+      "input_shape": [1, 4, 4, 3],
+      "output_shape": [1, 4, 4],
+      "source_dtypes": ["f16", "bf16", "f32"],
+      "sky": true,
+      "confidence": false,
+      "camera": false
+    },
+    {
+      "name": "reduced-dualdpt",
+      "artifact_sha256": "e23ba80bff17b5362d92f8a5f6078657bd2f61cd2df24b369e68b70f20934619",
+      "input_shape": [3, 4, 4, 3],
+      "output_shape": [3, 4, 4],
+      "source_dtypes": ["f16", "bf16", "f32"],
+      "sky": false,
+      "confidence": true,
+      "camera": true
+    }
+  ],
+  "reference_strategies": ["first", "middle", "saddle_balanced", "saddle_sim_range"],
+  "required_paths": [
+    "upper-bound-preprocess",
+    "lower-bound-preprocess",
+    "mono-serial",
+    "multiview-local-global-attention",
+    "qk-normalization",
+    "two-dimensional-rope",
+    "camera-encoder-token",
+    "reference-reorder-restore",
+    "dpt-depth-sky",
+    "dualdpt-depth-confidence",
+    "camera-decoder",
+    "ray-pose-ransac-ql-svd",
+    "original-size-align-corners-false"
+  ]
+}
