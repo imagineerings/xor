@@ -223,6 +223,53 @@ pub struct MeshAdmissionContext {
     replay_nonces: Arc<Mutex<HashMap<FrameNonce, u64>>>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AuthenticatedMeshPeer {
+    deployment_id: DeploymentId,
+    community_id: CommunityId,
+    owner_principal_id: PrincipalId,
+    endpoint_id: EndpointId,
+    runtime_generation: u64,
+    membership_version: AggregateVersion,
+}
+
+impl AuthenticatedMeshPeer {
+    fn from_record(record: &PeerMembershipRecord) -> Self {
+        Self {
+            deployment_id: record.deployment_id,
+            community_id: record.community_id,
+            owner_principal_id: record.owner_principal_id,
+            endpoint_id: record.endpoint.id,
+            runtime_generation: record.runtime_generation,
+            membership_version: record.membership_version,
+        }
+    }
+
+    pub const fn deployment_id(self) -> DeploymentId {
+        self.deployment_id
+    }
+
+    pub const fn community_id(self) -> CommunityId {
+        self.community_id
+    }
+
+    pub const fn owner_principal_id(self) -> PrincipalId {
+        self.owner_principal_id
+    }
+
+    pub const fn endpoint_id(self) -> EndpointId {
+        self.endpoint_id
+    }
+
+    pub const fn runtime_generation(self) -> u64 {
+        self.runtime_generation
+    }
+
+    pub const fn membership_version(self) -> AggregateVersion {
+        self.membership_version
+    }
+}
+
 impl MeshAdmissionContext {
     pub fn new(
         tenant: &TenantContext,
@@ -272,6 +319,15 @@ impl MeshProtocol {
             admission,
             state: ProtocolState::AwaitingHello,
             membership_versions: HashMap::new(),
+        }
+    }
+
+    pub fn authenticated_peer(&self) -> Option<AuthenticatedMeshPeer> {
+        match &self.state {
+            ProtocolState::Control { peer } | ProtocolState::Session { peer, .. } => {
+                Some(AuthenticatedMeshPeer::from_record(peer))
+            }
+            ProtocolState::AwaitingHello | ProtocolState::Closed => None,
         }
     }
 
