@@ -1042,6 +1042,10 @@ class ValidationGenerationTests(unittest.TestCase):
             "capacity-one typed WorkerProviderStreamRequest",
             "nonblocking enqueue",
             "canonical WorkerProviderStreamTransportValidator",
+            "ProviderV2InvocationProposal remains armed",
+            "no success disarm, completion token, completion setter, or arbitrary-receipt escape hatch",
+            "exact runtime, checked context, and route",
+            "armed proposal drop",
             "no public/default transport trait",
             "Every legacy v1 preparation",
         ):
@@ -1084,6 +1088,18 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_plugin_host/src/private_worker.rs",
             provider_worker_bridge["writes"],
         )
+        for bridge_completion_owner in (
+            "crates/comfy_plugin_host/src/component_host.rs",
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
+        ):
+            self.assertIn(bridge_completion_owner, provider_worker_bridge["reads"])
+            self.assertIn(bridge_completion_owner, provider_worker_bridge["writes"])
+        for bridge_completion_read in (
+            "crates/comfy_runtime/src/provider_materialization.rs",
+            "crates/comfy_runtime/src/trust.rs",
+        ):
+            self.assertIn(bridge_completion_read, provider_worker_bridge["reads"])
+            self.assertNotIn(bridge_completion_read, provider_worker_bridge["writes"])
         self.assertIn(
             "app-side native controller allocates the WorkerProviderInvocationContext",
             provider_worker_bridge["done"],
@@ -1100,6 +1116,18 @@ class ValidationGenerationTests(unittest.TestCase):
             "first valid-grant end-to-end success path",
             provider_worker_bridge["done"],
         )
+        for bridge_completion_gate in (
+            "ProviderV2InvocationProposal remains armed",
+            "exact session-derived identity",
+            "exact main stream handle returned by Start",
+            "ProviderRuntimeReceiptV2",
+            "does not carry WorkerProviderInvocationContext",
+            "canonical all-or-none materialization",
+            "unrelated valid receipt",
+            "completion token, no-argument disarm",
+            "proposal/context/handle/receipt/materialization binding",
+        ):
+            self.assertIn(bridge_completion_gate, provider_worker_bridge["done"])
         self.assertIn(
             "crates/comfy_nodes/src/families/partner_three_d_03.rs",
             provider_projection["writes"],
