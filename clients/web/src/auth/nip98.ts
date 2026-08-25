@@ -61,26 +61,29 @@ function base64Utf8(value: string): string {
 export async function makeNip98Authorization(
   signer: Nip07Provider | undefined,
   url: string,
-  method: "POST",
-  body: string,
+  method: "GET" | "POST",
+  body?: string,
   environment: Nip98Environment = { crypto, now: Date.now },
 ): Promise<string> {
   if (!signer) {
     throw new CollaborationAuthError(
       "signer_denied",
-      "A NIP-07 browser signer is required to accept this invite.",
+      "A NIP-07 browser signer is required to authorize this request.",
     );
   }
 
+  const tags = [
+    ["u", url],
+    ["method", method],
+  ];
+  if (body !== undefined) {
+    tags.push(["payload", await sha256Hex(body, environment.crypto)]);
+    tags.push(["nonce", environment.crypto.randomUUID()]);
+  }
   const unsigned: UnsignedNostrEvent = {
     kind: 27_235,
     created_at: Math.floor(environment.now() / 1_000),
-    tags: [
-      ["u", url],
-      ["method", method],
-      ["payload", await sha256Hex(body, environment.crypto)],
-      ["nonce", environment.crypto.randomUUID()],
-    ],
+    tags,
     content: "",
   };
 
@@ -92,7 +95,7 @@ export async function makeNip98Authorization(
   } catch {
     throw new CollaborationAuthError(
       "signer_denied",
-      "The browser signer denied the invite request.",
+      "The browser signer denied the authorization request.",
     );
   }
 
