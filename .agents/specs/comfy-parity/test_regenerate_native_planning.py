@@ -164,7 +164,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 722)
+        self.assertEqual(len(tasks), 724)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -287,6 +287,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-native-attention-ordered-additive-mask-foundation",
             "comfy-parity-native-background-removal-resource-foundation",
             "comfy-parity-native-depth-anything-3-resource-foundation",
+            "comfy-parity-native-dinov2-backbone-owner-foundation",
             "comfy-parity-native-moge-resource-foundation",
             "comfy-parity-native-conditioning-auxiliary-resource-foundation",
             "comfy-parity-native-model-resource-service-foundation",
@@ -438,6 +439,119 @@ class ValidationGenerationTests(unittest.TestCase):
             "ownership_consolidation val_ownership_001",
         ):
             self.assertIn(command, depth_anything_validation)
+        dino2_task = tasks_by_id[
+            "comfy-parity-native-dinov2-backbone-owner-foundation"
+        ]
+        self.assertEqual(
+            dino2_task["dependencies"],
+            ["comfy-parity-native-depth-anything-3-resource-foundation"],
+        )
+        self.assertEqual(
+            dino2_task["writes"],
+            [
+                "crates/comfy_model/src/dino2.rs",
+                "crates/comfy_model/src/depth_anything_3.rs",
+                "crates/comfy_model/src/comfy_model.rs",
+                "crates/comfy_test_support/fixtures/models/dinov2-backbone-owner-foundation",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ],
+        )
+        self.assertNotIn(
+            "crates/comfy_model/src/native_node_payload.rs", dino2_task["writes"]
+        )
+        for dino_read in (
+            "projects/comfy/ComfyUI/comfy/image_encoders/dino2.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/bert.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/reference_view_selector.py",
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/generate_oracle.py",
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/source_graph.py",
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/oracle.json",
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/manifest.json",
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/provenance.json",
+        ):
+            self.assertIn(dino_read, dino2_task["reads"])
+        for dino_gate in (
+            "ordinary forward and get_intermediate_layers",
+            "get_intermediate_layers_da3",
+            "camera-token injection",
+            "alternating local/global attention",
+            "QK normalization",
+            "two-dimensional RoPE",
+            "reference-view ordering",
+            "fixture hashes byte-for-byte",
+            "F32/F16/BF16 storage-to-F32 projection",
+            "shared-StorageId residency",
+            "no second DINO transformer, position, or attention equation",
+        ):
+            self.assertIn(dino_gate, dino2_task["done"])
+        dino_validation = planning.task_validation_commands(dino2_task)
+        for command in (
+            "dinov2-backbone-owner-foundation/generate_oracle.py --check",
+            "depth-anything-3-resource-foundation/generate_oracle.py --check",
+            "cargo test --locked -p comfy_model dino2",
+            "cargo test --locked -p comfy_model depth_anything_3",
+            "native_node_family_e2e depth_anything_3",
+            "ownership_consolidation val_ownership_001",
+        ):
+            self.assertIn(command, dino_validation)
+        moge_task = tasks_by_id["comfy-parity-native-moge-resource-foundation"]
+        self.assertEqual(
+            moge_task["dependencies"],
+            [
+                "comfy-parity-native-dinov2-backbone-owner-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        for moge_write in (
+            "crates/comfy_model/src/moge.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/fixtures/models/moge-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(moge_write, moge_task["writes"])
+        for moge_read in (
+            "projects/comfy/ComfyUI/comfy/ldm/moge/model.py",
+            "projects/comfy/ComfyUI/comfy/ldm/moge/modules.py",
+            "projects/comfy/ComfyUI/comfy/ldm/moge/geometry.py",
+            "projects/comfy/ComfyUI/comfy/image_encoders/dino2.py",
+            "crates/comfy_model/src/dino2.rs",
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_tensor/src/ops/linear_algebra_01.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+        ):
+            self.assertIn(moge_read, moge_task["reads"])
+        self.assertNotIn(
+            "projects/comfy/ComfyUI/comfy/ldm/moge/panorama.py", moge_task["reads"]
+        )
+        self.assertNotIn(
+            "crates/comfy_model/src/depth_anything_3.rs", moge_task["writes"]
+        )
+        for moge_gate in (
+            "v1 and v2 fixtures",
+            "collision-safe fused-QKV splitting",
+            "exclusively to NativeDino2Backbone",
+            "Levenberg-Marquardt",
+            "invalid-focal 60-degree fallback",
+            "F32/F16/BF16 retained storage",
+            "shared-StorageId residency",
+            "Panorama splitting and Poisson merge",
+            "comfy-parity-native-model-resource-execution-foundation",
+        ):
+            self.assertIn(moge_gate, moge_task["done"])
+        moge_validation = planning.task_validation_commands(moge_task)
+        for command in (
+            "moge-resource-foundation/generate_oracle.py --check",
+            "cargo test --locked -p comfy_model moge",
+            "native_node_family_e2e moge",
+            "ownership_consolidation val_ownership_001",
+        ):
+            self.assertIn(command, moge_validation)
         for path in (
             "projects/comfy/ComfyUI/comfy_extras/nodes_lt_upsampler.py",
             "projects/comfy/ComfyUI/comfy/ldm/hunyuan_video/upsampler.py",
@@ -749,6 +863,7 @@ class ValidationGenerationTests(unittest.TestCase):
         for path in (
             "crates/comfy_runtime/src/native_video_codec_abi.rs",
             "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-general-video-v1.json",
+            "crates/comfy_runtime/src/native_ffi_elf.rs",
             "crates/comfy_model/src/artifact_index.rs",
             "crates/comfy_media/src/video.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
@@ -764,10 +879,16 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_test_support/src/bin/generate_video_codec_package_bootstrap_fixture.rs",
             "crates/comfy_test_support/tests/video_codec_package_bootstrap.rs",
             "crates/comfy_test_support/fixtures/video/codec-package-bootstrap",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
         ):
             self.assertIn(path, video_package_task["writes"])
         for phrase in (
             "six-library/78-symbol catalog",
+            "inspect_elf64_dynamic_contract",
+            "no second ELF parser",
+            "all four worker NativeImageExecutor constructor branches consume the same certified inspected closure",
             "ReviewedGeneralVideoCodecDeclarations alone remains UncertifiedFfi",
             "historical five-library/54-symbol catalog",
             "Fixture signing keys and roots are test-only",
@@ -781,7 +902,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "general_video_codec_package_bootstrap",
             "--test video_codec_package_bootstrap",
             "-p comfy_worker video_codec_package_bootstrap",
-            "val_ownership_task558_video_codec_package_bootstrap_001",
+            "val_ownership_task559_video_codec_package_bootstrap_001",
         ):
             self.assertIn(command, video_package_validation)
         video_closure = tasks_by_id["comfy-parity-native-video-execution-foundation"]
@@ -808,6 +929,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-provider-runtime-component-activation-preflight-foundation",
             "comfy-parity-provider-runtime-worker-context-preflight-repair",
             "comfy-parity-provider-component-host-stream-adapter",
+            "comfy-parity-provider-controller-owned-worker-bridge-bootstrap",
             "comfy-parity-provider-worker-stream-bridge",
             "comfy-parity-provider-deployment-lifecycle",
             "comfy-parity-provider-hermetic-component-harness",
@@ -822,7 +944,7 @@ class ValidationGenerationTests(unittest.TestCase):
         provider_closure_id = (
             "comfy-parity-native-partner-provider-components-foundation"
         )
-        self.assertEqual(len(provider_shared_ids), 14)
+        self.assertEqual(len(provider_shared_ids), 15)
         self.assertEqual(len(provider_vendor_ids), 33)
         provider_projection = tasks_by_id[
             "comfy-parity-provider-namespace-binding-projection"
@@ -1204,9 +1326,56 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source",
         ):
             self.assertIn(streaming_fixture, provider_component_stream["writes"])
+        provider_bridge_bootstrap = tasks_by_id[
+            "comfy-parity-provider-controller-owned-worker-bridge-bootstrap"
+        ]
+        self.assertEqual(
+            provider_bridge_bootstrap["dependencies"],
+            ["comfy-parity-provider-component-host-stream-adapter"],
+        )
+        self.assertEqual(
+            provider_bridge_bootstrap["writes"],
+            [
+                "crates/comfy_runtime/src/native_execution_controller.rs",
+                "crates/comfy_plugin_host/src/private_worker.rs",
+                "crates/comfy_ui/src/execution_model.rs",
+                "crates/zed/src/comfy_plugin_services.rs",
+                "crates/zed/src/zed.rs",
+            ],
+        )
+        for read_only_bootstrap_path in (
+            "crates/comfy_ui/src/comfy_ui.rs",
+            "crates/zed/src/comfy_cli.rs",
+        ):
+            self.assertIn(read_only_bootstrap_path, provider_bridge_bootstrap["reads"])
+            self.assertNotIn(read_only_bootstrap_path, provider_bridge_bootstrap["writes"])
+        for bootstrap_gate in (
+            "sole ProviderRuntimeStreamService",
+            "at most one live attachment",
+            "replacement is accepted only after the prior controller has shut down or dropped",
+            "exposes no service, grant, context, source, or constructor getter",
+            "before any provider-v2 admission, envelope, instantiation, input, or request",
+            "headless CLI remains conformance_in_process with no attachment and no provider-v2 admission",
+        ):
+            self.assertIn(bootstrap_gate, provider_bridge_bootstrap["done"])
         provider_worker_bridge = tasks_by_id[
             "comfy-parity-provider-worker-stream-bridge"
         ]
+        self.assertEqual(
+            provider_worker_bridge["dependencies"],
+            ["comfy-parity-provider-controller-owned-worker-bridge-bootstrap"],
+        )
+        for bootstrap_read in (
+            "crates/comfy_ui/src/execution_model.rs",
+            "crates/zed/src/comfy_plugin_services.rs",
+            "crates/zed/src/zed.rs",
+            "crates/zed/src/comfy_cli.rs",
+        ):
+            self.assertIn(bootstrap_read, provider_worker_bridge["reads"])
+        self.assertIn(
+            "consumes only the current live controller attachment",
+            provider_worker_bridge["done"],
+        )
         self.assertIn(
             "crates/comfy_runtime/src/native_execution_controller.rs",
             provider_worker_bridge["reads"],
@@ -1263,6 +1432,21 @@ class ValidationGenerationTests(unittest.TestCase):
             "proposal/context/handle/receipt/materialization binding",
         ):
             self.assertIn(bridge_completion_gate, provider_worker_bridge["done"])
+        provider_deployment = tasks_by_id[
+            "comfy-parity-provider-deployment-lifecycle"
+        ]
+        for deployment_attachment_read in (
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/plugin_services.rs",
+            "crates/comfy_plugin_host/src/private_worker.rs",
+            "crates/comfy_plugin_host/src/component_host.rs",
+        ):
+            self.assertIn(deployment_attachment_read, provider_deployment["reads"])
+            self.assertNotIn(deployment_attachment_read, provider_deployment["writes"])
+        self.assertIn(
+            "headless consumes the same lifecycle-bound NativeExecutionController attachment",
+            provider_deployment["done"],
+        )
         self.assertIn(
             "crates/comfy_nodes/src/families/partner_three_d_03.rs",
             provider_projection["writes"],
