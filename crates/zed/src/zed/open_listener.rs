@@ -2116,7 +2116,7 @@ mod tests {
 
         match request.kind {
             Some(OpenRequestKind::GitClone { repo_url }) => {
-                assert_eq!(repo_url, "https://github.com/simtropolis/zed.git");
+                assert_eq!(repo_url, "https://github.com/simtropolis/sim.git");
             }
             _ => panic!("Expected GitClone kind"),
         }
