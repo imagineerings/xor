@@ -3738,7 +3738,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 47. Retire superseded implementations
 
-  - [ ] 47.1. Enforce legacy write freeze and usage gates
+  - [x] 47.1. Enforce legacy write freeze and usage gates
     - Reject direct legacy writes, measure remaining traffic and require rollback-window thresholds before removal.
     - _Requirements: 2.4, 18.3_
     - _Capability IDs: CAP-004, CAP-005, CAP-045_
@@ -3746,6 +3746,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/collab/src/migration/**, docs/collaboration/compatibility.md_
     - _Writes: crates/collab/src/migration/legacy_freeze.rs_
     - _Validation: tests reject legacy-only writes and removal gate fails above approved traffic/rollback thresholds_
+    - _Discovered contradiction (2026-08-25): the planned standalone source file cannot compile or be consumed by the dependent retirement leaves without migration-module registration, while this leaf specifies neither a telemetry database schema nor production routing/deletion adapters. The narrow correction registers the module and defines an injected idempotent usage-store boundary plus a pure evidence gate. It does not choose threshold values, add a second traffic owner, mutate legacy state, change routing or delete any component._
+    - _Evidence: 2026-08-25 — added a canonical-authority legacy-write freeze covering the closed desktop, agent-runtime, relay, database and pub/sub retirement components. Every operation-keyed adapter or direct attempt is recorded before a result is returned; only a compatibility adapter receives a canonical-write permit, while direct legacy writes are always rejected and unavailable, unknown or conflicting usage receipts fail closed. The Phase 8 removal gate binds one component's complete usage snapshot to the exact tenant aggregate and checkpoint version, requires its retained reversible boundary, nonzero approved threshold and rollback evidence, zero rejected direct writes, adapter read/write and active-client high-water marks at or below their approved ceilings, and both observation and rollback windows at or above their approved durations. Five focused tests passed direct-write rejection with recorded traffic, exact adapter retry with one measurement, every traffic-threshold excess, undersized observation/rollback windows and exact-threshold acceptance. Focused warning-denied release Collab library Clippy passed. The repository wrapper found no Task 47.1 warning before stopping on the unrelated pre-existing redundant clone in `buzz_object_git_metadata_import.rs:116` and needless lifetime in `collaboration_event_migration.rs:16`. Formatting, dependency, inventory, diff and canonical specification gates are recorded in the enclosing checkpoint commit. Commit: enclosing checkpoint commit, reported after creation._
 
   - [ ] 47.2. Prepare Buzz React/Tauri desktop retirement change
     - Remove build/package dependencies only after GPUI parity and desktop-state import evidence; preserve source until deletion approval.
