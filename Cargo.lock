@@ -3354,6 +3354,7 @@ dependencies = [
  "clap_complete_nushell",
  "collab",
  "collaboration_domain",
+ "collaboration_workflow",
  "collections",
  "console",
  "core-foundation 0.10.0",

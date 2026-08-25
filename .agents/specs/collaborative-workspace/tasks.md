@@ -3315,7 +3315,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Writes: tools/buzz_compat/Cargo.toml, tools/buzz_compat/src/*_
     - _Validation: frozen automation scripts produce approved output/exit codes against old and consolidated endpoints_
 
-  - [ ] 42.7. Port workflow CLI commands
+  - [x] 42.7. Port workflow CLI commands
     - Implement definition, trigger, run, approval and cancellation commands through canonical workflow APIs.
     - _Requirements: 13.1, 13.2, 13.3, 16.4_
     - _Capability IDs: CAP-027, CAP-038_
@@ -3323,8 +3323,10 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-cli/src/**, crates/cli/src/collaboration/contracts.rs_
     - _Writes: crates/cli/src/collaboration/workflows.rs_
     - _Validation: golden tests cover trigger, waiting approval, grant/deny, retry failure, cancellation and exit codes_
+    - _Discovered contradiction (2026-08-25): the planned legacy/contract read scope cannot validate definitions or serialize authoritative definition, run, retry and approval records without the canonical workflow-domain and repository contracts, and the leaf cannot compile without parent registration plus direct optional workflow/UUID edges and regenerated lock metadata. The narrow correction adds those reads, `crates/cli/{Cargo.toml,src/collaboration.rs}`, `Cargo.lock` and living evidence. It imports no repository instance and adds no signer, secret resolver, authorization reducer, trigger worker, action executor, approval store, retry scheduler or Standard-build dependency._
+    - _Evidence: 2026-08-25 — added ten Multiplayer-only workflow list/get/create/update/delete, manual trigger, run-history, approval decision, retry and cancellation variants through one injected executor. Definitions enter through the canonical bounded YAML parser and requests retain typed tenant/workflow/run/channel identities, bounded object inputs, exact approval decision/note, operation attribution and optimistic definition/run versions. Stable reads preserve definition integrity/lifecycle/scope and distinct waiting-approval, retry-scheduled, failed and cancelled states while omitting trigger contexts, action outputs, provider/step error details, approval capabilities and notes; mutations return one resource/version receipt. Five focused golden tests passed definition parsing/projection, trigger forwarding, grant/deny, retry/failure/cancellation/redaction, invalid preflight, mismatched results and the complete stable error matrix. Repository-prescribed release/all-target/all-feature CLI Clippy passed with warnings denied._
 
-  - [ ] 42.8. Consolidate moderation CLI commands
+  - [x] 42.8. Consolidate moderation CLI commands
     - Integrate the focused moderation commands into the common collaboration command/output contract.
     - _Requirements: 15.1, 15.4, 16.4_
     - _Capability IDs: CAP-029, CAP-038, CAP-041_
@@ -3332,8 +3334,10 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/cli/src/collaboration_moderation.rs, crates/cli/src/collaboration/contracts.rs_
     - _Writes: crates/cli/src/collaboration/moderation.rs_
     - _Validation: golden tests preserve role errors, redaction, output schemas and exit codes_
+    - _Discovered contradiction (2026-08-25): replacing the original top-level module outright would break the existing moderation administration/security integration target, while a pure re-export would leave its private error vocabulary outside the common contract. The narrow correction registers `collaboration::moderation`, preserves the old public path as the implementation compatibility surface, and updates that implementation plus living evidence to consume the shared error contract. It adds no parser, authorization, persistence, audit, policy, service or Standard-build behavior._
+    - _Evidence: 2026-08-25 — registered the complete canonical report/list/resolve/ban/timeout/identity-archive/community-archive adapter under `collaboration::moderation` while retaining the legacy import path for existing consumers. All errors now derive category, retryability and exit class from the shared collaboration contract and include its required content-free `message` field; partial completion maps to non-retryable `delivery_unknown`, unavailable work alone is retryable and authorization/tenant denials share the non-leaking `auth_error` class. Stable success schemas and structural private-context/debug redaction are unchanged. Five focused golden tests passed every verb, exact report/write output, denial/stale handling, the full error matrix, mismatched outcomes and debug redaction; the eight-scenario moderation administration/security suite passed role, tenant, archive, personal-mute, UI and exact audit-attribution cases. Repository-prescribed release/all-target/all-feature CLI Clippy passed with warnings denied._
 
-  - [ ] 42.9. Port media CLI commands
+  - [x] 42.9. Port media CLI commands
     - Implement authenticated upload, download, metadata and attachment commands through canonical media APIs.
     - _Requirements: 14.1, 14.2, 16.4_
     - _Capability IDs: CAP-031, CAP-038_
@@ -3341,6 +3345,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-cli/src/**, crates/cli/src/collaboration/contracts.rs_
     - _Writes: crates/cli/src/collaboration/media.rs_
     - _Validation: golden tests cover upload/download, unsupported media, permission denial, progress and exit codes_
+    - _Discovered contradiction (2026-08-25): the planned legacy/contract read scope cannot carry authenticated upload admission, canonical metadata/attachments, object selection or bounded ranges without the completed media domain and Collab object/admission contracts, and the new adapter is unreachable without parent-module registration. The narrow correction adds only those canonical reads, the `collaboration::media` declaration and living evidence. It adds no file reader/writer, network client, authorization reducer, byte validator, object provider, metadata store, attachment transaction or Standard-build edge._
+    - _Evidence: 2026-08-25 — added four Multiplayer-only authenticated upload, download, metadata and attachment variants through one injected executor. Requests retain canonical operation/hash/size/type, tenant media identity, variant/range selection and exact attachment link while source/output paths are bounded and redacted. Upload, metadata and attachment results emit stable JSON with canonical descriptors, variants and exact progress; explicit stdout download alone emits raw bytes, file-target completion emits none, and byte/progress/target mismatches fail closed. Four focused golden tests passed upload metadata/progress, raw stdout versus file output, unsupported-media and permission denials, invalid progress/outcome shapes and the complete stable error matrix. Repository-prescribed release/all-target/all-feature CLI Clippy passed with warnings denied._
 
   - [ ] 42.10. Port channel CLI commands
     - Implement channel create/update/archive, membership, template, topic and canvas commands.
