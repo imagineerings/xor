@@ -6,4 +6,5 @@ pub mod git;
 pub mod media;
 pub mod messages;
 pub mod moderation;
+pub mod social;
 pub mod workflows;
