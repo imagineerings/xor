@@ -14,11 +14,13 @@ use comfy_plugin_sdk::{
     CapabilityKind, CapabilityQuota, CapabilityRequest, CapabilityResponse, DType,
     DeterminismPolicy, DeviceId, ED25519_SIGNATURE_BYTES, EffectPolicy, InvocationError, Layout,
     ManifestProvenance, ManifestSignature, ModelValue, PLUGIN_SIGNATURE_ALGORITHM,
-    PROVIDER_BINDING_API_FEATURE, PROVIDER_BINDING_SCHEMA_VERSION, PluginContractError,
+    PROVIDER_BINDING_API_FEATURE, PROVIDER_BINDING_SCHEMA_VERSION, PROVIDER_COMPONENT_WORLD_V2,
+    PROVIDER_MANIFEST_SCHEMA_VERSION_V2, PROVIDER_STREAMING_API_FEATURE_V2, PluginContractError,
     PluginInvocation, PluginManifest, PluginNode, PluginPort, PluginSigningKey, PluginValue,
     PortCardinality, PortDirection, PortPresence, PortSerialization, ProviderBindingClaim,
-    ProviderBindingSet, RouteDeclaration, RustComfyPlugin, RustNodeInstance, ScalarValue, StreamId,
-    TensorDescriptor, TensorValue, TypeRegistry, UiContribution, ValueFamily,
+    ProviderBindingSet, ProviderHttpMethodV2, ProviderPluginManifestV2,
+    ProviderStreamingContractV2, RouteDeclaration, RustComfyPlugin, RustNodeInstance, ScalarValue,
+    StreamId, TensorDescriptor, TensorValue, TypeRegistry, UiContribution, ValueFamily,
 };
 use comfy_runtime::{
     AssetError, AssetIdentity, AssetNamespace, Capability, CapabilitySet, PermissionGrant,
@@ -346,6 +348,133 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
         routes: Vec::new(),
         legacy_mappings: Vec::new(),
     })
+}
+
+fn provider_streaming_manifest(
+    component_digest: String,
+) -> Result<ProviderPluginManifestV2, Box<dyn Error>> {
+    let registry = TypeRegistry::built_in()?;
+    let mut binding = ProviderBindingSet {
+        schema_version: 1,
+        implementation_namespace: "zed.comfy.provider.fixture".to_owned(),
+        bindings_sha256: "0".repeat(64),
+        bindings: vec![ProviderBindingClaim {
+            feature_id: "COMFY-NODE-TEST-STREAM".to_owned(),
+            node_id: "FixtureStreamingProvider".to_owned(),
+            contract_sha256: "79cf351160d022e2705307243f2c359736199070c8f147caf050a343a050e36b"
+                .to_owned(),
+            transport_schema: "zed:comfy-provider-transport@1".parse()?,
+            materializer_schema: "zed:comfy-provider-materializer@1".parse()?,
+        }],
+    };
+    binding.bindings_sha256 = binding.canonical_bindings_sha256()?;
+    assert_eq!(
+        binding.bindings_sha256,
+        "dd2046e20056584b2d9c0977a9228be1cefacf4dcf994fb5dc1fdf82284ff96d"
+    );
+    let input = PluginPort {
+        id: "prompt".to_owned(),
+        name: "prompt".to_owned(),
+        direction: PortDirection::Input,
+        type_id: registry.resolve("STRING")?.clone(),
+        cardinality: PortCardinality::Singular,
+        presence: PortPresence::Required,
+        hidden: false,
+        lazy: false,
+        default: None,
+        serialization: PortSerialization::Inline,
+        accepted_legacy_names: Vec::new(),
+    };
+    let output = PluginPort {
+        id: "output".to_owned(),
+        name: "output".to_owned(),
+        direction: PortDirection::Output,
+        type_id: registry.resolve("STRING")?.clone(),
+        cardinality: PortCardinality::Singular,
+        presence: PortPresence::Required,
+        hidden: false,
+        lazy: false,
+        default: None,
+        serialization: PortSerialization::Inline,
+        accepted_legacy_names: Vec::new(),
+    };
+    let mut manifest = PluginManifest {
+        schema_version: 1,
+        identifier: "zed.comfy.provider.fixture".to_owned(),
+        plugin_version: ApiVersion::new(1, 0, 0),
+        api: ApiRequirement {
+            major: 1,
+            minimum_minor: 0,
+            maximum_minor: 0,
+            required_features: vec![
+                PROVIDER_BINDING_API_FEATURE.to_owned(),
+                PROVIDER_STREAMING_API_FEATURE_V2.to_owned(),
+            ],
+        },
+        digest_sha256: component_digest,
+        signature: ManifestSignature {
+            algorithm: PLUGIN_SIGNATURE_ALGORITHM.to_owned(),
+            key_id: KEY_ID.to_owned(),
+            value: "0".repeat(ED25519_SIGNATURE_BYTES * 2),
+        },
+        provenance: ManifestProvenance {
+            source: "fixture://test.provider-streaming-plugin".to_owned(),
+            publisher: "Zed provider streaming fixture".to_owned(),
+            registry: Some("fixture://signed-registry".to_owned()),
+        },
+        provider_binding: Some(binding),
+        nodes: vec![PluginNode {
+            id: "FixtureStreamingProvider".to_owned(),
+            version: ApiVersion::new(1, 0, 0),
+            display_name: "Fixture Streaming Provider".to_owned(),
+            category: "partner/test".to_owned(),
+            ports: vec![input, output],
+            determinism: DeterminismPolicy::External,
+            cache: CachePolicy::Never,
+            effects: EffectPolicy::Provider,
+        }],
+        capabilities: Vec::new(),
+        ui: Vec::new(),
+        routes: Vec::new(),
+        legacy_mappings: Vec::new(),
+    };
+    manifest.signature.value = sign_manifest(&manifest)?;
+    let mut provider = ProviderPluginManifestV2 {
+        schema_version: PROVIDER_MANIFEST_SCHEMA_VERSION_V2,
+        component_world: PROVIDER_COMPONENT_WORLD_V2.to_owned(),
+        manifest,
+        streaming: ProviderStreamingContractV2 {
+            methods: vec![
+                ProviderHttpMethodV2::Delete,
+                ProviderHttpMethodV2::Get,
+                ProviderHttpMethodV2::Head,
+                ProviderHttpMethodV2::Options,
+                ProviderHttpMethodV2::Patch,
+                ProviderHttpMethodV2::Post,
+                ProviderHttpMethodV2::Put,
+            ],
+            maximum_headers: 8,
+            maximum_header_bytes: 4096,
+            maximum_request_body_bytes: 16384,
+            maximum_response_body_bytes: 65536,
+            maximum_chunk_bytes: 4096,
+            maximum_ndjson_line_bytes: 4096,
+            maximum_wait_milliseconds: 1000,
+            maximum_uploads: 1,
+            maximum_upload_body_bytes: 4096,
+            maximum_cost_requests: 1,
+            maximum_progress_total: 100,
+            uploads: true,
+            cost_requests: true,
+        },
+        signature: ManifestSignature {
+            algorithm: PLUGIN_SIGNATURE_ALGORITHM.to_owned(),
+            key_id: KEY_ID.to_owned(),
+            value: "0".repeat(ED25519_SIGNATURE_BYTES * 2),
+        },
+    };
+    provider.signature.value = signing_key()?.sign_provider_manifest_v2(&provider)?;
+    Ok(provider)
 }
 
 fn trust_policy() -> Result<PluginTrustPolicy, Box<dyn Error>> {
@@ -859,6 +988,10 @@ fn provider_component_fixture() -> Result<Vec<u8>, Box<dyn Error>> {
     decode_base64(include_str!("fixtures/provider_component").trim())
 }
 
+fn provider_streaming_component_fixture() -> Result<Vec<u8>, Box<dyn Error>> {
+    decode_base64(include_str!("fixtures/provider_streaming_component").trim())
+}
+
 fn decode_base64(value: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     let encoded = value
         .bytes()
@@ -1085,6 +1218,55 @@ fn provider_world_preflights_signed_bindings_and_returns_typed_outputs()
         &[b"host-owned-provider-receipt".to_vec()]
     );
     assert!(result.outputs.is_empty());
+    Ok(())
+}
+
+#[test]
+fn provider_v2_missing_certified_grant_is_denied_before_guest_or_input_exposure()
+-> Result<(), Box<dyn Error>> {
+    let component = provider_streaming_component_fixture()?;
+    let digest = format!("{:x}", Sha256::digest(&component));
+    let manifest = provider_streaming_manifest(digest)?;
+    let trust = trust_policy()?;
+    let authorization =
+        trust.authorize_provider_manifest_v2(&manifest, &permission_policy(&manifest.manifest)?)?;
+    let host = PluginHost::with_configuration(
+        conformance_component_limits(),
+        comfy_plugin_host::DEFAULT_API_FEATURES
+            .iter()
+            .map(|feature| (*feature).to_owned()),
+    )?;
+    let compiled = host.compile_provider_component_v2(&component, &manifest, &authorization)?;
+    let mut inputs = InvocationInputs::default();
+    inputs.set_present("prompt", vec![scalar_value("fixture")?]);
+    let invocation = host.begin_invocation(
+        &manifest.manifest,
+        authorization.authorization(),
+        "FixtureStreamingProvider",
+        inputs,
+        empty_services(),
+        CancellationToken::default(),
+    )?;
+    assert!(matches!(
+        host.instantiate_component(&compiled, invocation),
+        Err(PluginError::ProviderInvocationUnavailable)
+    ));
+
+    let guest = include_str!("fixtures/provider_streaming_component_source/guest.rs");
+    let invoke = guest
+        .split("fn invoke(")
+        .nth(1)
+        .ok_or("provider-v2 fixture invoke function is missing")?;
+    let start = invoke
+        .find("provider_streaming_host::start_request")
+        .ok_or("provider-v2 fixture start request is missing")?;
+    let input = invoke
+        .find("invocation_input_host::read_scalar_input")
+        .ok_or("provider-v2 fixture input read is missing")?;
+    assert!(
+        start < input,
+        "fixture attempted input access before binding"
+    );
     Ok(())
 }
 

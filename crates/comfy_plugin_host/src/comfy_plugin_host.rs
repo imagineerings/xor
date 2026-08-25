@@ -34,13 +34,29 @@ pub use registry_adapter::{
 use comfy_plugin_sdk::{
     COMPONENT_API_VERSION, CancelReason, CanonicalTypeId, CapabilityCall, CapabilityResponse,
     ComponentManifestProjection, InputState, InvocationError, NegotiatedApi,
-    PROVIDER_COMPONENT_WORLD, PluginContractError, PluginInvocation, PluginManifest, PluginNode,
-    PluginValue, PluginValueRepresentation, PortCardinality, PortDirection, PortPresence,
-    PortSerialization, ProviderBindingClaim, ProviderBindingSet, ProviderResultReceiptSet,
-    RustComfyPlugin, TypeRegistry, ValueFamily, ValueHandle,
+    PROVIDER_COMPONENT_WORLD, PROVIDER_STREAMING_API_FEATURE_V2, PluginContractError,
+    PluginInvocation, PluginManifest, PluginNode, PluginValue, PluginValueRepresentation,
+    PortCardinality, PortDirection, PortPresence, PortSerialization, ProviderBindingClaim,
+    ProviderBindingSet, ProviderEncodedValueV2, ProviderHeaderV2, ProviderHttpMethodV2,
+    ProviderInvocationResultV2, ProviderMaterializedOutputV2, ProviderPluginManifestV2,
+    ProviderRequestHeadV2, ProviderResultReceiptSet, ProviderStreamingContractV2, RustComfyPlugin,
+    TypeRegistry, ValueFamily, ValueHandle,
 };
-use comfy_runtime::ResolvedProviderResult;
-use comfy_runtime::{AssetIdentity, AssetNamespace, PluginAuthorization, TrustError};
+use comfy_runtime::{
+    AssetIdentity, AssetNamespace, PluginAuthorization, ProviderManifestAuthorizationV2,
+    ResolvedProviderResult, TrustError,
+};
+use comfy_types::{
+    MAX_WORKER_PROVIDER_PENDING_CALLS, MAX_WORKER_PROVIDER_WAIT_MILLISECONDS,
+    WorkerProviderCostRequest, WorkerProviderHeader, WorkerProviderHttpMethod,
+    WorkerProviderInvocationContext, WorkerProviderProgress, WorkerProviderRequestChunk,
+    WorkerProviderRequestHead, WorkerProviderResponseChunk, WorkerProviderResponseFrame,
+    WorkerProviderResponseFrameEvent, WorkerProviderStreamError, WorkerProviderStreamHandle,
+    WorkerProviderStreamRequest, WorkerProviderStreamResponse,
+    WorkerProviderStreamTransportValidator, WorkerProviderStreamingContract,
+    WorkerProviderTerminal, WorkerProviderUploadRequest, WorkerProviderWaitOutcome,
+    WorkerProviderWaitRequest,
+};
 use extension_host::ComponentRuntime;
 use sha2::{Digest, Sha256};
 use std::{
@@ -50,8 +66,10 @@ use std::{
     str::FromStr,
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        mpsc::{Receiver, SyncSender, TryRecvError, TrySendError, sync_channel},
     },
+    time::{Duration, Instant},
 };
 use thiserror::Error;
 use wasmtime::{
@@ -77,11 +95,13 @@ mod provider_wit_contract {
     });
 }
 
-#[allow(dead_code)]
 mod provider_v2_wit_contract {
     wasmtime::component::bindgen!({
         path: "../comfy_plugin_sdk/wit/provider-v2",
         world: "comfy-provider-plugin",
+        with: {
+            "zed:comfy-plugin/types@1.0.0": super::wit_contract::zed::comfy_plugin::types,
+        },
     });
 }
 
@@ -93,6 +113,7 @@ pub const DEFAULT_API_FEATURES: &[&str] = &[
     "legacy.non-destructive",
     "ports.list",
     "provider.bindings.v1",
+    PROVIDER_STREAMING_API_FEATURE_V2,
 ];
 
 static NEXT_INVOCATION_ID: AtomicU64 = AtomicU64::new(1);
@@ -199,12 +220,17 @@ pub enum PluginError {
     ProviderBindingMismatch,
     #[error("provider invocation is unavailable for this component")]
     ProviderInvocationUnavailable,
+    #[error("provider runtime activation was denied")]
+    ProviderRuntimeActivationDenied,
+    #[error("provider streaming operation failed: {0}")]
+    ProviderStreaming(WorkerProviderStreamError),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ComponentWorld {
     Legacy,
-    Provider,
+    ProviderV1,
+    ProviderV2,
 }
 
 pub struct CompiledPlugin {
@@ -213,6 +239,7 @@ pub struct CompiledPlugin {
     digest_sha256: String,
     manifest_projection: ComponentManifestProjection,
     provider_binding: Option<ProviderBindingSet>,
+    provider_manifest_v2: Option<ProviderPluginManifestV2>,
     world: ComponentWorld,
 }
 
@@ -233,6 +260,7 @@ impl CompiledPlugin {
 pub struct WasmStoreState {
     limits: StoreLimits,
     invocation: Option<InvocationHost>,
+    provider_runtime: Option<ProviderV2RuntimeHost>,
 }
 
 pub struct WasmPluginInstance {
@@ -240,12 +268,694 @@ pub struct WasmPluginInstance {
     bindings: WasmBindings,
     expected_manifest_projection: ComponentManifestProjection,
     provider_binding: Option<ProviderBindingSet>,
+    expected_provider_manifest_v2: Option<ProviderPluginManifestV2>,
     terminal: bool,
 }
 
 enum WasmBindings {
     Legacy(wit_contract::ComfyPlugin),
-    Provider(provider_wit_contract::ComfyProviderPlugin),
+    ProviderV1(provider_wit_contract::ComfyProviderPlugin),
+    ProviderV2(provider_v2_wit_contract::ComfyProviderPlugin),
+}
+
+#[derive(Debug)]
+pub(crate) struct ProviderV2StreamRouteCall {
+    call_id: u64,
+    request: WorkerProviderStreamRequest,
+    reply: SyncSender<WorkerProviderStreamResponse>,
+}
+
+impl ProviderV2StreamRouteCall {
+    pub(crate) fn call_id(&self) -> u64 {
+        self.call_id
+    }
+
+    pub(crate) fn request(&self) -> &WorkerProviderStreamRequest {
+        &self.request
+    }
+
+    pub(crate) fn respond(
+        self,
+        response: WorkerProviderStreamResponse,
+    ) -> Result<(), WorkerProviderStreamError> {
+        if matches!(
+            self.request,
+            WorkerProviderStreamRequest::StartRequest { .. }
+        ) {
+            return Err(WorkerProviderStreamError::InvalidRequestAuthority);
+        }
+        self.reply.try_send(response).map_err(|error| match error {
+            TrySendError::Full(_) => WorkerProviderStreamError::InvalidOrder,
+            TrySendError::Disconnected(_) => WorkerProviderStreamError::RevokedHandle,
+        })
+    }
+
+    fn into_start(
+        self,
+    ) -> Result<
+        (
+            u64,
+            WorkerProviderInvocationContext,
+            WorkerProviderRequestHead,
+            SyncSender<WorkerProviderStreamResponse>,
+        ),
+        WorkerProviderStreamError,
+    > {
+        let WorkerProviderStreamRequest::StartRequest { context, head } = self.request else {
+            return Err(WorkerProviderStreamError::InvalidOrder);
+        };
+        Ok((self.call_id, context, head, self.reply))
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ProviderV2BoundStartCall {
+    call_id: u64,
+    reply: SyncSender<WorkerProviderStreamResponse>,
+}
+
+impl ProviderV2BoundStartCall {
+    pub(crate) fn respond(
+        self,
+        response: Result<WorkerProviderStreamHandle, WorkerProviderStreamError>,
+    ) -> Result<(), WorkerProviderStreamError> {
+        self.reply
+            .try_send(WorkerProviderStreamResponse::Stream(response))
+            .map_err(|error| match error {
+                TrySendError::Full(_) => WorkerProviderStreamError::InvalidOrder,
+                TrySendError::Disconnected(_) => WorkerProviderStreamError::RevokedHandle,
+            })
+    }
+
+    pub(crate) fn call_id(&self) -> u64 {
+        self.call_id
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum ProviderV2StreamRouteMessage {
+    Request(ProviderV2StreamRouteCall),
+    Revoke {
+        reply: SyncSender<Result<(), WorkerProviderStreamError>>,
+    },
+}
+
+pub(crate) struct ProviderV2StreamRouteReceiver {
+    receiver: Receiver<ProviderV2StreamRouteMessage>,
+    revoke_receiver: Receiver<ProviderV2StreamRouteMessage>,
+    revoked: Arc<AtomicBool>,
+}
+
+impl ProviderV2StreamRouteReceiver {
+    pub(crate) fn try_receive(&self) -> Result<ProviderV2StreamRouteMessage, TryRecvError> {
+        if self.revoked.load(Ordering::Acquire) {
+            while self.receiver.try_recv().is_ok() {}
+            return self.revoke_receiver.try_recv();
+        }
+        match self.revoke_receiver.try_recv() {
+            Ok(message) => Ok(message),
+            Err(TryRecvError::Disconnected) => Err(TryRecvError::Disconnected),
+            Err(TryRecvError::Empty) => self.receiver.try_recv(),
+        }
+    }
+
+    pub(crate) fn mark_revoked(&self) {
+        self.revoked.store(true, Ordering::Release);
+    }
+}
+
+impl Drop for ProviderV2StreamRouteReceiver {
+    fn drop(&mut self) {
+        self.mark_revoked();
+    }
+}
+
+struct ProviderV2StreamRoute {
+    sender: SyncSender<ProviderV2StreamRouteMessage>,
+    revoke_sender: SyncSender<ProviderV2StreamRouteMessage>,
+    revoked: Arc<AtomicBool>,
+}
+
+pub(crate) struct ProviderV2RuntimeHost {
+    context: WorkerProviderInvocationContext,
+    validator: WorkerProviderStreamTransportValidator,
+    route: ProviderV2StreamRoute,
+    cancellation: CancellationToken,
+    reply_deadline: Duration,
+    next_call_id: u64,
+    bound: bool,
+    stream_terminal: bool,
+    revocation_complete: bool,
+    terminal_failure: Option<WorkerProviderStreamError>,
+}
+
+impl ProviderV2RuntimeHost {
+    fn checked_from_certified_capsule(
+        context: WorkerProviderInvocationContext,
+        contract: WorkerProviderStreamingContract,
+        cancellation: CancellationToken,
+        route: ProviderV2StreamRoute,
+    ) -> Result<Self, WorkerProviderStreamError> {
+        let reply_deadline = Duration::from_millis(
+            contract
+                .maximum_wait_milliseconds
+                .min(MAX_WORKER_PROVIDER_WAIT_MILLISECONDS),
+        );
+        let validator = WorkerProviderStreamTransportValidator::checked_for_host_session(
+            context.clone(),
+            contract,
+            cancellation.clone(),
+        )?;
+        Ok(Self {
+            context,
+            validator,
+            route,
+            cancellation,
+            reply_deadline,
+            next_call_id: 1,
+            bound: false,
+            stream_terminal: false,
+            revocation_complete: false,
+            terminal_failure: None,
+        })
+    }
+
+    fn exchange(
+        &mut self,
+        request: WorkerProviderStreamRequest,
+    ) -> Result<WorkerProviderStreamResponse, WorkerProviderStreamError> {
+        match self.exchange_active(request) {
+            Ok(response) => Ok(response),
+            Err(error) => {
+                if !self.stream_terminal
+                    && let Err(revoke_error) = self.revoke()
+                {
+                    eprintln!("provider-v2 route revocation after {error} failed: {revoke_error}");
+                }
+                Err(error)
+            }
+        }
+    }
+
+    fn exchange_active(
+        &mut self,
+        request: WorkerProviderStreamRequest,
+    ) -> Result<WorkerProviderStreamResponse, WorkerProviderStreamError> {
+        self.check_active()?;
+        let call_id = self.next_call_id;
+        self.validator.validate_request(call_id, &request)?;
+        let (reply, receiver) = sync_channel(1);
+        self.route
+            .sender
+            .try_send(ProviderV2StreamRouteMessage::Request(
+                ProviderV2StreamRouteCall {
+                    call_id,
+                    request,
+                    reply,
+                },
+            ))
+            .map_err(|error| match error {
+                TrySendError::Full(_) => WorkerProviderStreamError::InvalidOrder,
+                TrySendError::Disconnected(_) => WorkerProviderStreamError::RevokedHandle,
+            })?;
+        let deadline = Instant::now()
+            .checked_add(self.reply_deadline)
+            .ok_or(WorkerProviderStreamError::TimedOut)?;
+        let response = loop {
+            self.cancellation
+                .check()
+                .map_err(|_| WorkerProviderStreamError::Cancelled)?;
+            if self.route.revoked.load(Ordering::Acquire) {
+                return Err(WorkerProviderStreamError::RevokedHandle);
+            }
+            let now = Instant::now();
+            if now >= deadline {
+                return Err(WorkerProviderStreamError::TimedOut);
+            }
+            match receiver.recv_timeout(
+                deadline
+                    .saturating_duration_since(now)
+                    .min(Duration::from_millis(10)),
+            ) {
+                Ok(response) => break response,
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    return Err(WorkerProviderStreamError::RevokedHandle);
+                }
+            }
+        };
+        self.validator.validate_response(call_id, &response)?;
+        self.next_call_id = self
+            .next_call_id
+            .checked_add(1)
+            .ok_or(WorkerProviderStreamError::InvalidOrder)?;
+        if matches!(response, WorkerProviderStreamResponse::Stream(Ok(_))) && !self.bound {
+            self.bound = true;
+        }
+        response_result(&response)?;
+        if let Some(disposition) = worker_response_terminal_disposition(&response) {
+            self.stream_terminal = true;
+            if let Err(error) = disposition {
+                self.terminal_failure = Some(error);
+                if let Err(revoke_error) = self.revoke() {
+                    eprintln!("provider-v2 terminal route revocation failed: {revoke_error}");
+                }
+            }
+        }
+        Ok(response)
+    }
+
+    fn require_bound(&self) -> Result<(), WorkerProviderStreamError> {
+        self.check_active()?;
+        if !self.bound {
+            return Err(WorkerProviderStreamError::InvalidRequestAuthority);
+        }
+        Ok(())
+    }
+
+    fn worker_handle(
+        &self,
+        handle: provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamHandle,
+    ) -> WorkerProviderStreamHandle {
+        WorkerProviderStreamHandle {
+            session_id: self.context.session_id,
+            session_generation: self.context.session_generation,
+            invocation: handle.invocation,
+            slot: handle.slot,
+            generation: handle.generation,
+        }
+    }
+
+    fn ensure_completed(&self) -> Result<(), WorkerProviderStreamError> {
+        if let Some(error) = &self.terminal_failure {
+            return Err(error.clone());
+        }
+        if !self.stream_terminal || self.revocation_complete {
+            return Err(WorkerProviderStreamError::InvalidTerminal);
+        }
+        Ok(())
+    }
+
+    fn check_active(&self) -> Result<(), WorkerProviderStreamError> {
+        self.cancellation
+            .check()
+            .map_err(|_| WorkerProviderStreamError::Cancelled)?;
+        if self.stream_terminal
+            || self.revocation_complete
+            || self.route.revoked.load(Ordering::Acquire)
+        {
+            return Err(WorkerProviderStreamError::RevokedHandle);
+        }
+        Ok(())
+    }
+
+    fn revoke(&mut self) -> Result<(), WorkerProviderStreamError> {
+        if self.revocation_complete {
+            return Ok(());
+        }
+        self.stream_terminal = true;
+        self.revocation_complete = true;
+        self.route.revoked.store(true, Ordering::Release);
+        let (reply, receiver) = sync_channel(1);
+        match self
+            .route
+            .revoke_sender
+            .try_send(ProviderV2StreamRouteMessage::Revoke { reply })
+        {
+            Ok(()) => receiver
+                .recv_timeout(Duration::from_millis(10))
+                .map_err(|_| WorkerProviderStreamError::HostFailure)?,
+            Err(TrySendError::Full(_)) => Err(WorkerProviderStreamError::InvalidOrder),
+            Err(TrySendError::Disconnected(_)) => Err(WorkerProviderStreamError::RevokedHandle),
+        }
+    }
+}
+
+impl Drop for ProviderV2RuntimeHost {
+    fn drop(&mut self) {
+        if let Err(error) = self.revoke() {
+            eprintln!("provider-v2 route revocation failed: {error}");
+        }
+    }
+}
+
+fn response_result(
+    response: &WorkerProviderStreamResponse,
+) -> Result<(), WorkerProviderStreamError> {
+    match response {
+        WorkerProviderStreamResponse::Stream(result) => {
+            result.as_ref().map(|_| ()).map_err(Clone::clone)
+        }
+        WorkerProviderStreamResponse::Unit(result) => result.clone(),
+        WorkerProviderStreamResponse::Wait(result) => {
+            result.as_ref().map(|_| ()).map_err(Clone::clone)
+        }
+        WorkerProviderStreamResponse::Cost(result) => {
+            result.as_ref().map(|_| ()).map_err(Clone::clone)
+        }
+    }
+}
+
+fn worker_response_terminal_disposition(
+    response: &WorkerProviderStreamResponse,
+) -> Option<Result<(), WorkerProviderStreamError>> {
+    match response {
+        WorkerProviderStreamResponse::Wait(Ok(WorkerProviderWaitOutcome::Cancelled)) => {
+            Some(Err(WorkerProviderStreamError::Cancelled))
+        }
+        WorkerProviderStreamResponse::Wait(Ok(WorkerProviderWaitOutcome::Frame(
+            WorkerProviderResponseFrame {
+                event: WorkerProviderResponseFrameEvent::Terminal(terminal),
+                ..
+            },
+        ))) => Some(match terminal {
+            WorkerProviderTerminal::Completed(_) => Ok(()),
+            WorkerProviderTerminal::Failed { .. } => {
+                Err(WorkerProviderStreamError::InvalidTerminal)
+            }
+            WorkerProviderTerminal::Cancelled => Err(WorkerProviderStreamError::Cancelled),
+        }),
+        _ => None,
+    }
+}
+
+fn provider_v2_stream_route() -> (ProviderV2StreamRoute, ProviderV2StreamRouteReceiver) {
+    let (sender, receiver) = sync_channel(MAX_WORKER_PROVIDER_PENDING_CALLS);
+    let (revoke_sender, revoke_receiver) = sync_channel(1);
+    let revoked = Arc::new(AtomicBool::new(false));
+    (
+        ProviderV2StreamRoute {
+            sender,
+            revoke_sender,
+            revoked: revoked.clone(),
+        },
+        ProviderV2StreamRouteReceiver {
+            receiver,
+            revoke_receiver,
+            revoked,
+        },
+    )
+}
+
+fn worker_streaming_contract(
+    contract: &ProviderStreamingContractV2,
+) -> WorkerProviderStreamingContract {
+    WorkerProviderStreamingContract {
+        methods: contract
+            .methods
+            .iter()
+            .copied()
+            .map(worker_http_method)
+            .collect(),
+        maximum_headers: contract.maximum_headers,
+        maximum_header_bytes: contract.maximum_header_bytes,
+        maximum_request_body_bytes: contract.maximum_request_body_bytes,
+        maximum_response_body_bytes: contract.maximum_response_body_bytes,
+        maximum_chunk_bytes: contract.maximum_chunk_bytes,
+        maximum_ndjson_line_bytes: contract.maximum_ndjson_line_bytes,
+        maximum_wait_milliseconds: contract.maximum_wait_milliseconds,
+        maximum_uploads: contract.maximum_uploads,
+        maximum_upload_body_bytes: contract.maximum_upload_body_bytes,
+        maximum_cost_requests: contract.maximum_cost_requests,
+        maximum_progress_total: contract.maximum_progress_total,
+        uploads: contract.uploads,
+        cost_requests: contract.cost_requests,
+    }
+}
+
+fn sdk_provider_streaming_contract(
+    contract: provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamingContract,
+) -> ProviderStreamingContractV2 {
+    use provider_v2_wit_contract::zed::comfy_provider_plugin::types::HttpMethod;
+    ProviderStreamingContractV2 {
+        methods: contract
+            .methods
+            .into_iter()
+            .map(|method| match method {
+                HttpMethod::Delete => ProviderHttpMethodV2::Delete,
+                HttpMethod::Get => ProviderHttpMethodV2::Get,
+                HttpMethod::Head => ProviderHttpMethodV2::Head,
+                HttpMethod::Options => ProviderHttpMethodV2::Options,
+                HttpMethod::Patch => ProviderHttpMethodV2::Patch,
+                HttpMethod::Post => ProviderHttpMethodV2::Post,
+                HttpMethod::Put => ProviderHttpMethodV2::Put,
+            })
+            .collect(),
+        maximum_headers: contract.maximum_headers,
+        maximum_header_bytes: contract.maximum_header_bytes,
+        maximum_request_body_bytes: contract.maximum_request_body_bytes,
+        maximum_response_body_bytes: contract.maximum_response_body_bytes,
+        maximum_chunk_bytes: contract.maximum_chunk_bytes,
+        maximum_ndjson_line_bytes: contract.maximum_ndjson_line_bytes,
+        maximum_wait_milliseconds: contract.maximum_wait_milliseconds,
+        maximum_uploads: contract.maximum_uploads,
+        maximum_upload_body_bytes: contract.maximum_upload_body_bytes,
+        maximum_cost_requests: contract.maximum_cost_requests,
+        maximum_progress_total: contract.maximum_progress_total,
+        uploads: contract.uploads,
+        cost_requests: contract.cost_requests,
+    }
+}
+
+fn worker_http_method(method: ProviderHttpMethodV2) -> WorkerProviderHttpMethod {
+    match method {
+        ProviderHttpMethodV2::Delete => WorkerProviderHttpMethod::Delete,
+        ProviderHttpMethodV2::Get => WorkerProviderHttpMethod::Get,
+        ProviderHttpMethodV2::Head => WorkerProviderHttpMethod::Head,
+        ProviderHttpMethodV2::Options => WorkerProviderHttpMethod::Options,
+        ProviderHttpMethodV2::Patch => WorkerProviderHttpMethod::Patch,
+        ProviderHttpMethodV2::Post => WorkerProviderHttpMethod::Post,
+        ProviderHttpMethodV2::Put => WorkerProviderHttpMethod::Put,
+    }
+}
+
+fn sdk_request_head(head: &WorkerProviderRequestHead) -> ProviderRequestHeadV2 {
+    ProviderRequestHeadV2 {
+        endpoint: head.endpoint.clone(),
+        secret_id: head.secret_id.clone(),
+        method: match head.method {
+            WorkerProviderHttpMethod::Delete => ProviderHttpMethodV2::Delete,
+            WorkerProviderHttpMethod::Get => ProviderHttpMethodV2::Get,
+            WorkerProviderHttpMethod::Head => ProviderHttpMethodV2::Head,
+            WorkerProviderHttpMethod::Options => ProviderHttpMethodV2::Options,
+            WorkerProviderHttpMethod::Patch => ProviderHttpMethodV2::Patch,
+            WorkerProviderHttpMethod::Post => ProviderHttpMethodV2::Post,
+            WorkerProviderHttpMethod::Put => ProviderHttpMethodV2::Put,
+        },
+        headers: head
+            .headers
+            .iter()
+            .map(|header| ProviderHeaderV2 {
+                name: header.name.clone(),
+                value: header.value.clone(),
+            })
+            .collect(),
+        declared_body_bytes: head.declared_body_bytes,
+    }
+}
+
+fn worker_provider_request_head(
+    request: provider_v2_wit_contract::zed::comfy_provider_plugin::types::RequestHead,
+) -> WorkerProviderRequestHead {
+    use provider_v2_wit_contract::zed::comfy_provider_plugin::types::HttpMethod;
+    WorkerProviderRequestHead {
+        endpoint: request.endpoint,
+        secret_id: request.secret_id,
+        method: match request.method {
+            HttpMethod::Delete => WorkerProviderHttpMethod::Delete,
+            HttpMethod::Get => WorkerProviderHttpMethod::Get,
+            HttpMethod::Head => WorkerProviderHttpMethod::Head,
+            HttpMethod::Options => WorkerProviderHttpMethod::Options,
+            HttpMethod::Patch => WorkerProviderHttpMethod::Patch,
+            HttpMethod::Post => WorkerProviderHttpMethod::Post,
+            HttpMethod::Put => WorkerProviderHttpMethod::Put,
+        },
+        headers: request
+            .headers
+            .into_iter()
+            .map(|header| WorkerProviderHeader {
+                name: header.name,
+                value: header.value,
+            })
+            .collect(),
+        declared_body_bytes: request.declared_body_bytes,
+    }
+}
+
+fn wit_provider_stream_handle(
+    handle: WorkerProviderStreamHandle,
+) -> provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamHandle {
+    provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamHandle {
+        invocation: handle.invocation,
+        slot: handle.slot,
+        generation: handle.generation,
+    }
+}
+
+fn wit_provider_wait_outcome(
+    outcome: WorkerProviderWaitOutcome,
+) -> provider_v2_wit_contract::zed::comfy_provider_plugin::types::WaitOutcome {
+    use provider_v2_wit_contract::zed::comfy_provider_plugin::types as wit;
+    match outcome {
+        WorkerProviderWaitOutcome::TimedOut => wit::WaitOutcome::TimedOut,
+        WorkerProviderWaitOutcome::Cancelled => wit::WaitOutcome::Cancelled,
+        WorkerProviderWaitOutcome::Frame(frame) => wit::WaitOutcome::Frame(wit::ResponseFrame {
+            handle: wit_provider_stream_handle(frame.handle),
+            sequence: frame.sequence,
+            event: match frame.event {
+                WorkerProviderResponseFrameEvent::Head(head) => {
+                    wit::ResponseFrameEvent::Head(wit::ResponseHead {
+                        status: head.status,
+                        headers: head
+                            .headers
+                            .into_iter()
+                            .map(|header| wit::Header {
+                                name: header.name,
+                                value: header.value,
+                            })
+                            .collect(),
+                    })
+                }
+                WorkerProviderResponseFrameEvent::Chunk(chunk) => {
+                    wit::ResponseFrameEvent::Chunk(match chunk {
+                        WorkerProviderResponseChunk::Binary(bytes) => {
+                            wit::ResponseChunkValue::Binary(bytes)
+                        }
+                        WorkerProviderResponseChunk::Text(text) => {
+                            wit::ResponseChunkValue::Text(text)
+                        }
+                        WorkerProviderResponseChunk::NdjsonLine(line) => {
+                            wit::ResponseChunkValue::NdjsonLine(line)
+                        }
+                    })
+                }
+                WorkerProviderResponseFrameEvent::Terminal(terminal) => {
+                    wit::ResponseFrameEvent::Terminal(match terminal {
+                        WorkerProviderTerminal::Completed(receipt) => {
+                            wit::Terminal::Completed(receipt)
+                        }
+                        WorkerProviderTerminal::Failed { code, message } => {
+                            wit::Terminal::Failed((code, message))
+                        }
+                        WorkerProviderTerminal::Cancelled => wit::Terminal::Cancelled,
+                    })
+                }
+            },
+        }),
+    }
+}
+
+fn wit_provider_stream_error(
+    error: WorkerProviderStreamError,
+) -> provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError {
+    use provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError;
+    match error {
+        WorkerProviderStreamError::Cancelled => StreamError::Cancelled,
+        WorkerProviderStreamError::TimedOut => StreamError::TimedOut,
+        WorkerProviderStreamError::HostFailure => StreamError::HostFailure,
+        WorkerProviderStreamError::InvalidContract => StreamError::InvalidContract,
+        WorkerProviderStreamError::InvalidHandle => StreamError::InvalidHandle,
+        WorkerProviderStreamError::ForeignHandle
+        | WorkerProviderStreamError::ForeignSession
+        | WorkerProviderStreamError::ForeignInvocation => StreamError::ForeignHandle,
+        WorkerProviderStreamError::RevokedHandle
+        | WorkerProviderStreamError::StaleSession
+        | WorkerProviderStreamError::StaleGeneration => StreamError::RevokedHandle,
+        WorkerProviderStreamError::InvalidMethod => StreamError::InvalidMethod,
+        WorkerProviderStreamError::InvalidHeaders => StreamError::InvalidHeaders,
+        WorkerProviderStreamError::BodyLimit => StreamError::BodyLimit,
+        WorkerProviderStreamError::ChunkLimit => StreamError::ChunkLimit,
+        WorkerProviderStreamError::InvalidNdjsonLine => StreamError::InvalidNdjsonLine,
+        WorkerProviderStreamError::InvalidSequence => StreamError::InvalidSequence,
+        WorkerProviderStreamError::InvalidOrder => StreamError::InvalidOrder,
+        WorkerProviderStreamError::WaitLimit => StreamError::WaitLimit,
+        WorkerProviderStreamError::InvalidUpload => StreamError::InvalidUpload,
+        WorkerProviderStreamError::InvalidCostRequest => StreamError::InvalidCostRequest,
+        WorkerProviderStreamError::InvalidProgress => StreamError::InvalidProgress,
+        WorkerProviderStreamError::InvalidTerminal => StreamError::InvalidTerminal,
+        WorkerProviderStreamError::InvalidInvocationResult => StreamError::InvalidInvocationResult,
+        WorkerProviderStreamError::InvalidRequestAuthority => StreamError::InvalidRequestAuthority,
+    }
+}
+
+fn worker_provider_stream_error(
+    error: provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError,
+) -> WorkerProviderStreamError {
+    use provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError;
+    match error {
+        StreamError::Cancelled => WorkerProviderStreamError::Cancelled,
+        StreamError::TimedOut => WorkerProviderStreamError::TimedOut,
+        StreamError::HostFailure => WorkerProviderStreamError::HostFailure,
+        StreamError::InvalidContract => WorkerProviderStreamError::InvalidContract,
+        StreamError::InvalidHandle => WorkerProviderStreamError::InvalidHandle,
+        StreamError::ForeignHandle => WorkerProviderStreamError::ForeignHandle,
+        StreamError::RevokedHandle => WorkerProviderStreamError::RevokedHandle,
+        StreamError::InvalidMethod => WorkerProviderStreamError::InvalidMethod,
+        StreamError::InvalidHeaders => WorkerProviderStreamError::InvalidHeaders,
+        StreamError::BodyLimit => WorkerProviderStreamError::BodyLimit,
+        StreamError::ChunkLimit => WorkerProviderStreamError::ChunkLimit,
+        StreamError::InvalidNdjsonLine => WorkerProviderStreamError::InvalidNdjsonLine,
+        StreamError::InvalidSequence => WorkerProviderStreamError::InvalidSequence,
+        StreamError::InvalidOrder => WorkerProviderStreamError::InvalidOrder,
+        StreamError::WaitLimit => WorkerProviderStreamError::WaitLimit,
+        StreamError::InvalidUpload => WorkerProviderStreamError::InvalidUpload,
+        StreamError::InvalidCostRequest => WorkerProviderStreamError::InvalidCostRequest,
+        StreamError::InvalidProgress => WorkerProviderStreamError::InvalidProgress,
+        StreamError::InvalidTerminal => WorkerProviderStreamError::InvalidTerminal,
+        StreamError::InvalidInvocationResult => WorkerProviderStreamError::InvalidInvocationResult,
+        StreamError::InvalidRequestAuthority => WorkerProviderStreamError::InvalidRequestAuthority,
+    }
+}
+
+fn wit_provider_input_error(error: WorkerProviderStreamError) -> WitInvocationError {
+    match error {
+        WorkerProviderStreamError::Cancelled => wit_error(InvocationError::Cancelled),
+        WorkerProviderStreamError::TimedOut => wit_error(InvocationError::TimedOut),
+        WorkerProviderStreamError::RevokedHandle
+        | WorkerProviderStreamError::ForeignHandle
+        | WorkerProviderStreamError::ForeignSession
+        | WorkerProviderStreamError::StaleSession
+        | WorkerProviderStreamError::ForeignInvocation
+        | WorkerProviderStreamError::StaleGeneration => wit_error(InvocationError::RevokedHandle),
+        error => wit_host_failure(&format!("provider-v2 input authority denied: {error}")),
+    }
+}
+
+fn sdk_provider_invocation_result(
+    result: provider_v2_wit_contract::zed::comfy_provider_plugin::types::InvocationResult,
+    invocation: &Option<InvocationHost>,
+) -> Result<ProviderInvocationResultV2, PluginError> {
+    let registry = invocation
+        .as_ref()
+        .map(|invocation| &invocation.registry)
+        .ok_or_else(|| PluginError::Invocation(InvocationError::RevokedHandle))?;
+    let result = ProviderInvocationResultV2 {
+        outputs: result
+            .outputs
+            .into_iter()
+            .map(|output| {
+                Ok(ProviderMaterializedOutputV2 {
+                    port_id: output.port_id,
+                    value: ProviderEncodedValueV2 {
+                        type_id: CanonicalTypeId::from_str(&output.value.type_id).map_err(
+                            |_| {
+                                PluginError::ProviderStreaming(
+                                    WorkerProviderStreamError::InvalidInvocationResult,
+                                )
+                            },
+                        )?,
+                        family: sdk_value_family(output.value.family),
+                        abi_bytes: output.value.abi_bytes,
+                    },
+                })
+            })
+            .collect::<Result<Vec<_>, PluginError>>()?,
+        receipt: result.receipt,
+    };
+    result.validate(registry).map_err(|_| {
+        PluginError::ProviderStreaming(WorkerProviderStreamError::InvalidInvocationResult)
+    })?;
+    Ok(result)
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -257,6 +967,21 @@ pub struct ProviderInvocationResult {
     receipts: Vec<Vec<u8>>,
     #[serde(skip)]
     resolved_provider_results: Vec<ResolvedProviderResult>,
+}
+
+pub struct ProviderV2InvocationProposal {
+    result: ProviderInvocationResultV2,
+    runtime: ProviderV2RuntimeHost,
+}
+
+impl ProviderV2InvocationProposal {
+    pub fn result(&self) -> &ProviderInvocationResultV2 {
+        &self.result
+    }
+
+    pub(crate) fn into_parts(self) -> (ProviderInvocationResultV2, ProviderV2RuntimeHost) {
+        (self.result, self.runtime)
+    }
 }
 
 impl ProviderInvocationResult {
@@ -287,9 +1012,10 @@ impl WasmPluginInstance {
             WasmBindings::Legacy(bindings) => bindings
                 .zed_comfy_plugin_plugin()
                 .call_manifest(&mut self.store),
-            WasmBindings::Provider(bindings) => bindings
+            WasmBindings::ProviderV1(bindings) => bindings
                 .zed_comfy_plugin_plugin()
                 .call_manifest(&mut self.store),
+            WasmBindings::ProviderV2(_) => return self.provider_v2_manifest_projection(),
         };
         match result {
             Ok(projection) => {
@@ -328,9 +1054,13 @@ impl WasmPluginInstance {
             WasmBindings::Legacy(bindings) => bindings
                 .zed_comfy_plugin_plugin()
                 .call_create_node(&mut self.store, node_id),
-            WasmBindings::Provider(bindings) => bindings
+            WasmBindings::ProviderV1(bindings) => bindings
                 .zed_comfy_plugin_plugin()
                 .call_create_node(&mut self.store, node_id),
+            WasmBindings::ProviderV2(_) => {
+                self.abort();
+                return Err(PluginError::ProviderInvocationUnavailable);
+            }
         };
         match result {
             Ok(Ok(instance)) => Ok(instance),
@@ -348,7 +1078,7 @@ impl WasmPluginInstance {
             .provider_binding
             .clone()
             .ok_or(PluginError::ProviderInvocationUnavailable)?;
-        let WasmBindings::Provider(bindings) = &self.bindings else {
+        let WasmBindings::ProviderV1(bindings) = &self.bindings else {
             return Err(PluginError::ProviderInvocationUnavailable);
         };
         let binding_set = bindings
@@ -369,15 +1099,126 @@ impl WasmPluginInstance {
         Ok(actual)
     }
 
+    fn provider_v2_manifest_projection(
+        &mut self,
+    ) -> Result<ComponentManifestProjection, PluginError> {
+        self.check_active()?;
+        let expected = self
+            .expected_provider_manifest_v2
+            .clone()
+            .ok_or(PluginError::ProviderInvocationUnavailable)?;
+        let WasmBindings::ProviderV2(bindings) = &self.bindings else {
+            return Err(PluginError::ProviderInvocationUnavailable);
+        };
+        let projection = bindings
+            .zed_comfy_provider_plugin_provider_node()
+            .call_manifest(&mut self.store)
+            .map_err(|error| self.wasm_call_error(error))?;
+        let manifest_projection = sdk_manifest_projection(projection.manifest)?;
+        let provider_binding = sdk_provider_binding_set(projection.provider_binding)?;
+        let streaming = sdk_provider_streaming_contract(projection.streaming);
+        if projection.schema_version != expected.schema_version
+            || projection.component_world != expected.component_world
+            || manifest_projection != expected.manifest.component_projection()
+            || provider_binding
+                != *expected
+                    .manifest
+                    .provider_binding
+                    .as_ref()
+                    .ok_or(PluginError::ProviderBindingMismatch)?
+            || streaming != expected.streaming
+        {
+            self.abort();
+            return Err(PluginError::ManifestProjectionMismatch);
+        }
+        Ok(manifest_projection)
+    }
+
+    pub(crate) fn invoke_provider_v2(
+        mut self,
+        node_id: &str,
+    ) -> Result<ProviderV2InvocationProposal, PluginError> {
+        self.check_active()?;
+        let context = self
+            .store
+            .data()
+            .provider_runtime
+            .as_ref()
+            .map(|runtime| runtime.context.clone())
+            .ok_or(PluginError::ProviderRuntimeActivationDenied)?;
+        if !self
+            .expected_manifest_projection
+            .nodes
+            .iter()
+            .any(|node| node.id == node_id)
+        {
+            self.abort();
+            return Err(PluginError::ProviderRuntimeActivationDenied);
+        }
+        let WasmBindings::ProviderV2(bindings) = &self.bindings else {
+            self.abort();
+            return Err(PluginError::ProviderInvocationUnavailable);
+        };
+        let wit_context =
+            provider_v2_wit_contract::zed::comfy_provider_plugin::types::InvocationContext {
+                invocation: context.invocation,
+                generation: context.generation,
+            };
+        let result = match bindings
+            .zed_comfy_provider_plugin_provider_node()
+            .call_invoke(&mut self.store, wit_context, node_id)
+        {
+            Ok(Ok(result)) => result,
+            Ok(Err(error)) => {
+                self.abort();
+                return Err(PluginError::ProviderStreaming(
+                    worker_provider_stream_error(error),
+                ));
+            }
+            Err(error) => return Err(self.wasm_call_error(error)),
+        };
+        if let Err(error) = self
+            .store
+            .data()
+            .provider_runtime
+            .as_ref()
+            .ok_or(PluginError::ProviderRuntimeActivationDenied)?
+            .ensure_completed()
+        {
+            self.abort();
+            return Err(PluginError::ProviderStreaming(error));
+        }
+        let result = sdk_provider_invocation_result(result, &self.store.data().invocation)?;
+        let invocation = self
+            .store
+            .data_mut()
+            .invocation
+            .take()
+            .ok_or_else(|| PluginError::Invocation(InvocationError::RevokedHandle))?;
+        invocation.finish_provider_v2_inputs()?;
+        let runtime = self
+            .store
+            .data_mut()
+            .provider_runtime
+            .take()
+            .ok_or(PluginError::ProviderRuntimeActivationDenied)?;
+        self.terminal = true;
+        Ok(ProviderV2InvocationProposal { result, runtime })
+    }
+
     pub fn invoke(&mut self, instance: u64) -> Result<(), PluginError> {
         self.check_active()?;
         let result = match &self.bindings {
             WasmBindings::Legacy(bindings) => bindings
                 .zed_comfy_plugin_plugin()
                 .call_invoke(&mut self.store, instance),
-            WasmBindings::Provider(bindings) => bindings
+            WasmBindings::ProviderV1(bindings) => bindings
                 .zed_comfy_plugin_plugin()
                 .call_invoke(&mut self.store, instance),
+            WasmBindings::ProviderV2(_) => {
+                self.abort();
+                return Err(PluginError::ProviderInvocationUnavailable);
+            }
         };
         match result {
             Ok(Ok(())) => Ok(()),
@@ -392,18 +1233,21 @@ impl WasmPluginInstance {
     pub fn cancel(&mut self, instance: u64, reason: CancelReason) -> Result<(), PluginError> {
         self.check_active()?;
         let reason = wit_cancel_reason(reason);
-        let result = match &self.bindings {
-            WasmBindings::Legacy(bindings) => {
-                bindings
+        let result =
+            match &self.bindings {
+                WasmBindings::Legacy(bindings) => bindings.zed_comfy_plugin_plugin().call_cancel(
+                    &mut self.store,
+                    instance,
+                    reason,
+                ),
+                WasmBindings::ProviderV1(bindings) => bindings
                     .zed_comfy_plugin_plugin()
-                    .call_cancel(&mut self.store, instance, reason)
-            }
-            WasmBindings::Provider(bindings) => {
-                bindings
-                    .zed_comfy_plugin_plugin()
-                    .call_cancel(&mut self.store, instance, reason)
-            }
-        };
+                    .call_cancel(&mut self.store, instance, reason),
+                WasmBindings::ProviderV2(_) => {
+                    self.abort();
+                    return Err(PluginError::ProviderInvocationUnavailable);
+                }
+            };
         match result {
             Ok(Ok(())) => {
                 self.abort();
@@ -423,9 +1267,13 @@ impl WasmPluginInstance {
             WasmBindings::Legacy(bindings) => bindings
                 .zed_comfy_plugin_plugin()
                 .call_drop_node(&mut self.store, instance),
-            WasmBindings::Provider(bindings) => bindings
+            WasmBindings::ProviderV1(bindings) => bindings
                 .zed_comfy_plugin_plugin()
                 .call_drop_node(&mut self.store, instance),
+            WasmBindings::ProviderV2(_) => {
+                self.abort();
+                return Err(PluginError::ProviderInvocationUnavailable);
+            }
         };
         match result {
             Ok(()) => Ok(()),
@@ -483,7 +1331,7 @@ impl WasmPluginInstance {
             return Err(PluginError::Invocation(value_quota_error()));
         }
         invocation.check_cancellation()?;
-        let WasmBindings::Provider(bindings) = &self.bindings else {
+        let WasmBindings::ProviderV1(bindings) = &self.bindings else {
             self.abort();
             return Err(PluginError::ProviderInvocationUnavailable);
         };
@@ -514,6 +1362,11 @@ impl WasmPluginInstance {
     pub fn abort(&mut self) {
         if let Some(invocation) = self.store.data_mut().invocation.as_mut() {
             invocation.abort();
+        }
+        if let Some(provider_runtime) = self.store.data_mut().provider_runtime.as_mut() {
+            if let Err(error) = provider_runtime.revoke() {
+                eprintln!("provider-v2 runtime revocation failed: {error}");
+            }
         }
         self.terminal = true;
     }
@@ -643,7 +1496,7 @@ impl PluginHost {
             if manifest_projection.component_world != PROVIDER_COMPONENT_WORLD {
                 return Err(PluginError::ComponentWorldMismatch);
             }
-            ComponentWorld::Provider
+            ComponentWorld::ProviderV1
         } else {
             ComponentWorld::Legacy
         };
@@ -653,21 +1506,74 @@ impl PluginHost {
             digest_sha256: digest,
             manifest_projection,
             provider_binding: manifest.provider_binding.clone(),
+            provider_manifest_v2: None,
             world,
         };
         self.preflight_component(&compiled)?;
         Ok(compiled)
     }
 
+    pub fn compile_provider_component_v2(
+        &self,
+        bytes: &[u8],
+        manifest: &ProviderPluginManifestV2,
+        authorization: &ProviderManifestAuthorizationV2,
+    ) -> Result<CompiledPlugin, PluginError> {
+        manifest.validate(&self.registry)?;
+        self.validate(&manifest.manifest, authorization.authorization())?;
+        if bytes.len() > self.limits.maximum_component_bytes {
+            return Err(PluginError::ComponentTooLarge);
+        }
+        let digest = encode_hex(&Sha256::digest(bytes));
+        let provider_binding = manifest
+            .manifest
+            .provider_binding
+            .as_ref()
+            .ok_or(PluginError::ProviderBindingMismatch)?;
+        let outer_signing_payload_sha256 = Sha256::digest(manifest.signing_payload()?);
+        if !constant_time_equal(
+            digest.as_bytes(),
+            manifest.manifest.digest_sha256.as_bytes(),
+        ) || authorization.provider_binding() != provider_binding
+            || authorization.streaming_contract() != &manifest.streaming
+            || authorization.outer_signing_payload_sha256()
+                != outer_signing_payload_sha256.as_slice()
+        {
+            return Err(PluginError::ManifestProjectionMismatch);
+        }
+        let component = self.runtime.compile_component(bytes).map_err(|error| {
+            PluginError::ComponentCompilation(sanitize_diagnostic(&error.to_string()))
+        })?;
+        let compiled = CompiledPlugin {
+            component,
+            identifier: manifest.manifest.identifier.clone(),
+            digest_sha256: digest,
+            manifest_projection: manifest.manifest.component_projection(),
+            provider_binding: manifest.manifest.provider_binding.clone(),
+            provider_manifest_v2: Some(manifest.clone()),
+            world: ComponentWorld::ProviderV2,
+        };
+        self.preflight_component(&compiled)?;
+        Ok(compiled)
+    }
+
     fn new_wasm_store(&self) -> Result<Store<WasmStoreState>, PluginError> {
-        self.make_wasm_store(None)
+        self.make_wasm_store(None, None)
     }
 
     fn new_wasm_invocation_store(
         &self,
         invocation: InvocationHost,
     ) -> Result<Store<WasmStoreState>, PluginError> {
-        self.make_wasm_store(Some(invocation))
+        self.make_wasm_store(Some(invocation), None)
+    }
+
+    fn new_wasm_provider_v2_store(
+        &self,
+        invocation: InvocationHost,
+        provider_runtime: ProviderV2RuntimeHost,
+    ) -> Result<Store<WasmStoreState>, PluginError> {
+        self.make_wasm_store(Some(invocation), Some(provider_runtime))
     }
 
     pub fn instantiate_component(
@@ -675,6 +1581,9 @@ impl PluginHost {
         plugin: &CompiledPlugin,
         invocation: InvocationHost,
     ) -> Result<WasmPluginInstance, PluginError> {
+        if plugin.world == ComponentWorld::ProviderV2 {
+            return Err(PluginError::ProviderInvocationUnavailable);
+        }
         if invocation.plugin_identifier != plugin.identifier
             || invocation.plugin_digest_sha256 != plugin.digest_sha256
             || !plugin.manifest_projection.nodes.iter().any(|node| {
@@ -690,12 +1599,42 @@ impl PluginHost {
             bindings,
             expected_manifest_projection: plugin.manifest_projection.clone(),
             provider_binding: plugin.provider_binding.clone(),
+            expected_provider_manifest_v2: plugin.provider_manifest_v2.clone(),
             terminal: false,
         };
         instance.manifest_bytes()?;
-        if plugin.world == ComponentWorld::Provider {
+        if plugin.world == ComponentWorld::ProviderV1 {
             instance.provider_binding_set()?;
         }
+        Ok(instance)
+    }
+
+    pub(crate) fn instantiate_provider_component_v2(
+        &self,
+        plugin: &CompiledPlugin,
+        invocation: InvocationHost,
+        provider_runtime: ProviderV2RuntimeHost,
+    ) -> Result<WasmPluginInstance, PluginError> {
+        if plugin.world != ComponentWorld::ProviderV2
+            || invocation.plugin_identifier != plugin.identifier
+            || invocation.plugin_digest_sha256 != plugin.digest_sha256
+            || !plugin.manifest_projection.nodes.iter().any(|node| {
+                node.id == invocation.node.id && node.version == invocation.node.version
+            })
+        {
+            return Err(PluginError::InvocationBindingMismatch);
+        }
+        let store = self.new_wasm_provider_v2_store(invocation, provider_runtime)?;
+        let (store, bindings) = self.instantiate_bindings(plugin, store)?;
+        let mut instance = WasmPluginInstance {
+            store,
+            bindings,
+            expected_manifest_projection: plugin.manifest_projection.clone(),
+            provider_binding: plugin.provider_binding.clone(),
+            expected_provider_manifest_v2: plugin.provider_manifest_v2.clone(),
+            terminal: false,
+        };
+        instance.provider_v2_manifest_projection()?;
         Ok(instance)
     }
 
@@ -709,10 +1648,11 @@ impl PluginHost {
             bindings,
             expected_manifest_projection: plugin.manifest_projection.clone(),
             provider_binding: plugin.provider_binding.clone(),
+            expected_provider_manifest_v2: plugin.provider_manifest_v2.clone(),
             terminal: false,
         };
         instance.manifest_bytes()?;
-        if plugin.world == ComponentWorld::Provider {
+        if plugin.world == ComponentWorld::ProviderV1 {
             instance.provider_binding_set()?;
         }
         instance.terminal = true;
@@ -737,14 +1677,29 @@ impl PluginHost {
                         .map_err(component_instantiation_error)?,
                 )
             }
-            ComponentWorld::Provider => {
+            ComponentWorld::ProviderV1 => {
                 provider_wit_contract::ComfyProviderPlugin::add_to_linker::<
                     WasmStoreState,
                     wasmtime::component::HasSelf<WasmStoreState>,
                 >(&mut linker, |state| state)
                 .map_err(component_compilation_error)?;
-                WasmBindings::Provider(
+                WasmBindings::ProviderV1(
                     provider_wit_contract::ComfyProviderPlugin::instantiate(
+                        &mut store,
+                        plugin.component(),
+                        &linker,
+                    )
+                    .map_err(component_instantiation_error)?,
+                )
+            }
+            ComponentWorld::ProviderV2 => {
+                provider_v2_wit_contract::ComfyProviderPlugin::add_to_linker::<
+                    WasmStoreState,
+                    wasmtime::component::HasSelf<WasmStoreState>,
+                >(&mut linker, |state| state)
+                .map_err(component_compilation_error)?;
+                WasmBindings::ProviderV2(
+                    provider_v2_wit_contract::ComfyProviderPlugin::instantiate(
                         &mut store,
                         plugin.component(),
                         &linker,
@@ -759,6 +1714,7 @@ impl PluginHost {
     fn make_wasm_store(
         &self,
         invocation: Option<InvocationHost>,
+        provider_runtime: Option<ProviderV2RuntimeHost>,
     ) -> Result<Store<WasmStoreState>, PluginError> {
         let limits = StoreLimitsBuilder::new()
             .memory_size(self.limits.maximum_memory_bytes)
@@ -768,7 +1724,14 @@ impl PluginHost {
             .memories(self.limits.maximum_memories)
             .trap_on_grow_failure(true)
             .build();
-        let mut store = Store::new(self.runtime.engine(), WasmStoreState { limits, invocation });
+        let mut store = Store::new(
+            self.runtime.engine(),
+            WasmStoreState {
+                limits,
+                invocation,
+                provider_runtime,
+            },
+        );
         store.limiter(|state| &mut state.limits);
         store
             .set_fuel(self.limits.maximum_fuel)
@@ -1113,6 +2076,47 @@ impl InvocationHost {
             receipts,
             resolved_provider_results: Vec::new(),
         })
+    }
+
+    fn finish_provider_v2_inputs(mut self) -> Result<(), InvocationError> {
+        self.check_active()?;
+        self.check_cancellation()?;
+        if self
+            .outputs
+            .values()
+            .any(|state| !state.values.is_empty() || state.present.is_some() || state.finished)
+        {
+            self.abort();
+            return Err(InvocationError::HostFailure(
+                "provider-v2 input host retained output authority".to_owned(),
+            ));
+        }
+        let mut capabilities = self.capabilities.take().ok_or_else(|| {
+            InvocationError::HostFailure("invocation capability state is missing".to_owned())
+        })?;
+        if capabilities.has_open_output_buffers() {
+            capabilities.rollback();
+            self.abort();
+            return Err(InvocationError::HostFailure(
+                "provider-v2 input host retained an output transaction".to_owned(),
+            ));
+        }
+        let effects = capabilities.finish()?;
+        if !effects.outputs.is_empty()
+            || !effects.logs.is_empty()
+            || !effects.ui_state.is_empty()
+            || !effects.routes.is_empty()
+        {
+            self.abort();
+            return Err(InvocationError::HostFailure(
+                "provider-v2 input host produced a legacy capability effect".to_owned(),
+            ));
+        }
+        self.inputs.clear();
+        self.handles.clear();
+        self.outputs.clear();
+        self.terminal = true;
+        Ok(())
     }
 
     fn check_active(&self) -> Result<(), InvocationError> {
@@ -1726,6 +2730,327 @@ impl wit_contract::zed::comfy_plugin::host::Host for WasmStoreState {
     }
 }
 
+impl provider_v2_wit_contract::zed::comfy_provider_plugin::invocation_input_host::Host
+    for WasmStoreState
+{
+    fn get_input_state(
+        &mut self,
+        port_id: String,
+    ) -> Result<wit_contract::zed::comfy_plugin::types::InputState, WitInvocationError> {
+        self.provider_runtime_mut()
+            .map_err(wit_provider_input_error)?
+            .require_bound()
+            .map_err(wit_provider_input_error)?;
+        let state = self
+            .invocation_mut()?
+            .input_state(&port_id)
+            .map_err(wit_error)?;
+        Ok(wit_contract::zed::comfy_plugin::types::InputState {
+            present: state.present,
+            length: state.length,
+            type_id: state.type_id.to_string(),
+            family: wit_value_family(state.family),
+            cardinality: wit_port_cardinality(state.cardinality),
+            presence: wit_port_presence(state.presence),
+            serialization: wit_port_serialization(state.serialization),
+            lazy: state.lazy,
+        })
+    }
+
+    fn read_scalar_input(
+        &mut self,
+        port_id: String,
+        index: u32,
+    ) -> Result<wit_contract::zed::comfy_plugin::types::EncodedValue, WitInvocationError> {
+        self.provider_runtime_mut()
+            .map_err(wit_provider_input_error)?
+            .require_bound()
+            .map_err(wit_provider_input_error)?;
+        let value = self
+            .invocation_mut()?
+            .read_scalar_input(&port_id, index)
+            .map_err(wit_error)?;
+        Ok(wit_contract::zed::comfy_plugin::types::EncodedValue {
+            type_id: value.type_id().to_string(),
+            family: wit_value_family(value.family()),
+            abi_bytes: value.abi_bytes().map_err(|error| {
+                wit_host_failure(&format!("plugin value ABI encoding failed: {error}"))
+            })?,
+        })
+    }
+
+    fn take_input(
+        &mut self,
+        port_id: String,
+        index: u32,
+    ) -> Result<wit_contract::zed::comfy_plugin::types::ValueHandle, WitInvocationError> {
+        self.provider_runtime_mut()
+            .map_err(wit_provider_input_error)?
+            .require_bound()
+            .map_err(wit_provider_input_error)?;
+        self.invocation_mut()?
+            .take_input(&port_id, index)
+            .map(wit_value_handle)
+            .map_err(wit_error)
+    }
+
+    fn read_handle(
+        &mut self,
+        handle: wit_contract::zed::comfy_plugin::types::ValueHandle,
+    ) -> Result<wit_contract::zed::comfy_plugin::types::EncodedValue, WitInvocationError> {
+        self.provider_runtime_mut()
+            .map_err(wit_provider_input_error)?
+            .require_bound()
+            .map_err(wit_provider_input_error)?;
+        let value = self
+            .invocation_mut()?
+            .read_handle(sdk_value_handle(handle))
+            .map_err(wit_error)?;
+        Ok(wit_contract::zed::comfy_plugin::types::EncodedValue {
+            type_id: value.type_id().to_string(),
+            family: wit_value_family(value.family()),
+            abi_bytes: value.abi_bytes().map_err(|error| {
+                wit_host_failure(&format!("plugin value ABI encoding failed: {error}"))
+            })?,
+        })
+    }
+
+    fn check_cancelled(&mut self) -> Result<(), WitInvocationError> {
+        self.provider_runtime_mut()
+            .map_err(wit_provider_input_error)?
+            .require_bound()
+            .map_err(wit_provider_input_error)?;
+        self.invocation_mut()?.check_cancelled().map_err(wit_error)
+    }
+}
+
+impl provider_v2_wit_contract::zed::comfy_provider_plugin::provider_streaming_host::Host
+    for WasmStoreState
+{
+    fn start_request(
+        &mut self,
+        context: provider_v2_wit_contract::zed::comfy_provider_plugin::types::InvocationContext,
+        request: provider_v2_wit_contract::zed::comfy_provider_plugin::types::RequestHead,
+    ) -> Result<
+        provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamHandle,
+        provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError,
+    > {
+        let runtime = self
+            .provider_runtime_mut()
+            .map_err(wit_provider_stream_error)?;
+        if context.invocation != runtime.context.invocation
+            || context.generation != runtime.context.generation
+        {
+            if let Err(revoke_error) = runtime.revoke() {
+                eprintln!(
+                    "provider-v2 route revocation after invalid invocation context failed: {revoke_error}"
+                );
+            }
+            return Err(wit_provider_stream_error(
+                WorkerProviderStreamError::InvalidRequestAuthority,
+            ));
+        }
+        let context = runtime.context.clone();
+        let response = runtime
+            .exchange(WorkerProviderStreamRequest::StartRequest {
+                context,
+                head: worker_provider_request_head(request),
+            })
+            .map_err(wit_provider_stream_error)?;
+        match response {
+            WorkerProviderStreamResponse::Stream(Ok(handle)) => {
+                Ok(wit_provider_stream_handle(handle))
+            }
+            _ => Err(wit_provider_stream_error(
+                WorkerProviderStreamError::HostFailure,
+            )),
+        }
+    }
+
+    fn write_request_chunk(
+        &mut self,
+        chunk: provider_v2_wit_contract::zed::comfy_provider_plugin::types::RequestChunk,
+    ) -> Result<(), provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError> {
+        let runtime = self
+            .provider_runtime_mut()
+            .map_err(wit_provider_stream_error)?;
+        let chunk = WorkerProviderRequestChunk {
+            handle: runtime.worker_handle(chunk.handle),
+            sequence: chunk.sequence,
+            bytes: chunk.bytes,
+            end: chunk.end,
+        };
+        match runtime
+            .exchange(WorkerProviderStreamRequest::WriteRequestChunk(chunk))
+            .map_err(wit_provider_stream_error)?
+        {
+            WorkerProviderStreamResponse::Unit(Ok(())) => Ok(()),
+            _ => Err(wit_provider_stream_error(
+                WorkerProviderStreamError::HostFailure,
+            )),
+        }
+    }
+
+    fn wait_response(
+        &mut self,
+        request: provider_v2_wit_contract::zed::comfy_provider_plugin::types::WaitRequest,
+    ) -> Result<
+        provider_v2_wit_contract::zed::comfy_provider_plugin::types::WaitOutcome,
+        provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError,
+    > {
+        let runtime = self
+            .provider_runtime_mut()
+            .map_err(wit_provider_stream_error)?;
+        let request = WorkerProviderWaitRequest {
+            handle: runtime.worker_handle(request.handle),
+            after_sequence: request.after_sequence,
+            timeout_milliseconds: request.timeout_milliseconds,
+        };
+        match runtime
+            .exchange(WorkerProviderStreamRequest::WaitResponse(request))
+            .map_err(wit_provider_stream_error)?
+        {
+            WorkerProviderStreamResponse::Wait(Ok(outcome)) => {
+                Ok(wit_provider_wait_outcome(outcome))
+            }
+            _ => Err(wit_provider_stream_error(
+                WorkerProviderStreamError::HostFailure,
+            )),
+        }
+    }
+
+    fn start_upload(
+        &mut self,
+        request: provider_v2_wit_contract::zed::comfy_provider_plugin::types::UploadRequest,
+    ) -> Result<
+        provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamHandle,
+        provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError,
+    > {
+        let runtime = self
+            .provider_runtime_mut()
+            .map_err(wit_provider_stream_error)?;
+        let request = WorkerProviderUploadRequest {
+            handle: runtime.worker_handle(request.handle),
+            port_id: request.port_id,
+            media_type: request.media_type,
+            byte_length: request.byte_length,
+            content_sha256: request.content_sha256,
+        };
+        match runtime
+            .exchange(WorkerProviderStreamRequest::StartUpload(request))
+            .map_err(wit_provider_stream_error)?
+        {
+            WorkerProviderStreamResponse::Stream(Ok(handle)) => {
+                Ok(wit_provider_stream_handle(handle))
+            }
+            _ => Err(wit_provider_stream_error(
+                WorkerProviderStreamError::HostFailure,
+            )),
+        }
+    }
+
+    fn write_upload_chunk(
+        &mut self,
+        chunk: provider_v2_wit_contract::zed::comfy_provider_plugin::types::RequestChunk,
+    ) -> Result<(), provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError> {
+        let runtime = self
+            .provider_runtime_mut()
+            .map_err(wit_provider_stream_error)?;
+        let chunk = WorkerProviderRequestChunk {
+            handle: runtime.worker_handle(chunk.handle),
+            sequence: chunk.sequence,
+            bytes: chunk.bytes,
+            end: chunk.end,
+        };
+        match runtime
+            .exchange(WorkerProviderStreamRequest::WriteUploadChunk(chunk))
+            .map_err(wit_provider_stream_error)?
+        {
+            WorkerProviderStreamResponse::Unit(Ok(())) => Ok(()),
+            _ => Err(wit_provider_stream_error(
+                WorkerProviderStreamError::HostFailure,
+            )),
+        }
+    }
+
+    fn request_cost(
+        &mut self,
+        request: provider_v2_wit_contract::zed::comfy_provider_plugin::types::CostRequest,
+    ) -> Result<
+        provider_v2_wit_contract::zed::comfy_provider_plugin::types::CostResponse,
+        provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError,
+    > {
+        let runtime = self
+            .provider_runtime_mut()
+            .map_err(wit_provider_stream_error)?;
+        let request = WorkerProviderCostRequest {
+            handle: runtime.worker_handle(request.handle),
+            operation: request.operation,
+            currency: request.currency,
+            maximum_microunits: request.maximum_microunits,
+        };
+        match runtime
+            .exchange(WorkerProviderStreamRequest::RequestCost(request))
+            .map_err(wit_provider_stream_error)?
+        {
+            WorkerProviderStreamResponse::Cost(Ok(response)) => Ok(
+                provider_v2_wit_contract::zed::comfy_provider_plugin::types::CostResponse {
+                    accepted: response.accepted,
+                    approved_microunits: response.approved_microunits,
+                    receipt: response.receipt,
+                },
+            ),
+            _ => Err(wit_provider_stream_error(
+                WorkerProviderStreamError::HostFailure,
+            )),
+        }
+    }
+
+    fn report_progress(
+        &mut self,
+        progress: provider_v2_wit_contract::zed::comfy_provider_plugin::types::Progress,
+    ) -> Result<(), provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError> {
+        let runtime = self
+            .provider_runtime_mut()
+            .map_err(wit_provider_stream_error)?;
+        let progress = WorkerProviderProgress {
+            handle: runtime.worker_handle(progress.handle),
+            sequence: progress.sequence,
+            completed: progress.completed,
+            total: progress.total,
+            message: progress.message,
+        };
+        match runtime
+            .exchange(WorkerProviderStreamRequest::ReportProgress(progress))
+            .map_err(wit_provider_stream_error)?
+        {
+            WorkerProviderStreamResponse::Unit(Ok(())) => Ok(()),
+            _ => Err(wit_provider_stream_error(
+                WorkerProviderStreamError::HostFailure,
+            )),
+        }
+    }
+
+    fn check_cancelled(
+        &mut self,
+        handle: provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamHandle,
+    ) -> Result<(), provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError> {
+        let runtime = self
+            .provider_runtime_mut()
+            .map_err(wit_provider_stream_error)?;
+        let handle = runtime.worker_handle(handle);
+        match runtime
+            .exchange(WorkerProviderStreamRequest::CheckCancelled(handle))
+            .map_err(wit_provider_stream_error)?
+        {
+            WorkerProviderStreamResponse::Unit(Ok(())) => Ok(()),
+            _ => Err(wit_provider_stream_error(
+                WorkerProviderStreamError::HostFailure,
+            )),
+        }
+    }
+}
+
 impl WasmStoreState {
     fn invocation_mut(&mut self) -> Result<&mut InvocationHost, WitInvocationError> {
         self.invocation
@@ -1736,7 +3061,17 @@ impl WasmStoreState {
     fn call(&mut self, call: CapabilityCall) -> Result<CapabilityResponse, WitInvocationError> {
         self.invocation_mut()?.call(call).map_err(wit_error)
     }
+
+    fn provider_runtime_mut(
+        &mut self,
+    ) -> Result<&mut ProviderV2RuntimeHost, WorkerProviderStreamError> {
+        self.provider_runtime
+            .as_mut()
+            .ok_or(WorkerProviderStreamError::InvalidRequestAuthority)
+    }
 }
+
+impl provider_v2_wit_contract::zed::comfy_provider_plugin::types::Host for WasmStoreState {}
 
 fn wit_value_handle(handle: ValueHandle) -> wit_contract::zed::comfy_plugin::host::ValueHandle {
     wit_contract::zed::comfy_plugin::host::ValueHandle {
@@ -2681,6 +4016,1025 @@ fn sanitize_diagnostic(message: &str) -> String {
 mod tests {
     use super::*;
     use std::error::Error;
+    use uuid::Uuid;
+
+    fn provider_context() -> WorkerProviderInvocationContext {
+        WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x421),
+            session_generation: 7,
+            invocation: 11,
+            generation: 13,
+        }
+    }
+
+    fn provider_handle(slot: u32) -> WorkerProviderStreamHandle {
+        let context = provider_context();
+        WorkerProviderStreamHandle {
+            session_id: context.session_id,
+            session_generation: context.session_generation,
+            invocation: context.invocation,
+            slot,
+            generation: context.generation,
+        }
+    }
+
+    fn check_cancelled_request(slot: u32) -> WorkerProviderStreamRequest {
+        WorkerProviderStreamRequest::CheckCancelled(provider_handle(slot))
+    }
+
+    fn provider_head() -> WorkerProviderRequestHead {
+        WorkerProviderRequestHead {
+            endpoint: "https://provider.invalid/v2".to_owned(),
+            secret_id: Some("provider-secret".to_owned()),
+            method: WorkerProviderHttpMethod::Post,
+            headers: vec![WorkerProviderHeader {
+                name: "content-type".to_owned(),
+                value: "application/json".to_owned(),
+            }],
+            declared_body_bytes: Some(3),
+        }
+    }
+
+    fn provider_contract() -> WorkerProviderStreamingContract {
+        WorkerProviderStreamingContract {
+            methods: vec![WorkerProviderHttpMethod::Post],
+            maximum_headers: 4,
+            maximum_header_bytes: 1024,
+            maximum_request_body_bytes: 1024,
+            maximum_response_body_bytes: 1024,
+            maximum_chunk_bytes: 128,
+            maximum_ndjson_line_bytes: 128,
+            maximum_wait_milliseconds: 1000,
+            maximum_uploads: 1,
+            maximum_upload_body_bytes: 1024,
+            maximum_cost_requests: 1,
+            maximum_progress_total: 100,
+            uploads: true,
+            cost_requests: true,
+        }
+    }
+
+    fn started_provider_runtime(
+        cancellation: CancellationToken,
+    ) -> Result<(ProviderV2RuntimeHost, ProviderV2StreamRouteReceiver), WorkerProviderStreamError>
+    {
+        let (mut runtime, receiver) = checked_provider_runtime(cancellation)?;
+        runtime.validator.validate_request(
+            1,
+            &WorkerProviderStreamRequest::StartRequest {
+                context: provider_context(),
+                head: provider_head(),
+            },
+        )?;
+        runtime.validator.validate_response(
+            1,
+            &WorkerProviderStreamResponse::Stream(Ok(provider_handle(1))),
+        )?;
+        runtime.next_call_id = 2;
+        runtime.bound = true;
+        Ok((runtime, receiver))
+    }
+
+    fn checked_provider_runtime(
+        cancellation: CancellationToken,
+    ) -> Result<(ProviderV2RuntimeHost, ProviderV2StreamRouteReceiver), WorkerProviderStreamError>
+    {
+        let (route, receiver) = provider_v2_stream_route();
+        let runtime = ProviderV2RuntimeHost::checked_from_certified_capsule(
+            provider_context(),
+            provider_contract(),
+            cancellation,
+            route,
+        )?;
+        Ok((runtime, receiver))
+    }
+
+    #[test]
+    fn provider_v2_request_head_projection_preserves_every_signed_field() {
+        use provider_v2_wit_contract::zed::comfy_provider_plugin::types::{
+            Header, HttpMethod, RequestHead,
+        };
+
+        for (wit_method, worker_method) in [
+            (HttpMethod::Delete, WorkerProviderHttpMethod::Delete),
+            (HttpMethod::Get, WorkerProviderHttpMethod::Get),
+            (HttpMethod::Head, WorkerProviderHttpMethod::Head),
+            (HttpMethod::Options, WorkerProviderHttpMethod::Options),
+            (HttpMethod::Patch, WorkerProviderHttpMethod::Patch),
+            (HttpMethod::Post, WorkerProviderHttpMethod::Post),
+            (HttpMethod::Put, WorkerProviderHttpMethod::Put),
+        ] {
+            let projected = worker_provider_request_head(RequestHead {
+                endpoint: "https://provider.invalid/v2".to_owned(),
+                secret_id: Some("provider-secret".to_owned()),
+                method: wit_method,
+                headers: vec![
+                    Header {
+                        name: "x-first".to_owned(),
+                        value: "1".to_owned(),
+                    },
+                    Header {
+                        name: "x-second".to_owned(),
+                        value: "2".to_owned(),
+                    },
+                ],
+                declared_body_bytes: Some(41),
+            });
+            assert_eq!(projected.endpoint, "https://provider.invalid/v2");
+            assert_eq!(projected.secret_id.as_deref(), Some("provider-secret"));
+            assert_eq!(projected.method, worker_method);
+            assert_eq!(
+                projected.headers,
+                vec![
+                    WorkerProviderHeader {
+                        name: "x-first".to_owned(),
+                        value: "1".to_owned(),
+                    },
+                    WorkerProviderHeader {
+                        name: "x-second".to_owned(),
+                        value: "2".to_owned(),
+                    },
+                ]
+            );
+            assert_eq!(projected.declared_body_bytes, Some(41));
+        }
+
+        let without_secret = worker_provider_request_head(RequestHead {
+            endpoint: "https://provider.invalid/no-secret".to_owned(),
+            secret_id: None,
+            method: HttpMethod::Get,
+            headers: Vec::new(),
+            declared_body_bytes: None,
+        });
+        assert_eq!(without_secret.secret_id, None);
+        assert_eq!(without_secret.declared_body_bytes, None);
+    }
+
+    #[test]
+    fn provider_v2_route_is_capacity_one_and_revocation_discards_queued_work() {
+        let (route, receiver) = provider_v2_stream_route();
+        let (first_reply, _first_receiver) = sync_channel(1);
+        route
+            .sender
+            .try_send(ProviderV2StreamRouteMessage::Request(
+                ProviderV2StreamRouteCall {
+                    call_id: 1,
+                    request: check_cancelled_request(1),
+                    reply: first_reply,
+                },
+            ))
+            .expect("first capacity-one request must be admitted");
+        let (second_reply, _second_receiver) = sync_channel(1);
+        assert!(matches!(
+            route.sender.try_send(ProviderV2StreamRouteMessage::Request(
+                ProviderV2StreamRouteCall {
+                    call_id: 2,
+                    request: check_cancelled_request(1),
+                    reply: second_reply,
+                },
+            )),
+            Err(TrySendError::Full(_))
+        ));
+
+        route.revoked.store(true, Ordering::Release);
+        let (revoke_reply, _revoke_receiver) = sync_channel(1);
+        route
+            .revoke_sender
+            .try_send(ProviderV2StreamRouteMessage::Revoke {
+                reply: revoke_reply,
+            })
+            .expect("out-of-band revocation must not share request capacity");
+        assert!(matches!(
+            receiver.try_receive(),
+            Ok(ProviderV2StreamRouteMessage::Revoke { .. })
+        ));
+        assert!(matches!(
+            receiver.receiver.try_recv(),
+            Err(TryRecvError::Empty)
+        ));
+    }
+
+    #[test]
+    fn provider_v2_route_carries_every_typed_request_and_response_without_erasure()
+    -> Result<(), Box<dyn Error>> {
+        let requests = vec![
+            WorkerProviderStreamRequest::WriteRequestChunk(WorkerProviderRequestChunk {
+                handle: provider_handle(1),
+                sequence: 0,
+                bytes: vec![1, 2, 3],
+                end: true,
+            }),
+            WorkerProviderStreamRequest::WaitResponse(WorkerProviderWaitRequest {
+                handle: provider_handle(1),
+                after_sequence: None,
+                timeout_milliseconds: 10,
+            }),
+            WorkerProviderStreamRequest::StartUpload(WorkerProviderUploadRequest {
+                handle: provider_handle(1),
+                port_id: "reference".to_owned(),
+                media_type: "application/octet-stream".to_owned(),
+                byte_length: 3,
+                content_sha256: "039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81"
+                    .to_owned(),
+            }),
+            WorkerProviderStreamRequest::WriteUploadChunk(WorkerProviderRequestChunk {
+                handle: provider_handle(2),
+                sequence: 0,
+                bytes: vec![1, 2, 3],
+                end: true,
+            }),
+            WorkerProviderStreamRequest::RequestCost(WorkerProviderCostRequest {
+                handle: provider_handle(1),
+                operation: "fixture".to_owned(),
+                currency: "USD".to_owned(),
+                maximum_microunits: 1000,
+            }),
+            WorkerProviderStreamRequest::ReportProgress(WorkerProviderProgress {
+                handle: provider_handle(1),
+                sequence: 1,
+                completed: 1,
+                total: 1,
+                message: Some("complete".to_owned()),
+            }),
+            check_cancelled_request(1),
+        ];
+        let responses = vec![
+            WorkerProviderStreamResponse::Unit(Ok(())),
+            WorkerProviderStreamResponse::Wait(Ok(WorkerProviderWaitOutcome::TimedOut)),
+            WorkerProviderStreamResponse::Stream(Ok(provider_handle(2))),
+            WorkerProviderStreamResponse::Unit(Ok(())),
+            WorkerProviderStreamResponse::Cost(Ok(comfy_types::WorkerProviderCostResponse {
+                accepted: true,
+                approved_microunits: 900,
+                receipt: vec![9],
+            })),
+            WorkerProviderStreamResponse::Unit(Ok(())),
+            WorkerProviderStreamResponse::Unit(Ok(())),
+        ];
+        for (index, (request, response)) in requests.into_iter().zip(responses).enumerate() {
+            let (route, receiver) = provider_v2_stream_route();
+            let (reply, reply_receiver) = sync_channel(1);
+            let call_id = u64::try_from(index).expect("fixture index fits") + 1;
+            route
+                .sender
+                .try_send(ProviderV2StreamRouteMessage::Request(
+                    ProviderV2StreamRouteCall {
+                        call_id,
+                        request: request.clone(),
+                        reply,
+                    },
+                ))
+                .expect("typed route accepts one request");
+            let ProviderV2StreamRouteMessage::Request(call) =
+                receiver.try_receive().expect("typed request is available")
+            else {
+                return Err("request route yielded a control message".into());
+            };
+            assert_eq!(call.call_id(), call_id);
+            assert_eq!(call.request(), &request);
+            call.respond(response.clone())
+                .expect("typed response is delivered once");
+            assert_eq!(
+                reply_receiver
+                    .recv()
+                    .expect("typed response remains connected"),
+                response
+            );
+        }
+
+        let (route, receiver) = provider_v2_stream_route();
+        let (reply, reply_receiver) = sync_channel(1);
+        let start = WorkerProviderStreamRequest::StartRequest {
+            context: provider_context(),
+            head: provider_head(),
+        };
+        route
+            .sender
+            .try_send(ProviderV2StreamRouteMessage::Request(
+                ProviderV2StreamRouteCall {
+                    call_id: 1,
+                    request: start.clone(),
+                    reply,
+                },
+            ))
+            .expect("start request is admitted");
+        let ProviderV2StreamRouteMessage::Request(call) =
+            receiver.try_receive().expect("start request is available")
+        else {
+            return Err("start route yielded a control message".into());
+        };
+        assert_eq!(call.request(), &start);
+        let (call_id, context, head, reply) =
+            call.into_start().expect("exact start DTO is retained");
+        assert_eq!(call_id, 1);
+        assert_eq!(context, provider_context());
+        assert_eq!(head, provider_head());
+        ProviderV2BoundStartCall { call_id, reply }
+            .respond(Ok(provider_handle(1)))
+            .expect("bound start response is delivered once");
+        assert_eq!(
+            reply_receiver
+                .recv()
+                .expect("start response remains connected"),
+            WorkerProviderStreamResponse::Stream(Ok(provider_handle(1)))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn provider_v2_validator_rejects_every_exposed_handle_identity_mutation() {
+        let mut validator = WorkerProviderStreamTransportValidator::checked_for_host_session(
+            provider_context(),
+            provider_contract(),
+            CancellationToken::default(),
+        )
+        .expect("fixture streaming contract is valid");
+        validator
+            .validate_request(
+                1,
+                &WorkerProviderStreamRequest::StartRequest {
+                    context: provider_context(),
+                    head: provider_head(),
+                },
+            )
+            .expect("exact start is valid");
+        validator
+            .validate_response(
+                1,
+                &WorkerProviderStreamResponse::Stream(Ok(provider_handle(1))),
+            )
+            .expect("exact start response is valid");
+
+        let mut mutations = Vec::new();
+        let mut foreign_session = provider_handle(1);
+        foreign_session.session_id = Uuid::from_u128(0x999);
+        mutations.push((foreign_session, WorkerProviderStreamError::ForeignSession));
+        let mut stale_session = provider_handle(1);
+        stale_session.session_generation += 1;
+        mutations.push((stale_session, WorkerProviderStreamError::StaleSession));
+        let mut foreign_invocation = provider_handle(1);
+        foreign_invocation.invocation += 1;
+        mutations.push((
+            foreign_invocation,
+            WorkerProviderStreamError::ForeignInvocation,
+        ));
+        let mut stale_generation = provider_handle(1);
+        stale_generation.generation += 1;
+        mutations.push((stale_generation, WorkerProviderStreamError::StaleGeneration));
+        let mut foreign_slot = provider_handle(1);
+        foreign_slot.slot += 1;
+        mutations.push((foreign_slot, WorkerProviderStreamError::ForeignHandle));
+        for (handle, error) in mutations {
+            assert_eq!(
+                validator
+                    .validate_request(2, &WorkerProviderStreamRequest::CheckCancelled(handle),),
+                Err(error)
+            );
+        }
+    }
+
+    #[test]
+    fn provider_v2_inputs_are_denied_until_the_certified_start_is_bound()
+    -> Result<(), WorkerProviderStreamError> {
+        let (mut runtime, _receiver) = started_provider_runtime(CancellationToken::default())?;
+        runtime.bound = false;
+        assert_eq!(
+            runtime.require_bound(),
+            Err(WorkerProviderStreamError::InvalidRequestAuthority)
+        );
+        runtime.bound = true;
+        assert_eq!(runtime.require_bound(), Ok(()));
+        Ok(())
+    }
+
+    #[test]
+    fn provider_v2_non_start_operations_revoke_before_route_enqueue()
+    -> Result<(), WorkerProviderStreamError> {
+        let requests = vec![
+            WorkerProviderStreamRequest::WriteRequestChunk(WorkerProviderRequestChunk {
+                handle: provider_handle(1),
+                sequence: 0,
+                bytes: vec![1],
+                end: true,
+            }),
+            WorkerProviderStreamRequest::WaitResponse(WorkerProviderWaitRequest {
+                handle: provider_handle(1),
+                after_sequence: None,
+                timeout_milliseconds: 1,
+            }),
+            WorkerProviderStreamRequest::StartUpload(WorkerProviderUploadRequest {
+                handle: provider_handle(1),
+                port_id: "image".to_owned(),
+                media_type: "application/octet-stream".to_owned(),
+                byte_length: 1,
+                content_sha256: "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7c24e9bd663e6c"
+                    .to_owned(),
+            }),
+            WorkerProviderStreamRequest::WriteUploadChunk(WorkerProviderRequestChunk {
+                handle: provider_handle(2),
+                sequence: 0,
+                bytes: vec![1],
+                end: true,
+            }),
+            WorkerProviderStreamRequest::RequestCost(WorkerProviderCostRequest {
+                handle: provider_handle(1),
+                operation: "fixture".to_owned(),
+                currency: "USD".to_owned(),
+                maximum_microunits: 1,
+            }),
+            WorkerProviderStreamRequest::ReportProgress(WorkerProviderProgress {
+                handle: provider_handle(1),
+                sequence: 0,
+                completed: 0,
+                total: 1,
+                message: None,
+            }),
+            WorkerProviderStreamRequest::CheckCancelled(provider_handle(1)),
+        ];
+        for request in requests {
+            let (mut runtime, receiver) = checked_provider_runtime(CancellationToken::default())?;
+            assert_eq!(
+                runtime.exchange(request),
+                Err(WorkerProviderStreamError::InvalidOrder)
+            );
+            assert!(runtime.route.revoked.load(Ordering::Acquire));
+            assert!(matches!(
+                receiver.receiver.try_recv(),
+                Err(TryRecvError::Empty)
+            ));
+            assert!(matches!(
+                receiver.try_receive(),
+                Ok(ProviderV2StreamRouteMessage::Revoke { .. })
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn provider_v2_wit_start_context_mismatch_revokes_before_route_enqueue()
+    -> Result<(), WorkerProviderStreamError> {
+        use provider_v2_wit_contract::zed::comfy_provider_plugin::provider_streaming_host::Host;
+        use provider_v2_wit_contract::zed::comfy_provider_plugin::types::{
+            Header, HttpMethod, InvocationContext, RequestHead, StreamError,
+        };
+
+        for context in [
+            InvocationContext {
+                invocation: provider_context().invocation + 1,
+                generation: provider_context().generation,
+            },
+            InvocationContext {
+                invocation: provider_context().invocation,
+                generation: provider_context().generation + 1,
+            },
+        ] {
+            let (runtime, receiver) = checked_provider_runtime(CancellationToken::default())?;
+            let mut state = WasmStoreState {
+                limits: StoreLimitsBuilder::new().build(),
+                invocation: None,
+                provider_runtime: Some(runtime),
+            };
+            assert_eq!(
+                Host::start_request(
+                    &mut state,
+                    context,
+                    RequestHead {
+                        endpoint: "https://provider.invalid/v2".to_owned(),
+                        secret_id: Some("provider-secret".to_owned()),
+                        method: HttpMethod::Post,
+                        headers: vec![Header {
+                            name: "content-type".to_owned(),
+                            value: "application/json".to_owned(),
+                        }],
+                        declared_body_bytes: Some(3),
+                    },
+                ),
+                Err(StreamError::InvalidRequestAuthority)
+            );
+            let runtime = state
+                .provider_runtime
+                .as_ref()
+                .expect("test runtime remains retained after rejection");
+            assert!(runtime.route.revoked.load(Ordering::Acquire));
+            assert!(matches!(
+                receiver.receiver.try_recv(),
+                Err(TryRecvError::Empty)
+            ));
+            assert!(matches!(
+                receiver.try_receive(),
+                Ok(ProviderV2StreamRouteMessage::Revoke { .. })
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn provider_v2_full_disconnected_and_cancelled_routes_preserve_primary_errors()
+    -> Result<(), WorkerProviderStreamError> {
+        let (mut full_runtime, full_receiver) =
+            started_provider_runtime(CancellationToken::default())?;
+        let (reply, _reply_receiver) = sync_channel(1);
+        full_runtime
+            .route
+            .sender
+            .try_send(ProviderV2StreamRouteMessage::Request(
+                ProviderV2StreamRouteCall {
+                    call_id: 99,
+                    request: check_cancelled_request(1),
+                    reply,
+                },
+            ))
+            .map_err(|_| WorkerProviderStreamError::HostFailure)?;
+        assert_eq!(
+            full_runtime.exchange(check_cancelled_request(1)),
+            Err(WorkerProviderStreamError::InvalidOrder)
+        );
+        assert!(full_runtime.route.revoked.load(Ordering::Acquire));
+        drop(full_receiver);
+
+        let (mut disconnected_runtime, disconnected_receiver) =
+            started_provider_runtime(CancellationToken::default())?;
+        drop(disconnected_receiver);
+        assert_eq!(
+            disconnected_runtime.exchange(check_cancelled_request(1)),
+            Err(WorkerProviderStreamError::RevokedHandle)
+        );
+        assert!(disconnected_runtime.route.revoked.load(Ordering::Acquire));
+
+        let cancellation = CancellationToken::default();
+        let (mut cancelled_runtime, cancelled_receiver) =
+            started_provider_runtime(cancellation.clone())?;
+        assert!(cancellation.cancel());
+        assert_eq!(
+            cancelled_runtime.exchange(check_cancelled_request(1)),
+            Err(WorkerProviderStreamError::Cancelled)
+        );
+        assert!(cancelled_runtime.route.revoked.load(Ordering::Acquire));
+        drop(cancelled_receiver);
+        Ok(())
+    }
+
+    #[test]
+    fn provider_v2_completed_route_blocks_late_calls_and_drop_revokes() -> Result<(), Box<dyn Error>>
+    {
+        let (mut runtime, receiver) = started_provider_runtime(CancellationToken::default())?;
+        let revoked = Arc::new(AtomicBool::new(false));
+        let revoked_for_thread = revoked.clone();
+        let worker = std::thread::spawn(move || -> Result<(), WorkerProviderStreamError> {
+            let request = loop {
+                match receiver.try_receive() {
+                    Ok(message) => break message,
+                    Err(TryRecvError::Empty) => std::thread::yield_now(),
+                    Err(TryRecvError::Disconnected) => {
+                        return Err(WorkerProviderStreamError::RevokedHandle);
+                    }
+                }
+            };
+            let ProviderV2StreamRouteMessage::Request(call) = request else {
+                return Err(WorkerProviderStreamError::InvalidOrder);
+            };
+            call.respond(WorkerProviderStreamResponse::Wait(Ok(
+                WorkerProviderWaitOutcome::Frame(WorkerProviderResponseFrame {
+                    handle: provider_handle(1),
+                    sequence: 0,
+                    event: WorkerProviderResponseFrameEvent::Terminal(
+                        WorkerProviderTerminal::Completed(vec![4, 2, 1]),
+                    ),
+                }),
+            )))?;
+            loop {
+                match receiver.try_receive() {
+                    Ok(ProviderV2StreamRouteMessage::Revoke { reply }) => {
+                        reply
+                            .try_send(Ok(()))
+                            .map_err(|_| WorkerProviderStreamError::RevokedHandle)?;
+                        revoked_for_thread.store(true, Ordering::Release);
+                        return Ok(());
+                    }
+                    Ok(ProviderV2StreamRouteMessage::Request(_)) => {
+                        return Err(WorkerProviderStreamError::InvalidOrder);
+                    }
+                    Err(TryRecvError::Empty) => std::thread::yield_now(),
+                    Err(TryRecvError::Disconnected) => {
+                        return Err(WorkerProviderStreamError::RevokedHandle);
+                    }
+                }
+            }
+        });
+        assert!(matches!(
+            runtime.exchange(WorkerProviderStreamRequest::WaitResponse(
+                WorkerProviderWaitRequest {
+                    handle: provider_handle(1),
+                    after_sequence: None,
+                    timeout_milliseconds: 10,
+                },
+            )),
+            Ok(WorkerProviderStreamResponse::Wait(Ok(
+                WorkerProviderWaitOutcome::Frame(WorkerProviderResponseFrame {
+                    event: WorkerProviderResponseFrameEvent::Terminal(
+                        WorkerProviderTerminal::Completed(_)
+                    ),
+                    ..
+                })
+            )))
+        ));
+        assert_eq!(
+            runtime.exchange(check_cancelled_request(1)),
+            Err(WorkerProviderStreamError::RevokedHandle)
+        );
+        assert!(!revoked.load(Ordering::Acquire));
+        drop(runtime);
+        worker
+            .join()
+            .map_err(|_| "provider route worker panicked")??;
+        assert!(revoked.load(Ordering::Acquire));
+        Ok(())
+    }
+
+    #[test]
+    fn provider_v2_failed_cancelled_malformed_and_deadline_paths_revoke()
+    -> Result<(), Box<dyn Error>> {
+        let terminal_cases = [
+            (
+                WorkerProviderWaitOutcome::Cancelled,
+                WorkerProviderStreamError::Cancelled,
+            ),
+            (
+                WorkerProviderWaitOutcome::Frame(WorkerProviderResponseFrame {
+                    handle: provider_handle(1),
+                    sequence: 0,
+                    event: WorkerProviderResponseFrameEvent::Terminal(
+                        WorkerProviderTerminal::Failed {
+                            code: "fixture".to_owned(),
+                            message: "failed".to_owned(),
+                        },
+                    ),
+                }),
+                WorkerProviderStreamError::InvalidTerminal,
+            ),
+        ];
+        for (outcome, expected) in terminal_cases {
+            let (mut runtime, receiver) = started_provider_runtime(CancellationToken::default())?;
+            let worker = std::thread::spawn(move || -> Result<(), WorkerProviderStreamError> {
+                let call = receive_provider_route_request(&receiver)?;
+                call.respond(WorkerProviderStreamResponse::Wait(Ok(outcome)))?;
+                acknowledge_provider_route_revoke(&receiver)
+            });
+            assert!(matches!(
+                runtime.exchange(WorkerProviderStreamRequest::WaitResponse(
+                    WorkerProviderWaitRequest {
+                        handle: provider_handle(1),
+                        after_sequence: None,
+                        timeout_milliseconds: 10,
+                    },
+                )),
+                Ok(WorkerProviderStreamResponse::Wait(Ok(_)))
+            ));
+            assert_eq!(runtime.ensure_completed(), Err(expected));
+            assert!(runtime.revocation_complete);
+            worker
+                .join()
+                .map_err(|_| "provider terminal worker panicked")??;
+        }
+
+        let (mut malformed_runtime, malformed_receiver) =
+            started_provider_runtime(CancellationToken::default())?;
+        let malformed_worker =
+            std::thread::spawn(move || -> Result<(), WorkerProviderStreamError> {
+                let call = receive_provider_route_request(&malformed_receiver)?;
+                call.respond(WorkerProviderStreamResponse::Cost(Ok(
+                    comfy_types::WorkerProviderCostResponse {
+                        accepted: true,
+                        approved_microunits: 1,
+                        receipt: vec![1],
+                    },
+                )))?;
+                acknowledge_provider_route_revoke(&malformed_receiver)
+            });
+        assert_eq!(
+            malformed_runtime.exchange(check_cancelled_request(1)),
+            Err(WorkerProviderStreamError::InvalidOrder)
+        );
+        assert!(malformed_runtime.revocation_complete);
+        malformed_worker
+            .join()
+            .map_err(|_| "provider malformed-response worker panicked")??;
+
+        let (mut deadline_runtime, deadline_receiver) =
+            started_provider_runtime(CancellationToken::default())?;
+        deadline_runtime.reply_deadline = Duration::from_millis(1);
+        let deadline_worker =
+            std::thread::spawn(move || -> Result<(), WorkerProviderStreamError> {
+                let call = receive_provider_route_request(&deadline_receiver)?;
+                std::thread::sleep(Duration::from_millis(5));
+                drop(call);
+                acknowledge_provider_route_revoke(&deadline_receiver)
+            });
+        assert_eq!(
+            deadline_runtime.exchange(check_cancelled_request(1)),
+            Err(WorkerProviderStreamError::TimedOut)
+        );
+        assert!(deadline_runtime.revocation_complete);
+        deadline_worker
+            .join()
+            .map_err(|_| "provider deadline worker panicked")??;
+        Ok(())
+    }
+
+    fn receive_provider_route_request(
+        receiver: &ProviderV2StreamRouteReceiver,
+    ) -> Result<ProviderV2StreamRouteCall, WorkerProviderStreamError> {
+        loop {
+            match receiver.try_receive() {
+                Ok(ProviderV2StreamRouteMessage::Request(call)) => return Ok(call),
+                Ok(ProviderV2StreamRouteMessage::Revoke { .. }) => {
+                    return Err(WorkerProviderStreamError::InvalidOrder);
+                }
+                Err(TryRecvError::Empty) => std::thread::yield_now(),
+                Err(TryRecvError::Disconnected) => {
+                    return Err(WorkerProviderStreamError::RevokedHandle);
+                }
+            }
+        }
+    }
+
+    fn acknowledge_provider_route_revoke(
+        receiver: &ProviderV2StreamRouteReceiver,
+    ) -> Result<(), WorkerProviderStreamError> {
+        loop {
+            match receiver.try_receive() {
+                Ok(ProviderV2StreamRouteMessage::Revoke { reply }) => {
+                    return reply
+                        .try_send(Ok(()))
+                        .map_err(|_| WorkerProviderStreamError::RevokedHandle);
+                }
+                Ok(ProviderV2StreamRouteMessage::Request(_)) => {
+                    return Err(WorkerProviderStreamError::InvalidOrder);
+                }
+                Err(TryRecvError::Empty) => std::thread::yield_now(),
+                Err(TryRecvError::Disconnected) => {
+                    return Err(WorkerProviderStreamError::RevokedHandle);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn provider_v2_terminal_disposition_distinguishes_completion_and_failure() {
+        let completed = WorkerProviderStreamResponse::Wait(Ok(WorkerProviderWaitOutcome::Frame(
+            WorkerProviderResponseFrame {
+                handle: provider_handle(1),
+                sequence: 3,
+                event: WorkerProviderResponseFrameEvent::Terminal(
+                    WorkerProviderTerminal::Completed(vec![1, 2, 3]),
+                ),
+            },
+        )));
+        assert_eq!(
+            worker_response_terminal_disposition(&completed),
+            Some(Ok(()))
+        );
+
+        let failed = WorkerProviderStreamResponse::Wait(Ok(WorkerProviderWaitOutcome::Frame(
+            WorkerProviderResponseFrame {
+                handle: provider_handle(1),
+                sequence: 3,
+                event: WorkerProviderResponseFrameEvent::Terminal(WorkerProviderTerminal::Failed {
+                    code: "provider".to_owned(),
+                    message: "failed".to_owned(),
+                }),
+            },
+        )));
+        assert_eq!(
+            worker_response_terminal_disposition(&failed),
+            Some(Err(WorkerProviderStreamError::InvalidTerminal))
+        );
+        assert_eq!(
+            worker_response_terminal_disposition(&WorkerProviderStreamResponse::Wait(Ok(
+                WorkerProviderWaitOutcome::Cancelled,
+            ))),
+            Some(Err(WorkerProviderStreamError::Cancelled))
+        );
+        assert_eq!(
+            worker_response_terminal_disposition(&WorkerProviderStreamResponse::Wait(Ok(
+                WorkerProviderWaitOutcome::TimedOut,
+            ))),
+            None
+        );
+    }
+
+    #[test]
+    fn provider_v2_wait_projection_preserves_every_frame_variant() -> Result<(), Box<dyn Error>> {
+        use provider_v2_wit_contract::zed::comfy_provider_plugin::types as wit;
+
+        assert!(matches!(
+            wit_provider_wait_outcome(WorkerProviderWaitOutcome::TimedOut),
+            wit::WaitOutcome::TimedOut
+        ));
+        assert!(matches!(
+            wit_provider_wait_outcome(WorkerProviderWaitOutcome::Cancelled),
+            wit::WaitOutcome::Cancelled
+        ));
+
+        let cases = [
+            WorkerProviderResponseFrameEvent::Head(comfy_types::WorkerProviderResponseHead {
+                status: 207,
+                headers: vec![
+                    WorkerProviderHeader {
+                        name: "x-first".to_owned(),
+                        value: "1".to_owned(),
+                    },
+                    WorkerProviderHeader {
+                        name: "x-second".to_owned(),
+                        value: "2".to_owned(),
+                    },
+                ],
+            }),
+            WorkerProviderResponseFrameEvent::Chunk(WorkerProviderResponseChunk::Binary(vec![
+                0, 1, 2,
+            ])),
+            WorkerProviderResponseFrameEvent::Chunk(WorkerProviderResponseChunk::Text(
+                "text".to_owned(),
+            )),
+            WorkerProviderResponseFrameEvent::Chunk(WorkerProviderResponseChunk::NdjsonLine(
+                "{\"line\":1}".to_owned(),
+            )),
+            WorkerProviderResponseFrameEvent::Terminal(WorkerProviderTerminal::Completed(vec![
+                4, 2,
+            ])),
+            WorkerProviderResponseFrameEvent::Terminal(WorkerProviderTerminal::Failed {
+                code: "fixture".to_owned(),
+                message: "failed".to_owned(),
+            }),
+            WorkerProviderResponseFrameEvent::Terminal(WorkerProviderTerminal::Cancelled),
+        ];
+        for (index, event) in cases.into_iter().enumerate() {
+            let outcome = wit_provider_wait_outcome(WorkerProviderWaitOutcome::Frame(
+                WorkerProviderResponseFrame {
+                    handle: provider_handle(1),
+                    sequence: u64::try_from(index)?,
+                    event,
+                },
+            ));
+            let wit::WaitOutcome::Frame(frame) = outcome else {
+                return Err("frame projection changed its wait outcome".into());
+            };
+            assert_eq!(frame.handle.invocation, provider_context().invocation);
+            assert_eq!(frame.handle.slot, 1);
+            assert_eq!(frame.handle.generation, provider_context().generation);
+            assert_eq!(frame.sequence, u64::try_from(index)?);
+            match (index, frame.event) {
+                (0, wit::ResponseFrameEvent::Head(head)) => {
+                    assert_eq!(head.status, 207);
+                    let [first, second] = head.headers.as_slice() else {
+                        return Err("ordered response headers changed length".into());
+                    };
+                    assert_eq!(first.name, "x-first");
+                    assert_eq!(first.value, "1");
+                    assert_eq!(second.name, "x-second");
+                    assert_eq!(second.value, "2");
+                }
+                (1, wit::ResponseFrameEvent::Chunk(wit::ResponseChunkValue::Binary(bytes))) => {
+                    assert_eq!(bytes, vec![0, 1, 2]);
+                }
+                (2, wit::ResponseFrameEvent::Chunk(wit::ResponseChunkValue::Text(text))) => {
+                    assert_eq!(text, "text");
+                }
+                (3, wit::ResponseFrameEvent::Chunk(wit::ResponseChunkValue::NdjsonLine(line))) => {
+                    assert_eq!(line, "{\"line\":1}")
+                }
+                (4, wit::ResponseFrameEvent::Terminal(wit::Terminal::Completed(receipt))) => {
+                    assert_eq!(receipt, vec![4, 2]);
+                }
+                (5, wit::ResponseFrameEvent::Terminal(wit::Terminal::Failed(failure))) => {
+                    assert_eq!(failure, ("fixture".to_owned(), "failed".to_owned()));
+                }
+                (6, wit::ResponseFrameEvent::Terminal(wit::Terminal::Cancelled)) => {}
+                _ => return Err("response frame projection changed its exact variant".into()),
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn provider_v2_stream_error_projection_is_exhaustive_and_intentionally_collapsed() {
+        use provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError as WitError;
+
+        let one_to_one = [
+            (WorkerProviderStreamError::Cancelled, WitError::Cancelled),
+            (WorkerProviderStreamError::TimedOut, WitError::TimedOut),
+            (
+                WorkerProviderStreamError::HostFailure,
+                WitError::HostFailure,
+            ),
+            (
+                WorkerProviderStreamError::InvalidContract,
+                WitError::InvalidContract,
+            ),
+            (
+                WorkerProviderStreamError::InvalidHandle,
+                WitError::InvalidHandle,
+            ),
+            (
+                WorkerProviderStreamError::ForeignHandle,
+                WitError::ForeignHandle,
+            ),
+            (
+                WorkerProviderStreamError::RevokedHandle,
+                WitError::RevokedHandle,
+            ),
+            (
+                WorkerProviderStreamError::InvalidMethod,
+                WitError::InvalidMethod,
+            ),
+            (
+                WorkerProviderStreamError::InvalidHeaders,
+                WitError::InvalidHeaders,
+            ),
+            (WorkerProviderStreamError::BodyLimit, WitError::BodyLimit),
+            (WorkerProviderStreamError::ChunkLimit, WitError::ChunkLimit),
+            (
+                WorkerProviderStreamError::InvalidNdjsonLine,
+                WitError::InvalidNdjsonLine,
+            ),
+            (
+                WorkerProviderStreamError::InvalidSequence,
+                WitError::InvalidSequence,
+            ),
+            (
+                WorkerProviderStreamError::InvalidOrder,
+                WitError::InvalidOrder,
+            ),
+            (WorkerProviderStreamError::WaitLimit, WitError::WaitLimit),
+            (
+                WorkerProviderStreamError::InvalidUpload,
+                WitError::InvalidUpload,
+            ),
+            (
+                WorkerProviderStreamError::InvalidCostRequest,
+                WitError::InvalidCostRequest,
+            ),
+            (
+                WorkerProviderStreamError::InvalidProgress,
+                WitError::InvalidProgress,
+            ),
+            (
+                WorkerProviderStreamError::InvalidTerminal,
+                WitError::InvalidTerminal,
+            ),
+            (
+                WorkerProviderStreamError::InvalidInvocationResult,
+                WitError::InvalidInvocationResult,
+            ),
+            (
+                WorkerProviderStreamError::InvalidRequestAuthority,
+                WitError::InvalidRequestAuthority,
+            ),
+        ];
+        for (worker, wit) in one_to_one {
+            assert_eq!(wit_provider_stream_error(worker.clone()), wit);
+            assert_eq!(worker_provider_stream_error(wit), worker);
+        }
+        for worker in [
+            WorkerProviderStreamError::ForeignSession,
+            WorkerProviderStreamError::ForeignInvocation,
+        ] {
+            assert_eq!(wit_provider_stream_error(worker), WitError::ForeignHandle);
+        }
+        for worker in [
+            WorkerProviderStreamError::StaleSession,
+            WorkerProviderStreamError::StaleGeneration,
+        ] {
+            assert_eq!(wit_provider_stream_error(worker), WitError::RevokedHandle);
+        }
+    }
+
+    #[test]
+    fn provider_v2_adapter_source_contains_no_runtime_service_or_public_transport_authority() {
+        let source = include_str!("comfy_plugin_host.rs");
+        let route = source
+            .split("struct ProviderV2StreamRoute")
+            .nth(1)
+            .and_then(|source| source.split("pub struct ProviderInvocationResult").next())
+            .expect("provider-v2 route source must exist");
+        for forbidden in [
+            "ProviderRuntimeStreamService",
+            "ProviderPolicy",
+            "ProviderRuntimeAuthorityInput",
+            "dyn Provider",
+            "pub trait",
+            "SyncSender::send",
+            ".send(",
+        ] {
+            assert!(
+                !route.contains(forbidden),
+                "forbidden route authority: {forbidden}"
+            );
+        }
+        assert!(route.contains("MAX_WORKER_PROVIDER_PENDING_CALLS"));
+        assert!(route.contains("try_send"));
+        assert!(route.contains("WorkerProviderStreamTransportValidator"));
+    }
 
     #[test]
     fn component_projection_requires_an_exact_bounded_match() {
