@@ -1353,7 +1353,6 @@ class ValidationGenerationTests(unittest.TestCase):
                 "crates/zed/src/zed.rs",
                 "crates/collab_ui/src/huddle.rs",
                 "crates/collab_ui/Cargo.toml",
-                "Cargo.lock",
             ],
         )
         for baseline_read in (
@@ -1362,9 +1361,11 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/language_tools/src/language_tool_tree.rs",
             "crates/collab_ui/src/huddle.rs",
             "crates/collab_ui/Cargo.toml",
+            "crates/title_bar/Cargo.toml",
+            "crates/recent_projects/Cargo.toml",
+            "crates/recent_projects/src/recent_projects.rs",
             "crates/remote_connection/Cargo.toml",
             "crates/remote_connection/src/remote_connection.rs",
-            "Cargo.toml",
             "Cargo.lock",
         ):
             self.assertIn(baseline_read, zed_baseline_correction["reads"])
@@ -1376,12 +1377,10 @@ class ValidationGenerationTests(unittest.TestCase):
             "action registration",
             "without a redundant Arc clone",
             "huddle rendering",
-            "remote_connection/test-support",
-            "RemoteConnectionOptions::Mock remains exhaustively matched",
-            "without adding production mock behavior",
-            "Cargo.lock records only that collab_ui dev-graph edge",
-            "`remote_connection = { workspace = true, features = [\"test-support\"] }`",
-            "lists remote_connection in cargo-machete ignored solely because this direct dependency is a feature carrier",
+            "RemoteConnectionOptions::Mock therefore remains exhaustively matched",
+            "without adding a feature-only direct dependency, cargo-machete exception, lockfile change, production mock behavior",
+            "`title_bar = { workspace = true, features = [\"test-support\"] }`",
+            "remote, remote_connection, recent_projects, project, and workspace test features together",
         ):
             self.assertIn(baseline_gate, zed_baseline_correction["done"])
         baseline_validation = planning.task_validation_commands(zed_baseline_correction)
@@ -1393,6 +1392,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "cargo tree --locked -p collab_ui -e features -i remote_connection",
             "cargo metadata --locked --format-version 1",
             "cargo check --locked -p remote_connection --no-default-features",
+            "cargo check --locked -p recent_projects --features test-support --all-targets",
             "cargo check --locked -p collab_ui --all-targets",
             "cargo test --locked -p collab_ui --features test-support --all-targets",
             "cargo test --locked -p collab_ui --all-targets",
