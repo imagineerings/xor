@@ -154,6 +154,32 @@ pub struct NativeDepthAnything3Geometry {
 }
 
 #[cfg(any(test, feature = "test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Debug)]
+pub struct NativeDepthAnything3TestTrace {
+    pub raw_ray: Tensor,
+    pub raw_ray_confidence: Tensor,
+    pub ransac_samples: Vec<Vec<u64>>,
+    pub ransac_views: Vec<NativeDepthAnything3RansacViewTrace>,
+}
+
+#[cfg(any(test, feature = "test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeDepthAnything3RansacViewTrace {
+    pub candidate_indices: Vec<u64>,
+    pub best_iteration: u64,
+    pub best_inliers: Vec<u64>,
+    pub best_score_bits: u32,
+    pub fallback: bool,
+    pub normalized_homography: [f32; 9],
+    pub signed_homography: [f32; 9],
+    pub rotation: [f32; 9],
+    pub lower: [f32; 9],
+    pub c2w_pre_inverse: [f32; 12],
+}
+
+#[cfg(any(test, feature = "test-support"))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DepthAnything3FixtureProfile {
     Dpt,
@@ -829,6 +855,87 @@ impl NativeDepthAnything3Resource {
         invocation: NativeDepthAnything3Invocation<'_>,
         context: &ExecutionContext<'_>,
     ) -> Result<NativeDepthAnything3Geometry, NativeDepthAnything3Error> {
+        self.execute_internal(backend, invocation, context, None)
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    #[doc(hidden)]
+    pub fn execute_with_test_trace(
+        &self,
+        backend: &CpuBackend,
+        invocation: NativeDepthAnything3Invocation<'_>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<
+        (NativeDepthAnything3Geometry, NativeDepthAnything3TestTrace),
+        NativeDepthAnything3Error,
+    > {
+        let mut trace = DepthAnything3ExecutionTrace::default();
+        let geometry = self.execute_internal(backend, invocation, context, Some(&mut trace))?;
+        Ok((
+            geometry,
+            NativeDepthAnything3TestTrace {
+                raw_ray: trace
+                    .raw_ray
+                    .ok_or(NativeDepthAnything3Error::SemanticStateChanged)?,
+                raw_ray_confidence: trace
+                    .raw_ray_confidence
+                    .ok_or(NativeDepthAnything3Error::SemanticStateChanged)?,
+                ransac_samples: trace
+                    .ransac_samples
+                    .into_iter()
+                    .map(|row| {
+                        row.into_iter()
+                            .map(|value| {
+                                u64::try_from(value)
+                                    .map_err(|_| NativeDepthAnything3Error::ShapeOverflow)
+                            })
+                            .collect()
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+                ransac_views: trace
+                    .ransac_views
+                    .into_iter()
+                    .map(|view| {
+                        Ok(NativeDepthAnything3RansacViewTrace {
+                            candidate_indices: view
+                                .candidate_indices
+                                .into_iter()
+                                .map(|value| {
+                                    u64::try_from(value)
+                                        .map_err(|_| NativeDepthAnything3Error::ShapeOverflow)
+                                })
+                                .collect::<Result<Vec<_>, _>>()?,
+                            best_iteration: u64::try_from(view.best_iteration)
+                                .map_err(|_| NativeDepthAnything3Error::ShapeOverflow)?,
+                            best_inliers: view
+                                .best_inliers
+                                .into_iter()
+                                .map(|value| {
+                                    u64::try_from(value)
+                                        .map_err(|_| NativeDepthAnything3Error::ShapeOverflow)
+                                })
+                                .collect::<Result<Vec<_>, _>>()?,
+                            best_score_bits: view.best_score.to_bits(),
+                            fallback: view.fallback,
+                            normalized_homography: view.normalized_homography,
+                            signed_homography: view.signed_homography,
+                            rotation: view.rotation,
+                            lower: view.lower,
+                            c2w_pre_inverse: view.c2w_pre_inverse,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, NativeDepthAnything3Error>>()?,
+            },
+        ))
+    }
+
+    fn execute_internal(
+        &self,
+        backend: &CpuBackend,
+        invocation: NativeDepthAnything3Invocation<'_>,
+        context: &ExecutionContext<'_>,
+        mut trace: Option<&mut DepthAnything3ExecutionTrace>,
+    ) -> Result<NativeDepthAnything3Geometry, NativeDepthAnything3Error> {
         self.validate(context.cancellation)?;
         context.check()?;
         if context.stream != self.stream {
@@ -940,6 +1047,7 @@ impl NativeDepthAnything3Resource {
             invocation.use_ray_pose,
             invocation.ransac_seed,
             context,
+            trace.as_deref_mut(),
         )?;
         project_geometry(
             backend,
@@ -1234,6 +1342,28 @@ struct DepthHeadOutput {
     sky: Option<Tensor>,
     extrinsics: Option<Tensor>,
     intrinsics: Option<Tensor>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct DepthAnything3ExecutionTrace {
+    raw_ray: Option<Tensor>,
+    raw_ray_confidence: Option<Tensor>,
+    ransac_samples: Vec<Vec<usize>>,
+    ransac_views: Vec<DepthAnything3RansacViewTrace>,
+}
+
+#[derive(Clone, Debug)]
+struct DepthAnything3RansacViewTrace {
+    candidate_indices: Vec<usize>,
+    best_iteration: usize,
+    best_inliers: Vec<usize>,
+    best_score: f32,
+    fallback: bool,
+    normalized_homography: [f32; 9],
+    signed_homography: [f32; 9],
+    rotation: [f32; 9],
+    lower: [f32; 9],
+    c2w_pre_inverse: [f32; 12],
 }
 
 impl From<comfy_types::CancellationError> for NativeDepthAnything3Error {
@@ -2767,6 +2897,7 @@ fn execute_depth_head(
     use_ray_pose: bool,
     ransac_seed: u64,
     context: &ExecutionContext<'_>,
+    mut trace: Option<&mut DepthAnything3ExecutionTrace>,
 ) -> Result<DepthHeadOutput, NativeDepthAnything3Error> {
     if features.len() != 4 {
         return Err(NativeDepthAnything3Error::UnsupportedArchitecture);
@@ -3058,8 +3189,11 @@ fn execute_depth_head(
     };
     let (extrinsics, intrinsics) =
         if let (Some(ray), Some(ray_confidence)) = (ray.as_ref(), ray_confidence.as_ref()) {
+            if let Some(trace) = trace.as_deref_mut() {
+                trace.raw_ray = Some(ray.clone());
+                trace.raw_ray_confidence = Some(ray_confidence.clone());
+            }
             ray_pose_geometry(
-                resource,
                 backend,
                 ray,
                 ray_confidence,
@@ -3067,6 +3201,7 @@ fn execute_depth_head(
                 views,
                 ransac_seed,
                 context,
+                trace.as_deref_mut(),
             )?
         } else if resource.configuration.has_camera_decoder && views > 1 {
             decode_camera_geometry(
@@ -3966,7 +4101,6 @@ fn decode_camera_geometry(
 }
 
 fn ray_pose_geometry(
-    _resource: &NativeDepthAnything3Resource,
     backend: &CpuBackend,
     ray: &Tensor,
     confidence: &Tensor,
@@ -3974,6 +4108,7 @@ fn ray_pose_geometry(
     views: usize,
     ransac_seed: u64,
     context: &ExecutionContext<'_>,
+    mut trace: Option<&mut DepthAnything3ExecutionTrace>,
 ) -> Result<(Option<Tensor>, Option<Tensor>), NativeDepthAnything3Error> {
     let ray_shape = shape_usize(ray)?;
     let [ray_batch, ray_views, height, width, channels] = ray_shape.as_slice() else {
@@ -3994,46 +4129,11 @@ fn ray_pose_geometry(
             "ray-pose geometry requires at least eight pixels".to_owned(),
         ));
     }
-    let address = context.rng_phase.ok_or_else(|| {
-        NativeDepthAnything3Error::UnsupportedInvocation(
-            "ray-pose execution requires a versioned RANSAC RNG phase".to_owned(),
-        )
-    })?;
-    let stream = generator_exact_native(
-        RngProfileVersion::V2,
-        RngAlgorithm::Mt19937,
-        ransac_seed,
-        address.clone(),
-        context.cancellation,
-    )?;
-    let mut transaction = stream
-        .begin(None)
-        .map_err(RandomNumberGenerationPartOneError::from)?;
     let candidate_count = 8_usize.max((points as f64 * 0.3_f64) as usize);
-    let mut random_samples = Vec::new();
-    random_samples
-        .try_reserve_exact(100)
-        .map_err(|_| NativeDepthAnything3Error::Allocation)?;
-    for _ in 0..100 {
-        context.check()?;
-        let generated = randperm_with_context_exact_native(
-            backend,
-            u64::try_from(candidate_count).map_err(|_| NativeDepthAnything3Error::ShapeOverflow)?,
-            transaction,
-            context,
-        )?;
-        transaction = generated.transaction;
-        let permutation = tensor_i64_values(&generated.tensor, context.cancellation)?;
-        random_samples.push(
-            permutation
-                .get(..8)
-                .ok_or(NativeDepthAnything3Error::ShapeOverflow)?
-                .iter()
-                .map(|index| {
-                    usize::try_from(*index).map_err(|_| NativeDepthAnything3Error::ShapeOverflow)
-                })
-                .collect::<Result<Vec<_>, _>>()?,
-        );
+    let (random_samples, mut transaction) =
+        ray_pose_random_samples(backend, candidate_count, ransac_seed, context)?;
+    if let Some(trace) = trace.as_deref_mut() {
+        trace.ransac_samples = random_samples.clone();
     }
     let mut c2w = filled_f32(batch * views * 12, 0.0)?;
     let mut focal = filled_f32(batch * views * 2, 0.0)?;
@@ -4067,8 +4167,9 @@ fn ray_pose_geometry(
         let mut sorted = argsort_descending_indices(backend, &weights, context)?;
         sorted.truncate(candidate_count);
         let mut best_score = f32::NEG_INFINITY;
+        let mut best_iteration = 0;
         let mut best_inliers = Vec::new();
-        for sample in &random_samples {
+        for (iteration, sample) in random_samples.iter().enumerate() {
             context.check()?;
             let selected = sample
                 .iter()
@@ -4096,10 +4197,12 @@ fn ray_pose_geometry(
             }
             if score > best_score {
                 best_score = score;
+                best_iteration = iteration;
                 best_inliers = inliers;
             }
         }
-        let homography = if best_inliers.len() < 4 {
+        let fallback = best_inliers.len() < 4;
+        let homography = if fallback {
             [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
         } else {
             let inlier_weights = best_inliers
@@ -4122,6 +4225,7 @@ fn ray_pose_geometry(
                 context,
             )?
         };
+        let normalized_homography = homography;
         let homography_tensor = tensor_from_f32_with_context_exact_native(
             backend,
             &[1, 3, 3],
@@ -4139,6 +4243,7 @@ fn ray_pose_geometry(
         } else {
             homography
         };
+        let signed_homography = homography;
         let (rotation, lower) = ql_decomposition(backend, &homography, context)?;
         let scale = lower[8];
         let output = flat * 12;
@@ -4154,6 +4259,22 @@ fn ray_pose_geometry(
                 .map(|point| rays[(flat * points + point) * 6 + 3 + axis] * raw_confidence[point])
                 .sum::<f32>()
                 / total_weight;
+        }
+        if let Some(trace) = trace.as_deref_mut() {
+            trace.ransac_views.push(DepthAnything3RansacViewTrace {
+                candidate_indices: sorted.clone(),
+                best_iteration,
+                best_inliers: best_inliers.clone(),
+                best_score,
+                fallback,
+                normalized_homography,
+                signed_homography,
+                rotation,
+                lower,
+                c2w_pre_inverse: c2w[output..output + 12]
+                    .try_into()
+                    .map_err(|_| NativeDepthAnything3Error::ShapeOverflow)?,
+            });
         }
         focal[flat * 2] = 1.0 / (lower[0] / scale);
         focal[flat * 2 + 1] = 1.0 / (lower[4] / scale);
@@ -4190,6 +4311,55 @@ fn ray_pose_geometry(
             context,
         )?),
     ))
+}
+
+fn ray_pose_random_samples(
+    backend: &CpuBackend,
+    candidate_count: usize,
+    seed: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<(Vec<Vec<usize>>, comfy_tensor::RngTransaction), NativeDepthAnything3Error> {
+    let address = context.rng_phase.ok_or_else(|| {
+        NativeDepthAnything3Error::UnsupportedInvocation(
+            "ray-pose execution requires a versioned RANSAC RNG phase".to_owned(),
+        )
+    })?;
+    let stream = generator_exact_native(
+        RngProfileVersion::V2,
+        RngAlgorithm::Mt19937,
+        seed,
+        address.clone(),
+        context.cancellation,
+    )?;
+    let mut transaction = stream
+        .begin(None)
+        .map_err(RandomNumberGenerationPartOneError::from)?;
+    let mut samples = Vec::new();
+    samples
+        .try_reserve_exact(100)
+        .map_err(|_| NativeDepthAnything3Error::Allocation)?;
+    for _ in 0..100 {
+        context.check()?;
+        let generated = randperm_with_context_exact_native(
+            backend,
+            u64::try_from(candidate_count).map_err(|_| NativeDepthAnything3Error::ShapeOverflow)?,
+            transaction,
+            context,
+        )?;
+        transaction = generated.transaction;
+        let permutation = tensor_i64_values(&generated.tensor, context.cancellation)?;
+        samples.push(
+            permutation
+                .get(..8)
+                .ok_or(NativeDepthAnything3Error::ShapeOverflow)?
+                .iter()
+                .map(|index| {
+                    usize::try_from(*index).map_err(|_| NativeDepthAnything3Error::ShapeOverflow)
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        );
+    }
+    Ok((samples, transaction))
 }
 
 fn refit_inliers_if_needed(
@@ -5510,6 +5680,362 @@ fn usize_from(value: u64) -> Result<usize, NativeDepthAnything3Error> {
 mod tests {
     use super::*;
     use comfy_tensor::{CpuWorkspaceAuthority, RetryRngPolicy, RngStreamAddress};
+
+    fn fixture_index_rows_sha256(domain: &str, rows: &[Vec<usize>]) -> String {
+        let mut digest = Sha256::new();
+        digest.update((domain.len() as u64).to_le_bytes());
+        digest.update(domain.as_bytes());
+        digest.update((rows.len() as u64).to_le_bytes());
+        for row in rows {
+            digest.update((row.len() as u64).to_le_bytes());
+            for value in row {
+                digest.update((*value as u64).to_le_bytes());
+            }
+        }
+        format!("{:x}", digest.finalize())
+    }
+
+    #[test]
+    fn reduced_da3_ransac_uses_the_versioned_shared_sample_stream()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let workspace_bytes = 1024 * 1024;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(workspace_bytes)?;
+        let cancellation = CancellationToken::default();
+        let base_context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(workspace_bytes)?,
+            &cancellation,
+        );
+        let address = RngStreamAddress::new(
+            "task390",
+            "fixture",
+            "depth-anything-3-ray-pose",
+            0,
+            "reduced-ray-pose",
+            0,
+            0,
+            RetryRngPolicy::Replay,
+        )?;
+        let context = ExecutionContext {
+            stream: base_context.stream,
+            scratch: base_context.scratch.clone(),
+            rng_phase: Some(&address),
+            cancellation: base_context.cancellation,
+        };
+        let (samples, _) = ray_pose_random_samples(&backend, 76, 17, &context)?;
+        assert_eq!(samples.first(), Some(&vec![60, 49, 11, 21, 55, 35, 5, 45]));
+        assert_eq!(samples.last(), Some(&vec![3, 40, 68, 45, 54, 23, 58, 71]));
+        assert_eq!(
+            fixture_index_rows_sha256("zed.comfy.depth-anything-3.ransac-samples.v1", &samples,),
+            "3ec843b71311674d0c4a0398c695277266171086b191b43d3439e5d102e67207"
+        );
+        let (changed_seed, _) = ray_pose_random_samples(&backend, 76, 18, &context)?;
+        assert_ne!(changed_seed, samples);
+        assert_eq!(
+            fixture_index_rows_sha256(
+                "zed.comfy.depth-anything-3.ransac-samples.v1",
+                &changed_seed,
+            ),
+            "e06d07bd06353a26e748280c7037adffd2a9ce0bb66bfd507504aa7c3e985874"
+        );
+        let changed_address = RngStreamAddress::new(
+            "task390",
+            "fixture",
+            "depth-anything-3-ray-pose",
+            0,
+            "reduced-ray-pose-mutated",
+            0,
+            0,
+            RetryRngPolicy::Replay,
+        )?;
+        let changed_context = ExecutionContext {
+            stream: base_context.stream,
+            scratch: base_context.scratch.clone(),
+            rng_phase: Some(&changed_address),
+            cancellation: base_context.cancellation,
+        };
+        let (changed_phase, _) = ray_pose_random_samples(&backend, 76, 17, &changed_context)?;
+        assert_ne!(changed_phase, samples);
+        assert_ne!(changed_phase, changed_seed);
+        assert_eq!(
+            fixture_index_rows_sha256(
+                "zed.comfy.depth-anything-3.ransac-samples.v1",
+                &changed_phase,
+            ),
+            "8732477ad3af2972b8280df320a79a17327300da47f918bdad66b78f4bf3b425"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn reduced_da3_ray_pose_trace_localizes_source_equation_drift()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let oracle: serde_json::Value = serde_json::from_str(include_str!(
+            "../../comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/oracle.json"
+        ))?;
+        let fixture_tensor = |pointer: &str,
+                              backend: &CpuBackend,
+                              context: &ExecutionContext<'_>|
+         -> Result<Tensor, Box<dyn std::error::Error>> {
+            let document = oracle
+                .pointer(pointer)
+                .ok_or_else(|| format!("missing DA3 oracle {pointer}"))?;
+            let mut shape = document
+                .get("shape")
+                .and_then(serde_json::Value::as_array)
+                .ok_or_else(|| format!("missing DA3 oracle shape {pointer}"))?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_u64()
+                        .ok_or_else(|| format!("invalid DA3 oracle shape {pointer}"))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let mut values = document
+                .get("bits")
+                .and_then(serde_json::Value::as_array)
+                .ok_or_else(|| format!("missing DA3 oracle bits {pointer}"))?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_u64()
+                        .and_then(|value| u32::try_from(value).ok())
+                        .map(f32::from_bits)
+                        .ok_or_else(|| format!("invalid DA3 oracle bits {pointer}"))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let values_per_view = shape
+                .iter()
+                .skip(1)
+                .try_fold(1_u64, |total, dimension| total.checked_mul(*dimension))
+                .and_then(|value| usize::try_from(value).ok())
+                .ok_or_else(|| format!("invalid DA3 oracle view shape {pointer}"))?;
+            *shape
+                .first_mut()
+                .ok_or_else(|| format!("empty DA3 oracle view shape {pointer}"))? = 1;
+            shape.insert(0, 1);
+            values.truncate(values_per_view);
+            Ok(tensor_from_f32_with_context_exact_native(
+                backend,
+                &shape,
+                &values,
+                DType::F32,
+                DeviceId::CPU,
+                context,
+            )?)
+        };
+        let workspace_bytes = 64 * 1024 * 1024;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(workspace_bytes)?;
+        let cancellation = CancellationToken::default();
+        let base_context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(workspace_bytes)?,
+            &cancellation,
+        );
+        let address = RngStreamAddress::new(
+            "task390",
+            "fixture",
+            "depth-anything-3-ray-pose",
+            0,
+            "reduced-ray-pose",
+            0,
+            0,
+            RetryRngPolicy::Replay,
+        )?;
+        let context = ExecutionContext {
+            stream: base_context.stream,
+            scratch: base_context.scratch.clone(),
+            rng_phase: Some(&address),
+            cancellation: base_context.cancellation,
+        };
+        let ray = fixture_tensor(
+            "/reduced_dualdpt/ray_pose_trace/pre_geometry_ray",
+            &backend,
+            &context,
+        )?;
+        let confidence = fixture_tensor(
+            "/reduced_dualdpt/ray_pose_trace/pre_geometry_confidence",
+            &backend,
+            &context,
+        )?;
+        let mut trace = DepthAnything3ExecutionTrace::default();
+        let (extrinsics, intrinsics) = ray_pose_geometry(
+            &backend,
+            &ray,
+            &confidence,
+            1,
+            1,
+            17,
+            &context,
+            Some(&mut trace),
+        )?;
+        let expected_trace = oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace")
+            .ok_or("missing DA3 ray-pose trace")?;
+        let expected_samples = expected_trace
+            .get("samples")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("missing DA3 ray-pose samples")?
+            .iter()
+            .map(|row| {
+                row.as_array()
+                    .ok_or("invalid DA3 ray-pose sample row")?
+                    .iter()
+                    .map(|value| {
+                        value
+                            .as_u64()
+                            .and_then(|value| usize::try_from(value).ok())
+                            .ok_or("invalid DA3 ray-pose sample")
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(
+            trace.ransac_samples, expected_samples,
+            "RANSAC sample table"
+        );
+        let expected_views = expected_trace
+            .get("views")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("missing DA3 ray-pose view traces")?;
+        assert_eq!(trace.ransac_views.len(), 1);
+        for (view_index, (actual, expected)) in trace
+            .ransac_views
+            .iter()
+            .zip(expected_views.iter().take(1))
+            .enumerate()
+        {
+            let expected_candidates = expected
+                .get("candidate_indices")
+                .and_then(serde_json::Value::as_array)
+                .ok_or("missing DA3 RANSAC candidates")?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_u64()
+                        .and_then(|value| usize::try_from(value).ok())
+                        .ok_or("invalid DA3 RANSAC candidate")
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            assert_eq!(
+                actual.candidate_indices, expected_candidates,
+                "view {view_index} candidates"
+            );
+            assert_eq!(
+                actual.best_iteration as u64,
+                expected
+                    .get("best_iteration")
+                    .and_then(serde_json::Value::as_u64)
+                    .ok_or("missing DA3 RANSAC best iteration")?,
+                "view {view_index} best iteration"
+            );
+            assert_eq!(
+                actual.best_score.to_bits() as u64,
+                expected
+                    .get("best_score_bits")
+                    .and_then(serde_json::Value::as_u64)
+                    .ok_or("missing DA3 RANSAC best score")?,
+                "view {view_index} best score"
+            );
+            assert_eq!(
+                actual.best_inliers.len() as u64,
+                expected
+                    .get("best_inlier_count")
+                    .and_then(serde_json::Value::as_u64)
+                    .ok_or("missing DA3 RANSAC inlier count")?,
+                "view {view_index} inlier count"
+            );
+            let inlier_domain = expected
+                .get("best_inliers_sha256_domain")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("missing DA3 RANSAC inlier domain")?;
+            assert_eq!(
+                fixture_index_rows_sha256(
+                    inlier_domain,
+                    std::slice::from_ref(&actual.best_inliers)
+                ),
+                expected
+                    .get("best_inliers_sha256")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or("missing DA3 RANSAC inlier SHA")?,
+                "view {view_index} inlier identity"
+            );
+            for (phase, actual_values) in [
+                (
+                    "normalized_homography_bits",
+                    actual.normalized_homography.as_slice(),
+                ),
+                (
+                    "homography_post_sign_bits",
+                    actual.signed_homography.as_slice(),
+                ),
+                ("rotation_bits", actual.rotation.as_slice()),
+                ("lower_bits", actual.lower.as_slice()),
+                ("c2w_pre_inverse_bits", actual.c2w_pre_inverse.as_slice()),
+            ] {
+                let expected_values = expected
+                    .get(phase)
+                    .and_then(serde_json::Value::as_array)
+                    .ok_or_else(|| format!("missing DA3 RANSAC {phase}"))?
+                    .iter()
+                    .map(|value| {
+                        value
+                            .as_u64()
+                            .and_then(|value| u32::try_from(value).ok())
+                            .map(f32::from_bits)
+                            .ok_or_else(|| format!("invalid DA3 RANSAC {phase}"))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                for (lane, (actual_value, expected_value)) in actual_values
+                    .iter()
+                    .copied()
+                    .zip(expected_values)
+                    .enumerate()
+                {
+                    let tolerance = 2.5e-3_f32.max(expected_value.abs() * 2.5e-3);
+                    assert!(
+                        (actual_value - expected_value).abs() <= tolerance,
+                        "view {view_index} {phase}[{lane}]: {actual_value} != {expected_value}"
+                    );
+                }
+            }
+        }
+        for (actual, pointer) in [
+            (
+                extrinsics.as_ref().ok_or("missing DA3 ray extrinsics")?,
+                "/reduced_dualdpt/ray_pose_trace/geometry/extrinsics/bits",
+            ),
+            (
+                intrinsics.as_ref().ok_or("missing DA3 ray intrinsics")?,
+                "/reduced_dualdpt/ray_pose_trace/geometry/intrinsics/bits",
+            ),
+        ] {
+            let mut expected = oracle
+                .pointer(pointer)
+                .and_then(serde_json::Value::as_array)
+                .ok_or_else(|| format!("missing DA3 ray geometry {pointer}"))?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_u64()
+                        .and_then(|value| u32::try_from(value).ok())
+                        .map(f32::from_bits)
+                        .ok_or_else(|| format!("invalid DA3 ray geometry {pointer}"))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let actual = tensor_values(actual, &cancellation)?;
+            expected.truncate(actual.len());
+            assert_eq!(actual.len(), expected.len());
+            for (lane, (actual, expected)) in actual.into_iter().zip(expected).enumerate() {
+                let tolerance = 2.5e-3_f32.max(expected.abs() * 2.5e-3);
+                assert!(
+                    (actual - expected).abs() <= tolerance,
+                    "{pointer}[{lane}]: {actual} != {expected}"
+                );
+            }
+        }
+        Ok(())
+    }
 
     #[test]
     fn affine_inverse_materializes_the_transposed_rotation_view()

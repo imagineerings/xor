@@ -243,6 +243,7 @@ pub use depth_anything_3::{
 pub use depth_anything_3::{
     DepthAnything3FixtureCheckpointParity, DepthAnything3FixtureMutation,
     DepthAnything3FixtureProfile, DepthAnything3FixtureStateParity,
+    NativeDepthAnything3RansacViewTrace, NativeDepthAnything3TestTrace,
     deterministic_reduced_depth_anything_3_checkpoint, mutate_reduced_depth_anything_3_checkpoint,
     reduced_depth_anything_3_checkpoint_parity_for_fixture,
     select_reduced_depth_anything_3_reference_for_fixture,

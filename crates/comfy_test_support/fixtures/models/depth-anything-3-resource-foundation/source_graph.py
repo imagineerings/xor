@@ -7,6 +7,20 @@ LIBC = ctypes.CDLL(None)
 LIBC.atanf.argtypes = [ctypes.c_float]
 LIBC.atanf.restype = ctypes.c_float
 
+MASK64 = (1 << 64) - 1
+RAY_POSE_RNG_ADDRESS = {
+    "workflow": "task390",
+    "attempt": "fixture",
+    "node": "depth-anything-3-ray-pose",
+    "output": 0,
+    "phase": "reduced-ray-pose",
+    "batch": 0,
+    "retry": 0,
+    "retry_policy": "replay",
+    "device_kind": "cpu",
+    "device_ordinal": 0,
+}
+
 
 def f32(value):
     return struct.unpack("<f", struct.pack("<f", value))[0]
@@ -51,6 +65,116 @@ def fsum(values):
     for value in values:
         output = fadd(output, value)
     return output
+
+
+def mix_u64(value):
+    value = (value + 0x9E3779B97F4A7C15) & MASK64
+    value = ((value ^ (value >> 30)) * 0xBF58476D1CE4E5B9) & MASK64
+    value = ((value ^ (value >> 27)) * 0x94D049BB133111EB) & MASK64
+    return value ^ (value >> 31)
+
+
+def rng_address_digest(seed, address=RAY_POSE_RNG_ADDRESS):
+    value = 0xCBF29CE484222325
+
+    def write(raw):
+        nonlocal value
+        for byte in raw:
+            value ^= byte
+            value = (value * 0x00000100000001B3) & MASK64
+
+    def write_u8(item):
+        write(bytes([item]))
+
+    def write_u32(item):
+        write(int(item).to_bytes(4, "little"))
+
+    def write_u64(item):
+        write(int(item).to_bytes(8, "little"))
+
+    def write_text(item):
+        encoded = item.encode()
+        write_u64(len(encoded))
+        write(encoded)
+
+    write_u8(2)
+    write_u64(seed)
+    write_text(address["workflow"])
+    write_text(address["attempt"])
+    write_text(address["node"])
+    write_u32(address["output"])
+    write_text(address["phase"])
+    write_u64(address["batch"])
+    if address["retry_policy"] == "replay":
+        write_u8(0)
+    elif address["retry_policy"] == "advance":
+        write_u8(1)
+        write_u32(address["retry"])
+    else:
+        raise ValueError(address["retry_policy"])
+    if address["device_kind"] != "cpu":
+        raise ValueError(address["device_kind"])
+    write_u8(0)
+    write_u32(address["device_ordinal"])
+    return mix_u64(value)
+
+
+class Mt19937:
+    def __init__(self, seed):
+        self.state = [0] * 624
+        self.state[0] = seed & 0xFFFFFFFF
+        for index in range(1, 624):
+            previous = self.state[index - 1]
+            self.state[index] = (
+                1812433253 * (previous ^ (previous >> 30)) + index
+            ) & 0xFFFFFFFF
+        self.index = 624
+
+    def twist(self):
+        for index in range(624):
+            combined = (self.state[index] & 0x80000000) | (
+                self.state[(index + 1) % 624] & 0x7FFFFFFF
+            )
+            value = self.state[(index + 397) % 624] ^ (combined >> 1)
+            if combined & 1:
+                value ^= 0x9908B0DF
+            self.state[index] = value & 0xFFFFFFFF
+        self.index = 0
+
+    def next_u32(self):
+        if self.index >= 624:
+            self.twist()
+        value = self.state[self.index]
+        self.index += 1
+        value ^= value >> 11
+        value ^= (value << 7) & 0x9D2C5680
+        value ^= (value << 15) & 0xEFC60000
+        return (value ^ (value >> 18)) & 0xFFFFFFFF
+
+    def next_bounded_u64(self, upper_exclusive):
+        if upper_exclusive <= 0:
+            raise ValueError(upper_exclusive)
+        rejection_threshold = ((-upper_exclusive) & MASK64) % upper_exclusive
+        while True:
+            candidate = (self.next_u32() << 32) | self.next_u32()
+            if candidate >= rejection_threshold:
+                return candidate % upper_exclusive
+
+    def randperm(self, count):
+        values = list(range(count))
+        for upper in range(count - 1, 0, -1):
+            selected = self.next_bounded_u64(upper + 1)
+            values[upper], values[selected] = values[selected], values[upper]
+        return values
+
+
+def ransac_generator(seed=17, address=RAY_POSE_RNG_ADDRESS):
+    return Mt19937(seed ^ rng_address_digest(seed, address))
+
+
+def ransac_samples(candidate_count, seed=17, address=RAY_POSE_RNG_ADDRESS):
+    generator = ransac_generator(seed, address)
+    return [generator.randperm(candidate_count)[:8] for _ in range(100)]
 
 
 def product(values):
@@ -1063,15 +1187,16 @@ def smallest_symmetric_eigenvector(matrix):
 
 
 def weighted_homography(source, destination, weights, indices):
-    rows = []
+    first_rows = []
+    second_rows = []
     for index in indices:
         weight = f32(math.sqrt(weights[index]))
         x, y = source[index]
         u, v = destination[index]
-        rows.append([fmul(-x, weight), fmul(-y, weight), fmul(-1.0, weight), 0.0, 0.0, 0.0, fmul(fmul(x, u), weight), fmul(fmul(y, u), weight), fmul(u, weight)])
-        rows.append([0.0, 0.0, 0.0, fmul(-x, weight), fmul(-y, weight), fmul(-1.0, weight), fmul(fmul(x, v), weight), fmul(fmul(y, v), weight), fmul(v, weight)])
+        first_rows.append([fmul(-x, weight), fmul(-y, weight), fmul(-1.0, weight), 0.0, 0.0, 0.0, fmul(fmul(x, u), weight), fmul(fmul(y, u), weight), fmul(u, weight)])
+        second_rows.append([0.0, 0.0, 0.0, fmul(-x, weight), fmul(-y, weight), fmul(-1.0, weight), fmul(fmul(x, v), weight), fmul(fmul(y, v), weight), fmul(v, weight)])
     gram = [[f32(0.0) for _ in range(9)] for _ in range(9)]
-    for row in rows:
+    for row in first_rows + second_rows:
         for left in range(9):
             for right in range(9):
                 gram[left][right] = fadd(gram[left][right], fmul(row[left], row[right]))
@@ -1120,7 +1245,7 @@ def ql3(matrix):
     return q, lower
 
 
-def ray_pose(ray, confidence, views):
+def ray_pose_with_trace(ray, confidence, views, seed=17, address=RAY_POSE_RNG_ADDRESS):
     _, height, width, _ = ray.shape
     points = height * width
     dx = 1.0 / width
@@ -1129,6 +1254,10 @@ def ray_pose(ray, confidence, views):
     vertical = [f32(-(1.0 - dy) + 2.0 * (1.0 - dy) * index / (height - 1)) for index in range(height)]
     c2w = Tensor((1, views, 3, 4), [0.0] * (views * 12))
     intrinsics = Tensor((1, views, 3, 3), [0.0] * (views * 9))
+    candidate_count = max(8, int(points * 0.3))
+    generator = ransac_generator(seed, address)
+    samples = [generator.randperm(candidate_count)[:8] for _ in range(100)]
+    view_traces = []
     for view in range(views):
         source = []
         destination = []
@@ -1146,23 +1275,41 @@ def ray_pose(ray, confidence, views):
                     weights.append(0.0)
                 raw_confidence.append(confidence.get(view, y, x))
         sorted_indices = sorted(range(points), key=lambda index: (-weights[index], index))
-        candidate_count = max(8, int(points * 0.3))
         candidate_indices = sorted_indices[:candidate_count]
-        homography = weighted_homography(source, destination, weights, candidate_indices)
-        projected_inliers = []
-        for index in range(points):
-            x, y = source[index]
-            denominator = fsum([fmul(x, homography[6]), fmul(y, homography[7]), homography[8]])
-            projected_x = fdiv(fsum([fmul(x, homography[0]), fmul(y, homography[1]), homography[2]]), denominator)
-            projected_y = fdiv(fsum([fmul(x, homography[3]), fmul(y, homography[4]), homography[5]]), denominator)
-            error = f32(math.sqrt(fadd(fmul(fsub(projected_x, destination[index][0]), fsub(projected_x, destination[index][0])), fmul(fsub(projected_y, destination[index][1]), fsub(projected_y, destination[index][1])))))
-            if error < 0.2:
-                projected_inliers.append(index)
-        if len(projected_inliers) >= 4:
-            projected_inliers.sort(key=lambda index: (-weights[index], index))
-            homography = weighted_homography(source, destination, weights, projected_inliers)
+        best_score = f32(float("-inf"))
+        best_iteration = 0
+        best_inliers = []
+        for iteration, sample in enumerate(samples):
+            selected = [candidate_indices[index] for index in sample]
+            candidate_homography = weighted_homography(
+                source, destination, weights, selected
+            )
+            score = f32(0.0)
+            inliers = []
+            for index in range(points):
+                x, y = source[index]
+                denominator = fsum([fmul(x, candidate_homography[6]), fmul(y, candidate_homography[7]), candidate_homography[8]])
+                projected_x = fdiv(fsum([fmul(x, candidate_homography[0]), fmul(y, candidate_homography[1]), candidate_homography[2]]), denominator)
+                projected_y = fdiv(fsum([fmul(x, candidate_homography[3]), fmul(y, candidate_homography[4]), candidate_homography[5]]), denominator)
+                error = f32(math.sqrt(fadd(fmul(fsub(projected_x, destination[index][0]), fsub(projected_x, destination[index][0])), fmul(fsub(projected_y, destination[index][1]), fsub(projected_y, destination[index][1])))))
+                if error < 0.2:
+                    score = fadd(score, weights[index])
+                    inliers.append(index)
+            if score > best_score:
+                best_score = score
+                best_iteration = iteration
+                best_inliers = inliers
+        fallback = len(best_inliers) < 4
+        if not fallback:
+            best_inliers.sort(key=lambda index: (-weights[index], index))
+            if len(best_inliers) > 8000:
+                keep = max(int(len(best_inliers) * 0.95), 8000)
+                refit_sample = generator.randperm(keep)[:8000]
+                best_inliers = [best_inliers[index] for index in refit_sample]
+            homography = weighted_homography(source, destination, weights, best_inliers)
         else:
             homography = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        normalized_homography = list(homography)
         if determinant3(homography) < 0.0:
             homography = [fmul(-1.0, value) for value in homography]
         rotation, lower = ql3(homography)
@@ -1173,6 +1320,24 @@ def ray_pose(ray, confidence, views):
                 c2w.set(rotation[row * 3 + column], 0, view, row, column)
             translation = fdiv(fsum(fmul(ray.get(view, point // width, point % width, 3 + row), raw_confidence[point]) for point in range(points)), total)
             c2w.set(translation, 0, view, row, 3)
+        view_traces.append(
+            {
+                "candidate_indices": candidate_indices,
+                "best_iteration": best_iteration,
+                "best_inliers": best_inliers,
+                "best_score_bits": struct.unpack("<I", struct.pack("<f", best_score))[0],
+                "fallback": fallback,
+                "normalized_homography_bits": [struct.unpack("<I", struct.pack("<f", value))[0] for value in normalized_homography],
+                "homography_post_sign_bits": [struct.unpack("<I", struct.pack("<f", value))[0] for value in homography],
+                "rotation_bits": [struct.unpack("<I", struct.pack("<f", value))[0] for value in rotation],
+                "lower_bits": [struct.unpack("<I", struct.pack("<f", value))[0] for value in lower],
+                "c2w_pre_inverse_bits": [
+                    struct.unpack("<I", struct.pack("<f", c2w.get(0, view, row, column)))[0]
+                    for row in range(3)
+                    for column in range(4)
+                ],
+            }
+        )
         focal_x = fdiv(1.0, fdiv(lower[0], scale))
         focal_y = fdiv(1.0, fdiv(lower[4], scale))
         principal_x = fadd(fdiv(lower[6], scale), 1.0)
@@ -1182,7 +1347,19 @@ def ray_pose(ray, confidence, views):
         intrinsics.set(fmul(fmul(principal_x, width), 0.5), 0, view, 0, 2)
         intrinsics.set(fmul(fmul(principal_y, height), 0.5), 0, view, 1, 2)
         intrinsics.set(1.0, 0, view, 2, 2)
-    return affine_inverse(c2w), intrinsics
+    return (affine_inverse(c2w), intrinsics), {
+        "profile_version": 2,
+        "algorithm": "mt19937",
+        "seed": seed,
+        "address": dict(address),
+        "address_digest": rng_address_digest(seed, address),
+        "samples": samples,
+        "views": view_traces,
+    }
+
+
+def ray_pose(ray, confidence, views):
+    return ray_pose_with_trace(ray, confidence, views)[0]
 
 
 def execute_dualdpt(input_values, views=3, mutation=None, camera_inputs=None, use_ray=False, reference_strategy="saddle_sim_range", source_dtype="f32"):

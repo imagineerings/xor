@@ -2189,7 +2189,7 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
         rng_phase: Some(&ransac_address),
         cancellation: context.cancellation,
     };
-    let ray_geometry = dual.execute(
+    let (ray_geometry, ray_trace) = dual.execute_with_test_trace(
         &backend,
         NativeDepthAnything3Invocation {
             image: &multiview,
@@ -2204,6 +2204,204 @@ fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry(
         },
         &ray_context,
     )?;
+    for (actual, pointer) in [
+        (
+            &ray_trace.raw_ray,
+            "/reduced_dualdpt/ray_pose_trace/pre_geometry_ray/bits",
+        ),
+        (
+            &ray_trace.raw_ray_confidence,
+            "/reduced_dualdpt/ray_pose_trace/pre_geometry_confidence/bits",
+        ),
+    ] {
+        let document_pointer = pointer
+            .strip_suffix("/bits")
+            .ok_or("DA3 ray trace pointer has no bits suffix")?;
+        let mut expected_shape = oracle
+            .pointer(&format!("{document_pointer}/shape"))
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("missing DA3 ray trace shape {document_pointer}"))?
+            .iter()
+            .map(|value| {
+                value
+                    .as_u64()
+                    .ok_or_else(|| format!("invalid DA3 ray trace shape {document_pointer}"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        expected_shape.insert(0, 1);
+        assert_eq!(actual.descriptor().shape(), expected_shape);
+        assert_eq!(
+            tensor_bits(actual, &ray_context)?,
+            fixture_raw_bits(
+                oracle
+                    .pointer(pointer)
+                    .ok_or_else(|| format!("missing DA3 ray trace oracle {pointer}"))?,
+            )?,
+            "{pointer}: pre-geometry ray phase diverged"
+        );
+    }
+    let expected_samples = oracle
+        .pointer("/reduced_dualdpt/ray_pose_trace/samples")
+        .and_then(Value::as_array)
+        .ok_or("DA3 RANSAC samples are missing")?
+        .iter()
+        .map(|row| {
+            row.as_array()
+                .ok_or("DA3 RANSAC sample row is invalid")?
+                .iter()
+                .map(|value| value.as_u64().ok_or("DA3 RANSAC sample is invalid"))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(ray_trace.ransac_samples, expected_samples);
+    let index_rows_sha256 = |domain: &str, rows: &[Vec<u64>]| {
+        let mut digest = Sha256::new();
+        digest.update((domain.len() as u64).to_le_bytes());
+        digest.update(domain.as_bytes());
+        digest.update((rows.len() as u64).to_le_bytes());
+        for row in rows {
+            digest.update((row.len() as u64).to_le_bytes());
+            for value in row {
+                digest.update(value.to_le_bytes());
+            }
+        }
+        format!("{:x}", digest.finalize())
+    };
+    let samples_domain = oracle
+        .pointer("/reduced_dualdpt/ray_pose_trace/samples_sha256_domain")
+        .and_then(Value::as_str)
+        .ok_or("DA3 RANSAC sample SHA domain is missing")?;
+    assert_eq!(
+        index_rows_sha256(samples_domain, &ray_trace.ransac_samples),
+        oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/samples_sha256")
+            .and_then(Value::as_str)
+            .ok_or("DA3 RANSAC sample SHA is missing")?
+    );
+    assert_eq!(
+        oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/profile_version")
+            .and_then(Value::as_u64),
+        Some(2)
+    );
+    assert_eq!(
+        oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/algorithm")
+            .and_then(Value::as_str),
+        Some("mt19937")
+    );
+    assert_eq!(
+        oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/seed")
+            .and_then(Value::as_u64),
+        Some(17)
+    );
+    for (pointer, expected) in [
+        ("workflow", "task390"),
+        ("attempt", "fixture"),
+        ("node", "depth-anything-3-ray-pose"),
+        ("phase", "reduced-ray-pose"),
+        ("retry_policy", "replay"),
+        ("device_kind", "cpu"),
+    ] {
+        assert_eq!(
+            oracle
+                .pointer(&format!(
+                    "/reduced_dualdpt/ray_pose_trace/address/{pointer}"
+                ))
+                .and_then(Value::as_str),
+            Some(expected)
+        );
+    }
+    let expected_views = oracle
+        .pointer("/reduced_dualdpt/ray_pose_trace/views")
+        .and_then(Value::as_array)
+        .ok_or("DA3 RANSAC view traces are missing")?;
+    assert_eq!(ray_trace.ransac_views.len(), expected_views.len());
+    for (actual, expected) in ray_trace.ransac_views.iter().zip(expected_views) {
+        let candidates = expected
+            .get("candidate_indices")
+            .and_then(Value::as_array)
+            .ok_or("DA3 RANSAC candidates are missing")?
+            .iter()
+            .map(|value| value.as_u64().ok_or("DA3 RANSAC candidate is invalid"))
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(actual.candidate_indices, candidates);
+        assert_eq!(
+            actual.best_iteration,
+            expected
+                .get("best_iteration")
+                .and_then(Value::as_u64)
+                .ok_or("DA3 RANSAC best iteration is missing")?
+        );
+        assert_eq!(
+            actual.best_inliers.len() as u64,
+            expected
+                .get("best_inlier_count")
+                .and_then(Value::as_u64)
+                .ok_or("DA3 RANSAC inlier count is missing")?
+        );
+        assert_eq!(
+            u64::from(actual.best_score_bits),
+            expected
+                .get("best_score_bits")
+                .and_then(Value::as_u64)
+                .ok_or("DA3 RANSAC best score is missing")?
+        );
+        assert_eq!(
+            actual.fallback,
+            expected
+                .get("fallback")
+                .and_then(Value::as_bool)
+                .ok_or("DA3 RANSAC fallback disposition is missing")?
+        );
+        for (phase, actual_values) in [
+            (
+                "normalized_homography_bits",
+                actual.normalized_homography.as_slice(),
+            ),
+            (
+                "homography_post_sign_bits",
+                actual.signed_homography.as_slice(),
+            ),
+            ("rotation_bits", actual.rotation.as_slice()),
+            ("lower_bits", actual.lower.as_slice()),
+            ("c2w_pre_inverse_bits", actual.c2w_pre_inverse.as_slice()),
+        ] {
+            let expected_values = fixture_raw_bits(
+                expected
+                    .get(phase)
+                    .ok_or_else(|| format!("DA3 RANSAC {phase} is missing"))?,
+            )?
+            .into_iter()
+            .map(f32::from_bits)
+            .collect::<Vec<_>>();
+            assert_eq!(actual_values.len(), expected_values.len());
+            for (lane, (actual_value, expected_value)) in actual_values
+                .iter()
+                .copied()
+                .zip(expected_values)
+                .enumerate()
+            {
+                let tolerance = 2.5e-3_f32.max(expected_value.abs() * 2.5e-3);
+                assert!(
+                    (actual_value - expected_value).abs() <= tolerance,
+                    "DA3 RANSAC view phase {phase}[{lane}]: {actual_value} != {expected_value}"
+                );
+            }
+        }
+        let inlier_domain = expected
+            .get("best_inliers_sha256_domain")
+            .and_then(Value::as_str)
+            .ok_or("DA3 RANSAC inlier SHA domain is missing")?;
+        assert_eq!(
+            index_rows_sha256(inlier_domain, std::slice::from_ref(&actual.best_inliers)),
+            expected
+                .get("best_inliers_sha256")
+                .and_then(Value::as_str)
+                .ok_or("DA3 RANSAC inlier SHA is missing")?
+        );
+    }
     assert_eq!(
         tensor_bits(&ray_geometry.depth, &ray_context)?,
         fixture_raw_bits(

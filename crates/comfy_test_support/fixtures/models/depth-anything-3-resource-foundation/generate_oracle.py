@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from source_graph import (
+    RAY_POSE_RNG_ADDRESS,
     Tensor,
     execute_dpt,
     execute_dpt_resized,
@@ -17,6 +18,8 @@ from source_graph import (
     make_state,
     manifest,
     preprocess,
+    ray_pose_with_trace,
+    ransac_samples,
 )
 
 ROOT = Path(__file__).resolve().parents[5]
@@ -227,6 +230,53 @@ def tensor_document(tensor):
     }
 
 
+def index_rows_sha256(domain, rows):
+    digest = hashlib.sha256()
+    encoded_domain = domain.encode("ascii")
+    digest.update(len(encoded_domain).to_bytes(8, "little"))
+    digest.update(encoded_domain)
+    digest.update(len(rows).to_bytes(8, "little"))
+    for row in rows:
+        digest.update(len(row).to_bytes(8, "little"))
+        for value in row:
+            digest.update(value.to_bytes(8, "little"))
+    return digest.hexdigest()
+
+
+def ransac_trace_document(ray, confidence, views):
+    geometry, trace = ray_pose_with_trace(ray, confidence, views)
+    sample_domain = "zed.comfy.depth-anything-3.ransac-samples.v1"
+    inlier_domain = "zed.comfy.depth-anything-3.ransac-inliers.v1"
+    trace["samples_sha256_domain"] = sample_domain
+    trace["samples_sha256"] = index_rows_sha256(sample_domain, trace["samples"])
+    for view, view_trace in enumerate(trace["views"]):
+        view_trace["best_inliers_sha256_domain"] = inlier_domain
+        view_trace["best_inliers_sha256"] = index_rows_sha256(
+            inlier_domain, [view_trace["best_inliers"]]
+        )
+        view_trace["best_inlier_count"] = len(view_trace.pop("best_inliers"))
+        view_trace["view"] = view
+    trace["pre_geometry_ray"] = tensor_document(ray)
+    trace["pre_geometry_confidence"] = tensor_document(confidence)
+    trace["geometry"] = geometry_document(geometry)
+    changed_seed_samples = ransac_samples(len(trace["views"][0]["candidate_indices"]), 18)
+    changed_address = dict(RAY_POSE_RNG_ADDRESS)
+    changed_address["phase"] = "reduced-ray-pose-mutated"
+    changed_address_samples = ransac_samples(
+        len(trace["views"][0]["candidate_indices"]), 17, changed_address
+    )
+    trace["mutation_discriminators"] = {
+        "seed_18_samples_sha256": index_rows_sha256(
+            sample_domain, changed_seed_samples
+        ),
+        "changed_phase": changed_address["phase"],
+        "changed_phase_samples_sha256": index_rows_sha256(
+            sample_domain, changed_address_samples
+        ),
+    }
+    return trace
+
+
 def geometry_document(geometry):
     if geometry is None:
         return None
@@ -394,6 +444,7 @@ def document():
     }
     dual_camera = execute_dualdpt(multiview_values, camera_inputs=(camera_extrinsics, camera_intrinsics))
     dual_ray = execute_dualdpt(multiview_values, use_ray=True)
+    ray_trace = ransac_trace_document(dual_ray[2], dual_ray[3], 3)
     mutations = {
         "dpt_local_attention": ("dpt", ("native.backbone.encoder.layer.0.attention.attention.query.weight", 0, 0.25)),
         "dpt_head": ("dpt", ("native.head.scratch.output_conv2.2.bias", 0, 0.25)),
@@ -522,6 +573,7 @@ def document():
             "supplied_camera_output_identity_sha256": output_identity(dual_camera),
             "ray_depth": tensor_document(dual_ray[0]),
             "ray_confidence": tensor_document(dual_ray[1]),
+            "ray_pose_trace": ray_trace,
             "ray_extrinsics": tensor_document(dual_ray[4][0]),
             "ray_intrinsics": tensor_document(dual_ray[4][1]),
             "ray_output_identity_sha256": output_identity(dual_ray),
