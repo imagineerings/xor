@@ -12,6 +12,9 @@ environment: production
 runtimeSecret:
   name: ""
 migration:
+  image:
+    tag: ""
+    digest: ""
   secretName: ""
 objectStore:
   endpoint: ""

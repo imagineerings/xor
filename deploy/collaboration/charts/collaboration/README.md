@@ -12,7 +12,8 @@ separate because it may have DDL privileges that the runtime identity must not
 have.
 
 `values-production.yaml` is intentionally unrenderable on its own. The release
-system supplies environment-owned values, then runs:
+system supplies environment-owned values, including a separately published
+`collaboration-migrations` digest, then runs:
 
 ```sh
 helm lint deploy/collaboration/charts/collaboration \
@@ -21,10 +22,9 @@ helm template collaboration deploy/collaboration/charts/collaboration \
   -f deploy/collaboration/charts/collaboration/values-production.yaml
 ```
 
-The pre-install/pre-upgrade hook is the deployment contract for `collab
-migrate`. Task 44.4 owns the ordered migration package, checksums,
-compatibility ceiling and halt/resume behavior; this chart does not substitute
-for those controls.
+The pre-install/pre-upgrade hook runs the Task 44.4 migration artifact with a
+DDL-only Secret. Its immutable manifest owns ordering, checksums, compatibility
+ceiling and halt/resume behavior independently from the runtime image.
 
 Rollback overlays `values-rollback.yaml`, selects only a previous immutable
 digest, requires that binary to admit the deployed schema floor, and suppresses

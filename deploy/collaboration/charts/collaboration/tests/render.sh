@@ -14,6 +14,7 @@ active_args=(
   --set deployment.enabled=true
   --set image.tag=test
   --set runtimeSecret.name=collaboration-runtime
+  --set migration.image.tag=test
   --set migration.secretName=collaboration-migration
   --set publicUrl=https://collaboration.example.invalid
   --set objectStore.endpoint=https://objects.example.invalid
@@ -26,6 +27,7 @@ production_args=(
   -f "$chart/values-production.yaml"
   --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   --set runtimeSecret.name=collaboration-runtime
+  --set migration.image.digest=sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   --set migration.secretName=collaboration-migration
   --set publicUrl=https://collaboration.example.invalid
   --set objectStore.endpoint=https://objects.example.invalid
@@ -126,13 +128,17 @@ raise "replica admission drift" unless environment.dig("COLLABORATION_REPLICA_CO
 
 raise "migration hook missing" unless job.dig("metadata", "annotations", "helm.sh/hook") == "pre-install,pre-upgrade"
 raise "migration is not bounded" unless job.dig("spec", "activeDeadlineSeconds") == 300 && job.dig("spec", "backoffLimit") == 2
-raise "migration command drift" unless job.dig("spec", "template", "spec", "containers", 0, "args") == ["migrate"]
-migration_secret = job.dig("spec", "template", "spec", "containers", 0, "env", 1, "valueFrom", "secretKeyRef", "name")
+migration_container = job.dig("spec", "template", "spec", "containers", 0)
+raise "migration command drift" unless migration_container["args"] == ["up"]
+raise "migration image owner drift" unless migration_container["image"] == "ghcr.io/zed-industries/collaboration-migrations:test"
+migration_secret = migration_container.dig("env", 1, "valueFrom", "secretKeyRef", "name")
 raise "migration aliases runtime credentials" unless migration_secret == "collaboration-migration"
 
 production_deployment = production.find { |resource| resource["kind"] == "Deployment" }
 production_container = production_deployment.dig("spec", "template", "spec", "containers", 0)
 raise "production image is mutable" unless production_container["image"].end_with?("@sha256:" + "a" * 64)
+production_job = production.find { |resource| resource["kind"] == "Job" }
+raise "production migration image is mutable" unless production_job.dig("spec", "template", "spec", "containers", 0, "image").end_with?("@sha256:" + "c" * 64)
 raise "autoscaling replica contract drift" unless production_container["env"].find { |entry| entry["name"] == "COLLABORATION_REPLICA_COUNT" }["value"] == "10"
 route = production.find { |resource| resource["kind"] == "HTTPRoute" }
 raise "production route is unattached" unless route && route.dig("spec", "parentRefs", 0, "name") == "production-gateway"
@@ -179,6 +185,12 @@ if helm template collaboration "$chart" "${production_args[@]}" --set image.dige
   exit 1
 fi
 grep -q 'production deployment requires image.digest' "$error_output"
+
+if helm template collaboration "$chart" "${production_args[@]}" --set migration.image.digest= >"$error_output" 2>&1; then
+  echo "expected a mutable production migration image to fail" >&2
+  exit 1
+fi
+grep -q 'production migration requires migration.image.digest' "$error_output"
 
 if helm template collaboration "$chart" "${production_args[@]}" --set httpRoute.enabled=false >"$error_output" 2>&1; then
   echo "expected a production release without ingress to fail" >&2

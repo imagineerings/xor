@@ -27,6 +27,11 @@ runtimeSecret:
 
 migration:
   enabled: true
+  image:
+    repository: ghcr.io/zed-industries/collaboration-migrations
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
   secretName: ""
   databaseUrlKey: COLLABORATION_DATABASE_URL
   requiredSchemaVersion: "20260824000500"

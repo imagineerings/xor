@@ -88,9 +88,20 @@
     "migration": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "secretName", "databaseUrlKey", "requiredSchemaVersion", "activeDeadlineSeconds", "backoffLimit", "resources"],
+      "required": ["enabled", "image", "secretName", "databaseUrlKey", "requiredSchemaVersion", "activeDeadlineSeconds", "backoffLimit", "resources"],
       "properties": {
         "enabled": { "type": "boolean" },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "tag", "digest", "pullPolicy"],
+          "properties": {
+            "repository": { "const": "ghcr.io/zed-industries/collaboration-migrations" },
+            "tag": { "type": "string" },
+            "digest": { "type": "string", "pattern": "^$|^sha256:[0-9a-f]{64}$" },
+            "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+          }
+        },
         "secretName": { "type": "string" },
         "databaseUrlKey": { "$ref": "#/definitions/secretKey" },
         "requiredSchemaVersion": { "const": "20260824000500" },

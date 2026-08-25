@@ -26,9 +26,9 @@ spec:
       {{- end }}
       containers:
         - name: migrate
-          image: {{ include "collaboration.image" . | quote }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args: ["migrate"]
+          image: {{ include "collaboration.migrationImage" . | quote }}
+          imagePullPolicy: {{ .Values.migration.image.pullPolicy }}
+          args: ["up"]
           securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
           env:
             - { name: COLLABORATION_REQUIRED_SCHEMA_VERSION, value: {{ .Values.migration.requiredSchemaVersion | quote }} }

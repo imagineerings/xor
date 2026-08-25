@@ -55,6 +55,16 @@ app.kubernetes.io/component: migration
 {{- end -}}
 {{- end -}}
 
+{{- define "collaboration.migrationImage" -}}
+{{- if .Values.deployment.production -}}
+{{ printf "%s@%s" .Values.migration.image.repository (required "production migration requires migration.image.digest" .Values.migration.image.digest) }}
+{{- else if .Values.migration.image.digest -}}
+{{ printf "%s@%s" .Values.migration.image.repository .Values.migration.image.digest }}
+{{- else -}}
+{{ printf "%s:%s" .Values.migration.image.repository (required "migration.image.tag or migration.image.digest is required" .Values.migration.image.tag) }}
+{{- end -}}
+{{- end -}}
+
 {{- define "collaboration.validate" -}}
 {{- if .Values.deployment.enabled -}}
 {{- $_ := required "runtimeSecret.name is required when deployment.enabled=true" .Values.runtimeSecret.name -}}
@@ -149,6 +159,11 @@ app.kubernetes.io/component: migration
 {{- $_ := required "migration.secretName is required when migrations are enabled" .Values.migration.secretName -}}
 {{- if eq .Values.runtimeSecret.name .Values.migration.secretName -}}
 {{- fail "runtime and DDL-capable migration credentials must use distinct secrets" -}}
+{{- end -}}
+{{- if .Values.deployment.production -}}
+{{- $_ := required "production migration requires migration.image.digest" .Values.migration.image.digest -}}
+{{- else if not (or .Values.migration.image.tag .Values.migration.image.digest) -}}
+{{- fail "migration.image.tag or migration.image.digest is required" -}}
 {{- end -}}
 {{- end -}}
 {{- if .Values.rollback.enabled -}}
