@@ -3306,7 +3306,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Discovered contradiction (2026-08-25): the planned legacy/contract read scope cannot carry canonical agent catalog projections, identity archive records, engram rules or signed job commands without reading their completed domain/protocol owners, and the standalone adapter is unreachable without parent-module registration. The narrow correction adds only those canonical reads, the `collaboration::agents` declaration and living evidence. It does not import desktop repositories or add a parser, credential reader, signer, encryption key, persistence store, authorization reducer, scheduler, delegation orchestrator, cancellation runtime or Standard-build edge._
     - _Evidence: 2026-08-25 — added twenty-one Multiplayer-only draft/catalog lifecycle, archive/unarchive/list, persona validate/inspect, memory list/get/hash/set/patch/remove, snapshot create/list/restore and job get/submit/cancel/delegate variants through one injected executor. Requests retain canonical community and identity values, public/private projection boundaries, validated NIP-AE slugs/hashes, operation/version attribution and canonical job commands/ancestry. Command debug output redacts every payload; public catalog projection, persona metadata and snapshot integrity output omit private references/documents, and memory plaintext is emitted only by explicit `mem.get`. Six focused golden tests passed lifecycle redaction/forwarding, persona metadata redaction, explicit memory disclosure, snapshot integrity-only output, exact delegation/cancellation commands, archive preflight, mismatched outcomes and the complete stable error matrix. Repository-prescribed release/all-target/all-feature CLI Clippy passed with warnings denied._
 
-  - [ ] 42.6. Implement and verify the versioned buzz CLI shim
+  - [x] 42.6. Implement and verify the versioned buzz CLI shim
     - Forward legacy syntax to Zed commands, preserve stdout/stderr/retry semantics and emit minimum-version errors.
     - _Requirements: 18.1, 18.2, 18.3_
     - _Capability IDs: CAP-038, CAP-045_
@@ -3314,6 +3314,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/cli/src/collaboration/**, .agents/specs/collaborative-workspace/fixtures/clients/**_
     - _Writes: tools/buzz_compat/Cargo.toml, tools/buzz_compat/src/*_
     - _Validation: frozen automation scripts produce approved output/exit codes against old and consolidated endpoints_
+    - _Discovered contradiction (2026-08-25): a tool nested below the Zed repository cannot be built from its own manifest unless it is either added to the root workspace or declares an isolated workspace. Adding the compatibility executable to the root workspace would widen the planned manifest/lockfile writes and couple it to unrelated feature resolution, so the narrow correction makes `tools/buzz_compat` a dependency-free standalone workspace and retains the exact planned write surface._
+    - _Evidence: 2026-08-25 — added a standalone Buzz 0.1.0 shim covering the frozen 22 groups and 113 executable leaf paths and translating each to its canonical Zed collaboration owner under protocol version one. Relay/default and JSON/compact syntax are normalized, private-key and authorization-tag values move to the child environment without appearing in arguments or debug output, local help/version and exact missing-auth behavior retain their streams and exit classes, and incompatible endpoint protocol or minimum-client versions return a closed `upgrade_required` envelope before forwarding. Six focused tests passed the complete command translation inventory, frozen help/version, secret handling, exact missing-auth/minimum-version errors, malformed preflight and byte-exact stdout/stderr/exit parity across old and consolidated success, retryable network, delivery-unknown and conflict fixtures. A built-shim black-box run against separate old/consolidated endpoint executables also preserved byte-identical stdout/stderr and exit 5 while rejecting any secret argument. Standalone warning-denied Clippy and tests passed, and the frozen Buzz client checker passed all 28 client contracts including all seven CLI contracts._
 
   - [x] 42.7. Port workflow CLI commands
     - Implement definition, trigger, run, approval and cancellation commands through canonical workflow APIs.
@@ -3383,7 +3385,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 43. Repoint web, mobile and admin clients with version negotiation
 
-  - [ ] 43.1. Publish the compatibility matrix and negotiation contract
+  - [x] 43.1. Publish the compatibility matrix and negotiation contract
     - Record desktop, mobile, web, CLI, admin, service, protocol and schema minimum/maximum versions.
     - _Requirements: 18.1, 18.2_
     - _Capability IDs: CAP-038, CAP-039, CAP-040, CAP-041, CAP-042_
@@ -3391,6 +3393,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: .agents/specs/collaborative-workspace/fixtures/clients/**, .agents/specs/collaborative-workspace/migration-plan.md_
     - _Writes: docs/collaboration/compatibility.md_
     - _Validation: matrix checker rejects gaps, ambiguous write compatibility and unsupported schema combinations_
+    - _Evidence: 2026-08-25 — published compatibility policy version one with closed inclusive ranges for six desktop/mobile/web/CLI/admin clients, four canonical or retained-adapter services, nine HTTP/RPC/Nostr/CLI/pairing/ciphertext/push/audio protocols and three canonical/source schema families. Every client names an exact direct or adapter read/write route, selected service/protocol/schema set and a pre-tenant `upgrade_required` write failure; service startup and rollback fail closed below or above their declared schema window, Buzz schema 30 is import-only and wildcard or inferred compatibility is prohibited. The negotiation contract defines supported/read-only/upgrade-required outcomes, non-enumerating HTTP/Nostr/CLI errors, renegotiation triggers and the evidence required for future policy changes. The matrix checker passed all rows and rejected independently mutated missing-client, ambiguous-write and unknown-schema combinations; the frozen client checker passed all 28 source contracts._
 
   - [ ] 43.2. Implement common client feature negotiation endpoints
     - Return supported features/minimum versions before incompatible writes across Nostr and HTTP clients.
