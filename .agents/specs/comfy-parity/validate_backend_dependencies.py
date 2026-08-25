@@ -80,6 +80,9 @@ AUTHORIZED_INTEGRATION_WRITES = {
         "Cargo.lock",
         "crates/comfy_types/Cargo.toml",
     },
+    "comfy-parity-zed-all-target-baseline-assertion-correction": {
+        "crates/collab_ui/Cargo.toml",
+    },
     "comfy-parity-native-visual-asset-decode-foundation": {
         "Cargo.toml",
         "Cargo.lock",

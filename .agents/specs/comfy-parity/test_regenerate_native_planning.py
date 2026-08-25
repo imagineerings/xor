@@ -246,6 +246,16 @@ class ValidationGenerationTests(unittest.TestCase):
             ],
             {"Cargo.lock", "crates/comfy_types/Cargo.toml"},
         )
+        self.assertEqual(
+            backend_dependencies.AUTHORIZED_INTEGRATION_WRITES[
+                "comfy-parity-zed-all-target-baseline-assertion-correction"
+            ],
+            {"crates/collab_ui/Cargo.toml"},
+        )
+        self.assertIn(
+            "Zed and collaboration all-target baseline correction's collab_ui manifest",
+            dependency_ledger_task["done"],
+        )
         media_dependency_writes = {
             "Cargo.toml",
             "Cargo.lock",
