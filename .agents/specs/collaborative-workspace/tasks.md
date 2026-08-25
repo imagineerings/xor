@@ -3315,7 +3315,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Writes: tools/buzz_compat/Cargo.toml, tools/buzz_compat/src/*_
     - _Validation: frozen automation scripts produce approved output/exit codes against old and consolidated endpoints_
 
-  - [ ] 42.7. Port workflow CLI commands
+  - [x] 42.7. Port workflow CLI commands
     - Implement definition, trigger, run, approval and cancellation commands through canonical workflow APIs.
     - _Requirements: 13.1, 13.2, 13.3, 16.4_
     - _Capability IDs: CAP-027, CAP-038_
@@ -3323,6 +3323,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-cli/src/**, crates/cli/src/collaboration/contracts.rs_
     - _Writes: crates/cli/src/collaboration/workflows.rs_
     - _Validation: golden tests cover trigger, waiting approval, grant/deny, retry failure, cancellation and exit codes_
+    - _Discovered contradiction (2026-08-25): the planned legacy/contract read scope cannot validate definitions or serialize authoritative definition, run, retry and approval records without the canonical workflow-domain and repository contracts, and the leaf cannot compile without parent registration plus direct optional workflow/UUID edges and regenerated lock metadata. The narrow correction adds those reads, `crates/cli/{Cargo.toml,src/collaboration.rs}`, `Cargo.lock` and living evidence. It imports no repository instance and adds no signer, secret resolver, authorization reducer, trigger worker, action executor, approval store, retry scheduler or Standard-build dependency._
+    - _Evidence: 2026-08-25 — added ten Multiplayer-only workflow list/get/create/update/delete, manual trigger, run-history, approval decision, retry and cancellation variants through one injected executor. Definitions enter through the canonical bounded YAML parser and requests retain typed tenant/workflow/run/channel identities, bounded object inputs, exact approval decision/note, operation attribution and optimistic definition/run versions. Stable reads preserve definition integrity/lifecycle/scope and distinct waiting-approval, retry-scheduled, failed and cancelled states while omitting trigger contexts, action outputs, provider/step error details, approval capabilities and notes; mutations return one resource/version receipt. Five focused golden tests passed definition parsing/projection, trigger forwarding, grant/deny, retry/failure/cancellation/redaction, invalid preflight, mismatched results and the complete stable error matrix. Repository-prescribed release/all-target/all-feature CLI Clippy passed with warnings denied._
 
   - [ ] 42.8. Consolidate moderation CLI commands
     - Integrate the focused moderation commands into the common collaboration command/output contract.
