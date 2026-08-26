@@ -9,7 +9,9 @@ cutover, an irreversible migration, source deletion or data deletion.
 
 The implementation evidence is complete for all 45 capabilities and 93
 acceptance criteria in the [parity report](../../.agents/specs/collaborative-workspace/parity-report.md).
-Final operational and product approval remains a separate recorded decision.
+The repository-only product and operational approval is recorded in the
+[final sign-off](../../.agents/specs/collaborative-workspace/final-signoff.md);
+production actions remain separately gated.
 
 ## Product and process boundary
 
@@ -266,6 +268,8 @@ because implementation parity passed.
   [migration-plan.md](../../.agents/specs/collaborative-workspace/migration-plan.md)
 - Final capability and acceptance-criterion evidence:
   [parity-report.md](../../.agents/specs/collaborative-workspace/parity-report.md)
+- Repository-only product and operational decision:
+  [final-signoff.md](../../.agents/specs/collaborative-workspace/final-signoff.md)
 - Canonical owner/dependency proof:
   [no-duplicate-audit.md](../../.agents/specs/collaborative-workspace/retirement/no-duplicate-audit.md)
 - Retained artifact checksums and source-history gate:
