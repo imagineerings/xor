@@ -43,6 +43,7 @@ mod rust_analyzer_ext;
 pub mod scroll;
 mod selections_collection;
 pub mod semantic_tokens;
+pub mod source_coverage;
 mod split;
 pub mod split_editor_view;
 

@@ -21,9 +21,12 @@ pub mod manifest_tree;
 pub mod prettier_store;
 pub mod project_search;
 pub mod project_settings;
+#[cfg(feature = "rust-coverage")]
+pub mod rust_coverage_provider;
 #[cfg(feature = "rust-tests")]
 pub mod rust_test_provider;
 pub mod search;
+pub mod source_coverage;
 #[cfg(feature = "structured-execution")]
 pub mod structured_execution;
 pub mod task_inventory;
@@ -110,8 +113,11 @@ use lsp::{
     LanguageServerBinary, LanguageServerId, LanguageServerName, LanguageServerSelector,
     MessageActionItem,
 };
-pub use lsp_command::EditPredictionDefinition;
 use lsp_command::*;
+pub use lsp_command::{
+    CallHierarchyCall, CallHierarchyCalls, CallHierarchyItem, EditPredictionDefinition,
+    PreparedCallHierarchy,
+};
 use lsp_store::{CompletionDocumentation, LspFormatTarget, OpenLspBufferHandle};
 pub use manifest_tree::ManifestProvidersStore;
 use node_runtime::NodeRuntime;
@@ -238,6 +244,9 @@ pub struct Project {
     cargo_workspace_store: Entity<cargo_workspace_store::CargoWorkspaceStore>,
     #[cfg(feature = "structured-execution")]
     structured_execution_store: Entity<structured_execution::StructuredExecutionStore>,
+    source_coverage_store: Entity<source_coverage::SourceCoverageStore>,
+    #[cfg(feature = "rust-coverage")]
+    rust_coverage_provider_store: Entity<rust_coverage_provider::RustCoverageProviderStore>,
     #[cfg(feature = "rust-tests")]
     rust_test_provider_store: Entity<rust_test_provider::RustTestProviderStore>,
     user_store: Entity<UserStore>,
@@ -1200,6 +1209,9 @@ impl Project {
         cargo_workspace_store::CargoWorkspaceStore::init(&client);
         #[cfg(feature = "structured-execution")]
         structured_execution::StructuredExecutionStore::init(&client);
+        source_coverage::SourceCoverageStore::init(&client);
+        #[cfg(feature = "rust-coverage")]
+        rust_coverage_provider::RustCoverageProviderStore::init(&client);
         #[cfg(feature = "rust-tests")]
         rust_test_provider::RustTestProviderStore::init(&client);
         DapStore::init(&client, cx);
@@ -1260,6 +1272,16 @@ impl Project {
             #[cfg(feature = "structured-execution")]
             let structured_execution_store = cx.new(|_| {
                 structured_execution::StructuredExecutionStore::local(worktree_store.clone(), 1)
+            });
+            let source_coverage_store =
+                cx.new(|_| source_coverage::SourceCoverageStore::local(worktree_store.clone(), 1));
+            #[cfg(feature = "rust-coverage")]
+            let rust_coverage_provider_store = cx.new(|_| {
+                rust_coverage_provider::RustCoverageProviderStore::local(
+                    worktree_store.clone(),
+                    source_coverage_store.clone(),
+                    1,
+                )
             });
             #[cfg(feature = "rust-tests")]
             let rust_test_provider_store = cx.new(|cx| {
@@ -1407,6 +1429,9 @@ impl Project {
                 cargo_workspace_store,
                 #[cfg(feature = "structured-execution")]
                 structured_execution_store,
+                source_coverage_store,
+                #[cfg(feature = "rust-coverage")]
+                rust_coverage_provider_store,
                 #[cfg(feature = "rust-tests")]
                 rust_test_provider_store,
                 user_store,
@@ -1551,6 +1576,24 @@ impl Project {
                     worktree_store.clone(),
                 )
             });
+            let source_coverage_store = cx.new(|_| {
+                source_coverage::SourceCoverageStore::remote(
+                    REMOTE_SERVER_PROJECT_ID,
+                    remote_proto.clone(),
+                    worktree_store.clone(),
+                    1,
+                )
+            });
+            #[cfg(feature = "rust-coverage")]
+            let rust_coverage_provider_store = cx.new(|_| {
+                rust_coverage_provider::RustCoverageProviderStore::remote(
+                    REMOTE_SERVER_PROJECT_ID,
+                    remote_proto.clone(),
+                    worktree_store.clone(),
+                    source_coverage_store.clone(),
+                    1,
+                )
+            });
             #[cfg(feature = "rust-tests")]
             let rust_test_provider_store = cx.new(|cx| {
                 rust_test_provider::RustTestProviderStore::remote(
@@ -1688,6 +1731,9 @@ impl Project {
                 cargo_workspace_store,
                 #[cfg(feature = "structured-execution")]
                 structured_execution_store,
+                source_coverage_store,
+                #[cfg(feature = "rust-coverage")]
+                rust_coverage_provider_store,
                 #[cfg(feature = "rust-tests")]
                 rust_test_provider_store,
                 user_store,
@@ -1863,6 +1909,24 @@ impl Project {
                 worktree_store.clone(),
             )
         });
+        let source_coverage_store = cx.new(|_| {
+            source_coverage::SourceCoverageStore::remote(
+                remote_id,
+                client.clone().into(),
+                worktree_store.clone(),
+                1,
+            )
+        });
+        #[cfg(feature = "rust-coverage")]
+        let rust_coverage_provider_store = cx.new(|_| {
+            rust_coverage_provider::RustCoverageProviderStore::remote(
+                remote_id,
+                client.clone().into(),
+                worktree_store.clone(),
+                source_coverage_store.clone(),
+                1,
+            )
+        });
         #[cfg(feature = "rust-tests")]
         let rust_test_provider_store = cx.new(|cx| {
             rust_test_provider::RustTestProviderStore::remote(
@@ -2001,6 +2065,9 @@ impl Project {
                 cargo_workspace_store,
                 #[cfg(feature = "structured-execution")]
                 structured_execution_store,
+                source_coverage_store,
+                #[cfg(feature = "rust-coverage")]
+                rust_coverage_provider_store,
                 #[cfg(feature = "rust-tests")]
                 rust_test_provider_store,
                 snippets,
@@ -2487,6 +2554,17 @@ impl Project {
         &self,
     ) -> &Entity<structured_execution::StructuredExecutionStore> {
         &self.structured_execution_store
+    }
+
+    pub fn source_coverage_store(&self) -> &Entity<source_coverage::SourceCoverageStore> {
+        &self.source_coverage_store
+    }
+
+    #[cfg(feature = "rust-coverage")]
+    pub fn rust_coverage_provider_store(
+        &self,
+    ) -> &Entity<rust_coverage_provider::RustCoverageProviderStore> {
+        &self.rust_coverage_provider_store
     }
 
     #[cfg(feature = "rust-tests")]
@@ -2981,6 +3059,17 @@ impl Project {
                 store.shared(project_id, self.collab_client.clone().into())
             });
         }
+        self.client_subscriptions.push(
+            self.collab_client
+                .subscribe_to_entity(project_id)?
+                .set_entity(&self.source_coverage_store, &cx.to_async()),
+        );
+        #[cfg(feature = "rust-coverage")]
+        self.client_subscriptions.push(
+            self.collab_client
+                .subscribe_to_entity(project_id)?
+                .set_entity(&self.rust_coverage_provider_store, &cx.to_async()),
+        );
         #[cfg(feature = "rust-tests")]
         self.client_subscriptions.push(
             self.collab_client
@@ -4593,6 +4682,56 @@ impl Project {
         let task = self.lsp_store.update(cx, |lsp_store, cx| {
             lsp_store.references(buffer, position, cx)
         });
+        cx.background_spawn(async move {
+            let result = task.await;
+            drop(guard);
+            result
+        })
+    }
+
+    pub fn prepare_call_hierarchy<T: ToPointUtf16>(
+        &mut self,
+        buffer: &Entity<Buffer>,
+        position: T,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<Option<PreparedCallHierarchy>>> {
+        let position = position.to_point_utf16(buffer.read(cx));
+        let guard = self.retain_remotely_created_models(cx);
+        let task = self.lsp_store.update(cx, |lsp_store, cx| {
+            lsp_store.prepare_call_hierarchy(buffer, position, cx)
+        });
+        cx.background_spawn(async move {
+            let result = task.await;
+            drop(guard);
+            result
+        })
+    }
+
+    pub fn incoming_calls(
+        &mut self,
+        item: CallHierarchyItem,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<CallHierarchyCalls>> {
+        let guard = self.retain_remotely_created_models(cx);
+        let task = self
+            .lsp_store
+            .update(cx, |lsp_store, cx| lsp_store.incoming_calls(item, cx));
+        cx.background_spawn(async move {
+            let result = task.await;
+            drop(guard);
+            result
+        })
+    }
+
+    pub fn outgoing_calls(
+        &mut self,
+        item: CallHierarchyItem,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<CallHierarchyCalls>> {
+        let guard = self.retain_remotely_created_models(cx);
+        let task = self
+            .lsp_store
+            .update(cx, |lsp_store, cx| lsp_store.outgoing_calls(item, cx));
         cx.background_spawn(async move {
             let result = task.await;
             drop(guard);

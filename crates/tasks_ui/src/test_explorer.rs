@@ -1686,7 +1686,10 @@ pub fn init(cx: &mut App) {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
+    use std::{
+        collections::VecDeque,
+        time::{Duration, Instant},
+    };
 
     use gpui::TestAppContext;
     use settings::WorktreeId;
@@ -1961,6 +1964,59 @@ mod tests {
         cx.background_executor
             .timer(std::time::Duration::from_millis(1))
             .await;
+    }
+
+    #[gpui::test]
+    async fn structured_execution_foreground_budget(cx: &mut TestAppContext) {
+        const NODE_LIMIT: usize = 10_000;
+        const FOREGROUND_BUDGET: Duration = Duration::from_millis(250);
+
+        let provider_id = StructuredProviderId("synthetic-provider".to_string());
+        let root_id = StructuredNodeId("synthetic-root".to_string());
+        let mut nodes = Vec::with_capacity(NODE_LIMIT);
+        nodes.push(StructuredNode {
+            id: root_id.clone(),
+            parent_id: None,
+            label: "Synthetic tests".to_string(),
+            kind: StructuredNodeKind::Provider,
+            path: None,
+        });
+        nodes.extend((1..NODE_LIMIT).map(|index| StructuredNode {
+            id: StructuredNodeId(format!("synthetic-case-{index:05}")),
+            parent_id: Some(root_id.clone()),
+            label: format!("Synthetic case {index:05}"),
+            kind: StructuredNodeKind::Case,
+            path: None,
+        }));
+        let provider = StructuredProviderSnapshot::discovery(
+            provider_id,
+            DiscoveryGeneration(1),
+            StructuredProviderStatus::Current,
+            nodes,
+        );
+
+        let projection_task = cx.background_executor.spawn(async move {
+            project_test_explorer(&[provider], &TestExplorerFilter::default()).snapshot
+        });
+        cx.background_executor.timer(Duration::from_millis(1)).await;
+        let projection = projection_task.await;
+        assert_eq!(collect_ids(&projection.roots).len(), NODE_LIMIT);
+
+        let started = Instant::now();
+        let mut host = LanguageToolTreeHost::default();
+        host.replace_snapshot(projection);
+        host.expand_all();
+        let elapsed = started.elapsed();
+        assert_eq!(host.visible_rows().len(), NODE_LIMIT);
+        assert_eq!(host.visible_rows_in_range(4_000..4_025).len(), 25);
+        assert!(
+            elapsed <= FOREGROUND_BUDGET,
+            "10,000-row Tests foreground reconciliation took {elapsed:?}, exceeding {FOREGROUND_BUDGET:?}"
+        );
+        eprintln!(
+            "structured-execution-foreground-budget rows={NODE_LIMIT} elapsed_ms={}",
+            elapsed.as_millis()
+        );
     }
 
     fn find_node<'a>(nodes: &'a [LanguageToolNode], label: &str) -> Option<&'a LanguageToolNode> {

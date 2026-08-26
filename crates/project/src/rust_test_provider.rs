@@ -2205,8 +2205,8 @@ fn project_provider_projection(
     RustTestProviderProjection { snapshot, actions }
 }
 
-#[cfg(test)]
-fn project_provider_snapshot(
+#[cfg(any(test, feature = "test-support"))]
+pub fn project_provider_snapshot_for_test(
     cargo_snapshot: &CargoWorkspaceSnapshot,
     captures: Vec<(CargoWorkspaceModel, RustTestDiscoveryCapture)>,
     source_hints: &[RustTestSourceHint],
@@ -2283,7 +2283,8 @@ fn project_package_nodes(
             .harnesses
             .iter()
             .filter(|harness| {
-                cargo_package_name(&harness.package_id) == package.name
+                (harness.package_id == package.id
+                    || cargo_package_name(&harness.package_id) == package.name)
                     && harness.target_name == target.name
                     && (harness.target_kind == target_kind
                         || (target_kind == RustTestTargetKind::Unit
@@ -2766,14 +2767,14 @@ mod tests {
             source: Some(project_path("src/lib.rs")),
             runnable: None,
         };
-        let first = project_provider_snapshot(
+        let first = project_provider_snapshot_for_test(
             &workspace_snapshot,
             vec![(workspace.clone(), capture())],
             std::slice::from_ref(&hint),
             Vec::new(),
             DiscoveryGeneration(1),
         );
-        let second = project_provider_snapshot(
+        let second = project_provider_snapshot_for_test(
             &workspace_snapshot,
             vec![(workspace, capture())],
             &[hint],
@@ -2818,7 +2819,7 @@ mod tests {
             message: "fixture failure".to_string(),
             has_stale_model: false,
         });
-        let partial = project_provider_snapshot(
+        let partial = project_provider_snapshot_for_test(
             &cargo_snapshot,
             vec![(good_workspace, capture())],
             &[],

@@ -9,7 +9,7 @@ use task::{
     TaskTemplate,
 };
 
-pub const CARGO_PRESET_SCHEMA_VERSION: u32 = 1;
+pub const CARGO_PRESET_SCHEMA_VERSION: u32 = 2;
 pub const CARGO_PRESET_WORKSPACE_STATE_VERSION: u32 = 1;
 const CARGO_LOCATOR_NAME: &str = "rust-cargo-locator";
 const MAX_PRESETS: usize = 256;
@@ -26,6 +26,11 @@ pub enum CargoSubcommand {
     Run,
     Test,
     Bench,
+    Doc,
+    Clippy,
+    Fmt,
+    Clean,
+    Tree,
 }
 
 impl CargoSubcommand {
@@ -36,6 +41,11 @@ impl CargoSubcommand {
             Self::Run => "run",
             Self::Test => "test",
             Self::Bench => "bench",
+            Self::Doc => "doc",
+            Self::Clippy => "clippy",
+            Self::Fmt => "fmt",
+            Self::Clean => "clean",
+            Self::Tree => "tree",
         }
     }
 }
@@ -50,6 +60,11 @@ impl TryFrom<&str> for CargoSubcommand {
             "run" => Ok(Self::Run),
             "test" => Ok(Self::Test),
             "bench" => Ok(Self::Bench),
+            "doc" => Ok(Self::Doc),
+            "clippy" => Ok(Self::Clippy),
+            "fmt" => Ok(Self::Fmt),
+            "clean" => Ok(Self::Clean),
+            "tree" => Ok(Self::Tree),
             _ => bail!("unsupported Cargo subcommand `{value}`"),
         }
     }
@@ -165,6 +180,8 @@ pub struct CargoPreset {
     pub features: Vec<String>,
     pub default_features: Option<bool>,
     pub target_triple: Option<String>,
+    pub toolchain: Option<String>,
+    pub pre_launch_task: Option<String>,
     pub args: Vec<String>,
     pub trailing_args: Vec<String>,
     pub environment: HashMap<String, String>,
@@ -185,6 +202,8 @@ impl CargoPreset {
             features: Vec::new(),
             default_features: None,
             target_triple: None,
+            toolchain: None,
+            pre_launch_task: None,
             args: Vec::new(),
             trailing_args: Vec::new(),
             environment: HashMap::default(),
@@ -235,7 +254,7 @@ pub fn parse_settings_content(content: &CargoSettingsContent) -> CargoPresetSett
     let schema_version = content
         .schema_version
         .unwrap_or(CARGO_PRESET_SCHEMA_VERSION);
-    if schema_version != CARGO_PRESET_SCHEMA_VERSION {
+    if !matches!(schema_version, 1 | CARGO_PRESET_SCHEMA_VERSION) {
         return CargoPresetSettings {
             presets: BTreeMap::new(),
             diagnostics: vec![CargoPresetDiagnostic {
@@ -330,6 +349,8 @@ fn parse_preset(id: &str, content: &CargoPresetSettingsContent) -> Result<CargoP
         ("package", content.package.as_deref()),
         ("profile", content.profile.as_deref()),
         ("target_triple", content.target_triple.as_deref()),
+        ("toolchain", content.toolchain.as_deref()),
+        ("pre_launch_task", content.pre_launch_task.as_deref()),
     ] {
         if let Some(value) = value {
             validate_text(field, value)?;
@@ -350,12 +371,18 @@ fn parse_preset(id: &str, content: &CargoPresetSettingsContent) -> Result<CargoP
         features,
         default_features: content.default_features,
         target_triple: content.target_triple.clone(),
+        toolchain: content.toolchain.clone(),
+        pre_launch_task: content.pre_launch_task.clone(),
         args,
         trailing_args,
         environment,
         working_directory,
         presentation,
     })
+}
+
+pub fn parse_preset_content(id: &str, content: &CargoPresetSettingsContent) -> Result<CargoPreset> {
+    parse_preset(id, content)
 }
 
 fn parse_target(kind: Option<&str>, name: Option<&str>) -> Result<Option<CargoTargetSelector>> {
@@ -480,6 +507,7 @@ pub struct CargoTaskContextInputs {
 pub struct CompiledCargoPreset {
     pub task_template: TaskTemplate,
     pub task_context: CargoTaskContextInputs,
+    pub pre_launch_task: Option<String>,
 }
 
 pub fn compile_preset(
@@ -488,7 +516,11 @@ pub fn compile_preset(
     subcommand_override: Option<CargoSubcommand>,
 ) -> Result<CompiledCargoPreset> {
     let subcommand = subcommand_override.unwrap_or(preset.subcommand);
-    let mut args = vec![subcommand.as_str().to_string()];
+    let mut args = Vec::new();
+    if let Some(toolchain) = &preset.toolchain {
+        args.push(format!("+{toolchain}"));
+    }
+    args.push(subcommand.as_str().to_string());
     match preset.scope {
         CargoPresetScope::Workspace => args.push("--workspace".to_string()),
         CargoPresetScope::Package => {
@@ -567,6 +599,7 @@ pub fn compile_preset(
             workspace_cwd: context.workspace_cwd.clone(),
             package_cwd: context.package_cwd.clone(),
         },
+        pre_launch_task: preset.pre_launch_task.clone(),
     })
 }
 
@@ -575,9 +608,15 @@ pub fn compile_debug_scenario(
     adapter: Option<&str>,
 ) -> Result<DebugScenario> {
     let mut build_template = compiled.task_template.clone();
+    let subcommand_index = usize::from(
+        build_template
+            .args
+            .first()
+            .is_some_and(|argument| argument.starts_with('+')),
+    );
     let action = build_template
         .args
-        .first_mut()
+        .get_mut(subcommand_index)
         .ok_or_else(|| anyhow!("Cargo task has no subcommand"))?;
     match action.as_str() {
         "run" => *action = "build".to_string(),
@@ -750,6 +789,8 @@ mod tests {
             features: Some(vec!["z".to_string(), "a feature".to_string()]),
             default_features: Some(false),
             target_triple: Some("wasm32-unknown-unknown".to_string()),
+            toolchain: None,
+            pre_launch_task: None,
             args: Some(vec!["--config".to_string(), "x='$(nope)'".to_string()]),
             trailing_args: Some(vec!["argument with spaces".to_string()]),
             environment: Some(HashMap::from_iter([
@@ -858,6 +899,58 @@ mod tests {
             Some("build")
         );
         assert_eq!(locator_name.as_deref(), Some(CARGO_LOCATOR_NAME));
+    }
+
+    #[test]
+    fn cargo_preset_v2_migrates_v1_and_compiles_toolchain_and_pre_launch_reference() {
+        let version_one = CargoSettingsContent {
+            schema_version: Some(1),
+            presets: HashMap::from_iter([("legacy".to_string(), content("check"))]),
+        };
+        let migrated = parse_settings_content(&version_one);
+        assert!(migrated.diagnostics.is_empty());
+        assert!(migrated.presets["legacy"].toolchain.is_none());
+        assert!(migrated.presets["legacy"].pre_launch_task.is_none());
+
+        let mut version_two_content = content("run");
+        version_two_content.toolchain = Some("nightly-2026-08-01".to_string());
+        version_two_content.pre_launch_task = Some("Generate bindings".to_string());
+        let version_two = CargoSettingsContent {
+            schema_version: Some(2),
+            presets: HashMap::from_iter([("v2".to_string(), version_two_content)]),
+        };
+        let parsed = parse_settings_content(&version_two);
+        let compiled = compile_preset(
+            &parsed.presets["v2"],
+            &CargoCompileContext {
+                workspace_name: Some("workspace".to_string()),
+                workspace_cwd: Some("/workspace".to_string()),
+                package_name: Some("package".to_string()),
+                package_cwd: Some("/workspace/package".to_string()),
+            },
+            None,
+        )
+        .expect("version-two preset should compile");
+        assert_eq!(
+            compiled.task_template.args.first().map(String::as_str),
+            Some("+nightly-2026-08-01")
+        );
+        assert_eq!(
+            compiled.task_template.args.get(1).map(String::as_str),
+            Some("run")
+        );
+        assert_eq!(
+            compiled.pre_launch_task.as_deref(),
+            Some("Generate bindings")
+        );
+
+        let scenario = compile_debug_scenario(&compiled, None)
+            .expect("toolchain preset should compile to a debug scenario");
+        let Some(BuildTaskDefinition::Template { task_template, .. }) = scenario.build else {
+            panic!("debug scenario should contain a task template")
+        };
+        assert_eq!(task_template.args[0], "+nightly-2026-08-01");
+        assert_eq!(task_template.args[1], "build");
     }
 
     #[test]

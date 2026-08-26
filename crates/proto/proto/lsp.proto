@@ -89,6 +89,69 @@ message GetReferencesResponse {
   repeated Location locations = 1;
 }
 
+message PrepareCallHierarchy {
+  uint64 project_id = 1;
+  uint64 buffer_id = 2;
+  Anchor position = 3;
+  repeated VectorClockEntry version = 4;
+}
+
+message PrepareCallHierarchyResponse {
+  repeated CallHierarchyItem items = 1;
+  bool truncated = 2;
+  uint32 malformed_count = 3;
+}
+
+message GetIncomingCalls {
+  uint64 project_id = 1;
+  uint64 buffer_id = 2;
+  CallHierarchyItem item = 3;
+  repeated VectorClockEntry version = 4;
+}
+
+message GetIncomingCallsResponse {
+  repeated CallHierarchyCall calls = 1;
+  bool truncated = 2;
+  uint32 malformed_count = 3;
+}
+
+message GetOutgoingCalls {
+  uint64 project_id = 1;
+  uint64 buffer_id = 2;
+  CallHierarchyItem item = 3;
+  repeated VectorClockEntry version = 4;
+}
+
+message GetOutgoingCallsResponse {
+  repeated CallHierarchyCall calls = 1;
+  bool truncated = 2;
+  uint32 malformed_count = 3;
+}
+
+message CallHierarchyItem {
+  string name = 1;
+  optional string detail = 2;
+  int32 kind = 3;
+  repeated int32 tags = 4;
+  uint64 buffer_id = 5;
+  Anchor range_start = 6;
+  Anchor range_end = 7;
+  Anchor selection_start = 8;
+  Anchor selection_end = 9;
+  bytes data_json = 10;
+  uint64 server_id = 11;
+}
+
+message CallHierarchyCall {
+  CallHierarchyItem item = 1;
+  repeated CallHierarchyRange from_ranges = 2;
+}
+
+message CallHierarchyRange {
+  PointUtf16 start = 1;
+  PointUtf16 end = 2;
+}
+
 message GetDocumentHighlights {
   uint64 project_id = 1;
   uint64 buffer_id = 2;
@@ -951,6 +1014,9 @@ message LspQuery {
     GetDocumentLinks get_document_links = 19;
     GetEditPredictionDefinition get_edit_prediction_definition = 20;
     GetEditPredictionTypeDefinition get_edit_prediction_type_definition = 21;
+    PrepareCallHierarchy prepare_call_hierarchy = 22;
+    GetIncomingCalls get_incoming_calls = 23;
+    GetOutgoingCalls get_outgoing_calls = 24;
   }
 }
 
@@ -980,6 +1046,9 @@ message LspResponse {
     GetDocumentLinksResponse get_document_links_response = 17;
     GetEditPredictionDefinitionResponse get_edit_prediction_definition_response = 18;
     GetEditPredictionTypeDefinitionResponse get_edit_prediction_type_definition_response = 19;
+    PrepareCallHierarchyResponse prepare_call_hierarchy_response = 20;
+    GetIncomingCallsResponse get_incoming_calls_response = 21;
+    GetOutgoingCallsResponse get_outgoing_calls_response = 22;
   }
   uint64 server_id = 7;
 }

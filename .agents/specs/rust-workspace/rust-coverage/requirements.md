@@ -2,11 +2,11 @@
 
 ## Purpose and status
 
-This Next pack owns a small language-neutral coverage-result/annotation contract and a Rust adapter for an explicitly available coverage collector. No implementation was found. Coverage execution must use Tasks on the authoritative host and must not become a `CargoWorkspaceStore` responsibility.
+This Next pack owns the implemented language-neutral coverage-result/annotation contract and the Rust adapter for an explicitly available `cargo-llvm-cov` collector. Coverage execution uses Tasks on the authoritative host and is not a `CargoWorkspaceStore` responsibility.
 
 Canonical IDs are `rust-coverage/<criterion>`.
 
-### Requirement 1: Provide generic bounded coverage presentation [Deferred / Next]
+### Requirement 1: Provide generic bounded coverage presentation [Implemented / Next]
 
 #### Acceptance criteria
 
@@ -16,7 +16,7 @@ Canonical IDs are `rust-coverage/<criterion>`.
 4. **1.4** Coverage reports SHALL be node/file/byte bounded, generation-bound and cancellable; obsolete reports SHALL be rejected and large reports SHALL expose truncation.
 5. **1.5** Generic coverage types/rendering SHALL remain internal, language-neutral and independent of `cargo_ui`, `cargo_metadata` and Rust provider types.
 
-### Requirement 2: Add an explicit Rust collector adapter [Deferred / Next]
+### Requirement 2: Add an explicit Rust collector adapter [Implemented / Next]
 
 #### Acceptance criteria
 
@@ -28,9 +28,9 @@ Canonical IDs are `rust-coverage/<criterion>`.
 
 ## Non-goals
 
-No coverage implementation in the first Now milestone, no dedicated Cargo process runner, no automatic tool installation, no terminal parser, no coverage suite merging initially, no public provider API, and no profiling/call hierarchy.
+No dedicated Cargo process runner, automatic tool installation, terminal parser, coverage suite merging, public provider API, profiling, or call-hierarchy coupling.
 
-## Open questions
+## Resolved product choices
 
-1. **Initial presentation.** Recommended default: gutter annotations plus one compact generic summary/filter surface; defer a dedicated analysis panel and suite merging. UI task 1.2 depends on approval.
-2. **Collector support floor.** Recommended default: detect an already installed `cargo llvm-cov`, validate one pinned report schema, and otherwise show setup guidance. Adapter task 2.1 depends on the supported version matrix.
+1. **Initial presentation.** Use gutter annotations plus one compact generic summary/filter projection; defer a dedicated analysis panel and suite merging.
+2. **Collector support floor.** Invoke an already installed `cargo llvm-cov`, accept LLVM coverage export schema major 2 with bounded `cargo_llvm_cov` metadata, and otherwise show setup guidance. Zed performs no installation or network fallback.

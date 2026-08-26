@@ -13,6 +13,8 @@ pub const MAX_CARGO_CONFIGURATION_DIAGNOSTICS: usize = 32;
 pub const MAX_CARGO_CONFIGURATION_ITEMS: usize = 128;
 pub const MAX_CARGO_CONFIGURATION_FIELD_BYTES: usize = 512;
 pub const MAX_RUSTC_VERBOSE_VERSION_BYTES: usize = 64 * 1024;
+pub const MAX_CARGO_DEPENDENCY_INSTANCES: usize = 32;
+pub const MAX_CARGO_DEPENDENCY_FEATURES: usize = 256;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CargoWorkspaceSnapshot {
@@ -243,6 +245,45 @@ pub struct CargoDependencyModel {
     pub resolved_version: Option<String>,
     pub resolved_workspace_member: Option<ProjectPath>,
     pub local_manifest: Option<ProjectPath>,
+    pub declaration_manifest: Option<ProjectPath>,
+    pub declaration_origin: CargoDependencyDeclarationOrigin,
+    pub resolved_instances: Vec<CargoResolvedDependencyModel>,
+    pub resolution_truncated: bool,
+    pub feature_causality: CargoDependencyFeatureCausality,
+    pub cycle_detected: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CargoDependencyDeclarationOrigin {
+    Direct,
+    WorkspaceInherited,
+    Unknown,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CargoDependencyFeatureCausality {
+    Validated,
+    Ambiguous,
+    Unknown,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CargoResolvedDependencyModel {
+    pub name: String,
+    pub version: String,
+    pub source_kind: CargoDependencySourceKind,
+    pub enabled_features: Vec<String>,
+    pub lock_status: CargoDependencyLockStatus,
+    pub workspace_member: Option<ProjectPath>,
+    pub local_manifest: Option<ProjectPath>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CargoDependencyLockStatus {
+    Locked,
+    NotLocked,
+    MissingLockfile,
+    Unknown,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -253,7 +294,7 @@ pub enum CargoDependencyKind {
     Unknown,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CargoDependencySourceKind {
     Path,
     Registry,
@@ -496,6 +537,7 @@ pub fn workspace_from_metadata(
             manifest_path,
             default_ids.contains(&package.id),
             nodes_by_id.get(&package.id).copied(),
+            &nodes_by_id,
             &packages_by_id,
             &workspace_ids,
             &mut resolve_path,
@@ -537,6 +579,7 @@ fn convert_package(
     manifest_path: ProjectPath,
     is_default_member: bool,
     node: Option<&Node>,
+    nodes_by_id: &HashMap<&PackageId, &Node>,
     packages_by_id: &HashMap<&PackageId, &Package>,
     workspace_ids: &BTreeSet<&PackageId>,
     resolve_path: &mut impl FnMut(&Path) -> Option<ProjectPath>,
@@ -581,6 +624,7 @@ fn convert_package(
             convert_dependency(
                 dependency,
                 node,
+                nodes_by_id,
                 packages_by_id,
                 workspace_ids,
                 resolve_path,
@@ -658,18 +702,24 @@ fn normalize_target_kind(kinds: &[TargetKind]) -> CargoTargetKind {
 fn convert_dependency(
     dependency: &Dependency,
     node: Option<&Node>,
+    nodes_by_id: &HashMap<&PackageId, &Node>,
     packages_by_id: &HashMap<&PackageId, &Package>,
     workspace_ids: &BTreeSet<&PackageId>,
     resolve_path: &mut impl FnMut(&Path) -> Option<ProjectPath>,
 ) -> CargoDependencyModel {
     let alias = dependency.rename.as_deref().unwrap_or(&dependency.name);
-    let resolved_package = node
-        .and_then(|node| {
-            node.deps
-                .iter()
-                .find(|node_dependency| node_dependency.name == alias)
+    let matching_packages = node
+        .into_iter()
+        .flat_map(|node| &node.deps)
+        .filter(|node_dependency| node_dependency.name == alias)
+        .filter_map(|node_dependency| {
+            packages_by_id
+                .get(&node_dependency.pkg)
+                .copied()
+                .map(|package| (node_dependency, package))
         })
-        .and_then(|node_dependency| packages_by_id.get(&node_dependency.pkg).copied());
+        .collect::<Vec<_>>();
+    let resolved_package = matching_packages.first().map(|(_, package)| *package);
     let local_manifest = dependency
         .path
         .as_ref()
@@ -680,6 +730,38 @@ fn convert_dependency(
     let resolved_workspace_member = resolved_package
         .filter(|package| workspace_ids.contains(&package.id))
         .and_then(|package| resolve_path(package.manifest_path.as_std_path()));
+    let resolution_truncated = matching_packages.len() > MAX_CARGO_DEPENDENCY_INSTANCES;
+    let resolved_instances = matching_packages
+        .into_iter()
+        .take(MAX_CARGO_DEPENDENCY_INSTANCES)
+        .map(|(node_dependency, package)| {
+            let workspace_member = workspace_ids
+                .contains(&package.id)
+                .then(|| resolve_path(package.manifest_path.as_std_path()))
+                .flatten();
+            let local_manifest = dependency
+                .path
+                .as_ref()
+                .and_then(|path| resolve_path(path.join("Cargo.toml").as_std_path()))
+                .or_else(|| resolve_path(package.manifest_path.as_std_path()));
+            let mut enabled_features = nodes_by_id
+                .get(&node_dependency.pkg)
+                .map(|node| node.features.clone())
+                .unwrap_or_default();
+            enabled_features.sort();
+            enabled_features.dedup();
+            enabled_features.truncate(MAX_CARGO_DEPENDENCY_FEATURES);
+            CargoResolvedDependencyModel {
+                name: package.name.clone(),
+                version: package.version.to_string(),
+                source_kind: dependency_source_kind(dependency),
+                enabled_features,
+                lock_status: CargoDependencyLockStatus::Unknown,
+                workspace_member,
+                local_manifest,
+            }
+        })
+        .collect::<Vec<_>>();
 
     CargoDependencyModel {
         declaration_name: dependency.name.clone(),
@@ -700,6 +782,18 @@ fn convert_dependency(
         resolved_version: resolved_package.map(|package| package.version.to_string()),
         resolved_workspace_member,
         local_manifest,
+        declaration_manifest: None,
+        declaration_origin: CargoDependencyDeclarationOrigin::Unknown,
+        feature_causality: if resolved_instances.len() == 1 {
+            CargoDependencyFeatureCausality::Validated
+        } else if resolved_instances.len() > 1 {
+            CargoDependencyFeatureCausality::Ambiguous
+        } else {
+            CargoDependencyFeatureCausality::Unknown
+        },
+        resolved_instances,
+        resolution_truncated,
+        cycle_detected: false,
     }
 }
 
@@ -722,6 +816,178 @@ fn dependency_source_kind(dependency: &Dependency) -> CargoDependencySourceKind 
     } else {
         CargoDependencySourceKind::Other
     }
+}
+
+pub fn enrich_dependency_provenance(
+    workspace: &mut CargoWorkspaceModel,
+    manifests: &BTreeMap<ProjectPath, String>,
+    lock_contents: Option<&str>,
+) {
+    let lock_packages = lock_contents.and_then(parse_lock_packages);
+    let lock_state = match (lock_contents, lock_packages.as_ref()) {
+        (None, _) => CargoDependencyLockStatus::MissingLockfile,
+        (Some(_), None) => CargoDependencyLockStatus::Unknown,
+        (Some(_), Some(_)) => CargoDependencyLockStatus::NotLocked,
+    };
+    let adjacency = workspace
+        .members
+        .iter()
+        .map(|package| {
+            (
+                package.manifest_path.clone(),
+                package
+                    .dependencies
+                    .iter()
+                    .flat_map(|dependency| &dependency.resolved_instances)
+                    .filter_map(|resolved| resolved.workspace_member.clone())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    for package in &mut workspace.members {
+        let manifest = manifests
+            .get(&package.manifest_path)
+            .and_then(|contents| toml::from_str::<toml::Value>(contents).ok());
+        for dependency in &mut package.dependencies {
+            dependency.declaration_manifest = manifests
+                .contains_key(&package.manifest_path)
+                .then(|| package.manifest_path.clone());
+            dependency.declaration_origin = manifest
+                .as_ref()
+                .and_then(|manifest| manifest_dependency_value(manifest, dependency))
+                .map(|value| {
+                    if value
+                        .as_table()
+                        .and_then(|table| table.get("workspace"))
+                        .and_then(toml::Value::as_bool)
+                        == Some(true)
+                    {
+                        CargoDependencyDeclarationOrigin::WorkspaceInherited
+                    } else {
+                        CargoDependencyDeclarationOrigin::Direct
+                    }
+                })
+                .unwrap_or(CargoDependencyDeclarationOrigin::Unknown);
+
+            for resolved in &mut dependency.resolved_instances {
+                resolved.lock_status = lock_packages
+                    .as_ref()
+                    .map(|packages| {
+                        if packages.iter().any(|package| package.matches(resolved)) {
+                            CargoDependencyLockStatus::Locked
+                        } else {
+                            CargoDependencyLockStatus::NotLocked
+                        }
+                    })
+                    .unwrap_or(lock_state);
+                dependency.cycle_detected |=
+                    resolved.workspace_member.as_ref().is_some_and(|target| {
+                        dependency_path_reaches(target, &package.manifest_path, &adjacency)
+                    });
+            }
+        }
+    }
+}
+
+fn manifest_dependency_value<'a>(
+    manifest: &'a toml::Value,
+    dependency: &CargoDependencyModel,
+) -> Option<&'a toml::Value> {
+    let section = match dependency.kind {
+        CargoDependencyKind::Normal => "dependencies",
+        CargoDependencyKind::Development => "dev-dependencies",
+        CargoDependencyKind::Build => "build-dependencies",
+        CargoDependencyKind::Unknown => return None,
+    };
+    let key = dependency
+        .rename
+        .as_deref()
+        .unwrap_or(&dependency.declaration_name);
+    let root_match = manifest
+        .get(section)
+        .and_then(toml::Value::as_table)
+        .and_then(|table| table.get(key));
+    if dependency.target.is_none() && root_match.is_some() {
+        return root_match;
+    }
+    manifest
+        .get("target")
+        .and_then(toml::Value::as_table)
+        .into_iter()
+        .flat_map(|targets| targets.values())
+        .filter_map(toml::Value::as_table)
+        .filter_map(|target| target.get(section))
+        .filter_map(toml::Value::as_table)
+        .find_map(|dependencies| dependencies.get(key))
+        .or(root_match)
+}
+
+#[derive(Clone, Debug)]
+struct LockPackage {
+    name: String,
+    version: String,
+    source_kind: CargoDependencySourceKind,
+}
+
+impl LockPackage {
+    fn matches(&self, resolved: &CargoResolvedDependencyModel) -> bool {
+        self.name == resolved.name
+            && self.version == resolved.version
+            && (self.source_kind == resolved.source_kind
+                || matches!(resolved.source_kind, CargoDependencySourceKind::Path))
+    }
+}
+
+fn parse_lock_packages(contents: &str) -> Option<Vec<LockPackage>> {
+    let value = toml::from_str::<toml::Value>(contents).ok()?;
+    let packages = value.get("package")?.as_array()?;
+    let mut result = Vec::with_capacity(packages.len());
+    for package in packages {
+        let package = package.as_table()?;
+        let name = package.get("name")?.as_str()?;
+        let version = package.get("version")?.as_str()?;
+        let source_kind = package
+            .get("source")
+            .and_then(toml::Value::as_str)
+            .map(|source| {
+                if source.starts_with("registry+") {
+                    CargoDependencySourceKind::Registry
+                } else if source.starts_with("git+") {
+                    CargoDependencySourceKind::Git
+                } else {
+                    CargoDependencySourceKind::Other
+                }
+            })
+            .unwrap_or(CargoDependencySourceKind::Path);
+        result.push(LockPackage {
+            name: name.to_string(),
+            version: version.to_string(),
+            source_kind,
+        });
+    }
+    Some(result)
+}
+
+fn dependency_path_reaches(
+    start: &ProjectPath,
+    destination: &ProjectPath,
+    adjacency: &BTreeMap<ProjectPath, Vec<ProjectPath>>,
+) -> bool {
+    let mut pending = vec![start.clone()];
+    let mut visited = BTreeSet::new();
+    while let Some(path) = pending.pop() {
+        if &path == destination {
+            return true;
+        }
+        if !visited.insert(path.clone()) || visited.len() > 10_000 {
+            continue;
+        }
+        if let Some(next) = adjacency.get(&path) {
+            pending.extend(next.iter().cloned());
+        }
+    }
+    false
 }
 
 fn dependency_label(dependency: &CargoDependencyModel) -> &str {
@@ -858,5 +1124,111 @@ mod tests {
             previous.host_compiler.release
         );
         assert_eq!(current.declared_toolchain, previous.declared_toolchain);
+    }
+
+    #[test]
+    fn cargo_dependency_provenance_combines_manifest_lock_resolution_and_cycles() {
+        let package_a_manifest = project_path("a/Cargo.toml");
+        let package_b_manifest = project_path("b/Cargo.toml");
+        let dependency = |name: &str, workspace_member: ProjectPath| CargoDependencyModel {
+            declaration_name: name.to_string(),
+            rename: Some(format!("{name}_alias")),
+            kind: CargoDependencyKind::Normal,
+            version_requirement: "^1".to_string(),
+            optional: true,
+            uses_default_features: false,
+            requested_features: vec!["derive".to_string()],
+            target: None,
+            source_kind: CargoDependencySourceKind::Path,
+            resolved_name: Some(name.to_string()),
+            resolved_version: Some("1.0.0".to_string()),
+            resolved_workspace_member: Some(workspace_member.clone()),
+            local_manifest: Some(workspace_member.clone()),
+            declaration_manifest: None,
+            declaration_origin: CargoDependencyDeclarationOrigin::Unknown,
+            resolved_instances: vec![CargoResolvedDependencyModel {
+                name: name.to_string(),
+                version: "1.0.0".to_string(),
+                source_kind: CargoDependencySourceKind::Path,
+                enabled_features: vec!["derive".to_string()],
+                lock_status: CargoDependencyLockStatus::Unknown,
+                workspace_member: Some(workspace_member.clone()),
+                local_manifest: Some(workspace_member),
+            }],
+            resolution_truncated: false,
+            feature_causality: CargoDependencyFeatureCausality::Validated,
+            cycle_detected: false,
+        };
+        let package = |name: &str, manifest_path: ProjectPath, dependency: CargoDependencyModel| {
+            CargoPackageModel {
+                id: name.to_string(),
+                name: name.to_string(),
+                version: "1.0.0".to_string(),
+                manifest_path,
+                is_default_member: false,
+                targets: Vec::new(),
+                features: Vec::new(),
+                dependencies: vec![dependency],
+            }
+        };
+        let mut workspace = CargoWorkspaceModel {
+            key: CargoWorkspaceKey {
+                root: project_path(""),
+            },
+            root_manifest: Some(project_path("Cargo.toml")),
+            display_name: "fixture".to_string(),
+            is_virtual: true,
+            members: vec![
+                package(
+                    "a",
+                    package_a_manifest.clone(),
+                    dependency("b", package_b_manifest.clone()),
+                ),
+                package(
+                    "b",
+                    package_b_manifest.clone(),
+                    dependency("a", package_a_manifest.clone()),
+                ),
+            ],
+            configuration: CargoWorkspaceConfiguration::unresolved(),
+        };
+        let manifests = BTreeMap::from([
+            (
+                package_a_manifest.clone(),
+                "[dependencies]\nb_alias = { workspace = true, features = [\"derive\"] }\n"
+                    .to_string(),
+            ),
+            (
+                package_b_manifest,
+                "[dependencies]\na_alias = { path = \"../a\" }\n".to_string(),
+            ),
+        ]);
+        let lock = "version = 4\n[[package]]\nname = \"a\"\nversion = \"1.0.0\"\n[[package]]\nname = \"b\"\nversion = \"1.0.0\"\n";
+        enrich_dependency_provenance(&mut workspace, &manifests, Some(lock));
+
+        let dependency_a = &workspace.members[0].dependencies[0];
+        assert_eq!(
+            dependency_a.declaration_origin,
+            CargoDependencyDeclarationOrigin::WorkspaceInherited
+        );
+        assert_eq!(
+            dependency_a.resolved_instances[0].lock_status,
+            CargoDependencyLockStatus::Locked
+        );
+        assert!(dependency_a.cycle_detected);
+        assert_eq!(
+            dependency_a.declaration_manifest.as_ref(),
+            Some(&package_a_manifest)
+        );
+
+        enrich_dependency_provenance(&mut workspace, &manifests, Some("malformed = ["));
+        assert_eq!(
+            workspace.members[0].dependencies[0].resolved_instances[0].lock_status,
+            CargoDependencyLockStatus::Unknown
+        );
+        assert_eq!(
+            workspace.members[1].dependencies[0].declaration_origin,
+            CargoDependencyDeclarationOrigin::Direct
+        );
     }
 }

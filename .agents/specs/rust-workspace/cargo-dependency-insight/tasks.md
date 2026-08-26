@@ -2,8 +2,8 @@
 
 ## Milestone 1: Bounded provenance model
 
-- [ ] 1. Extend Cargo metadata with validated provenance
-  - [ ] 1.1. Add manifest/lock/resolution provenance conversion
+- [x] 1. Extend Cargo metadata with validated provenance
+  - [x] 1.1. Add manifest/lock/resolution provenance conversion
     - _Requirements: 1.1, 1.3, 1.5, 1.6, 1.7_
     - _Depends on: none_
     - _Reads: crates/project/src/cargo_workspace.rs, crates/project/src/cargo_workspace_store.rs, crates/project/test_data/cargo_workspace/workspace-v1.json, crates/proto/proto/cargo.proto_
@@ -13,11 +13,12 @@
     - Cross-pack dependency: completed `cargo-dashboard/1.1` baseline.
     - Outcome: The authoritative host exposes bounded, origin-labelled direct dependency provenance.
     - Done when: Every declaration/source kind, ambiguity, missing lock, cycle, trust and path filter passes without network.
+    - Evidence: Cargo snapshot enrichment parses only visible manifest/lock captures, bounds resolved instances/features, labels direct/workspace-inherited declarations and missing/malformed lock state, detects finite workspace cycles, and round-trips only `ProjectPath` values. Existing restricted-store tests prove no injected commands run before trust.
 
 ## Milestone 2: Finite Cargo UI detail
 
-- [ ] 2. Present selected dependency provenance
-  - [ ] 2.1. Add the package-centric detail projection and navigation
+- [x] 2. Present selected dependency provenance
+  - [x] 2.1. Add the package-centric detail projection and navigation
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
     - _Depends on: 1.1_
     - _Reads: crates/cargo_ui/src/cargo_panel.rs, crates/project/src/cargo_workspace.rs, crates/language_tools/src/language_tool_tree.rs_
@@ -26,11 +27,12 @@
     - Design: D1, D3, D4
     - Outcome: A selected direct dependency has accessible finite provenance and safe local navigation.
     - Done when: Multiple versions, unknown causality, external sources, cycles and stale state render without recursive children.
+    - Evidence: The Cargo panel projects Declared, Resolved, Features, and Source/lock sections for one direct row. Resolved versions are finite siblings, every fact is a leaf, and only visible declaration/workspace-member manifests receive navigation targets.
 
 ## Milestone 3: Remote and scale acceptance
 
-- [ ] 3. Validate privacy and large graphs
-  - [ ] 3.1. Add deterministic provenance acceptance fixtures
+- [x] 3. Validate privacy and large graphs
+  - [x] 3.1. Add deterministic provenance acceptance fixtures
     - _Requirements: 1.5, 1.6, 1.7, 1.8_
     - _Depends on: 1.1, 2.1_
     - _Reads: crates/project/src/cargo_workspace_store.rs, crates/cargo_ui/src/dependency_insight.rs, crates/remote_server/src/headless_project.rs_
@@ -39,6 +41,7 @@
     - Design: D4, D5
     - Outcome: Provenance remains deterministic, private and bounded across local/remote scale.
     - Done when: Peer filtering, stale rejection, no-network runner assertions and the accepted large graph cap pass.
+    - Evidence: `dependency-provenance-v1.json` covers renamed, target-specific, workspace-inherited, path, registry, Git and lock facts; project/proto tests reject host cache paths, and the large UI projection remains below 100 finite nodes at the accepted 32-instance cap.
 
 ## Mandatory manual task-decomposition audit
 

@@ -2,6 +2,9 @@
 
 mod agent_registry_store;
 mod bookmark_store;
+mod call_hierarchy;
+#[cfg(feature = "cargo-workspace")]
+mod cargo_workspace;
 mod collaboration_navigation;
 mod collaboration_repository;
 mod color_extractor;
@@ -14,9 +17,13 @@ mod lsp_command;
 mod lsp_store;
 mod manifest_tree;
 mod project_search;
+#[cfg(all(feature = "cargo-workspace", feature = "rust-tests"))]
+mod rust_workspace_comprehensive;
 mod search;
 mod search_history;
 mod signature_help;
+#[cfg(feature = "rust-coverage")]
+mod source_coverage;
 mod task_inventory;
 mod trusted_worktrees;
 mod yarn;

@@ -27,7 +27,7 @@
 ## Milestone 1: Integrated graduation evidence
 
 - [ ] 2. Complete fixture, performance, environment and accessibility certification
-  - [ ] 2.1. Run the comprehensive fixture across the integrated feature
+  - [x] 2.1. Run the comprehensive fixture across the integrated feature
     - Wire the completed dashboard fixture through preset planning, structured results and Rust provider fake runners without real tools.
     - _Requirements: 4.1, 4.5_
     - _Depends on: none_
@@ -38,7 +38,8 @@
     - Cross-pack dependency: requires `cargo-dashboard/2.1` complete.
     - Outcome: One integrated hermetic fixture covers the Now stack.
     - Done when: The test records zero real tool/network calls and exercises partial/mismatch/stale transitions.
-  - [ ] 2.2. Enforce accepted dashboard and structured-result budgets
+    - Evidence: The specified project command and the Cargo UI comprehensive-fixture planning test pass with zero real tool/network calls, partial-root isolation, typed result reduction and stale/mismatched generation rejection.
+  - [x] 2.2. Enforce accepted dashboard and structured-result budgets
     - Add release/CI invocations for owner-pack benchmark budgets without duplicating their harnesses.
     - _Requirements: 4.2, 4.5_
     - _Depends on: 2.1_
@@ -49,6 +50,7 @@
     - Cross-pack dependency: requires `cargo-dashboard/2.2`, `cargo-dashboard/2.3`, `structured-execution/2.1`, and `structured-execution/2.2` complete.
     - Outcome: Reviewed scale budgets become maintained release gates.
     - Done when: CI invokes both deterministic gates and does not depend on machine-specific Cargo projects.
+    - Evidence: Both specified release benchmarks pass their enforced 1,000-package and 10,000-node budgets; `cargo xtask workflows` emits both gates and the offline local environment harness into `run_tests.yml`, and the feature-boundary check passes.
   - [ ] 2.3. Consume the physical project-mode matrix
     - Make supported local/SSH/WSL/dev-container/multiplayer cells visible in release evidence and fail required-cell regressions.
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.7, 4.3, 4.5_
@@ -60,6 +62,7 @@
     - Cross-pack dependency: requires `rust-test-explorer/2.2` complete.
     - Outcome: Zed distinguishes physically certified, unavailable and unsupported environment cells.
     - Done when: Required cells fail CI on routing/fallback regressions and unsupported cells are documented.
+    - Current blocker: The local hermetic gate and matrix reporting are implemented, but actual SSH/WSL/development-container/multiplayer evidence is unavailable. Follow `../rust-test-explorer/physical-matrix-evidence.md`, then run `ZED_RUST_TOOLS_REQUIRE_PHYSICAL=1 ./script/test-rust-tools-environments --matrix --offline`.
   - [ ] 2.4. Complete screen-reader certification for Cargo and Tests panels
     - Execute and document role/name/state, focus, selection, expansion, filter/status and disabled-action announcements on supported desktop accessibility stacks.
     - _Requirements: 4.4_
@@ -70,6 +73,7 @@
     - Design: D6
     - Outcome: Automated semantics are backed by explicit manual assistive-technology evidence.
     - Done when: Each supported stack has dated results and unresolved failures are tracked rather than marked complete.
+    - Current blocker: Physical macOS VoiceOver and Windows NVDA sessions are unavailable. Run the automated commands and every dated checklist item in `accessibility-evidence.md` on both stacks.
 
 ## Mandatory manual task-decomposition audit
 

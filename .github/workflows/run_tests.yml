@@ -50,6 +50,12 @@ jobs:
       run: ./script/clippy
     - name: run_tests::shared_validation
       run: cargo nextest run --workspace --no-fail-fast --no-tests=warn
+    - name: run_tests::shared_validation
+      run: cargo bench -p project --features cargo-workspace --bench cargo_workspace -- --noplot
+    - name: run_tests::shared_validation
+      run: cargo bench -p project --features structured-execution --bench structured_execution -- --noplot
+    - name: run_tests::shared_validation
+      run: ./script/test-rust-tools-environments --matrix --offline
     - name: steps::cleanup_cargo_config
       if: always()
       run: |

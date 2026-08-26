@@ -18,19 +18,23 @@ settings = tomllib.loads((root / "crates/settings/Cargo.toml").read_text())
 settings_content = tomllib.loads((root / "crates/settings_content/Cargo.toml").read_text())
 tasks_ui = tomllib.loads((root / "crates/tasks_ui/Cargo.toml").read_text())
 
-assert zed["features"]["default"] == [], "zed default features must remain empty"
+assert "rust-tools" not in zed["features"]["default"], (
+    "rust-tools must remain outside zed default features"
+)
 assert zed["features"]["rust-tools"] == ["dep:cargo_ui", "tasks_ui/rust-test-actions"]
 assert zed["dependencies"]["cargo_ui"].get("optional") is True
 assert project["features"]["cargo-workspace"] == ["dep:cargo_metadata"]
 assert project["features"]["rust-tests"] == ["cargo-workspace", "structured-execution"]
+assert project["features"]["rust-coverage"] == ["structured-execution"]
 assert project["dependencies"]["cargo_metadata"].get("optional") is True
-assert remote["features"]["rust-tools"] == ["project/rust-tests"]
+assert remote["features"]["rust-tools"] == ["project/rust-tests", "project/rust-coverage"]
 assert settings["features"]["rust-tools"] == ["settings_content/rust-tools"]
 assert "rust-tools" in settings_content["features"]
 assert tasks_ui["features"]["default"] == []
 assert tasks_ui["features"]["rust-test-actions"] == ["test-explorer", "project/rust-tests"]
 assert "settings/test-explorer" in tasks_ui["features"]["test-explorer"]
 assert "cargo-workspace" in cargo_ui["dependencies"]["project"]["features"]
+assert "rust-coverage" in cargo_ui["dependencies"]["project"]["features"]
 assert "rust-tools" in cargo_ui["dependencies"]["settings"]["features"]
 
 language_tools_manifest = (root / "crates/language_tools/Cargo.toml").read_text()
@@ -65,7 +69,7 @@ for path in [
 
 headless = (root / "crates/remote_server/src/headless_project.rs").read_text()
 assert "#[cfg(feature = \"rust-tools\")]" in headless
-for capability in ["CargoWorkspaceStore::init", "StructuredExecutionStore::init", "RustTestProviderStore::init"]:
+for capability in ["CargoWorkspaceStore::init", "StructuredExecutionStore::init", "RustTestProviderStore::init", "RustCoverageProviderStore::init"]:
     assert capability in headless, f"headless rust-tools path misses {capability}"
 
 tasks_ui_source = (root / "crates/tasks_ui/src/tasks_ui.rs").read_text()
@@ -122,8 +126,9 @@ import pathlib
 root = pathlib.Path.cwd()
 windows = (root / "script/bundle-windows.ps1").read_text()
 assert "[Parameter()][switch]$RustTools" in windows
-assert "--features zed/rust-tools" in windows
-assert "--features rust-tools" in windows
+assert "\"zed/$_\"" in windows
+assert "--features $applicationFeatures" in windows
+assert "--features $env:ZED_PRODUCT_REMOTE_FEATURES" in windows
 assert "--rust-tools" in (root / "script/flatpak/bundle-flatpak").read_text()
 assert "--rust-tools" in (root / "script/install-linux").read_text()
 '

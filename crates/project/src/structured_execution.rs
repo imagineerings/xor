@@ -118,6 +118,7 @@ pub struct StructuredRun {
     pub truncated: bool,
     pub diagnostic: Option<String>,
     message_bytes: usize,
+    latest_states: BTreeMap<StructuredNodeId, StructuredNodeState>,
 }
 
 impl StructuredRun {
@@ -137,6 +138,7 @@ impl StructuredRun {
             truncated: false,
             diagnostic: None,
             message_bytes: 0,
+            latest_states: BTreeMap::new(),
         }
     }
 }
@@ -206,6 +208,7 @@ pub struct StructuredExecutionState {
     project_generation: u64,
     limits: StructuredExecutionLimits,
     providers: BTreeMap<StructuredProviderId, StructuredProviderSnapshot>,
+    provider_node_ids: BTreeMap<StructuredProviderId, HashSet<StructuredNodeId>>,
 }
 
 impl StructuredExecutionState {
@@ -218,6 +221,7 @@ impl StructuredExecutionState {
             project_generation,
             limits,
             providers: BTreeMap::new(),
+            provider_node_ids: BTreeMap::new(),
         }
     }
 
@@ -229,6 +233,7 @@ impl StructuredExecutionState {
         if self.project_generation != project_generation {
             self.project_generation = project_generation;
             self.providers.clear();
+            self.provider_node_ids.clear();
         }
     }
 
@@ -291,8 +296,12 @@ impl StructuredExecutionState {
         } else {
             StructuredApplyOutcome::Applied
         };
-        self.providers
-            .insert(snapshot.provider_id.clone(), snapshot);
+        let provider_id = snapshot.provider_id.clone();
+        self.provider_node_ids.insert(
+            provider_id.clone(),
+            snapshot.nodes.iter().map(|node| node.id.clone()).collect(),
+        );
+        self.providers.insert(provider_id, snapshot);
         Ok(outcome)
     }
 
@@ -312,11 +321,10 @@ impl StructuredExecutionState {
         if run.discovery_generation != provider.discovery_generation {
             bail!("run uses a stale structured discovery generation");
         }
-        let known_nodes = provider
-            .nodes
-            .iter()
-            .map(|node| &node.id)
-            .collect::<HashSet<_>>();
+        let known_nodes = self
+            .provider_node_ids
+            .get(provider_id)
+            .context("structured provider node index is missing")?;
         run.scope_node_ids.retain(|id| known_nodes.contains(id));
         run.scope_node_ids.sort();
         run.scope_node_ids.dedup();
@@ -339,6 +347,7 @@ impl StructuredExecutionState {
         run.next_sequence = 0;
         run.summary = StructuredExecutionSummary::default();
         run.message_bytes = 0;
+        run.latest_states.clear();
         provider.current_run = Some(run);
         Ok(StructuredApplyOutcome::Applied)
     }
@@ -391,13 +400,17 @@ impl StructuredExecutionState {
         self.require_project_generation(project_generation)?;
         validate_identifier("node ID", &event.node_id.0)?;
         let limits = self.limits;
+        let known_nodes = self
+            .provider_node_ids
+            .get(provider_id)
+            .context("structured provider node index is missing")?;
+        if !known_nodes.contains(&event.node_id) {
+            bail!("structured event references an unknown node");
+        }
         let provider = self
             .providers
             .get_mut(provider_id)
             .context("unknown structured execution provider")?;
-        if !provider.nodes.iter().any(|node| node.id == event.node_id) {
-            bail!("structured event references an unknown node");
-        }
         let run = provider
             .current_run
             .as_mut()
@@ -447,8 +460,12 @@ impl StructuredExecutionState {
             run.truncated = true;
             return Ok(StructuredApplyOutcome::Truncated);
         }
+        update_summary(
+            &mut run.summary,
+            run.latest_states.insert(event.node_id.clone(), event.state),
+            event.state,
+        );
         run.events.push(event);
-        run.summary = summarize_events(&run.events);
         Ok(if run.truncated {
             StructuredApplyOutcome::Truncated
         } else {
@@ -469,8 +486,12 @@ impl StructuredExecutionState {
         snapshot: StructuredProviderSnapshot,
     ) {
         self.replace_project_generation(project_generation);
-        self.providers
-            .insert(snapshot.provider_id.clone(), snapshot);
+        let provider_id = snapshot.provider_id.clone();
+        self.provider_node_ids.insert(
+            provider_id.clone(),
+            snapshot.nodes.iter().map(|node| node.id.clone()).collect(),
+        );
+        self.providers.insert(provider_id, snapshot);
     }
 }
 
@@ -507,6 +528,50 @@ fn summarize_events(events: &[StructuredExecutionEvent]) -> StructuredExecutionS
         }
     }
     summary
+}
+
+fn update_summary(
+    summary: &mut StructuredExecutionSummary,
+    previous: Option<StructuredNodeState>,
+    current: StructuredNodeState,
+) {
+    if previous == Some(current) {
+        return;
+    }
+    if let Some(previous) = previous {
+        update_summary_count(summary, previous, false);
+    } else {
+        summary.total = summary.total.saturating_add(1);
+    }
+    update_summary_count(summary, current, true);
+}
+
+fn update_summary_count(
+    summary: &mut StructuredExecutionSummary,
+    state: StructuredNodeState,
+    increment: bool,
+) {
+    let count = match state {
+        StructuredNodeState::Queued => &mut summary.queued,
+        StructuredNodeState::Running => &mut summary.running,
+        StructuredNodeState::Passed => &mut summary.passed,
+        StructuredNodeState::Failed => &mut summary.failed,
+        StructuredNodeState::Skipped => &mut summary.skipped,
+        StructuredNodeState::Cancelled => &mut summary.cancelled,
+    };
+    *count = if increment {
+        count.saturating_add(1)
+    } else {
+        count.saturating_sub(1)
+    };
+}
+
+fn rebuild_run_summary(run: &mut StructuredRun) {
+    run.latest_states.clear();
+    for event in &run.events {
+        run.latest_states.insert(event.node_id.clone(), event.state);
+    }
+    run.summary = summarize_events(&run.events);
 }
 
 fn bounded_nodes(
@@ -903,7 +968,7 @@ fn apply_task_lifecycle(
     Ok(outcome)
 }
 
-fn snapshot_page_to_proto(
+pub fn snapshot_page_to_proto(
     state: &StructuredExecutionState,
     provider_id: &StructuredProviderId,
     requested_generation: DiscoveryGeneration,
@@ -917,7 +982,13 @@ fn snapshot_page_to_proto(
     if requested_generation.0 != 0 && requested_generation != provider.discovery_generation {
         bail!("stale structured discovery generation");
     }
-    let nodes = filter_nodes(&provider.nodes, visible_worktrees)?;
+    let filtered_nodes;
+    let nodes = if visible_worktrees.is_some() {
+        filtered_nodes = filter_nodes(&provider.nodes, visible_worktrees)?;
+        filtered_nodes.as_slice()
+    } else {
+        provider.nodes.as_slice()
+    };
     let page_size = requested_page_size.clamp(1, MAX_STRUCTURED_PAGE_SIZE);
     let page_end = page_start.saturating_add(page_size).min(nodes.len());
     let page = nodes
@@ -1089,7 +1160,7 @@ async fn fetch_remote_provider(
             .events
             .last()
             .map_or(0, |event| event.sequence.saturating_add(1));
-        run.summary = summarize_events(&run.events);
+        rebuild_run_summary(run);
     }
     if let Some(run) = snapshot.last_complete_run.as_mut() {
         run.events = fetch_remote_events(
@@ -1104,7 +1175,7 @@ async fn fetch_remote_provider(
             .events
             .last()
             .map_or(0, |event| event.sequence.saturating_add(1));
-        run.summary = summarize_events(&run.events);
+        rebuild_run_summary(run);
     }
     Ok((first.project_generation, snapshot))
 }
@@ -1626,6 +1697,8 @@ mod tests {
             .last_complete_run
             .as_ref()
             .expect("completed task should be retained");
+        assert_eq!(completed_run.summary.total, 1);
+        assert_eq!(completed_run.summary.running, 0);
         assert_eq!(completed_run.summary.failed, 1);
         assert_eq!(completed_run.events.len(), 2);
         assert_eq!(

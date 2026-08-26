@@ -16,8 +16,8 @@
 
 ## Milestone 1: Performance certification
 
-- [ ] 2. Establish formal structured-result budgets
-  - [ ] 2.1. Benchmark store reduction and paging at the supported limit
+- [x] 2. Establish formal structured-result budgets
+  - [x] 2.1. Benchmark store reduction and paging at the supported limit
     - Add a deterministic synthetic-provider benchmark for discovery application, event reduction and pagination.
     - _Requirements: 2.1, 2.2_
     - _Depends on: none_
@@ -28,7 +28,8 @@
     - Cross-pack dependency: `rust-tools-platform/2.2` consumes the accepted budget in release certification.
     - Outcome: The current limit has reviewed, repeatable time/memory regression gates.
     - Done when: 10,000-node discovery, events and paging meet recorded time/memory budgets.
-  - [ ] 2.2. Certify Tests-panel foreground projection
+    - _Evidence: `cargo bench -p project --features structured-execution --bench structured_execution` passed on macOS arm64 after exercising every protocol page: 2 ms discovery, 3 ms event reduction, 65 ms pagination and approximately 5.4 MiB conservatively modeled retained state against 2 s/2 s/100 ms/64 MiB ceilings. Criterion recorded 2.04–2.26 ms discovery, 3.58–4.03 ms reduction and 66.82–68.74 ms pagination._
+  - [x] 2.2. Certify Tests-panel foreground projection
     - Add a GPUI executor test separating background reduction from foreground tree reconciliation and visible-range rendering.
     - _Requirements: 2.1, 2.3_
     - _Depends on: 2.1_
@@ -39,6 +40,7 @@
     - Cross-pack dependency: `rust-tools-platform/2.2` consumes this accepted budget.
     - Outcome: Generic Tests projection has a reviewed foreground budget.
     - Done when: 10,000 rows remain bounded/virtualized and every timed transition uses GPUI executor timers.
+    - _Evidence: `cargo test -p tasks_ui --features test-explorer structured_execution_foreground_budget -- --nocapture` passed at 37 ms against the 250 ms foreground ceiling for exactly 10,000 rows. Provider projection runs on the background executor, the test yields through `background_executor.timer`, and foreground validation accesses only a 25-row visible range._
 
 ## Mandatory manual task-decomposition audit
 

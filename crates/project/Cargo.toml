@@ -18,10 +18,21 @@ name = "integration"
 required-features = ["test-support"]
 path = "tests/integration/project_tests.rs"
 
+[[bench]]
+name = "cargo_workspace"
+harness = false
+required-features = ["cargo-workspace"]
+
+[[bench]]
+name = "structured_execution"
+harness = false
+required-features = ["structured-execution"]
+
 [features]
 cargo-workspace = ["dep:cargo_metadata"]
 structured-execution = []
 rust-tests = ["cargo-workspace", "structured-execution"]
+rust-coverage = ["structured-execution"]
 test-support = [
     "buffer_diff/test-support",
     "client/test-support",
@@ -114,6 +125,7 @@ ztracing.workspace = true
 
 [dev-dependencies]
 client = { workspace = true, features = ["test-support"] }
+criterion.workspace = true
 encoding_rs.workspace = true
 collections = { workspace = true, features = ["test-support"] }
 context_server = { workspace = true, features = ["test-support"] }

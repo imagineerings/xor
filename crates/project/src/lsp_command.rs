@@ -8,7 +8,7 @@ use crate::{
     ProjectTransaction, PulledDiagnostics, ResolveState,
     lsp_store::{LocalLspStore, LspDocumentLink, LspFoldingRange, LspStore},
 };
-use anyhow::{Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use async_trait::async_trait;
 use client::proto::{self, PeerId};
 use clock::Global;
@@ -224,6 +224,60 @@ pub(crate) struct GetImplementations {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GetReferences {
     pub position: PointUtf16,
+}
+
+const MAX_CALL_HIERARCHY_ITEMS: usize = 256;
+const MAX_CALL_HIERARCHY_RANGES_PER_ITEM: usize = 64;
+const MAX_CALL_HIERARCHY_TEXT_BYTES: usize = 1024;
+const MAX_CALL_HIERARCHY_DATA_BYTES: usize = 16 * 1024;
+const MAX_CALL_HIERARCHY_TAGS: usize = 16;
+
+#[derive(Clone, Debug)]
+pub struct CallHierarchyItem {
+    pub name: SharedString,
+    pub detail: Option<SharedString>,
+    pub kind: lsp::SymbolKind,
+    pub tags: Vec<lsp::SymbolTag>,
+    pub buffer: Entity<Buffer>,
+    pub range: Range<Anchor>,
+    pub selection_range: Range<Anchor>,
+    pub data: Option<Value>,
+    pub server_id: LanguageServerId,
+}
+
+#[derive(Clone, Debug)]
+pub struct CallHierarchyCall {
+    pub item: CallHierarchyItem,
+    pub from_ranges: Vec<Range<Unclipped<PointUtf16>>>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct PreparedCallHierarchy {
+    pub items: Vec<CallHierarchyItem>,
+    pub truncated: bool,
+    pub malformed_count: usize,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct CallHierarchyCalls {
+    pub calls: Vec<CallHierarchyCall>,
+    pub truncated: bool,
+    pub malformed_count: usize,
+}
+
+#[derive(Clone, Debug, Copy)]
+pub(crate) struct PrepareCallHierarchy {
+    pub position: PointUtf16,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct GetIncomingCalls {
+    pub item: CallHierarchyItem,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct GetOutgoingCalls {
+    pub item: CallHierarchyItem,
 }
 
 #[derive(Debug)]
@@ -1822,6 +1876,816 @@ impl LspCommand for GetReferences {
     }
 
     fn buffer_id_from_proto(message: &proto::GetReferences) -> Result<BufferId> {
+        BufferId::new(message.buffer_id)
+    }
+}
+
+fn call_hierarchy_capable(capabilities: AdapterServerCapabilities) -> bool {
+    capabilities
+        .server_capabilities
+        .call_hierarchy_provider
+        .is_some_and(|capability| match capability {
+            lsp::CallHierarchyServerCapability::Simple(enabled) => enabled,
+            lsp::CallHierarchyServerCapability::Options(_) => true,
+        })
+}
+
+fn validate_call_hierarchy_text(field: &str, value: &str) -> Result<()> {
+    if value.len() > MAX_CALL_HIERARCHY_TEXT_BYTES {
+        bail!("call hierarchy {field} exceeds {MAX_CALL_HIERARCHY_TEXT_BYTES} bytes");
+    }
+    Ok(())
+}
+
+fn validate_call_hierarchy_data(data: &Option<Value>) -> Result<()> {
+    if let Some(data) = data {
+        let byte_count = serde_json::to_vec(data)?.len();
+        if byte_count > MAX_CALL_HIERARCHY_DATA_BYTES {
+            bail!("call hierarchy opaque data exceeds {MAX_CALL_HIERARCHY_DATA_BYTES} bytes");
+        }
+    }
+    Ok(())
+}
+
+fn call_hierarchy_item_to_lsp(
+    item: &CallHierarchyItem,
+    path: &Path,
+    buffer: &Buffer,
+    cx: &App,
+) -> Result<lsp::CallHierarchyItem> {
+    if item.buffer.read(cx).remote_id() != buffer.remote_id() {
+        bail!("call hierarchy item buffer does not match request buffer");
+    }
+    validate_call_hierarchy_text("name", &item.name)?;
+    if let Some(detail) = &item.detail {
+        validate_call_hierarchy_text("detail", detail)?;
+    }
+    validate_call_hierarchy_data(&item.data)?;
+    if item.tags.len() > MAX_CALL_HIERARCHY_TAGS {
+        bail!("call hierarchy item has too many tags");
+    }
+    Ok(lsp::CallHierarchyItem {
+        name: item.name.to_string(),
+        kind: item.kind,
+        tags: (!item.tags.is_empty()).then(|| item.tags.clone()),
+        detail: item.detail.as_ref().map(ToString::to_string),
+        uri: file_path_to_lsp_url(path)?,
+        range: range_to_lsp(item.range.clone().to_point_utf16(buffer))?,
+        selection_range: range_to_lsp(item.selection_range.clone().to_point_utf16(buffer))?,
+        data: item.data.clone(),
+    })
+}
+
+async fn call_hierarchy_item_from_lsp(
+    item: lsp::CallHierarchyItem,
+    lsp_store: &Entity<LspStore>,
+    server_id: LanguageServerId,
+    cx: &mut AsyncApp,
+) -> Result<CallHierarchyItem> {
+    validate_call_hierarchy_text("name", &item.name)?;
+    if let Some(detail) = &item.detail {
+        validate_call_hierarchy_text("detail", detail)?;
+    }
+    validate_call_hierarchy_data(&item.data)?;
+    let tags = item.tags.unwrap_or_default();
+    if tags.len() > MAX_CALL_HIERARCHY_TAGS {
+        bail!("call hierarchy item has too many tags");
+    }
+    let buffer = lsp_store
+        .update(cx, |lsp_store, cx| {
+            lsp_store.open_local_buffer_via_lsp(item.uri, server_id, cx)
+        })
+        .await?;
+    let (range, selection_range) = buffer.read_with(cx, |buffer, _| {
+        let range_start = point_from_lsp(item.range.start);
+        let range_end = point_from_lsp(item.range.end);
+        let selection_start = point_from_lsp(item.selection_range.start);
+        let selection_end = point_from_lsp(item.selection_range.end);
+        let clipped_range_start = buffer.clip_point_utf16(range_start, Bias::Left);
+        let clipped_range_end = buffer.clip_point_utf16(range_end, Bias::Left);
+        let clipped_selection_start = buffer.clip_point_utf16(selection_start, Bias::Left);
+        let clipped_selection_end = buffer.clip_point_utf16(selection_end, Bias::Left);
+        if clipped_range_start != range_start.0
+            || clipped_range_end != range_end.0
+            || clipped_selection_start != selection_start.0
+            || clipped_selection_end != selection_end.0
+            || clipped_range_start > clipped_range_end
+            || clipped_selection_start > clipped_selection_end
+            || clipped_selection_start < clipped_range_start
+            || clipped_selection_end > clipped_range_end
+        {
+            bail!("call hierarchy item contains an invalid range");
+        }
+        Ok((
+            buffer.anchor_after(clipped_range_start)..buffer.anchor_before(clipped_range_end),
+            buffer.anchor_after(clipped_selection_start)
+                ..buffer.anchor_before(clipped_selection_end),
+        ))
+    })?;
+    Ok(CallHierarchyItem {
+        name: item.name.into(),
+        detail: item.detail.map(Into::into),
+        kind: item.kind,
+        tags,
+        buffer,
+        range,
+        selection_range,
+        data: item.data,
+        server_id,
+    })
+}
+
+fn bounded_call_ranges(
+    ranges: Vec<lsp::Range>,
+) -> (Vec<Range<Unclipped<PointUtf16>>>, bool, usize) {
+    let truncated = ranges.len() > MAX_CALL_HIERARCHY_RANGES_PER_ITEM;
+    let mut malformed_count = 0;
+    let ranges = ranges
+        .into_iter()
+        .take(MAX_CALL_HIERARCHY_RANGES_PER_ITEM)
+        .filter_map(|range| {
+            let start = point_from_lsp(range.start);
+            let end = point_from_lsp(range.end);
+            if start <= end {
+                Some(start..end)
+            } else {
+                malformed_count += 1;
+                None
+            }
+        })
+        .collect();
+    (ranges, truncated, malformed_count)
+}
+
+fn symbol_kind_to_proto(kind: lsp::SymbolKind) -> Result<i32> {
+    serde_json::to_value(kind)?
+        .as_i64()
+        .and_then(|kind| i32::try_from(kind).ok())
+        .context("invalid call hierarchy symbol kind")
+}
+
+fn symbol_kind_from_proto(kind: i32) -> Result<lsp::SymbolKind> {
+    serde_json::from_value(Value::from(kind)).context("invalid call hierarchy symbol kind")
+}
+
+fn symbol_tag_to_proto(tag: lsp::SymbolTag) -> Result<i32> {
+    serde_json::to_value(tag)?
+        .as_i64()
+        .and_then(|tag| i32::try_from(tag).ok())
+        .context("invalid call hierarchy symbol tag")
+}
+
+fn symbol_tag_from_proto(tag: i32) -> Result<lsp::SymbolTag> {
+    serde_json::from_value(Value::from(tag)).context("invalid call hierarchy symbol tag")
+}
+
+fn call_hierarchy_item_to_proto(
+    item: CallHierarchyItem,
+    lsp_store: &mut LspStore,
+    peer_id: PeerId,
+    cx: &mut App,
+) -> Result<proto::CallHierarchyItem> {
+    validate_call_hierarchy_text("name", &item.name)?;
+    if let Some(detail) = &item.detail {
+        validate_call_hierarchy_text("detail", detail)?;
+    }
+    validate_call_hierarchy_data(&item.data)?;
+    lsp_store
+        .buffer_store()
+        .update(cx, |buffer_store, cx| {
+            buffer_store.create_buffer_for_peer(&item.buffer, peer_id, cx)
+        })
+        .detach_and_log_err(cx);
+    Ok(proto::CallHierarchyItem {
+        name: item.name.to_string(),
+        detail: item.detail.map(|detail| detail.to_string()),
+        kind: symbol_kind_to_proto(item.kind)?,
+        tags: item
+            .tags
+            .into_iter()
+            .map(symbol_tag_to_proto)
+            .collect::<Result<_>>()?,
+        buffer_id: item.buffer.read(cx).remote_id().into(),
+        range_start: Some(serialize_anchor(&item.range.start)),
+        range_end: Some(serialize_anchor(&item.range.end)),
+        selection_start: Some(serialize_anchor(&item.selection_range.start)),
+        selection_end: Some(serialize_anchor(&item.selection_range.end)),
+        data_json: item
+            .data
+            .as_ref()
+            .map(serde_json::to_vec)
+            .transpose()?
+            .unwrap_or_default(),
+        server_id: item.server_id.to_proto(),
+    })
+}
+
+async fn call_hierarchy_item_from_proto(
+    item: proto::CallHierarchyItem,
+    lsp_store: &Entity<LspStore>,
+    cx: &mut AsyncApp,
+) -> Result<CallHierarchyItem> {
+    let buffer_id = BufferId::new(item.buffer_id)?;
+    let buffer = lsp_store
+        .update(cx, |lsp_store, cx| {
+            lsp_store.wait_for_remote_buffer(buffer_id, cx)
+        })
+        .await?;
+    call_hierarchy_item_from_proto_with_buffer(item, buffer, cx).await
+}
+
+async fn call_hierarchy_item_from_proto_with_buffer(
+    item: proto::CallHierarchyItem,
+    buffer: Entity<Buffer>,
+    cx: &mut AsyncApp,
+) -> Result<CallHierarchyItem> {
+    validate_call_hierarchy_text("name", &item.name)?;
+    if let Some(detail) = &item.detail {
+        validate_call_hierarchy_text("detail", detail)?;
+    }
+    if item.tags.len() > MAX_CALL_HIERARCHY_TAGS {
+        bail!("call hierarchy item has too many tags");
+    }
+    if item.data_json.len() > MAX_CALL_HIERARCHY_DATA_BYTES {
+        bail!("call hierarchy opaque data exceeds {MAX_CALL_HIERARCHY_DATA_BYTES} bytes");
+    }
+    if BufferId::new(item.buffer_id)? != buffer.read_with(cx, |buffer, _| buffer.remote_id()) {
+        bail!("call hierarchy request item does not match its resolved buffer");
+    }
+    let range_start = item
+        .range_start
+        .and_then(deserialize_anchor)
+        .context("missing call hierarchy range start")?;
+    let range_end = item
+        .range_end
+        .and_then(deserialize_anchor)
+        .context("missing call hierarchy range end")?;
+    let selection_start = item
+        .selection_start
+        .and_then(deserialize_anchor)
+        .context("missing call hierarchy selection start")?;
+    let selection_end = item
+        .selection_end
+        .and_then(deserialize_anchor)
+        .context("missing call hierarchy selection end")?;
+    buffer
+        .update(cx, |buffer, _| {
+            buffer.wait_for_anchors([range_start, range_end, selection_start, selection_end])
+        })
+        .await?;
+    let data = (!item.data_json.is_empty())
+        .then(|| serde_json::from_slice(&item.data_json))
+        .transpose()?;
+    Ok(CallHierarchyItem {
+        name: item.name.into(),
+        detail: item.detail.map(Into::into),
+        kind: symbol_kind_from_proto(item.kind)?,
+        tags: item
+            .tags
+            .into_iter()
+            .map(symbol_tag_from_proto)
+            .collect::<Result<_>>()?,
+        buffer,
+        range: range_start..range_end,
+        selection_range: selection_start..selection_end,
+        data,
+        server_id: LanguageServerId::from_proto(item.server_id),
+    })
+}
+
+fn call_hierarchy_item_to_request_proto(
+    item: &CallHierarchyItem,
+    buffer: &Buffer,
+) -> proto::CallHierarchyItem {
+    let kind = symbol_kind_to_proto(item.kind).unwrap_or_else(|error| {
+        log::error!("failed to serialize call hierarchy symbol kind: {error:#}");
+        0
+    });
+    let tags = item
+        .tags
+        .iter()
+        .filter_map(|tag| {
+            symbol_tag_to_proto(tag.clone())
+                .map_err(|error| {
+                    log::error!("failed to serialize call hierarchy symbol tag: {error:#}");
+                    error
+                })
+                .ok()
+        })
+        .collect();
+    let data_json = item
+        .data
+        .as_ref()
+        .and_then(|data| {
+            serde_json::to_vec(data)
+                .map_err(|error| {
+                    log::error!("failed to serialize call hierarchy opaque data: {error:#}");
+                    error
+                })
+                .ok()
+        })
+        .unwrap_or_default();
+    proto::CallHierarchyItem {
+        name: item.name.to_string(),
+        detail: item.detail.as_ref().map(ToString::to_string),
+        kind,
+        tags,
+        buffer_id: buffer.remote_id().into(),
+        range_start: Some(serialize_anchor(&item.range.start)),
+        range_end: Some(serialize_anchor(&item.range.end)),
+        selection_start: Some(serialize_anchor(&item.selection_range.start)),
+        selection_end: Some(serialize_anchor(&item.selection_range.end)),
+        data_json,
+        server_id: item.server_id.to_proto(),
+    }
+}
+
+fn call_hierarchy_range_to_proto(range: Range<Unclipped<PointUtf16>>) -> proto::CallHierarchyRange {
+    proto::CallHierarchyRange {
+        start: Some(proto::PointUtf16 {
+            row: range.start.0.row,
+            column: range.start.0.column,
+        }),
+        end: Some(proto::PointUtf16 {
+            row: range.end.0.row,
+            column: range.end.0.column,
+        }),
+    }
+}
+
+fn call_hierarchy_range_from_proto(
+    range: proto::CallHierarchyRange,
+) -> Result<Range<Unclipped<PointUtf16>>> {
+    let start = range
+        .start
+        .context("missing call hierarchy call range start")?;
+    let end = range.end.context("missing call hierarchy call range end")?;
+    let start = Unclipped(PointUtf16::new(start.row, start.column));
+    let end = Unclipped(PointUtf16::new(end.row, end.column));
+    if start > end {
+        bail!("call hierarchy call range is reversed");
+    }
+    Ok(start..end)
+}
+
+async fn calls_from_lsp<I>(
+    calls: Vec<I>,
+    lsp_store: &Entity<LspStore>,
+    server_id: LanguageServerId,
+    cx: &mut AsyncApp,
+    split: impl Fn(I) -> (lsp::CallHierarchyItem, Vec<lsp::Range>),
+) -> CallHierarchyCalls {
+    let mut result = CallHierarchyCalls {
+        truncated: calls.len() > MAX_CALL_HIERARCHY_ITEMS,
+        ..CallHierarchyCalls::default()
+    };
+    for call in calls.into_iter().take(MAX_CALL_HIERARCHY_ITEMS) {
+        let (item, ranges) = split(call);
+        let (from_ranges, ranges_truncated, malformed_ranges) = bounded_call_ranges(ranges);
+        result.truncated |= ranges_truncated;
+        result.malformed_count += malformed_ranges;
+        match call_hierarchy_item_from_lsp(item, lsp_store, server_id, cx).await {
+            Ok(item) => result.calls.push(CallHierarchyCall { item, from_ranges }),
+            Err(error) => {
+                result.malformed_count += 1;
+                log::warn!("ignoring malformed call hierarchy item: {error:#}");
+            }
+        }
+    }
+    result
+}
+
+fn calls_to_proto(
+    response: CallHierarchyCalls,
+    lsp_store: &mut LspStore,
+    peer_id: PeerId,
+    cx: &mut App,
+) -> (Vec<proto::CallHierarchyCall>, bool, u32) {
+    let mut malformed_count = response.malformed_count;
+    let calls = response
+        .calls
+        .into_iter()
+        .filter_map(
+            |call| match call_hierarchy_item_to_proto(call.item, lsp_store, peer_id, cx) {
+                Ok(item) => Some(proto::CallHierarchyCall {
+                    item: Some(item),
+                    from_ranges: call
+                        .from_ranges
+                        .into_iter()
+                        .map(call_hierarchy_range_to_proto)
+                        .collect(),
+                }),
+                Err(error) => {
+                    malformed_count += 1;
+                    log::warn!("omitting malformed call hierarchy protocol item: {error:#}");
+                    None
+                }
+            },
+        )
+        .collect();
+    (
+        calls,
+        response.truncated,
+        u32::try_from(malformed_count).unwrap_or(u32::MAX),
+    )
+}
+
+async fn calls_from_proto(
+    calls: Vec<proto::CallHierarchyCall>,
+    truncated: bool,
+    malformed_count: u32,
+    lsp_store: &Entity<LspStore>,
+    cx: &mut AsyncApp,
+) -> CallHierarchyCalls {
+    let mut result = CallHierarchyCalls {
+        truncated: truncated || calls.len() > MAX_CALL_HIERARCHY_ITEMS,
+        malformed_count: malformed_count as usize,
+        ..CallHierarchyCalls::default()
+    };
+    for call in calls.into_iter().take(MAX_CALL_HIERARCHY_ITEMS) {
+        let Some(item) = call.item else {
+            result.malformed_count += 1;
+            continue;
+        };
+        if call.from_ranges.len() > MAX_CALL_HIERARCHY_RANGES_PER_ITEM {
+            result.truncated = true;
+        }
+        let mut from_ranges = Vec::new();
+        for range in call
+            .from_ranges
+            .into_iter()
+            .take(MAX_CALL_HIERARCHY_RANGES_PER_ITEM)
+        {
+            match call_hierarchy_range_from_proto(range) {
+                Ok(range) => from_ranges.push(range),
+                Err(error) => {
+                    result.malformed_count += 1;
+                    log::warn!("ignoring malformed call hierarchy call range: {error:#}");
+                }
+            }
+        }
+        match call_hierarchy_item_from_proto(item, lsp_store, cx).await {
+            Ok(item) => result.calls.push(CallHierarchyCall { item, from_ranges }),
+            Err(error) => {
+                result.malformed_count += 1;
+                log::warn!("ignoring malformed call hierarchy protocol item: {error:#}");
+            }
+        }
+    }
+    result
+}
+
+#[async_trait(?Send)]
+impl LspCommand for PrepareCallHierarchy {
+    type Response = PreparedCallHierarchy;
+    type LspRequest = lsp::request::CallHierarchyPrepare;
+    type ProtoRequest = proto::PrepareCallHierarchy;
+
+    fn display_name(&self) -> &str {
+        "Prepare call hierarchy"
+    }
+
+    fn status(&self) -> Option<String> {
+        Some("Preparing call hierarchy...".to_string())
+    }
+
+    fn check_capabilities(&self, capabilities: AdapterServerCapabilities) -> bool {
+        call_hierarchy_capable(capabilities)
+    }
+
+    fn to_lsp(
+        &self,
+        path: &Path,
+        _: &Buffer,
+        _: &Arc<LanguageServer>,
+        _: &App,
+    ) -> Result<lsp::CallHierarchyPrepareParams> {
+        Ok(lsp::CallHierarchyPrepareParams {
+            text_document_position_params: make_lsp_text_document_position(path, self.position)?,
+            work_done_progress_params: Default::default(),
+        })
+    }
+
+    async fn response_from_lsp(
+        self,
+        items: Option<Vec<lsp::CallHierarchyItem>>,
+        lsp_store: Entity<LspStore>,
+        _: Entity<Buffer>,
+        server_id: LanguageServerId,
+        mut cx: AsyncApp,
+    ) -> Result<PreparedCallHierarchy> {
+        let items = items.unwrap_or_default();
+        let mut response = PreparedCallHierarchy {
+            truncated: items.len() > MAX_CALL_HIERARCHY_ITEMS,
+            ..PreparedCallHierarchy::default()
+        };
+        for item in items.into_iter().take(MAX_CALL_HIERARCHY_ITEMS) {
+            match call_hierarchy_item_from_lsp(item, &lsp_store, server_id, &mut cx).await {
+                Ok(item) => response.items.push(item),
+                Err(error) => {
+                    response.malformed_count += 1;
+                    log::warn!("ignoring malformed prepared call hierarchy item: {error:#}");
+                }
+            }
+        }
+        Ok(response)
+    }
+
+    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::PrepareCallHierarchy {
+        proto::PrepareCallHierarchy {
+            project_id,
+            buffer_id: buffer.remote_id().into(),
+            position: Some(serialize_anchor(&buffer.anchor_before(self.position))),
+            version: serialize_version(&buffer.version()),
+        }
+    }
+
+    async fn from_proto(
+        message: proto::PrepareCallHierarchy,
+        _: Entity<LspStore>,
+        buffer: Entity<Buffer>,
+        mut cx: AsyncApp,
+    ) -> Result<Self> {
+        let position = message
+            .position
+            .and_then(deserialize_anchor)
+            .context("invalid call hierarchy position")?;
+        buffer
+            .update(&mut cx, |buffer, _| {
+                buffer.wait_for_version(deserialize_version(&message.version))
+            })
+            .await?;
+        Ok(Self {
+            position: buffer.read_with(&cx, |buffer, _| position.to_point_utf16(buffer)),
+        })
+    }
+
+    fn response_to_proto(
+        response: PreparedCallHierarchy,
+        lsp_store: &mut LspStore,
+        peer_id: PeerId,
+        _: &clock::Global,
+        cx: &mut App,
+    ) -> proto::PrepareCallHierarchyResponse {
+        let mut malformed_count = response.malformed_count;
+        let items = response
+            .items
+            .into_iter()
+            .filter_map(
+                |item| match call_hierarchy_item_to_proto(item, lsp_store, peer_id, cx) {
+                    Ok(item) => Some(item),
+                    Err(error) => {
+                        malformed_count += 1;
+                        log::warn!("omitting malformed prepared call hierarchy item: {error:#}");
+                        None
+                    }
+                },
+            )
+            .collect();
+        proto::PrepareCallHierarchyResponse {
+            items,
+            truncated: response.truncated,
+            malformed_count: u32::try_from(malformed_count).unwrap_or(u32::MAX),
+        }
+    }
+
+    async fn response_from_proto(
+        self,
+        message: proto::PrepareCallHierarchyResponse,
+        lsp_store: Entity<LspStore>,
+        _: Entity<Buffer>,
+        mut cx: AsyncApp,
+    ) -> Result<PreparedCallHierarchy> {
+        let mut response = PreparedCallHierarchy {
+            truncated: message.truncated || message.items.len() > MAX_CALL_HIERARCHY_ITEMS,
+            malformed_count: message.malformed_count as usize,
+            ..PreparedCallHierarchy::default()
+        };
+        for item in message.items.into_iter().take(MAX_CALL_HIERARCHY_ITEMS) {
+            match call_hierarchy_item_from_proto(item, &lsp_store, &mut cx).await {
+                Ok(item) => response.items.push(item),
+                Err(error) => {
+                    response.malformed_count += 1;
+                    log::warn!("ignoring malformed prepared hierarchy protocol item: {error:#}");
+                }
+            }
+        }
+        Ok(response)
+    }
+
+    fn buffer_id_from_proto(message: &proto::PrepareCallHierarchy) -> Result<BufferId> {
+        BufferId::new(message.buffer_id)
+    }
+}
+
+#[async_trait(?Send)]
+impl LspCommand for GetIncomingCalls {
+    type Response = CallHierarchyCalls;
+    type LspRequest = lsp::request::CallHierarchyIncomingCalls;
+    type ProtoRequest = proto::GetIncomingCalls;
+
+    fn display_name(&self) -> &str {
+        "Get incoming calls"
+    }
+
+    fn check_capabilities(&self, capabilities: AdapterServerCapabilities) -> bool {
+        call_hierarchy_capable(capabilities)
+    }
+
+    fn to_lsp(
+        &self,
+        path: &Path,
+        buffer: &Buffer,
+        _: &Arc<LanguageServer>,
+        cx: &App,
+    ) -> Result<lsp::CallHierarchyIncomingCallsParams> {
+        Ok(lsp::CallHierarchyIncomingCallsParams {
+            item: call_hierarchy_item_to_lsp(&self.item, path, buffer, cx)?,
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        })
+    }
+
+    async fn response_from_lsp(
+        self,
+        calls: Option<Vec<lsp::CallHierarchyIncomingCall>>,
+        lsp_store: Entity<LspStore>,
+        _: Entity<Buffer>,
+        server_id: LanguageServerId,
+        mut cx: AsyncApp,
+    ) -> Result<CallHierarchyCalls> {
+        Ok(calls_from_lsp(
+            calls.unwrap_or_default(),
+            &lsp_store,
+            server_id,
+            &mut cx,
+            |call| (call.from, call.from_ranges),
+        )
+        .await)
+    }
+
+    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::GetIncomingCalls {
+        proto::GetIncomingCalls {
+            project_id,
+            buffer_id: buffer.remote_id().into(),
+            item: Some(call_hierarchy_item_to_request_proto(&self.item, buffer)),
+            version: serialize_version(&buffer.version()),
+        }
+    }
+
+    async fn from_proto(
+        message: proto::GetIncomingCalls,
+        _: Entity<LspStore>,
+        buffer: Entity<Buffer>,
+        mut cx: AsyncApp,
+    ) -> Result<Self> {
+        let item = message
+            .item
+            .context("missing incoming call hierarchy item")?;
+        Ok(Self {
+            item: call_hierarchy_item_from_proto_with_buffer(item, buffer, &mut cx).await?,
+        })
+    }
+
+    fn response_to_proto(
+        response: CallHierarchyCalls,
+        lsp_store: &mut LspStore,
+        peer_id: PeerId,
+        _: &clock::Global,
+        cx: &mut App,
+    ) -> proto::GetIncomingCallsResponse {
+        let (calls, truncated, malformed_count) = calls_to_proto(response, lsp_store, peer_id, cx);
+        proto::GetIncomingCallsResponse {
+            calls,
+            truncated,
+            malformed_count,
+        }
+    }
+
+    async fn response_from_proto(
+        self,
+        message: proto::GetIncomingCallsResponse,
+        lsp_store: Entity<LspStore>,
+        _: Entity<Buffer>,
+        mut cx: AsyncApp,
+    ) -> Result<CallHierarchyCalls> {
+        Ok(calls_from_proto(
+            message.calls,
+            message.truncated,
+            message.malformed_count,
+            &lsp_store,
+            &mut cx,
+        )
+        .await)
+    }
+
+    fn buffer_id_from_proto(message: &proto::GetIncomingCalls) -> Result<BufferId> {
+        BufferId::new(message.buffer_id)
+    }
+}
+
+#[async_trait(?Send)]
+impl LspCommand for GetOutgoingCalls {
+    type Response = CallHierarchyCalls;
+    type LspRequest = lsp::request::CallHierarchyOutgoingCalls;
+    type ProtoRequest = proto::GetOutgoingCalls;
+
+    fn display_name(&self) -> &str {
+        "Get outgoing calls"
+    }
+
+    fn check_capabilities(&self, capabilities: AdapterServerCapabilities) -> bool {
+        call_hierarchy_capable(capabilities)
+    }
+
+    fn to_lsp(
+        &self,
+        path: &Path,
+        buffer: &Buffer,
+        _: &Arc<LanguageServer>,
+        cx: &App,
+    ) -> Result<lsp::CallHierarchyOutgoingCallsParams> {
+        Ok(lsp::CallHierarchyOutgoingCallsParams {
+            item: call_hierarchy_item_to_lsp(&self.item, path, buffer, cx)?,
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        })
+    }
+
+    async fn response_from_lsp(
+        self,
+        calls: Option<Vec<lsp::CallHierarchyOutgoingCall>>,
+        lsp_store: Entity<LspStore>,
+        _: Entity<Buffer>,
+        server_id: LanguageServerId,
+        mut cx: AsyncApp,
+    ) -> Result<CallHierarchyCalls> {
+        Ok(calls_from_lsp(
+            calls.unwrap_or_default(),
+            &lsp_store,
+            server_id,
+            &mut cx,
+            |call| (call.to, call.from_ranges),
+        )
+        .await)
+    }
+
+    fn to_proto(&self, project_id: u64, buffer: &Buffer) -> proto::GetOutgoingCalls {
+        proto::GetOutgoingCalls {
+            project_id,
+            buffer_id: buffer.remote_id().into(),
+            item: Some(call_hierarchy_item_to_request_proto(&self.item, buffer)),
+            version: serialize_version(&buffer.version()),
+        }
+    }
+
+    async fn from_proto(
+        message: proto::GetOutgoingCalls,
+        _: Entity<LspStore>,
+        buffer: Entity<Buffer>,
+        mut cx: AsyncApp,
+    ) -> Result<Self> {
+        let item = message
+            .item
+            .context("missing outgoing call hierarchy item")?;
+        Ok(Self {
+            item: call_hierarchy_item_from_proto_with_buffer(item, buffer, &mut cx).await?,
+        })
+    }
+
+    fn response_to_proto(
+        response: CallHierarchyCalls,
+        lsp_store: &mut LspStore,
+        peer_id: PeerId,
+        _: &clock::Global,
+        cx: &mut App,
+    ) -> proto::GetOutgoingCallsResponse {
+        let (calls, truncated, malformed_count) = calls_to_proto(response, lsp_store, peer_id, cx);
+        proto::GetOutgoingCallsResponse {
+            calls,
+            truncated,
+            malformed_count,
+        }
+    }
+
+    async fn response_from_proto(
+        self,
+        message: proto::GetOutgoingCallsResponse,
+        lsp_store: Entity<LspStore>,
+        _: Entity<Buffer>,
+        mut cx: AsyncApp,
+    ) -> Result<CallHierarchyCalls> {
+        Ok(calls_from_proto(
+            message.calls,
+            message.truncated,
+            message.malformed_count,
+            &lsp_store,
+            &mut cx,
+        )
+        .await)
+    }
+
+    fn buffer_id_from_proto(message: &proto::GetOutgoingCalls) -> Result<BufferId> {
         BufferId::new(message.buffer_id)
     }
 }

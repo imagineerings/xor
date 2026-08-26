@@ -54,6 +54,15 @@ fn shared_validation() -> NamedJob {
             .add_step(named::bash(
                 "cargo nextest run --workspace --no-fail-fast --no-tests=warn",
             ))
+            .add_step(named::bash(
+                "cargo bench -p project --features cargo-workspace --bench cargo_workspace -- --noplot",
+            ))
+            .add_step(named::bash(
+                "cargo bench -p project --features structured-execution --bench structured_execution -- --noplot",
+            ))
+            .add_step(named::bash(
+                "./script/test-rust-tools-environments --matrix --offline",
+            ))
             .add_step(steps::cleanup_cargo_config(Platform::Linux)),
     )
 }
@@ -367,6 +376,9 @@ mod tests {
         assert!(workflow.contains("cargo fmt --all -- --check"));
         assert!(workflow.contains("./script/clippy"));
         assert!(workflow.contains("cargo nextest run --workspace"));
+        assert!(workflow.contains("--bench cargo_workspace -- --noplot"));
+        assert!(workflow.contains("--bench structured_execution -- --noplot"));
+        assert!(workflow.contains("test-rust-tools-environments --matrix --offline"));
         assert!(workflow.contains("application_features: agentic,rust-tools"));
         assert!(workflow.contains("remote_features: rust-tools"));
         assert!(workflow.contains("cargo xtask bundle --product"));

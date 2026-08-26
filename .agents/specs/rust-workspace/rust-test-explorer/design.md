@@ -49,4 +49,4 @@ The remaining matrix uses the production transport/project environment on suppor
 
 ## Remaining delta
 
-Only D6 is missing. Source-shape and fake-headless coverage remain useful but do not constitute the physical certification.
+The hermetic physical-workspace fixture, matrix coordinator, local CI invocation and exact production-mode checklist now exist. D6 remains uncertified for actual SSH/headless, WSL, development-container and multiplayer transports. Checkout-only or fake-headless results remain useful but do not constitute that physical certification; the dated evidence requirements are recorded in `physical-matrix-evidence.md`.

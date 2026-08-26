@@ -622,6 +622,8 @@ actions!(
         HalfPageUp,
         /// Shows hover information for the symbol at cursor.
         Hover,
+        /// Shows callers and callees for the symbol at cursor.
+        ShowCallHierarchy,
         /// Increases indentation of selected lines.
         Indent,
         /// Inserts a UUID v4 at cursor position.
@@ -995,6 +997,18 @@ impl Default for FindAllReferences {
             always_open_multibuffer: true,
             open_results_in: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::Action as _;
+
+    use super::ShowCallHierarchy;
+
+    #[test]
+    fn call_hierarchy_editor_action_is_registered_in_the_editor_namespace() {
+        assert_eq!(ShowCallHierarchy.name(), "editor::ShowCallHierarchy");
     }
 }
 

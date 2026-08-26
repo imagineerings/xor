@@ -103,6 +103,9 @@ messages!(
     (StructuredExecutionSnapshotPage, Background),
     (GetStructuredExecutionEvents, Background),
     (StructuredExecutionEventChunk, Background),
+    (GetSourceCoverage, Background),
+    (SourceCoverageResponse, Background),
+    (InterpretRustCoverageArtifact, Background),
     (GetCodeActions, Background),
     (GetCodeActionsResponse, Background),
     (GetCompletions, Background),
@@ -135,6 +138,12 @@ messages!(
     (GetProjectSymbolsResponse, Background),
     (GetReferences, Background),
     (GetReferencesResponse, Background),
+    (PrepareCallHierarchy, Background),
+    (PrepareCallHierarchyResponse, Background),
+    (GetIncomingCalls, Background),
+    (GetIncomingCallsResponse, Background),
+    (GetOutgoingCalls, Background),
+    (GetOutgoingCallsResponse, Background),
     (GetSignatureHelp, Background),
     (GetSignatureHelpResponse, Background),
     (GetTypeDefinition, Background),
@@ -455,6 +464,8 @@ request_messages!(
         StructuredExecutionSnapshotPage
     ),
     (GetStructuredExecutionEvents, StructuredExecutionEventChunk),
+    (GetSourceCoverage, SourceCoverageResponse),
+    (InterpretRustCoverageArtifact, SourceCoverageResponse),
     (GetCompletions, GetCompletionsResponse),
     (GetDefinition, GetDefinitionResponse),
     (
@@ -473,6 +484,9 @@ request_messages!(
     (GetNotifications, GetNotificationsResponse),
     (GetProjectSymbols, GetProjectSymbolsResponse),
     (GetReferences, GetReferencesResponse),
+    (PrepareCallHierarchy, PrepareCallHierarchyResponse),
+    (GetIncomingCalls, GetIncomingCallsResponse),
+    (GetOutgoingCalls, GetOutgoingCallsResponse),
     (GetSignatureHelp, GetSignatureHelpResponse),
     (OpenUnstagedDiff, OpenUnstagedDiffResponse),
     (OpenUncommittedDiff, OpenUncommittedDiffResponse),
@@ -657,6 +671,9 @@ request_messages!(
 
 lsp_messages!(
     (GetReferences, GetReferencesResponse, true),
+    (PrepareCallHierarchy, PrepareCallHierarchyResponse, true),
+    (GetIncomingCalls, GetIncomingCallsResponse, true),
+    (GetOutgoingCalls, GetOutgoingCallsResponse, true),
     (GetDocumentColor, GetDocumentColorResponse, true),
     (GetFoldingRanges, GetFoldingRangesResponse, true),
     (GetDocumentSymbols, GetDocumentSymbolsResponse, true),
@@ -724,6 +741,8 @@ entity_messages!(
     UpdateRustTestRun,
     GetStructuredExecutionSnapshot,
     GetStructuredExecutionEvents,
+    GetSourceCoverage,
+    InterpretRustCoverageArtifact,
     GetCodeLens,
     GetCompletions,
     GetDefinition,
@@ -736,6 +755,9 @@ entity_messages!(
     GetHover,
     GetProjectSymbols,
     GetReferences,
+    PrepareCallHierarchy,
+    GetIncomingCalls,
+    GetOutgoingCalls,
     GetSignatureHelp,
     OpenUnstagedDiff,
     OpenUncommittedDiff,
@@ -1083,6 +1105,9 @@ impl LspQuery {
             Some(lsp_query::Request::GetTypeDefinition(_)) => ("GetTypeDefinition", false),
             Some(lsp_query::Request::GetImplementation(_)) => ("GetImplementation", false),
             Some(lsp_query::Request::GetReferences(_)) => ("GetReferences", false),
+            Some(lsp_query::Request::PrepareCallHierarchy(_)) => ("PrepareCallHierarchy", false),
+            Some(lsp_query::Request::GetIncomingCalls(_)) => ("GetIncomingCalls", false),
+            Some(lsp_query::Request::GetOutgoingCalls(_)) => ("GetOutgoingCalls", false),
             Some(lsp_query::Request::GetDocumentColor(_)) => ("GetDocumentColor", false),
             Some(lsp_query::Request::GetFoldingRanges(_)) => ("GetFoldingRanges", false),
             Some(lsp_query::Request::GetDocumentSymbols(_)) => ("GetDocumentSymbols", false),
@@ -1096,6 +1121,8 @@ impl LspQuery {
 
 #[cfg(test)]
 mod tests {
+    use prost::Message as _;
+
     use super::*;
 
     #[test]
@@ -1120,6 +1147,39 @@ mod tests {
             id: u32::MAX,
         };
         assert_eq!(PeerId::from_u64(peer_id.as_u64()), peer_id);
+    }
+
+    #[test]
+    fn source_coverage_protocol_round_trips_only_project_relative_facts() {
+        let response = SourceCoverageResponse {
+            project_generation: 3,
+            provider_id: "fake-language".to_string(),
+            generation: 9,
+            status: SourceCoverageStatus::Current as i32,
+            files: vec![SourceCoverageFile {
+                path: Some(ProjectPath {
+                    worktree_id: 7,
+                    path: "src/lib.rs".to_string(),
+                }),
+                ranges: vec![SourceCoverageRange {
+                    start_line: 1,
+                    start_column: 0,
+                    end_line: 1,
+                    end_column: 8,
+                    hit_count: 4,
+                }],
+                covered_lines: 1,
+                uncovered_lines: 0,
+                truncated: false,
+            }],
+            truncated: false,
+            diagnostic: None,
+        };
+        let bytes = response.encode_to_vec();
+        let decoded = SourceCoverageResponse::decode(bytes.as_slice())
+            .expect("source coverage response should decode");
+        assert_eq!(decoded, response);
+        assert!(!String::from_utf8_lossy(&bytes).contains("/Users/"));
     }
 
     #[test]
@@ -1206,6 +1266,50 @@ mod tests {
         assert_eq!(root.path, "crates/example");
         assert!(!String::from_utf8_lossy(&encoded).contains("/Users/"));
         assert!(!String::from_utf8_lossy(&encoded).contains("project_env"));
+    }
+
+    #[test]
+    fn cargo_dependency_provenance_round_trips_bounded_visible_facts() {
+        let dependency = CargoDependency {
+            declaration_name: "serde".to_string(),
+            rename: Some("serialization".to_string()),
+            kind: CargoDependencyKind::Normal as i32,
+            version_requirement: "^1".to_string(),
+            optional: true,
+            uses_default_features: false,
+            requested_features: vec!["derive".to_string()],
+            target: Some("cfg(unix)".to_string()),
+            source_kind: CargoDependencySourceKind::Registry as i32,
+            declaration_manifest: Some(ProjectPath {
+                worktree_id: 3,
+                path: "member/Cargo.toml".to_string(),
+            }),
+            declaration_origin: CargoDependencyDeclarationOrigin::WorkspaceInherited as i32,
+            resolved_instances: vec![CargoResolvedDependency {
+                name: "serde".to_string(),
+                version: "1.0.0".to_string(),
+                source_kind: CargoDependencySourceKind::Registry as i32,
+                enabled_features: vec!["derive".to_string()],
+                lock_status: CargoDependencyLockStatus::Locked as i32,
+                ..Default::default()
+            }],
+            feature_causality: CargoDependencyFeatureCausality::Validated as i32,
+            ..Default::default()
+        };
+        let encoded = dependency.encode_to_vec();
+        let decoded = CargoDependency::decode(encoded.as_slice())
+            .expect("Cargo dependency provenance should decode");
+        assert_eq!(decoded.resolved_instances.len(), 1);
+        assert_eq!(
+            decoded
+                .declaration_manifest
+                .as_ref()
+                .map(|path| path.path.as_str()),
+            Some("member/Cargo.toml")
+        );
+        let wire = String::from_utf8_lossy(&encoded);
+        assert!(!wire.contains("/Users/"));
+        assert!(!wire.contains(".cargo/registry"));
     }
 
     #[test]

@@ -1,8 +1,10 @@
+pub mod call_hierarchy;
 mod highlights_tree_view;
 mod key_context_view;
 pub mod language_tool_tree;
 pub mod lsp_button;
 pub mod lsp_log_view;
+pub mod source_coverage_summary;
 mod syntax_tree_view;
 
 #[cfg(test)]
@@ -17,6 +19,7 @@ use ui::{Context, Window};
 use workspace::{Item, ItemHandle, SplitDirection, Workspace};
 
 pub fn init(cx: &mut App) {
+    call_hierarchy::init(cx);
     highlights_tree_view::init(cx);
     lsp_log_view::init(false, cx);
     syntax_tree_view::init(cx);

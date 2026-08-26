@@ -30,6 +30,7 @@ proto.workspace = true
 serde_json.workspace = true
 settings.workspace = true
 telemetry.workspace = true
+text.workspace = true
 theme.workspace = true
 tree-sitter = { workspace = true, features = ["wasm"] }
 sysinfo.workspace = true
