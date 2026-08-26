@@ -736,6 +736,9 @@ class ValidationGenerationTests(unittest.TestCase):
             "before and between every layer's layer-normalization, attention QKV and output, and MLP module phases",
             "StorageIds and alias deduplication",
             "output F32 bytes",
+            "post-layernorm, pre-visual-projection pooled hidden tensor",
+            "public NativeClipVision::forward delegates to that path",
+            "preserving public ClipVisionOutput identity, residency, and bytes",
             "native payload remains read-only and unchanged",
             "No PhotoMaker-specific fork, second CLIP transformer, ExecutionContext requirement",
         ):
@@ -749,6 +752,46 @@ class ValidationGenerationTests(unittest.TestCase):
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task340_clip_vision_001 -- --exact --nocapture",
         ):
             self.assertIn(command, clip_vision_validation)
+        for photomaker_read in (
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/tests/clip_vision.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/indexing_masking_01.rs",
+            "crates/comfy_tensor/src/ops/reduction_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(photomaker_read, photomaker_task["reads"])
+        for photomaker_gate in (
+            "exact 407-entry ordered source schema",
+            "392 delegated NativeClipVision keys plus 15 PhotoMaker-owned keys",
+            "1024 to 1280 without bias",
+            "concatenates the canonical 768 and 1280 projections to width 2048",
+            "MLP1 applies LayerNorm 4096",
+            "MLP2 applies LayerNorm 2048",
+            "count_true(mask) equal to N",
+            "source row-major true positions pair with images in order",
+            "unmasked rows remain bit-identical",
+            "Batch greater than one rejects",
+            "reconstruction calls NativeClipVision::reconstruct(token)",
+            "noncontiguous multi-identity mask and scatter",
+            "max-plus-one OOM",
+            "without changing the StyleAdapter or Flux Redux fixture hashes",
+        ):
+            self.assertIn(photomaker_gate, photomaker_task["done"])
+        photomaker_validation = planning.task_validation_commands(photomaker_task)
+        for command in (
+            "cargo test --locked -p comfy_model photomaker_resource -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_conditioning_integration photomaker_resource -- --exact --nocapture",
+            "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+            "cargo test --locked -p comfy_model --test clip_vision -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task340_clip_vision_001 -- --exact --nocapture",
+        ):
+            self.assertIn(command, photomaker_validation)
         for phrase in (
             "NativeGligenResource",
             "NativePhotoMakerResource",

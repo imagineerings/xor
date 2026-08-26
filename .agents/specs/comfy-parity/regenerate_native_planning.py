@@ -9867,7 +9867,7 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_model/tests/clip_vision.rs",
             "crates/comfy_test_support/tests/native_conditioning_integration.rs",
         ],
-        "NativeClipVision remains the sole owner of the fixed CLIP vision graph. NativeClipVision::new_with_cancellation(configuration, weights, &CancellationToken) is the sole caller-cancellable construction path, while the existing new constructor delegates with a fresh default token without changing its public behavior or identity. NativeClipVision::reconstruct(&self, &CancellationToken) validates and strictly reprojects the complete retained ordered canonical checkpoint into ClipVisionWeights, then calls the same cancellable constructor rather than cloning the model. Construction and reconstruction check the same token at entry, during canonical-state projection, before and between every layer's layer-normalization, attention QKV and output, and MLP module phases, before optional projection modules, during semantic and module digests and validation, and immediately before return. They preserve configuration, ordered state names and tensors, StorageIds and alias deduplication, storage dtype, semantic identity and module digest, resident bytes, and output F32 bytes. Private deterministic checkpoint tests cancel every named phase and prove no model, payload, digest, or residency is returned. The existing native payload remains read-only and unchanged. No PhotoMaker-specific fork, second CLIP transformer, ExecutionContext requirement, public unchecked constructor, or test-only authority factory is introduced.",
+        "NativeClipVision remains the sole owner of the fixed CLIP vision graph. NativeClipVision::new_with_cancellation(configuration, weights, &CancellationToken) is the sole caller-cancellable construction path, while the existing new constructor delegates with a fresh default token without changing its public behavior or identity. NativeClipVision::reconstruct(&self, &CancellationToken) validates and strictly reprojects the complete retained ordered canonical checkpoint into ClipVisionWeights, then calls the same cancellable constructor rather than cloning the model. Construction and reconstruction check the same token at entry, during canonical-state projection, before and between every layer's layer-normalization, attention QKV and output, and MLP module phases, before optional projection modules, during semantic and module digests and validation, and immediately before return. They preserve configuration, ordered state names and tensors, StorageIds and alias deduplication, storage dtype, semantic identity and module digest, resident bytes, and output F32 bytes. One crate-private checked forward result retains the exact post-layernorm, pre-visual-projection pooled hidden tensor together with the public output; public NativeClipVision::forward delegates to that path and discards only the private pooled tensor, preserving public ClipVisionOutput identity, residency, and bytes. The public contract test proves exact pooled bits and that this path owns no second layer-normalization or projection equation. Private deterministic checkpoint tests cancel every named construction phase and prove no model, payload, digest, or residency is returned. The existing native payload remains read-only and unchanged. No PhotoMaker-specific fork, second CLIP transformer, ExecutionContext requirement, public unchecked constructor, or test-only authority factory is introduced.",
         include_model_payload=False,
     )
     append(
@@ -9878,12 +9878,24 @@ def native_model_resource_precursor_tasks(
             "projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py",
             "projects/comfy/ComfyUI/comfy/clip_model.py",
             "projects/comfy/ComfyUI/comfy/clip_vision.py",
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "crates/comfy_model/src/conditioning_resources.rs",
             "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/tests/clip_vision.rs",
             "crates/comfy_model/src/native_ops.rs",
             "crates/comfy_model/src/conditioning.rs",
             "crates/comfy_model/src/model_family.rs",
             "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/indexing_masking_01.rs",
+            "crates/comfy_tensor/src/ops/reduction_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_test_support/tests/native_conditioning_integration.rs",
             "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [
             "crates/comfy_model/src/conditioning_resources.rs",
@@ -9892,7 +9904,7 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_test_support/tests/native_conditioning_integration.rs",
             "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
         ],
-        "One sealed NativePhotoMakerResource normalizes an optional top-level id_encoder checkpoint, strictly admits the complete PhotoMaker state, and delegates the fixed 1024/4096/16-head/24-layer/224/14/projection-768 CLIP image graph exclusively to NativeClipVision with the caller CancellationToken. Invocation accepts the checked preprocessed image tensor, prompt embeddings, and boolean token mask and produces the source-exact fused conditioning output. Resource identity binds artifact, architecture, ordered state, storage dtype, semantic digest, and distinct-StorageId residency; construction and invocation use conservative phase-memory admission and check cancellation between layers and before publication. Node-level text/token editing, strength handling, attention-mask concatenation, and conditioning metadata mutation remain assigned to their later node leaves. Cross-role use, malformed state or inputs, uncertified non-CPU/F32 execution, OOM, cancellation, or failed reconstruction publishes no PHOTOMAKER resource or conditioning state. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-service-foundation.",
+        "One sealed NativePhotoMakerResource accepts either the flat source checkpoint or one optional top-level id_encoder mapping, rejects a non-mapping or any outer or inner extra entry, and strictly admits the exact 407-entry ordered source schema: 392 delegated NativeClipVision keys plus 15 PhotoMaker-owned keys comprising visual_projection_2.weight, two six-key MLPs, and the final two-key layer normalization. It delegates the fixed 1024/4096/16-head/24-layer/224/14 CLIP image graph, checkpoint reconstruction, semantic digest, and exact post-layernorm pre-projection pooled hidden exclusively to NativeClipVision with the caller CancellationToken and owns no second CLIP state, equation, layer normalization, projection, or digest. The extra projection is exactly 1024 to 1280 without bias; it concatenates the canonical 768 and 1280 projections to width 2048. MLP1 applies LayerNorm 4096, Linear 4096-to-2048, exact GELU, and Linear 2048-to-2048 with no internal residual before adding the prompt. MLP2 applies LayerNorm 2048, Linear 2048-to-2048, exact GELU, and Linear 2048-to-2048 before its residual addition, followed by the final LayerNorm. Invocation admits only CPU/F32 image input [1, N, 3, 224, 224], prompt [1, S, 2048], and Bool mask [1, S], with N greater than zero and count_true(mask) equal to N and no greater than S; source row-major true positions pair with images in order, output is [1, S, 2048], unmasked rows remain bit-identical, and inputs remain immutable. Batch greater than one rejects rather than inventing semantics for the source global mask sum. Reshape, concatenation, sum, nonzero gather, scatter, normalization, and GELU mechanics delegate to canonical tensor owners. Resource identity binds the whole artifact bytes, wrapper disposition, architecture, ordered state, storage dtype, semantic digest, and alias-aware distinct-StorageId residency; reconstruction calls NativeClipVision::reconstruct(token). Construction and invocation use conservative checked phase memory and cancellation before publication. A separately named tracked pure-standard-library reduced PhotoMaker case pins nodes_photomaker.py and inherited CLIP hashes, cross-links pooled and projected CLIP oracles, and discriminates flat and nested wrappers, all 407 keys, both projections, both MLP residual dispositions, a noncontiguous multi-identity mask and scatter, F32/F16/BF16 storage projection, alias residency, reconstruction, max-plus-one OOM, and every cancellation phase without changing the StyleAdapter or Flux Redux fixture hashes. Node-level text editing, strength, attention-mask concatenation, and conditioning metadata mutation remain assigned to later node leaves. Cross-role use, malformed state or inputs, uncertified execution, OOM, cancellation, or failed reconstruction publishes no PHOTOMAKER resource or conditioning state. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-service-foundation.",
     )
     append(
         "comfy-parity-native-gligen-resource-foundation",
@@ -21662,6 +21674,16 @@ def task_validation_commands(item: dict[str, object]) -> str:
             ])
         if identifier == "comfy-parity-native-clip-vision-context-construction":
             commands.extend([
+                "cargo test --locked -p comfy_model --test clip_vision -- --nocapture",
+                "cargo test --locked -p comfy_test_support --test native_conditioning_integration native_clip_vision_context_construction -- --exact --nocapture",
+                "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task340_clip_vision_001 -- --exact --nocapture",
+            ])
+        if identifier == "comfy-parity-native-photomaker-resource-foundation":
+            commands.extend([
+                "cargo test --locked -p comfy_model photomaker_resource -- --nocapture",
+                "cargo test --locked -p comfy_test_support --test native_conditioning_integration photomaker_resource -- --exact --nocapture",
+                "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+                "cargo test --locked -p comfy_test_support --test native_conditioning_integration style_model_resource -- --exact --nocapture",
                 "cargo test --locked -p comfy_model --test clip_vision -- --nocapture",
                 "cargo test --locked -p comfy_test_support --test native_conditioning_integration native_clip_vision_context_construction -- --exact --nocapture",
                 "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task340_clip_vision_001 -- --exact --nocapture",
