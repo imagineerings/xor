@@ -133,11 +133,13 @@ mod tests {
             uncovered_lines: 1,
             truncated: false,
         };
-        editor.update(cx, |editor, _window, cx| {
-            editor.apply_source_coverage(Some(&file), cx);
-            assert_eq!(editor.source_coverage_gutter_counts(), (1, 1));
-            editor.apply_source_coverage(None, cx);
-            assert_eq!(editor.source_coverage_gutter_counts(), (0, 0));
-        });
+        editor
+            .update(cx, |editor, _window, cx| {
+                editor.apply_source_coverage(Some(&file), cx);
+                assert_eq!(editor.source_coverage_gutter_counts(), (1, 1));
+                editor.apply_source_coverage(None, cx);
+                assert_eq!(editor.source_coverage_gutter_counts(), (0, 0));
+            })
+            .expect("update editor window");
     }
 }
