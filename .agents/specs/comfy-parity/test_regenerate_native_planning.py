@@ -1651,6 +1651,38 @@ class ValidationGenerationTests(unittest.TestCase):
         provider_deployment = tasks_by_id[
             "comfy-parity-provider-deployment-lifecycle"
         ]
+        for deployment_read in (
+            "crates/extension_host/src/extension_host.rs",
+            "crates/comfy_runtime/src/settings.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/permissions.rs",
+            "crates/paths/src/paths.rs",
+            "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
+            "crates/comfy_test_support/tests/plugin_e2e.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component",
+        ):
+            self.assertIn(deployment_read, provider_deployment["reads"])
+            self.assertNotIn(deployment_read, provider_deployment["writes"])
+        self.assertIn(
+            "crates/comfy_test_support/tests/provider_deployment_lifecycle.rs",
+            provider_deployment["writes"],
+        )
+        for deployment_gate in (
+            "canonical paths::extensions_dir inventory",
+            "neither rescans files, substitutes PluginTrustPolicy::default()",
+            "commit the whole VerifiedComponentGeneration atomically",
+            "rejected candidate retains the prior descriptors",
+            "starts the replacement with start_with_provider_worker_bridge",
+            "publishes Ready/API state only after attachment succeeds",
+            "Headless remains fail-closed for provider, network, credential, and cost actuation",
+            "focused provider_deployment_lifecycle test reuses Task425's nonconstructible scripted bridge",
+            "exactly one ProviderRuntimeStreamService::new owner",
+        ):
+            self.assertIn(deployment_gate, provider_deployment["done"])
+        self.assertIn(
+            "cargo test --locked -p comfy_test_support --test provider_deployment_lifecycle provider_deployment_lifecycle_preserves_cross_mode_generation_and_recovery -- --exact --nocapture",
+            planning.task_validation_commands(provider_deployment),
+        )
         for deployment_attachment_read in (
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_runtime/src/plugin_services.rs",
