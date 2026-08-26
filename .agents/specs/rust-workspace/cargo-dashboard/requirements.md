@@ -35,6 +35,9 @@ Canonical IDs are `cargo-dashboard/<criterion>`.
 
 ### Requirement 3: Close dashboard validation gaps [Required change]
 
+<!-- impl: crates/project/tests/integration/cargo_workspace.rs#cargo_workspace_comprehensive_fixture -->
+<!-- impl: crates/cargo_ui/src/cargo_panel.rs#cargo_dashboard_foreground_budget -->
+
 #### Acceptance criteria
 
 1. **3.1** THE repository SHALL provide one standalone deterministic evaluation fixture that combines multiple Cargo roots, a virtual workspace, a standalone package, every supported target/dependency form, profiles, toolchain declarations, duplicate names, malformed input, and partial failure without using host Cargo or network access.

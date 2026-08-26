@@ -28,6 +28,7 @@
     - Cross-pack dependency: `rust-tools-platform/2.3` consumes the completed matrix after Task 2.2.
     - Outcome: Release evidence distinguishes real supported and unsupported environment cells.
     - Done when: The harness runs local and actual SSH/headless cells, probes available WSL/dev-container cells, observes host execution, and rejects stale reconnect results.
+    - Current evidence: `physical-workspace` and `script/test-rust-tools-environments` implement the offline local probe and configurable SSH/WSL/container/multiplayer rows. Actual production-transport certification remains in `physical-matrix-evidence.md`; run `ZED_RUST_TOOLS_REQUIRE_PHYSICAL=1 ./script/test-rust-tools-environments --matrix --offline` in the required physical environments.
   - [ ] 2.2. Add required physical cells to CI and release documentation
     - Select required/optional cells from the harness, fail required regressions, and document explicit unsupported results.
     - _Requirements: 2.1, 2.2, 2.3_
@@ -39,6 +40,7 @@
     - Cross-pack dependency: `rust-tools-platform/2.3` requires this leaf complete.
     - Outcome: Physical compatibility results are maintained rather than inferred from source-shape tests.
     - Done when: Required cells run in CI/release gates and optional/unsupported cells have visible reasons.
+    - Current evidence: Generated CI runs the hermetic local matrix and documentation exposes optional/unavailable reasons. Required remote physical cells cannot be selected until the dated production-transport checklist in `physical-matrix-evidence.md` is complete.
 
 ## Mandatory manual task-decomposition audit
 

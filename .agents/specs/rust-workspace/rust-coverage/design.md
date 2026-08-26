@@ -2,7 +2,7 @@
 
 ## Current implementation baseline
 
-No generic coverage model, source-analysis overlay, or Rust collector is present. Existing seams are editor gutter decorations/navigation, project-visible paths, structured task lifecycle, Cargo preset compilation, remote project ownership, and workspace panels/toolbar components.
+`project::source_coverage` owns bounded language-neutral session state, host/client protocol conversion, visible-worktree filtering and generation rejection. Editor gutter annotations and `language_tools::source_coverage_summary` consume only generic facts. `project::rust_coverage_provider`, behind `rust-coverage`, validates bounded LLVM coverage JSON on the authoritative host. Cargo UI compiles Run with Coverage to an ordinary task whose JSON data artifact is interpreted only after typed success. Desktop/headless feature forwarding is under `rust-tools`; disabled builds retain inert protobuf definitions without a handler or fallback.
 
 ## Design decisions
 
@@ -16,7 +16,7 @@ The editor consumes annotations through a generic source-analysis seam and expos
 
 ### D3: Split Cargo action planning from host artifact interpretation
 
-`cargo_ui` resolves current Cargo scope/configuration through `cargo-execution` and creates an ordinary explicit Task for a detected supported collector with a known project-relative artifact path. A separate feature-gated `project::rust_coverage_provider` on the authoritative host validates/parses that artifact after typed task completion and publishes generic coverage facts. `CargoWorkspaceStore` remains untouched.
+`cargo_ui` resolves current Cargo scope/configuration through `cargo-execution` and creates an ordinary explicit `cargo llvm-cov --json --output-path target/zed-coverage.json run ...` Task with a project-relative data artifact. A separate feature-gated `project::rust_coverage_provider` on the authoritative host validates/parses that artifact after typed task completion and publishes generic coverage facts. `CargoWorkspaceStore` remains untouched.
 
 ### D4: Validate artifacts under strict host/privacy bounds
 
@@ -24,7 +24,7 @@ The collector adapter accepts only supported schema/version, maps paths through 
 
 ### D5: Degrade without installation or network
 
-Missing collector, unsupported platform/version, restricted worktree, guest denial, disconnect and mismatch are explicit action/UI states. The product never installs the collector or fetches dependencies.
+Missing collector, unsupported platform/version, restricted worktree, guest denial, disconnect and mismatch are explicit failure/action/UI states. A failed collector task gives installation guidance but never performs the installation or fetches dependencies.
 
 ## Persistence and cancellation
 

@@ -16,8 +16,8 @@
 
 ## Milestone 1: Optional external-tool convenience
 
-- [ ] 2. Add a declarative profile Task/artifact flow if approved
-  - [ ] 2.1. Compile an explicit Cargo profile preset and open its declared artifact
+- [x] 2. Add a declarative profile Task/artifact flow if approved
+  - [x] 2.1. Compile an explicit Cargo profile preset and open its declared artifact
     - _Requirements: 1.2, 1.3, 1.4, 1.5_
     - _Depends on: none_
     - _Reads: crates/cargo_ui/src/cargo_preset.rs, crates/workspace/src/tasks.rs, crates/workspace/src/workspace.rs, crates/task/src/task.rs_
@@ -27,6 +27,7 @@
     - Cross-pack dependencies: completed `cargo-execution/1.1` and `rust-tools-platform/1.1` baselines.
     - Outcome: An approved shortcut remains an explicit Task with a declared safe artifact and no blessed installer.
     - Done when: Missing tool/artifact, remote visibility, size, trust and cancellation tests pass without terminal parsing.
+    - Evidence: Pure Cargo planning preserves the compiled host context while requiring an explicit external command; Task resolution rejects unsafe/oversized artifact declarations; Workspace opens only successful, visible, bounded project files. Missing, failed and cancelled artifacts stay in the existing task failure path and no terminal parser or installer is present.
 
 ## Milestone 2: Native profiling decision and later implementation
 

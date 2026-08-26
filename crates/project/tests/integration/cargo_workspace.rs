@@ -7,11 +7,13 @@ use gpui::{AppContext as _, TestAppContext};
 use project::{
     Project, ProjectPath,
     cargo_workspace::{
-        CargoConfigurationCompleteness, CargoConfigurationDiagnosticCategory, CargoDependencyKind,
+        CargoConfigurationCompleteness, CargoConfigurationDiagnosticCategory,
+        CargoDependencyDeclarationOrigin, CargoDependencyKind, CargoDependencyLockStatus,
         CargoDependencySourceKind, CargoFeatureEnabled, CargoHostCompilerModel,
         CargoHostCompilerStatus, CargoProfileModel, CargoProfileOrigin, CargoTargetKind,
-        CargoToolchainFormat, CargoWorkspaceConfiguration, parse_cargo_profiles, parse_metadata,
-        parse_rust_toolchain, parse_rustc_verbose_version, workspace_from_metadata,
+        CargoToolchainFormat, CargoWorkspaceConfiguration, enrich_dependency_provenance,
+        parse_cargo_profiles, parse_metadata, parse_rust_toolchain, parse_rustc_verbose_version,
+        workspace_from_metadata,
     },
     cargo_workspace_store::{
         CargoConfigurationProbe, CargoConfigurationProbeRequest, CargoMetadataRequest,
@@ -19,6 +21,7 @@ use project::{
     },
     trusted_worktrees::{self, DbTrustedPaths, TrustedWorktrees},
 };
+use serde::Deserialize;
 use serde_json::json;
 use settings::WorktreeId;
 use util::{paths::PathStyle, rel_path::RelPath};
@@ -27,7 +30,7 @@ fn resolve(root: &Path, path: &Path) -> Option<ProjectPath> {
     let relative = path.strip_prefix(root).ok()?;
     Some(ProjectPath {
         worktree_id: WorktreeId::from_usize(1),
-        path: Arc::from(RelPath::new(relative, PathStyle::Posix).ok()?.as_ref()),
+        path: Arc::from(RelPath::new(relative, PathStyle::Unix).ok()?.as_ref()),
     })
 }
 
@@ -35,6 +38,191 @@ fn fixture_path(path: &str) -> ProjectPath {
     ProjectPath {
         worktree_id: WorktreeId::from_usize(1),
         path: Arc::from(RelPath::from_unix_str(path).expect("fixture path should be valid")),
+    }
+}
+
+#[derive(Deserialize)]
+struct ComprehensiveFixture {
+    schema_version: u32,
+    roots: Vec<ComprehensiveRoot>,
+    profile_manifests: Vec<ComprehensiveTextFixture>,
+    toolchain_declarations: Vec<ComprehensiveTextFixture>,
+}
+
+#[derive(Deserialize)]
+struct ComprehensiveRoot {
+    manifest_path: String,
+    root_path: String,
+    metadata: serde_json::Value,
+}
+
+#[derive(Deserialize)]
+struct ComprehensiveTextFixture {
+    path: String,
+    contents: String,
+}
+
+#[derive(Deserialize)]
+struct DependencyProvenanceFixture {
+    schema_version: u32,
+    metadata_file: String,
+    manifests: Vec<ComprehensiveTextFixture>,
+    lock_contents: String,
+}
+
+#[test]
+fn cargo_dependency_provenance_acceptance_is_bounded_and_private() {
+    let fixture: DependencyProvenanceFixture = serde_json::from_slice(include_bytes!(
+        "../../test_data/cargo_workspace/dependency-provenance-v1.json"
+    ))
+    .expect("dependency provenance fixture should be valid JSON");
+    assert_eq!(fixture.schema_version, 1);
+    assert_eq!(fixture.metadata_file, "workspace-v1.json");
+    let metadata = parse_metadata(include_bytes!(
+        "../../test_data/cargo_workspace/workspace-v1.json"
+    ))
+    .expect("metadata fixture should parse");
+    let mut workspace =
+        workspace_from_metadata(&metadata, |path| resolve(Path::new("/workspace"), path))
+            .expect("metadata fixture should convert");
+    let manifests = fixture
+        .manifests
+        .into_iter()
+        .map(|manifest| (fixture_path(&manifest.path), manifest.contents))
+        .collect();
+    enrich_dependency_provenance(&mut workspace, &manifests, Some(&fixture.lock_contents));
+
+    let primary = workspace
+        .members
+        .iter()
+        .find(|package| package.name == "member-one")
+        .expect("primary fixture package should exist");
+    let inherited = primary
+        .dependencies
+        .iter()
+        .find(|dependency| dependency.rename.as_deref() == Some("renamed_member"))
+        .expect("renamed dependency should exist");
+    assert_eq!(
+        inherited.declaration_origin,
+        CargoDependencyDeclarationOrigin::WorkspaceInherited
+    );
+    assert_eq!(inherited.resolved_instances.len(), 1);
+    assert_eq!(
+        inherited.resolved_instances[0].lock_status,
+        CargoDependencyLockStatus::Locked
+    );
+    let git = primary
+        .dependencies
+        .iter()
+        .find(|dependency| dependency.source_kind == CargoDependencySourceKind::Git)
+        .expect("Git dependency should exist");
+    assert!(git.local_manifest.is_none());
+    assert!(format!("{workspace:?}").find("/Users/").is_none());
+
+    enrich_dependency_provenance(&mut workspace, &manifests, None);
+    assert_eq!(
+        workspace
+            .members
+            .iter()
+            .find(|package| package.name == "member-one")
+            .and_then(|package| package
+                .dependencies
+                .iter()
+                .find(|dependency| { dependency.rename.as_deref() == Some("renamed_member") }))
+            .and_then(|dependency| dependency.resolved_instances.first())
+            .map(|resolved| resolved.lock_status),
+        Some(CargoDependencyLockStatus::MissingLockfile)
+    );
+}
+
+#[test]
+fn cargo_workspace_comprehensive_fixture() {
+    let fixture: ComprehensiveFixture = serde_json::from_slice(include_bytes!(
+        "../../test_data/cargo_workspace/comprehensive-v1.json"
+    ))
+    .expect("comprehensive fixture should be valid JSON");
+    assert_eq!(fixture.schema_version, 1);
+    assert_eq!(fixture.roots.len(), 3);
+
+    let mut converted = Vec::new();
+    let mut failures = Vec::new();
+    for root in &fixture.roots {
+        let encoded = serde_json::to_vec(&root.metadata).expect("metadata should serialize");
+        match parse_metadata(&encoded).and_then(|metadata| {
+            workspace_from_metadata(&metadata, |path| resolve(Path::new(&root.root_path), path))
+        }) {
+            Ok(workspace) => converted.push((root, workspace)),
+            Err(error) => failures.push((root.manifest_path.as_str(), error.to_string())),
+        }
+    }
+
+    assert_eq!(converted.len(), 2);
+    assert_eq!(failures.len(), 1);
+    assert_eq!(failures[0].0, "broken/Cargo.toml");
+    assert!(failures[0].1.contains("format version"));
+
+    let virtual_workspace = &converted[0].1;
+    assert!(virtual_workspace.is_virtual);
+    let primary = virtual_workspace
+        .members
+        .iter()
+        .find(|member| member.name == "duplicate-name")
+        .expect("virtual member should exist");
+    let target_kinds = primary
+        .targets
+        .iter()
+        .map(|target| &target.kind)
+        .collect::<Vec<_>>();
+    assert!(target_kinds.contains(&&CargoTargetKind::Library));
+    assert!(target_kinds.contains(&&CargoTargetKind::Binary));
+    assert!(target_kinds.contains(&&CargoTargetKind::Example));
+    assert!(target_kinds.contains(&&CargoTargetKind::Test));
+    assert!(target_kinds.contains(&&CargoTargetKind::Bench));
+    assert!(target_kinds.contains(&&CargoTargetKind::BuildScript));
+    assert!(
+        target_kinds
+            .iter()
+            .any(|kind| matches!(kind, CargoTargetKind::Other(_)))
+    );
+    assert!(primary.dependencies.iter().any(|dependency| {
+        dependency.kind == CargoDependencyKind::Normal
+            && dependency.rename.as_deref() == Some("renamed_member")
+            && dependency.optional
+            && dependency.target.as_deref() == Some("cfg(unix)")
+            && dependency.source_kind == CargoDependencySourceKind::Path
+    }));
+    assert!(primary.dependencies.iter().any(|dependency| {
+        dependency.kind == CargoDependencyKind::Development
+            && dependency.source_kind == CargoDependencySourceKind::Registry
+    }));
+    assert!(primary.dependencies.iter().any(|dependency| {
+        dependency.kind == CargoDependencyKind::Build
+            && dependency.source_kind == CargoDependencySourceKind::Registry
+    }));
+    assert!(
+        primary
+            .dependencies
+            .iter()
+            .any(|dependency| { dependency.source_kind == CargoDependencySourceKind::Git })
+    );
+
+    let standalone = &converted[1].1;
+    assert!(!standalone.is_virtual);
+    assert_eq!(standalone.members[0].name, primary.name);
+
+    let parsed_profiles = fixture
+        .profile_manifests
+        .iter()
+        .map(|entry| (entry.path.as_str(), parse_cargo_profiles(&entry.contents)))
+        .collect::<Vec<_>>();
+    assert!(parsed_profiles[0].1.is_ok());
+    assert!(parsed_profiles[1].1.is_err());
+
+    for declaration in &fixture.toolchain_declarations {
+        let toolchain =
+            parse_rust_toolchain(fixture_path(&declaration.path), &declaration.contents)
+                .expect("toolchain declaration should parse");
+        assert!(toolchain.channel.is_some());
     }
 }
 

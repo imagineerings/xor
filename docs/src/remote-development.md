@@ -9,6 +9,8 @@ Remote Development lets you edit code on a remote server while running Zed local
 
 For Rust workspace tooling, Cargo metadata, Rust test discovery, Cargo tasks, and DAP build commands also run on the authoritative remote project host. The local Cargo and Tests panels receive bounded project-relative models and structured lifecycle state; they do not receive environment values, raw terminal output, or absolute host paths, and they never fall back to a local Cargo installation. The remote server must be built with the same `rust-tools` capability. A disabled or older host is shown as an unsupported protocol/capability state rather than repeatedly retrying commands.
 
+Maintainers certifying Rust tooling across project modes should run `./script/test-rust-tools-environments --matrix --offline` and then complete the production UI checklist printed in the Rust language documentation. A checkout-only SSH, WSL, or container fixture run is recorded as observed, not physically certified, until the Cargo and Tests panels have been exercised through that actual Zed project transport.
+
 For day-to-day workflows, pair remote development with [Tasks](./tasks.md),
 [Terminal](./terminal.md), and [Debugger](./debugger.md).
 

@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-This pack owns Cargo-specific execution configuration, contextual action availability, and compilation into Zed's existing Tasks and DAP systems. The versioned preset schema, settings precedence, safe workspace state, structured argv/env compilation, six contextual actions, and DAP conversion are verified baseline. This pack does not own process execution.
+This pack owns Cargo-specific execution configuration, contextual action availability, and compilation into Zed's existing Tasks and DAP systems. The versioned preset schema, settings precedence, safe workspace state, structured argv/env compilation, contextual actions, and DAP conversion are implemented. This pack does not own process execution.
 
 Canonical IDs are `cargo-execution/<criterion>`.
 
@@ -21,7 +21,12 @@ Canonical IDs are `cargo-execution/<criterion>`.
 9. **1.9** Metadata refresh/navigation SHALL remain distinct from execution; `CargoWorkspaceStore` SHALL expose no arbitrary build/run/test API.
 10. **1.10** Cargo presets SHALL augment, not replace, language tasks, runnables, terminals, `tasks.json`, `debug.json`, or DAP scenarios.
 
-### Requirement 2: Complete preset authoring and missing configuration [Next]
+### Requirement 2: Complete preset authoring and missing configuration [Implemented]
+
+<!-- impl: crates/cargo_ui/src/cargo_preset.rs#CargoPreset -->
+<!-- impl: crates/cargo_ui/src/cargo_preset_editor.rs#CargoPresetEditor -->
+<!-- impl: crates/cargo_ui/src/cargo_actions.rs#plan_cargo_action_with_confirmation -->
+<!-- impl: crates/cargo_ui/tests/cargo_configuration_compatibility.rs#tasks_json_and_debug_json_coexist_with_cargo_configuration -->
 
 #### Acceptance criteria
 
@@ -43,11 +48,10 @@ Canonical IDs are `cargo-execution/<criterion>`.
 
 ## Roadmap boundaries and non-goals
 
-Now baseline is complete. Dedicated compatibility tests are the highest-priority gap; authoring UX and missing fields are Next. Doc/Clippy/Fmt/Clean/Tree require separate product sequencing within this pack. `cargo update` is rejected because it mutates resolution and can use the network.
+The preset editor, schema version 2, pre-launch lifecycle, compatibility suite and approved Doc/Clippy/Fmt/Clean/Tree actions are complete. `cargo update` remains rejected because it mutates resolution and can use the network.
 
 Out of scope: a second task scheduler, terminal parsing, automatic dependency changes, inline shell strings, replacing configuration JSON, coverage/profiling execution, or moving arbitrary commands into `CargoWorkspaceStore`.
 
 ## Open questions
 
-1. **Preset editor surface.** Recommended default: a Cargo-panel modal/popover with redacted argv preview, not a general settings editor. Task 2.2 depends on this interaction choice.
-2. **Project save confirmation.** Recommended default: one explicit confirmation explaining repository sharing/trust and omitting environment values. Task 2.2 depends on final copy.
+None. The recommended Cargo-panel modal and one explicit project-save confirmation were adopted.

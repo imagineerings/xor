@@ -60,6 +60,10 @@ pub struct HeadlessProject {
     pub cargo_workspace_store: Entity<project::cargo_workspace_store::CargoWorkspaceStore>,
     #[cfg(feature = "rust-tools")]
     pub structured_execution_store: Entity<project::structured_execution::StructuredExecutionStore>,
+    pub source_coverage_store: Entity<project::source_coverage::SourceCoverageStore>,
+    #[cfg(feature = "rust-tools")]
+    pub rust_coverage_provider_store:
+        Entity<project::rust_coverage_provider::RustCoverageProviderStore>,
     #[cfg(feature = "rust-tools")]
     pub rust_test_provider_store: Entity<project::rust_test_provider::RustTestProviderStore>,
     pub dap_store: Entity<DapStore>,
@@ -147,6 +151,17 @@ impl HeadlessProject {
             );
             store.shared(REMOTE_SERVER_PROJECT_ID, session.clone());
             store
+        });
+        let source_coverage_store = cx.new(|_| {
+            project::source_coverage::SourceCoverageStore::local(worktree_store.clone(), 1)
+        });
+        #[cfg(feature = "rust-tools")]
+        let rust_coverage_provider_store = cx.new(|_| {
+            project::rust_coverage_provider::RustCoverageProviderStore::local(
+                worktree_store.clone(),
+                source_coverage_store.clone(),
+                1,
+            )
         });
         #[cfg(feature = "rust-tools")]
         let rust_test_provider_store = cx.new(|cx| {
@@ -320,6 +335,9 @@ impl HeadlessProject {
         session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &cargo_workspace_store);
         #[cfg(feature = "rust-tools")]
         session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &structured_execution_store);
+        session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &source_coverage_store);
+        #[cfg(feature = "rust-tools")]
+        session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &rust_coverage_provider_store);
         #[cfg(feature = "rust-tools")]
         session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &rust_test_provider_store);
         session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &toolchain_store);
@@ -376,6 +394,9 @@ impl HeadlessProject {
         project::cargo_workspace_store::CargoWorkspaceStore::init(&session);
         #[cfg(feature = "rust-tools")]
         project::structured_execution::StructuredExecutionStore::init(&session);
+        project::source_coverage::SourceCoverageStore::init(&session);
+        #[cfg(feature = "rust-tools")]
+        project::rust_coverage_provider::RustCoverageProviderStore::init(&session);
         #[cfg(feature = "rust-tools")]
         project::rust_test_provider::RustTestProviderStore::init(&session);
         ToolchainStore::init(&session);
@@ -399,6 +420,9 @@ impl HeadlessProject {
             cargo_workspace_store,
             #[cfg(feature = "rust-tools")]
             structured_execution_store,
+            source_coverage_store,
+            #[cfg(feature = "rust-tools")]
+            rust_coverage_provider_store,
             #[cfg(feature = "rust-tools")]
             rust_test_provider_store,
             dap_store,

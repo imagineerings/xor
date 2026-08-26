@@ -4,6 +4,9 @@
 
 `project::cargo_workspace` is a feature-gated, UI-independent Cargo model. `CargoWorkspaceStore` discovers visible manifest candidates and invokes injected or production metadata/configuration runners on the authoritative project host. `cargo_ui::CargoTreeProvider` projects bounded snapshots into `language_tools::language_tool_tree`; `CargoPanel` is a thin dockable wrapper titled `Cargo`.
 
+<!-- impl: crates/project/benches/cargo_workspace.rs#cargo_workspace_benchmark -->
+<!-- impl: crates/cargo_ui/src/cargo_panel.rs#cargo_dashboard_foreground_budget -->
+
 Evidence includes `crates/project/test_data/cargo_workspace/`, `crates/project/tests/integration/cargo_workspace.rs`, inline store tests, Cargo panel projection/GPUI tests, the 1,000-package panel case, and the generic host's 10,000-row case.
 
 ## Design decisions
@@ -26,7 +29,9 @@ The store parses visible profile/toolchain declarations and performs one bounded
 
 ### D5: Add a fixture and benchmark without changing runtime architecture
 
-The remaining fixture composes existing deterministic captures under `crates/project/test_data`; it must not run real Cargo. A repeatable benchmark seam shall invoke pure metadata conversion, store reconciliation and tree projection separately, report time/peak retained allocations using repository-standard tooling, and define accepted budgets after a checked-in baseline is reviewed. GPUI portions use executor timers and visible-range assertions.
+<!-- impl: crates/project/tests/integration/cargo_workspace.rs#cargo_workspace_comprehensive_fixture -->
+
+The standalone `comprehensive-v1.json` fixture contains three independent Cargo candidates and deterministic configuration declarations. Its integration test converts valid virtual and standalone roots, retains a malformed candidate as an isolated failure, and never invokes Cargo or the network. The project benchmark deterministically expands that fixture to 1,000 packages, gates parse/model conversion at two seconds and 32 MiB of retained modeled data, and records Criterion timing distributions. The accepted macOS arm64 baseline is 10 ms one-shot, 517,559 retained bytes, and a 4.25–4.49 ms Criterion interval. The Cargo GPUI test projects in the background, yields through a GPUI executor timer, and gates foreground reconciliation plus visible-range access for exactly 10,000 rows at 250 ms; the accepted local result is 74 ms.
 
 ### D6: Preserve failure, privacy and persistence behavior
 
@@ -61,4 +66,4 @@ Candidate failures remain scoped; last-good safe data can become stale; malforme
 
 ## Remaining delta
 
-Only D5 is unimplemented. No dashboard production behavior is otherwise reopened by this pack.
+D5's hermetic fixture, pure model budget and GPUI foreground gate are implemented. No dashboard production behavior remains open in this pack.

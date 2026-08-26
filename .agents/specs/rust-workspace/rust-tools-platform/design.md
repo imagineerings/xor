@@ -2,7 +2,7 @@
 
 ## Current implementation baseline
 
-`zed/rust-tools = [dep:cargo_ui, tasks_ui/rust-test-actions]`; `project` gates `cargo-workspace`, `structured-execution`, and `rust-tests`; `remote_server/rust-tools` selects `project/rust-tests`. Zed imports/initializes menus/panels only under cfg. HeadlessProject constructs/registers three stores only under its feature. `script/check-rust-tools-feature-boundary`, CI checks, bundle dry runs and enabled/disabled tests enforce the boundary. Protobufs remain inert and compiled.
+`zed/rust-tools = [dep:cargo_ui, tasks_ui/rust-test-actions]`; `project` gates `cargo-workspace`, `structured-execution`, `rust-tests`, and `rust-coverage`; `remote_server/rust-tools` selects the Rust test and coverage providers. Zed imports/initializes menus/panels only under cfg. HeadlessProject constructs/registers the feature-gated stores only under its feature. `script/check-rust-tools-feature-boundary`, CI checks, bundle dry runs and enabled/disabled tests enforce the boundary. Protobufs remain inert and compiled.
 
 ## Design decisions
 
@@ -61,4 +61,4 @@ Existing workspace/settings migrations remain additive. Disabled builds instanti
 
 ## Remaining delta
 
-D6 certification artifacts remain. D1–D5 are verified baselines and must not be rewritten as a new platform layer.
+The integrated fixture, deterministic budget gates, hermetic local matrix and manual certification documents are implemented. D6 still requires dated production SSH/WSL/development-container/multiplayer results plus physical VoiceOver and NVDA results. D1–D5 are verified baselines and must not be rewritten as a new platform layer.

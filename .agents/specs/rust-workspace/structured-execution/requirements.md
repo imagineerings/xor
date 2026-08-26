@@ -21,6 +21,9 @@ Canonical IDs are `structured-execution/<criterion>`.
 
 ### Requirement 2: Certify bounded performance [Required change]
 
+<!-- impl: crates/project/benches/structured_execution.rs#structured_execution_benchmark -->
+<!-- impl: crates/tasks_ui/src/test_explorer.rs#structured_execution_foreground_budget -->
+
 #### Acceptance criteria
 
 1. **2.1** THE repository SHALL define repeatable time and memory budgets for discovery application, event reduction, paging and visible-range projection at the supported 10,000-node limit and SHALL gate regressions against an accepted baseline.

@@ -41,7 +41,7 @@ pub struct TestsPanelSettingsContent {
 #[cfg(feature = "rust-tools")]
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
 pub struct CargoSettingsContent {
-    /// Cargo preset schema version. The first supported version is 1.
+    /// Cargo preset schema version. Versions 1 and 2 are supported.
     pub schema_version: Option<u32>,
     /// Named Cargo presets, merged by stable identifier across settings scopes.
     #[serde(default)]
@@ -61,6 +61,10 @@ pub struct CargoPresetSettingsContent {
     pub features: Option<Vec<String>>,
     pub default_features: Option<bool>,
     pub target_triple: Option<String>,
+    /// An already-installed Rust toolchain selected through Cargo's structured `+toolchain` argument.
+    pub toolchain: Option<String>,
+    /// The label of an existing Tasks-owned task that must succeed before this preset starts.
+    pub pre_launch_task: Option<String>,
     pub args: Option<Vec<String>>,
     pub trailing_args: Option<Vec<String>>,
     pub environment: Option<HashMap<String, String>>,

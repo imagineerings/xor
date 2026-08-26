@@ -2,7 +2,7 @@
 
 ## Current implementation baseline
 
-Zed's Tasks/terminal can run explicit user commands on local or remote project hosts, and Workspace can open project paths or URL/file targets. There is no Rust profile preset, artifact declaration, profiler adapter, sample model, flamegraph or call-tree view.
+Zed's Tasks/terminal can run explicit user commands on local or remote project hosts. Task templates now support a bounded project-relative artifact declaration, and Cargo UI can compile an explicitly configured external profiling command from an existing Cargo context. Workspace opens a declared visible artifact only after successful completion. There is no bundled profiler, terminal parser, native sample model, flamegraph or call-tree view.
 
 ## Design decisions
 

@@ -2,7 +2,7 @@
 
 ## Current implementation baseline
 
-`cargo_workspace` already converts bounded direct dependency declarations and annotates kind, rename, optional/default/requested features, target, source kind, resolved name/version, workspace member and local manifest where metadata exposes them. `CargoPanel` renders these as direct leaves. It does not retain a resolved transitive graph, lock provenance or workspace-inheritance syntax.
+`cargo_workspace` converts bounded direct dependency declarations and now enriches them with visible manifest origin, bounded resolved instances/features, lock status, and workspace-cycle observations. `CargoPanel` keeps the dashboard direct-only while rendering a finite selected-row detail projection. It does not retain or render a recursive transitive graph.
 
 ## Design decisions
 

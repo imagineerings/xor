@@ -1,5 +1,6 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
+use anyhow::Context as _;
 use db::kvp::KeyValueStore;
 use gpui::{
     Action, Anchor, App, AsyncWindowContext, Context, DismissEvent, Entity, EventEmitter,
@@ -22,6 +23,7 @@ use project::{
 };
 use settings::{DockSide, Settings, SettingsStore};
 use ui::{ContextMenu, IconName, Tooltip, prelude::*};
+use util::rel_path::RelPath;
 use workspace::{
     Panel, Workspace,
     dock::{DockPosition, PanelEvent},
@@ -30,10 +32,13 @@ use workspace::{
 
 use crate::{
     BenchSelected, BuildSelected, CargoAction, CargoActionNodeKind, CargoActionRuntime,
-    CargoActionSelection, CargoActionTargetKind, CargoPanelSettings, CargoPresetScope,
-    CargoPresetSettings, CargoPresetWorkspaceState, CargoSafeSelectionState, CheckSelected,
-    DebugSelected, RunSelected, TestSelected, WorkspaceCargoActionDispatcher,
-    cargo_action_availability, dispatch_cargo_action, plan_cargo_action, recover_workspace_state,
+    CargoActionSelection, CargoActionTargetKind, CargoPanelSettings, CargoPreset,
+    CargoPresetEditor, CargoPresetSaveScope, CargoPresetScope, CargoPresetSettings,
+    CargoPresetValidationContext, CargoPresetWorkspaceState, CargoSafeSelectionState,
+    CheckSelected, CleanSelected, ClippySelected, DebugSelected, DocSelected, FmtSelected,
+    RunSelected, RunWithCoverageSelected, TestSelected, TreeSelected,
+    WorkspaceCargoActionDispatcher, apply_preset_save, cargo_action_availability,
+    dispatch_cargo_action, plan_cargo_action_with_confirmation, recover_workspace_state,
 };
 
 actions!(cargo_panel, [ToggleCargoPanel]);
@@ -766,13 +771,17 @@ fn package_node(
                     if let Some(version) = &dependency.resolved_version {
                         annotations.push(format!("resolved {version}"));
                     }
+                    let insight = crate::cargo_dependency_insight(&dependency_id, dependency);
+                    for (node_id, path) in insight.navigation {
+                        navigation.insert(node_id, path);
+                    }
                     LanguageToolNode {
                         id: dependency_id,
                         label: display_name.to_string(),
                         secondary_label: Some(annotations.join(" · ")),
                         icon: None,
                         accessibility_label: format!("Cargo dependency {display_name}"),
-                        children: Vec::new(),
+                        children: insight.children,
                         enabled: true,
                         activation_label: Some("Open relevant Cargo.toml".to_string()),
                     }
@@ -965,6 +974,7 @@ pub struct CargoPanel {
     pending_preset_serialization: Option<gpui::Task<()>>,
     last_snapshot: Option<CargoWorkspaceSnapshot>,
     execution_host_available: bool,
+    pending_clean_confirmation: Option<CargoActionSelection>,
     context_menu: Option<(Entity<ContextMenu>, Point<Pixels>, Subscription)>,
     _subscriptions: Vec<Subscription>,
 }
@@ -1035,6 +1045,7 @@ impl CargoPanel {
                     pending_preset_serialization,
                     last_snapshot: None,
                     execution_host_available: false,
+                    pending_clean_confirmation: None,
                     context_menu: None,
                     _subscriptions: vec![subscription, settings_subscription],
                 }
@@ -1248,6 +1259,16 @@ impl CargoPanel {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.execute_selected_action_with_preset(action, None, window, cx);
+    }
+
+    pub(crate) fn execute_selected_action_with_preset(
+        &mut self,
+        action: CargoAction,
+        preset_override: Option<CargoPreset>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(selection) = self
             .host
             .selected()
@@ -1274,12 +1295,28 @@ impl CargoPanel {
             );
             return;
         }
-        let preset = self
-            .preset_state
-            .active_preset_id
-            .as_ref()
-            .and_then(|identifier| CargoPresetSettings::get_global(cx).presets.get(identifier))
-            .cloned();
+        let clean_confirmed = if action == CargoAction::Clean {
+            if self.pending_clean_confirmation.as_ref() != Some(&selection) {
+                self.pending_clean_confirmation = Some(selection);
+                self.set_action_notice(
+                    "Clean removes Cargo build artifacts. Invoke Clean again on this item to confirm",
+                    cx,
+                );
+                return;
+            }
+            self.pending_clean_confirmation.take();
+            true
+        } else {
+            self.pending_clean_confirmation = None;
+            false
+        };
+        let preset = preset_override.or_else(|| {
+            self.preset_state
+                .active_preset_id
+                .as_ref()
+                .and_then(|identifier| CargoPresetSettings::get_global(cx).presets.get(identifier))
+                .cloned()
+        });
         let Some(workspace) = self.workspace.upgrade() else {
             self.set_action_notice("The workspace is no longer available", cx);
             return;
@@ -1296,7 +1333,13 @@ impl CargoPanel {
                     .ok_or_else(|| {
                         anyhow::anyhow!("No task context exists for the selected worktree")
                     })?;
-                let plan = plan_cargo_action(action, &selection, preset.as_ref(), base_context)?;
+                let plan = plan_cargo_action_with_confirmation(
+                    action,
+                    &selection,
+                    preset.as_ref(),
+                    base_context,
+                    clean_confirmed,
+                )?;
                 workspace_handle.update_in(cx, |workspace, window, cx| {
                     let mut dispatcher = WorkspaceCargoActionDispatcher::new(workspace, window, cx);
                     dispatch_cargo_action(plan, &mut dispatcher);
@@ -1313,6 +1356,157 @@ impl CargoPanel {
             }
         })
         .detach();
+    }
+
+    fn open_preset_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let preset = self
+            .preset_state
+            .active_preset_id
+            .as_ref()
+            .and_then(|identifier| CargoPresetSettings::get_global(cx).presets.get(identifier))
+            .cloned()
+            .unwrap_or_else(|| {
+                crate::CargoPreset::ephemeral_default(crate::CargoSubcommand::Build)
+            });
+        let mut validation_context = CargoPresetValidationContext::default();
+        if let Some(snapshot) = &self.last_snapshot {
+            for workspace in &snapshot.workspaces {
+                validation_context.profiles.extend(
+                    workspace
+                        .configuration
+                        .profiles
+                        .iter()
+                        .map(|profile| profile.name.clone()),
+                );
+                for package in &workspace.members {
+                    validation_context.packages.insert(package.name.clone());
+                    validation_context
+                        .targets
+                        .extend(package.targets.iter().map(|target| target.name.clone()));
+                }
+            }
+        }
+        let Some(workspace) = self.workspace.upgrade() else {
+            self.set_action_notice("The workspace is no longer available", cx);
+            return;
+        };
+        let panel = cx.weak_entity();
+        workspace.update(cx, |workspace, cx| {
+            workspace.toggle_modal(window, cx, move |window, cx| {
+                CargoPresetEditor::new(panel, preset, validation_context, window, cx)
+            });
+        });
+    }
+
+    pub(crate) fn save_project_preset(
+        &mut self,
+        preset: CargoPreset,
+        cx: &mut Context<Self>,
+    ) -> anyhow::Result<()> {
+        let selection = self
+            .host
+            .selected()
+            .and_then(|id| self.provider.action_selection(id))
+            .cloned()
+            .context("Select a Cargo workspace, package, or target before saving for Project")?;
+        let runtime = self.action_runtime(&selection, cx);
+        if !runtime.trusted {
+            anyhow::bail!("Trust this worktree before saving a shared Cargo preset");
+        }
+        if !runtime.connected {
+            anyhow::bail!("The authoritative project host is disconnected");
+        }
+        if !runtime.writable {
+            anyhow::bail!("This project is read-only");
+        }
+
+        let settings_path = Arc::<RelPath>::from(
+            RelPath::from_unix_str(".zed/settings.json")
+                .context("project settings path should be valid")?,
+        );
+        let settings_directory = Arc::<RelPath>::from(
+            RelPath::from_unix_str(".zed").context("settings directory should be valid")?,
+        );
+        let project = self.project.clone();
+        let panel = cx.weak_entity();
+        cx.spawn(async move |_panel, cx| {
+            let worktree = project
+                .read_with(cx, |project, cx| {
+                    project.worktree_for_id(selection.worktree_id, cx)
+                })
+                .context("Selected Cargo worktree is unavailable")?;
+            let (directory_exists, file_exists) = worktree.read_with(cx, |worktree, _| {
+                (
+                    worktree.entry_for_path(&settings_directory).is_some(),
+                    worktree.entry_for_path(&settings_path).is_some(),
+                )
+            });
+            if !directory_exists {
+                project
+                    .update(cx, |project, cx| {
+                        project.create_entry(
+                            ProjectPath {
+                                worktree_id: selection.worktree_id,
+                                path: settings_directory.clone(),
+                            },
+                            true,
+                            cx,
+                        )
+                    })
+                    .await?;
+            }
+            if !file_exists {
+                project
+                    .update(cx, |project, cx| {
+                        project.create_entry(
+                            ProjectPath {
+                                worktree_id: selection.worktree_id,
+                                path: settings_path.clone(),
+                            },
+                            false,
+                            cx,
+                        )
+                    })
+                    .await?;
+            }
+            let buffer = project
+                .update(cx, |project, cx| {
+                    project.open_buffer(
+                        ProjectPath {
+                            worktree_id: selection.worktree_id,
+                            path: settings_path,
+                        },
+                        cx,
+                    )
+                })
+                .await?;
+            let old_text = buffer.read_with(cx, |buffer, _| buffer.text());
+            let new_text = cx.read_global(|store: &SettingsStore, _| {
+                store.new_text_for_update(old_text, |settings| {
+                    let cargo = settings.cargo.get_or_insert_default();
+                    if let Err(error) =
+                        apply_preset_save(cargo, &preset, CargoPresetSaveScope::Project, true, true)
+                    {
+                        log::error!("Cargo project preset update failed: {error:#}");
+                    }
+                })
+            })?;
+            buffer.update(cx, |buffer, cx| {
+                let _edit_timestamp = buffer.set_text(new_text, cx);
+            });
+            project
+                .update(cx, |project, cx| project.save_buffer(buffer, cx))
+                .await?;
+            panel.update(cx, |panel, cx| {
+                panel.set_action_notice(
+                    "Saved Cargo preset to .zed/settings.json without environment values",
+                    cx,
+                );
+            })?;
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
+        Ok(())
     }
 
     fn deploy_context_menu(
@@ -1358,6 +1552,11 @@ impl CargoPanel {
                             label,
                             Box::new(RunSelected),
                         ),
+                        CargoAction::RunWithCoverage => menu.action_disabled_when(
+                            !availability.enabled,
+                            label,
+                            Box::new(RunWithCoverageSelected),
+                        ),
                         CargoAction::Test => menu.action_disabled_when(
                             !availability.enabled,
                             label,
@@ -1372,6 +1571,31 @@ impl CargoPanel {
                             !availability.enabled,
                             label,
                             Box::new(DebugSelected),
+                        ),
+                        CargoAction::Doc => menu.action_disabled_when(
+                            !availability.enabled,
+                            label,
+                            Box::new(DocSelected),
+                        ),
+                        CargoAction::Clippy => menu.action_disabled_when(
+                            !availability.enabled,
+                            label,
+                            Box::new(ClippySelected),
+                        ),
+                        CargoAction::Fmt => menu.action_disabled_when(
+                            !availability.enabled,
+                            label,
+                            Box::new(FmtSelected),
+                        ),
+                        CargoAction::Clean => menu.action_disabled_when(
+                            !availability.enabled,
+                            label,
+                            Box::new(CleanSelected),
+                        ),
+                        CargoAction::Tree => menu.action_disabled_when(
+                            !availability.enabled,
+                            label,
+                            Box::new(TreeSelected),
                         ),
                     };
                 }
@@ -1570,6 +1794,11 @@ impl Render for CargoPanel {
             .on_action(cx.listener(|panel, _: &RunSelected, window, cx| {
                 panel.execute_selected_action(CargoAction::Run, window, cx)
             }))
+            .on_action(
+                cx.listener(|panel, _: &RunWithCoverageSelected, window, cx| {
+                    panel.execute_selected_action(CargoAction::RunWithCoverage, window, cx)
+                }),
+            )
             .on_action(cx.listener(|panel, _: &TestSelected, window, cx| {
                 panel.execute_selected_action(CargoAction::Test, window, cx)
             }))
@@ -1578,6 +1807,21 @@ impl Render for CargoPanel {
             }))
             .on_action(cx.listener(|panel, _: &DebugSelected, window, cx| {
                 panel.execute_selected_action(CargoAction::Debug, window, cx)
+            }))
+            .on_action(cx.listener(|panel, _: &DocSelected, window, cx| {
+                panel.execute_selected_action(CargoAction::Doc, window, cx)
+            }))
+            .on_action(cx.listener(|panel, _: &ClippySelected, window, cx| {
+                panel.execute_selected_action(CargoAction::Clippy, window, cx)
+            }))
+            .on_action(cx.listener(|panel, _: &FmtSelected, window, cx| {
+                panel.execute_selected_action(CargoAction::Fmt, window, cx)
+            }))
+            .on_action(cx.listener(|panel, _: &CleanSelected, window, cx| {
+                panel.execute_selected_action(CargoAction::Clean, window, cx)
+            }))
+            .on_action(cx.listener(|panel, _: &TreeSelected, window, cx| {
+                panel.execute_selected_action(CargoAction::Tree, window, cx)
             }))
             .child(
                 div()
@@ -1590,6 +1834,14 @@ impl Render for CargoPanel {
                     .child(
                         h_flex()
                             .gap_2()
+                            .child(
+                                IconButton::new("cargo-edit-preset", IconName::Pencil)
+                                    .aria_label("Edit Cargo preset")
+                                    .tooltip(Tooltip::text("Edit Cargo preset"))
+                                    .on_click(cx.listener(|panel, _, window, cx| {
+                                        panel.open_preset_editor(window, cx)
+                                    })),
+                            )
                             .child(
                                 IconButton::new("cargo-expand-all", IconName::ExpandVertical)
                                     .aria_label("Expand All")
@@ -1667,15 +1919,22 @@ impl Render for CargoPanel {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, sync::Arc};
+    use std::{
+        collections::HashSet,
+        sync::Arc,
+        time::{Duration, Instant},
+    };
+
+    use gpui::TestAppContext;
 
     use project::cargo_workspace::{
-        CargoCandidateFailure, CargoConfigurationCompleteness, CargoDependencyModel,
+        CargoCandidateFailure, CargoConfigurationCompleteness, CargoDependencyDeclarationOrigin,
+        CargoDependencyFeatureCausality, CargoDependencyLockStatus, CargoDependencyModel,
         CargoDependencySourceKind, CargoFeatureModel, CargoHostCompilerModel,
         CargoHostCompilerStatus, CargoPackageModel, CargoProfileModel, CargoProfileOrigin,
-        CargoSnapshotCompleteness, CargoTargetModel, CargoToolchainFormat, CargoToolchainModel,
-        CargoWorkspaceConfiguration, CargoWorkspaceErrorCategory, CargoWorkspaceKey,
-        CargoWorkspaceModel,
+        CargoResolvedDependencyModel, CargoSnapshotCompleteness, CargoTargetModel,
+        CargoToolchainFormat, CargoToolchainModel, CargoWorkspaceConfiguration,
+        CargoWorkspaceErrorCategory, CargoWorkspaceKey, CargoWorkspaceModel,
     };
     use settings::WorktreeId;
     use util::rel_path::RelPath;
@@ -1739,6 +1998,20 @@ mod tests {
                         resolved_version: Some("1.0.0".to_string()),
                         resolved_workspace_member: None,
                         local_manifest: None,
+                        declaration_manifest: Some(path("member/Cargo.toml")),
+                        declaration_origin: CargoDependencyDeclarationOrigin::Direct,
+                        resolved_instances: vec![CargoResolvedDependencyModel {
+                            name: "serde".to_string(),
+                            version: "1.0.0".to_string(),
+                            source_kind: CargoDependencySourceKind::Registry,
+                            enabled_features: vec!["derive".to_string()],
+                            lock_status: CargoDependencyLockStatus::Locked,
+                            workspace_member: None,
+                            local_manifest: None,
+                        }],
+                        resolution_truncated: false,
+                        feature_causality: CargoDependencyFeatureCausality::Validated,
+                        cycle_detected: false,
                     }],
                 }],
             }],
@@ -1762,7 +2035,13 @@ mod tests {
             .first()
             .and_then(|group| group.children.first())
             .expect("direct dependency should be projected under its kind");
-        assert!(dependency.children.is_empty());
+        assert_eq!(dependency.children.len(), 4);
+        assert!(
+            dependency
+                .children
+                .iter()
+                .all(|section| { section.children.iter().all(|fact| fact.children.is_empty()) })
+        );
         assert_eq!(
             first_provider.navigation(&dependency.id),
             Some(&path("member/Cargo.toml"))
@@ -1803,6 +2082,70 @@ mod tests {
         assert!(first_ids.len() >= 6_000);
         assert!(first_ids.len() < 10_000);
         assert!(first_ids.iter().all(|id| !id.0.contains("/Users/")));
+    }
+
+    #[gpui::test]
+    async fn cargo_dashboard_foreground_budget(cx: &mut TestAppContext) {
+        const VISIBLE_ROW_LIMIT: usize = 10_000;
+        const FOREGROUND_BUDGET: Duration = Duration::from_millis(250);
+
+        let mut large_snapshot = snapshot();
+        let package_template = large_snapshot.workspaces[0].members[0].clone();
+        large_snapshot.workspaces[0].members = (0..1_240)
+            .map(|index| scaled_package(&package_template, index))
+            .collect();
+
+        let initial_projection = CargoTreeProvider::project(&large_snapshot).0;
+        let initial_count = collect_ids(&initial_projection.roots).len();
+        assert!(initial_count < VISIBLE_ROW_LIMIT);
+        let remaining_rows = VISIBLE_ROW_LIMIT - initial_count;
+        large_snapshot.workspaces[0]
+            .members
+            .extend((0..remaining_rows).map(|offset| {
+                let index = 1_240 + offset;
+                let mut package = scaled_package(&package_template, index);
+                package.targets.clear();
+                package.features.clear();
+                package.dependencies.clear();
+                package
+            }));
+
+        let projection_task = cx
+            .background_executor
+            .spawn(async move { CargoTreeProvider::project(&large_snapshot).0 });
+        cx.background_executor.timer(Duration::from_millis(1)).await;
+        let projected = projection_task.await;
+        assert_eq!(collect_ids(&projected.roots).len(), VISIBLE_ROW_LIMIT);
+
+        let started = Instant::now();
+        let mut host = LanguageToolTreeHost::default();
+        host.replace_snapshot(projected);
+        host.expand_all();
+        let elapsed = started.elapsed();
+        assert_eq!(host.visible_rows().len(), VISIBLE_ROW_LIMIT);
+        assert_eq!(host.visible_rows_in_range(4_000..4_025).len(), 25);
+        assert!(
+            elapsed <= FOREGROUND_BUDGET,
+            "10,000-row foreground reconciliation took {elapsed:?}, exceeding {FOREGROUND_BUDGET:?}"
+        );
+        eprintln!(
+            "cargo-dashboard-foreground-budget rows={VISIBLE_ROW_LIMIT} elapsed_ms={}",
+            elapsed.as_millis()
+        );
+    }
+
+    fn scaled_package(template: &CargoPackageModel, index: usize) -> CargoPackageModel {
+        let package_name = format!("package-{index:04}");
+        let package_root = format!("members/{package_name}");
+        let mut package = template.clone();
+        package.id = format!("{package_name} 0.1.0");
+        package.name = package_name.clone();
+        package.manifest_path = path(&format!("{package_root}/Cargo.toml"));
+        package.is_default_member = index == 0;
+        package.targets[0].name = package_name;
+        package.targets[0].source_path = Some(path(&format!("{package_root}/src/main.rs")));
+        package.targets[0].source_display_path = Some(format!("{package_root}/src/main.rs"));
+        package
     }
 
     #[test]

@@ -4,6 +4,9 @@
 
 `project::structured_execution` owns the generic state machine, paging and bounded protocol conversion. The task layer exposes structured lifecycle handles while terminals remain canonical output. `tasks_ui::test_explorer` projects all providers through the generic language-tool tree and delegates provider-specific actions without importing Cargo types in its generic core.
 
+<!-- impl: crates/project/benches/structured_execution.rs#structured_execution_benchmark -->
+<!-- impl: crates/tasks_ui/src/test_explorer.rs#structured_execution_foreground_budget -->
+
 ## Design decisions
 
 ### D1: Keep the contract ecosystem-neutral and internal
@@ -28,7 +31,9 @@ The authoritative project store reduces provider results. Remote peers request b
 
 ### D6: Add measured budgets at the existing limit
 
-A synthetic provider shall separately benchmark snapshot application, event reduction, pagination and tree flattening at 10,000 nodes. Accepted wall-time and retained-memory budgets are checked in only after review. GPUI tests drive timers through the executor and assert visible-range rendering.
+A deterministic synthetic provider separately benchmarks snapshot application, event reduction and the real bounded protocol-page conversion at 10,000 nodes. The gate allows two seconds for discovery, two seconds for event reduction, 100 ms for complete pagination and 64 MiB for conservatively modeled retained state. The accepted macOS arm64 result was 2 ms discovery, 3 ms event reduction, 65 ms pagination and approximately 5.4 MiB modeled retained state. Provider-node membership and latest result states are indexed so event reduction remains incremental rather than quadratic.
+
+The Tests-panel GPUI gate projects provider results on the background executor, yields with a GPUI executor timer, then requires foreground tree reconciliation and a 25-row visible-range projection for exactly 10,000 nodes to complete within 250 ms. The accepted local result was 37 ms.
 
 ## Cross-pack dependencies
 
@@ -49,4 +54,4 @@ A synthetic provider shall separately benchmark snapshot application, event redu
 
 ## Remaining delta
 
-Only D6 remains. Existing generic models, protocol, task bridge and Tests panel are not reopened.
+D6 is implemented without changing the 10,000-node protocol limit. No structured-execution behavior remains open in this pack.

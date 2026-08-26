@@ -2,8 +2,8 @@
 
 ## Milestone 1: LSP model and routing
 
-- [ ] 1. Add bounded call-hierarchy requests
-  - [ ] 1.1. Implement prepare/incoming/outgoing project routing
+- [x] 1. Add bounded call-hierarchy requests
+  - [x] 1.1. Implement prepare/incoming/outgoing project routing
     - _Requirements: 1.1, 1.2, 1.5, 1.6, 1.7_
     - _Depends on: none_
     - _Reads: crates/project/src/lsp_store.rs, crates/project/src/lsp_command.rs, crates/project/src/lsp_store/document_symbols.rs, crates/proto/proto/lsp.proto_
@@ -12,11 +12,12 @@
     - Design: D1, D4, D5
     - Outcome: Local and remote project paths expose bounded standard call-hierarchy requests.
     - Done when: Fake-server tests cover capabilities, locations, malformed data, cancellation and peer visibility.
+    - Evidence: Project fake-LSP tests cover prepare/incoming/outgoing, unsupported capability, malformed isolation, bounded TypeScript responses and dropped-request cancellation; the collaboration integration test proves guest requests and returned buffers route through the authoritative host.
 
 ## Milestone 2: Generic hierarchy view
 
-- [ ] 2. Add editor and language-tools UI
-  - [ ] 2.1. Implement lazy hierarchy projection and editor action
+- [x] 2. Add editor and language-tools UI
+  - [x] 2.1. Implement lazy hierarchy projection and editor action
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.7_
     - _Depends on: none_
     - _Reads: crates/language_tools/src/language_tool_tree.rs, crates/editor/src/editor.rs, crates/editor/src/hover_links.rs, crates/workspace/src/workspace.rs_
@@ -25,11 +26,12 @@
     - Design: D2, D3, D5
     - Outcome: Users can inspect and navigate a bounded accessible callers/callees tree.
     - Done when: Cycles do not recurse, direction switching cancels old work, and keyboard/navigation/state tests pass.
+    - Evidence: The language-tools projection tests cover lazy expansion, cycles, direction generation changes, depth/node limits, partial states and keyboard tree actions; production editor integration compiles through `language_tools`.
 
 ## Milestone 3: Cross-language acceptance
 
-- [ ] 3. Validate Rust and non-Rust behavior
-  - [ ] 3.1. Add cross-language remote and scale coverage
+- [x] 3. Validate Rust and non-Rust behavior
+  - [x] 3.1. Add cross-language remote and scale coverage
     - _Requirements: 1.5, 1.6, 1.8_
     - _Depends on: 1.1, 2.1_
     - _Reads: crates/project/src/lsp_store.rs, crates/language_tools/src/call_hierarchy.rs, crates/remote_server/src/headless_project.rs_
@@ -38,6 +40,7 @@
     - Design: D4, D5
     - Outcome: The generic feature is proven independently of Rust and through remote routing.
     - Done when: Rust/non-Rust fake servers and a bounded large cyclic hierarchy pass with GPUI timers.
+    - Evidence: Rust and TypeScript fake servers, a 257-item truncation case, a 10,000-node cyclic projection and the two-client collaboration route pass hermetically with GPUI timers.
 
 ## Mandatory manual task-decomposition audit
 
