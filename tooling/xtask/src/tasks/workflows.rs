@@ -290,8 +290,6 @@ pub fn run_workflows(args: GenerateWorkflowArgs) -> Result<()> {
         anyhow::bail!("xtask workflows must be ran from the project root");
     }
 
-    crate::tasks::products::run(crate::tasks::products::ProductsArgs { check: true })?;
-
     // Remove all previously generated workflows to ensure these do not become stale.
     WorkflowType::remove_generated_workflows()?;
 
@@ -299,6 +297,7 @@ pub fn run_workflows(args: GenerateWorkflowArgs) -> Result<()> {
         workflow_file.generate_file(&args)?;
     }
 
+    crate::tasks::products::run(crate::tasks::products::ProductsArgs { check: true })?;
     workflow_checks::validate(Default::default())
 }
 

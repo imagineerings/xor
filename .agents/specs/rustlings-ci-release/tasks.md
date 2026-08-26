@@ -20,7 +20,7 @@ First establish stable Rustlings package naming, then replace the active CI and 
     - _Evidence: Linux and macOS dry runs reported `rust_tools=true`; `bash -n script/bundle-linux script/bundle-mac` and Cargo metadata parsing passed; Windows stable and early dry-run branches were inspected because `pwsh` is unavailable on the macOS host._
   - [x] 1.2. Replace the active CI composition with one GitHub-hosted validation job
     - Retain generator helpers used outside the active `run_tests()` entry point.
-    - Include formatting, repository clippy, cargo-nextest, and an explicit `agentic,rust-tools` release check.
+    - Include formatting, repository clippy, cargo-nextest, and an explicit `multiplayer-tools,rust-tools` release check.
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 4.1_
     - _Depends on: none_
     - _Reads: tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/steps.rs_

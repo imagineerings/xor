@@ -237,7 +237,7 @@ Phase 1 establishes the catalog and typed identity boundary, migrates only the R
 - [x] 5. Generate shared validation and catalog-driven product matrices
   - [x] 5.1. Generate shared CI once plus enabled-product smoke rows
     - Keep formatting, repository clippy, and workspace nextest in one shared job; add a dependent product smoke matrix generated from enabled entries.
-    - Assert the Rust row checks exact `agentic,rust-tools`, remote `rust-tools`, and bundle-plan metadata while planned entries remain absent.
+    - Assert the Rust row checks exact `multiplayer-tools,rust-tools`, remote `rust-tools`, and bundle-plan metadata while planned entries remain absent.
     - _Requirements: 3.1, 3.6, 5.1, 5.2, 5.5, 6.1_
     - _Depends on: 1.4_
     - _Reads: tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/product_manifest.rs, tooling/xtask/src/tasks/bundle.rs_

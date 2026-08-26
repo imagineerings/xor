@@ -73,7 +73,7 @@ fn audit_phase_one_consumers() -> Result<()> {
         }
     }
     ensure!(
-        ci.contains("application_features: agentic,rust-tools")
+        ci.contains("application_features: multiplayer-tools,rust-tools")
             && ci.contains("remote_features: rust-tools"),
         "CI workflow is missing the exact Rust product feature row"
     );

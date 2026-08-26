@@ -9,7 +9,7 @@ The fork inherits large, organization-specific Zed workflows that require privat
 ### In scope
 
 - Replace the two active generated workflows with focused Rustlings CI and release workflows.
-- Build Linux x86_64, macOS ARM64, and Windows x86_64 release artifacts with `agentic` and `rust-tools` enabled.
+- Build Linux x86_64, macOS ARM64, and Windows x86_64 release artifacts with `multiplayer-tools` and `rust-tools` enabled; `multiplayer-tools` enables agentic functionality transitively.
 - Give the installed stable application and downloadable artifacts Rustlings branding.
 - Support unsigned builds when platform signing credentials are absent.
 
@@ -28,7 +28,7 @@ The fork inherits large, organization-specific Zed workflows that require privat
 #### Acceptance criteria
 
 1. **1.1** WHEN a pull request, a push to `main`, or a manual dispatch occurs, THEN THE CI workflow SHALL run one Linux validation job on a standard GitHub-hosted runner.
-2. **1.2** THE validation job SHALL check formatting, run `./script/clippy`, execute workspace tests with cargo-nextest, and check a release build of `zed` with `agentic` and `rust-tools` enabled.
+2. **1.2** THE validation job SHALL check formatting, run `./script/clippy`, execute workspace tests with cargo-nextest, and check a release build of `zed` with exactly `multiplayer-tools` and `rust-tools` enabled.
 3. **1.3** WHEN a newer run starts for the same workflow and ref, THEN THE workflow SHALL cancel the superseded run.
 4. **1.4** THE active CI workflow SHALL NOT require an organization-owner guard, private runner, R2 cache, Sentry, Slack, PostgreSQL service, or unrelated Zed automation.
 
@@ -39,7 +39,7 @@ The fork inherits large, organization-specific Zed workflows that require privat
 #### Acceptance criteria
 
 1. **2.1** WHEN a `v*` tag or manual dispatch starts the release workflow, THEN THE workflow SHALL build Linux x86_64, macOS ARM64, and Windows x86_64 bundles on matching standard GitHub-hosted runners.
-2. **2.2** THE platform jobs SHALL reuse the existing bundle scripts and enable `rust-tools` while retaining the default `agentic` feature.
+2. **2.2** THE platform jobs SHALL reuse the existing bundle scripts and enable exactly `multiplayer-tools` and `rust-tools`; agentic functionality SHALL remain enabled transitively through `multiplayer-tools`.
 3. **2.3** WHEN every platform build succeeds, THEN THE publishing job SHALL create or update a GitHub Release titled `Rustlings <tag>` and attach all Rustlings artifacts.
 4. **2.4** IF any platform build fails, THEN THE publishing job SHALL NOT publish a release.
 5. **2.5** THE release workflow SHALL use read-only contents permission by default and grant contents write permission only to the publishing job.

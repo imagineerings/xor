@@ -114,8 +114,8 @@ impl ProductManifest {
             "Rust product must be enabled in Phase 1"
         );
         ensure!(
-            rust.cargo_features == ["agentic", "rust-tools"],
-            "Rust application features must be exactly agentic,rust-tools"
+            rust.cargo_features == ["multiplayer-tools", "rust-tools"],
+            "Rust application features must be exactly multiplayer-tools,rust-tools"
         );
         ensure!(
             rust.remote_server_features == ["rust-tools"],
@@ -361,7 +361,7 @@ mod tests {
     fn rust_features_are_explicit() {
         let manifest = ProductManifest::load().expect("repository product catalog should be valid");
         let rust = manifest.product("rust").expect("Rust product should exist");
-        assert_eq!(rust.cargo_features, ["agentic", "rust-tools"]);
+        assert_eq!(rust.cargo_features, ["multiplayer-tools", "rust-tools"]);
         assert_eq!(rust.remote_server_features, ["rust-tools"]);
     }
 
