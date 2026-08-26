@@ -1,3 +1,5 @@
+#[cfg(any(test, feature = "test-support"))]
+use crate::ProviderTransportResponse;
 use crate::{
     AssetNamespace, AssetRoots, AttemptEventKind, AttemptState, AuthorizedCapabilities,
     CacheDependencies, CanonicalClipCacheIdentities, CanonicalConditioningCacheIdentities,
@@ -10,13 +12,15 @@ use crate::{
     NativeProviderInvocationAuthority, NativeProviderInvocationScope, NativeProviderWorkerRequest,
     NativeProviderWorkerResponse, NodeContext, NodeFailure, NodeFailureKind, NodeOutcome,
     OutputCommitError, OutputCommitReceipt, OutputCommitter, OutputExecutionScope, OutputMediaKind,
-    OutputProposal, PluginServiceWireFailure, PluginServiceWireRequest, PreparedEffect,
-    PreparedEffectRequest, PreparedOutput, ProfileId, PromptCompileError,
-    ProviderRuntimeStreamService, RuntimeCachePolicy, RuntimeNodeDescriptor,
-    RuntimeOutputDescriptor, RuntimeSupervisor, RuntimeSupervisorError, SharedAssetService,
-    SharedExecutionPresentationService, SharedOutputCommitter, WorkerLaunchConfig,
-    WorkerRegistryDeploymentPlan, WorkflowFormatDocument, authorize_native_input_reader,
-    authorize_native_output_committer, graph_to_prompt,
+    OutputProposal, PluginServiceWireFailure, PluginServiceWireRequest,
+    PreflightedProviderRuntimeActivationGrant, PreparedEffect, PreparedEffectRequest,
+    PreparedOutput, ProfileId, PromptCompileError, ProviderManifestAuthorizationV2, ProviderPolicy,
+    ProviderRuntimeActivationGrant, ProviderRuntimeStreamService, RuntimeCachePolicy,
+    RuntimeNodeDescriptor, RuntimeOutputDescriptor, RuntimeSupervisor, RuntimeSupervisorError,
+    SharedAssetService, SharedExecutionPresentationService, SharedOutputCommitter,
+    VerifiedProviderRuntimeReceiptV2, WorkerLaunchConfig, WorkerRegistryDeploymentPlan,
+    WorkflowFormatDocument, authorize_native_input_reader, authorize_native_output_committer,
+    graph_to_prompt,
 };
 use chrono::{Local, Utc};
 #[cfg(test)]
@@ -71,6 +75,9 @@ use comfy_nodes::{
     NativePreparedEffectKind, NativePreparedEffectService,
 };
 use comfy_plugin_sdk::ProviderResultReceiptSet;
+use comfy_plugin_sdk::{ProviderHeaderV2, ProviderHttpMethodV2, ProviderRequestHeadV2};
+#[cfg(any(test, feature = "test-support"))]
+use comfy_plugin_sdk::{ProviderInvocationResultV2, TypeRegistry};
 use comfy_sampler::{
     DiscreteSamplingProfile, GUIDANCE_ADAPTER_ID, GuidanceDenoiser, GuidanceError,
     GuidanceEvaluation, GuidanceOptions, GuidanceResult, INITIAL_NOISE_PHASE_ID,
@@ -117,7 +124,17 @@ use comfy_tensor::{
     generated_elementwise_or_runtime_operation_16::ElementwiseRuntimePartSixteenError,
     generated_indexing_masking_01::IndexingMaskingPartOneError,
 };
-use comfy_types::{AttemptId, BackendUnavailable, CancellationError, NodeId, WorkerOutputProposal};
+#[cfg(any(test, feature = "test-support"))]
+use comfy_types::WorkerProviderV2ProposalFinalization;
+use comfy_types::{
+    AttemptId, BackendUnavailable, CancellationError, NodeId, WorkerOutputProposal,
+    WorkerProviderInvocationContext, WorkerProviderStreamError, WorkerProviderStreamHandle,
+    WorkerProviderStreamingContract, WorkerSha256Digest,
+};
+#[cfg(feature = "test-support")]
+use comfy_types::{
+    WorkerPluginExecutionOutcome, WorkerProviderStreamRequest, WorkerProviderStreamResponse,
+};
 use futures::future::BoxFuture;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -151,6 +168,947 @@ const MAX_NATIVE_UI_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const NATIVE_CONTROLLER_CAPACITY: usize = 1024;
 const NATIVE_WORKER_EVENT_POLL: Duration = Duration::from_millis(100);
 const DEFAULT_NATIVE_IMAGE_MEMORY_LIMIT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+fn encode_provider_sha256(bytes: &[u8; 32]) -> String {
+    const LOWER_HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(64);
+    for byte in bytes {
+        encoded.push(char::from(LOWER_HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(LOWER_HEX[usize::from(byte & 0x0f)]));
+    }
+    encoded
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderV2InvocationEnvelope {
+    context: WorkerProviderInvocationContext,
+    streaming_contract: WorkerProviderStreamingContract,
+    provider_manifest_sha256: WorkerSha256Digest,
+    proposal_generation: u64,
+    finalization_nonce: [u8; 32],
+}
+
+pub struct NativeProviderWorkerV2Activation {
+    grant: Option<ProviderRuntimeActivationGrant>,
+    context: WorkerProviderInvocationContext,
+    envelope: WorkerProviderV2InvocationEnvelope,
+    provider_streams: ProviderRuntimeStreamService,
+    receipt_scope: NativeProviderWorkerV2ReceiptScope,
+}
+
+pub struct NativeProviderWorkerV2Preflight {
+    grant: Option<PreflightedProviderRuntimeActivationGrant>,
+    envelope: WorkerProviderV2InvocationEnvelope,
+    provider_streams: ProviderRuntimeStreamService,
+    receipt_scope: NativeProviderWorkerV2ReceiptScope,
+}
+
+pub struct NativeProviderWorkerV2RouteAuthority {
+    grant: Option<PreflightedProviderRuntimeActivationGrant>,
+    envelope: WorkerProviderV2InvocationEnvelope,
+    provider_streams: ProviderRuntimeStreamService,
+    receipt_scope: NativeProviderWorkerV2ReceiptScope,
+}
+
+#[cfg(feature = "test-support")]
+pub struct NativeProviderWorkerV2SupervisorBridge {
+    bridge: Option<crate::runtime_supervisor::RuntimeProviderV2Bridge>,
+    cancellation: CancellationToken,
+}
+
+#[cfg(feature = "test-support")]
+pub struct NativeProviderWorkerV2ActuatorRoute {
+    route_authority: Option<NativeProviderWorkerV2RouteAuthority>,
+    session: Option<NativeProviderWorkerV2RouteSession>,
+    verified_completion: Option<NativeProviderWorkerV2VerifiedCompletion>,
+    stream_calls: async_channel::Receiver<crate::runtime_supervisor::RuntimeProviderV2StreamCall>,
+    proposals: async_channel::Receiver<crate::runtime_supervisor::RuntimeProviderV2Proposal>,
+    cancellation: CancellationToken,
+    finalization_committed: bool,
+}
+
+#[cfg(feature = "test-support")]
+pub struct NativeProviderWorkerV2ActuationCall {
+    call: crate::runtime_supervisor::RuntimeProviderV2StreamCall,
+}
+
+#[cfg(feature = "test-support")]
+pub struct NativeProviderWorkerV2ProposalCall {
+    proposal: crate::runtime_supervisor::RuntimeProviderV2Proposal,
+}
+
+pub struct NativeProviderWorkerV2RouteSession {
+    envelope: WorkerProviderV2InvocationEnvelope,
+    provider_streams: ProviderRuntimeStreamService,
+    receipt_scope: NativeProviderWorkerV2ReceiptScope,
+    handle: WorkerProviderStreamHandle,
+    actuation: Option<crate::ProviderRuntimeActuationProposal>,
+}
+
+#[cfg_attr(
+    not(any(test, feature = "test-support")),
+    expect(
+        dead_code,
+        reason = "Task427 deployment actuator consumes verified provider-v2 completion fields"
+    )
+)]
+pub struct NativeProviderWorkerV2VerifiedCompletion {
+    envelope: WorkerProviderV2InvocationEnvelope,
+    receipt_scope: NativeProviderWorkerV2ReceiptScope,
+    handle: WorkerProviderStreamHandle,
+    receipt: VerifiedProviderRuntimeReceiptV2,
+}
+
+#[cfg(any(test, feature = "test-support"))]
+pub struct NativeProviderWorkerV2CompletedProposal {
+    completion: NativeProviderWorkerV2VerifiedCompletion,
+    proposal: ProviderInvocationResultV2,
+    registry: TypeRegistry,
+    cancellation: CancellationToken,
+}
+
+struct NativeProviderWorkerV2ReceiptScope {
+    context: WorkerProviderInvocationContext,
+    provider: String,
+    provider_manifest_sha256: String,
+    component_generation: u64,
+    component_digest_sha256: String,
+    binding_generation: u64,
+    binding_set_sha256: String,
+    request_ordinal: u32,
+}
+
+impl WorkerProviderV2InvocationEnvelope {
+    fn checked_from_controller(
+        context: WorkerProviderInvocationContext,
+        streaming_contract: WorkerProviderStreamingContract,
+        provider_manifest_sha256: WorkerSha256Digest,
+        proposal_generation: u64,
+        finalization_nonce: [u8; 32],
+    ) -> Result<Self, WorkerProviderStreamError> {
+        let envelope = Self {
+            context,
+            streaming_contract,
+            provider_manifest_sha256,
+            proposal_generation,
+            finalization_nonce,
+        };
+        envelope.validate()?;
+        Ok(envelope)
+    }
+
+    pub fn context(&self) -> &WorkerProviderInvocationContext {
+        &self.context
+    }
+
+    pub fn streaming_contract(&self) -> &WorkerProviderStreamingContract {
+        &self.streaming_contract
+    }
+
+    pub fn provider_manifest_sha256(&self) -> &WorkerSha256Digest {
+        &self.provider_manifest_sha256
+    }
+
+    pub const fn proposal_generation(&self) -> u64 {
+        self.proposal_generation
+    }
+
+    pub const fn finalization_nonce(&self) -> [u8; 32] {
+        self.finalization_nonce
+    }
+
+    pub fn validate(&self) -> Result<(), WorkerProviderStreamError> {
+        comfy_types::WorkerProviderStreamTransportValidator::checked_for_host_session(
+            self.context.clone(),
+            self.streaming_contract.clone(),
+            CancellationToken::default(),
+        )?;
+        if self.proposal_generation == 0 || self.finalization_nonce == [0; 32] {
+            return Err(WorkerProviderStreamError::InvalidInvocationResult);
+        }
+        Ok(())
+    }
+}
+
+impl NativeProviderWorkerV2Activation {
+    pub fn preflight_installed_component(
+        mut self,
+        worker_deployment: &WorkerRegistryDeploymentPlan,
+        worker_start: &crate::NativeProviderWorkerSessionStart,
+        manifest_authorization: ProviderManifestAuthorizationV2,
+    ) -> Result<NativeProviderWorkerV2Preflight, crate::PluginServiceError> {
+        let grant = self
+            .grant
+            .take()
+            .ok_or(crate::PluginServiceError::ProviderRuntimeAuthorityDenied)?
+            .preflight_installed_component(
+                &self.context,
+                worker_deployment,
+                worker_start,
+                manifest_authorization,
+            )?;
+        Ok(NativeProviderWorkerV2Preflight {
+            grant: Some(grant),
+            envelope: self.envelope,
+            provider_streams: self.provider_streams,
+            receipt_scope: self.receipt_scope,
+        })
+    }
+}
+
+impl NativeProviderWorkerV2Preflight {
+    pub fn into_transport_parts(
+        mut self,
+    ) -> Result<
+        (
+            WorkerProviderV2InvocationEnvelope,
+            NativeProviderWorkerV2RouteAuthority,
+        ),
+        crate::PluginServiceError,
+    > {
+        let grant = self
+            .grant
+            .take()
+            .ok_or(crate::PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        let route_envelope = self.envelope.clone();
+        Ok((
+            self.envelope,
+            NativeProviderWorkerV2RouteAuthority {
+                grant: Some(grant),
+                envelope: route_envelope,
+                provider_streams: self.provider_streams,
+                receipt_scope: self.receipt_scope,
+            },
+        ))
+    }
+}
+
+impl NativeProviderWorkerV2RouteAuthority {
+    #[cfg(feature = "test-support")]
+    pub fn into_supervised_route(
+        self,
+        invocation_timeout: Duration,
+        cancellation: CancellationToken,
+    ) -> Result<
+        (
+            NativeProviderWorkerV2SupervisorBridge,
+            NativeProviderWorkerV2ActuatorRoute,
+        ),
+        RuntimeSupervisorError,
+    > {
+        let (bridge, stream_calls, proposals) =
+            crate::runtime_supervisor::RuntimeProviderV2Bridge::capacity_one(
+                self.envelope.context().clone(),
+                self.envelope.streaming_contract().clone(),
+                cancellation.clone(),
+                invocation_timeout,
+            )?;
+        Ok((
+            NativeProviderWorkerV2SupervisorBridge {
+                bridge: Some(bridge),
+                cancellation: cancellation.clone(),
+            },
+            NativeProviderWorkerV2ActuatorRoute {
+                route_authority: Some(self),
+                session: None,
+                verified_completion: None,
+                stream_calls,
+                proposals,
+                cancellation,
+                finalization_committed: false,
+            },
+        ))
+    }
+
+    pub fn start(
+        mut self,
+        worker_request_head: comfy_types::WorkerProviderRequestHead,
+        provider_policy: &ProviderPolicy,
+    ) -> Result<NativeProviderWorkerV2RouteSession, crate::PluginServiceError> {
+        let request_head = provider_v2_sdk_request_head(&worker_request_head);
+        let authority = self
+            .grant
+            .take()
+            .ok_or(crate::PluginServiceError::ProviderRuntimeAuthorityDenied)?
+            .bind(&request_head, provider_policy)?;
+        let handle = self
+            .provider_streams
+            .start_request(authority, worker_request_head)?;
+        if handle.session_id != self.receipt_scope.context.session_id
+            || handle.session_generation != self.receipt_scope.context.session_generation
+            || handle.invocation != self.receipt_scope.context.invocation
+            || handle.generation != self.receipt_scope.context.generation
+        {
+            self.provider_streams.revoke_stream(handle);
+            return Err(crate::PluginServiceError::ProviderRuntimeAuthorityDenied);
+        }
+        Ok(NativeProviderWorkerV2RouteSession {
+            envelope: self.envelope,
+            provider_streams: self.provider_streams,
+            receipt_scope: self.receipt_scope,
+            handle,
+            actuation: None,
+        })
+    }
+}
+
+#[cfg(feature = "test-support")]
+impl NativeProviderWorkerV2SupervisorBridge {
+    pub(crate) fn take(
+        &mut self,
+    ) -> Result<crate::runtime_supervisor::RuntimeProviderV2Bridge, RuntimeSupervisorError> {
+        self.bridge.take().ok_or_else(|| {
+            RuntimeSupervisorError::Protocol(
+                "provider-v2 supervisor bridge was already consumed".to_owned(),
+            )
+        })
+    }
+}
+
+#[cfg(any(test, feature = "test-support"))]
+async fn receive_provider_v2_actuator_item<T>(
+    receiver: &async_channel::Receiver<T>,
+    cancellation: &CancellationToken,
+    timeout: Duration,
+    timeout_stage: &'static str,
+    closed_message: &'static str,
+) -> Result<T, RuntimeSupervisorError> {
+    if timeout.is_zero() {
+        return Err(RuntimeSupervisorError::Timeout {
+            stage: timeout_stage,
+        });
+    }
+    if cancellation.is_cancelled() {
+        match receiver.try_recv() {
+            Ok(item) => drop(item),
+            Err(async_channel::TryRecvError::Empty | async_channel::TryRecvError::Closed) => {}
+        }
+        return Err(RuntimeSupervisorError::Protocol(closed_message.to_owned()));
+    }
+    let item = smol::future::race(
+        async {
+            receiver
+                .recv()
+                .await
+                .map_err(|_| RuntimeSupervisorError::Protocol(closed_message.to_owned()))
+        },
+        async {
+            crate::runtime_supervisor::supervisor_delay(timeout).await;
+            Err(RuntimeSupervisorError::Timeout {
+                stage: timeout_stage,
+            })
+        },
+    )
+    .await?;
+    if cancellation.is_cancelled() {
+        return Err(RuntimeSupervisorError::Protocol(closed_message.to_owned()));
+    }
+    Ok(item)
+}
+
+#[cfg(feature = "test-support")]
+impl NativeProviderWorkerV2ActuatorRoute {
+    #[cfg(feature = "test-support")]
+    pub async fn receive_call(
+        &self,
+        timeout: Duration,
+    ) -> Result<NativeProviderWorkerV2ActuationCall, RuntimeSupervisorError> {
+        receive_provider_v2_actuator_item(
+            &self.stream_calls,
+            &self.cancellation,
+            timeout,
+            "provider-v2 actuator call",
+            "provider-v2 actuator call route closed",
+        )
+        .await
+        .map(|call| NativeProviderWorkerV2ActuationCall { call })
+    }
+
+    #[cfg(feature = "test-support")]
+    pub async fn receive_proposal(
+        &self,
+        timeout: Duration,
+    ) -> Result<NativeProviderWorkerV2ProposalCall, RuntimeSupervisorError> {
+        receive_provider_v2_actuator_item(
+            &self.proposals,
+            &self.cancellation,
+            timeout,
+            "provider-v2 actuator proposal",
+            "provider-v2 actuator proposal route closed",
+        )
+        .await
+        .map(|proposal| NativeProviderWorkerV2ProposalCall { proposal })
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn respond_start(
+        &mut self,
+        call: NativeProviderWorkerV2ActuationCall,
+        policy: &ProviderPolicy,
+    ) -> Result<(), RuntimeSupervisorError> {
+        let WorkerProviderStreamRequest::StartRequest { head, .. } = call.call.request() else {
+            return Err(RuntimeSupervisorError::Protocol(
+                "provider-v2 actuator expected StartRequest".to_owned(),
+            ));
+        };
+        if self.session.is_some() {
+            return Err(RuntimeSupervisorError::Protocol(
+                "provider-v2 actuator repeated StartRequest".to_owned(),
+            ));
+        }
+        let authority = self.route_authority.take().ok_or_else(|| {
+            RuntimeSupervisorError::Protocol(
+                "provider-v2 actuator lost its one-use authority".to_owned(),
+            )
+        })?;
+        let session = authority
+            .start(head.clone(), policy)
+            .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+        let handle = session.handle();
+        call.call
+            .respond(WorkerProviderStreamResponse::Stream(Ok(handle)))?;
+        self.session = Some(session);
+        Ok(())
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn respond_call(
+        &mut self,
+        call: NativeProviderWorkerV2ActuationCall,
+        wait_outcome: Option<comfy_types::WorkerProviderWaitOutcome>,
+    ) -> Result<(), RuntimeSupervisorError> {
+        let session = self.session.as_mut().ok_or_else(|| {
+            RuntimeSupervisorError::Protocol(
+                "provider-v2 actuator call preceded StartRequest".to_owned(),
+            )
+        })?;
+        let response = match call.call.request().clone() {
+            WorkerProviderStreamRequest::WriteRequestChunk(chunk) => {
+                session
+                    .write_request_chunk(chunk)
+                    .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+                WorkerProviderStreamResponse::Unit(Ok(()))
+            }
+            WorkerProviderStreamRequest::WaitResponse(request) => {
+                let outcome = wait_outcome.ok_or_else(|| {
+                    RuntimeSupervisorError::Protocol(
+                        "provider-v2 WaitResponse omitted its scripted outcome".to_owned(),
+                    )
+                })?;
+                session
+                    .accept_wait(request, outcome.clone())
+                    .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+                WorkerProviderStreamResponse::Wait(Ok(outcome))
+            }
+            WorkerProviderStreamRequest::StartUpload(request) => {
+                let handle = session
+                    .start_upload(request)
+                    .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+                WorkerProviderStreamResponse::Stream(Ok(handle))
+            }
+            WorkerProviderStreamRequest::WriteUploadChunk(chunk) => {
+                session
+                    .write_upload_chunk(chunk)
+                    .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+                WorkerProviderStreamResponse::Unit(Ok(()))
+            }
+            WorkerProviderStreamRequest::ReportProgress(progress) => {
+                session
+                    .report_progress(progress, Instant::now())
+                    .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+                WorkerProviderStreamResponse::Unit(Ok(()))
+            }
+            WorkerProviderStreamRequest::CheckCancelled(_) => {
+                session
+                    .check_cancelled()
+                    .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+                WorkerProviderStreamResponse::Unit(Ok(()))
+            }
+            WorkerProviderStreamRequest::RequestCost(request) => {
+                return Err(RuntimeSupervisorError::Protocol(format!(
+                    "provider-v2 cost request `{}` requires an explicit checked acceptance",
+                    request.operation
+                )));
+            }
+            WorkerProviderStreamRequest::StartRequest { .. } => {
+                return Err(RuntimeSupervisorError::Protocol(
+                    "provider-v2 actuator repeated StartRequest".to_owned(),
+                ));
+            }
+        };
+        call.call.respond(response)
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn respond_cost(
+        &mut self,
+        call: NativeProviderWorkerV2ActuationCall,
+        issuer: &crate::ProviderCostAcceptanceIssuer,
+        issued_at: Instant,
+        expires_at: Instant,
+        nonce: crate::ProviderCostNonce,
+    ) -> Result<(), RuntimeSupervisorError> {
+        let session = self.session.as_mut().ok_or_else(|| {
+            RuntimeSupervisorError::Protocol(
+                "provider-v2 cost request preceded StartRequest".to_owned(),
+            )
+        })?;
+        let WorkerProviderStreamRequest::RequestCost(request) = call.call.request().clone() else {
+            return Err(RuntimeSupervisorError::Protocol(
+                "provider-v2 cost acceptance received a non-cost request".to_owned(),
+            ));
+        };
+        let price_bound =
+            crate::ProviderPriceBound::new(request.currency.clone(), request.maximum_microunits)
+                .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+        let scope = session
+            .provider_streams
+            .prepare_cost_acceptance(&request, price_bound.clone())
+            .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+        let acceptance = issuer
+            .issue(scope, issued_at, expires_at, nonce)
+            .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+        let verifier = issuer
+            .verifier()
+            .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+        let response = session
+            .provider_streams
+            .accept_streaming_cost(
+                request,
+                crate::ProviderCostAuthorization::new(price_bound, nonce, acceptance)
+                    .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?,
+                &verifier,
+                issued_at,
+            )
+            .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+        call.call
+            .respond(WorkerProviderStreamResponse::Cost(Ok(response)))
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn prepare_actuation(&mut self) -> Result<(), RuntimeSupervisorError> {
+        let session = self.session.as_mut().ok_or_else(|| {
+            RuntimeSupervisorError::Protocol(
+                "provider-v2 actuator preparation preceded StartRequest".to_owned(),
+            )
+        })?;
+        if session.actuation.is_some() {
+            return Err(RuntimeSupervisorError::Protocol(
+                "provider-v2 actuator actuation was already prepared".to_owned(),
+            ));
+        }
+        session
+            .prepare_actuation()
+            .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+        Ok(())
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn finish(
+        &mut self,
+        issuer: &crate::ProviderRuntimeReceiptIssuerV2,
+        verifier: &crate::ProviderRuntimeReceiptVerifierV2,
+        issued_at: Instant,
+        expires_at: Instant,
+        nonce: [u8; 32],
+        verification_time: Instant,
+    ) -> Result<(), RuntimeSupervisorError> {
+        let session = self.session.as_ref().ok_or_else(|| {
+            RuntimeSupervisorError::Protocol(
+                "provider-v2 actuator finish preceded StartRequest".to_owned(),
+            )
+        })?;
+        if session.actuation.is_none() {
+            return Err(RuntimeSupervisorError::Protocol(
+                "provider-v2 actuator finish preceded actuation preparation".to_owned(),
+            ));
+        }
+        let session = self.session.take().ok_or_else(|| {
+            RuntimeSupervisorError::Protocol(
+                "provider-v2 actuator finish preceded StartRequest".to_owned(),
+            )
+        })?;
+        self.verified_completion = Some(
+            session
+                .finish_and_verify(
+                    issuer,
+                    verifier,
+                    issued_at,
+                    expires_at,
+                    nonce,
+                    verification_time,
+                )
+                .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?,
+        );
+        Ok(())
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn finalize_proposal(
+        &mut self,
+        proposal_call: NativeProviderWorkerV2ProposalCall,
+        registry: TypeRegistry,
+    ) -> Result<(), RuntimeSupervisorError> {
+        let outcome = proposal_call.proposal.outcome();
+        let WorkerPluginExecutionOutcome::Succeeded(bytes) = outcome else {
+            return Err(RuntimeSupervisorError::Protocol(
+                "provider-v2 actuator received a failed proposal".to_owned(),
+            ));
+        };
+        let proposal: ProviderInvocationResultV2 = serde_json::from_slice(bytes).map_err(|_| {
+            RuntimeSupervisorError::Protocol(
+                "provider-v2 worker proposal was not canonical JSON".to_owned(),
+            )
+        })?;
+        let completion = self.verified_completion.take().ok_or_else(|| {
+            RuntimeSupervisorError::Protocol(
+                "provider-v2 proposal preceded verified completion".to_owned(),
+            )
+        })?;
+        let (finalization, materialization) = completion
+            .bind_proposal(proposal, registry, self.cancellation.clone())
+            .and_then(NativeProviderWorkerV2CompletedProposal::materialize_and_finalize)
+            .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+        proposal_call
+            .proposal
+            .finalize(finalization, materialization)?;
+        self.finalization_committed = true;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "test-support")]
+impl NativeProviderWorkerV2ActuationCall {
+    pub fn call_id(&self) -> u64 {
+        self.call.call_id()
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn request(&self) -> &WorkerProviderStreamRequest {
+        self.call.request()
+    }
+}
+
+#[cfg(feature = "test-support")]
+impl Drop for NativeProviderWorkerV2SupervisorBridge {
+    fn drop(&mut self) {
+        if self.bridge.is_some() {
+            self.cancellation.cancel();
+        }
+    }
+}
+
+#[cfg(feature = "test-support")]
+impl Drop for NativeProviderWorkerV2ActuatorRoute {
+    fn drop(&mut self) {
+        close_provider_v2_actuator_route(
+            self.finalization_committed,
+            &self.cancellation,
+            &mut self.session,
+        );
+    }
+}
+
+#[cfg(any(test, feature = "test-support"))]
+fn close_provider_v2_actuator_route(
+    finalization_committed: bool,
+    cancellation: &CancellationToken,
+    session: &mut Option<NativeProviderWorkerV2RouteSession>,
+) {
+    if finalization_committed {
+        return;
+    }
+    cancellation.cancel();
+    if let Some(session) = session.take() {
+        session.revoke();
+    }
+}
+
+impl NativeProviderWorkerV2RouteSession {
+    pub const fn handle(&self) -> WorkerProviderStreamHandle {
+        self.handle
+    }
+
+    pub fn write_request_chunk(
+        &self,
+        chunk: comfy_types::WorkerProviderRequestChunk,
+    ) -> Result<(), crate::PluginServiceError> {
+        self.provider_streams.write_request_chunk(chunk)
+    }
+
+    pub fn accept_wait(
+        &self,
+        request: comfy_types::WorkerProviderWaitRequest,
+        outcome: comfy_types::WorkerProviderWaitOutcome,
+    ) -> Result<(), crate::PluginServiceError> {
+        self.provider_streams.accept_wait(request, outcome)
+    }
+
+    pub fn start_upload(
+        &self,
+        request: comfy_types::WorkerProviderUploadRequest,
+    ) -> Result<WorkerProviderStreamHandle, crate::PluginServiceError> {
+        self.provider_streams.start_upload(request)
+    }
+
+    pub fn write_upload_chunk(
+        &self,
+        chunk: comfy_types::WorkerProviderRequestChunk,
+    ) -> Result<(), crate::PluginServiceError> {
+        self.provider_streams.write_upload_chunk(chunk)
+    }
+
+    pub fn report_progress(
+        &self,
+        progress: comfy_types::WorkerProviderProgress,
+        now: Instant,
+    ) -> Result<Option<crate::ProviderRuntimeProgressProjection>, crate::PluginServiceError> {
+        self.provider_streams.report_progress(progress, now)
+    }
+
+    pub fn check_cancelled(&self) -> Result<(), crate::PluginServiceError> {
+        self.provider_streams.check_cancelled(self.handle)
+    }
+
+    pub fn prepare_actuation(
+        &mut self,
+    ) -> Result<&crate::ProviderRuntimeActuationProposal, crate::PluginServiceError> {
+        if self.actuation.is_none() {
+            self.actuation = Some(
+                self.provider_streams
+                    .prepare_streaming_actuation(self.handle)?,
+            );
+        }
+        self.actuation
+            .as_ref()
+            .ok_or(crate::PluginServiceError::ProviderRuntimeAuthorityDenied)
+    }
+
+    pub fn finish_and_verify(
+        self,
+        issuer: &crate::ProviderRuntimeReceiptIssuerV2,
+        verifier: &crate::ProviderRuntimeReceiptVerifierV2,
+        issued_at: Instant,
+        expires_at: Instant,
+        nonce: [u8; 32],
+        verification_time: Instant,
+    ) -> Result<NativeProviderWorkerV2VerifiedCompletion, crate::PluginServiceError> {
+        let actuation = self
+            .actuation
+            .as_ref()
+            .ok_or(crate::PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        let receipt = self.provider_streams.finish_streaming(
+            self.handle,
+            issuer,
+            issued_at,
+            expires_at,
+            nonce,
+        )?;
+        validate_provider_v2_receipt_identity(&self.receipt_scope, actuation, receipt.identity())?;
+        let verified = verifier
+            .verify(&receipt, receipt.identity(), verification_time)
+            .map_err(|_| crate::PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        Ok(NativeProviderWorkerV2VerifiedCompletion {
+            envelope: self.envelope,
+            receipt_scope: self.receipt_scope,
+            handle: self.handle,
+            receipt: verified,
+        })
+    }
+
+    pub fn revoke(self) {
+        self.provider_streams.revoke_stream(self.handle);
+    }
+}
+
+impl NativeProviderWorkerV2VerifiedCompletion {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn bind_proposal(
+        self,
+        proposal: ProviderInvocationResultV2,
+        registry: TypeRegistry,
+        cancellation: CancellationToken,
+    ) -> Result<NativeProviderWorkerV2CompletedProposal, NativeImageRuntimeError> {
+        if self.receipt_scope.context != *self.envelope.context() {
+            return Err(NativeImageRuntimeError::Execution(
+                "provider-v2 completion context differs from its certified activation".to_owned(),
+            ));
+        }
+        if crate::provider_terminal_completed_receipt_sha256(&proposal.receipt)
+            != self.receipt.identity().terminal_receipt_sha256
+        {
+            return Err(NativeImageRuntimeError::Execution(
+                "provider-v2 proposal receipt differs from its certified completion".to_owned(),
+            ));
+        }
+        Ok(NativeProviderWorkerV2CompletedProposal {
+            completion: self,
+            proposal,
+            registry,
+            cancellation,
+        })
+    }
+}
+
+#[cfg(any(test, feature = "test-support"))]
+impl NativeProviderWorkerV2CompletedProposal {
+    pub fn materialize_and_finalize(
+        self,
+    ) -> Result<
+        (
+            WorkerProviderV2ProposalFinalization,
+            ProviderTransportResponse,
+        ),
+        NativeImageRuntimeError,
+    > {
+        let completion = self.completion;
+        let envelope = completion.envelope;
+        let handle = completion.handle;
+        if handle.session_id != envelope.context.session_id
+            || handle.session_generation != envelope.context.session_generation
+            || handle.invocation != envelope.context.invocation
+            || handle.generation != envelope.context.generation
+        {
+            return Err(NativeImageRuntimeError::Execution(
+                "provider-v2 finalization handle differs from its certified context".to_owned(),
+            ));
+        }
+        let materialization = crate::materialize_provider_invocation_result_v2(
+            &self.proposal,
+            &completion.receipt,
+            &self.registry,
+            &self.cancellation,
+        )
+        .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
+        let receipt_identity_sha256 = WorkerSha256Digest::new(encode_provider_sha256(
+            &Sha256::digest(&self.proposal.receipt).into(),
+        ))
+        .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
+        let materialization_bytes = materialization
+            .to_bytes()
+            .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
+        let materialization_identity_sha256 = WorkerSha256Digest::new(encode_provider_sha256(
+            &Sha256::digest(&materialization_bytes).into(),
+        ))
+        .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
+        let finalization = WorkerProviderV2ProposalFinalization {
+            context: envelope.context,
+            handle,
+            proposal_generation: envelope.proposal_generation,
+            finalization_nonce: envelope.finalization_nonce,
+            receipt_identity_sha256,
+            materialization_identity_sha256,
+        };
+        finalization
+            .validate()
+            .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
+        Ok((finalization, materialization))
+    }
+}
+
+#[cfg(test)]
+fn provider_v2_finalization_from_verified_materialization(
+    envelope: &WorkerProviderV2InvocationEnvelope,
+    handle: WorkerProviderStreamHandle,
+    receipt: VerifiedProviderRuntimeReceiptV2,
+    proposal: &ProviderInvocationResultV2,
+    registry: &TypeRegistry,
+    cancellation: &CancellationToken,
+) -> Result<
+    (
+        WorkerProviderV2ProposalFinalization,
+        ProviderTransportResponse,
+    ),
+    NativeImageRuntimeError,
+> {
+    let identity = receipt.identity();
+    NativeProviderWorkerV2VerifiedCompletion {
+        envelope: envelope.clone(),
+        receipt_scope: NativeProviderWorkerV2ReceiptScope {
+            context: envelope.context().clone(),
+            provider: identity.provider.clone(),
+            provider_manifest_sha256: identity.provider_manifest_sha256.clone(),
+            component_generation: identity.component_generation,
+            component_digest_sha256: identity.component_digest_sha256.clone(),
+            binding_generation: identity.binding_generation,
+            binding_set_sha256: identity.binding_set_sha256.clone(),
+            request_ordinal: identity.request_ordinal,
+        },
+        handle,
+        receipt,
+    }
+    .bind_proposal(proposal.clone(), registry.clone(), cancellation.clone())?
+    .materialize_and_finalize()
+}
+
+fn provider_v2_sdk_request_head(
+    head: &comfy_types::WorkerProviderRequestHead,
+) -> ProviderRequestHeadV2 {
+    ProviderRequestHeadV2 {
+        endpoint: head.endpoint.clone(),
+        secret_id: head.secret_id.clone(),
+        method: match head.method {
+            comfy_types::WorkerProviderHttpMethod::Delete => ProviderHttpMethodV2::Delete,
+            comfy_types::WorkerProviderHttpMethod::Get => ProviderHttpMethodV2::Get,
+            comfy_types::WorkerProviderHttpMethod::Head => ProviderHttpMethodV2::Head,
+            comfy_types::WorkerProviderHttpMethod::Options => ProviderHttpMethodV2::Options,
+            comfy_types::WorkerProviderHttpMethod::Patch => ProviderHttpMethodV2::Patch,
+            comfy_types::WorkerProviderHttpMethod::Post => ProviderHttpMethodV2::Post,
+            comfy_types::WorkerProviderHttpMethod::Put => ProviderHttpMethodV2::Put,
+        },
+        headers: head
+            .headers
+            .iter()
+            .map(|header| ProviderHeaderV2 {
+                name: header.name.clone(),
+                value: header.value.clone(),
+            })
+            .collect(),
+        declared_body_bytes: head.declared_body_bytes,
+    }
+}
+
+fn validate_provider_v2_receipt_identity(
+    scope: &NativeProviderWorkerV2ReceiptScope,
+    actuation: &crate::ProviderRuntimeActuationProposal,
+    identity: &crate::ProviderRuntimeReceiptIdentityV2,
+) -> Result<(), crate::PluginServiceError> {
+    validate_provider_v2_retained_receipt_scope(scope, identity)?;
+    if identity.method != actuation.request_head().method
+        || identity.endpoint != actuation.request().endpoint()
+        || identity.secret_id.as_deref()
+            != actuation
+                .request()
+                .secret_id()
+                .map(|secret| secret.as_str())
+        || identity.request_head_sha256 != actuation.request_head_sha256()
+        || identity.request_body_sha256 != actuation.request_body_sha256()
+        || identity.accepted_cost_microunits != actuation.accepted_cost_microunits()
+        || identity.ordered_uploads_sha256 != actuation.ordered_uploads_sha256()
+        || identity.idempotency_identity_sha256 != actuation.idempotency_identity_sha256()
+    {
+        return Err(crate::PluginServiceError::ProviderRuntimeAuthorityDenied);
+    }
+    Ok(())
+}
+
+fn validate_provider_v2_retained_receipt_scope(
+    scope: &NativeProviderWorkerV2ReceiptScope,
+    identity: &crate::ProviderRuntimeReceiptIdentityV2,
+) -> Result<(), crate::PluginServiceError> {
+    if identity.provider != scope.provider
+        || identity.provider_manifest_sha256 != scope.provider_manifest_sha256
+        || identity.component_generation != scope.component_generation
+        || identity.component_digest_sha256 != scope.component_digest_sha256
+        || identity.binding_generation != scope.binding_generation
+        || identity.binding_set_sha256 != scope.binding_set_sha256
+        || identity.request_ordinal != scope.request_ordinal
+    {
+        return Err(crate::PluginServiceError::ProviderRuntimeAuthorityDenied);
+    }
+    Ok(())
+}
 
 fn project_effective_native_backend(
     accepted_backend: &BackendCapabilityMatrix,
@@ -6298,6 +7256,9 @@ pub struct NativeExecutionController {
     provider_registry: Option<NativeProviderRegistryPin>,
     provider_streams: ProviderRuntimeStreamService,
     provider_bridge_live: Arc<AtomicBool>,
+    provider_bridge_attempt: Arc<Mutex<Option<NativeProviderWorkerBridgeActiveAttempt>>>,
+    provider_bridge_session_id: Uuid,
+    next_provider_bridge_invocation: AtomicU64,
     commands: async_channel::Sender<PreparedNativeCommand>,
     runner: Mutex<Option<thread::JoinHandle<()>>>,
 }
@@ -6305,6 +7266,24 @@ pub struct NativeExecutionController {
 pub struct NativeProviderWorkerBridgeAttachment {
     controller: Weak<NativeExecutionController>,
     profile_id: ProfileId,
+}
+
+#[derive(Clone)]
+struct NativeProviderWorkerBridgeActiveAttempt {
+    profile_id: ProfileId,
+    prompt_id: comfy_types::PromptId,
+    attempt_id: AttemptId,
+    cancellation: CancellationToken,
+    compiled_plan_sha256: String,
+    provider_node_ids: BTreeSet<String>,
+    lifecycle_epoch: Arc<()>,
+    next_request_ordinal: u32,
+}
+
+struct NativeProviderWorkerBridgeReservation {
+    cancellation: CancellationToken,
+    lifecycle_epoch: Arc<()>,
+    request_ordinal: u32,
 }
 
 impl NativeProviderWorkerBridgeAttachment {
@@ -6336,6 +7315,246 @@ impl NativeProviderWorkerBridgeAttachment {
             .upgrade()
             .is_some_and(|controller| controller.provider_bridge_live.load(Ordering::Acquire))
     }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn activate_provider_v2(
+        &self,
+        profile_id: ProfileId,
+        prompt_id: comfy_types::PromptId,
+        attempt_id: AttemptId,
+        execution_node_id: &str,
+        provider_node_id: &str,
+        worker_deployment: &WorkerRegistryDeploymentPlan,
+        worker_start: &crate::NativeProviderWorkerSessionStart,
+        manifest_authorization: ProviderManifestAuthorizationV2,
+        streaming_contract: WorkerProviderStreamingContract,
+    ) -> Result<NativeProviderWorkerV2Activation, NativeImageRuntimeError> {
+        let controller = self.controller.upgrade().ok_or_else(|| {
+            NativeImageRuntimeError::Execution(
+                "native provider worker bridge controller is unavailable".to_owned(),
+            )
+        })?;
+        if !controller.provider_bridge_live.load(Ordering::Acquire)
+            || self.profile_id != profile_id
+            || controller.profile_id != profile_id
+        {
+            return Err(NativeImageRuntimeError::Execution(
+                "native provider worker bridge activation is stale or foreign".to_owned(),
+            ));
+        }
+        let provider_registry = controller.provider_registry.as_ref().ok_or_else(|| {
+            NativeImageRuntimeError::Execution(
+                "native provider worker bridge has no active provider deployment".to_owned(),
+            )
+        })?;
+        if worker_deployment.begin().generation().get() != provider_registry.generation()
+            || worker_deployment.begin().registry_digest_sha256().as_str()
+                != provider_registry.registry_digest_sha256()
+            || worker_start.registry_generation != provider_registry.generation()
+            || worker_start.registry_digest_sha256 != provider_registry.registry_digest_sha256()
+        {
+            return Err(NativeImageRuntimeError::Execution(
+                "native provider worker bridge deployment is stale".to_owned(),
+            ));
+        }
+        let reservation = reserve_provider_bridge_node(
+            &controller.provider_bridge_attempt,
+            profile_id,
+            prompt_id,
+            attempt_id,
+            execution_node_id,
+            &worker_start.compiled_plan_sha256,
+        )?;
+        let cancellation = reservation.cancellation.clone();
+        let invocation =
+            allocate_provider_bridge_invocation(&controller.next_provider_bridge_invocation)?;
+        let generation = u32::try_from(worker_start.registry_generation).map_err(|_| {
+            NativeImageRuntimeError::Execution(
+                "native provider worker bridge registry generation overflowed".to_owned(),
+            )
+        })?;
+        let context = WorkerProviderInvocationContext {
+            session_id: controller.provider_bridge_session_id,
+            session_generation: worker_start.registry_generation,
+            invocation,
+            generation,
+        };
+        let mut nonce_digest = Sha256::new();
+        nonce_digest.update(b"zed-comfy-provider-worker-finalization-nonce-v1");
+        nonce_digest.update(context.session_id.as_bytes());
+        nonce_digest.update(context.session_generation.to_le_bytes());
+        nonce_digest.update(context.invocation.to_le_bytes());
+        nonce_digest.update(context.generation.to_le_bytes());
+        nonce_digest.update(worker_start.compiled_plan_sha256.as_bytes());
+        let finalization_nonce: [u8; 32] = nonce_digest.finalize().into();
+        let provider_manifest_sha256 = WorkerSha256Digest::new(encode_provider_sha256(
+            manifest_authorization.outer_signing_payload_sha256(),
+        ))
+        .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
+        let grant = ProviderRuntimeActivationGrant::checked_from_active_deployment(
+            profile_id.0.to_string(),
+            "native-provider-worker-v2",
+            prompt_id.0.to_string(),
+            worker_start.compiled_plan_sha256.clone(),
+            attempt_id.0.to_string(),
+            provider_node_id,
+            reservation.request_ordinal,
+            worker_deployment,
+            worker_start.component_digest_sha256.clone(),
+            provider_manifest_sha256.as_str(),
+            worker_start.authorization_generation_sha256.clone(),
+            worker_start.binding_set_sha256.clone(),
+            worker_start.compiled_plan_sha256.clone(),
+        )
+        .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
+        controller
+            .provider_streams
+            .register_activation(&context, grant, &cancellation)
+            .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
+        let grant = controller
+            .provider_streams
+            .claim_activation(&context, &cancellation)
+            .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
+        if let Err(error) = revalidate_provider_bridge_reservation(
+            &controller.provider_bridge_attempt,
+            profile_id,
+            prompt_id,
+            attempt_id,
+            &reservation.lifecycle_epoch,
+            &cancellation,
+        ) {
+            if let Err(revoke_error) = controller.provider_streams.revoke_invocation(&context) {
+                eprintln!(
+                    "native provider worker bridge stale activation revocation failed: {revoke_error}"
+                );
+            }
+            return Err(error);
+        }
+        let envelope = WorkerProviderV2InvocationEnvelope::checked_from_controller(
+            context.clone(),
+            streaming_contract,
+            provider_manifest_sha256.clone(),
+            invocation,
+            finalization_nonce,
+        )
+        .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
+        Ok(NativeProviderWorkerV2Activation {
+            grant: Some(grant),
+            context: context.clone(),
+            envelope,
+            provider_streams: controller.provider_streams.clone(),
+            receipt_scope: NativeProviderWorkerV2ReceiptScope {
+                context: context.clone(),
+                provider: manifest_authorization
+                    .provider_binding()
+                    .implementation_namespace
+                    .clone(),
+                provider_manifest_sha256: provider_manifest_sha256.as_str().to_owned(),
+                component_generation: worker_start.registry_generation,
+                component_digest_sha256: worker_start.component_digest_sha256.clone(),
+                binding_generation: worker_start.registry_generation,
+                binding_set_sha256: worker_start.binding_set_sha256.clone(),
+                request_ordinal: reservation.request_ordinal,
+            },
+        })
+    }
+}
+
+fn reserve_provider_bridge_node(
+    attempt: &Mutex<Option<NativeProviderWorkerBridgeActiveAttempt>>,
+    profile_id: ProfileId,
+    prompt_id: comfy_types::PromptId,
+    attempt_id: AttemptId,
+    node_id: &str,
+    compiled_plan_sha256: &str,
+) -> Result<NativeProviderWorkerBridgeReservation, NativeImageRuntimeError> {
+    let mut attempt = attempt.lock();
+    let active = attempt.as_mut().ok_or_else(|| {
+        NativeImageRuntimeError::Execution(
+            "native provider worker bridge has no active attempt".to_owned(),
+        )
+    })?;
+    if active.profile_id != profile_id
+        || active.prompt_id != prompt_id
+        || active.attempt_id != attempt_id
+        || active.compiled_plan_sha256 != compiled_plan_sha256
+        || !active.provider_node_ids.remove(node_id)
+    {
+        return Err(NativeImageRuntimeError::Execution(
+            "native provider worker bridge activation differs from the active attempt".to_owned(),
+        ));
+    }
+    active.cancellation.check().map_err(|_| {
+        NativeImageRuntimeError::Execution(
+            "native provider worker bridge activation was cancelled".to_owned(),
+        )
+    })?;
+    let request_ordinal = active.next_request_ordinal.checked_add(1).ok_or_else(|| {
+        NativeImageRuntimeError::Execution(
+            "native provider worker bridge request ordinal overflowed".to_owned(),
+        )
+    })?;
+    active.next_request_ordinal = request_ordinal;
+    Ok(NativeProviderWorkerBridgeReservation {
+        cancellation: active.cancellation.clone(),
+        lifecycle_epoch: active.lifecycle_epoch.clone(),
+        request_ordinal,
+    })
+}
+
+fn revalidate_provider_bridge_reservation(
+    attempt: &Mutex<Option<NativeProviderWorkerBridgeActiveAttempt>>,
+    profile_id: ProfileId,
+    prompt_id: comfy_types::PromptId,
+    attempt_id: AttemptId,
+    lifecycle_epoch: &Arc<()>,
+    cancellation: &CancellationToken,
+) -> Result<(), NativeImageRuntimeError> {
+    cancellation.check().map_err(|_| {
+        NativeImageRuntimeError::Execution(
+            "native provider worker bridge activation was cancelled".to_owned(),
+        )
+    })?;
+    let attempt = attempt.lock();
+    let active = attempt.as_ref().ok_or_else(|| {
+        NativeImageRuntimeError::Execution(
+            "native provider worker bridge activation became stale".to_owned(),
+        )
+    })?;
+    if active.profile_id != profile_id
+        || active.prompt_id != prompt_id
+        || active.attempt_id != attempt_id
+        || !Arc::ptr_eq(&active.lifecycle_epoch, lifecycle_epoch)
+    {
+        return Err(NativeImageRuntimeError::Execution(
+            "native provider worker bridge activation became stale".to_owned(),
+        ));
+    }
+    active.cancellation.check().map_err(|_| {
+        NativeImageRuntimeError::Execution(
+            "native provider worker bridge activation was cancelled".to_owned(),
+        )
+    })
+}
+
+fn allocate_provider_bridge_invocation(
+    next_invocation: &AtomicU64,
+) -> Result<u64, NativeImageRuntimeError> {
+    next_invocation
+        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+            current.checked_add(1)
+        })
+        .map_err(|_| {
+            NativeImageRuntimeError::Execution(
+                "native provider worker bridge invocation generation overflowed".to_owned(),
+            )
+        })?
+        .checked_add(1)
+        .ok_or_else(|| {
+            NativeImageRuntimeError::Execution(
+                "native provider worker bridge invocation generation overflowed".to_owned(),
+            )
+        })
 }
 
 impl Drop for NativeProviderWorkerBridgeAttachment {
@@ -6419,9 +7638,11 @@ impl NativeExecutionController {
         let profile_id = config.worker.profile_id;
         let provider_streams = ProviderRuntimeStreamService::new();
         let provider_bridge_live = Arc::new(AtomicBool::new(true));
+        let provider_bridge_attempt = Arc::new(Mutex::new(None));
         let runner_provider_streams = provider_streams.clone();
         let runner_cleanup_streams = provider_streams.clone();
         let runner_provider_bridge_live = provider_bridge_live.clone();
+        let runner_provider_bridge_attempt = provider_bridge_attempt.clone();
         let runner = thread::Builder::new()
             .name("native-image-controller".to_owned())
             .spawn(move || {
@@ -6431,10 +7652,12 @@ impl NativeExecutionController {
                     receiver,
                     supervisor,
                     runner_provider_streams,
+                    runner_provider_bridge_attempt.clone(),
                 ));
                 invalidate_provider_worker_bridge(
                     &runner_provider_bridge_live,
                     &runner_cleanup_streams,
+                    &runner_provider_bridge_attempt,
                 );
                 if let Err(error) = result {
                     eprintln!("native image execution controller stopped: {error}");
@@ -6446,6 +7669,9 @@ impl NativeExecutionController {
             provider_registry,
             provider_streams,
             provider_bridge_live,
+            provider_bridge_attempt,
+            provider_bridge_session_id: Uuid::new_v4(),
+            next_provider_bridge_invocation: AtomicU64::new(0),
             commands,
             runner: Mutex::new(Some(runner)),
         }))
@@ -6467,17 +7693,39 @@ impl NativeExecutionController {
     }
 
     fn revoke_provider_worker_bridge(&self) {
-        invalidate_provider_worker_bridge(&self.provider_bridge_live, &self.provider_streams);
+        invalidate_provider_worker_bridge(
+            &self.provider_bridge_live,
+            &self.provider_streams,
+            &self.provider_bridge_attempt,
+        );
     }
 }
 
 fn invalidate_provider_worker_bridge(
     live: &AtomicBool,
     provider_streams: &ProviderRuntimeStreamService,
+    provider_bridge_attempt: &Mutex<Option<NativeProviderWorkerBridgeActiveAttempt>>,
 ) {
-    if live.swap(false, Ordering::AcqRel) {
-        provider_streams.revoke_all();
+    live.store(false, Ordering::Release);
+    abort_native_provider_worker_sessions(provider_streams, provider_bridge_attempt);
+}
+
+fn retire_native_provider_worker_sessions(
+    provider_streams: &ProviderRuntimeStreamService,
+    provider_bridge_attempt: &Mutex<Option<NativeProviderWorkerBridgeActiveAttempt>>,
+) {
+    provider_bridge_attempt.lock().take();
+    provider_streams.revoke_all();
+}
+
+fn abort_native_provider_worker_sessions(
+    provider_streams: &ProviderRuntimeStreamService,
+    provider_bridge_attempt: &Mutex<Option<NativeProviderWorkerBridgeActiveAttempt>>,
+) {
+    if let Some(active) = provider_bridge_attempt.lock().take() {
+        active.cancellation.cancel();
     }
+    provider_streams.revoke_all();
 }
 
 impl ExecutionController for NativeExecutionController {
@@ -6592,6 +7840,7 @@ struct NativeControllerState {
     input_authorization: AuthorizedCapabilities,
     output_authorization: AuthorizedCapabilities,
     provider_streams: ProviderRuntimeStreamService,
+    provider_bridge_attempt: Arc<Mutex<Option<NativeProviderWorkerBridgeActiveAttempt>>>,
 }
 
 enum ControllerInput {
@@ -6605,6 +7854,7 @@ async fn run_native_controller(
     commands: async_channel::Receiver<PreparedNativeCommand>,
     supervisor: RuntimeSupervisor,
     provider_streams: ProviderRuntimeStreamService,
+    provider_bridge_attempt: Arc<Mutex<Option<NativeProviderWorkerBridgeActiveAttempt>>>,
 ) -> Result<(), NativeImageRuntimeError> {
     let roots = config.roots()?;
     let output_committer = config.output_committer.clone();
@@ -6621,6 +7871,7 @@ async fn run_native_controller(
         input_authorization,
         output_authorization,
         provider_streams,
+        provider_bridge_attempt,
     };
     state.reconcile_committed_output_receipts().await?;
     loop {
@@ -6861,6 +8112,7 @@ impl NativeControllerState {
                         "active execution disappeared after cancellation failure".to_owned(),
                     )
                 })?;
+                self.abort_provider_sessions();
                 let kind = {
                     canonical_termination_kind(
                         self.config
@@ -6940,7 +8192,7 @@ impl NativeControllerState {
             .as_ref()
             .map(|identity| identity.compiled_plan_sha256().to_owned())
             .unwrap_or_else(|| format!("{:x}", Sha256::digest(lease.plan.prompt_id.0.as_bytes())));
-        let provider_node_ids = lease
+        let provider_node_ids: BTreeSet<String> = lease
             .plan
             .nodes
             .iter()
@@ -6949,21 +8201,10 @@ impl NativeControllerState {
                     .then_some(node_id.0.clone())
             })
             .collect();
-        self.active = Some(ActiveNativeExecution {
-            profile_id: lease.profile_id,
-            prompt_id: lease.prompt_id,
-            attempt_id: lease.attempt_id,
-            cancellation: lease.cancellation.clone(),
-            compiled_plan_sha256,
-            provider_node_ids,
-            output_proposals: BTreeMap::new(),
-            output_proposal_bytes: 0,
-        });
         if self.supervisor.is_none() {
             match RuntimeSupervisor::start(self.config.worker.clone()).await {
                 Ok(supervisor) => self.supervisor = Some(supervisor),
                 Err(error) => {
-                    self.active = None;
                     self.publish_kind(
                         lease.profile_id,
                         lease.prompt_id,
@@ -6997,14 +8238,6 @@ impl NativeControllerState {
             self.config.worker.memory_limit_bytes,
             self.config.memory_policy,
         );
-        self.publish_kind(
-            lease.profile_id,
-            lease.prompt_id,
-            lease.attempt_id,
-            None,
-            AttemptEventKind::Started,
-            Some(json!({"effective_native_backend": effective_backend})),
-        )?;
         let input_assets = collect_worker_input_assets(
             &lease.plan,
             &self.config.assets,
@@ -7025,6 +8258,39 @@ impl NativeControllerState {
         )?;
         let encoded = serde_json::to_vec(&worker_plan)
             .map_err(|error| NativeImageRuntimeError::Encoding(error.to_string()))?;
+        let lifecycle_epoch = Arc::new(());
+        *self.provider_bridge_attempt.lock() = Some(NativeProviderWorkerBridgeActiveAttempt {
+            profile_id: lease.profile_id,
+            prompt_id: lease.prompt_id,
+            attempt_id: lease.attempt_id,
+            cancellation: lease.cancellation.clone(),
+            compiled_plan_sha256: compiled_plan_sha256.clone(),
+            provider_node_ids: provider_node_ids.clone(),
+            lifecycle_epoch,
+            next_request_ordinal: 0,
+        });
+        self.active = Some(ActiveNativeExecution {
+            profile_id: lease.profile_id,
+            prompt_id: lease.prompt_id,
+            attempt_id: lease.attempt_id,
+            cancellation: lease.cancellation.clone(),
+            compiled_plan_sha256,
+            provider_node_ids,
+            output_proposals: BTreeMap::new(),
+            output_proposal_bytes: 0,
+        });
+        if let Err(error) = self.publish_kind(
+            lease.profile_id,
+            lease.prompt_id,
+            lease.attempt_id,
+            None,
+            AttemptEventKind::Started,
+            Some(json!({"effective_native_backend": effective_backend})),
+        ) {
+            self.active = None;
+            self.abort_provider_sessions();
+            return Err(error);
+        }
         let supervisor = self.supervisor.as_mut().ok_or_else(|| {
             NativeImageRuntimeError::Execution(
                 "native worker disappeared before execute".to_owned(),
@@ -7035,6 +8301,7 @@ impl NativeControllerState {
             .await
         {
             self.active = None;
+            self.abort_provider_sessions();
             self.publish_terminal_failure(
                 lease.profile_id,
                 lease.prompt_id,
@@ -7194,22 +8461,33 @@ impl NativeControllerState {
                 self.publish_worker_progress(progress)?;
             }
             NativeImageWorkerEvent::Completed { result } => {
-                self.abort_provider_sessions();
-                let ui_outputs = result.decode_ui_outputs()?;
                 let Some(active) = self.active.as_ref() else {
                     return Ok(());
                 };
-                if result.report.profile_id != active.profile_id
-                    || result.report.prompt_id != active.prompt_id
-                    || result.report.attempt_id != active.attempt_id
-                {
+                if !native_worker_completion_matches_active(
+                    active,
+                    result.report.profile_id,
+                    result.report.prompt_id,
+                    result.report.attempt_id,
+                ) {
                     return Ok(());
                 }
-                let mut active = self.active.take().ok_or_else(|| {
-                    NativeImageRuntimeError::Execution(
-                        "active execution disappeared while applying completion".to_owned(),
-                    )
-                })?;
+                let ui_outputs = match result.decode_ui_outputs() {
+                    Ok(ui_outputs) => ui_outputs,
+                    Err(error) => {
+                        self.abort_provider_sessions();
+                        return Err(error);
+                    }
+                };
+                let mut active = match self.active.take() {
+                    Some(active) => active,
+                    None => {
+                        self.abort_provider_sessions();
+                        return Err(NativeImageRuntimeError::Execution(
+                            "active execution disappeared while applying completion".to_owned(),
+                        ));
+                    }
+                };
                 let expected_ids = result
                     .output_proposal_ids
                     .iter()
@@ -7223,12 +8501,13 @@ impl NativeControllerState {
                 if expected_ids.len() != result.output_proposal_ids.len()
                     || expected_ids != actual_ids
                 {
+                    self.abort_provider_sessions();
                     return Err(NativeImageRuntimeError::WorkerEvent(
                         "worker completion does not exactly reference its output proposals"
                             .to_owned(),
                     ));
                 }
-                let proposals = result
+                let proposals = match result
                     .output_proposal_ids
                     .iter()
                     .map(|proposal_id| {
@@ -7238,8 +8517,16 @@ impl NativeControllerState {
                             ))
                         })
                     })
-                    .collect::<Result<Vec<_>, _>>()?;
+                    .collect::<Result<Vec<_>, _>>()
+                {
+                    Ok(proposals) => proposals,
+                    Err(error) => {
+                        self.abort_provider_sessions();
+                        return Err(error);
+                    }
+                };
                 if result.report.state != AttemptState::Succeeded && !proposals.is_empty() {
+                    self.abort_provider_sessions();
                     return Err(NativeImageRuntimeError::WorkerEvent(
                         "failed worker completion referenced output proposals".to_owned(),
                     ));
@@ -7256,6 +8543,10 @@ impl NativeControllerState {
                             let mut event_inputs = Vec::new();
                             let canonical_termination =
                                 canonical_termination_kind(termination_intent, &active);
+                            let provider_session_cleanup = provider_session_completion_cleanup(
+                                result.report.state,
+                                canonical_termination.is_some(),
+                            );
                             let terminal_kind =
                                 canonical_termination.clone().unwrap_or_else(|| {
                                     terminal_event(result.report.state, result.report.error)
@@ -7337,19 +8628,25 @@ impl NativeControllerState {
                                     NativeImageRuntimeError::Execution(error.to_string())
                                 })?;
                             }
-                            Ok((event_inputs, ()))
+                            Ok((event_inputs, provider_session_cleanup))
                         },
                     )
                     .await;
-                let (applied, ()) = match transaction {
+                let (applied, provider_session_cleanup) = match transaction {
                     Ok(transaction) => transaction,
                     Err(crate::ExecutionActuatorTransactionError::Presentation(error)) => {
+                        self.abort_provider_sessions();
                         return Err(NativeImageRuntimeError::Execution(error.to_string()));
                     }
                     Err(crate::ExecutionActuatorTransactionError::Operation(error)) => {
+                        self.abort_provider_sessions();
                         return Err(error);
                     }
                 };
+                match provider_session_cleanup {
+                    ProviderSessionCompletionCleanup::Retire => self.retire_provider_sessions(),
+                    ProviderSessionCompletionCleanup::Abort => self.abort_provider_sessions(),
+                }
                 self.publish_projection_events(applied);
             }
             NativeImageWorkerEvent::BackendUnavailable { unavailable } => {
@@ -7487,7 +8784,17 @@ impl NativeControllerState {
     }
 
     fn abort_provider_sessions(&mut self) {
-        self.provider_streams.revoke_all();
+        abort_native_provider_worker_sessions(
+            &self.provider_streams,
+            &self.provider_bridge_attempt,
+        );
+    }
+
+    fn retire_provider_sessions(&mut self) {
+        retire_native_provider_worker_sessions(
+            &self.provider_streams,
+            &self.provider_bridge_attempt,
+        );
     }
 
     fn publish_worker_progress(
@@ -7633,6 +8940,34 @@ fn canonical_termination_kind(
         None if active.cancellation.is_cancelled() => Some(AttemptEventKind::Cancelled),
         None => None,
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ProviderSessionCompletionCleanup {
+    Retire,
+    Abort,
+}
+
+fn provider_session_completion_cleanup(
+    state: AttemptState,
+    has_canonical_termination: bool,
+) -> ProviderSessionCompletionCleanup {
+    if state == AttemptState::Succeeded && !has_canonical_termination {
+        ProviderSessionCompletionCleanup::Retire
+    } else {
+        ProviderSessionCompletionCleanup::Abort
+    }
+}
+
+fn native_worker_completion_matches_active(
+    active: &ActiveNativeExecution,
+    profile_id: ProfileId,
+    prompt_id: comfy_types::PromptId,
+    attempt_id: AttemptId,
+) -> bool {
+    profile_id == active.profile_id
+        && prompt_id == active.prompt_id
+        && attempt_id == active.attempt_id
 }
 
 fn committed_event_inputs(
@@ -7847,6 +9182,9 @@ mod tests {
             provider_registry: None,
             provider_streams: ProviderRuntimeStreamService::new(),
             provider_bridge_live: Arc::new(AtomicBool::new(true)),
+            provider_bridge_attempt: Arc::new(Mutex::new(None)),
+            provider_bridge_session_id: Uuid::from_u128(0x4250),
+            next_provider_bridge_invocation: AtomicU64::new(0),
             commands,
             runner: Mutex::new(None),
         })
@@ -7859,6 +9197,25 @@ mod tests {
             controller: Arc::downgrade(controller),
             profile_id: controller.profile_id,
         }
+    }
+
+    fn arm_provider_bridge_attempt(
+        controller: &NativeExecutionController,
+        identity: u128,
+    ) -> CancellationToken {
+        let cancellation = CancellationToken::default();
+        *controller.provider_bridge_attempt.lock() =
+            Some(NativeProviderWorkerBridgeActiveAttempt {
+                profile_id: controller.profile_id,
+                prompt_id: PromptId(Uuid::from_u128(identity)),
+                attempt_id: AttemptId(Uuid::from_u128(identity + 1)),
+                lifecycle_epoch: Arc::new(()),
+                cancellation: cancellation.clone(),
+                compiled_plan_sha256: "a".repeat(64),
+                next_request_ordinal: 0,
+                provider_node_ids: BTreeSet::new(),
+            });
+        cancellation
     }
 
     #[test]
@@ -7884,11 +9241,14 @@ mod tests {
                 .load(Ordering::Acquire)
         );
 
+        let cancellation = arm_provider_bridge_attempt(&controller, 0x4230_100);
         controller
             .shutdown_and_join()
             .expect("shut down controller while retaining a strong reference");
         assert!(Arc::strong_count(&controller) >= 1);
         assert!(!attachment.is_live());
+        assert!(cancellation.is_cancelled());
+        assert!(controller.provider_bridge_attempt.lock().is_none());
     }
 
     #[test]
@@ -7896,36 +9256,523 @@ mod tests {
         let controller = inactive_provider_bridge_controller(ProfileId(Uuid::from_u128(0x4233)));
         let attachment = provider_bridge_attachment(&controller);
         assert!(attachment.is_live());
+        let cancellation = arm_provider_bridge_attempt(&controller, 0x4233_100);
         drop(attachment);
         assert!(!controller.provider_bridge_live.load(Ordering::Acquire));
+        assert!(cancellation.is_cancelled());
+        assert!(controller.provider_bridge_attempt.lock().is_none());
     }
 
     #[test]
     fn native_provider_worker_bridge_attachment_runner_loss_revokes_with_controller_retained() {
         let controller = inactive_provider_bridge_controller(ProfileId(Uuid::from_u128(0x4234)));
         let attachment = provider_bridge_attachment(&controller);
+        let cancellation = arm_provider_bridge_attempt(&controller, 0x4234_100);
         let runner_live = controller.provider_bridge_live.clone();
         let runner_streams = controller.provider_streams.clone();
+        let runner_attempt = controller.provider_bridge_attempt.clone();
         thread::spawn(move || {
-            invalidate_provider_worker_bridge(&runner_live, &runner_streams);
+            invalidate_provider_worker_bridge(&runner_live, &runner_streams, &runner_attempt);
         })
         .join()
         .expect("simulate native controller runner exit");
         assert!(Arc::strong_count(&controller) >= 1);
         assert!(!attachment.is_live());
+        assert!(cancellation.is_cancelled());
+        assert!(controller.provider_bridge_attempt.lock().is_none());
     }
 
     #[test]
     fn native_provider_worker_bridge_attachment_registration_drop_revokes_its_controller() {
         let profile_id = ProfileId(Uuid::from_u128(0x4232));
         let controller = inactive_provider_bridge_controller(profile_id);
+        let cancellation = arm_provider_bridge_attempt(&controller, 0x4232_100);
         let observer = Arc::downgrade(&controller);
+        let attempt = controller.provider_bridge_attempt.clone();
         let registration = NativeExecutionControllerRegistration {
             provider_worker_bridge: provider_bridge_attachment(&controller),
             controller,
         };
         drop(registration);
         assert!(observer.upgrade().is_none());
+        assert!(cancellation.is_cancelled());
+        assert!(attempt.lock().is_none());
+    }
+
+    #[test]
+    fn provider_worker_session_retirement_preserves_success_and_abort_cancels() {
+        assert_eq!(
+            provider_session_completion_cleanup(AttemptState::Succeeded, false),
+            ProviderSessionCompletionCleanup::Retire
+        );
+        for state in [
+            AttemptState::Queued,
+            AttemptState::Running,
+            AttemptState::Cancelling,
+            AttemptState::Succeeded,
+            AttemptState::Failed,
+            AttemptState::Cancelled,
+            AttemptState::Interrupted,
+        ] {
+            assert_eq!(
+                provider_session_completion_cleanup(state, true),
+                ProviderSessionCompletionCleanup::Abort
+            );
+        }
+        for state in [
+            AttemptState::Queued,
+            AttemptState::Running,
+            AttemptState::Cancelling,
+            AttemptState::Failed,
+            AttemptState::Cancelled,
+            AttemptState::Interrupted,
+        ] {
+            assert_eq!(
+                provider_session_completion_cleanup(state, false),
+                ProviderSessionCompletionCleanup::Abort
+            );
+        }
+
+        let streams = ProviderRuntimeStreamService::new();
+        let attempt = Mutex::new(None);
+        let success = CancellationToken::default();
+        *attempt.lock() = Some(NativeProviderWorkerBridgeActiveAttempt {
+            profile_id: ProfileId(Uuid::from_u128(0x425_601)),
+            prompt_id: PromptId(Uuid::from_u128(0x425_602)),
+            attempt_id: AttemptId(Uuid::from_u128(0x425_603)),
+            lifecycle_epoch: Arc::new(()),
+            cancellation: success.clone(),
+            compiled_plan_sha256: "b".repeat(64),
+            next_request_ordinal: 0,
+            provider_node_ids: BTreeSet::new(),
+        });
+        retire_native_provider_worker_sessions(&streams, &attempt);
+        assert!(!success.is_cancelled());
+        assert!(attempt.lock().is_none());
+
+        let aborted = CancellationToken::default();
+        *attempt.lock() = Some(NativeProviderWorkerBridgeActiveAttempt {
+            profile_id: ProfileId(Uuid::from_u128(0x425_604)),
+            prompt_id: PromptId(Uuid::from_u128(0x425_605)),
+            attempt_id: AttemptId(Uuid::from_u128(0x425_606)),
+            lifecycle_epoch: Arc::new(()),
+            cancellation: aborted.clone(),
+            compiled_plan_sha256: "c".repeat(64),
+            next_request_ordinal: 0,
+            provider_node_ids: BTreeSet::new(),
+        });
+        abort_native_provider_worker_sessions(&streams, &attempt);
+        assert!(aborted.is_cancelled());
+        assert!(attempt.lock().is_none());
+    }
+
+    #[test]
+    fn stale_worker_completion_preserves_the_current_provider_attempt() {
+        let profile_id = ProfileId(Uuid::from_u128(0x425_611));
+        let prompt_id = PromptId(Uuid::from_u128(0x425_612));
+        let attempt_id = AttemptId(Uuid::from_u128(0x425_613));
+        let active = ActiveNativeExecution {
+            profile_id,
+            prompt_id,
+            attempt_id,
+            cancellation: CancellationToken::default(),
+            compiled_plan_sha256: "d".repeat(64),
+            provider_node_ids: BTreeSet::new(),
+            output_proposals: BTreeMap::new(),
+            output_proposal_bytes: 0,
+        };
+        let cancellation = CancellationToken::default();
+        let provider_attempt = Mutex::new(Some(NativeProviderWorkerBridgeActiveAttempt {
+            profile_id,
+            prompt_id,
+            attempt_id,
+            lifecycle_epoch: Arc::new(()),
+            cancellation: cancellation.clone(),
+            compiled_plan_sha256: "d".repeat(64),
+            next_request_ordinal: 0,
+            provider_node_ids: BTreeSet::new(),
+        }));
+
+        assert!(native_worker_completion_matches_active(
+            &active, profile_id, prompt_id, attempt_id,
+        ));
+        assert!(!native_worker_completion_matches_active(
+            &active,
+            profile_id,
+            prompt_id,
+            AttemptId(Uuid::from_u128(0x425_614)),
+        ));
+        assert!(provider_attempt.lock().is_some());
+        assert!(!cancellation.is_cancelled());
+    }
+
+    #[test]
+    fn provider_bridge_reservation_is_one_use_per_node_and_interleaves_distinct_nodes() {
+        let profile_id = ProfileId(Uuid::from_u128(0x425_401));
+        let prompt_id = PromptId(Uuid::from_u128(0x425_402));
+        let attempt_id = AttemptId(Uuid::from_u128(0x425_403));
+        let attempt = Mutex::new(Some(NativeProviderWorkerBridgeActiveAttempt {
+            profile_id,
+            prompt_id,
+            attempt_id,
+            lifecycle_epoch: Arc::new(()),
+            cancellation: CancellationToken::default(),
+            compiled_plan_sha256: "a".repeat(64),
+            next_request_ordinal: 0,
+            provider_node_ids: BTreeSet::from(["first".to_owned(), "second".to_owned()]),
+        }));
+        reserve_provider_bridge_node(
+            &attempt,
+            profile_id,
+            prompt_id,
+            attempt_id,
+            "first",
+            &"a".repeat(64),
+        )
+        .expect("first node activation is reserved once");
+        assert!(
+            reserve_provider_bridge_node(
+                &attempt,
+                profile_id,
+                prompt_id,
+                attempt_id,
+                "first",
+                &"a".repeat(64),
+            )
+            .is_err()
+        );
+        reserve_provider_bridge_node(
+            &attempt,
+            profile_id,
+            prompt_id,
+            attempt_id,
+            "second",
+            &"a".repeat(64),
+        )
+        .expect("a distinct node remains interleavable");
+        assert!(
+            attempt
+                .lock()
+                .as_ref()
+                .is_some_and(|attempt| attempt.provider_node_ids.is_empty())
+        );
+    }
+
+    #[test]
+    fn provider_bridge_invocation_exhaustion_is_terminal_and_never_recycles() {
+        let next = AtomicU64::new(u64::MAX - 1);
+        assert_eq!(
+            allocate_provider_bridge_invocation(&next).expect("last invocation remains available"),
+            u64::MAX
+        );
+        assert!(allocate_provider_bridge_invocation(&next).is_err());
+        assert!(allocate_provider_bridge_invocation(&next).is_err());
+        assert_eq!(next.load(Ordering::Acquire), u64::MAX);
+    }
+
+    #[test]
+    fn provider_manifest_envelope_uses_the_single_signing_payload_digest() {
+        let signing_payload_digest = [0x5a; 32];
+        let direct = encode_provider_sha256(&signing_payload_digest);
+        let double: [u8; 32] = Sha256::digest(signing_payload_digest).into();
+        assert_eq!(direct, "5a".repeat(32));
+        assert_ne!(direct, encode_provider_sha256(&double));
+        assert_eq!(
+            WorkerSha256Digest::new(direct.clone())
+                .expect("direct manifest digest")
+                .as_str(),
+            direct
+        );
+    }
+
+    #[test]
+    fn provider_v2_finalization_binds_verified_receipt_materialization_and_context()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            ProviderRuntimeReceiptIdentityV2, ProviderRuntimeReceiptIssuerV2,
+            provider_terminal_completed_receipt_sha256,
+        };
+        use comfy_plugin_sdk::{
+            CanonicalTypeId, PluginValue, ProviderEncodedValueV2, ProviderHttpMethodV2,
+            ProviderInvocationResultV2, ProviderMaterializedOutputV2, ScalarValue, TypeRegistry,
+        };
+        use comfy_types::WorkerProviderStreamingContract;
+
+        let context = WorkerProviderInvocationContext {
+            session_id: Uuid::from_u128(0x425_100),
+            session_generation: 7,
+            invocation: 9,
+            generation: 11,
+        };
+        let envelope = WorkerProviderV2InvocationEnvelope::checked_from_controller(
+            context.clone(),
+            WorkerProviderStreamingContract {
+                methods: vec![comfy_types::WorkerProviderHttpMethod::Post],
+                maximum_headers: 4,
+                maximum_header_bytes: 1024,
+                maximum_request_body_bytes: 1024,
+                maximum_response_body_bytes: 1024,
+                maximum_chunk_bytes: 256,
+                maximum_ndjson_line_bytes: 256,
+                maximum_wait_milliseconds: 100,
+                maximum_uploads: 1,
+                maximum_upload_body_bytes: 1024,
+                maximum_cost_requests: 1,
+                maximum_progress_total: 100,
+                uploads: true,
+                cost_requests: true,
+            },
+            WorkerSha256Digest::new("a".repeat(64))?,
+            13,
+            [0x42; 32],
+        )?;
+        let handle = WorkerProviderStreamHandle {
+            session_id: context.session_id,
+            session_generation: context.session_generation,
+            invocation: context.invocation,
+            slot: 1,
+            generation: context.generation,
+        };
+        let terminal_receipt = b"terminal-receipt".to_vec();
+        let identity = ProviderRuntimeReceiptIdentityV2 {
+            provider: "plugin.fixture".to_owned(),
+            method: ProviderHttpMethodV2::Post,
+            endpoint: "https://provider.invalid/v2".to_owned(),
+            ordered_headers_sha256: "1".repeat(64),
+            secret_id: None,
+            request_head_sha256: "2".repeat(64),
+            request_body_sha256: "3".repeat(64),
+            provider_manifest_sha256: "4".repeat(64),
+            component_generation: 1,
+            component_digest_sha256: "5".repeat(64),
+            binding_generation: 1,
+            binding_set_sha256: "6".repeat(64),
+            accepted_cost_microunits: 0,
+            request_ordinal: 1,
+            response_status: 200,
+            response_headers_sha256: "7".repeat(64),
+            ordered_uploads_sha256: "8".repeat(64),
+            ordered_chunks_sha256: "9".repeat(64),
+            terminal_receipt_sha256: provider_terminal_completed_receipt_sha256(&terminal_receipt),
+            idempotency_identity_sha256: "b".repeat(64),
+        };
+        let receipt_scope = NativeProviderWorkerV2ReceiptScope {
+            context: context.clone(),
+            provider: identity.provider.clone(),
+            provider_manifest_sha256: identity.provider_manifest_sha256.clone(),
+            component_generation: identity.component_generation,
+            component_digest_sha256: identity.component_digest_sha256.clone(),
+            binding_generation: identity.binding_generation,
+            binding_set_sha256: identity.binding_set_sha256.clone(),
+            request_ordinal: identity.request_ordinal,
+        };
+        let origin = Instant::now();
+        let issuer = ProviderRuntimeReceiptIssuerV2::from_seed([0x43; 32], origin)?;
+        let verifier = issuer.verifier()?;
+        let verified_receipt =
+            || -> Result<VerifiedProviderRuntimeReceiptV2, Box<dyn std::error::Error>> {
+                let receipt = issuer.issue(
+                    identity.clone(),
+                    origin,
+                    origin + Duration::from_secs(30),
+                    [0x44; 32],
+                )?;
+                Ok(verifier.verify(&receipt, &identity, origin + Duration::from_secs(1))?)
+            };
+        let verified = verified_receipt()?;
+        validate_provider_v2_retained_receipt_scope(&receipt_scope, verified.identity())?;
+        let mut unrelated_identity = identity.clone();
+        unrelated_identity.request_ordinal += 1;
+        let unrelated_signed_receipt = issuer.issue(
+            unrelated_identity.clone(),
+            origin,
+            origin + Duration::from_secs(30),
+            [0x45; 32],
+        )?;
+        let unrelated_verified_receipt = verifier.verify(
+            &unrelated_signed_receipt,
+            &unrelated_identity,
+            origin + Duration::from_secs(1),
+        )?;
+        assert_eq!(
+            unrelated_verified_receipt
+                .identity()
+                .terminal_receipt_sha256,
+            identity.terminal_receipt_sha256
+        );
+        assert!(matches!(
+            validate_provider_v2_retained_receipt_scope(
+                &receipt_scope,
+                unrelated_verified_receipt.identity(),
+            ),
+            Err(crate::PluginServiceError::ProviderRuntimeAuthorityDenied)
+        ));
+        let registry = TypeRegistry::built_in()?;
+        let type_id: CanonicalTypeId = "comfy:string@1".parse()?;
+        let value = PluginValue::scalar(
+            type_id.clone(),
+            ScalarValue::String("result".to_owned()),
+            &registry,
+        )?;
+        let proposal = ProviderInvocationResultV2 {
+            outputs: vec![ProviderMaterializedOutputV2 {
+                port_id: "result".to_owned(),
+                value: ProviderEncodedValueV2 {
+                    type_id,
+                    family: value.family(),
+                    abi_bytes: value.abi_bytes()?,
+                },
+            }],
+            receipt: terminal_receipt,
+        };
+        let verified_receipt_identity =
+            encode_provider_sha256(&Sha256::digest(verified.bytes()).into());
+        let proposal_receipt_identity =
+            encode_provider_sha256(&Sha256::digest(&proposal.receipt).into());
+        assert_ne!(proposal_receipt_identity, verified_receipt_identity);
+        let (finalization, materialization) =
+            provider_v2_finalization_from_verified_materialization(
+                &envelope,
+                handle,
+                verified,
+                &proposal,
+                &registry,
+                &CancellationToken::default(),
+            )?;
+        assert_eq!(finalization.context, context);
+        assert_eq!(finalization.handle, handle);
+        assert_eq!(finalization.proposal_generation, 13);
+        assert_eq!(finalization.finalization_nonce, [0x42; 32]);
+        assert_eq!(
+            finalization.receipt_identity_sha256.as_str(),
+            proposal_receipt_identity
+        );
+        assert_eq!(
+            finalization.materialization_identity_sha256.as_str(),
+            encode_provider_sha256(&Sha256::digest(materialization.to_bytes()?).into())
+        );
+
+        let mut foreign_handle = handle;
+        foreign_handle.invocation += 1;
+        assert!(
+            provider_v2_finalization_from_verified_materialization(
+                &envelope,
+                foreign_handle,
+                verified_receipt()?,
+                &proposal,
+                &registry,
+                &CancellationToken::default(),
+            )
+            .is_err()
+        );
+        let mut changed_proposal = proposal.clone();
+        let changed_value = PluginValue::scalar(
+            "comfy:string@1".parse()?,
+            ScalarValue::String("changed".to_owned()),
+            &registry,
+        )?;
+        changed_proposal.outputs[0].value.abi_bytes = changed_value.abi_bytes()?;
+        assert_ne!(
+            provider_v2_finalization_from_verified_materialization(
+                &envelope,
+                handle,
+                verified_receipt()?,
+                &changed_proposal,
+                &registry,
+                &CancellationToken::default(),
+            )?
+            .0
+            .materialization_identity_sha256,
+            finalization.materialization_identity_sha256
+        );
+        let mut changed_terminal_receipt = proposal.clone();
+        changed_terminal_receipt.receipt[0] ^= 1;
+        assert!(
+            provider_v2_finalization_from_verified_materialization(
+                &envelope,
+                handle,
+                verified_receipt()?,
+                &changed_terminal_receipt,
+                &registry,
+                &CancellationToken::default(),
+            )
+            .is_err()
+        );
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        assert!(
+            provider_v2_finalization_from_verified_materialization(
+                &envelope,
+                handle,
+                verified_receipt()?,
+                &proposal,
+                &registry,
+                &cancelled,
+            )
+            .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn provider_v2_actuator_drop_transfers_cancellation_only_after_finalization_delivery() {
+        let failed_delivery_cancellation = CancellationToken::default();
+        close_provider_v2_actuator_route(false, &failed_delivery_cancellation, &mut None);
+        assert!(failed_delivery_cancellation.is_cancelled());
+
+        let committed_delivery_cancellation = CancellationToken::default();
+        close_provider_v2_actuator_route(true, &committed_delivery_cancellation, &mut None);
+        assert!(!committed_delivery_cancellation.is_cancelled());
+    }
+
+    #[test]
+    fn provider_v2_actuator_rejects_queued_work_after_cancellation() {
+        smol::block_on(async {
+            let (call_sender, call_receiver) = async_channel::bounded(1);
+            call_sender.send(1_u8).await.expect("queued actuator call");
+            let call_cancellation = CancellationToken::default();
+            call_cancellation.cancel();
+            assert!(matches!(
+                receive_provider_v2_actuator_item(
+                    &call_receiver,
+                    &call_cancellation,
+                    Duration::from_secs(1),
+                    "provider-v2 actuator call",
+                    "provider-v2 actuator call route closed",
+                )
+                .await,
+                Err(RuntimeSupervisorError::Protocol(message))
+                    if message == "provider-v2 actuator call route closed"
+            ));
+            assert!(matches!(
+                call_receiver.try_recv(),
+                Err(async_channel::TryRecvError::Empty)
+            ));
+
+            let (proposal_sender, proposal_receiver) = async_channel::bounded(1);
+            proposal_sender
+                .send(2_u8)
+                .await
+                .expect("queued actuator proposal");
+            let proposal_cancellation = CancellationToken::default();
+            proposal_cancellation.cancel();
+            assert!(matches!(
+                receive_provider_v2_actuator_item(
+                    &proposal_receiver,
+                    &proposal_cancellation,
+                    Duration::from_secs(1),
+                    "provider-v2 actuator proposal",
+                    "provider-v2 actuator proposal route closed",
+                )
+                .await,
+                Err(RuntimeSupervisorError::Protocol(message))
+                    if message == "provider-v2 actuator proposal route closed"
+            ));
+            assert!(matches!(
+                proposal_receiver.try_recv(),
+                Err(async_channel::TryRecvError::Empty)
+            ));
+        });
     }
 
     #[test]
@@ -10420,6 +12267,7 @@ mod tests {
             input_authorization,
             output_authorization,
             provider_streams: ProviderRuntimeStreamService::new(),
+            provider_bridge_attempt: Arc::new(Mutex::new(None)),
         };
         let before = presentation.snapshot(profile_id)?;
         smol::block_on(state.apply_command(ExecutionControlCommand {
@@ -10636,6 +12484,7 @@ mod tests {
                 input_authorization: authorize_native_input_reader(&roots.profile_id)?,
                 output_authorization: authorization,
                 provider_streams: ProviderRuntimeStreamService::new(),
+                provider_bridge_attempt: Arc::new(Mutex::new(None)),
             };
 
             assert!(state.reconcile_committed_output_receipts().await.is_err());
@@ -10764,6 +12613,7 @@ mod tests {
             input_authorization,
             output_authorization,
             provider_streams: ProviderRuntimeStreamService::new(),
+            provider_bridge_attempt: Arc::new(Mutex::new(None)),
         };
 
         smol::block_on(state.recover_worker(RuntimeSupervisorError::ChannelClosed))?;
@@ -10881,6 +12731,7 @@ mod tests {
             input_authorization: authorize_native_input_reader(&roots.profile_id)?,
             output_authorization: authorize_native_output_committer(&roots.profile_id)?,
             provider_streams: ProviderRuntimeStreamService::new(),
+            provider_bridge_attempt: Arc::new(Mutex::new(None)),
         };
         let event = NativeImageWorkerEvent::Failed {
             message: "untrusted worker cancellation observation".to_owned(),
@@ -10969,6 +12820,7 @@ mod tests {
                 output_proposal_bytes: 0,
             }),
             provider_streams: ProviderRuntimeStreamService::new(),
+            provider_bridge_attempt: Arc::new(Mutex::new(None)),
         };
         let envelope = comfy_types::WorkerEnvelope {
             version: comfy_types::WORKER_PROTOCOL_VERSION,

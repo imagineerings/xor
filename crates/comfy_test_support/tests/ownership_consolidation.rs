@@ -9669,7 +9669,16 @@ fn run_ownership_validation(
                 && plugin_component_host.contains("policy: &ProviderPolicy")
                 && plugin_component_host.contains("pub(crate) fn bind_start_request(")
                 && plugin_component_host
+                    .contains("route_authority: Option<NativeProviderWorkerV2RouteAuthority>")
+                && plugin_component_host.contains(".route_authority\n            .take()")
+                && plugin_component_host.contains(".start(head, policy)")
+                && !plugin_component_host
                     .contains(".bind(&crate::sdk_request_head(&head), policy)")
+                && !plugin_component_host.contains("grant: ProviderRuntimeActivationGrant")
+                && !plugin_component_host
+                    .contains("grant: Option<ProviderRuntimeActivationGrant>")
+                && !plugin_component_host.contains("ProviderRuntimeActivationGrant::checked")
+                && !plugin_component_host.contains("ProviderRuntimeActivationGrant::new")
                 && !plugin_component_host.contains("provider_policy: ProviderPolicy")
                 && !plugin_component_host.contains("ProviderPolicy::new(")
                 && !plugin_component_host.contains("ProviderPolicy::default(")
@@ -9830,8 +9839,22 @@ fn run_ownership_validation(
                     .contains("for (class_type, runtime) in self.registry.descriptors()")
                 && api_services.contains("project_component_node(")
                 && api_headless.contains("active.runtime.host()")
-                && plugin_private_worker.contains("command.deployment")
-                && plugin_private_worker.contains("supervisor.deploy_registry("),
+                && plugin_private_worker.contains("enum PrivateWorkerCommand")
+                && plugin_private_worker.contains("Legacy {")
+                && plugin_private_worker
+                    .contains("#[cfg(feature = \"test-support\")]\n    ProviderV2 {")
+                && plugin_private_worker
+                    .matches("ensure_private_worker_supervisor(launch, state, &deployment).await?")
+                    .count()
+                    == 2
+                && plugin_private_worker
+                    .matches("supervisor.deploy_registry(deployment).await")
+                    .count()
+                    == 2
+                && plugin_private_worker.contains("deployment.begin().generation()")
+                && plugin_private_worker.contains("registry_digest_sha256()")
+                && plugin_private_worker.contains("authorization_verifier()")
+                && !plugin_private_worker.contains("command.deployment"),
         ),
         (
             "task367_production_consumers_use_the_comprehensive_generated_registry",

@@ -125,6 +125,7 @@ struct ExecutionScope {
 enum ExecutionKind {
     Native,
     Plugin,
+    ProviderV2Plugin,
 }
 
 #[derive(Clone, Debug)]
@@ -314,6 +315,11 @@ pub struct WorkerSession {
     last_input_sequence: Option<u64>,
     next_output_sequence: u64,
     execution: Option<ExecutionScope>,
+    provider_v2_proposal_pending: bool,
+    last_provider_v2_finalization: Option<(
+        ExecutionScope,
+        comfy_types::WorkerProviderV2ProposalFinalization,
+    )>,
     pending_registry: Option<PendingWorkerRegistry>,
     registry: Option<AssembledWorkerRegistry>,
     backend_session: Option<WorkerBackendSession>,
@@ -338,6 +344,8 @@ impl WorkerSession {
             last_input_sequence: None,
             next_output_sequence: 0,
             execution: None,
+            provider_v2_proposal_pending: false,
+            last_provider_v2_finalization: None,
             pending_registry: None,
             registry: None,
             backend_session,
@@ -412,6 +420,28 @@ impl WorkerSession {
         envelope: WorkerEnvelope,
     ) -> Result<Vec<WorkerEnvelope>, WorkerSessionError> {
         self.validate_input(&envelope)?;
+        if let WorkerMessage::ProviderV2ProposalFinalization { finalization } = &envelope.message
+            && self.lifecycle == WorkerLifecycle::Ready
+            && self
+                .last_provider_v2_finalization
+                .as_ref()
+                .is_some_and(|(scope, completed)| {
+                    completed == finalization
+                        && envelope.request_id == scope.request_id
+                        && envelope.prompt_id == Some(scope.prompt_id)
+                        && envelope.attempt_id == Some(scope.attempt_id)
+                })
+        {
+            return Ok(vec![self.response_to(
+                &envelope,
+                WorkerMessage::ProviderV2ProposalFinalizationAck {
+                    acknowledgement: comfy_types::WorkerProviderV2ProposalFinalizationAck {
+                        finalization: finalization.clone(),
+                        result: Err(comfy_types::WorkerProviderStreamError::InvalidOrder),
+                    },
+                },
+            )?]);
+        }
         let messages = match &envelope.message {
             WorkerMessage::Hello { backend } => self.handle_hello(&envelope, backend)?,
             WorkerMessage::RegistryDeploymentBegin { deployment } => {
@@ -430,6 +460,10 @@ impl WorkerSession {
             WorkerMessage::PluginCapabilityResponse { .. } => {
                 self.handle_plugin_capability_response(&envelope)?
             }
+            WorkerMessage::ProviderStreamResponse { .. }
+            | WorkerMessage::ProviderV2ProposalFinalization { .. } => {
+                self.handle_provider_v2_response(&envelope)?
+            }
             WorkerMessage::Cancel { reason } => self.handle_cancel(&envelope, reason)?,
             WorkerMessage::Heartbeat => {
                 vec![self.response_to(&envelope, WorkerMessage::Heartbeat)?]
@@ -444,7 +478,7 @@ impl WorkerSession {
             | WorkerMessage::RegistryDeploymentRejected { .. }
             | WorkerMessage::PluginCapabilityRequest { .. }
             | WorkerMessage::ProviderStreamRequest { .. }
-            | WorkerMessage::ProviderStreamResponse { .. }
+            | WorkerMessage::ProviderV2ProposalFinalizationAck { .. }
             | WorkerMessage::PluginResult { .. }
             | WorkerMessage::Fatal { .. } => return Err(WorkerSessionError::InvalidDirection),
         };
@@ -726,6 +760,8 @@ impl WorkerSession {
             request_id: envelope.request_id,
             kind: ExecutionKind::Native,
         });
+        self.provider_v2_proposal_pending = false;
+        self.last_provider_v2_finalization = None;
         self.lifecycle = WorkerLifecycle::Running;
         Ok(vec![self.event_response(
             envelope,
@@ -760,6 +796,8 @@ impl WorkerSession {
             request_id: envelope.request_id,
             kind: ExecutionKind::Plugin,
         });
+        self.provider_v2_proposal_pending = false;
+        self.last_provider_v2_finalization = None;
         self.lifecycle = WorkerLifecycle::Running;
         Ok(vec![self.event_response(
             envelope,
@@ -772,6 +810,47 @@ impl WorkerSession {
         envelope: &WorkerEnvelope,
     ) -> Result<Vec<WorkerEnvelope>, WorkerSessionError> {
         self.require_running_attempt(envelope)?;
+        Ok(Vec::new())
+    }
+
+    pub fn mark_provider_v2_execution(&mut self) -> Result<(), WorkerSessionError> {
+        let execution = self
+            .execution
+            .as_mut()
+            .ok_or(WorkerSessionError::StaleAttempt)?;
+        if self.lifecycle != WorkerLifecycle::Running || execution.kind != ExecutionKind::Plugin {
+            return Err(WorkerSessionError::InvalidDirection);
+        }
+        execution.kind = ExecutionKind::ProviderV2Plugin;
+        Ok(())
+    }
+
+    fn handle_provider_v2_response(
+        &mut self,
+        envelope: &WorkerEnvelope,
+    ) -> Result<Vec<WorkerEnvelope>, WorkerSessionError> {
+        let (prompt_id, attempt_id) = attempt_identity(envelope)?;
+        let execution = self
+            .execution
+            .as_ref()
+            .ok_or(WorkerSessionError::StaleAttempt)?;
+        if execution.prompt_id != prompt_id || execution.attempt_id != attempt_id {
+            return Err(WorkerSessionError::StaleAttempt);
+        }
+        if execution.kind != ExecutionKind::ProviderV2Plugin {
+            return Err(WorkerSessionError::InvalidDirection);
+        }
+        match &envelope.message {
+            WorkerMessage::ProviderStreamResponse { .. } if self.provider_v2_proposal_pending => {
+                return Err(WorkerSessionError::InvalidDirection);
+            }
+            WorkerMessage::ProviderV2ProposalFinalization { finalization } => {
+                finalization
+                    .validate()
+                    .map_err(|error| WorkerSessionError::Payload(error.to_string()))?;
+            }
+            _ => {}
+        }
         Ok(Vec::new())
     }
 
@@ -913,6 +992,91 @@ impl WorkerSession {
         )
     }
 
+    pub fn provider_stream_request(
+        &mut self,
+        call_id: u64,
+        request: comfy_types::WorkerProviderStreamRequest,
+    ) -> Result<WorkerEnvelope, WorkerSessionError> {
+        let execution = self.execution.ok_or(WorkerSessionError::StaleAttempt)?;
+        if execution.kind != ExecutionKind::ProviderV2Plugin {
+            return Err(WorkerSessionError::InvalidDirection);
+        }
+        let identity = self
+            .identity
+            .clone()
+            .ok_or(WorkerSessionError::IdentityChanged)?;
+        let identity = SessionIdentity {
+            request_id: execution.request_id,
+            prompt_id: Some(execution.prompt_id),
+            attempt_id: Some(execution.attempt_id),
+            ..identity
+        };
+        self.envelope_from_identity(
+            identity,
+            WorkerMessage::ProviderStreamRequest { call_id, request },
+        )
+    }
+
+    pub fn provider_v2_proposal(
+        &mut self,
+        outcome: WorkerPluginExecutionOutcome,
+    ) -> Result<WorkerEnvelope, WorkerSessionError> {
+        let execution = self.execution.ok_or(WorkerSessionError::StaleAttempt)?;
+        if execution.kind != ExecutionKind::ProviderV2Plugin
+            || self.lifecycle != WorkerLifecycle::Running
+            || self.provider_v2_proposal_pending
+        {
+            return Err(WorkerSessionError::InvalidDirection);
+        }
+        self.provider_v2_proposal_pending = true;
+        let identity = self
+            .identity
+            .clone()
+            .ok_or(WorkerSessionError::IdentityChanged)?;
+        let identity = SessionIdentity {
+            request_id: execution.request_id,
+            prompt_id: Some(execution.prompt_id),
+            attempt_id: Some(execution.attempt_id),
+            ..identity
+        };
+        self.envelope_from_identity(identity, WorkerMessage::PluginResult { outcome })
+    }
+
+    pub fn complete_provider_v2_finalization(
+        &mut self,
+        acknowledgement: comfy_types::WorkerProviderV2ProposalFinalizationAck,
+    ) -> Result<WorkerEnvelope, WorkerSessionError> {
+        acknowledgement
+            .validate()
+            .map_err(|error| WorkerSessionError::Payload(error.to_string()))?;
+        let execution = self
+            .execution
+            .take()
+            .ok_or(WorkerSessionError::StaleAttempt)?;
+        if execution.kind != ExecutionKind::ProviderV2Plugin {
+            self.execution = Some(execution);
+            return Err(WorkerSessionError::InvalidDirection);
+        }
+        let identity = self
+            .identity
+            .clone()
+            .ok_or(WorkerSessionError::IdentityChanged)?;
+        let identity = SessionIdentity {
+            request_id: execution.request_id,
+            prompt_id: Some(execution.prompt_id),
+            attempt_id: Some(execution.attempt_id),
+            ..identity
+        };
+        self.provider_v2_proposal_pending = false;
+        self.last_provider_v2_finalization =
+            Some((execution, acknowledgement.finalization.clone()));
+        self.lifecycle = WorkerLifecycle::Ready;
+        self.envelope_from_identity(
+            identity,
+            WorkerMessage::ProviderV2ProposalFinalizationAck { acknowledgement },
+        )
+    }
+
     pub fn complete_plugin_execution(
         &mut self,
         outcome: WorkerPluginExecutionOutcome,
@@ -921,10 +1085,14 @@ impl WorkerSession {
             .execution
             .take()
             .ok_or(WorkerSessionError::StaleAttempt)?;
-        if execution.kind != ExecutionKind::Plugin {
+        if !matches!(
+            execution.kind,
+            ExecutionKind::Plugin | ExecutionKind::ProviderV2Plugin
+        ) {
             self.execution = Some(execution);
             return Err(WorkerSessionError::InvalidDirection);
         }
+        self.provider_v2_proposal_pending = false;
         let identity = self
             .identity
             .clone()
@@ -1344,6 +1512,31 @@ mod tests {
         ));
         assert!(matches!(responses[1].message, WorkerMessage::Ready));
         session
+    }
+
+    fn provider_v2_finalization() -> comfy_types::WorkerProviderV2ProposalFinalization {
+        let context = comfy_types::WorkerProviderInvocationContext {
+            session_id: uuid::Uuid::from_u128(0x425_200),
+            session_generation: 3,
+            invocation: 5,
+            generation: 7,
+        };
+        comfy_types::WorkerProviderV2ProposalFinalization {
+            handle: comfy_types::WorkerProviderStreamHandle {
+                session_id: context.session_id,
+                session_generation: context.session_generation,
+                invocation: context.invocation,
+                slot: 1,
+                generation: context.generation,
+            },
+            context,
+            proposal_generation: 11,
+            finalization_nonce: [0x42; 32],
+            receipt_identity_sha256: WorkerSha256Digest::new("a".repeat(64))
+                .expect("receipt identity"),
+            materialization_identity_sha256: WorkerSha256Digest::new("b".repeat(64))
+                .expect("materialization identity"),
+        }
     }
 
     fn stage_single_component_deployment(
@@ -1998,21 +2191,242 @@ mod tests {
             slot: 1,
             generation: 1,
         };
-        for message in [
-            WorkerMessage::ProviderStreamRequest {
-                call_id: 1,
-                request: comfy_types::WorkerProviderStreamRequest::CheckCancelled(handle),
-            },
+        assert_eq!(
+            ready_session().handle(envelope(
+                1,
+                WorkerMessage::ProviderStreamRequest {
+                    call_id: 1,
+                    request: comfy_types::WorkerProviderStreamRequest::CheckCancelled(handle),
+                },
+            )),
+            Err(WorkerSessionError::InvalidDirection)
+        );
+        let response = || WorkerMessage::ProviderStreamResponse {
+            call_id: 1,
+            response: comfy_types::WorkerProviderStreamResponse::Unit(Ok(())),
+        };
+        assert_eq!(
+            ready_session().handle(envelope(1, response())),
+            Err(WorkerSessionError::MissingAttemptIdentity)
+        );
+        assert_eq!(
+            ready_session().handle(attempt_envelope(1, response())),
+            Err(WorkerSessionError::StaleAttempt)
+        );
+    }
+
+    #[test]
+    fn provider_v2_finalization_is_ordered_typed_and_one_use() {
+        let executing_session = || {
+            let mut session = ready_session();
+            session.registry = Some(AssembledWorkerRegistry::empty_for_test(
+                WorkerRegistryGeneration::new(1).expect("generation"),
+                WorkerSha256Digest::new("c".repeat(64)).expect("registry digest"),
+            ));
+            session
+                .handle(attempt_envelope(
+                    1,
+                    WorkerMessage::ExecutePlugin {
+                        invocation: vec![1],
+                    },
+                ))
+                .expect("provider-v2 execution starts");
+            session
+                .mark_provider_v2_execution()
+                .expect("decoded invocation selects the provider-v2 route");
+            session
+        };
+        let finalization = provider_v2_finalization();
+        let mut ordinary = ready_session();
+        ordinary.registry = Some(AssembledWorkerRegistry::empty_for_test(
+            WorkerRegistryGeneration::new(1).expect("generation"),
+            WorkerSha256Digest::new("c".repeat(64)).expect("registry digest"),
+        ));
+        ordinary
+            .handle(attempt_envelope(
+                1,
+                WorkerMessage::ExecutePlugin {
+                    invocation: vec![1],
+                },
+            ))
+            .expect("ordinary plugin execution starts");
+        assert_eq!(
+            ordinary.handle(attempt_envelope(
+                2,
+                WorkerMessage::ProviderV2ProposalFinalization {
+                    finalization: finalization.clone(),
+                },
+            )),
+            Err(WorkerSessionError::InvalidDirection)
+        );
+
+        let mut foreign_response = executing_session();
+        let mut response_envelope = attempt_envelope(
+            2,
             WorkerMessage::ProviderStreamResponse {
                 call_id: 1,
                 response: comfy_types::WorkerProviderStreamResponse::Unit(Ok(())),
             },
-        ] {
-            assert_eq!(
-                ready_session().handle(envelope(1, message)),
-                Err(WorkerSessionError::InvalidDirection)
-            );
-        }
+        );
+        response_envelope.attempt_id = Some(AttemptId(uuid::Uuid::from_u128(2)));
+        assert_eq!(
+            foreign_response.handle(response_envelope),
+            Err(WorkerSessionError::StaleAttempt)
+        );
+
+        let mut foreign_finalization = executing_session();
+        let mut finalization_envelope = attempt_envelope(
+            2,
+            WorkerMessage::ProviderV2ProposalFinalization {
+                finalization: finalization.clone(),
+            },
+        );
+        finalization_envelope.attempt_id = Some(AttemptId(uuid::Uuid::from_u128(2)));
+        assert_eq!(
+            foreign_finalization.handle(finalization_envelope),
+            Err(WorkerSessionError::StaleAttempt)
+        );
+
+        let mut wrong_order = executing_session();
+        assert!(
+            wrong_order
+                .handle(attempt_envelope(
+                    2,
+                    WorkerMessage::ProviderV2ProposalFinalization {
+                        finalization: finalization.clone(),
+                    },
+                ))
+                .expect("structurally valid finalization reaches the retained-state owner")
+                .is_empty()
+        );
+        let wrong_order_acknowledgement = comfy_types::WorkerProviderV2ProposalFinalizationAck {
+            finalization: finalization.clone(),
+            result: Err(comfy_types::WorkerProviderStreamError::InvalidOrder),
+        };
+        wrong_order
+            .complete_provider_v2_finalization(wrong_order_acknowledgement)
+            .expect("wrong-order finalization returns a typed acknowledgement");
+
+        let mut session = executing_session();
+        session
+            .provider_v2_proposal(WorkerPluginExecutionOutcome::Succeeded(vec![1]))
+            .expect("worker retains a proposal before finalization");
+        assert_eq!(
+            session.handle(attempt_envelope(
+                2,
+                WorkerMessage::ProviderStreamResponse {
+                    call_id: 1,
+                    response: comfy_types::WorkerProviderStreamResponse::Unit(Ok(())),
+                },
+            )),
+            Err(WorkerSessionError::InvalidDirection)
+        );
+        let mut malformed = finalization.clone();
+        malformed.finalization_nonce = [0; 32];
+        assert!(matches!(
+            session.handle(attempt_envelope(
+                3,
+                WorkerMessage::ProviderV2ProposalFinalization {
+                    finalization: malformed,
+                },
+            )),
+            Err(WorkerSessionError::Payload(_))
+        ));
+        assert!(
+            session
+                .handle(attempt_envelope(
+                    4,
+                    WorkerMessage::ProviderV2ProposalFinalization {
+                        finalization: finalization.clone(),
+                    },
+                ))
+                .expect("valid finalization reaches the retained worker proposal")
+                .is_empty()
+        );
+        let acknowledgement = comfy_types::WorkerProviderV2ProposalFinalizationAck {
+            finalization: finalization.clone(),
+            result: Ok(()),
+        };
+        let response = session
+            .complete_provider_v2_finalization(acknowledgement.clone())
+            .expect("exact acknowledgement completes the worker execution");
+        assert_eq!(
+            response.message,
+            WorkerMessage::ProviderV2ProposalFinalizationAck { acknowledgement }
+        );
+        assert_eq!(session.lifecycle(), WorkerLifecycle::Ready);
+        let duplicate = session
+            .handle(attempt_envelope(
+                5,
+                WorkerMessage::ProviderV2ProposalFinalization {
+                    finalization: finalization.clone(),
+                },
+            ))
+            .expect("duplicate finalization returns a typed acknowledgement");
+        assert!(matches!(
+            duplicate.as_slice(),
+            [WorkerEnvelope {
+                message: WorkerMessage::ProviderV2ProposalFinalizationAck { acknowledgement },
+                ..
+            }] if acknowledgement.finalization == finalization
+                && acknowledgement.result
+                    == Err(comfy_types::WorkerProviderStreamError::InvalidOrder)
+        ));
+    }
+
+    #[test]
+    fn provider_v2_cancellation_revokes_an_armed_proposal_before_terminal_result() {
+        let mut session = ready_session();
+        session.registry = Some(AssembledWorkerRegistry::empty_for_test(
+            WorkerRegistryGeneration::new(1).expect("generation"),
+            WorkerSha256Digest::new("c".repeat(64)).expect("registry digest"),
+        ));
+        session
+            .handle(attempt_envelope(
+                1,
+                WorkerMessage::ExecutePlugin {
+                    invocation: vec![1],
+                },
+            ))
+            .expect("provider-v2 execution starts");
+        session
+            .mark_provider_v2_execution()
+            .expect("decoded invocation selects the provider-v2 route");
+        session
+            .provider_v2_proposal(WorkerPluginExecutionOutcome::Succeeded(vec![1]))
+            .expect("proposal remains armed");
+        let cancellation = session
+            .handle(attempt_envelope(
+                2,
+                WorkerMessage::Cancel {
+                    reason: "test cancellation".to_owned(),
+                },
+            ))
+            .expect("cancellation is observed");
+        assert!(matches!(
+            cancellation.as_slice(),
+            [WorkerEnvelope {
+                message: WorkerMessage::Lifecycle {
+                    event: WorkerLifecycleEvent::CancellationRequested { .. }
+                },
+                ..
+            }]
+        ));
+        let terminal = session
+            .complete_plugin_execution(WorkerPluginExecutionOutcome::Failed(
+                comfy_types::WorkerPluginExecutionFailure::Cancelled,
+            ))
+            .expect("cancelled proposal converges without finalization");
+        assert!(matches!(
+            terminal.message,
+            WorkerMessage::PluginResult {
+                outcome: WorkerPluginExecutionOutcome::Failed(
+                    comfy_types::WorkerPluginExecutionFailure::Cancelled
+                )
+            }
+        ));
+        assert_eq!(session.lifecycle(), WorkerLifecycle::Ready);
+        assert!(!session.provider_v2_proposal_pending);
     }
 
     #[test]

@@ -147,6 +147,8 @@ pub(crate) fn run_native_controller_e2e() -> Result<BTreeMap<&'static str, bool>
     let mut initial_events = wait_for_event(
         &event_receiver,
         &presentation,
+        "initial Started",
+        profile_id,
         initial_attempt,
         Duration::from_secs(10),
         |event| matches!(event.kind, AttemptEventKind::Started),
@@ -236,6 +238,8 @@ pub(crate) fn run_native_controller_e2e() -> Result<BTreeMap<&'static str, bool>
     initial_events.extend(wait_for_event(
         &event_receiver,
         &presentation,
+        "initial Cancelled",
+        profile_id,
         initial_attempt,
         Duration::from_secs(10),
         |event| matches!(event.kind, AttemptEventKind::Cancelled),
@@ -278,6 +282,8 @@ pub(crate) fn run_native_controller_e2e() -> Result<BTreeMap<&'static str, bool>
     let mut interrupted_events = wait_for_event(
         &event_receiver,
         &presentation,
+        "retry Started",
+        profile_id,
         interrupted_attempt,
         Duration::from_secs(10),
         |event| matches!(event.kind, AttemptEventKind::Started),
@@ -297,6 +303,8 @@ pub(crate) fn run_native_controller_e2e() -> Result<BTreeMap<&'static str, bool>
     interrupted_events.extend(wait_for_event(
         &event_receiver,
         &presentation,
+        "retry Interrupted",
+        profile_id,
         interrupted_attempt,
         Duration::from_secs(10),
         |event| matches!(event.kind, AttemptEventKind::Interrupted { .. }),
@@ -335,6 +343,8 @@ pub(crate) fn run_native_controller_e2e() -> Result<BTreeMap<&'static str, bool>
     let completed_events = wait_for_event(
         &event_receiver,
         &presentation,
+        "retry Succeeded",
+        profile_id,
         completed_attempt,
         Duration::from_secs(15),
         |event| matches!(event.kind, AttemptEventKind::Succeeded),
@@ -452,19 +462,63 @@ fn dispatch_accepted(
 fn wait_for_event(
     receiver: &async_channel::Receiver<AttemptEvent>,
     presentation: &SharedExecutionPresentationService,
+    phase: &str,
+    profile_id: ProfileId,
     attempt_id: AttemptId,
     timeout: Duration,
     predicate: impl Fn(&AttemptEvent) -> bool,
 ) -> Result<Vec<AttemptEvent>, Box<dyn Error>> {
+    if phase.trim().is_empty() {
+        return Err("native controller event wait phase must be non-empty".into());
+    }
     let deadline = Instant::now() + timeout;
     let mut events = Vec::new();
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
-            return Err(format!("timed out waiting for attempt {attempt_id:?}").into());
+            return Err(wait_for_event_diagnostic(
+                "timed out",
+                phase,
+                profile_id,
+                attempt_id,
+                timeout,
+                &events,
+                presentation,
+            )
+            .into());
         }
-        let event = receive_event(receiver, remaining)?
-            .ok_or_else(|| format!("timed out waiting for attempt {attempt_id:?}"))?;
+        let event = match receive_event(receiver, remaining) {
+            Ok(Some(event)) => event,
+            Ok(None) => {
+                return Err(wait_for_event_diagnostic(
+                    "timed out",
+                    phase,
+                    profile_id,
+                    attempt_id,
+                    timeout,
+                    &events,
+                    presentation,
+                )
+                .into());
+            }
+            Err(error)
+                if error
+                    .downcast_ref::<NativeControllerEventBusClosed>()
+                    .is_some() =>
+            {
+                return Err(wait_for_event_diagnostic(
+                    "event channel closed",
+                    phase,
+                    profile_id,
+                    attempt_id,
+                    timeout,
+                    &events,
+                    presentation,
+                )
+                .into());
+            }
+            Err(error) => return Err(error),
+        };
         assert_event_is_canonical(presentation, &event)?;
         if event.attempt_id == attempt_id {
             let matched = predicate(&event);
@@ -475,6 +529,45 @@ fn wait_for_event(
         }
     }
 }
+
+fn wait_for_event_diagnostic(
+    disposition: &str,
+    phase: &str,
+    profile_id: ProfileId,
+    attempt_id: AttemptId,
+    timeout: Duration,
+    events: &[AttemptEvent],
+    presentation: &SharedExecutionPresentationService,
+) -> String {
+    let observed_events = events
+        .iter()
+        .map(|event| (event.sequence, &event.kind))
+        .collect::<Vec<_>>();
+    let canonical = match presentation.snapshot(profile_id) {
+        Ok(snapshot) => {
+            let attempt = snapshot
+                .attempts
+                .iter()
+                .find(|attempt| attempt.attempt_id == attempt_id);
+            format!("attempt={attempt:#?}; snapshot={snapshot:#?}")
+        }
+        Err(error) => format!("snapshot lookup error: {error:?}"),
+    };
+    format!(
+        "native controller event wait {disposition}: phase={phase:?}; profile_id={profile_id:?}; attempt_id={attempt_id:?}; timeout={timeout:?}; observed_target_events={observed_events:#?}; canonical={canonical}"
+    )
+}
+
+#[derive(Debug)]
+struct NativeControllerEventBusClosed;
+
+impl std::fmt::Display for NativeControllerEventBusClosed {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("native controller event bus closed")
+    }
+}
+
+impl Error for NativeControllerEventBusClosed {}
 
 fn assert_event_is_canonical(
     presentation: &SharedExecutionPresentationService,
@@ -520,7 +613,7 @@ fn receive_event(
         match receiver.try_recv() {
             Ok(event) => return Ok(Some(event)),
             Err(async_channel::TryRecvError::Closed) => {
-                return Err("native controller event bus closed".into());
+                return Err(NativeControllerEventBusClosed.into());
             }
             Err(async_channel::TryRecvError::Empty) => {
                 let remaining = deadline.saturating_duration_since(Instant::now());

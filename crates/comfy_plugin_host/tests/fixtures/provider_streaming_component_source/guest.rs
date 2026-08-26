@@ -20,14 +20,14 @@ impl provider_node::Guest for ProviderStreamingComponent {
             manifest: manifest_projection(),
             provider_binding: plugin_types::ProviderBindingSet {
                 schema_version: 1,
-                implementation_namespace: "zed.comfy.provider.fixture".to_owned(),
-                bindings_sha256: "dd2046e20056584b2d9c0977a9228be1cefacf4dcf994fb5dc1fdf82284ff96d"
+                implementation_namespace: "zed.comfy.provider.openrouter".to_owned(),
+                bindings_sha256: "ca1e5cb11d6d456dd26c354a5f4cf00188414854587002e8137694758270d00f"
                     .to_owned(),
                 bindings: vec![plugin_types::ProviderBindingClaim {
-                    feature_id: "COMFY-NODE-TEST-STREAM".to_owned(),
-                    node_id: "FixtureStreamingProvider".to_owned(),
+                    feature_id: "COMFY-NODE-0466".to_owned(),
+                    node_id: "OpenRouterLLMNode".to_owned(),
                     contract_sha256:
-                        "79cf351160d022e2705307243f2c359736199070c8f147caf050a343a050e36b"
+                        "9f9e252f2dc4b6827fe12c30f29979d8aafc956ed76ddda414b3d65e9d21f0c9"
                             .to_owned(),
                     transport_schema: "zed:comfy-provider-transport@1".to_owned(),
                     materializer_schema: "zed:comfy-provider-materializer@1".to_owned(),
@@ -64,7 +64,7 @@ impl provider_node::Guest for ProviderStreamingComponent {
         context: types::InvocationContext,
         node_id: String,
     ) -> Result<types::InvocationResult, types::StreamError> {
-        if node_id != "FixtureStreamingProvider" {
+        if node_id != "OpenRouterLLMNode" {
             return Err(types::StreamError::InvalidRequestAuthority);
         }
         let handle = provider_streaming_host::start_request(
@@ -143,7 +143,7 @@ impl provider_node::Guest for ProviderStreamingComponent {
         };
         Ok(types::InvocationResult {
             outputs: vec![types::MaterializedOutput {
-                port_id: "output".to_owned(),
+                port_id: "output_0".to_owned(),
                 value: types::EncodedValue {
                     type_id: input.type_id,
                     family: input.family,
@@ -159,7 +159,7 @@ fn manifest_projection() -> plugin_types::ManifestProjection {
     plugin_types::ManifestProjection {
         component_world: "zed:comfy-provider-plugin@1.0.0".to_owned(),
         schema_version: 1,
-        identifier: "zed.comfy.provider.fixture".to_owned(),
+        identifier: "zed.comfy.provider.openrouter".to_owned(),
         plugin_version: version(1, 0, 0),
         api: plugin_types::ApiRequirement {
             major: 1,
@@ -171,18 +171,38 @@ fn manifest_projection() -> plugin_types::ManifestProjection {
             ],
         },
         nodes: vec![plugin_types::Node {
-            id: "FixtureStreamingProvider".to_owned(),
+            id: "OpenRouterLLMNode".to_owned(),
             version: version(1, 0, 0),
-            display_name: "Fixture Streaming Provider".to_owned(),
-            category: "partner/test".to_owned(),
+            display_name: "OpenRouter LLM".to_owned(),
+            category: "partner/text/OpenRouter".to_owned(),
             ports: vec![
                 port(
                     "prompt",
+                    "comfy:string@1",
                     plugin_types::PortDirection::Input,
                     plugin_types::PortPresence::Required,
                 ),
                 port(
-                    "output",
+                    "model",
+                    "comfy:dynamic-combo@1",
+                    plugin_types::PortDirection::Input,
+                    plugin_types::PortPresence::Required,
+                ),
+                port(
+                    "seed",
+                    "comfy:integer@1",
+                    plugin_types::PortDirection::Input,
+                    plugin_types::PortPresence::Required,
+                ),
+                port(
+                    "system_prompt",
+                    "comfy:string@1",
+                    plugin_types::PortDirection::Input,
+                    plugin_types::PortPresence::Optional,
+                ),
+                port(
+                    "output_0",
+                    "comfy:string@1",
                     plugin_types::PortDirection::Output,
                     plugin_types::PortPresence::Required,
                 ),
@@ -193,8 +213,32 @@ fn manifest_projection() -> plugin_types::ManifestProjection {
         }],
         capabilities: vec![
             plugin_types::CapabilityRequest {
+                kind: plugin_types::CapabilityKind::NetworkProvider,
+                scope: "zed.comfy.provider.openrouter|https://fixture.invalid/v2/stream".to_owned(),
+                quota: plugin_types::CapabilityQuota {
+                    maximum_operations: 1,
+                    maximum_request_bytes: 16384,
+                    maximum_response_bytes: 65536,
+                    maximum_total_bytes: 81920,
+                    maximum_handles: 1,
+                    timeout_milliseconds: 1000,
+                },
+            },
+            plugin_types::CapabilityRequest {
+                kind: plugin_types::CapabilityKind::Secret,
+                scope: "fixture-secret".to_owned(),
+                quota: plugin_types::CapabilityQuota {
+                    maximum_operations: 1,
+                    maximum_request_bytes: 1,
+                    maximum_response_bytes: 1,
+                    maximum_total_bytes: 2,
+                    maximum_handles: 1,
+                    timeout_milliseconds: 1000,
+                },
+            },
+            plugin_types::CapabilityRequest {
                 kind: plugin_types::CapabilityKind::ProviderUpload,
-                scope: "fixture|https://fixture.invalid/v2/stream".to_owned(),
+                scope: "zed.comfy.provider.openrouter|https://fixture.invalid/v2/stream".to_owned(),
                 quota: plugin_types::CapabilityQuota {
                     maximum_operations: 1,
                     maximum_request_bytes: 4096,
@@ -206,7 +250,7 @@ fn manifest_projection() -> plugin_types::ManifestProjection {
             },
             plugin_types::CapabilityRequest {
                 kind: plugin_types::CapabilityKind::ProviderCost,
-                scope: "fixture|https://fixture.invalid/v2/stream".to_owned(),
+                scope: "zed.comfy.provider.openrouter|https://fixture.invalid/v2/stream".to_owned(),
                 quota: plugin_types::CapabilityQuota {
                     maximum_operations: 1,
                     maximum_request_bytes: 512,
@@ -225,6 +269,7 @@ fn manifest_projection() -> plugin_types::ManifestProjection {
 
 fn port(
     id: &str,
+    type_id: &str,
     direction: plugin_types::PortDirection,
     presence: plugin_types::PortPresence,
 ) -> plugin_types::Port {
@@ -232,7 +277,7 @@ fn port(
         id: id.to_owned(),
         name: id.to_owned(),
         direction,
-        type_id: "comfy:string@1".to_owned(),
+        type_id: type_id.to_owned(),
         cardinality: plugin_types::PortCardinality::Singular,
         presence,
         hidden: false,

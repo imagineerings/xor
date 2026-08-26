@@ -8,11 +8,14 @@ use std::{
     time::Duration,
 };
 
-use comfy_runtime::{RuntimeSupervisor, SupervisorPolicy, WorkerLaunchConfig};
+use comfy_runtime::{
+    PluginAuthorizationVerifier, RuntimeSupervisor, SupervisorPolicy, WorkerLaunchConfig,
+};
 use comfy_tensor::{BackendCapabilityMatrix, CpuBackend};
 use comfy_types::{
     MAX_WORKER_FRAME_BYTES, ProfileId, WORKER_PROTOCOL_VERSION, WorkerEnvelope, WorkerId,
-    WorkerLifecycleEvent, WorkerMessage, decode_worker_frame, encode_worker_frame,
+    WorkerLifecycleEvent, WorkerMessage, WorkerRegistryDeploymentAck, decode_worker_frame,
+    encode_worker_frame,
 };
 use uuid::Uuid;
 
@@ -29,6 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut output = stdout.lock();
     let mut expected_input_sequence = 0_u64;
     let mut next_output_sequence = 0_u64;
+    let mut pending_registry = None;
 
     loop {
         let envelope = read_frame(&mut input)?;
@@ -75,12 +79,45 @@ fn main() -> Result<(), Box<dyn Error>> {
             }],
             WorkerMessage::Heartbeat => vec![WorkerMessage::Heartbeat],
             WorkerMessage::Shutdown => vec![WorkerMessage::Shutdown],
-            WorkerMessage::RegistryDeploymentBegin { .. }
-            | WorkerMessage::RegistryDeploymentChunk { .. }
-            | WorkerMessage::RegistryDeploymentCommit { .. }
-            | WorkerMessage::ExecutePlugin { .. }
+            WorkerMessage::RegistryDeploymentBegin { deployment } => {
+                if pending_registry.is_some() {
+                    return Err("fixture received overlapping registry deployments".into());
+                }
+                pending_registry = Some((
+                    deployment.generation(),
+                    deployment.registry_digest_sha256().clone(),
+                    u32::try_from(deployment.components().len())?,
+                ));
+                Vec::new()
+            }
+            WorkerMessage::RegistryDeploymentChunk { chunk } => {
+                let Some((generation, _, _)) = pending_registry.as_ref() else {
+                    return Err("fixture received a registry chunk before begin".into());
+                };
+                if chunk.generation() != *generation {
+                    return Err("fixture received a foreign registry chunk".into());
+                }
+                Vec::new()
+            }
+            WorkerMessage::RegistryDeploymentCommit { commit } => {
+                let Some((generation, digest, component_count)) = pending_registry.take() else {
+                    return Err("fixture received a registry commit before begin".into());
+                };
+                if commit.generation() != generation || commit.registry_digest_sha256() != &digest {
+                    return Err("fixture received a stale registry commit".into());
+                }
+                vec![WorkerMessage::RegistryDeploymentAck {
+                    acknowledgement: WorkerRegistryDeploymentAck::new(
+                        generation,
+                        digest,
+                        component_count,
+                    )?,
+                }]
+            }
+            WorkerMessage::ExecutePlugin { .. }
             | WorkerMessage::PluginCapabilityResponse { .. }
-            | WorkerMessage::ProviderStreamResponse { .. } => {
+            | WorkerMessage::ProviderStreamResponse { .. }
+            | WorkerMessage::ProviderV2ProposalFinalization { .. } => {
                 return Err("fixture does not implement the component worker protocol".into());
             }
             WorkerMessage::HelloAck { .. }
@@ -92,6 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             | WorkerMessage::RegistryDeploymentRejected { .. }
             | WorkerMessage::PluginCapabilityRequest { .. }
             | WorkerMessage::ProviderStreamRequest { .. }
+            | WorkerMessage::ProviderV2ProposalFinalizationAck { .. }
             | WorkerMessage::PluginResult { .. }
             | WorkerMessage::Fatal { .. } => {
                 return Err("supervisor sent a worker-only message".into());
@@ -197,6 +235,7 @@ fn parse_memory_limit() -> Result<u64, Box<dyn Error>> {
     let mut arguments = env::args_os().skip(1);
     let mut memory_limit = None;
     let mut backend_seen = false;
+    let mut authorization_verifier_seen = false;
     while let Some(argument) = arguments.next() {
         if argument == "--backend" {
             let backend = arguments.next().ok_or("--backend requires a value")?;
@@ -204,6 +243,20 @@ fn parse_memory_limit() -> Result<u64, Box<dyn Error>> {
                 return Err("test worker requires exactly one CPU backend selection".into());
             }
             backend_seen = true;
+            continue;
+        }
+        if argument == "--plugin-authorization-verification-key" {
+            if authorization_verifier_seen {
+                return Err("authorization verifier was provided more than once".into());
+            }
+            let value = arguments
+                .next()
+                .ok_or("authorization verifier requires a value")?;
+            let value = value
+                .to_str()
+                .ok_or("authorization verifier is not UTF-8")?;
+            PluginAuthorizationVerifier::from_token(value)?;
+            authorization_verifier_seen = true;
             continue;
         }
         if argument != "--memory-limit-bytes" {
