@@ -1586,11 +1586,26 @@ class ValidationGenerationTests(unittest.TestCase):
             self.assertIn(bridge_completion_owner, provider_worker_bridge["reads"])
             self.assertIn(bridge_completion_owner, provider_worker_bridge["writes"])
         for bridge_completion_read in (
-            "crates/comfy_runtime/src/provider_materialization.rs",
             "crates/comfy_runtime/src/trust.rs",
         ):
             self.assertIn(bridge_completion_read, provider_worker_bridge["reads"])
             self.assertNotIn(bridge_completion_read, provider_worker_bridge["writes"])
+        self.assertIn(
+            "crates/comfy_runtime/src/provider_materialization.rs",
+            provider_worker_bridge["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_runtime/src/provider_materialization.rs",
+            provider_worker_bridge["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
+            provider_worker_bridge["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
+            provider_worker_bridge["writes"],
+        )
         self.assertIn(
             "app-side native controller allocates the WorkerProviderInvocationContext",
             provider_worker_bridge["done"],
@@ -1621,11 +1636,15 @@ class ValidationGenerationTests(unittest.TestCase):
             "ProviderRuntimeReceiptV2",
             "does not carry WorkerProviderInvocationContext",
             "canonical all-or-none materialization",
+            "canonical provider materialization owner exposes only an opaque checked proposal-to-transport identity transition",
+            "worker independently derives the expected receipt and canonical materialization identities",
             "unrelated valid receipt",
             "completion token, no-argument disarm",
             "proposal/context/handle/receipt/materialization binding",
             "test-only scripted actuator",
             "Production provider-v2 remains fail-closed without an actuator",
+            "focused provider_worker_stream_bridge integration target proves the desktop hermetic first valid-grant bridge path",
+            "no service getter, grant constructor, context constructor, or feature-gated authority factory",
             "comfy-parity-provider-hermetic-component-harness",
         ):
             self.assertIn(bridge_completion_gate, provider_worker_bridge["done"])
