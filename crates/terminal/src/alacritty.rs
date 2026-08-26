@@ -46,7 +46,7 @@ use crate::{
 pub(super) use hyperlinks::{HyperlinkMatch, RegexSearches};
 
 pub(super) type AlacrittyPty = tty::Pty;
-pub(super) type AlacrittyTerm = Term<SimListener>;
+pub(super) type AlacrittyTerm = Term<ZedListener>;
 pub(super) type AlacrittyTermConfig = Config;
 pub(super) type AlacrittyTermLock = FairMutex<AlacrittyTerm>;
 pub(super) type AlacrittyCell = AlacCell;
@@ -54,7 +54,7 @@ pub(super) type AlacrittyGridIterator<'a> = GridIterator<'a, AlacCell>;
 pub(super) type AlacrittyHyperlink = AlacHyperlink;
 
 #[derive(Clone)]
-pub(super) struct SimListener(UnboundedSender<PtyEvent>);
+pub(super) struct ZedListener(UnboundedSender<PtyEvent>);
 
 #[derive(Clone, Debug)]
 pub(super) struct AlacrittySearch {
@@ -190,7 +190,7 @@ pub(super) fn new_term(
     events_tx: UnboundedSender<PtyEvent>,
     alternate_scroll: AlternateScroll,
 ) -> Arc<AlacrittyTermLock> {
-    let mut term = Term::new(config.clone(), &bounds, SimListener(events_tx));
+    let mut term = Term::new(config.clone(), &bounds, ZedListener(events_tx));
 
     if let AlternateScroll::Off = alternate_scroll {
         term.unset_private_mode(PrivateMode::Named(NamedPrivateMode::AlternateScroll));
@@ -205,7 +205,7 @@ pub(super) fn spawn_event_loop(
     pty: AlacrittyPty,
     drain_on_exit: bool,
 ) -> Result<PtySender> {
-    let event_loop = EventLoop::new(term, SimListener(events_tx), pty, drain_on_exit, false)
+    let event_loop = EventLoop::new(term, ZedListener(events_tx), pty, drain_on_exit, false)
         .context("failed to create event loop")?;
     let pty_tx = event_loop.channel();
     let _io_thread = event_loop.spawn();
@@ -322,7 +322,7 @@ impl From<AlacTermEvent> for TerminalBackendEvent {
     }
 }
 
-impl EventListener for SimListener {
+impl EventListener for ZedListener {
     fn send_event(&self, event: AlacTermEvent) {
         self.0.unbounded_send(PtyEvent::Event(event.into())).ok();
     }
@@ -777,7 +777,7 @@ fn terminal_selection_range_from_alacritty(range: AlacSelectionRange) -> Selecti
     }
 }
 
-pub(super) fn clear_saved_screen(term: &mut Term<SimListener>) {
+pub(super) fn clear_saved_screen(term: &mut Term<ZedListener>) {
     term.clear_screen(ClearMode::Saved);
 
     let cursor = term.grid().cursor.point;
@@ -802,7 +802,7 @@ pub(super) fn clear_saved_screen(term: &mut Term<SimListener>) {
     }
 }
 
-pub(super) fn used_lines(term: &Term<SimListener>) -> usize {
+pub(super) fn used_lines(term: &Term<ZedListener>) -> usize {
     if term.mode().contains(TermMode::ALT_SCREEN) {
         return term.total_lines();
     }
@@ -815,7 +815,7 @@ pub(super) fn used_lines(term: &Term<SimListener>) -> usize {
     term.history_size() + last_occupied_line + 1
 }
 
-pub(super) fn make_content(term: &Term<SimListener>, last_content: &Content) -> Content {
+pub(super) fn make_content(term: &Term<ZedListener>, last_content: &Content) -> Content {
     let content = term.renderable_content();
 
     let estimated_size = content.display_iter.size_hint().0;
@@ -858,13 +858,13 @@ pub(super) fn make_content(term: &Term<SimListener>, last_content: &Content) -> 
     }
 }
 
-pub(super) fn content_text(term: &Term<SimListener>) -> String {
+pub(super) fn content_text(term: &Term<ZedListener>) -> String {
     let start = AlacPoint::new(term.topmost_line(), Column(0));
     let end = AlacPoint::new(term.bottommost_line(), term.last_column());
     term.bounds_to_string(start, end)
 }
 
-pub(super) fn total_lines(term: &Term<SimListener>) -> usize {
+pub(super) fn total_lines(term: &Term<ZedListener>) -> usize {
     term.total_lines()
 }
 
@@ -913,17 +913,17 @@ pub(super) fn shrink_to_used(term: &mut AlacrittyTerm) {
     }
 }
 
-pub(super) fn screen_lines(term: &Term<SimListener>) -> usize {
+pub(super) fn screen_lines(term: &Term<ZedListener>) -> usize {
     term.screen_lines()
 }
 
-pub(super) fn full_content_range(term: &Term<SimListener>) -> Range {
+pub(super) fn full_content_range(term: &Term<ZedListener>) -> Range {
     let start = AlacPoint::new(term.topmost_line(), Column(0));
     let end = AlacPoint::new(term.bottommost_line(), term.last_column());
     Range::from_alacritty(start..=end)
 }
 
-pub(super) fn last_non_empty_lines(term: &Term<SimListener>, line_count: usize) -> Vec<String> {
+pub(super) fn last_non_empty_lines(term: &Term<ZedListener>, line_count: usize) -> Vec<String> {
     let grid = term.grid();
     let mut lines = Vec::new();
 
@@ -945,7 +945,7 @@ pub(super) fn last_non_empty_lines(term: &Term<SimListener>, line_count: usize) 
     lines
 }
 
-pub(super) fn update_vi_cursor_for_scroll(term: &mut Term<SimListener>, scroll: Scroll) {
+pub(super) fn update_vi_cursor_for_scroll(term: &mut Term<ZedListener>, scroll: Scroll) {
     match scroll {
         Scroll::Delta(delta) => {
             term.vi_mode_cursor = term.vi_mode_cursor.scroll(term, delta);
@@ -969,7 +969,7 @@ pub(super) fn update_vi_cursor_for_scroll(term: &mut Term<SimListener>, scroll: 
     }
 }
 
-pub(super) fn update_selection_to_vi_cursor(term: &mut Term<SimListener>) -> Option<Point> {
+pub(super) fn update_selection_to_vi_cursor(term: &mut Term<ZedListener>) -> Option<Point> {
     let mut selection = term.selection.take()?;
     let point = term.vi_mode_cursor.point;
     selection.update(point, AlacDirection::Right);
@@ -1050,7 +1050,7 @@ fn process_line(line: String) -> Option<String> {
 /// do not properly set the scrolling state and display odd text after appending; also those manipulations are more tedious and error-prone.
 /// The function achieves proper display and scrolling capabilities, at a cost of grid state not properly synchronized.
 /// This is enough for printing moderately-sized texts like task summaries, but might break or perform poorly for larger texts.
-pub(super) unsafe fn append_text_to_term(term: &mut Term<SimListener>, text_lines: &[&str]) {
+pub(super) unsafe fn append_text_to_term(term: &mut Term<ZedListener>, text_lines: &[&str]) {
     term.newline();
     term.grid_mut().cursor.point.column = Column(0);
     for line in text_lines {
