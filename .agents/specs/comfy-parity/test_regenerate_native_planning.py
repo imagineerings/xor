@@ -195,7 +195,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 725)
+        self.assertEqual(len(tasks), 729)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -330,6 +330,10 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-native-depth-anything-3-resource-foundation",
             "comfy-parity-native-dinov2-backbone-owner-foundation",
             "comfy-parity-native-moge-resource-foundation",
+            "comfy-parity-native-style-model-resource-foundation",
+            "comfy-parity-native-clip-vision-context-construction",
+            "comfy-parity-native-photomaker-resource-foundation",
+            "comfy-parity-native-gligen-resource-foundation",
             "comfy-parity-native-conditioning-auxiliary-resource-foundation",
             "comfy-parity-native-model-resource-service-foundation",
         ]
@@ -593,6 +597,98 @@ class ValidationGenerationTests(unittest.TestCase):
             "ownership_consolidation val_ownership_001",
         ):
             self.assertIn(command, moge_validation)
+        style_task = tasks_by_id["comfy-parity-native-style-model-resource-foundation"]
+        clip_vision_context_task = tasks_by_id[
+            "comfy-parity-native-clip-vision-context-construction"
+        ]
+        photomaker_task = tasks_by_id[
+            "comfy-parity-native-photomaker-resource-foundation"
+        ]
+        gligen_task = tasks_by_id["comfy-parity-native-gligen-resource-foundation"]
+        conditioning_auxiliary = tasks_by_id[
+            "comfy-parity-native-conditioning-auxiliary-resource-foundation"
+        ]
+        self.assertEqual(
+            style_task["dependencies"],
+            [
+                "comfy-parity-native-moge-resource-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        self.assertEqual(
+            clip_vision_context_task["dependencies"],
+            [
+                "comfy-parity-native-style-model-resource-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        self.assertEqual(
+            photomaker_task["dependencies"],
+            [
+                "comfy-parity-native-clip-vision-context-construction",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        self.assertEqual(
+            gligen_task["dependencies"],
+            [
+                "comfy-parity-native-photomaker-resource-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        self.assertEqual(
+            conditioning_auxiliary["dependencies"],
+            [
+                "comfy-parity-native-gligen-resource-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        for source_path in (
+            "projects/comfy/ComfyUI/comfy/gligen.py",
+            "projects/comfy/ComfyUI/comfy/sd.py",
+            "projects/comfy/ComfyUI/comfy/t2i_adapter/adapter.py",
+            "projects/comfy/ComfyUI/comfy/ldm/flux/redux.py",
+            "projects/comfy/ComfyUI/comfy/clip_model.py",
+            "projects/comfy/ComfyUI/comfy/clip_vision.py",
+        ):
+            self.assertTrue(
+                any(
+                    source_path in item["reads"]
+                    for item in (
+                        style_task,
+                        clip_vision_context_task,
+                        photomaker_task,
+                        gligen_task,
+                        conditioning_auxiliary,
+                    )
+                )
+            )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
+            style_task["writes"],
+        )
+        self.assertIn("crates/comfy_model/src/clip_vision.rs", clip_vision_context_task["writes"])
+        for phrase in (
+            "NativeGligenResource",
+            "NativePhotoMakerResource",
+            "NativeStyleModelResource",
+            "reduced dimensions are never labeled source-exact production profiles",
+            "Handle publication, cache, durable persistence, restart, and stale-generation behavior remain exclusively assigned",
+        ):
+            self.assertIn(phrase, conditioning_auxiliary["done"])
+        for item in (
+            style_task,
+            clip_vision_context_task,
+            photomaker_task,
+            gligen_task,
+            conditioning_auxiliary,
+        ):
+            validation = planning.task_validation_commands(item)
+            self.assertIn(
+                "conditioning-auxiliary-resource-foundation/generate_oracle.py --check",
+                validation,
+            )
+            self.assertIn("native_conditioning_integration conditioning_auxiliary", validation)
         for path in (
             "projects/comfy/ComfyUI/comfy_extras/nodes_lt_upsampler.py",
             "projects/comfy/ComfyUI/comfy/ldm/hunyuan_video/upsampler.py",
