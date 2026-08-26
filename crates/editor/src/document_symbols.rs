@@ -339,7 +339,6 @@ mod tests {
     use text::Point;
     use util::path;
     use workspace::item::{Item, ItemEvent};
-    use zed_actions::editor::MoveDown;
     use zed_actions::editor::{MoveDown, MoveUp};
 
     use crate::{
@@ -616,6 +615,7 @@ mod tests {
         // Move cursor within the same buffer version — should use cache
         cx.update_editor(|editor, window, cx| {
             editor.move_down(&MoveDown, window, cx);
+            editor.move_up(&MoveUp, window, cx);
         });
         cx.background_executor
             .advance_clock(LSP_REQUEST_DEBOUNCE_TIMEOUT + Duration::from_millis(100));

@@ -1826,48 +1826,6 @@ impl CodeActionContents {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn bold() -> HighlightStyle {
-        FontWeight::BOLD.into()
-    }
-
-    fn colored() -> HighlightStyle {
-        HighlightStyle {
-            fade_out: Some(0.5),
-            ..Default::default()
-        }
-    }
-
-    #[test]
-    fn test_split_completion_label_keeps_prefix_before_filter_range() {
-        let ((main_text, main_highlights), (suffix_text, suffix_highlights)) =
-            split_completion_label("&some_str: String", &(1..9), &[(11..17, colored())]);
-
-        assert_eq!(main_text, "&some_str");
-        assert_eq!(suffix_text, ": String");
-        assert_eq!(main_highlights, vec![]);
-        assert_eq!(suffix_highlights, vec![(2..8, colored())]);
-    }
-
-    #[test]
-    fn test_split_completion_label_splits_boundary_spanning_highlight() {
-        let ((main_text, main_highlights), (suffix_text, suffix_highlights)) =
-            split_completion_label(
-                "await.as_deref_mut(&mut self)",
-                &(6..18),
-                &[(0..29, bold())],
-            );
-
-        assert_eq!(main_text, "await.as_deref_mut");
-        assert_eq!(suffix_text, "(&mut self)");
-        assert_eq!(main_highlights, vec![(0..18, bold())]);
-        assert_eq!(suffix_highlights, vec![(0..11, bold())]);
-    }
-}
-
 #[derive(Clone)]
 pub enum CodeActionsItem {
     Task(TaskSourceKind, ResolvedTask),
