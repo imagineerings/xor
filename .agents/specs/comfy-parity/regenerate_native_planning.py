@@ -9810,12 +9810,25 @@ def native_model_resource_precursor_tasks(
         "Implement sealed STYLE_MODEL resources for the source-exact StyleAdapter and Flux Redux architectures, with typed get_cond invocation, strict retained state, and bounded CPU execution.",
         [
             "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/comfy/sd.py",
+            "projects/comfy/ComfyUI/comfy/ops.py",
             "projects/comfy/ComfyUI/comfy/t2i_adapter/adapter.py",
             "projects/comfy/ComfyUI/comfy/ldm/flux/redux.py",
+            "crates/comfy_model/src/clip_vision.rs",
             "crates/comfy_model/src/native_ops.rs",
             "crates/comfy_model/src/conditioning.rs",
             "crates/comfy_model/src/model_family.rs",
             "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_08.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs",
+            "crates/comfy_tensor/src/ops/linear_algebra_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [
             "crates/comfy_model/src/conditioning_resources.rs",
@@ -9823,8 +9836,11 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_test_support/tests/native_conditioning_integration.rs",
             "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "One sealed NativeStyleModelResource owns an internal exact architecture enum with StyleAdapter width 1024, context width 768, eight heads, three transformer layers, and eight output tokens, or Flux Redux projections 1152 to 12288 to 4096. Each variant has a strict ordered checkpoint schema including forward-unused state, deterministic checkpoint reconstruction, F32/F16/BF16 storage-to-F32 projection, semantic digest, distinct-StorageId residency, conservative construction and invocation phase-memory admission, and cancellation between layers and before publication. It exposes only get_cond(last_hidden_state) with the source-exact output and never impersonates GLIGEN or PHOTOMAKER. A tracked pure-standard-library reduced source-equation fixture covers both variants and clearly distinguishes reduced executable dimensions from the source-exact production profiles. Unsupported or ambiguous architecture, cross-role use, malformed weights or inputs, uncertified non-CPU/F32 execution, OOM, cancellation, and failed reconstruction publish no resource or conditioning state. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-service-foundation.",
+        "One sealed NativeStyleModelResource owns an internal exact architecture enum with StyleAdapter width 1024, context width 768, eight heads, three transformer layers, and eight output tokens, or Flux Redux projections 1152 to 12288 to 4096. Each variant has a strict complete ordered schema for every source checkpoint entry, deterministic checkpoint reconstruction, F32/F16/BF16 storage-to-F32 projection under the pinned manual-cast disposition, semantic digest, distinct-StorageId residency, conservative construction and invocation phase-memory admission, and cancellation between layers and before publication. It exposes only get_cond(last_hidden_state) from the canonical ClipVisionOutput last_hidden_state and preserves the source loader's StyleAdapter-before-FluxRedux detection precedence without impersonating GLIGEN or PHOTOMAKER. A tracked pure-standard-library reduced source-equation fixture covers both variants, asserts the exact source key sets, and clearly distinguishes reduced executable dimensions from the source-exact production profiles. Unsupported or ambiguous architecture, cross-role use, malformed weights or inputs, uncertified non-CPU/F32 execution, OOM, cancellation, and failed reconstruction publish no resource or conditioning state. The STYLE_MODEL-specific ownership concern, required mappings, and exact ownership test certify one authoritative retained resource and invocation owner without pre-claiming GLIGEN or PHOTOMAKER closure. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-service-foundation.",
     )
     append(
         "comfy-parity-native-clip-vision-context-construction",
@@ -21592,6 +21608,14 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "cargo test --locked -p comfy_model conditioning_resources -- --nocapture",
             "cargo test --locked -p comfy_model clip_vision -- --nocapture",
             "cargo test --locked -p comfy_test_support --test native_conditioning_integration conditioning_auxiliary -- --nocapture",
+        ])
+        if identifier == "comfy-parity-native-style-model-resource-foundation":
+            commands.extend([
+                "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+                "cargo test --locked -p comfy_test_support --test native_conditioning_integration style_model_resource -- --exact --nocapture",
+                "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task393_style_model_resource_001 -- --exact --nocapture",
+            ])
+        commands.extend([
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",

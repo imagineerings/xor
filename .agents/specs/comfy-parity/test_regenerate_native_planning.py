@@ -667,6 +667,42 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
             style_task["writes"],
         )
+        for style_read in (
+            "projects/comfy/ComfyUI/comfy/sd.py",
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_08.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs",
+            "crates/comfy_tensor/src/ops/linear_algebra_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+        ):
+            self.assertIn(style_read, style_task["reads"])
+        for ownership_path in (
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(ownership_path, style_task["writes"])
+        for style_gate in (
+            "strict complete ordered schema for every source checkpoint entry",
+            "asserts the exact source key sets",
+            "manual-cast disposition",
+            "canonical ClipVisionOutput last_hidden_state",
+            "StyleAdapter-before-FluxRedux detection precedence",
+            "STYLE_MODEL-specific ownership concern",
+            "without pre-claiming GLIGEN or PHOTOMAKER closure",
+        ):
+            self.assertIn(style_gate, style_task["done"])
+        style_validation = planning.task_validation_commands(style_task)
+        for command in (
+            "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_conditioning_integration style_model_resource -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task393_style_model_resource_001 -- --exact --nocapture",
+        ):
+            self.assertIn(command, style_validation)
         self.assertIn("crates/comfy_model/src/clip_vision.rs", clip_vision_context_task["writes"])
         for phrase in (
             "NativeGligenResource",
