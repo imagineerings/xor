@@ -92,6 +92,8 @@ zeroize.workspace = true
 agent = { workspace = true, features = ["test-support"] }
 async-trait.workspace = true
 async-channel.workspace = true
+bech32.workspace = true
+credentials_provider.workspace = true
 
 buffer_diff.workspace = true
 call = { workspace = true, features = ["test-support"] }
@@ -128,7 +130,9 @@ media = { workspace = true, features = ["collaboration"] }
 menu.workspace = true
 multi_buffer = { workspace = true, features = ["test-support"] }
 node_runtime.workspace = true
+nostr.workspace = true
 notifications = { workspace = true, features = ["multiplayer-tools", "test-support"] }
+pair_relay.workspace = true
 pretty_assertions.workspace = true
 project = { workspace = true, features = ["test-support"] }
 prompt_store.workspace = true
@@ -156,4 +160,5 @@ util.workspace = true
 workspace = { workspace = true, features = ["test-support"] }
 worktree = { workspace = true, features = ["test-support"] }
 zed_actions.workspace = true
+zed_credentials_provider = { workspace = true, features = ["multiplayer-tools"] }
 zlog.workspace = true

@@ -13,7 +13,7 @@ impl plugin::Guest for ProviderComponent {
         types::ManifestProjection {
             component_world: "zed:comfy-provider-plugin@1.0.0".to_owned(),
             schema_version: 1,
-            identifier: "zed.comfy.provider.comfy-node-0141".to_owned(),
+            identifier: "zed.comfy.provider.openrouter".to_owned(),
             plugin_version: version(1, 0, 0),
             api: types::ApiRequirement {
                 major: 1,
@@ -22,35 +22,74 @@ impl plugin::Guest for ProviderComponent {
                 required_features: vec!["provider.bindings.v1".to_owned()],
             },
             nodes: vec![types::Node {
-                id: "ElevenLabsAudioIsolation".to_owned(),
+                id: "OpenRouterLLMNode".to_owned(),
                 version: version(1, 0, 0),
-                display_name: "ElevenLabs Voice Isolation".to_owned(),
-                category: "partner/audio/ElevenLabs".to_owned(),
+                display_name: "OpenRouter LLM".to_owned(),
+                category: "partner/text/OpenRouter".to_owned(),
                 ports: vec![
                     types::Port {
-                        id: "audio".to_owned(),
-                        name: "audio".to_owned(),
+                        id: "prompt".to_owned(),
+                        name: "prompt".to_owned(),
                         direction: types::PortDirection::Input,
-                        type_id: "comfy:audio@1".to_owned(),
+                        type_id: "comfy:string@1".to_owned(),
                         cardinality: types::PortCardinality::Singular,
                         presence: types::PortPresence::Required,
                         hidden: false,
                         lazy: false,
                         default: None,
-                        serialization: types::PortSerialization::Handle,
+                        serialization: types::PortSerialization::Inline,
+                        accepted_legacy_names: Vec::new(),
+                    },
+                    types::Port {
+                        id: "model".to_owned(),
+                        name: "model".to_owned(),
+                        direction: types::PortDirection::Input,
+                        type_id: "comfy:dynamic-combo@1".to_owned(),
+                        cardinality: types::PortCardinality::Singular,
+                        presence: types::PortPresence::Required,
+                        hidden: false,
+                        lazy: false,
+                        default: None,
+                        serialization: types::PortSerialization::Inline,
+                        accepted_legacy_names: Vec::new(),
+                    },
+                    types::Port {
+                        id: "seed".to_owned(),
+                        name: "seed".to_owned(),
+                        direction: types::PortDirection::Input,
+                        type_id: "comfy:integer@1".to_owned(),
+                        cardinality: types::PortCardinality::Singular,
+                        presence: types::PortPresence::Required,
+                        hidden: false,
+                        lazy: false,
+                        default: None,
+                        serialization: types::PortSerialization::Inline,
+                        accepted_legacy_names: Vec::new(),
+                    },
+                    types::Port {
+                        id: "system_prompt".to_owned(),
+                        name: "system_prompt".to_owned(),
+                        direction: types::PortDirection::Input,
+                        type_id: "comfy:string@1".to_owned(),
+                        cardinality: types::PortCardinality::Singular,
+                        presence: types::PortPresence::Optional,
+                        hidden: false,
+                        lazy: false,
+                        default: None,
+                        serialization: types::PortSerialization::Inline,
                         accepted_legacy_names: Vec::new(),
                     },
                     types::Port {
                         id: "output_0".to_owned(),
                         name: "output_0".to_owned(),
                         direction: types::PortDirection::Output,
-                        type_id: "comfy:audio@1".to_owned(),
+                        type_id: "comfy:string@1".to_owned(),
                         cardinality: types::PortCardinality::Singular,
                         presence: types::PortPresence::Required,
                         hidden: false,
                         lazy: false,
                         default: None,
-                        serialization: types::PortSerialization::Handle,
+                        serialization: types::PortSerialization::Inline,
                         accepted_legacy_names: Vec::new(),
                     },
                 ],
@@ -84,7 +123,7 @@ impl plugin::Guest for ProviderComponent {
     }
 
     fn create_node(node_id: String) -> Result<u64, types::InvocationError> {
-        if node_id == "ElevenLabsAudioIsolation" {
+        if node_id == "OpenRouterLLMNode" {
             Ok(1)
         } else {
             Err(types::InvocationError::PluginFailure(
@@ -110,14 +149,14 @@ impl provider_binding::Guest for ProviderComponent {
     fn binding_set() -> types::ProviderBindingSet {
         types::ProviderBindingSet {
             schema_version: 1,
-            implementation_namespace: "zed.comfy.provider.comfy-node-0141".to_owned(),
-            bindings_sha256: "6edd3643bc5577d66f7bd6765e970142448aab383476e1fc7d084c00ae988ae8"
+            implementation_namespace: "zed.comfy.provider.openrouter".to_owned(),
+            bindings_sha256: "ca1e5cb11d6d456dd26c354a5f4cf00188414854587002e8137694758270d00f"
                 .to_owned(),
             bindings: vec![types::ProviderBindingClaim {
-                feature_id: "COMFY-NODE-0141".to_owned(),
-                node_id: "ElevenLabsAudioIsolation".to_owned(),
+                feature_id: "COMFY-NODE-0466".to_owned(),
+                node_id: "OpenRouterLLMNode".to_owned(),
                 contract_sha256:
-                    "48dd482033f7ca2bb6baa83e9a9cde25c8e7f896a15acd31821d37451423106b"
+                    "9f9e252f2dc4b6827fe12c30f29979d8aafc956ed76ddda414b3d65e9d21f0c9"
                         .to_owned(),
                 transport_schema: "zed:comfy-provider-transport@1".to_owned(),
                 materializer_schema: "zed:comfy-provider-materializer@1".to_owned(),
@@ -129,7 +168,7 @@ impl provider_binding::Guest for ProviderComponent {
         class_type: String,
         request: Vec<u8>,
     ) -> Result<types::ProviderInvocationResponse, types::InvocationError> {
-        if class_type != "ElevenLabsAudioIsolation" || request.is_empty() {
+        if class_type != "OpenRouterLLMNode" || request.is_empty() {
             return Err(types::InvocationError::PluginFailure(
                 "invalid provider request".to_owned(),
             ));

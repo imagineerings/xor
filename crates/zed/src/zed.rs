@@ -618,6 +618,8 @@ struct ComfyComponentHostGlobal {
     provider_invocation_authority:
         Option<Arc<dyn comfy_runtime::NativeProviderInvocationAuthority>>,
     #[cfg(not(test))]
+    private_worker_executor: Arc<comfy_plugin_host::PrivateWorkerPluginExecutor>,
+    #[cfg(not(test))]
     provider_cost_authority: Arc<comfy_runtime::ProviderCostApprovalAuthority>,
 }
 
@@ -777,6 +779,40 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
     let profile_id = comfy_ui::LOCAL_EXECUTION_PROFILE_ID.0.to_string();
 
     #[cfg(not(test))]
+    let (trust_policy, permission_policy, component_generation) = (
+        plugin_security.trust_policy().clone(),
+        plugin_security.permission_policy().clone(),
+        plugin_security.component_registry_generation(),
+    );
+    #[cfg(test)]
+    let (trust_policy, permission_policy, component_generation) = (
+        comfy_runtime::PluginTrustPolicy::default(),
+        comfy_runtime::PermissionPolicy::new(profile_id.clone(), std::iter::empty())?,
+        comfy_runtime::DEFAULT_COMPONENT_REGISTRY_GENERATION,
+    );
+
+    if let Some(component_host) = cx.try_global::<ComfyComponentHostGlobal>() {
+        let matches_current = component_host.profile_id == profile_id
+            && component_host.component_generation == component_generation
+            && {
+                #[cfg(not(test))]
+                {
+                    component_host.plugin_security == plugin_security
+                }
+                #[cfg(test)]
+                {
+                    true
+                }
+            };
+        if matches_current {
+            let router = component_host.router.clone();
+            router.current()?.installed_plugins()?;
+            register_comfy_plugin_contribution_source(router, cx);
+            return Ok(());
+        }
+    }
+
+    #[cfg(not(test))]
     let plugin_services = {
         let asset_service = comfy_ui::native_asset_services(cx)
             .ok_or_else(|| anyhow::anyhow!("native Comfy asset service is unavailable"))?;
@@ -797,24 +833,14 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
     };
     #[cfg(not(test))]
     let execution_boundary = plugin_services.boundary.clone();
+    #[cfg(not(test))]
+    let private_worker_executor = plugin_services.private_worker_executor();
     #[cfg(test)]
     let execution_boundary = comfy_plugin_host::ComponentExecutionBoundary::conformance_in_process(
         Arc::new(comfy_plugin_host::UnavailablePluginCapabilityServices),
     );
 
     let runtime = extension_host::ComponentRuntime::no_wasi()?;
-    #[cfg(not(test))]
-    let (trust_policy, permission_policy, component_generation) = (
-        plugin_security.trust_policy().clone(),
-        plugin_security.permission_policy().clone(),
-        plugin_security.component_registry_generation(),
-    );
-    #[cfg(test)]
-    let (trust_policy, permission_policy, component_generation) = (
-        comfy_runtime::PluginTrustPolicy::default(),
-        comfy_runtime::PermissionPolicy::new(profile_id.clone(), std::iter::empty())?,
-        comfy_runtime::DEFAULT_COMPONENT_REGISTRY_GENERATION,
-    );
     let replacement_host = comfy_plugin_host::ComponentHost::new(
         runtime,
         trust_policy,
@@ -833,28 +859,7 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
     #[cfg(test)]
     let provider_invocation_authority = None;
     if let Some(component_host) = cx.try_global::<ComfyComponentHostGlobal>() {
-        let current_profile_id = component_host.profile_id.clone();
-        let current_component_generation = component_host.component_generation;
-        #[cfg(not(test))]
-        let current_plugin_security = component_host.plugin_security.clone();
         let router = component_host.router.clone();
-        if current_profile_id == profile_id
-            && current_component_generation == component_generation
-            && {
-                #[cfg(not(test))]
-                {
-                    current_plugin_security == plugin_security
-                }
-                #[cfg(test)]
-                {
-                    true
-                }
-            }
-        {
-            router.current()?.installed_plugins()?;
-            register_comfy_plugin_contribution_source(router, cx);
-            return Ok(());
-        }
         router.replace_with_initial_generation(replacement_host, component_generation)?;
         register_comfy_plugin_contribution_source(router, cx);
         let component_host = cx.global_mut::<ComfyComponentHostGlobal>();
@@ -867,6 +872,7 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
         component_host.provider_invocation_authority = provider_invocation_authority;
         #[cfg(not(test))]
         {
+            component_host.private_worker_executor = private_worker_executor;
             component_host.provider_cost_authority = provider_cost_authority;
         }
         return Ok(());
@@ -890,6 +896,8 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
         plugin_security,
         router,
         provider_invocation_authority,
+        #[cfg(not(test))]
+        private_worker_executor,
         #[cfg(not(test))]
         provider_cost_authority,
     });
@@ -1114,7 +1122,7 @@ fn register_native_comfy_execution(
         }
     };
     let mut worker = native_comfy_worker_launch(profile, WorkerId(Uuid::new_v4()))?;
-    let (registry_bundle, provider_invocation_authority) = {
+    let (registry_bundle, provider_invocation_authority, private_worker_executor) = {
         let component_host = cx
             .try_global::<ComfyComponentHostGlobal>()
             .filter(|component_host| component_host.profile_id == profile_id.0.to_string())
@@ -1122,6 +1130,7 @@ fn register_native_comfy_execution(
         (
             Arc::new(component_host.router.active_execution_registry_bundle()?),
             component_host.provider_invocation_authority.clone(),
+            component_host.private_worker_executor.clone(),
         )
     };
     worker = worker.with_registry_deployment(registry_bundle.worker_deployment().clone());
@@ -1138,7 +1147,20 @@ fn register_native_comfy_execution(
                 || anyhow::anyhow!("native provider invocation authority is unavailable"),
             )?);
     }
-    comfy_ui::register_native_execution_services(config, registry_bundle, cx)?;
+    let provider_worker_bridge =
+        comfy_ui::register_native_execution_services(config, registry_bundle, cx)?;
+    if let Err(error) =
+        private_worker_executor.attach_provider_worker_bridge(provider_worker_bridge)
+    {
+        if let Err(clear_error) = comfy_ui::clear_native_execution_services(cx) {
+            return Err(anyhow::anyhow!(
+                "native provider bridge attachment failed: {error}; controller rollback failed: {clear_error}"
+            ));
+        }
+        return Err(anyhow::anyhow!(
+            "native provider bridge attachment failed: {error}"
+        ));
+    }
     Ok(())
 }
 
@@ -4106,6 +4128,46 @@ mod tests {
         sync::Arc,
         time::Duration,
     };
+
+    #[test]
+    fn provider_worker_bridge_bootstrap_retains_active_executor_and_headless_stays_denied() {
+        let desktop = include_str!("zed.rs");
+        let headless = include_str!("comfy_cli.rs");
+        for required in [
+            "private_worker_executor: Arc<comfy_plugin_host::PrivateWorkerPluginExecutor>",
+            "let private_worker_executor = plugin_services.private_worker_executor()",
+            "component_host.private_worker_executor = private_worker_executor",
+            "component_host.private_worker_executor.clone()",
+            "private_worker_executor.attach_provider_worker_bridge(provider_worker_bridge)",
+            "comfy_ui::clear_native_execution_services(cx)",
+        ] {
+            assert!(
+                desktop.contains(required),
+                "desktop provider bridge bootstrap lacks {required}"
+            );
+        }
+        let current_fast_path = desktop
+            .find("if matches_current")
+            .expect("same-generation component-host fast path");
+        let services_construction = desktop[current_fast_path..]
+            .find("comfy_plugin_services::private_worker_services(")
+            .map(|offset| current_fast_path + offset)
+            .expect("private-worker services construction");
+        assert!(current_fast_path < services_construction);
+
+        let register = desktop
+            .find("comfy_ui::register_native_execution_services(config, registry_bundle, cx)")
+            .expect("native controller registration");
+        let attach = desktop[register..]
+            .find("private_worker_executor.attach_provider_worker_bridge(provider_worker_bridge)")
+            .map(|offset| register + offset)
+            .expect("exact retained executor attachment");
+        assert!(register < attach);
+
+        assert!(headless.contains("ComponentExecutionBoundary::conformance_in_process"));
+        assert!(!headless.contains("attach_provider_worker_bridge"));
+        assert!(!headless.contains("NativeProviderWorkerBridgeAttachment"));
+    }
     use theme::ThemeRegistry;
     use util::{
         path,

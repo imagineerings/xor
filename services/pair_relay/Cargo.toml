@@ -21,6 +21,9 @@ tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "syn
 [dev-dependencies]
 secp256k1.workspace = true
 
+[lib]
+path = "src/pair_relay.rs"
+
 [[bin]]
 name = "pair-relay"
 path = "src/main.rs"

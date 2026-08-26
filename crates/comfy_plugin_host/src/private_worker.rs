@@ -5,8 +5,8 @@ use crate::{
 use comfy_plugin_sdk::InvocationError;
 use comfy_plugin_sdk::ProviderResultReceiptSet;
 use comfy_runtime::{
-    PluginAuthorizationVerifier, PluginCapabilityBroker, PluginCapabilityInvocation,
-    PluginServiceInvocationContext, ProviderCostAuthorizationAuthority,
+    NativeProviderWorkerBridgeAttachment, PluginAuthorizationVerifier, PluginCapabilityBroker,
+    PluginCapabilityInvocation, PluginServiceInvocationContext, ProviderCostAuthorizationAuthority,
     ProviderResultReceiptAuthority, ProviderResultReceiptIssuer, RetainedPluginExecution,
     RuntimeSupervisor, RuntimeSupervisorError, WorkerLaunchConfig, WorkerRegistryDeploymentPlan,
 };
@@ -17,7 +17,7 @@ use comfy_types::{
 use std::{
     future::Future,
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -25,6 +25,7 @@ pub struct PrivateWorkerPluginExecutor {
     launch: WorkerLaunchConfig,
     broker: PluginCapabilityBroker,
     provider_result_receipts: Option<PrivateWorkerProviderResultReceipts>,
+    provider_worker_bridge: Mutex<Option<NativeProviderWorkerBridgeAttachment>>,
     commands: async_channel::Sender<PrivateWorkerCommand>,
 }
 
@@ -125,8 +126,33 @@ impl PrivateWorkerPluginExecutor {
             launch,
             broker,
             provider_result_receipts,
+            provider_worker_bridge: Mutex::new(None),
             commands,
         }))
+    }
+
+    pub fn attach_provider_worker_bridge(
+        &self,
+        attachment: NativeProviderWorkerBridgeAttachment,
+    ) -> Result<(), ComponentHostError> {
+        let attachment = attachment
+            .bind_to_worker_profile(self.launch.profile_id)
+            .map_err(worker_boundary_error)?;
+        let mut current = self.provider_worker_bridge.lock().map_err(|error| {
+            ComponentHostError::ExecutionBoundary(format!(
+                "private worker provider bridge slot is unavailable: {error}"
+            ))
+        })?;
+        if current
+            .as_ref()
+            .is_some_and(NativeProviderWorkerBridgeAttachment::is_live)
+        {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "private worker already has a live native provider bridge".to_owned(),
+            ));
+        }
+        *current = Some(attachment);
+        Ok(())
     }
 
     async fn execute_prepared(
@@ -511,5 +537,37 @@ mod tests {
                 message: "fatal".to_owned(),
             }
         ));
+    }
+
+    #[test]
+    fn private_worker_provider_bridge_attachment_is_one_live_weak_consumer() {
+        let source = include_str!("private_worker.rs");
+        let production = source
+            .split_once("#[cfg(test)]")
+            .map(|(production, _)| production)
+            .expect("private worker production source");
+        for required in [
+            "provider_worker_bridge: Mutex<Option<NativeProviderWorkerBridgeAttachment>>",
+            "bind_to_worker_profile(self.launch.profile_id)",
+            "is_some_and(NativeProviderWorkerBridgeAttachment::is_live)",
+            "private worker already has a live native provider bridge",
+            "*current = Some(attachment)",
+        ] {
+            assert!(
+                production.contains(required),
+                "private worker bridge attachment lacks {required}"
+            );
+        }
+        for forbidden in [
+            concat!("ProviderRuntimeStream", "Service::new()"),
+            concat!("ProviderRuntimeActivation", "GrantSource"),
+            concat!("provider_runtime_stream", "_service"),
+            concat!("provider_runtime_activation", "_grants"),
+        ] {
+            assert!(
+                !production.contains(forbidden),
+                "private worker bridge attachment exposes {forbidden}"
+            );
+        }
     }
 }

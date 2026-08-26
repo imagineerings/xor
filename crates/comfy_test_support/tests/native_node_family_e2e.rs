@@ -1,13 +1,18 @@
 use comfy_media::{PngLimits, encode_png_frame};
 use comfy_model::{
+    BackgroundRemovalFixtureMutation, DepthAnything3FixtureMutation, DepthAnything3FixtureProfile,
     NATIVE_UPSCALE_ADMITTED_ARCHITECTURE_COUNT, NATIVE_UPSCALE_ARCHITECTURE_COUNT,
-    NATIVE_UPSCALE_CONTRACT_SHA256, NativeFrameInterpolationModel, NativeLatentUpscaleCheckpoint,
-    NativeLatentUpscaleModelResource, NativeModelPayload, NativeSdPoseHeatmapHead,
-    NativeSdPoseModel, NativeSdPoseSd2Denoiser, NativeUpscaleContractError,
-    NativeUpscaleModelError, NativeUpscaleModelResource, NativeUpscaleStateDictionaryLayout,
-    NativeUpscaleUnavailableReason, SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration,
-    compiled_native_upscale_contract, sdpose_heatmap_head_weight_manifest,
-    sdpose_sd2_weight_manifest,
+    NATIVE_UPSCALE_CONTRACT_SHA256, NativeBackgroundRemovalError, NativeBackgroundRemovalResource,
+    NativeDepthAnything3Invocation, NativeDepthAnything3ReferenceStrategy,
+    NativeDepthAnything3ResizeMethod, NativeDepthAnything3Resource, NativeFrameInterpolationModel,
+    NativeLatentUpscaleCheckpoint, NativeLatentUpscaleModelResource, NativeModelPayload,
+    NativeModelPayloadError, NativeSdPoseHeatmapHead, NativeSdPoseModel, NativeSdPoseSd2Denoiser,
+    NativeUpscaleContractError, NativeUpscaleModelError, NativeUpscaleModelResource,
+    NativeUpscaleStateDictionaryLayout, NativeUpscaleUnavailableReason,
+    SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration, compiled_native_upscale_contract,
+    deterministic_reduced_depth_anything_3_checkpoint, mutate_reduced_depth_anything_3_checkpoint,
+    reduced_depth_anything_3_checkpoint_parity_for_fixture, sdpose_heatmap_head_weight_manifest,
+    sdpose_sd2_weight_manifest, select_reduced_depth_anything_3_reference_for_fixture,
 };
 use comfy_nodes::{
     NativePreparedEffectKind, NativeStoredModelPayload, NativeStructuredValue,
@@ -25,7 +30,8 @@ use comfy_runtime::{
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, ExecutionContext, ImageTensor,
-    NativeTensorPayload, NativeTensorRole, StreamId, Tensor, TensorBackend,
+    NativeTensorPayload, NativeTensorRole, RetryRngPolicy, RngStreamAddress, StreamId, Tensor,
+    TensorBackend,
     generated_comfy_operator_indirection_01::tensor_from_f32_with_context_exact_native,
     generated_neural_network_functional_01::pixel_shuffle_tensor_with_context_exact_native,
     generated_spatial_functional_kernel_01::{
@@ -36,7 +42,7 @@ use comfy_tensor::{
 };
 use comfy_types::{AttemptId, NodeId, ProfileId, PromptId, WorkerId, WorkerMessage};
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -53,6 +59,24 @@ const SDPOSE_FIXTURE_ARTIFACT: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const UPSCALE_MODEL_RESOURCE_FIXTURE: &str =
     include_str!("../fixtures/models/upscale-model-resource-foundation/contract.json");
+const BACKGROUND_REMOVAL_RESOURCE_FIXTURE: &str =
+    include_str!("../fixtures/models/background-removal-resource-foundation/manifest.json");
+const BACKGROUND_REMOVAL_RESOURCE_ORACLE: &str =
+    include_str!("../fixtures/models/background-removal-resource-foundation/oracle.json");
+const BACKGROUND_REMOVAL_RESOURCE_PROVENANCE: &str =
+    include_str!("../fixtures/models/background-removal-resource-foundation/provenance.json");
+const BACKGROUND_REMOVAL_RESOURCE_GENERATOR: &str =
+    include_str!("../fixtures/models/background-removal-resource-foundation/generate_oracle.py");
+const DEPTH_ANYTHING_3_RESOURCE_FIXTURE: &str =
+    include_str!("../fixtures/models/depth-anything-3-resource-foundation/manifest.json");
+const DEPTH_ANYTHING_3_RESOURCE_ORACLE: &str =
+    include_str!("../fixtures/models/depth-anything-3-resource-foundation/oracle.json");
+const DEPTH_ANYTHING_3_RESOURCE_PROVENANCE: &str =
+    include_str!("../fixtures/models/depth-anything-3-resource-foundation/provenance.json");
+const DEPTH_ANYTHING_3_RESOURCE_GENERATOR: &str =
+    include_str!("../fixtures/models/depth-anything-3-resource-foundation/generate_oracle.py");
+const DEPTH_ANYTHING_3_RESOURCE_SOURCE_GRAPH: &str =
+    include_str!("../fixtures/models/depth-anything-3-resource-foundation/source_graph.py");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -90,6 +114,32 @@ fn fixture_raw_bits(value: &serde_json::Value) -> Result<Vec<u32>, Box<dyn Error
     let mut output = Vec::new();
     collect(value, &mut output)?;
     Ok(output)
+}
+
+fn require_exact_fixture_bits(
+    phase: &str,
+    actual: &[u32],
+    expected: &[u32],
+) -> Result<(), Box<dyn Error>> {
+    if actual.len() != expected.len() {
+        return Err(format!(
+            "{phase}: actual length {}, expected {}",
+            actual.len(),
+            expected.len()
+        )
+        .into());
+    }
+    if let Some((index, (actual, expected))) = actual
+        .iter()
+        .zip(expected)
+        .enumerate()
+        .find(|(_, (actual, expected))| actual != expected)
+    {
+        return Err(
+            format!("{phase}[{index}]: actual {actual:#010x}, expected {expected:#010x}").into(),
+        );
+    }
+    Ok(())
 }
 
 fn sdpose_tensor(
@@ -1010,6 +1060,1907 @@ fn native_latent_upscale_model_fixture_oracles_are_complete_and_consumed()
         &tensor_bits(&reversed_order)?[..4],
         &tensor_bits(&unnormalized)?[..4]
     );
+    Ok(())
+}
+
+#[test]
+fn native_background_removal_fixture_executes_and_discriminates_source_phases()
+-> Result<(), Box<dyn Error>> {
+    let fixture: serde_json::Value = serde_json::from_str(BACKGROUND_REMOVAL_RESOURCE_FIXTURE)?;
+    let oracle: serde_json::Value = serde_json::from_str(BACKGROUND_REMOVAL_RESOURCE_ORACLE)?;
+    let provenance: serde_json::Value =
+        serde_json::from_str(BACKGROUND_REMOVAL_RESOURCE_PROVENANCE)?;
+    assert_eq!(
+        fixture
+            .get("oracle_domain")
+            .and_then(serde_json::Value::as_str),
+        Some("zed.comfy.background-removal-source-profile.v1")
+    );
+    assert_eq!(
+        fixture
+            .get("source_sha256")
+            .and_then(serde_json::Value::as_str),
+        Some(comfy_model::BIREFNET_SOURCE_SHA256)
+    );
+    assert_eq!(
+        oracle.get("format").and_then(serde_json::Value::as_str),
+        Some("zed.comfy.background-removal-reduced-oracle.v1")
+    );
+    let generator_sha256 = format!(
+        "{:x}",
+        Sha256::digest(BACKGROUND_REMOVAL_RESOURCE_GENERATOR.as_bytes())
+    );
+    let oracle_sha256 = format!(
+        "{:x}",
+        Sha256::digest(BACKGROUND_REMOVAL_RESOURCE_ORACLE.as_bytes())
+    );
+    for document in [&fixture, &oracle, &provenance] {
+        assert_eq!(
+            document
+                .get("generator_sha256")
+                .and_then(serde_json::Value::as_str),
+            Some(generator_sha256.as_str())
+        );
+    }
+    for document in [&fixture, &provenance] {
+        assert_eq!(
+            document
+                .get("oracle_sha256")
+                .and_then(serde_json::Value::as_str),
+            Some(oracle_sha256.as_str())
+        );
+    }
+    for field in ["generator_command", "platform", "python"] {
+        let oracle_value = oracle
+            .get(field)
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or("background-removal oracle provenance field is missing")?;
+        assert_eq!(
+            provenance.get(field).and_then(serde_json::Value::as_str),
+            Some(oracle_value)
+        );
+    }
+    assert!(
+        oracle
+            .get("f32_rule")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|value| !value.is_empty())
+    );
+    let expected_sources = BTreeMap::from([
+        (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_bg_removal.py",
+            comfy_model::NODES_BACKGROUND_REMOVAL_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/bg_removal_model.py",
+            comfy_model::BACKGROUND_REMOVAL_MODEL_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/background_removal/birefnet.py",
+            comfy_model::BIREFNET_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/background_removal/birefnet.json",
+            comfy_model::BIREFNET_CONFIG_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/clip_model.py",
+            comfy_model::CLIP_MODEL_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            comfy_model::COMFY_OPS_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            comfy_model::MODEL_MANAGEMENT_SOURCE_SHA256,
+        ),
+    ]);
+    for document in [&oracle, &provenance] {
+        let pinned_sources = document
+            .get("pinned_sources")
+            .and_then(serde_json::Value::as_object)
+            .ok_or("background-removal pinned sources are missing")?;
+        assert_eq!(pinned_sources.len(), expected_sources.len());
+        for (path, expected_sha256) in &expected_sources {
+            assert_eq!(
+                pinned_sources
+                    .get(*path)
+                    .and_then(serde_json::Value::as_str),
+                Some(*expected_sha256)
+            );
+        }
+    }
+    let input_shape = fixture
+        .get("input_shape")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("background-removal input shape is missing")?
+        .iter()
+        .map(|value| value.as_u64().ok_or("invalid input-shape dimension"))
+        .collect::<Result<Vec<_>, _>>()?;
+    let output_shape = fixture
+        .get("output_shape")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("background-removal output shape is missing")?
+        .iter()
+        .map(|value| value.as_u64().ok_or("invalid output-shape dimension"))
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(input_shape, vec![1, 3, 5, 4]);
+    assert_eq!(output_shape, vec![1, 3, 5]);
+    assert_eq!(oracle.get("input_shape"), fixture.get("input_shape"));
+    assert_eq!(oracle.get("output_shape"), fixture.get("output_shape"));
+    let input = fixture
+        .get("input_rgba")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("background-removal input fixture is missing")?
+        .iter()
+        .map(|value| {
+            value
+                .as_f64()
+                .map(|value| value as f32)
+                .ok_or("background-removal input value is invalid")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let expected_bits = fixture_raw_bits(
+        oracle
+            .get("output_bits")
+            .ok_or("background-removal oracle output is missing")?,
+    )?;
+    assert_eq!(
+        fixture_raw_bits(
+            fixture
+                .get("baseline_output_bits")
+                .ok_or("background-removal output fixture is missing")?,
+        )?,
+        expected_bits
+    );
+    let expected_raw_f32_sha256 = oracle
+        .get("raw_f32_sha256")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("background-removal raw-output hash is missing")?;
+    for document in [&fixture, &provenance] {
+        assert_eq!(
+            document
+                .get("raw_f32_sha256")
+                .and_then(serde_json::Value::as_str),
+            Some(expected_raw_f32_sha256)
+        );
+    }
+    let required_mutations = fixture
+        .get("required_mutations")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("background-removal mutation fixture is missing")?
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .ok_or("background-removal mutation is invalid")
+        })
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    assert_eq!(
+        required_mutations,
+        BTreeSet::from([
+            "aspp-dilated-branch",
+            "aspp-global-pool",
+            "deform-mask",
+            "deform-offset",
+            "relative-position-index",
+            "shifted-window-block",
+            "unused-decoder-head",
+        ])
+    );
+    let mutation_oracles = oracle
+        .get("mutations")
+        .and_then(serde_json::Value::as_object)
+        .ok_or("background-removal mutation oracles are missing")?;
+    assert_eq!(
+        mutation_oracles
+            .keys()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>(),
+        required_mutations
+    );
+    for (name, mutation_oracle) in mutation_oracles {
+        let mutation_bits = fixture_raw_bits(
+            mutation_oracle
+                .get("output_bits")
+                .ok_or("background-removal mutation output is missing")?,
+        )?;
+        assert_eq!(
+            mutation_bits != expected_bits,
+            name != "unused-decoder-head",
+            "{name} is not a discriminating source-equation oracle"
+        );
+        let mut mutation_hasher = Sha256::new();
+        for bits in &mutation_bits {
+            mutation_hasher.update(f32::from_bits(*bits).to_le_bytes());
+        }
+        assert_eq!(
+            format!("{:x}", mutation_hasher.finalize()),
+            mutation_oracle
+                .get("raw_f32_sha256")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("background-removal mutation hash is missing")?
+        );
+    }
+
+    let workspace_bytes = 512 * 1024 * 1024;
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(workspace_bytes)?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority.authorize_workspace(workspace_bytes)?,
+        &cancellation,
+    );
+    let image = ImageTensor::from_f32(&backend, &context, 1, 3, 5, 4, &input)?;
+    let resource = Arc::new(
+        NativeBackgroundRemovalResource::deterministic_reduced_test_fixture(
+            &backend,
+            &context,
+            BackgroundRemovalFixtureMutation::None,
+        )?,
+    );
+    let output = resource.encode_image(&backend, &image, &context)?;
+    let output_values =
+        comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+            &backend,
+            &output,
+            &context,
+        )?;
+    let output_bits = output_values
+        .iter()
+        .map(|value| value.to_bits())
+        .collect::<Vec<_>>();
+    let mut raw_output_hasher = Sha256::new();
+    for value in &output_values {
+        raw_output_hasher.update(value.to_le_bytes());
+    }
+    let actual_raw_f32_sha256 = format!("{:x}", raw_output_hasher.finalize());
+    assert_eq!(actual_raw_f32_sha256, expected_raw_f32_sha256);
+    assert_eq!(output.descriptor().shape(), output_shape.as_slice());
+    assert!(
+        output_values
+            .iter()
+            .all(|value| (0.0..=1.0).contains(value))
+    );
+    assert_eq!(
+        output_bits, expected_bits,
+        "background-removal baseline bits were {output_bits:?}"
+    );
+
+    let mut alpha_mutation = input.clone();
+    for alpha in alpha_mutation.iter_mut().skip(3).step_by(4) {
+        *alpha = 1.0 - *alpha;
+    }
+    let alpha_output = resource.encode_image(
+        &backend,
+        &ImageTensor::from_f32(&backend, &context, 1, 3, 5, 4, &alpha_mutation)?,
+        &context,
+    )?;
+    assert_eq!(
+        comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+            &backend,
+            &alpha_output,
+            &context,
+        )?
+        .iter()
+        .map(|value| value.to_bits())
+        .collect::<Vec<_>>(),
+        output_bits
+    );
+
+    let mut rgb_mutation = input.clone();
+    rgb_mutation[0] = 0.75;
+    let rgb_output = resource.encode_image(
+        &backend,
+        &ImageTensor::from_f32(&backend, &context, 1, 3, 5, 4, &rgb_mutation)?,
+        &context,
+    )?;
+    let rgb_bits = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+        &backend,
+        &rgb_output,
+        &context,
+    )?
+    .iter()
+    .map(|value| value.to_bits())
+    .collect::<Vec<_>>();
+    assert_ne!(rgb_bits, output_bits);
+
+    let mut ordered_batch = input.clone();
+    ordered_batch.extend_from_slice(&rgb_mutation);
+    let mut reversed_batch = rgb_mutation.clone();
+    reversed_batch.extend_from_slice(&input);
+    let ordered = resource.encode_image(
+        &backend,
+        &ImageTensor::from_f32(&backend, &context, 2, 3, 5, 4, &ordered_batch)?,
+        &context,
+    )?;
+    let reversed = resource.encode_image(
+        &backend,
+        &ImageTensor::from_f32(&backend, &context, 2, 3, 5, 4, &reversed_batch)?,
+        &context,
+    )?;
+    let ordered_bits = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+        &backend,
+        &ordered,
+        &context,
+    )?
+    .iter()
+    .map(|value| value.to_bits())
+    .collect::<Vec<_>>();
+    let reversed_bits = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+        &backend,
+        &reversed,
+        &context,
+    )?
+    .iter()
+    .map(|value| value.to_bits())
+    .collect::<Vec<_>>();
+    assert_eq!(&ordered_bits[..15], output_bits.as_slice());
+    assert_eq!(&ordered_bits[15..], rgb_bits.as_slice());
+    assert_eq!(&reversed_bits[..15], rgb_bits.as_slice());
+    assert_eq!(&reversed_bits[15..], output_bits.as_slice());
+
+    for (mutation, mutation_name, changes_output) in [
+        (
+            BackgroundRemovalFixtureMutation::ShiftedWindowBlock,
+            "shifted-window-block",
+            true,
+        ),
+        (
+            BackgroundRemovalFixtureMutation::RelativePositionIndex,
+            "relative-position-index",
+            true,
+        ),
+        (
+            BackgroundRemovalFixtureMutation::DeformOffset,
+            "deform-offset",
+            true,
+        ),
+        (
+            BackgroundRemovalFixtureMutation::DeformMask,
+            "deform-mask",
+            true,
+        ),
+        (
+            BackgroundRemovalFixtureMutation::AsppDilatedBranch,
+            "aspp-dilated-branch",
+            true,
+        ),
+        (
+            BackgroundRemovalFixtureMutation::AsppGlobalPool,
+            "aspp-global-pool",
+            true,
+        ),
+        (
+            BackgroundRemovalFixtureMutation::UnusedDecoderHead,
+            "unused-decoder-head",
+            false,
+        ),
+    ] {
+        let mutated = NativeBackgroundRemovalResource::deterministic_reduced_test_fixture(
+            &backend, &context, mutation,
+        )?;
+        assert_ne!(
+            mutated.semantic_digest_sha256(),
+            resource.semantic_digest_sha256(),
+            "{mutation:?} did not change resource identity"
+        );
+        let mutated_output = mutated.encode_image(&backend, &image, &context)?;
+        let mutated_bits = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+            &backend,
+            &mutated_output,
+            &context,
+        )?
+        .iter()
+        .map(|value| value.to_bits())
+        .collect::<Vec<_>>();
+        let expected_mutated_bits = fixture_raw_bits(
+            mutation_oracles
+                .get(mutation_name)
+                .and_then(|value| value.get("output_bits"))
+                .ok_or("background-removal mutation oracle is missing")?,
+        )?;
+        assert_eq!(
+            mutated_bits, expected_mutated_bits,
+            "{mutation:?} diverged from the independent source-equation oracle"
+        );
+        assert_eq!(
+            mutated_bits != output_bits,
+            changes_output,
+            "{mutation:?} output disposition changed"
+        );
+    }
+
+    let payload =
+        NativeModelPayload::background_removal_test_fixture(resource.clone(), &cancellation)?;
+    assert_eq!(
+        payload
+            .background_removal_resource()
+            .ok_or("background-removal resource projection is missing")?
+            .semantic_digest_sha256(),
+        resource.semantic_digest_sha256()
+    );
+    assert_eq!(
+        payload.resident_parts()?.resident_bytes()?,
+        payload.resident_bytes()
+    );
+
+    let memory_before_cancellation = backend.memory_snapshot();
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    assert!(matches!(
+        resource.encode_image(
+            &backend,
+            &image,
+            &backend.execution_context(
+                StreamId::DEFAULT,
+                authority.authorize_workspace(workspace_bytes)?,
+                &cancelled,
+            ),
+        ),
+        Err(NativeBackgroundRemovalError::Cancelled)
+    ));
+    assert!(matches!(
+        NativeModelPayload::background_removal_test_fixture(resource, &cancelled),
+        Err(NativeModelPayloadError::Tensor(
+            comfy_tensor::TensorError::Cancelled
+        ))
+    ));
+    assert_eq!(backend.memory_snapshot(), memory_before_cancellation);
+    Ok(())
+}
+
+fn assert_depth_anything_3_checkpoint_projection(
+    oracle: &serde_json::Value,
+    profile: &str,
+    dtype: &str,
+    resource: &NativeDepthAnything3Resource,
+    cancellation: &CancellationToken,
+) -> Result<(), Box<dyn Error>> {
+    let expected = oracle
+        .pointer(&format!("/checkpoint_projection/{profile}/{dtype}"))
+        .ok_or("DA3 checkpoint projection oracle is missing")?;
+    assert_eq!(
+        expected.get("ordering").and_then(serde_json::Value::as_str),
+        Some("utf8-key-ascending")
+    );
+    let actual = reduced_depth_anything_3_checkpoint_parity_for_fixture(resource, cancellation)?;
+    assert_eq!(
+        u64::try_from(actual.states.len())?,
+        expected
+            .get("key_count")
+            .and_then(serde_json::Value::as_u64)
+            .ok_or("DA3 checkpoint projection key count is missing")?
+    );
+    let expected_states = expected
+        .get("states")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("DA3 checkpoint state projection list is missing")?;
+    assert_eq!(actual.states.len(), expected_states.len());
+    for (actual, expected) in actual.states.iter().zip(expected_states) {
+        assert_eq!(
+            actual.key,
+            expected
+                .get("key")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("DA3 projected checkpoint key is missing")?
+        );
+        let expected_shape = expected
+            .get("shape")
+            .and_then(serde_json::Value::as_array)
+            .ok_or("DA3 projected checkpoint shape is missing")?
+            .iter()
+            .map(|dimension| {
+                dimension
+                    .as_u64()
+                    .ok_or("DA3 projected checkpoint dimension is invalid")
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(actual.shape, expected_shape);
+        assert_eq!(
+            actual.source_sha256,
+            expected
+                .get("source_sha256")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("DA3 checkpoint state source digest is missing")?
+        );
+        assert_eq!(
+            actual.projected_f32_sha256,
+            expected
+                .get("projected_f32_sha256")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("DA3 checkpoint state projected digest is missing")?
+        );
+    }
+    assert_eq!(
+        actual.source_sha256,
+        expected
+            .get("source_sha256")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("DA3 checkpoint source digest is missing")?
+    );
+    assert_eq!(
+        actual.projected_f32_sha256,
+        expected
+            .get("projected_f32_sha256")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("DA3 projected checkpoint digest is missing")?
+    );
+    Ok(())
+}
+
+#[test]
+fn native_depth_anything_3_reduced_resources_execute_and_publish_typed_geometry()
+-> Result<(), Box<dyn Error>> {
+    let manifest: serde_json::Value = serde_json::from_str(DEPTH_ANYTHING_3_RESOURCE_FIXTURE)?;
+    let oracle: serde_json::Value = serde_json::from_str(DEPTH_ANYTHING_3_RESOURCE_ORACLE)?;
+    let provenance: serde_json::Value = serde_json::from_str(DEPTH_ANYTHING_3_RESOURCE_PROVENANCE)?;
+    assert_eq!(
+        manifest
+            .get("oracle_domain")
+            .and_then(serde_json::Value::as_str),
+        oracle.get("format").and_then(serde_json::Value::as_str)
+    );
+    let generator_sha256 = format!("{:x}", Sha256::digest(DEPTH_ANYTHING_3_RESOURCE_GENERATOR));
+    let source_graph_sha256 = format!(
+        "{:x}",
+        Sha256::digest(DEPTH_ANYTHING_3_RESOURCE_SOURCE_GRAPH)
+    );
+    let oracle_sha256 = format!("{:x}", Sha256::digest(DEPTH_ANYTHING_3_RESOURCE_ORACLE));
+    for document in [&manifest, &provenance] {
+        assert_eq!(
+            document
+                .get("generator_sha256")
+                .and_then(serde_json::Value::as_str),
+            Some(generator_sha256.as_str())
+        );
+        assert_eq!(
+            document
+                .get("oracle_sha256")
+                .and_then(serde_json::Value::as_str),
+            Some(oracle_sha256.as_str())
+        );
+        assert_eq!(
+            document
+                .get("source_graph_sha256")
+                .and_then(serde_json::Value::as_str),
+            Some(source_graph_sha256.as_str())
+        );
+    }
+    assert_eq!(
+        provenance
+            .get("transcendental_boundary")
+            .and_then(serde_json::Value::as_str),
+        Some(
+            "F32 camera atan, DPT positional sin/cos/pow, and canonical exponential oracle bits call the pinned macOS host libc atanf/sinf/cosf/powf/expf through Python ctypes; they are not claimed portable to another libc or platform."
+        )
+    );
+    let expected_sources = BTreeMap::from([
+        (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_depth_anything_3.py",
+            comfy_model::NODES_DEPTH_ANYTHING_3_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/model.py",
+            comfy_model::DEPTH_ANYTHING_3_MODEL_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/preprocess.py",
+            comfy_model::DEPTH_ANYTHING_3_PREPROCESS_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/dpt.py",
+            comfy_model::DEPTH_ANYTHING_3_DPT_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/camera.py",
+            comfy_model::DEPTH_ANYTHING_3_CAMERA_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/ray_pose.py",
+            comfy_model::DEPTH_ANYTHING_3_RAY_POSE_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/reference_view_selector.py",
+            comfy_model::DEPTH_ANYTHING_3_REFERENCE_VIEW_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/transform.py",
+            comfy_model::DEPTH_ANYTHING_3_TRANSFORM_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/image_encoders/dino2.py",
+            comfy_model::DEPTH_ANYTHING_3_DINO2_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/model_detection.py",
+            comfy_model::DEPTH_ANYTHING_3_MODEL_DETECTION_SOURCE_SHA256,
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/text_encoders/bert.py",
+            "3f1f32353da95790285a10f452959a871aa949aab15a89b646a95abc6165955c",
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+            "436e1d91f8d5d84c5667e051cdf3ab2f91d8db25b66d88a084c89a202de0579e",
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/utils.py",
+            "8b8805ca837e20c922a846854156d10e214654f69df96be90969522f9def2bdb",
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "9d8a4ec8357a9bfcd98dddbf06fcc2a0244643a392aacbe0970d945462c86a42",
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            "c2ca243c80a5262ecafe19feb15cec22d4003c16e523b5376f543f0f75acabaa",
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/supported_models.py",
+            "3801a60d15fe0abf8573cfa60f90e796d773450370f80784f2e0603cda3ffd69",
+        ),
+        (
+            "projects/comfy/ComfyUI/comfy/model_base.py",
+            "99dc53baee665eca1a6aea70cfb9ab071d55784dff339b5e919dc14ae4fde8bd",
+        ),
+    ]);
+    for document in [&oracle, &provenance] {
+        let pinned = document
+            .get("pinned_sources")
+            .and_then(serde_json::Value::as_object)
+            .ok_or("DA3 pinned sources are missing")?;
+        assert_eq!(pinned.len(), expected_sources.len());
+        for (path, digest) in &expected_sources {
+            assert_eq!(
+                pinned.get(*path).and_then(serde_json::Value::as_str),
+                Some(*digest)
+            );
+        }
+    }
+    assert_ne!(
+        oracle
+            .pointer("/reference_fixture/saddle_balanced")
+            .and_then(serde_json::Value::as_u64),
+        oracle
+            .pointer("/reference_fixture/saddle_sim_range")
+            .and_then(serde_json::Value::as_u64),
+        "the independent reference fixture must discriminate both saddle strategies"
+    );
+    let reference_tokens = fixture_raw_bits(
+        oracle
+            .pointer("/reference_fixture/token_bits")
+            .ok_or("DA3 reference tokens are missing")?,
+    )?
+    .into_iter()
+    .map(f32::from_bits)
+    .collect::<Vec<_>>();
+    for (name, strategy) in [
+        ("first", NativeDepthAnything3ReferenceStrategy::First),
+        ("middle", NativeDepthAnything3ReferenceStrategy::Middle),
+        (
+            "saddle_balanced",
+            NativeDepthAnything3ReferenceStrategy::SaddleBalanced,
+        ),
+        (
+            "saddle_sim_range",
+            NativeDepthAnything3ReferenceStrategy::SaddleSimRange,
+        ),
+    ] {
+        assert_eq!(
+            u64::try_from(select_reduced_depth_anything_3_reference_for_fixture(
+                &reference_tokens,
+                4,
+                strategy,
+                &CancellationToken::default(),
+            )?)?,
+            oracle
+                .pointer(&format!("/reference_fixture/{name}"))
+                .and_then(serde_json::Value::as_u64)
+                .ok_or("DA3 reference index is missing")?,
+            "production reference selection diverged for {name}"
+        );
+    }
+
+    let workspace_bytes = 256 * 1024 * 1024;
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(workspace_bytes)?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority.authorize_workspace(workspace_bytes)?,
+        &cancellation,
+    );
+    let tensor_bits = |tensor: &Tensor,
+                       context: &ExecutionContext<'_>|
+     -> Result<Vec<u32>, Box<dyn Error>> {
+        Ok(comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+            &backend,
+            tensor,
+            context,
+        )?
+        .into_iter()
+        .map(f32::to_bits)
+        .collect())
+    };
+    let image_bits = fixture_raw_bits(
+        oracle
+            .get("input_bits")
+            .ok_or("DA3 input oracle is missing")?,
+    )?;
+    let image_values = image_bits
+        .into_iter()
+        .map(f32::from_bits)
+        .collect::<Vec<_>>();
+    let image = ImageTensor::from_f32(&backend, &context, 1, 4, 4, 3, &image_values)?;
+    let mut dtype_identities = BTreeSet::new();
+    let mut f32_resource = None;
+    let mut resources = Vec::new();
+    for dtype in [DType::F16, DType::Bf16, DType::F32] {
+        let resource = NativeDepthAnything3Resource::from_reduced_fixture(
+            &backend,
+            deterministic_reduced_depth_anything_3_checkpoint(
+                &backend,
+                DepthAnything3FixtureProfile::Dpt,
+                dtype,
+                workspace_bytes,
+                &context,
+            )?,
+            &context,
+        )?;
+        let dtype_name = match dtype {
+            DType::F16 => "f16",
+            DType::Bf16 => "bf16",
+            DType::F32 => "f32",
+            _ => return Err("unexpected DA3 fixture dtype".into()),
+        };
+        assert_depth_anything_3_checkpoint_projection(
+            &oracle,
+            "dpt",
+            dtype_name,
+            &resource,
+            &cancellation,
+        )?;
+        let resource = Arc::new(resource);
+        dtype_identities.insert(resource.semantic_digest_sha256().to_owned());
+        if dtype == DType::F32 {
+            f32_resource = Some(resource.clone());
+        }
+        resources.push((dtype, resource));
+    }
+    assert_eq!(dtype_identities.len(), 3);
+    let resource = f32_resource.ok_or("F32 DA3 fixture was not retained")?;
+    for (dtype, resource) in &resources {
+        let dtype_name = match dtype {
+            DType::F16 => "f16",
+            DType::Bf16 => "bf16",
+            DType::F32 => "f32",
+            _ => return Err("unexpected DA3 execution dtype".into()),
+        };
+        let geometry = resource.execute(
+            &backend,
+            NativeDepthAnything3Invocation {
+                image: &image,
+                views_per_sample: 1,
+                process_resolution: 4,
+                resize_method: NativeDepthAnything3ResizeMethod::UpperBound,
+                reference_strategy: NativeDepthAnything3ReferenceStrategy::First,
+                use_ray_pose: false,
+                ransac_seed: 17,
+                extrinsics: None,
+                intrinsics: None,
+            },
+            &context,
+        )?;
+        assert_eq!(geometry.depth.descriptor().shape(), &[1, 4, 4]);
+        assert!(geometry.confidence.is_none());
+        assert_eq!(
+            geometry
+                .sky
+                .as_ref()
+                .map(|value| value.descriptor().shape()),
+            Some([1, 4, 4].as_slice())
+        );
+        for (actual, field) in [
+            (&geometry.depth, "depth"),
+            (
+                geometry.sky.as_ref().ok_or("DA3 sky output is missing")?,
+                "sky",
+            ),
+        ] {
+            let pointer = if *dtype == DType::F32 {
+                format!("/reduced_dpt/{field}/bits")
+            } else {
+                format!("/reduced_dpt/low_precision/{dtype_name}/{field}/bits")
+            };
+            assert_eq!(
+                tensor_bits(actual, &context)?,
+                fixture_raw_bits(
+                    oracle
+                        .pointer(&pointer)
+                        .ok_or_else(|| format!("missing DA3 execution oracle {pointer}"))?,
+                )?,
+                "{dtype_name} projected execution diverged"
+            );
+        }
+    }
+    let nonsquare_values = fixture_raw_bits(
+        oracle
+            .pointer("/nonsquare_resize_projection/input_bits")
+            .ok_or("DA3 non-square input oracle is missing")?,
+    )?
+    .into_iter()
+    .map(f32::from_bits)
+    .collect::<Vec<_>>();
+    let nonsquare = ImageTensor::from_f32(&backend, &context, 1, 2, 4, 3, &nonsquare_values)?;
+    for (name, resize_method) in [
+        ("upper_bound", NativeDepthAnything3ResizeMethod::UpperBound),
+        ("lower_bound", NativeDepthAnything3ResizeMethod::LowerBound),
+    ] {
+        let resized_geometry = resource.execute(
+            &backend,
+            NativeDepthAnything3Invocation {
+                image: &nonsquare,
+                views_per_sample: 1,
+                process_resolution: 6,
+                resize_method,
+                reference_strategy: NativeDepthAnything3ReferenceStrategy::First,
+                use_ray_pose: false,
+                ransac_seed: 17,
+                extrinsics: None,
+                intrinsics: None,
+            },
+            &context,
+        )?;
+        assert_eq!(resized_geometry.depth.descriptor().shape(), &[1, 2, 4]);
+        for (actual, field) in [
+            (&resized_geometry.depth, "depth"),
+            (
+                resized_geometry
+                    .sky
+                    .as_ref()
+                    .ok_or("DA3 non-square sky output is missing")?,
+                "sky",
+            ),
+        ] {
+            let pointer = format!("/nonsquare_resize_projection/cases/{name}/{field}/bits");
+            assert_eq!(
+                tensor_bits(actual, &context)?,
+                fixture_raw_bits(
+                    oracle
+                        .pointer(&pointer)
+                        .ok_or_else(|| format!("missing DA3 resize oracle {pointer}"))?,
+                )?,
+                "{name} preprocessing/final projection diverged"
+            );
+        }
+    }
+    let payload =
+        NativeModelPayload::depth_anything_3_test_fixture(resource.clone(), &cancellation)?;
+    assert_eq!(
+        payload
+            .depth_anything_3_resource()
+            .map(|value| value.semantic_digest_sha256()),
+        Some(resource.semantic_digest_sha256())
+    );
+    assert_eq!(
+        payload.resident_parts()?.resident_bytes()?,
+        payload.resident_bytes()
+    );
+
+    let multiview_values = fixture_raw_bits(
+        oracle
+            .get("multiview_input_bits")
+            .ok_or("DA3 multiview input oracle is missing")?,
+    )?
+    .into_iter()
+    .map(f32::from_bits)
+    .collect::<Vec<_>>();
+    let multiview = ImageTensor::from_f32(&backend, &context, 3, 4, 4, 3, &multiview_values)?;
+    let dual = Arc::new(NativeDepthAnything3Resource::from_reduced_fixture(
+        &backend,
+        deterministic_reduced_depth_anything_3_checkpoint(
+            &backend,
+            DepthAnything3FixtureProfile::DualDpt,
+            DType::F32,
+            workspace_bytes,
+            &context,
+        )?,
+        &context,
+    )?);
+    assert_depth_anything_3_checkpoint_projection(&oracle, "dualdpt", "f32", &dual, &cancellation)?;
+    let dual_geometry = dual.execute(
+        &backend,
+        NativeDepthAnything3Invocation {
+            image: &multiview,
+            views_per_sample: 3,
+            process_resolution: 4,
+            resize_method: NativeDepthAnything3ResizeMethod::LowerBound,
+            reference_strategy: NativeDepthAnything3ReferenceStrategy::SaddleSimRange,
+            use_ray_pose: false,
+            ransac_seed: 17,
+            extrinsics: None,
+            intrinsics: None,
+        },
+        &context,
+    )?;
+    assert_eq!(dual_geometry.depth.descriptor().shape(), &[3, 4, 4]);
+    assert_eq!(
+        dual_geometry
+            .confidence
+            .as_ref()
+            .map(|value| value.descriptor().shape()),
+        Some([3, 4, 4].as_slice())
+    );
+    assert!(dual_geometry.sky.is_none());
+    assert_eq!(
+        dual_geometry
+            .extrinsics
+            .as_ref()
+            .map(|value| value.descriptor().shape()),
+        Some([1, 3, 3, 4].as_slice())
+    );
+    assert_eq!(
+        dual_geometry
+            .intrinsics
+            .as_ref()
+            .map(|value| value.descriptor().shape()),
+        Some([1, 3, 3, 3].as_slice())
+    );
+    assert_eq!(
+        tensor_bits(&dual_geometry.depth, &context)?,
+        fixture_raw_bits(
+            oracle
+                .pointer("/reduced_dualdpt/depth/bits")
+                .ok_or("DA3 DualDPT depth oracle is missing")?,
+        )?
+    );
+    assert_eq!(
+        tensor_bits(
+            dual_geometry
+                .confidence
+                .as_ref()
+                .ok_or("DA3 DualDPT confidence output is missing")?,
+            &context,
+        )?,
+        fixture_raw_bits(
+            oracle
+                .pointer("/reduced_dualdpt/confidence/bits")
+                .ok_or("DA3 DualDPT confidence oracle is missing")?,
+        )?
+    );
+    for (name, strategy) in [
+        ("first", NativeDepthAnything3ReferenceStrategy::First),
+        ("middle", NativeDepthAnything3ReferenceStrategy::Middle),
+        (
+            "saddle_balanced",
+            NativeDepthAnything3ReferenceStrategy::SaddleBalanced,
+        ),
+        (
+            "saddle_sim_range",
+            NativeDepthAnything3ReferenceStrategy::SaddleSimRange,
+        ),
+    ] {
+        let strategy_geometry = dual.execute(
+            &backend,
+            NativeDepthAnything3Invocation {
+                image: &multiview,
+                views_per_sample: 3,
+                process_resolution: 4,
+                resize_method: NativeDepthAnything3ResizeMethod::LowerBound,
+                reference_strategy: strategy,
+                use_ray_pose: false,
+                ransac_seed: 17,
+                extrinsics: None,
+                intrinsics: None,
+            },
+            &context,
+        )?;
+        for (actual, field) in [
+            (&strategy_geometry.depth, "depth"),
+            (
+                strategy_geometry
+                    .confidence
+                    .as_ref()
+                    .ok_or("DA3 strategy confidence is missing")?,
+                "confidence",
+            ),
+            (
+                strategy_geometry
+                    .extrinsics
+                    .as_ref()
+                    .ok_or("DA3 strategy extrinsics are missing")?,
+                "camera/extrinsics",
+            ),
+            (
+                strategy_geometry
+                    .intrinsics
+                    .as_ref()
+                    .ok_or("DA3 strategy intrinsics are missing")?,
+                "camera/intrinsics",
+            ),
+        ] {
+            let pointer = format!("/reduced_dualdpt/reference_strategies/{name}/{field}/bits");
+            assert_eq!(
+                tensor_bits(actual, &context)?,
+                fixture_raw_bits(
+                    oracle
+                        .pointer(&pointer)
+                        .ok_or_else(|| format!("missing DA3 strategy oracle {pointer}"))?,
+                )?,
+                "reference strategy {name} did not preserve source reorder/restore"
+            );
+        }
+    }
+    assert_eq!(
+        tensor_bits(
+            dual_geometry
+                .extrinsics
+                .as_ref()
+                .ok_or("DA3 decoded extrinsics are missing")?,
+            &context,
+        )?,
+        fixture_raw_bits(
+            oracle
+                .pointer("/reduced_dualdpt/camera/extrinsics/bits")
+                .ok_or("DA3 decoded extrinsics oracle is missing")?,
+        )?
+    );
+    assert_eq!(
+        tensor_bits(
+            dual_geometry
+                .intrinsics
+                .as_ref()
+                .ok_or("DA3 decoded intrinsics are missing")?,
+            &context,
+        )?,
+        fixture_raw_bits(
+            oracle
+                .pointer("/reduced_dualdpt/camera/intrinsics/bits")
+                .ok_or("DA3 decoded intrinsics oracle is missing")?,
+        )?
+    );
+
+    let oracle_tensor = |pointer: &str, shape: &[u64]| -> Result<Tensor, Box<dyn Error>> {
+        let values = fixture_raw_bits(
+            oracle
+                .pointer(pointer)
+                .ok_or_else(|| format!("missing DA3 tensor oracle {pointer}"))?,
+        )?
+        .into_iter()
+        .map(f32::from_bits)
+        .collect::<Vec<_>>();
+        Ok(tensor_from_f32_with_context_exact_native(
+            &backend,
+            shape,
+            &values,
+            DType::F32,
+            backend.device(),
+            &context,
+        )?)
+    };
+    let camera_extrinsics = oracle_tensor("/camera_inputs/extrinsics/bits", &[1, 3, 3, 4])?;
+    let camera_intrinsics = oracle_tensor("/camera_inputs/intrinsics/bits", &[1, 3, 3, 3])?;
+    let supplied_camera_geometry = dual
+        .execute(
+            &backend,
+            NativeDepthAnything3Invocation {
+                image: &multiview,
+                views_per_sample: 3,
+                process_resolution: 4,
+                resize_method: NativeDepthAnything3ResizeMethod::LowerBound,
+                reference_strategy: NativeDepthAnything3ReferenceStrategy::SaddleSimRange,
+                use_ray_pose: false,
+                ransac_seed: 17,
+                extrinsics: Some(&camera_extrinsics),
+                intrinsics: Some(&camera_intrinsics),
+            },
+            &context,
+        )
+        .map_err(|error| -> Box<dyn Error> {
+            format!("DA3 supplied-camera execution failed: {error}").into()
+        })?;
+    for (actual, pointer) in [
+        (
+            &supplied_camera_geometry.depth,
+            "/reduced_dualdpt/supplied_camera_depth/bits",
+        ),
+        (
+            supplied_camera_geometry
+                .confidence
+                .as_ref()
+                .ok_or("DA3 supplied-camera confidence is missing")?,
+            "/reduced_dualdpt/supplied_camera_confidence/bits",
+        ),
+        (
+            supplied_camera_geometry
+                .extrinsics
+                .as_ref()
+                .ok_or("DA3 supplied-camera extrinsics are missing")?,
+            "/reduced_dualdpt/supplied_camera/extrinsics/bits",
+        ),
+        (
+            supplied_camera_geometry
+                .intrinsics
+                .as_ref()
+                .ok_or("DA3 supplied-camera intrinsics are missing")?,
+            "/reduced_dualdpt/supplied_camera/intrinsics/bits",
+        ),
+    ] {
+        assert_eq!(
+            tensor_bits(actual, &context)?,
+            fixture_raw_bits(
+                oracle
+                    .pointer(pointer)
+                    .ok_or_else(|| format!("missing DA3 supplied-camera oracle {pointer}"))?,
+            )?,
+            "{pointer}: supplied-camera output diverged"
+        );
+    }
+
+    let ransac_address = RngStreamAddress::new(
+        "task390",
+        "fixture",
+        "depth-anything-3-ray-pose",
+        0,
+        "reduced-ray-pose",
+        0,
+        0,
+        RetryRngPolicy::Replay,
+    )?;
+    let ray_context = ExecutionContext {
+        stream: context.stream,
+        scratch: context.scratch.clone(),
+        rng_phase: Some(&ransac_address),
+        cancellation: context.cancellation,
+    };
+    let (ray_geometry, ray_trace) = dual.execute_with_test_trace(
+        &backend,
+        NativeDepthAnything3Invocation {
+            image: &multiview,
+            views_per_sample: 3,
+            process_resolution: 4,
+            resize_method: NativeDepthAnything3ResizeMethod::LowerBound,
+            reference_strategy: NativeDepthAnything3ReferenceStrategy::SaddleSimRange,
+            use_ray_pose: true,
+            ransac_seed: 17,
+            extrinsics: None,
+            intrinsics: None,
+        },
+        &ray_context,
+    )?;
+    for (actual, pointer) in [
+        (
+            &ray_trace.raw_ray,
+            "/reduced_dualdpt/ray_pose_trace/pre_geometry_ray/bits",
+        ),
+        (
+            &ray_trace.raw_ray_confidence,
+            "/reduced_dualdpt/ray_pose_trace/pre_geometry_confidence/bits",
+        ),
+    ] {
+        let document_pointer = pointer
+            .strip_suffix("/bits")
+            .ok_or("DA3 ray trace pointer has no bits suffix")?;
+        let mut expected_shape = oracle
+            .pointer(&format!("{document_pointer}/shape"))
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("missing DA3 ray trace shape {document_pointer}"))?
+            .iter()
+            .map(|value| {
+                value
+                    .as_u64()
+                    .ok_or_else(|| format!("invalid DA3 ray trace shape {document_pointer}"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        expected_shape.insert(0, 1);
+        assert_eq!(actual.descriptor().shape(), expected_shape);
+        require_exact_fixture_bits(
+            pointer,
+            &tensor_bits(actual, &ray_context)?,
+            &fixture_raw_bits(
+                oracle
+                    .pointer(pointer)
+                    .ok_or_else(|| format!("missing DA3 ray trace oracle {pointer}"))?,
+            )?,
+        )?;
+    }
+    let raw_ray_values = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+        &backend,
+        &ray_trace.raw_ray,
+        &ray_context,
+    )?;
+    let raw_confidence_values = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+        &backend,
+        &ray_trace.raw_ray_confidence,
+        &ray_context,
+    )?;
+    let admission = oracle
+        .pointer("/reduced_dualdpt/ray_pose_trace/admission")
+        .ok_or("DA3 ray-pose admission trace is missing")?;
+    assert_eq!(
+        admission.get("candidate_count").and_then(Value::as_u64),
+        Some(76)
+    );
+    assert_eq!(
+        admission
+            .pointer("/confidence_ordering/source")
+            .and_then(Value::as_str),
+        Some("torch.argsort(descending=True, stable=False-default)")
+    );
+    assert_eq!(
+        admission
+            .pointer("/confidence_ordering/native_owner")
+            .and_then(Value::as_str),
+        Some("argsort_with_context_exact_native(descending=true, stable=false)")
+    );
+    assert_eq!(
+        admission
+            .pointer("/confidence_ordering/tied_order_pinned")
+            .and_then(Value::as_bool),
+        Some(false)
+    );
+    let admission_views = admission
+        .get("views")
+        .and_then(Value::as_array)
+        .ok_or("DA3 ray-pose admission views are missing")?;
+    assert_eq!(admission_views.len(), 3);
+    for (view, expected) in admission_views.iter().enumerate() {
+        let confidence_start = view * 256;
+        let confidence_end = confidence_start + 256;
+        let confidence = raw_confidence_values
+            .get(confidence_start..confidence_end)
+            .ok_or("DA3 ray confidence view is unavailable")?;
+        assert_eq!(
+            expected.get("confidence_count").and_then(Value::as_u64),
+            Some(256)
+        );
+        assert_eq!(
+            expected
+                .get("confidence_all_finite_positive")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        assert_eq!(
+            expected
+                .get("confidence_all_bit_distinct")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        assert!(
+            confidence
+                .iter()
+                .all(|value| value.is_finite() && *value > 0.0)
+        );
+        let mut sorted_confidence = confidence.to_vec();
+        sorted_confidence.sort_by(f32::total_cmp);
+        assert!(
+            sorted_confidence
+                .windows(2)
+                .all(|pair| pair[0].to_bits() != pair[1].to_bits())
+        );
+        let minimum_ulp_gap = sorted_confidence
+            .windows(2)
+            .map(|pair| pair[1].to_bits() - pair[0].to_bits())
+            .min()
+            .ok_or("DA3 ray confidence ULP gap is unavailable")?;
+        let minimum_value_gap = sorted_confidence
+            .windows(2)
+            .map(|pair| pair[1] - pair[0])
+            .min_by(f32::total_cmp)
+            .ok_or("DA3 ray confidence value gap is unavailable")?;
+        assert_eq!(
+            u64::from(minimum_ulp_gap),
+            expected
+                .get("minimum_adjacent_ulp_gap")
+                .and_then(Value::as_u64)
+                .ok_or("DA3 ray confidence ULP gap oracle is missing")?
+        );
+        assert_eq!(
+            u64::from(minimum_value_gap.to_bits()),
+            expected
+                .get("minimum_adjacent_value_gap_bits")
+                .and_then(Value::as_u64)
+                .ok_or("DA3 ray confidence value gap oracle is missing")?
+        );
+        let ray_start = view * 256 * 6;
+        let ray_end = ray_start + 256 * 6;
+        let ray_z = raw_ray_values
+            .get(ray_start..ray_end)
+            .ok_or("DA3 ray view is unavailable")?
+            .chunks_exact(6)
+            .map(|ray| {
+                ray.get(2)
+                    .copied()
+                    .ok_or("DA3 ray z lane is unavailable")
+                    .map(f32::abs)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(ray_z.len(), 256);
+        assert_eq!(
+            expected.get("ray_z_all_valid").and_then(Value::as_bool),
+            Some(true)
+        );
+        assert!(
+            ray_z
+                .iter()
+                .all(|value| value.is_finite() && *value > 1.0e-4)
+        );
+        let minimum_ray_z = ray_z
+            .into_iter()
+            .min_by(f32::total_cmp)
+            .ok_or("DA3 ray z minimum is unavailable")?;
+        assert_eq!(
+            u64::from(minimum_ray_z.to_bits()),
+            expected
+                .get("minimum_ray_z_abs_bits")
+                .and_then(Value::as_u64)
+                .ok_or("DA3 ray z minimum oracle is missing")?
+        );
+    }
+    let expected_samples = oracle
+        .pointer("/reduced_dualdpt/ray_pose_trace/samples")
+        .and_then(Value::as_array)
+        .ok_or("DA3 RANSAC samples are missing")?
+        .iter()
+        .map(|row| {
+            row.as_array()
+                .ok_or("DA3 RANSAC sample row is invalid")?
+                .iter()
+                .map(|value| value.as_u64().ok_or("DA3 RANSAC sample is invalid"))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(ray_trace.ransac_samples, expected_samples);
+    let index_rows_sha256 = |domain: &str, rows: &[Vec<u64>]| {
+        let mut digest = Sha256::new();
+        digest.update((domain.len() as u64).to_le_bytes());
+        digest.update(domain.as_bytes());
+        digest.update((rows.len() as u64).to_le_bytes());
+        for row in rows {
+            digest.update((row.len() as u64).to_le_bytes());
+            for value in row {
+                digest.update(value.to_le_bytes());
+            }
+        }
+        format!("{:x}", digest.finalize())
+    };
+    let samples_domain = oracle
+        .pointer("/reduced_dualdpt/ray_pose_trace/samples_sha256_domain")
+        .and_then(Value::as_str)
+        .ok_or("DA3 RANSAC sample SHA domain is missing")?;
+    assert_eq!(
+        index_rows_sha256(samples_domain, &ray_trace.ransac_samples),
+        oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/samples_sha256")
+            .and_then(Value::as_str)
+            .ok_or("DA3 RANSAC sample SHA is missing")?
+    );
+    assert_eq!(
+        oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/profile_version")
+            .and_then(Value::as_u64),
+        Some(2)
+    );
+    assert_eq!(
+        oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/algorithm")
+            .and_then(Value::as_str),
+        Some("mt19937")
+    );
+    assert_eq!(
+        oracle
+            .pointer("/reduced_dualdpt/ray_pose_trace/seed")
+            .and_then(Value::as_u64),
+        Some(17)
+    );
+    for (pointer, expected) in [
+        ("workflow", "task390"),
+        ("attempt", "fixture"),
+        ("node", "depth-anything-3-ray-pose"),
+        ("phase", "reduced-ray-pose"),
+        ("retry_policy", "replay"),
+        ("device_kind", "cpu"),
+    ] {
+        assert_eq!(
+            oracle
+                .pointer(&format!(
+                    "/reduced_dualdpt/ray_pose_trace/address/{pointer}"
+                ))
+                .and_then(Value::as_str),
+            Some(expected)
+        );
+    }
+    let expected_views = oracle
+        .pointer("/reduced_dualdpt/ray_pose_trace/views")
+        .and_then(Value::as_array)
+        .ok_or("DA3 RANSAC view traces are missing")?;
+    assert_eq!(ray_trace.ransac_views.len(), expected_views.len());
+    for (actual, expected) in ray_trace.ransac_views.iter().zip(expected_views) {
+        let candidates = expected
+            .get("candidate_indices")
+            .and_then(Value::as_array)
+            .ok_or("DA3 RANSAC candidates are missing")?
+            .iter()
+            .map(|value| value.as_u64().ok_or("DA3 RANSAC candidate is invalid"))
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(actual.candidate_indices, candidates);
+        assert_eq!(
+            actual.best_iteration,
+            expected
+                .get("best_iteration")
+                .and_then(Value::as_u64)
+                .ok_or("DA3 RANSAC best iteration is missing")?
+        );
+        assert_eq!(
+            actual.best_inliers.len() as u64,
+            expected
+                .get("best_inlier_count")
+                .and_then(Value::as_u64)
+                .ok_or("DA3 RANSAC inlier count is missing")?
+        );
+        assert_eq!(
+            u64::from(actual.best_score_bits),
+            expected
+                .get("best_score_bits")
+                .and_then(Value::as_u64)
+                .ok_or("DA3 RANSAC best score is missing")?
+        );
+        assert_eq!(
+            actual.fallback,
+            expected
+                .get("fallback")
+                .and_then(Value::as_bool)
+                .ok_or("DA3 RANSAC fallback disposition is missing")?
+        );
+        for (phase, actual_values) in [
+            (
+                "normalized_homography_bits",
+                actual.normalized_homography.as_slice(),
+            ),
+            (
+                "homography_post_sign_bits",
+                actual.signed_homography.as_slice(),
+            ),
+            ("rotation_bits", actual.rotation.as_slice()),
+            ("lower_bits", actual.lower.as_slice()),
+            ("c2w_pre_inverse_bits", actual.c2w_pre_inverse.as_slice()),
+        ] {
+            let expected_values = fixture_raw_bits(
+                expected
+                    .get(phase)
+                    .ok_or_else(|| format!("DA3 RANSAC {phase} is missing"))?,
+            )?
+            .into_iter()
+            .map(f32::from_bits)
+            .collect::<Vec<_>>();
+            assert_eq!(actual_values.len(), expected_values.len());
+            for (lane, (actual_value, expected_value)) in actual_values
+                .iter()
+                .copied()
+                .zip(expected_values)
+                .enumerate()
+            {
+                let tolerance = 2.5e-3_f32.max(expected_value.abs() * 2.5e-3);
+                assert!(
+                    (actual_value - expected_value).abs() <= tolerance,
+                    "DA3 RANSAC view phase {phase}[{lane}]: {actual_value} != {expected_value}"
+                );
+            }
+        }
+        let inlier_domain = expected
+            .get("best_inliers_sha256_domain")
+            .and_then(Value::as_str)
+            .ok_or("DA3 RANSAC inlier SHA domain is missing")?;
+        assert_eq!(
+            index_rows_sha256(inlier_domain, std::slice::from_ref(&actual.best_inliers)),
+            expected
+                .get("best_inliers_sha256")
+                .and_then(Value::as_str)
+                .ok_or("DA3 RANSAC inlier SHA is missing")?
+        );
+    }
+    assert_eq!(
+        tensor_bits(&ray_geometry.depth, &ray_context)?,
+        fixture_raw_bits(
+            oracle
+                .pointer("/reduced_dualdpt/ray_depth/bits")
+                .ok_or("DA3 ray depth oracle is missing")?,
+        )?
+    );
+    assert_eq!(
+        tensor_bits(
+            ray_geometry
+                .confidence
+                .as_ref()
+                .ok_or("DA3 ray confidence is missing")?,
+            &ray_context,
+        )?,
+        fixture_raw_bits(
+            oracle
+                .pointer("/reduced_dualdpt/ray_confidence/bits")
+                .ok_or("DA3 ray confidence oracle is missing")?,
+        )?
+    );
+    for (actual, pointer) in [
+        (
+            ray_geometry
+                .extrinsics
+                .as_ref()
+                .ok_or("DA3 ray extrinsics are missing")?,
+            "/reduced_dualdpt/ray_extrinsics/bits",
+        ),
+        (
+            ray_geometry
+                .intrinsics
+                .as_ref()
+                .ok_or("DA3 ray intrinsics are missing")?,
+            "/reduced_dualdpt/ray_intrinsics/bits",
+        ),
+    ] {
+        let expected = fixture_raw_bits(
+            oracle
+                .pointer(pointer)
+                .ok_or_else(|| format!("missing DA3 ray geometry oracle {pointer}"))?,
+        )?
+        .into_iter()
+        .map(f32::from_bits)
+        .collect::<Vec<_>>();
+        let actual = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+            &backend,
+            actual,
+            &ray_context,
+        )?;
+        assert_eq!(actual.len(), expected.len());
+        for (actual, expected) in actual.into_iter().zip(expected) {
+            let tolerance = 2.5e-3_f32.max(expected.abs() * 2.5e-3);
+            assert!(
+                (actual - expected).abs() <= tolerance,
+                "{pointer}: {actual} != {expected}"
+            );
+        }
+    }
+
+    let public_geometry_identity = |geometry: &comfy_model::NativeDepthAnything3Geometry,
+                                    context: &ExecutionContext<'_>|
+     -> Result<String, Box<dyn Error>> {
+        let mut hasher = Sha256::new();
+        for tensor in [
+            Some(&geometry.depth),
+            geometry.confidence.as_ref(),
+            geometry.sky.as_ref(),
+            geometry.extrinsics.as_ref(),
+            geometry.intrinsics.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            for value in comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+                &backend,
+                tensor,
+                context,
+            )? {
+                hasher.update(value.to_le_bytes());
+            }
+        }
+        Ok(format!("{:x}", hasher.finalize()))
+    };
+    let mutations = oracle
+        .get("full_path_mutations")
+        .and_then(serde_json::Value::as_object)
+        .ok_or("DA3 full-path mutations are missing")?;
+    for (name, mutation) in mutations {
+        let execution = mutation
+            .get("execution")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("DA3 mutation execution is missing")?;
+        let profile = if execution == "dpt" {
+            DepthAnything3FixtureProfile::Dpt
+        } else {
+            DepthAnything3FixtureProfile::DualDpt
+        };
+        let mut checkpoint = deterministic_reduced_depth_anything_3_checkpoint(
+            &backend,
+            profile,
+            DType::F32,
+            workspace_bytes,
+            &context,
+        )?;
+        mutate_reduced_depth_anything_3_checkpoint(
+            &backend,
+            &mut checkpoint,
+            DepthAnything3FixtureMutation {
+                state_key: mutation
+                    .get("state_key")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or("DA3 mutation state key is missing")?,
+                lane: usize::try_from(
+                    mutation
+                        .get("lane")
+                        .and_then(serde_json::Value::as_u64)
+                        .ok_or("DA3 mutation lane is missing")?,
+                )?,
+                delta: f32::from_bits(u32::try_from(
+                    mutation
+                        .get("delta_bits")
+                        .and_then(serde_json::Value::as_u64)
+                        .ok_or("DA3 mutation delta is missing")?,
+                )?),
+            },
+            &context,
+        )?;
+        let mutated =
+            NativeDepthAnything3Resource::from_reduced_fixture(&backend, checkpoint, &context)?;
+        let (input, views, camera, use_ray, execution_context) = match execution {
+            "dpt" => (&image, 1, None, false, &context),
+            "camera" => (
+                &multiview,
+                3,
+                Some((&camera_extrinsics, &camera_intrinsics)),
+                false,
+                &context,
+            ),
+            "ray" => (&multiview, 3, None, true, &ray_context),
+            "dual" => (&multiview, 3, None, false, &context),
+            _ => return Err(format!("unknown DA3 mutation execution {execution}").into()),
+        };
+        let invocation = NativeDepthAnything3Invocation {
+            image: input,
+            views_per_sample: views,
+            process_resolution: 4,
+            resize_method: NativeDepthAnything3ResizeMethod::LowerBound,
+            reference_strategy: NativeDepthAnything3ReferenceStrategy::SaddleSimRange,
+            use_ray_pose: use_ray,
+            ransac_seed: 17,
+            extrinsics: camera.map(|camera| camera.0),
+            intrinsics: camera.map(|camera| camera.1),
+        };
+        let (geometry, mutation_trace) = if execution == "ray" {
+            let (geometry, trace) =
+                mutated.execute_with_test_trace(&backend, invocation, execution_context)?;
+            (geometry, Some(trace))
+        } else {
+            (
+                mutated.execute(&backend, invocation, execution_context)?,
+                None,
+            )
+        };
+        let actual_identity = public_geometry_identity(&geometry, execution_context)?;
+        if execution != "ray" {
+            assert_eq!(
+                Some(actual_identity.as_str()),
+                mutation
+                    .get("output_identity_sha256")
+                    .and_then(serde_json::Value::as_str),
+                "DA3 mutation {name} diverged from the source-equation oracle"
+            );
+        }
+        let changes_output = mutation
+            .get("changes_output")
+            .and_then(serde_json::Value::as_bool)
+            .ok_or("DA3 mutation disposition is missing")?;
+        if execution == "ray" {
+            assert!(changes_output, "{name}");
+            let trace = mutation_trace
+                .as_ref()
+                .ok_or("DA3 ray mutation trace is unavailable")?;
+            let confidence = geometry
+                .confidence
+                .as_ref()
+                .ok_or("DA3 ray mutation confidence is unavailable")?;
+            for (phase, actual) in [
+                ("depth", &geometry.depth),
+                ("confidence", confidence),
+                ("raw_ray", &trace.raw_ray),
+                ("raw_ray_confidence", &trace.raw_ray_confidence),
+            ] {
+                require_exact_fixture_bits(
+                    &format!("DA3 ray mutation {phase}"),
+                    &tensor_bits(actual, execution_context)?,
+                    &fixture_raw_bits(
+                        mutation
+                            .get(phase)
+                            .and_then(|value| value.get("bits"))
+                            .ok_or("DA3 ray mutation exact phase is missing")?,
+                    )?,
+                )?;
+            }
+            assert_ne!(
+                tensor_bits(&trace.raw_ray, execution_context)?,
+                tensor_bits(&ray_trace.raw_ray, &ray_context)?,
+                "DA3 ray mutation must change the production raw ray"
+            );
+            assert_eq!(
+                mutation
+                    .get("source_raw_ray_changed")
+                    .and_then(serde_json::Value::as_bool),
+                Some(true)
+            );
+            assert_eq!(
+                mutation
+                    .get("source_geometry_changed")
+                    .and_then(serde_json::Value::as_bool),
+                Some(true)
+            );
+            let expected_trace = mutation
+                .get("ransac_trace")
+                .ok_or("DA3 ray mutation RANSAC trace is missing")?;
+            let expected_samples = expected_trace
+                .get("samples")
+                .and_then(Value::as_array)
+                .ok_or("DA3 ray mutation samples are missing")?
+                .iter()
+                .map(|row| {
+                    row.as_array()
+                        .ok_or("DA3 ray mutation sample row is invalid")?
+                        .iter()
+                        .map(|value| value.as_u64().ok_or("DA3 ray mutation sample is invalid"))
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            assert_eq!(trace.ransac_samples, expected_samples);
+            let expected_views = expected_trace
+                .get("views")
+                .and_then(Value::as_array)
+                .ok_or("DA3 ray mutation view traces are missing")?;
+            assert_eq!(trace.ransac_views.len(), expected_views.len());
+            for (actual, expected) in trace.ransac_views.iter().zip(expected_views) {
+                let candidates = expected
+                    .get("candidate_indices")
+                    .and_then(Value::as_array)
+                    .ok_or("DA3 ray mutation candidates are missing")?
+                    .iter()
+                    .map(|value| {
+                        value
+                            .as_u64()
+                            .ok_or("DA3 ray mutation candidate is invalid")
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                assert_eq!(actual.candidate_indices, candidates);
+                assert_eq!(
+                    actual.best_iteration,
+                    expected
+                        .get("best_iteration")
+                        .and_then(Value::as_u64)
+                        .ok_or("DA3 ray mutation best iteration is missing")?
+                );
+                assert_eq!(
+                    actual.best_inliers.len() as u64,
+                    expected
+                        .get("best_inlier_count")
+                        .and_then(Value::as_u64)
+                        .ok_or("DA3 ray mutation inlier count is missing")?
+                );
+                assert_eq!(
+                    u64::from(actual.best_score_bits),
+                    expected
+                        .get("best_score_bits")
+                        .and_then(Value::as_u64)
+                        .ok_or("DA3 ray mutation best score is missing")?
+                );
+                assert_eq!(
+                    actual.fallback,
+                    expected
+                        .get("fallback")
+                        .and_then(Value::as_bool)
+                        .ok_or("DA3 ray mutation fallback is missing")?
+                );
+                let inlier_domain = expected
+                    .get("best_inliers_sha256_domain")
+                    .and_then(Value::as_str)
+                    .ok_or("DA3 ray mutation inlier domain is missing")?;
+                assert_eq!(
+                    index_rows_sha256(inlier_domain, std::slice::from_ref(&actual.best_inliers)),
+                    expected
+                        .get("best_inliers_sha256")
+                        .and_then(Value::as_str)
+                        .ok_or("DA3 ray mutation inlier SHA is missing")?
+                );
+                for (phase, actual_values) in [
+                    (
+                        "normalized_homography_bits",
+                        actual.normalized_homography.as_slice(),
+                    ),
+                    (
+                        "homography_post_sign_bits",
+                        actual.signed_homography.as_slice(),
+                    ),
+                    ("rotation_bits", actual.rotation.as_slice()),
+                    ("lower_bits", actual.lower.as_slice()),
+                    ("c2w_pre_inverse_bits", actual.c2w_pre_inverse.as_slice()),
+                ] {
+                    let expected_values = fixture_raw_bits(
+                        expected
+                            .get(phase)
+                            .ok_or("DA3 ray mutation continuous phase is missing")?,
+                    )?
+                    .into_iter()
+                    .map(f32::from_bits)
+                    .collect::<Vec<_>>();
+                    assert_eq!(actual_values.len(), expected_values.len());
+                    for (lane, (actual, expected)) in actual_values
+                        .iter()
+                        .copied()
+                        .zip(expected_values)
+                        .enumerate()
+                    {
+                        let tolerance = 2.5e-3_f32.max(expected.abs() * 2.5e-3);
+                        assert!(
+                            (actual - expected).abs() <= tolerance,
+                            "DA3 ray mutation {phase}[{lane}]: {actual} != {expected}"
+                        );
+                    }
+                }
+            }
+            for (actual, field) in [
+                (
+                    geometry
+                        .extrinsics
+                        .as_ref()
+                        .ok_or("DA3 mutated ray extrinsics are missing")?,
+                    "extrinsics",
+                ),
+                (
+                    geometry
+                        .intrinsics
+                        .as_ref()
+                        .ok_or("DA3 mutated ray intrinsics are missing")?,
+                    "intrinsics",
+                ),
+            ] {
+                let actual = comfy_tensor::generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native(
+                    &backend,
+                    actual,
+                    execution_context,
+                )?;
+                let expected = fixture_raw_bits(
+                    mutation
+                        .pointer(&format!("/geometry/{field}/bits"))
+                        .ok_or("DA3 ray mutation geometry is missing")?,
+                )?
+                .into_iter()
+                .map(f32::from_bits)
+                .collect::<Vec<_>>();
+                assert_eq!(actual.len(), expected.len());
+                for (lane, (actual, expected)) in actual.into_iter().zip(expected).enumerate() {
+                    let tolerance = 2.5e-3_f32.max(expected.abs() * 2.5e-3);
+                    assert!(
+                        (actual - expected).abs() <= tolerance,
+                        "DA3 ray mutation {field}[{lane}]: {actual} != {expected}"
+                    );
+                }
+            }
+            let baseline_actual_identity = public_geometry_identity(&ray_geometry, &ray_context)?;
+            assert_ne!(actual_identity, baseline_actual_identity, "{name}");
+        } else {
+            let baseline_identity = match execution {
+                "dpt" => oracle.pointer("/reduced_dpt/output_identity_sha256"),
+                "camera" => {
+                    oracle.pointer("/reduced_dualdpt/supplied_camera_output_identity_sha256")
+                }
+                _ => oracle.pointer("/reduced_dualdpt/output_identity_sha256"),
+            }
+            .and_then(serde_json::Value::as_str)
+            .ok_or("DA3 mutation baseline identity is missing")?;
+            assert_eq!(
+                actual_identity != baseline_identity,
+                changes_output,
+                "{name}"
+            );
+        }
+        if !changes_output {
+            let baseline_digest = match profile {
+                DepthAnything3FixtureProfile::Dpt => resource.semantic_digest_sha256(),
+                DepthAnything3FixtureProfile::DualDpt => dual.semantic_digest_sha256(),
+            };
+            assert_ne!(
+                mutated.semantic_digest_sha256(),
+                baseline_digest,
+                "forward-unused retained state must still change resource identity"
+            );
+        }
+    }
     Ok(())
 }
 

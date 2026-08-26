@@ -538,11 +538,13 @@ impl ProviderRuntimeActivationGrant {
 
     pub fn preflight_installed_component(
         self,
+        worker_context: &WorkerProviderInvocationContext,
         worker_deployment: &WorkerRegistryDeploymentPlan,
         worker_invocation: &NativeProviderWorkerSessionStart,
         manifest_authorization: ProviderManifestAuthorizationV2,
     ) -> Result<PreflightedProviderRuntimeActivationGrant, PluginServiceError> {
         let result = self.preflight_installed_component_inner(
+            worker_context,
             worker_deployment,
             worker_invocation,
             &manifest_authorization,
@@ -558,6 +560,7 @@ impl ProviderRuntimeActivationGrant {
 
     fn preflight_installed_component_inner(
         &self,
+        worker_context: &WorkerProviderInvocationContext,
         worker_deployment: &WorkerRegistryDeploymentPlan,
         worker_invocation: &NativeProviderWorkerSessionStart,
         manifest_authorization: &ProviderManifestAuthorizationV2,
@@ -569,6 +572,17 @@ impl ProviderRuntimeActivationGrant {
         cancellation
             .check()
             .map_err(|_| PluginServiceError::Cancelled)?;
+        let claimed_context = self
+            .host_context
+            .as_ref()
+            .ok_or(PluginServiceError::ProviderRuntimeAuthorityDenied)?;
+        if worker_context.session_id != claimed_context.session_id
+            || worker_context.session_generation != claimed_context.session_generation
+            || worker_context.invocation != claimed_context.invocation
+            || worker_context.generation != claimed_context.generation
+        {
+            return Err(PluginServiceError::ProviderRuntimeAuthorityDenied);
+        }
         let deployment = worker_deployment.begin();
         let component = deployment
             .components()
@@ -6507,6 +6521,33 @@ mod tests {
         }
     }
 
+    #[test]
+    fn legacy_provider_worker_wire_fixture_is_frozen() -> Result<(), Box<dyn Error>> {
+        let deployment = worker_registry_deployment()?;
+        let binding = provider_binding()?;
+        let request = NativeProviderWorkerRequest::Begin(activation_start(&deployment, &binding))
+            .to_bytes()?;
+        let response = NativeProviderWorkerResponse::Begun.to_bytes()?;
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&request)),
+            "c39833ba648209526b0a1f87110e72503857e8a5e4058a2aec53f1d7709a02de"
+        );
+        assert_eq!(response, [0]);
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&response)),
+            "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d"
+        );
+        assert!(matches!(
+            NativeProviderWorkerRequest::from_bytes(&request)?,
+            NativeProviderWorkerRequest::Begin(_)
+        ));
+        assert_eq!(
+            NativeProviderWorkerResponse::from_bytes(&response)?,
+            NativeProviderWorkerResponse::Begun
+        );
+        Ok(())
+    }
+
     fn activation_grant(
         binding: &ProviderBindingSet,
         outer_signing_payload_sha256: [u8; 32],
@@ -6544,12 +6585,13 @@ mod tests {
 
     fn preflight_activation(
         grant: ProviderRuntimeActivationGrant,
+        worker_context: &WorkerProviderInvocationContext,
         manifest: ProviderManifestAuthorizationV2,
     ) -> Result<PreflightedProviderRuntimeActivationGrant, PluginServiceError> {
         let deployment = worker_registry_deployment()
             .map_err(|_| PluginServiceError::ProviderRuntimeAuthorityDenied)?;
         let start = activation_start(&deployment, manifest.provider_binding());
-        grant.preflight_installed_component(&deployment, &start, manifest)
+        grant.preflight_installed_component(worker_context, &deployment, &start, manifest)
     }
 
     fn bound_streaming_authority(
@@ -6594,7 +6636,8 @@ mod tests {
             &CancellationToken::default(),
         )?;
         let authority = source.claim(&context, &CancellationToken::default())?;
-        let authority = preflight_activation(authority, manifest)?.bind(&head, &policy)?;
+        let authority =
+            preflight_activation(authority, &context, manifest)?.bind(&head, &policy)?;
         Ok((authority, head))
     }
 
@@ -6670,7 +6713,8 @@ mod tests {
             cancellation,
         )?;
         let authority = service.claim_activation(context, cancellation)?;
-        let authority = preflight_activation(authority, manifest)?.bind(&sdk_head, &policy)?;
+        let authority =
+            preflight_activation(authority, context, manifest)?.bind(&sdk_head, &policy)?;
         Ok((service, authority, worker_head))
     }
 
@@ -6845,7 +6889,7 @@ mod tests {
             );
         }
         let grant = source.claim(&rightful, &CancellationToken::default())?;
-        let authority = preflight_activation(grant, manifest)?.bind(&head, &policy)?;
+        let authority = preflight_activation(grant, &rightful, manifest)?.bind(&head, &policy)?;
         assert_eq!(authority.request_head, head);
         assert!(matches!(
             source.claim(&rightful, &CancellationToken::default()),
@@ -6894,6 +6938,7 @@ mod tests {
         assert!(matches!(
             preflight_activation(
                 changed_outer_source.claim(&rightful, &CancellationToken::default())?,
+                &rightful,
                 changed_outer,
             ),
             Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
@@ -6913,6 +6958,7 @@ mod tests {
         assert!(matches!(
             preflight_activation(
                 changed_inner_source.claim(&rightful, &CancellationToken::default())?,
+                &rightful,
                 changed_inner,
             ),
             Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
@@ -6946,6 +6992,7 @@ mod tests {
         assert!(matches!(
             preflight_activation(
                 bind_cancelled_grant,
+                &rightful,
                 ProviderManifestAuthorizationV2::fixture(
                     authorization,
                     outer_digest,
@@ -6980,6 +7027,81 @@ mod tests {
             invocation: 1,
             generation: 1,
         };
+        let context_mutations: [fn(&mut WorkerProviderInvocationContext); 4] = [
+            |context| context.session_id = Uuid::from_u128(0x418),
+            |context| context.session_generation += 1,
+            |context| context.invocation += 1,
+            |context| context.generation += 1,
+        ];
+        for mutate in context_mutations {
+            let source = ProviderRuntimeActivationGrantSource::new();
+            let cancellation = CancellationToken::default();
+            source.insert(
+                &context,
+                activation_grant(&binding, outer_digest)?,
+                &cancellation,
+            )?;
+            let deployment = worker_registry_deployment()?;
+            let start = activation_start(&deployment, &binding);
+            let mut supplied_context = context.clone();
+            mutate(&mut supplied_context);
+            let grant = source.claim(&context, &cancellation)?;
+            assert!(matches!(
+                grant.preflight_installed_component(
+                    &supplied_context,
+                    &deployment,
+                    &start,
+                    manifest.clone(),
+                ),
+                Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
+            ));
+            let claim_key = (
+                context.session_id,
+                context.session_generation,
+                context.invocation,
+                context.generation,
+            );
+            assert!(
+                !source
+                    .state
+                    .lock()
+                    .activation_claims
+                    .get(&claim_key)
+                    .ok_or("activation claim disappeared")?
+                    .load(Ordering::Acquire)
+            );
+            assert!(matches!(
+                source.claim(&context, &cancellation),
+                Err(PluginServiceError::ProviderStreamingContract(
+                    ProviderStreamingContractError::RevokedHandle
+                ))
+            ));
+        }
+
+        let exact_source = ProviderRuntimeActivationGrantSource::new();
+        let exact_cancellation = CancellationToken::default();
+        exact_source.insert(
+            &context,
+            activation_grant(&binding, outer_digest)?,
+            &exact_cancellation,
+        )?;
+        let exact_deployment = worker_registry_deployment()?;
+        let exact_start = activation_start(&exact_deployment, &binding);
+        exact_source
+            .claim(&context, &exact_cancellation)?
+            .preflight_installed_component(
+                &context,
+                &exact_deployment,
+                &exact_start,
+                manifest.clone(),
+            )?;
+        assert!(matches!(
+            exact_source.claim(&context, &exact_cancellation),
+            Err(PluginServiceError::ProviderStreamingContract(
+                ProviderStreamingContractError::RevokedHandle
+            ))
+        ));
+
         let mutations: [fn(&mut ProviderRuntimeActivationGrant); 10] = [
             |grant| grant.registry_generation += 1,
             |grant| grant.registry_digest_sha256 = "0".repeat(64),
@@ -7000,7 +7122,7 @@ mod tests {
             source.insert(&context, grant, &cancellation)?;
             let grant = source.claim(&context, &cancellation)?;
             assert!(matches!(
-                preflight_activation(grant, manifest.clone()),
+                preflight_activation(grant, &context, manifest.clone()),
                 Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
             ));
             let claim_key = (
@@ -7053,7 +7175,12 @@ mod tests {
             mutate(&mut start);
             let grant = source.claim(&context, &cancellation)?;
             assert!(matches!(
-                grant.preflight_installed_component(&deployment, &start, manifest.clone()),
+                grant.preflight_installed_component(
+                    &context,
+                    &deployment,
+                    &start,
+                    manifest.clone()
+                ),
                 Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
             ));
             assert!(
@@ -7077,7 +7204,7 @@ mod tests {
             &cancellation,
         )?;
         assert!(matches!(
-            preflight_activation(source.claim(&context, &cancellation)?, manifest),
+            preflight_activation(source.claim(&context, &cancellation)?, &context, manifest),
             Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
         ));
 
@@ -7099,6 +7226,7 @@ mod tests {
         assert!(matches!(
             preflight_activation(
                 source.claim(&context, &CancellationToken::default())?,
+                &context,
                 changed_binding_manifest,
             ),
             Err(PluginServiceError::ProviderRuntimeAuthorityDenied)
@@ -7121,6 +7249,7 @@ mod tests {
         assert!(matches!(
             preflight_activation(
                 source.claim(&context, &CancellationToken::default())?,
+                &context,
                 changed_streaming_manifest,
             ),
             Err(PluginServiceError::ProviderRuntimeAuthorityDenied)

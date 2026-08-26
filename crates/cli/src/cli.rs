@@ -6,7 +6,11 @@ pub use ipc_channel::ipc;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "multiplayer-tools")]
+pub mod collaboration;
+#[cfg(feature = "multiplayer-tools")]
 pub mod collaboration_moderation;
+#[cfg(feature = "multiplayer-tools")]
+pub mod pairing;
 
 #[derive(Serialize, Deserialize)]
 pub struct IpcHandshake {

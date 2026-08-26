@@ -8713,7 +8713,7 @@ def native_node_inherited_v3_presentation_catalog_correction_task(
         "Project inherited V3 node presentation overrides exactly",
         [4, 6, 7, 16, 32, 41, 44],
         [8, 20, 32, 34, 39, 41],
-        ["VAL-CATALOG-001", "VAL-NODE-001", "VAL-NODE-REGISTRY-001"],
+        ["VAL-CATALOG-001", "VAL-NODE-001", "VAL-NODE-REGISTRY-001", "VAL-PLUGIN-HOST-001"],
         "Correct the authoritative backend-node and schema-v2 catalogs so inherited V3 subclasses project their own presentation assignments instead of retaining those assignments only as provenance.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
@@ -8733,6 +8733,60 @@ def native_node_inherited_v3_presentation_catalog_correction_task(
             "crates/comfy_nodes/src/registry_generator.rs",
         ],
         "COMFY-NODE-0542 and COMFY-NODE-0543 retain their source identifiers and experimental availability while backend display names exactly include `(DEPRECATED)` and portable schema presentation sets both `is_deprecated` and `is_experimental`. The generic inherited/class-override projection is source-ordered, limited to recognized node options, deterministic, and covered by catalog and registry validation without weakening descriptor equality.",
+        dependency,
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["4.1", "4.2", "4.3", "6.1", "6.2", "16.3", "32.1", "32.3", "41.2", "44.2"],
+    )
+
+
+def native_node_v3_presentation_catalog_closure_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-node-v3-presentation-catalog-closure",
+        "Close inherited V3 node presentation catalog drift",
+        [4, 6, 7, 16, 32, 41, 44],
+        [8, 20, 32, 34, 39, 41],
+        ["VAL-CATALOG-001", "VAL-NODE-001", "VAL-NODE-REGISTRY-001"],
+        "Correct every remaining authoritative backend-node row whose inherited V3 class presentation disagrees with the already source-verified portable schema projection.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_hunyuan.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_context_windows.py",
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+            ".agents/specs/comfy-parity/catalogs/provider-component-contracts.json",
+            ".agents/specs/comfy-parity/generate_node_contract_catalog.py",
+            "crates/comfy_nodes/src/registry_generator.rs",
+            "crates/comfy_nodes/src/provider_contracts.rs",
+            "crates/comfy_nodes/src/families/image_batch_01.rs",
+            "crates/comfy_nodes/src/families/image_color_01.rs",
+            "crates/comfy_nodes/src/families/text_01.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_plugin_host/tests/component_contract.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_component_source/guest.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_component",
+        ],
+        [
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+            ".agents/specs/comfy-parity/catalogs/provider-component-contracts.json",
+            ".agents/specs/comfy-parity/catalogs/source-snapshot-manifest.json",
+            ".agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "crates/comfy_nodes/src/provider_contracts.rs",
+            "crates/comfy_nodes/src/families/image_batch_01.rs",
+            "crates/comfy_nodes/src/families/image_color_01.rs",
+            "crates/comfy_nodes/src/families/text_01.rs",
+            "crates/comfy_plugin_host/tests/component_contract.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_component_source/guest.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_component",
+        ],
+        "The finite source-pinned set COMFY-NODE-0002, COMFY-NODE-0003, COMFY-NODE-0047, COMFY-NODE-0159, COMFY-NODE-0249, COMFY-NODE-0252, COMFY-NODE-0366, COMFY-NODE-0405, COMFY-NODE-0407, COMFY-NODE-0456, COMFY-NODE-0504, COMFY-NODE-0620, COMFY-NODE-0649, COMFY-NODE-0673, COMFY-NODE-0674, COMFY-NODE-0701, and COMFY-NODE-0760 keeps each exact source identifier while projecting its inherited class display_name into both the authoritative backend-node row and portable schema presentation. A generic regression requires every non-null portable display name to equal its CSV projection, and the provider catalog fingerprint and generated runtime registry accept the corrected rows. The checked provider-component fixture uses one complete authoritative vendor namespace, preserves dynamic-combo source identity across the plugin adapter, and is re-sealed to the resulting canonical provider contract and binding-set identities. Strict regeneration is byte-identical twice; no fallback or unrelated node presentation changes.",
         dependency,
         locked=True,
         feature_scoped=True,
@@ -9573,30 +9627,182 @@ def native_model_resource_precursor_tasks(
         "Bind the existing Depth Anything 3 family detection and state plans to a concrete DA3_MODEL resource with source-exact preprocessing, inference, geometry normalization, and typed output ownership.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_depth_anything_3.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/model.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/preprocess.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/dpt.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/camera.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/ray_pose.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/reference_view_selector.py",
+            "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/transform.py",
+            "projects/comfy/ComfyUI/comfy/image_encoders/dino2.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/bert.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+            "projects/comfy/ComfyUI/comfy/utils.py",
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            "projects/comfy/ComfyUI/comfy/model_detection.py",
+            "projects/comfy/ComfyUI/comfy/supported_models.py",
+            "projects/comfy/ComfyUI/comfy/model_base.py",
+            ".agents/specs/comfy-parity/generate_ownership_catalog.py",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
             "crates/comfy_model/src/families/depthanything3_comfy_model_0075.rs",
             "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/attention.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs",
+            "crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_02.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_05.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_08.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_13.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_14.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_15.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_16.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_21.rs",
+            "crates/comfy_tensor/src/ops/indexing_masking_01.rs",
+            "crates/comfy_tensor/src/ops/linear_algebra_01.rs",
+            "crates/comfy_tensor/src/ops/linear_algebra_02.rs",
+            "crates/comfy_tensor/src/ops/neural_network_functional_01.rs",
+            "crates/comfy_tensor/src/ops/neural_network_module_01.rs",
+            "crates/comfy_tensor/src/ops/random_number_generation_01.rs",
+            "crates/comfy_tensor/src/ops/reduction_01.rs",
+            "crates/comfy_tensor/src/ops/reduction_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/tensor_creation_01.rs",
         ],
         [
             "crates/comfy_model/src/depth_anything_3.rs",
             "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "Pinned DA3 backbone and head fixtures detect, load, execute, normalize, persist, and restart with exact geometry, camera, depth, confidence, digest, and residency. Ambiguous or unsupported architecture, malformed weights or images, OOM, cancellation, and stale handles publish no model or geometry.",
+        "Hash-pinned, test-support-only reduced DPT and DualDPT fixtures plus a tracked pure-standard-library source-equation oracle execute the exact source graph while production admission remains fixed to the vits, vitb, vitl, and vitg profiles. Fixture provenance pins the wrapper, model-detection/configuration owner, backbone, heads, preprocessing, camera, ray-pose, reference-selection, and transform source hashes. Preserve upper- and lower-bound preprocessing, mono and multiview paths, alternating local/global attention, QK normalization, two-dimensional RoPE, camera tokens, reference-view reordering, DPT and DualDPT heads, cam-dec and ray-pose camera paths with exact QL/SVD sign choices and a versioned RANSAC random-number phase, and original-size align_corners=false depth, confidence, and sky projection. Family orchestration delegates resize, attention, RoPE, QR, SVD, determinant, inverse, quantile, and random-permutation mechanics to their canonical owners instead of duplicating kernels. BF16, F16, and F32 retained-state admission uses a checked storage-to-F32 execution projection whose source dtype remains bound into semantic digest and alias-aware residency, with an independent conversion oracle. The ownership policy classifies the fixture's Python Tensor as a development-reference independent test oracle under the canonical Rust tensor identity, mutation-lineage, and storage/view owners; it confers no production tensor identity, storage, mutation, call-site, or consumer authority. Strict admission covers the complete retained state including forward-unused keys; reconstruct, restart, and stale-generation behavior remain exact. Ambiguous or unsupported architecture, malformed weights or images, OOM, cancellation, or any failed phase publishes no model or geometry.",
+    )
+    tasks.append(
+        native_model_resource_precursor_task(
+            "comfy-parity-native-dinov2-backbone-owner-foundation",
+            "Consolidate native DINOv2 backbone ownership",
+            "Extract the source-exact DINOv2 state, schema, and execution mechanics currently embedded in the retained Depth Anything 3 resource into one crate-private comfy_model owner supporting both ordinary MoGe inference and the extended DA3 path, without owning either parent resource, public payload, handle publication, cache, persistence, or restart lifecycle.",
+            [
+                "projects/comfy/ComfyUI/comfy/image_encoders/dino2.py",
+                "projects/comfy/ComfyUI/comfy/text_encoders/bert.py",
+                "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+                "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/model.py",
+                "projects/comfy/ComfyUI/comfy/ldm/depth_anything_3/reference_view_selector.py",
+                "projects/comfy/ComfyUI/comfy/ldm/moge/model.py",
+                "projects/comfy/ComfyUI/comfy/ldm/moge/modules.py",
+                "crates/comfy_model/src/depth_anything_3.rs",
+                "crates/comfy_model/src/attention.rs",
+                "crates/comfy_model/src/native_ops.rs",
+                "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+                "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/generate_oracle.py",
+                "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/source_graph.py",
+                "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/oracle.json",
+                "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/manifest.json",
+                "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/provenance.json",
+                ".agents/specs/comfy-parity/generate_ownership_catalog.py",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+                "crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs",
+                "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_16.rs",
+                "crates/comfy_tensor/src/ops/indexing_masking_01.rs",
+                "crates/comfy_tensor/src/ops/neural_network_functional_01.rs",
+                "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+                "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+                "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+                "crates/comfy_tensor/src/ops/tensor_creation_01.rs",
+            ],
+            [
+                "crates/comfy_model/src/dino2.rs",
+                "crates/comfy_model/src/depth_anything_3.rs",
+                "crates/comfy_model/src/comfy_model.rs",
+                "crates/comfy_test_support/fixtures/models/dinov2-backbone-owner-foundation",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ],
+            "One crate-private comfy_model::dino2::NativeDino2Backbone is the sole native owner of DINOv2 retained-state schema, checked storage projection, position interpolation, transformer execution, and intermediate-feature extraction. It implements ordinary forward and get_intermediate_layers behavior for the plain MoGe profile and get_intermediate_layers_da3 behavior with camera-token injection, alternating local/global attention, QK normalization, two-dimensional RoPE, intermediate and export layers, reference-view ordering, class-token handling, LayerScale, MLP or SwiGLU, final normalization, and height-first +0.1 scale-factor position interpolation. DA3 delegates every DINO state key and execution phase to this owner while preserving its existing ordered checkpoint reconstruction, semantic digest, alias-aware residency, output bits, error classification, and fixture hashes byte-for-byte. Parent DA3 and future MoGe resources retain their own public identity, complete resource residency, invocation, payload, and lifecycle authority. A tracked pure-standard-library reduced fixture source-hashes dino2.py, bert.py, the source attention adapter, and the reference selector; it independently discriminates both ordinary and DA3 routes plus patch embedding, position interpolation, QKV and output projection, LayerScale, MLP and SwiGLU, normalization, RoPE, camera tokens, reference selection, forward-unused strict state, F32/F16/BF16 storage-to-F32 projection, shared-StorageId residency, bounded memory, cancellation, and atomic failure. Repository and ownership scans establish comfy_model::dino2::NativeDino2Backbone as the native_dinov2_backbone_execution owner, classify DA3 as an adapter and MoGe only as a future non-authoritative consumer until implemented, and find no second DINO transformer, position, or attention equation in DA3 or any consumer.",
+            [],
+        )
     )
     append(
         "comfy-parity-native-moge-resource-foundation",
         "Retain executable MoGe models",
-        "Implement a concrete MOGE_MODEL resource and typed MoGe geometry owner with source-exact image preprocessing, disparity, points, normals, mask, intrinsics, triangulation inputs, and bounded inference.",
+        "Implement a concrete MOGE_MODEL resource and typed perspective MoGe geometry owner with source-exact image preprocessing, bounded v1/v2 inference, point, depth, normal, mask, intrinsics, and validated downstream triangulation inputs.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_moge.py",
+            "projects/comfy/ComfyUI/comfy/ldm/moge/model.py",
+            "projects/comfy/ComfyUI/comfy/ldm/moge/modules.py",
+            "projects/comfy/ComfyUI/comfy/ldm/moge/geometry.py",
+            "projects/comfy/ComfyUI/comfy/image_encoders/dino2.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/bert.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            "projects/comfy/ComfyUI/comfy/model_patcher.py",
+            "projects/comfy/ComfyUI/comfy/utils.py",
+            "crates/comfy_model/src/dino2.rs",
             "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/attention.rs",
+            "crates/comfy_test_support/fixtures/models/dinov2-backbone-owner-foundation",
+            ".agents/specs/comfy-parity/generate_ownership_catalog.py",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_04.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_05.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_15.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_16.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_18.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_21.rs",
+            "crates/comfy_tensor/src/ops/indexing_masking_01.rs",
+            "crates/comfy_tensor/src/ops/linear_algebra_01.rs",
+            "crates/comfy_tensor/src/ops/neural_network_functional_01.rs",
+            "crates/comfy_tensor/src/ops/reduction_01.rs",
+            "crates/comfy_tensor/src/ops/reduction_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/tensor_creation_01.rs",
         ],
         [
             "crates/comfy_model/src/moge.rs",
             "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/fixtures/models/moge-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "Pinned MoGe fixtures load and execute exact disparity, point, normal, mask, intrinsics, geometry identity, residency, cache, persistence, and restart behavior. Unsupported architecture, malformed weights or images, invalid triangulation bounds, OOM, cancellation, and stale handles publish no model or geometry.",
+        "Hash-pinned test-support-only reduced v1 and v2 fixtures plus a tracked pure-standard-library source-equation oracle execute the complete MoGe resource graph. Admission preserves nested model and model_config normalization, raw Meta-style DINO key remapping, collision-safe fused-QKV splitting, exact v1-versus-v2 detection, strict complete state schemas including forward-unused state, F32/F16/BF16 retained storage with checked F32 execution projection, semantic digest, size-consistent shared-StorageId residency, and deterministic checkpoint reconstruction. Both variants delegate ordinary DINO execution and intermediate/class-token extraction exclusively to NativeDino2Backbone. V1 preserves token-count interpolation, bicubic-antialiased normalization, patch-aligned bilinear input, the four-feature HeadV1 projection and ordered upsample/residual path, raw mask thresholding, point exponential remap, and original-size projection. V2 preserves ties-to-even token-grid sizing, DINO projections, normalized view-plane grids, five-level neck, points, mask, normal, and metric-scale heads, sigmoid mask, unit normals, and exponential scale. Geometry preserves focal and shift recovery through a bounded source-specific Levenberg-Marquardt orchestration over canonical tensor solves, invalid-focal 60-degree fallback, forced horizontal FOV, normalized intrinsics, depth shift, v2 positive-depth filtering, force_projection, apply_mask, and apply_metric_scale. The typed result contains the source image and optional points, depth, intrinsics, mask, and normal fields with exact shapes, dtypes, and finite or intentional-infinity dispositions; invalid triangulation-input projections fail typed. Unsupported or ambiguous architecture, malformed or colliding state, invalid RGB or RGBA image, invalid geometry controls, uncertified placement, conservative phase-memory OOM, cancellation, or any failed phase publishes no resource or geometry. Panorama splitting and Poisson merge, disparity or color rendering, normal rendering, triangulation execution, and MESH or media publication remain assigned to comfy-parity-native-nodes-image-geometry-estimation-comfy-node-0129; loader handle publication, cache, persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation and comfy-parity-native-nodes-model-loaders-comfy-node-0209.",
     )
     append(
         "comfy-parity-native-conditioning-auxiliary-resource-foundation",
@@ -9651,6 +9857,7 @@ def native_model_resource_precursor_tasks(
         "comfy-parity-native-attention-ordered-additive-mask-foundation",
         "comfy-parity-native-background-removal-resource-foundation",
         "comfy-parity-native-depth-anything-3-resource-foundation",
+        "comfy-parity-native-dinov2-backbone-owner-foundation",
         "comfy-parity-native-moge-resource-foundation",
         "comfy-parity-native-conditioning-auxiliary-resource-foundation",
         "comfy-parity-native-model-resource-service-foundation",
@@ -10749,12 +10956,36 @@ def provider_component_foundation_tasks(
             "crates/comfy_plugin_host/src/component_host.rs",
             "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
             "crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        [
+            "crates/comfy_runtime/src/plugin_services.rs",
+            "crates/comfy_plugin_host/src/component_host.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "ProviderRuntimeActivationGrant::preflight_installed_component consumes a claimed opaque grant, checks sealed cancellation before and after validation, and compares the exact registry generation and digest, component generation and digest, provider outer-signing-payload digest and independently verified inner authorization identity, authorization-generation digest, binding generation and set digest, node identity, and compiled-plan digest. It returns a distinct non-cloneable PreflightedProviderRuntimeActivationGrant. Every failure atomically revokes the one-use claim. Only the preflighted grant exposes the later consuming bind for a checked request head and ProviderPolicy; the raw grant no longer exposes bind, fields, constructors, registration, provider identity, or authority material. A private component-host PreflightedProviderComponentCapsule retains that grant together with the exact selected InstalledVerifiedPlugin, current VerifiedComponentGeneration, and node identity. Its private constructor derives evidence only from those installed objects, and the later adapter must instantiate only by consuming the capsule without accepting a second plugin, component generation, or node. No public primitive-field evidence constructor or capsule getter exists, the runtime wildcard export remains unchanged, and repository ownership asserts exactly one production preflight callsite. Same-crate runtime tests independently mutate every sealed field, typed worker-session-start field, outer streaming contract, inner authorization, binding membership, and cancellation, and prove every failed preflight revokes the claim and cannot be retried. Component-host source tests prove the sole callsite retains and consumes the exact installed plugin, current generation, authorization, and node, orders preflight before begin_invocation, input state, read, take, node creation, or guest code, and accepts no second selector or getter through which those objects can be swapped. Raw mint and registration stay crate-private, so comfy-parity-provider-worker-stream-bridge owns the first executable capsule success, second-claim, and instantiation anti-swap proof; this task adds no public or feature-gated test authority factory.",
+        ["comfy_runtime", "comfy_plugin_host"],
+        validation_packages=["comfy_runtime", "comfy_plugin_host"],
+    )
+    append_shared(
+        "comfy-parity-provider-runtime-worker-context-preflight-repair",
+        "Bind app-issued provider worker contexts during preflight",
+        "Consume and seal the exact app-issued provider worker invocation context in the sole component-activation preflight before any provider-v2 guest, input, validator, or transport state exists.",
+        [
+            "crates/comfy_runtime/src/plugin_services.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_plugin_host/src/component_host.rs",
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
         ],
         [
             "crates/comfy_runtime/src/plugin_services.rs",
             "crates/comfy_plugin_host/src/component_host.rs",
         ],
-        "ProviderRuntimeActivationGrant::preflight_installed_component consumes a claimed opaque grant, checks sealed cancellation before and after validation, and compares the exact registry generation and digest, component generation and digest, provider outer-signing-payload digest and independently verified inner authorization identity, authorization-generation digest, binding generation and set digest, node identity, and compiled-plan digest. It returns a distinct non-cloneable PreflightedProviderRuntimeActivationGrant. Every failure atomically revokes the one-use claim. Only the preflighted grant exposes the later consuming bind for a checked request head and ProviderPolicy; the raw grant no longer exposes bind, fields, constructors, registration, provider identity, or authority material. A private component-host PreflightedProviderComponentCapsule retains that grant together with the exact selected InstalledVerifiedPlugin, current VerifiedComponentGeneration, and node identity. Its private constructor derives evidence only from those installed objects, and the later adapter must instantiate only by consuming the capsule without accepting a second plugin, component generation, or node. No public primitive-field evidence constructor or capsule getter exists, the runtime wildcard export remains unchanged, and repository ownership asserts exactly one production preflight callsite. Same-crate runtime tests independently mutate every sealed field, typed worker-session-start field, outer streaming contract, inner authorization, binding membership, and cancellation, and prove every failed preflight revokes the claim and cannot be retried. Component-host source tests prove the sole callsite retains and consumes the exact installed plugin, current generation, authorization, and node, orders preflight before begin_invocation, input state, read, take, node creation, or guest code, and accepts no second selector or getter through which those objects can be swapped. Raw mint and registration stay crate-private, so Task419 owns the first executable capsule success, second-claim, and instantiation anti-swap proof; this task adds no public or feature-gated test authority factory.",
+        "The existing NativeProviderWorkerRequest, NativeProviderWorkerResponse, NativeProviderWorkerSessionStart, and their postcard bytes remain unchanged: legacy Begin is a worker-to-app request and cannot establish host authority. The sole consuming ProviderRuntimeActivationGrant::preflight_installed_component additionally requires the app-issued WorkerProviderInvocationContext and compares its session UUID, session generation, invocation, and invocation generation exactly to the private claimed grant context before returning success. The context-free preflight overload is removed. Every mismatch, cancellation, or later activation mismatch atomically revokes the one-use claim and a second claim fails. The sole private PreflightedProviderComponentCapsule constructor accepts that context from the app-side grant-mint owner, passes it into the consuming runtime preflight, and copies it into a private non-cloneable capsule field only after success; it exposes no context getter, selector, constructor, raw grant, or primitive authority material. Source and API witnesses prove exactly one production preflight callsite, no second context selector, and ordering before begin_invocation, guest instantiation, WIT invocation context, input-state/read/take, node creation, or transport-validator construction. Runtime tests independently mutate every WorkerProviderInvocationContext field and prove typed rejection plus claim revocation, while exact context succeeds once. Legacy wire hash and byte fixtures remain frozen. This task creates no app-to-worker v2 envelope and no network, provider, secret, credential, actuator, purchase, charge, or output-publication path; comfy-parity-provider-worker-stream-bridge alone allocates the production context and transports the certified projection.",
         ["comfy_runtime", "comfy_plugin_host"],
         validation_packages=["comfy_runtime", "comfy_plugin_host"],
     )
@@ -10789,9 +11020,70 @@ def provider_component_foundation_tasks(
             "crates/comfy_plugin_host/tests/component_contract.rs",
             "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component",
             "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "Before exposing any provider-v8 invocation context to a component, the adapter maps its runtime-issued session identity and generation to the verified signed invocation's full sealed activation identity, including registry generation and digest, component generation and digest, authorization-generation digest, binding-set digest, node identity, and compiled-plan digest. Verified outer and inner provider-v2 authorization and the signed streaming-contract digest remain bound to that activation; the host derives provider identity from the verified binding set. Components can reference a host-issued capability but cannot construct or replace its authority. Generated provider-v2 invocation-input-host methods delegate the existing canonical InvocationHost input methods, and returned outputs remain proposals for Task412's all-or-none materializer. Component contract tests prove missing-grant denial, exact claim-and-bind checks before every request, upload, cost, stream, and input operation, generation-scoped handle revocation, bounded response streaming and progress, traps, cancellation, and atomic output proposals. The adapter does not expose or invoke the crate-private raw grant constructor or registration seam; the later worker bridge owns the first production valid-grant issuance and end-to-end success proof. Missing or extra manifest claims, undeclared operations, stale handles, and worker loss cannot actuate or publish. Direct provider-v8 worker routing remains rejected until comfy-parity-provider-worker-stream-bridge.",
+        "Before exposing any provider-v8 invocation context, input, or guest state, the adapter consumes the private PreflightedProviderComponentCapsule whose app-issued WorkerProviderInvocationContext was exactly matched to the sealed runtime grant together with the verified signed invocation's full sealed activation identity, including registry generation and digest, component generation and digest, authorization-generation digest, binding-set digest, node identity, and compiled-plan digest. Verified outer and inner provider-v2 authorization and the signed streaming-contract digest remain bound to that activation; the host derives provider identity from the verified binding set. Components can reference a host-issued capability but cannot construct or replace its authority. Generated provider-v2 invocation-input-host methods delegate the existing canonical InvocationHost input methods, and returned outputs remain proposals for Task412's all-or-none materializer. The private prepared invocation retains the exact non-cloneable preflighted grant, context, plugin, generation, node, lease, and authorization; no second selector is accepted. Its hermetic test route uses a concrete capacity-one typed WorkerProviderStreamRequest plus one-shot WorkerProviderStreamResponse channel, nonblocking enqueue, checked bounded response polling, the canonical WorkerProviderStreamTransportValidator, and terminal revocation on full, cancellation, disconnect, malformed, foreign, stale, trap, abort, decode, materialization, or drop. A completed terminal Wait seals every later WIT route call but does not disarm revocation. The returned ProviderV2InvocationProposal remains armed and privately retains the exact runtime, checked context, and route; Task421 exposes no success disarm, completion token, completion setter, or arbitrary-receipt escape hatch. Dropping that proposal or runtime, splitting it without verified downstream finalization, or any failed, cancelled, trapped, decoded, or materialization path revokes. Only comfy-parity-provider-worker-stream-bridge may consume the exact armed proposal after its app-side ProviderRuntimeStreamService session has finished, its runtime receipt has been verified for that same session, and canonical all-or-none materialization has succeeded. The crate-private app-side bind adapter may borrow the canonical runtime ProviderPolicy only while consuming the preflighted grant; it owns no policy field, constructor, default, authorization equation, or second security decision. It exposes no public/default transport trait, runtime stream service, provider policy owner, provider authority, secret, credential, actuator, purchase, charge, or direct worker-v8 production bridge. Every legacy v1 preparation, execution, provider, and conformance entrypoint rejects provider-v2 before input or guest exposure. Component contract tests prove missing-grant denial, exact claim-and-bind checks before every request, upload, cost, stream, and input operation, generation-scoped handle revocation, bounded response streaming and progress, traps, cancellation, armed proposal drop, and atomic output proposals. The adapter does not expose or invoke the crate-private raw grant constructor or registration seam; the later worker bridge owns the first production valid-grant issuance and end-to-end success proof. Missing or extra manifest claims, undeclared operations, stale handles, and worker loss cannot actuate or publish. Direct provider-v8 worker routing remains rejected until comfy-parity-provider-worker-stream-bridge.",
         ["comfy_plugin_host"],
+    )
+    append_shared(
+        "comfy-parity-zed-all-target-baseline-assertion-correction",
+        "Correct the Zed and collaboration all-target baselines",
+        "Repair two stale Zed test expectations, one redundant-clone lint baseline, and one test-support feature-coherence edge so the provider bootstrap and later native execution leaves retain executable all-target and Clippy validation boundaries without changing URL parsing, registered action behavior, remote connection behavior, or huddle rendering.",
+        [
+            "crates/zed/src/zed/open_listener.rs",
+            "crates/zed/src/zed.rs",
+            "crates/language_tools/src/language_tool_tree.rs",
+            "crates/collab_ui/src/huddle.rs",
+            "crates/collab_ui/Cargo.toml",
+            "crates/title_bar/Cargo.toml",
+            "crates/recent_projects/Cargo.toml",
+            "crates/recent_projects/src/recent_projects.rs",
+            "crates/remote_connection/Cargo.toml",
+            "crates/remote_connection/src/remote_connection.rs",
+            "Cargo.lock",
+        ],
+        [
+            "crates/zed/src/zed/open_listener.rs",
+            "crates/zed/src/zed.rs",
+            "crates/collab_ui/src/huddle.rs",
+            "crates/collab_ui/Cargo.toml",
+        ],
+        "The percent-decoded Git clone test expects the exact input repository URL returned by the existing parser, including the sim.git repository name, the exhaustive action-namespace test includes the already registered language_tool_tree namespace in sorted order, and the native huddle view consumes its already-owned optional snapshot without a redundant Arc clone. The collab_ui all-target dev graph declares `title_bar = { workspace = true, features = [\"test-support\"] }` under dev-dependencies so the existing aggregate title_bar test-support owner activates remote, remote_connection, recent_projects, project, and workspace test features together. RemoteConnectionOptions::Mock therefore remains exhaustively matched throughout the unified test graph without adding a feature-only direct dependency, cargo-machete exception, lockfile change, production mock behavior, or any change to the remote connection enum, parser, modal equations, or normal dependency graph. Focused differentials prove no clone URL rewriting, action registration, huddle rendering, dispatch, provider, runtime, remote connection, or production behavior changes; the complete Zed and collab_ui all-target suites and the provider bootstrap's scoped Clippy boundary are green.",
+        ["zed"],
+        validation_packages=["zed", "collab_ui"],
+    )
+    append_shared(
+        "comfy-parity-provider-controller-owned-worker-bridge-bootstrap",
+        "Attach the controller-owned provider bridge",
+        "Attach exactly one live NativeExecutionController-owned provider bridge capability to the desktop private-worker executor without creating a second stream table, and keep headless provider-v2 fail-closed until the deployment lifecycle supplies the same attachment.",
+        [
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/plugin_services.rs",
+            "crates/comfy_plugin_host/src/private_worker.rs",
+            "crates/comfy_plugin_host/src/component_host.rs",
+            "crates/comfy_ui/src/execution_model.rs",
+            "crates/comfy_ui/src/comfy_ui.rs",
+            "crates/zed/src/comfy_plugin_services.rs",
+            "crates/zed/src/zed.rs",
+            "crates/zed/src/comfy_cli.rs",
+            ".agents/specs/comfy-parity/generate_ownership_catalog.py",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        [
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_plugin_host/src/private_worker.rs",
+            "crates/comfy_ui/src/execution_model.rs",
+            "crates/zed/src/comfy_plugin_services.rs",
+            "crates/zed/src/zed.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "NativeExecutionController alone constructs an opaque non-cloneable weak and lifecycle-bound attachment over its existing sole ProviderRuntimeStreamService; it exposes no service, grant, context, source, or constructor getter. The private executor retains at most one live attachment and cannot construct a provider runtime service. Duplicate, current, or foreign attachment fails, while replacement is accepted only after the prior controller has shut down or dropped, its weak attachment is unusable, and its sessions are revoked. register_native_execution_services returns the exact live controller attachment after registration, and desktop Zed attaches it to the concrete executor retained by SimComfyPluginServices before any provider-v2 admission, envelope, instantiation, input, or request; absent or failed attachment rolls back and leaves provider-v2 unavailable. Clear, drop, replacement, and controller loss revoke the attachment and every session. The provider runtime ownership concern retains ProviderRuntimeStreamService as its sole canonical owner, proves exactly one production ProviderRuntimeStreamService::new() site, replaces the controller's public service and activation-grant getters with the opaque attachment boundary, and classifies the private executor only as a weak lifecycle consumer with no second table or authority. The headless CLI remains conformance_in_process with no attachment and no provider-v2 admission; comfy-parity-provider-deployment-lifecycle must later consume the same controller attachment rather than constructing another service. This bootstrap creates no invocation envelope, transport route, guest, input, network, secret, cost, receipt, materialization, or output authority.",
+        ["comfy_runtime", "comfy_plugin_host", "comfy_ui", "zed"],
+        validation_packages=["comfy_runtime", "comfy_plugin_host", "comfy_ui", "zed"],
     )
     append_shared(
         "comfy-parity-provider-worker-stream-bridge",
@@ -10802,20 +11094,29 @@ def provider_component_foundation_tasks(
             "crates/comfy_worker/src/supervisor.rs",
             "crates/comfy_types/src/worker_protocol.rs",
             "crates/comfy_plugin_host/src/component_host.rs",
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
             "crates/comfy_plugin_host/src/private_worker.rs",
             "crates/comfy_runtime/src/plugin_services.rs",
+            "crates/comfy_runtime/src/provider_materialization.rs",
+            "crates/comfy_runtime/src/trust.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_ui/src/execution_model.rs",
+            "crates/zed/src/comfy_plugin_services.rs",
+            "crates/zed/src/zed.rs",
+            "crates/zed/src/comfy_cli.rs",
         ],
         [
             "crates/comfy_worker/src/plugin_runtime.rs",
             "crates/comfy_worker/src/comfy_worker.rs",
             "crates/comfy_worker/src/supervisor.rs",
             "crates/comfy_worker/tests/ipc_framing.rs",
+            "crates/comfy_plugin_host/src/component_host.rs",
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
             "crates/comfy_plugin_host/src/private_worker.rs",
             "crates/comfy_runtime/src/runtime_supervisor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
         ],
-        "The native controller mints and registers the one-use runtime activation grant only from the current active deployment and full sealed generation identity; the component host then claims and binds that opaque grant before the first provider-v8 request is routed. No public raw-field constructor or component-supplied authority exists. IPC tests prove the first valid-grant end-to-end success path, interleaved bounded sessions, strict sequence and generation checks, backpressure, cancellation between chunks, late progress rejection, worker crash/restart cleanup, and clean retry without duplicated request, receipt, output, or effect.",
+        "The bridge consumes only the current live controller attachment and never constructs a ProviderRuntimeStreamService. The app-side native controller allocates the WorkerProviderInvocationContext, mints and registers the one-use runtime activation grant only from the current active deployment and full sealed generation identity, and passes that exact context into the consuming component-host preflight before serializing or starting a provider-v2 guest. Only the successful private capsule retains the certified context, grant, plugin, generation, node, lease, and authorization. The bridge then sends that certified context in a distinct app-to-worker provider-v2 invocation envelope; legacy worker-to-app NativeProviderWorkerRequest::Begin bytes remain unchanged and never establish authority. The worker constructs the canonical transport validator only from that envelope and routes capacity-one typed requests back to the exact app-side capsule and ProviderRuntimeStreamService. Task421's ProviderV2InvocationProposal remains armed after a completed terminal frame. The bridge retains that exact proposal and the exact main stream handle returned by Start while its app-side ProviderRuntimeStreamService finishes that handle, verifies the resulting ProviderRuntimeReceiptV2 against the exact session-derived identity, and completes canonical all-or-none materialization; only a consuming private transition after all three checks may compare the exact proposal context, handle, receipt identity, and materialization identity and mark the proposal successfully finalized without revocation. ProviderRuntimeReceiptV2 alone never disarms because it does not carry WorkerProviderInvocationContext. An unrelated valid receipt, context/session/handle mismatch, dropped proposal, failed receipt verification, failed materialization, cancellation, worker loss, or any abnormal terminal path revokes and cannot publish. No public raw-field constructor, completion token, no-argument disarm, raw receipt escape hatch, second context selector, component-supplied authority, generic transport closure, network client, secret resolver, provider actuator, purchase, or charge path exists. IPC tests prove the desktop hermetic first valid-grant end-to-end success path while headless remains denied until comfy-parity-provider-deployment-lifecycle attaches the same controller capability; preflight precedes envelope serialization, worker instantiation, WIT context, input exposure, and the first provider-v8 request; exact proposal/context/handle/receipt/materialization binding precedes non-revoking finalization; unrelated-receipt and proposal-drop revocation, interleaved bounded sessions, strict sequence and generation checks, backpressure, cancellation between chunks, terminal revocation, late progress rejection, worker crash/restart cleanup, and clean retry cannot duplicate a request, receipt, output, or effect.",
         ["comfy_plugin_host", "comfy_worker", "comfy_runtime"],
     )
     append_shared(
@@ -10823,6 +11124,10 @@ def provider_component_foundation_tasks(
         "Deploy identical provider registries in desktop and headless modes",
         "Install and replace signed provider component snapshots through one deployment lifecycle shared by desktop and headless execution. Offline, disabled, missing, stale, and rejected deployments retain provider-required descriptors and expose deterministic diagnostics without fallback.",
         [
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/plugin_services.rs",
+            "crates/comfy_plugin_host/src/private_worker.rs",
+            "crates/comfy_plugin_host/src/component_host.rs",
             "crates/zed/src/comfy_plugin_services.rs",
             "crates/zed/src/comfy_cli.rs",
             "crates/comfy_api/src/headless.rs",
@@ -10835,7 +11140,7 @@ def provider_component_foundation_tasks(
             "crates/comfy_api/src/headless.rs",
             "crates/comfy_api/src/comfy_api.rs",
         ],
-        "Desktop and headless hosts admit the same signed snapshot and namespace generations, replace a namespace atomically, invalidate stale sessions/cache identities, and surface identical offline or rejected-deployment diagnostics. Neither mode invents a provider, signer, secret, cost acceptance, or network fallback.",
+        "Desktop and headless hosts admit the same signed snapshot and namespace generations, replace a namespace atomically, invalidate stale sessions/cache identities, and surface identical offline or rejected-deployment diagnostics. Before provider-v2 admission, headless consumes the same lifecycle-bound NativeExecutionController attachment established for desktop and never constructs a second ProviderRuntimeStreamService or grant table. Neither mode invents a provider, signer, secret, cost acceptance, or network fallback.",
         ["zed", "comfy_api"],
     )
     append_shared(
@@ -13813,8 +14118,40 @@ def native_video_component_h264_mp4_10bit_backing_foundation_task(
     )
 
 
+def native_backend_dependency_ledger_current_lock_repair_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-backend-dependency-ledger-current-lock-repair",
+        "Refresh the native backend dependency ledger lock identity",
+        [18, 31, 41, 44],
+        [11, 25, 31, 41],
+        ["VAL-FOUNDATION-001", "VAL-NATIVE-BOUNDARY-001", "VAL-OWNERSHIP-001"],
+        "Refresh the canonical native-backend dependency ledger after serialized upstream workspace dependency changes without changing any Comfy adapter dependency, feature, source, target, or availability claim.",
+        [
+            "Cargo.lock",
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
+            "crates/comfy_test_support/tests/native_foundation.rs",
+        ],
+        [
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/tasks.md",
+        ],
+        "The ledger's full Cargo.lock SHA-256 equals the checked-in lockfile after the latest serialized upstream workspace dependency update. The canonical validator authorizes only the exact manifest and lockfile Write sets of the completed provider worker-stream protocol, the Zed and collaboration all-target baseline correction's collab_ui manifest, and the serial visual decode then image-output codec integration leaves, while rejecting every unscoped later dependency writer. Every canonical Comfy backend adapter package, version, source, target, feature, rationale, and typed-unavailable disposition remains unchanged, no Cargo manifest or lockfile is written by this repair, and the exact native-foundation dependency and packaged native-boundary tests pass with locked resolution.",
+        dependency,
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["18.1", "31.5", "41.2", "44.3"],
+    )
+
+
 def native_video_execution_precursor_tasks(
     dependency: str,
+    catalog_dependency: str,
 ) -> list[dict[str, object]]:
     tasks: list[dict[str, object]] = []
 
@@ -13828,7 +14165,11 @@ def native_video_execution_precursor_tasks(
         criterion_ids: list[str],
         registered_source_edits: list[str],
     ) -> None:
-        previous = dependency if not tasks else str(tasks[-1]["id"])
+        dependencies = (
+            [dependency, catalog_dependency]
+            if not tasks
+            else [str(tasks[-1]["id"])]
+        )
         tasks.append(
             task(
                 identifier,
@@ -13848,7 +14189,7 @@ def native_video_execution_precursor_tasks(
                 reads,
                 writes,
                 done,
-                [previous],
+                dependencies,
                 locked=True,
                 criterion_ids=criterion_ids,
                 registered_source_edits=registered_source_edits,
@@ -13889,34 +14230,76 @@ def native_video_execution_precursor_tasks(
         "Bootstrap the signed native video codec package",
         "Add one explicit runtime-profile codec package authority, independently of compute backend selection, and use it to verify the canonical signed FFmpeg package and dependency closure before starting the sole thread-affine codec actor inside the worker. Inject the existing LTXV, WebM, and H.264 service ports through the normal executor configuration and bind the package identity into cache configuration without a downloader or private signing key.",
         [
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-general-video-v1.json",
+            "crates/comfy_runtime/src/native_ffi_elf.rs",
             "crates/comfy_runtime/src/native_video_codec_ffi.rs",
             "crates/comfy_runtime/src/native_video_codec_service.rs",
             "crates/comfy_runtime/src/settings.rs",
             "crates/comfy_runtime/src/runtime_supervisor.rs",
             "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_model/src/artifact_index.rs",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
             "crates/comfy_worker/src/comfy_worker_main.rs",
             "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_worker/src/memory_modes.rs",
+            "crates/comfy_worker/src/memory_planner.rs",
+            "crates/comfy_worker/src/supervisor.rs",
+            ".agents/specs/comfy-parity/generate_ownership_catalog.py",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            "crates/comfy_test_support/tests/native_release_boundary.rs",
+            "crates/comfy_test_support/fixtures/video/codec-general-video-abi/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-callable-symbol-certification/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-suite-admission/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-webm-node-service/manifest.json",
+            "crates/comfy_test_support/fixtures/video/component-h264-mp4-backing-service/manifest.json",
         ],
         [
             "crates/comfy_runtime/src/native_video_codec_package.rs",
+            "crates/comfy_runtime/src/native_ffi_elf.rs",
             "crates/comfy_runtime/src/native_video_codec_ffi.rs",
             "crates/comfy_runtime/src/native_video_codec_service.rs",
             "crates/comfy_runtime/src/settings.rs",
             "crates/comfy_runtime/src/runtime_supervisor.rs",
             "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_model/src/artifact_index.rs",
             "crates/settings_content/src/settings_content.rs",
             "crates/comfy_worker/src/comfy_worker_main.rs",
             "crates/comfy_worker/src/comfy_worker.rs",
-            "crates/comfy_test_support/fixtures/video/codec-package-bootstrap/manifest.json",
+            "crates/comfy_worker/src/memory_modes.rs",
+            "crates/comfy_test_support/src/bin/generate_video_codec_package_bootstrap_fixture.rs",
+            "crates/comfy_test_support/tests/video_codec_package_bootstrap.rs",
+            "crates/comfy_test_support/tests/native_release_boundary.rs",
+            "crates/comfy_test_support/fixtures/video/codec-package-bootstrap",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
             ".agents/specs/comfy-parity/regenerate_native_planning.py",
             ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ],
-        "CPU and accelerator worker launches carry the same independent codec authority. Valid signed Linux packages reach the retained actor from production startup; missing, tampered, symlinked, incomplete, wrong-target, unlicensed, or signer-mismatched packages fail before executor construction. Shutdown releases thread-affine state on its owner thread, service identity changes invalidate cache configuration, and fixture keys never become production trust roots.",
-        ["18.1", "28.6", "31.5", "37.5", "41.3", "41.5", "44.3"],
-        ["comfy_runtime", "comfy_worker", "comfy_test_support"],
+        "CPU and every accelerator worker launch project the same optional, backend-independent general-video package authority (ArtifactRoot path, signer id, and public verification key); partial configuration, private signing material, the reserved fixture signer, and the reserved fixture public-key fingerprint are each rejected independently by production settings and worker CLI parsing. Fixture construction and injection are available only through a cfg(test or test-support) boundary that settings and CLI production code cannot call. The canonical ArtifactRoot owner adds one cancellable bounded private-file capture that opens through the capability parent, rejects symlink or non-regular leaves, checks identity and length before and after fixed-size chunked reads, hashes the captured bytes, and exposes no raw path or file handle. General package admission captures only signed coverage and receipt first, derives the exact bounded dynamic path and size set, requires recursive enumeration equality, then captures bounded metadata and each native image one at a time; it never buffers the whole package, hands a raw host path to trust, or bypasses cancellation. Before publication it re-enumerates the tree, recaptures the initially excluded coverage and receipt byte-for-byte, re-verifies their signature, and revalidates every covered metadata and image against its signed size and digest; coverage-only or receipt-only mutation discards every unpublished seal and port. The canonical trust owner makes the shared native-package admission path available to ordinary production and verifies separate domain-separated general-video package and dependency profiles whose signed canonical manifest, coverage, license/notice/source-build dispositions, x86_64-unknown-linux-gnu target, six-library/78-symbol catalog, callable symbol versions/providers, and complete dependency graph all agree. General-package ELF admission delegates machine, PT_DYNAMIC, SONAME, export, DT_NEEDED, RPATH, and RUNPATH inspection exclusively to comfy_runtime::native_ffi_elf::inspect_elf64_dynamic_contract; native_video_codec_package and trust define no second ELF parser. Parallel general package, inspected-image, certified-closure, load, symbol, and binding types cannot be coerced into the frozen historical five-library/54-symbol profile. NativeFfiRegistry certifies the exact general closure before one shared unsafe loader projection binds all six libraries and 78 symbols, invokes and checks all six version functions including avfilter_version against the exact FFmpeg 7.1 releases, and retains the 24 supplemental pointers privately for Task563. General admission cannot downgrade to the historical bind path, the historical path cannot acquire supplemental authority, and the frozen LTXV, WebM, and H.264 port interfaces can reach only their historical symbol subset. The sole retained codec actor consumes the one non-cloneable certified inspected closure, and all four worker NativeImageExecutor constructor branches attach clones of the existing LTXV, WebM, and H.264 ports issued by that same actor. One opaque non-cloneable worker service bundle owns the actor and all three ports, publishes them only after readiness, and retains the bundle for the worker lifetime. CPU launch reuses the existing CPU backend; configured accelerator launch may retain a separately bounded codec-only CPU backend but claims no accelerator tensor or service execution before the later accelerator owner. Package capture and retained actor residency have a checked startup ceiling; every CPU native attempt injects the exact retained codec bytes into the canonical MemoryPlanRequest::codec_bytes reservation before dispatch so MemoryReservationKind::Codec and safety-margin accounting remain intact, while accelerator profiles retain a separately bounded codec-only CPU or host budget without publishing an executable service path before the later accelerator owner. No package-local planner, allocator, retry policy, or BackendMemorySnapshot baseline inflation is introduced. The historical five-library/54-symbol catalog, v1 signing domains, public identities, fixtures, and manifest hashes remain byte-exact; ReviewedGeneralVideoCodecDeclarations alone remains UncertifiedFfi. Missing, extra, tampered, racy, symlinked, non-regular, oversized, cancelled, incomplete, wrong-machine, wrong-target, RPATH/RUNPATH-bearing, unlicensed, signer-mismatched, or dependency-invalid packages fail atomically before dlopen, actor, port, service, or executor publication. Shutdown or restart revokes ports, drains the capacity-one actor, and drops loaded thread-affine state on its owner thread. Cache configuration binds the verified semantic package, six-library runtime versions, catalog, dependency, license, source/build, runtime-limit, signer, signature-domain, and public-key identities rather than filesystem path, so semantic or trust-root changes invalidate cache while an identical relocated package does not. A deterministic test-only generator emits the signed canonical metadata and synthetic x86_64 ELF fixtures without a host compiler, subprocess, download, credential, or production private key; non-Linux or non-x86_64 verification remains cross-platform while actual load and actor success fail typed as unsupported before dlopen.",
+        ["28.6", "31.5", "41.4", "41.5", "44.3"],
+        ["comfy_model", "comfy_runtime", "comfy_worker", "comfy_test_support"],
+    )
+    tasks[-1]["done"] = (
+        str(tasks[-1]["done"])
+        + " The canonical native_ffi_elf owner rejects a non-current ELF64 e_version or a non-64 e_ehsize before dynamic inspection, and the signed synthetic package fixtures encode both canonical header fields."
     )
     append(
         "comfy-parity-native-video-demux-decode-foundation",
@@ -17763,8 +18146,18 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(node_schema_foundation["id"])
         )
     )
+    v3_presentation_catalog_closure = (
+        native_node_v3_presentation_catalog_closure_task(
+            str(inherited_v3_presentation_catalog_correction["id"])
+        )
+    )
+    native_backend_dependency_ledger_lock_repair = (
+        native_backend_dependency_ledger_current_lock_repair_task(
+            "comfy-parity-provider-runtime-component-activation-preflight-foundation"
+        )
+    )
     node_compute_foundation = native_node_compute_value_foundation_task(
-        str(inherited_v3_presentation_catalog_correction["id"]), compute_integration
+        str(v3_presentation_catalog_closure["id"]), compute_integration
     )
     latent_bundle_foundation = native_latent_bundle_foundation_task(
         str(node_compute_foundation["id"])
@@ -18248,7 +18641,14 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         )
     )
     video_execution_precursors = native_video_execution_precursor_tasks(
-        str(video_component_h264_mp4_10bit_backing_foundation["id"])
+        str(video_component_h264_mp4_10bit_backing_foundation["id"]),
+        str(v3_presentation_catalog_closure["id"]),
+    )
+    video_execution_precursors[0]["dependencies"] = list(
+        dict.fromkeys(
+            list(video_execution_precursors[0]["dependencies"])
+            + [str(native_backend_dependency_ledger_lock_repair["id"])]
+        )
     )
     video_foundation = native_video_execution_foundation_task(
         str(video_execution_precursors[-1]["id"])
@@ -18383,6 +18783,8 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             node_runtime_foundation,
             node_schema_foundation,
             inherited_v3_presentation_catalog_correction,
+            v3_presentation_catalog_closure,
+            native_backend_dependency_ledger_lock_repair,
             node_compute_foundation,
             latent_bundle_foundation,
             node_asset_effect_foundation,
@@ -20947,6 +21349,45 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
             "git diff --check",
         ])
+    if identifier == "comfy-parity-native-depth-anything-3-resource-foundation":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "PYTHONDONTWRITEBYTECODE=1 python3 crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/generate_oracle.py --check",
+            "cargo test --locked -p comfy_model depth_anything_3 -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_node_family_e2e depth_anything_3 -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-dinov2-backbone-owner-foundation":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "PYTHONDONTWRITEBYTECODE=1 python3 crates/comfy_test_support/fixtures/models/dinov2-backbone-owner-foundation/generate_oracle.py --check",
+            "PYTHONDONTWRITEBYTECODE=1 python3 crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/generate_oracle.py --check",
+            "cargo test --locked -p comfy_model dino2 -- --nocapture",
+            "cargo test --locked -p comfy_model depth_anything_3 -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_node_family_e2e depth_anything_3 -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-moge-resource-foundation":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "PYTHONDONTWRITEBYTECODE=1 python3 crates/comfy_test_support/fixtures/models/moge-resource-foundation/generate_oracle.py --check",
+            "cargo test --locked -p comfy_model moge -- --nocapture",
+            "cargo test --locked -p comfy_model dino2 -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_node_family_e2e moge -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
     if identifier == "comfy-parity-native-video-codec-general-abi-foundation":
         commands.extend([
             "cargo fmt --all -- --check",
@@ -20954,6 +21395,74 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task555_general_video_codec_declarations_001 -- --exact --nocapture",
             "cargo check --locked -p comfy_runtime -p comfy_test_support",
             "./script/clippy -p comfy_runtime -p comfy_test_support",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-video-codec-package-bootstrap-foundation":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo run --locked -p comfy_test_support --bin generate_video_codec_package_bootstrap_fixture -- --check",
+            "cargo test --locked -p comfy_model artifact_root_cancellable_private_capture -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_ffi_elf::tests::elf_inspection_rejects_invalid_elf64_header_contract --lib -- --exact --nocapture",
+            "cargo test --locked -p comfy_runtime general_video_codec_package_bootstrap --lib -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test video_codec_package_bootstrap -- --nocapture",
+            "cargo test --locked -p comfy_worker video_codec_package_bootstrap -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task562_video_codec_package_bootstrap_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-backend-dependency-ledger-current-lock-repair":
+        commands.extend([
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/validate_backend_dependencies.py",
+            "cargo metadata --locked --format-version 1",
+            "cargo test --locked -p comfy_test_support --test native_foundation -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_release_boundary val_native_boundary_001_packaged_release -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-provider-component-host-stream-adapter":
+        commands.extend([
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_domain_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-provider-controller-owned-worker-bridge-bootstrap":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p comfy_runtime native_provider_worker_bridge_attachment -- --nocapture",
+            "cargo test --locked -p comfy_plugin_host private_worker_provider_bridge_attachment -- --nocapture",
+            "cargo test --locked -p comfy_ui --features test-support native_provider_worker_bridge_registration -- --nocapture",
+            "cargo test --locked -p zed --features test-support provider_worker_bridge_bootstrap -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task412_provider_runtime_stream_progress_001 -- --exact --nocapture",
+            "cargo check --locked -p comfy_runtime -p comfy_plugin_host -p comfy_ui -p zed",
+            "cargo test --locked -p comfy_runtime -p comfy_plugin_host -p comfy_ui -p zed --all-targets",
+            "./script/clippy -p comfy_runtime -p comfy_plugin_host -p comfy_ui -p zed",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-zed-all-target-baseline-assertion-correction":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo tree --locked -p collab_ui -e features -i remote_connection",
+            "cargo metadata --locked --format-version 1",
+            "cargo check --locked -p remote_connection --no-default-features",
+            "cargo check --locked -p recent_projects --features test-support --all-targets",
+            "cargo check --locked -p collab_ui --all-targets",
+            "cargo test --locked -p collab_ui --features test-support --all-targets",
+            "cargo test --locked -p zed --features test-support test_parse_git_clone_url_with_encoding -- --nocapture",
+            "cargo test --locked -p zed --features test-support test_action_namespaces -- --nocapture",
+            "cargo test --locked -p zed --features test-support --all-targets",
+            "./script/clippy -p comfy_runtime -p comfy_plugin_host -p comfy_ui -p zed -p collab_ui",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
@@ -20987,6 +21496,20 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+        ])
+    if identifier == "comfy-parity-native-node-v3-presentation-catalog-closure":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p comfy_nodes val_node_001 -- --nocapture",
+            "cargo test --locked -p comfy_nodes val_node_registry_001 -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_execution_controller::tests::generated_registry_is_comprehensive_and_preserves_union_frontend_types --lib -- --exact --nocapture",
+            "cargo test --locked -p comfy_plugin_host --test component_contract provider_fixture_contract_matches_the_generated_paid_descriptor -- --exact --nocapture",
+            "cargo test --locked -p comfy_plugin_host --test component_contract provider_component_activation_publishes_one_exact_registry_bundle_and_rolls_back_rejection -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
         ])
     if identifier == "comfy-parity-native-node-compute-value-foundation":
         commands.extend([
@@ -21765,6 +22288,17 @@ def task_validation_commands(item: dict[str, object]) -> str:
     return "; ".join(commands)
 
 
+def dependency_ledger_revalidation_marker() -> str:
+    lock_sha256 = hashlib.sha256((REPOSITORY_ROOT / "Cargo.lock").read_bytes()).hexdigest()
+    validator_sha256 = hashlib.sha256(
+        (ROOT / "validate_backend_dependencies.py").read_bytes()
+    ).hexdigest()
+    return (
+        "POST-CURRENT-LOCK-ALLOWLIST-REVALIDATION "
+        f"lock={lock_sha256} validator={validator_sha256}"
+    )
+
+
 def existing_task_annotations() -> dict[str, dict[str, str | bool]]:
     path = ROOT / "tasks.md"
     if not path.is_file():
@@ -21827,6 +22361,25 @@ def existing_task_annotations() -> dict[str, dict[str, str | bool]]:
                     "  - _validation_evidence: "
                     + stale_marker
                     + "; the canonical `_io.py` type identities, nested MultiType/autogrow projection, and checked node-contract catalog changed after the prior evidence and require fresh catalog, descriptor, workflow, API, and registry validation. ",
+                    1,
+                )
+            annotations[identifier_match.group(1)] = {
+                "complete": False,
+                "evidence": evidence,
+            }
+            continue
+        if (
+            identifier_match.group(1)
+            == "comfy-parity-native-backend-dependency-ledger-current-lock-repair"
+            and dependency_ledger_revalidation_marker() not in evidence
+        ):
+            stale_marker = "STALE AFTER CURRENT LOCK AND ALLOWLIST AUDIT"
+            if evidence and stale_marker not in evidence:
+                evidence = evidence.replace(
+                    "  - _validation_evidence: ",
+                    "  - _validation_evidence: "
+                    + stale_marker
+                    + "; the Cargo.lock identity and exact serialized later-task dependency-write allowlist require fresh canonical validation. ",
                     1,
                 )
             annotations[identifier_match.group(1)] = {

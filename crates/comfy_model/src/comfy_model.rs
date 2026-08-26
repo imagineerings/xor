@@ -2,6 +2,7 @@ pub mod alias_free_activation;
 pub mod artifact_index;
 pub mod attention;
 pub mod audio_encoder;
+pub mod background_removal;
 pub mod clip;
 pub mod clip_text;
 pub mod clip_text_encoder_composite;
@@ -15,7 +16,9 @@ pub mod cogvideox_family;
 pub mod conditioning;
 pub mod controlnet;
 pub mod cosmos_family;
+pub mod depth_anything_3;
 pub mod descriptor;
+mod dino2;
 pub mod flux_chroma_family;
 pub mod formats;
 pub mod frame_interpolation;
@@ -80,6 +83,17 @@ pub use audio_encoder::{
     NativeAudioEncoderCheckpoint, NativeAudioEncoderDiagnostic, NormalizedAudioEncoderCheckpoint,
     WAV2VEC2_SOURCE_PATH, WAV2VEC2_SOURCE_SHA256, WHISPER_SOURCE_PATH, WHISPER_SOURCE_SHA256,
     normalize_and_select_architecture, normalize_and_select_profile,
+};
+pub use background_removal::{
+    BACKGROUND_REMOVAL_MODEL_SOURCE_SHA256, BIREFNET_CONFIG_SOURCE_SHA256, BIREFNET_MARKER,
+    BIREFNET_SOURCE_SHA256, CLIP_MODEL_SOURCE_SHA256, COMFY_OPS_SOURCE_SHA256,
+    MODEL_MANAGEMENT_SOURCE_SHA256, NODES_BACKGROUND_REMOVAL_SOURCE_SHA256,
+    NativeBackgroundRemovalCheckpoint, NativeBackgroundRemovalError,
+    NativeBackgroundRemovalResource,
+};
+#[cfg(any(test, feature = "test-support"))]
+pub use background_removal::{
+    BackgroundRemovalFixtureMutation, deterministic_reduced_test_checkpoint,
 };
 pub use clip_text::{
     CLIP_TEXT_CATALOG_SYMBOLS, CLIP_TEXT_SOURCE_PATH, CLIP_TEXT_SOURCE_SHA256, ClipTextActivation,
@@ -215,6 +229,25 @@ pub use cosmos_family::{
     COSMOS_PREDICT2_STATE_PLAN_CASES, COSMOS_SUPPORTED_DEVICES, COSMOS_SUPPORTED_DTYPES,
     COSMOS_WEIGHT_RULES, CosmosArchitecture, CosmosConfiguration, CosmosModelSize, CosmosRatio,
     configuration_for_probe as cosmos_configuration_for_probe,
+};
+pub use depth_anything_3::{
+    DEPTH_ANYTHING_3_CAMERA_SOURCE_SHA256, DEPTH_ANYTHING_3_DINO2_SOURCE_SHA256,
+    DEPTH_ANYTHING_3_DPT_SOURCE_SHA256, DEPTH_ANYTHING_3_MODEL_DETECTION_SOURCE_SHA256,
+    DEPTH_ANYTHING_3_MODEL_SOURCE_SHA256, DEPTH_ANYTHING_3_PREPROCESS_SOURCE_SHA256,
+    DEPTH_ANYTHING_3_RAY_POSE_SOURCE_SHA256, DEPTH_ANYTHING_3_REFERENCE_VIEW_SOURCE_SHA256,
+    DEPTH_ANYTHING_3_TRANSFORM_SOURCE_SHA256, NODES_DEPTH_ANYTHING_3_SOURCE_SHA256,
+    NativeDepthAnything3Checkpoint, NativeDepthAnything3Error, NativeDepthAnything3Geometry,
+    NativeDepthAnything3Invocation, NativeDepthAnything3ReferenceStrategy,
+    NativeDepthAnything3ResizeMethod, NativeDepthAnything3Resource,
+};
+#[cfg(any(test, feature = "test-support"))]
+pub use depth_anything_3::{
+    DepthAnything3FixtureCheckpointParity, DepthAnything3FixtureMutation,
+    DepthAnything3FixtureProfile, DepthAnything3FixtureStateParity,
+    NativeDepthAnything3RansacViewTrace, NativeDepthAnything3TestTrace,
+    deterministic_reduced_depth_anything_3_checkpoint, mutate_reduced_depth_anything_3_checkpoint,
+    reduced_depth_anything_3_checkpoint_parity_for_fixture,
+    select_reduced_depth_anything_3_reference_for_fixture,
 };
 pub use descriptor::{
     CatalogModelDescriptor, MODEL_DESCRIPTOR_SCHEMA_VERSION, MemoryEstimatorDescriptor,

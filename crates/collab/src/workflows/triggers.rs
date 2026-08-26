@@ -24,9 +24,10 @@ use uuid::Uuid;
 
 use super::repository::{
     StoredWorkflowDefinition, WorkflowIdentity, WorkflowLifecycle, WorkflowProvenance,
-    WorkflowRepository, WorkflowRepositoryError, WorkflowRunIdentity, WorkflowRunRequest,
-    WorkflowStoreOutcome, WorkflowTriggerKind,
+    WorkflowRepositoryError, WorkflowRunIdentity, WorkflowRunRequest, WorkflowStoreOutcome,
+    WorkflowTriggerKind,
 };
+use super::scheduler::{WorkflowQueueAdmission, WorkflowScheduler};
 
 pub const EVENT_TRIGGER_SCOPE: &str = "messages:write";
 pub const WORKFLOW_RUN_SCOPE: &str = "workflows:run";
@@ -311,13 +312,16 @@ pub trait WorkflowRunClaimer: Send + Sync {
 }
 
 #[async_trait]
-impl WorkflowRunClaimer for WorkflowRepository {
+impl WorkflowRunClaimer for WorkflowScheduler {
     async fn claim_run(
         &self,
         tenant: &TenantContext,
         request: &WorkflowRunRequest,
     ) -> Result<WorkflowStoreOutcome, WorkflowRepositoryError> {
-        WorkflowRepository::claim_run(self, tenant, request).await
+        match self.queue_run(tenant, request).await? {
+            WorkflowQueueAdmission::Queued => Ok(WorkflowStoreOutcome::Applied),
+            WorkflowQueueAdmission::Duplicate => Ok(WorkflowStoreOutcome::Duplicate),
+        }
     }
 }
 

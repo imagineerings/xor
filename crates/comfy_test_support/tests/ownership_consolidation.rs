@@ -5,6 +5,7 @@ use comfy_plugin_host::AssetPluginCapabilityServices;
 use comfy_plugin_sdk::{CapabilityKind, CapabilityQuota, CapabilityRequest};
 use comfy_runtime::{
     AssetIdentity, AssetNamespace, AssetOperation, Capability, ExternalNavigationPolicy,
+    NativeProviderWorkerBridgeAttachment, PreflightedProviderRuntimeActivationGrant,
     ProviderManifestAuthorizationV2, ProviderRuntimeActivationGrant,
     ProviderRuntimeActivationGrantSource, ProviderRuntimeActuationProposal,
     ProviderRuntimeAuthorityInput, ProviderRuntimeProgressProjection,
@@ -331,6 +332,278 @@ fn parse_csv_records(csv: &str) -> Result<Vec<Vec<String>>, String> {
         records.push(record);
     }
     Ok(records)
+}
+
+#[test]
+fn task390_depth_anything_tensor_oracle_is_only_a_development_reference()
+-> Result<(), Box<dyn std::error::Error>> {
+    const ORACLE_PATH: &str = "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/source_graph.py";
+    const CONCERNS: [&str; 3] = [
+        "tensor_logical_identity",
+        "tensor_mutation_lineage",
+        "tensor_storage_descriptors_and_views",
+    ];
+
+    let root = repository_root()?;
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let policy_concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("ownership policy has no concerns")?;
+    for concern_name in CONCERNS {
+        let concern = policy_concerns
+            .iter()
+            .find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str) == Some(concern_name)
+            })
+            .ok_or_else(|| format!("ownership policy has no {concern_name} concern"))?;
+        let matching_definitions = concern
+            .get("definitions")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| format!("{concern_name} has no definitions"))?
+            .iter()
+            .filter(|definition| {
+                definition.get("path").and_then(serde_json::Value::as_str) == Some(ORACLE_PATH)
+                    && definition.get("symbol").and_then(serde_json::Value::as_str)
+                        == Some("Tensor")
+                    && definition.get("role").and_then(serde_json::Value::as_str)
+                        == Some("development_reference")
+            })
+            .count();
+        assert_eq!(
+            matching_definitions, 1,
+            "{concern_name} oracle role drifted"
+        );
+        assert!(
+            concern
+                .get("allowed_adapters")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|adapters| adapters.iter().any(|adapter| {
+                    adapter.as_str().is_some_and(|adapter| {
+                        adapter.contains("pure-standard-library reduced Depth Anything 3")
+                            && adapter.contains(
+                                "owns no Rust Tensor identity, storage, or mutation authority",
+                            )
+                    })
+                })),
+            "{concern_name} lacks the test-oracle authority boundary"
+        );
+    }
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let mut records = parse_csv_records(&catalog)?.into_iter();
+    let header = records.next().ok_or("ownership catalog has no header")?;
+    let column = |name: &str| {
+        header
+            .iter()
+            .position(|candidate| candidate == name)
+            .ok_or_else(|| format!("ownership catalog has no {name} column"))
+    };
+    let concern_column = column("concern")?;
+    let status_column = column("current_status")?;
+    let competing_column = column("competing_symbols")?;
+    let definitions_column = column("definition_hits")?;
+    let consumers_column = column("production_consumers")?;
+    let calls_column = column("production_call_sites")?;
+    let rows = records
+        .map(|row| (row[concern_column].clone(), row))
+        .collect::<BTreeMap<_, _>>();
+    for concern_name in CONCERNS {
+        let row = rows
+            .get(concern_name)
+            .ok_or_else(|| format!("ownership catalog has no {concern_name} row"))?;
+        assert_eq!(row[status_column], "authoritative_owner_confirmed");
+        assert!(row[competing_column].is_empty());
+        assert!(row[definitions_column].contains(&format!("development_reference@{ORACLE_PATH}:")));
+        assert!(!row[consumers_column].contains(ORACLE_PATH));
+        assert!(!row[calls_column].contains(ORACLE_PATH));
+    }
+    Ok(())
+}
+
+#[test]
+fn task391_dinov2_has_one_crate_private_backbone_owner() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let crate_root = fs::read_to_string(root.join("crates/comfy_model/src/comfy_model.rs"))?;
+    let owner = fs::read_to_string(root.join("crates/comfy_model/src/dino2.rs"))?;
+    let da3 = fs::read_to_string(root.join("crates/comfy_model/src/depth_anything_3.rs"))?;
+    let moge = fs::read_to_string(root.join("projects/comfy/ComfyUI/comfy/ldm/moge/model.py"))?;
+    assert!(crate_root.lines().any(|line| line == "mod dino2;"));
+    assert!(!crate_root.contains("pub mod dino2;"));
+    assert_eq!(owner.matches("struct NativeDino2Backbone").count(), 1);
+    for required in [
+        "state_manifest",
+        "project_state_tensor",
+        "interpolated_position_embeddings",
+        "transformer_block",
+        "get_intermediate_layers(",
+        "get_intermediate_layers_da3(",
+        "forward(",
+        "apply_da3_rotary",
+        "select_reference_indices",
+    ] {
+        assert!(owner.contains(required), "DINOv2 owner lacks {required}");
+    }
+    for forbidden in [
+        "fn interpolated_position_embeddings(",
+        "fn transformer_block(",
+        "fn apply_da3_rotary(",
+        "fn select_reference_indices(",
+    ] {
+        assert!(
+            !da3.contains(forbidden),
+            "DA3 retains DINO equation {forbidden}"
+        );
+    }
+    assert!(da3.contains("backbone.project_state_tensor"));
+    assert!(da3.contains("get_intermediate_layers_da3"));
+    assert!(!moge.contains("NativeDino2Backbone"));
+    assert!(moge.contains("\"mask_token\":              \"embeddings.mask_token\""));
+    assert!(owner.contains("use_mask_token"));
+    assert!(owner.contains("embeddings.mask_token"));
+
+    let fixture =
+        root.join("crates/comfy_test_support/fixtures/models/dinov2-backbone-owner-foundation");
+    let oracle: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(fixture.join("oracle.json"))?)?;
+    let manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(fixture.join("manifest.json"))?)?;
+    let provenance: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(fixture.join("provenance.json"))?)?;
+    assert_eq!(
+        oracle.get("format").and_then(serde_json::Value::as_str),
+        Some("dinov2-backbone-owner-foundation-v1")
+    );
+    assert!(oracle.get("ordinary_routes").is_some());
+    let ordinary_mutations = oracle["ordinary_mutations"]
+        .as_object()
+        .ok_or("DINOv2 ordinary mutations are missing")?;
+    assert_eq!(ordinary_mutations.len(), 8);
+    assert_eq!(
+        ordinary_mutations
+            .values()
+            .filter(|mutation| mutation["changes_output"].as_bool() == Some(false))
+            .count(),
+        1
+    );
+    assert!(oracle.get("forward_unused_mask_token").is_some());
+    assert_eq!(
+        oracle["ordinary_mutations"]["forward_unused_mask_token"]["changes_output"].as_bool(),
+        Some(false)
+    );
+    assert!(oracle.get("da3_reference_fixture").is_some());
+    assert!(oracle.get("storage_projection").is_some());
+    assert_eq!(
+        oracle
+            .get("pinned_sources")
+            .and_then(serde_json::Value::as_object)
+            .map(serde_json::Map::len),
+        Some(4)
+    );
+    let generator_sha256 = file_sha256(&fixture.join("generate_oracle.py"))?;
+    let oracle_sha256 = file_sha256(&fixture.join("oracle.json"))?;
+    let manifest_sha256 = file_sha256(&fixture.join("manifest.json"))?;
+    let source_graph_sha256 = file_sha256(
+        &root.join(
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/source_graph.py",
+        ),
+    )?;
+    let da3_oracle_sha256 = file_sha256(
+        &root.join(
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/oracle.json",
+        ),
+    )?;
+    let da3_oracle: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(
+            "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/oracle.json",
+        ),
+    )?)?;
+    for document in [&oracle, &manifest, &provenance] {
+        assert_eq!(
+            document["generator_sha256"].as_str(),
+            Some(generator_sha256.as_str())
+        );
+        assert_eq!(
+            document["source_graph_sha256"].as_str(),
+            Some(source_graph_sha256.as_str())
+        );
+        assert_eq!(
+            document["da3_oracle_sha256"].as_str(),
+            Some(da3_oracle_sha256.as_str())
+        );
+    }
+    assert_eq!(
+        manifest["oracle_sha256"].as_str(),
+        Some(oracle_sha256.as_str())
+    );
+    assert_eq!(
+        provenance["oracle_sha256"].as_str(),
+        Some(oracle_sha256.as_str())
+    );
+    assert_eq!(
+        provenance["manifest_sha256"].as_str(),
+        Some(manifest_sha256.as_str())
+    );
+    assert!(
+        provenance["cross_check"]
+            .as_str()
+            .is_some_and(|value| value.contains("alias-residency") && value.contains("lifecycle"))
+    );
+    assert_eq!(
+        oracle["da3_reference_fixture"],
+        da3_oracle["reference_fixture"]
+    );
+    assert_eq!(
+        oracle["storage_projection"],
+        da3_oracle["storage_projection"]
+    );
+    assert!(da3.contains("reduced_da3_admission_is_atomic_and_alias_aware"));
+    assert!(da3.contains("reconstruct_checkpoint"));
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy["concerns"]
+        .as_array()
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern["concern"].as_str() == Some("native_dinov2_backbone_execution")
+            })
+        })
+        .ok_or("DINOv2 ownership concern is missing")?;
+    assert_eq!(
+        concern["canonical_owner"].as_str(),
+        Some("comfy_model::dino2::NativeDino2Backbone")
+    );
+    assert_eq!(
+        concern["production_consumers"].as_array().map(Vec::len),
+        Some(1)
+    );
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let row = parse_csv_records(&catalog)?
+        .into_iter()
+        .find(|record| {
+            record
+                .first()
+                .is_some_and(|value| value == "native_dinov2_backbone_execution")
+        })
+        .ok_or("DINOv2 ownership catalog row is missing")?;
+    assert!(
+        row.iter()
+            .any(|field| field == "authoritative_owner_confirmed")
+    );
+    assert!(
+        row.iter()
+            .any(|field| field.contains("canonical@crates/comfy_model/src/dino2.rs"))
+    );
+    Ok(())
 }
 
 fn accounted_pending_ownership_rows(
@@ -5556,11 +5829,14 @@ fn run_ownership_validation(
             && model_artifact_index_production.contains("symlink_metadata(&file_name)")
             && model_artifact_index_production.contains("metadata.file_type().is_symlink()")
             && runtime_trust_production.contains("pub(crate) fn capture_native_package(")
+            && runtime_trust_production.contains("pub(crate) fn parse_native_package_coverage(")
             && runtime_trust_production.contains("pub(crate) fn validate_native_package_coverage(")
             && runtime_trust_production.contains("if observed_paths != expected_paths")
             && runtime_trust_production.contains("package tree changed while it was captured")
             && runtime_trust_production.contains("if total_bytes > maximum_total_bytes")
-            && runtime_trust_production.contains("coverage paths must be exact, strictly sorted")
+            && runtime_trust_production.contains(
+                "coverage rows must be canonical, strictly sorted, unique, and non-excluded",
+            )
             && !runtime_trust_production.contains("fs::read_dir(")
             && runtime_metal_ffi_production.contains("capture_native_package(")
             && runtime_metal_ffi_production.contains("validate_native_package_coverage(")
@@ -9258,7 +9534,15 @@ fn run_ownership_validation(
                 && runtime_plugin_services_production
                     .contains(".provider_policy\n            .authorize(")
                 && !plugin_host_production_capabilities.contains("provider_policy: ProviderPolicy")
-                && !plugin_component_host.contains("ProviderPolicy")
+                && plugin_component_host.matches("ProviderPolicy").count() == 2
+                && plugin_component_host.contains("policy: &ProviderPolicy")
+                && plugin_component_host.contains("pub(crate) fn bind_start_request(")
+                && plugin_component_host
+                    .contains(".bind(&crate::sdk_request_head(&head), policy)")
+                && !plugin_component_host.contains("provider_policy: ProviderPolicy")
+                && !plugin_component_host.contains("ProviderPolicy::new(")
+                && !plugin_component_host.contains("ProviderPolicy::default(")
+                && !plugin_component_host.contains(".authorize(")
                 && !plugin_private_worker.contains("ProviderPolicy")
                 && zed_plugin_services.contains(".uri(request.endpoint())")
                 && !zed_plugin_services.contains("validated_provider_url")
@@ -14393,7 +14677,8 @@ fn val_ownership_native_video_codec_reviewed_abi_001() -> Result<(), Box<dyn std
     }
 
     let trust = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
-    assert!(trust.contains("native_video_codec_abi::{video_codec_library_contracts"));
+    assert!(trust.contains("native_video_codec_abi::{"));
+    assert!(trust.contains("video_codec_library_contracts,"));
     assert!(!trust.contains("const VIDEO_CODEC_AVCODEC_SYMBOLS"));
 
     let verifier =
@@ -14634,6 +14919,172 @@ fn val_ownership_task555_general_video_codec_declarations_001()
             "missing general video ownership mapping {mapping}"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn val_ownership_task562_video_codec_package_bootstrap_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let package =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_package.rs"))?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    let service =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    let worker = fs::read_to_string(root.join("crates/comfy_worker/src/comfy_worker.rs"))?;
+    let worker_production = worker
+        .split("#[cfg(test)]")
+        .next()
+        .ok_or("worker production source must precede tests")?;
+    let runtime_root = fs::read_to_string(root.join("crates/comfy_runtime/src/comfy_runtime.rs"))?;
+
+    assert_eq!(
+        package
+            .matches("pub fn certify_general_video_codec_package(")
+            .count(),
+        1
+    );
+    for required in [
+        "parse_native_package_coverage(",
+        "inspect_elf64_dynamic_contract(captured.as_bytes()",
+        "capture_native_library_bytes(captured",
+        "NativeFfiRegistry::new",
+        "GENERAL_VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN",
+        "GENERAL_VIDEO_CODEC_DEPENDENCY_CONTRACT_SIGNATURE_DOMAIN",
+    ] {
+        assert!(package.contains(required), "package owner lacks {required}");
+    }
+    for forbidden in [
+        "fn parse_elf",
+        "canonical_path().join(",
+        "resolve_existing(",
+    ] {
+        assert!(
+            !package.contains(forbidden),
+            "package owner duplicates or bypasses shared authority: {forbidden}"
+        );
+    }
+
+    for private_owner in [
+        "pub(crate) struct NativeGeneralVideoCodecLoad",
+        "pub(crate) struct NativeGeneralVideoCodecBinding",
+        "pub(crate) fn load_certified_general_video_codec_closure(",
+        "pub(crate) fn bind_certified_general_video_codec_abi(",
+    ] {
+        assert!(
+            ffi.contains(private_owner),
+            "general loader lacks {private_owner}"
+        );
+    }
+    for escaped_owner in [
+        "pub fn load_certified_general_video_codec_closure(",
+        "pub fn bind_certified_general_video_codec_abi(",
+    ] {
+        assert!(
+            !ffi.contains(escaped_owner),
+            "general loader escaped: {escaped_owner}"
+        );
+    }
+    for escaped_type in [
+        "NativeGeneralVideoCodecLoad,",
+        "NativeGeneralVideoCodecBinding,",
+    ] {
+        assert!(
+            !runtime_root.contains(escaped_type),
+            "general type escaped: {escaped_type}"
+        );
+    }
+    assert!(ffi.contains("pub fn load_certified_video_codec_closure("));
+
+    let actor = service
+        .find("let actor = NativeLtxvCodecThreadService::start_general")
+        .ok_or("general worker bundle does not consume the closure into the sole actor")?;
+    assert_eq!(
+        service
+            .matches("let actor = NativeLtxvCodecThreadService::start_general")
+            .count(),
+        1
+    );
+    let webm = service[actor..]
+        .find("NativeWebmCodecRequestService::checked")
+        .map(|offset| actor + offset)
+        .ok_or("general worker bundle lacks WebM port")?;
+    let h264 = service[webm..]
+        .find("NativeComponentH264Mp4CodecRequestService::checked")
+        .map(|offset| webm + offset)
+        .ok_or("general worker bundle lacks H264 port")?;
+    let cache = service[h264..]
+        .find("worker_service_cache_configuration_identity")
+        .map(|offset| h264 + offset)
+        .ok_or("general worker bundle lacks aggregate cache identity")?;
+    assert!(actor < webm && webm < h264 && h264 < cache);
+    for port in [
+        "with_ltxv_preprocess_service",
+        "with_webm_encode_service",
+        "with_component_h264_mp4_backing_service",
+    ] {
+        assert_eq!(
+            worker_production.matches(port).count(),
+            1,
+            "worker duplicated {port}"
+        );
+    }
+    assert!(worker.contains("NativeVideoCodecWorkerServices::codec_residency_bytes"));
+    assert!(worker.contains("append_video_codec_cache_configuration("));
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concerns = policy["concerns"]
+        .as_array()
+        .ok_or("ownership concerns are absent")?;
+    let package_concern = concerns
+        .iter()
+        .find(|concern| {
+            concern["concern"]
+                == "native_video_reviewed_codec_registry_ltxv_thread_general_package_bootstrap"
+        })
+        .ok_or("general video package ownership concern is absent")?;
+    assert_eq!(
+        package_concern["canonical_owner"],
+        "comfy_runtime::native_video_codec_package::certify_general_video_codec_package"
+    );
+    for concern_name in [
+        "native_video_reviewed_codec_registry_ltxv_thread_general_package_bootstrap",
+        "native_video_retained_codec_library_loading",
+        "native_video_reviewed_codec_registry_ltxv_thread_service",
+        "native_execution_elf_dynamic_contract_inspection",
+        "native_ffi_certification",
+        "native_library_image_capture_and_sealing",
+        "runtime_backend_native_package_admission",
+    ] {
+        let concern = concerns
+            .iter()
+            .find(|concern| concern["concern"] == concern_name)
+            .ok_or("required general video ownership concern is absent")?;
+        assert!(
+            concern["consolidation_tasks"]
+                .as_array()
+                .is_some_and(|tasks| tasks.iter().any(|task| {
+                    task == "comfy-parity-native-video-codec-package-bootstrap-foundation"
+                })),
+            "{concern_name} does not name Task562"
+        );
+    }
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let row = catalog
+        .lines()
+        .find(|line| {
+            line.starts_with(
+                "native_video_reviewed_codec_registry_ltxv_thread_general_package_bootstrap,",
+            )
+        })
+        .ok_or("general video package catalog row is absent")?;
+    assert!(row.contains("authoritative_owner_confirmed"));
+    assert!(!row.contains("consolidation_required"));
     Ok(())
 }
 
@@ -19358,6 +19809,7 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
 
     assert_root_export::<ProviderManifestAuthorizationV2>();
     assert_root_export::<ProviderRuntimeActivationGrant>();
+    assert_root_export::<PreflightedProviderRuntimeActivationGrant>();
     assert_root_export::<ProviderRuntimeActivationGrantSource>();
     assert_root_export::<ProviderRuntimeActuationProposal>();
     assert_root_export::<ProviderRuntimeAuthorityInput>();
@@ -19367,6 +19819,7 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
     assert_root_export::<ProviderRuntimeReceiptV2>();
     assert_root_export::<ProviderRuntimeReceiptVerifierV2>();
     assert_root_export::<ProviderRuntimeStreamService>();
+    assert_root_export::<NativeProviderWorkerBridgeAttachment>();
     assert_root_export::<VerifiedProviderRuntimeReceiptV2>();
     let _materializer = comfy_runtime::materialize_provider_invocation_result_v2;
 
@@ -19377,6 +19830,8 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_execution_controller.rs"))?;
     let component_host =
         fs::read_to_string(root.join("crates/comfy_plugin_host/src/component_host.rs"))?;
+    let private_worker =
+        fs::read_to_string(root.join("crates/comfy_plugin_host/src/private_worker.rs"))?;
     for required in [
         "pub use plugin_services::*;",
         "pub use provider_materialization::*;",
@@ -19389,6 +19844,7 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
     }
     for required in [
         "ProviderRuntimeActivationGrantSource",
+        "PreflightedProviderRuntimeActivationGrant",
         "ProviderRuntimeActuationProposal",
         "ProviderRuntimeAuthorityInput",
         "ProviderRuntimeProgressProjection",
@@ -19421,7 +19877,13 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
     for required in [
         "provider_streams: ProviderRuntimeStreamService",
         "ProviderRuntimeStreamService::new()",
-        "provider_runtime_stream_service",
+        "pub struct NativeProviderWorkerBridgeAttachment",
+        "Weak<NativeExecutionController>",
+        "provider_bridge_live: Arc<AtomicBool>",
+        "runner_provider_bridge_live",
+        "start_with_provider_worker_bridge",
+        "fn revoke_provider_worker_bridge",
+        "fn invalidate_provider_worker_bridge",
         "begin_legacy(",
         "call_legacy(",
         "resolve_legacy(",
@@ -19439,7 +19901,15 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
         !controller.contains("provider_sessions: BTreeMap<String, PluginCapabilityInvocation>")
     );
     assert!(!controller.contains("pub struct ProviderRuntimeStreamService"));
+    assert!(!controller.contains("pub fn provider_runtime_stream_service"));
+    assert!(!controller.contains("pub fn provider_runtime_activation_grants"));
     assert!(!component_host.contains("pub struct ProviderRuntimeStreamOwner"));
+    assert!(!private_worker.contains("ProviderRuntimeStreamService::new()"));
+    assert!(
+        private_worker.contains(
+            "provider_worker_bridge: Mutex<Option<NativeProviderWorkerBridgeAttachment>>"
+        )
+    );
     assert!(!services.contains("pub struct ProviderRuntimeStreamOwner"));
     assert!(!services.contains("pub struct ProviderRuntimeStreamState"));
     assert!(services.contains("state: Arc<Mutex<ProviderRuntimeStreamState>>"));
@@ -19454,6 +19924,34 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
         owner_declarations.len(),
         1,
         "Task412 must retain exactly one public production stream service: {owner_declarations:?}"
+    );
+    let controller_production = controller
+        .split_once("#[cfg(test)]\nmod tests")
+        .map_or(controller.as_str(), |(production, _)| production);
+    assert_eq!(
+        controller_production
+            .matches("ProviderRuntimeStreamService::new()")
+            .count(),
+        1,
+        "Task423 must retain exactly one controller production stream-service constructor"
+    );
+    assert!(services.contains(
+        "#[cfg(test)]\n    fn new() -> Self {\n        ProviderRuntimeStreamService::new().activation_grants()"
+    ));
+    let non_controller_constructors =
+        production_source_occurrences(&sources, "ProviderRuntimeStreamService::new()")
+            .into_iter()
+            .filter(|location| !location.contains("native_execution_controller.rs:"))
+            .collect::<Vec<_>>();
+    assert_eq!(
+        non_controller_constructors.len(),
+        1,
+        "Task423 found an unexpected non-controller stream-service constructor: {non_controller_constructors:?}"
+    );
+    assert!(
+        non_controller_constructors
+            .first()
+            .is_some_and(|location| location.contains("plugin_services.rs:"))
     );
     assert!(
         production_source_occurrences(&sources, "pub struct ProviderRuntimeStreamOwner").is_empty()
@@ -19495,10 +19993,13 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
         "comfy_runtime::ProviderRuntimeStreamService",
         "comfy_runtime::ProviderRuntimeStreamOwner",
         "comfy_runtime::ProviderRuntimeActivationGrant",
+        "comfy_runtime::PreflightedProviderRuntimeActivationGrant",
         "comfy_runtime::ProviderRuntimeActivationGrantSource",
         "comfy_runtime::ProviderRuntimeActuationProposal",
         "comfy_runtime::ProviderRuntimeAuthorityInput",
         "comfy_runtime::ProviderRuntimeProgressProjection",
+        "comfy_runtime::NativeProviderWorkerBridgeAttachment",
+        "comfy_plugin_host::PrivateWorkerPluginExecutor",
         "comfy_runtime::materialize_provider_invocation_result_v2",
     ] {
         assert!(
@@ -19519,6 +20020,7 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
         "task412-raw-owner-remains-private-behind-service-lock",
         "task412-actuation-proposal-binds-authority-body-uploads-cost-and-idempotency",
         "task412-controller-shares-service-and-delegates-v1-cleanup",
+        "task423-private-executor-retains-only-one-live-weak-controller-attachment",
         "task412-root-exports-runtime-stream-authority",
         "task412-v2-materialization-validates-before-canonical-projection",
         "task412-ownership-oracle-proves-single-owner-and-root-export",
@@ -19550,6 +20052,27 @@ fn val_ownership_task412_provider_runtime_stream_progress_001()
                     .iter()
                     .any(|candidate| candidate.as_str() == Some(task))),
             "Task412 is not mapped to {concern_name}"
+        );
+    }
+    let preflight_task = "comfy-parity-provider-runtime-component-activation-preflight-foundation";
+    for concern_name in [
+        "provider_request_authorization",
+        "provider_runtime_stream_sessions",
+    ] {
+        let concern = concerns
+            .iter()
+            .find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str) == Some(concern_name)
+            })
+            .ok_or("Task417 ownership concern is missing")?;
+        assert!(
+            concern
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| tasks
+                    .iter()
+                    .any(|candidate| candidate.as_str() == Some(preflight_task))),
+            "Task417 is not mapped to {concern_name}"
         );
     }
     for (concern_name, required_definitions, required_mappings) in [

@@ -10,9 +10,10 @@ use comfy_runtime::{
     AttemptEvent, AttemptEventKind, AttemptState, ExecutionEventBus, InputBinding,
     NativeDiffusionProvider, NativeImageExecutor, NativeImageRuntimeError, NativeImageWorkerEvent,
     NativeImageWorkerPlan, NativeImageWorkerProgress, NativeImageWorkerProgressKind, NativeValue,
-    PluginAuthorizationVerifier, WorkerBackendSelection,
+    NativeVideoCodecWorkerServices, PluginAuthorizationVerifier, WorkerBackendSelection,
+    certify_general_video_codec_package,
 };
-use comfy_tensor::{CancellationToken, CpuBackend, DeviceId};
+use comfy_tensor::{BackendWorkspaceAuthority, CancellationToken, CpuBackend, DeviceId};
 use comfy_types::{
     BackendUnavailable, DeviceKind, MAX_ENCODED_PREVIEW_BYTES, MAX_WORKER_FRAME_BYTES,
     WorkerEnvelope, WorkerMessage, WorkerPluginExecutionOutcome, WorkerProtocolError,
@@ -193,9 +194,25 @@ pub async fn run_worker_process_with_backend_selection(
     backend_selection: WorkerBackendSelection,
     plugin_authorization_verifier: Option<PluginAuthorizationVerifier>,
 ) -> anyhow::Result<()> {
+    run_worker_process_with_backend_selection_and_video_codec_package(
+        memory_limit_bytes,
+        backend_selection,
+        None,
+        plugin_authorization_verifier,
+    )
+    .await
+}
+
+pub async fn run_worker_process_with_backend_selection_and_video_codec_package(
+    memory_limit_bytes: u64,
+    backend_selection: WorkerBackendSelection,
+    general_video_codec_package: Option<comfy_runtime::NativeGeneralVideoCodecPackageSettings>,
+    plugin_authorization_verifier: Option<PluginAuthorizationVerifier>,
+) -> anyhow::Result<()> {
     run_worker_process_with_configuration(
         memory_limit_bytes,
         backend_selection,
+        general_video_codec_package,
         None,
         plugin_authorization_verifier,
     )
@@ -209,6 +226,7 @@ pub async fn run_worker_process_with_diffusion_provider(
     run_worker_process_with_configuration(
         memory_limit_bytes,
         WorkerBackendSelection::Cpu,
+        None,
         diffusion_provider,
         None,
     )
@@ -572,11 +590,17 @@ fn initialize_worker_backend(
 async fn run_worker_process_with_configuration(
     memory_limit_bytes: u64,
     backend_selection: WorkerBackendSelection,
+    general_video_codec_package: Option<comfy_runtime::NativeGeneralVideoCodecPackageSettings>,
     diffusion_provider: Option<Arc<dyn NativeDiffusionProvider>>,
     plugin_authorization_verifier: Option<PluginAuthorizationVerifier>,
 ) -> anyhow::Result<()> {
     let (backend_session, cpu_executor_backend) =
         initialize_worker_backend(backend_selection, memory_limit_bytes);
+    let video_codec_worker_services = initialize_general_video_codec_worker_services(
+        general_video_codec_package,
+        cpu_executor_backend.clone(),
+        memory_limit_bytes,
+    )?;
     if cpu_executor_backend.is_some() {
         comfy_runtime::generated_native_node_registry_projection(diffusion_provider.clone())?;
         comfy_runtime::prewarm_native_shader_executor();
@@ -753,7 +777,14 @@ async fn run_worker_process_with_configuration(
                                     continue 'worker;
                                 }
                                 let (mut memory, memory_configuration) =
-                                    match prepare_native_image_memory(&session, &worker_plan) {
+                                    match prepare_native_image_memory(
+                                        &session,
+                                        &worker_plan,
+                                        video_codec_worker_services.as_ref().map_or(
+                                            0,
+                                            NativeVideoCodecWorkerServices::codec_residency_bytes,
+                                        ),
+                                    ) {
                                         Ok(memory) => memory,
                                         Err(error) => {
                                             let event = NativeImageWorkerEvent::Failed {
@@ -768,6 +799,10 @@ async fn run_worker_process_with_configuration(
                                             continue 'worker;
                                         }
                                     };
+                                let memory_configuration = append_video_codec_cache_configuration(
+                                    memory_configuration,
+                                    video_codec_worker_services.as_ref(),
+                                );
                                 let diffusion_enabled = diffusion_provider.is_some();
                                 let reuse_executor =
                                     native_image_executor.as_ref().is_some_and(|executor| {
@@ -873,6 +908,22 @@ async fn run_worker_process_with_configuration(
                                         )
                                     };
                                     created.map(|executor| {
+                                        let executor = if let Some(services) =
+                                            video_codec_worker_services.as_ref()
+                                        {
+                                            executor
+                                                .with_ltxv_preprocess_service(
+                                                    services.ltxv_preprocess_service(),
+                                                )
+                                                .with_webm_encode_service(
+                                                    services.webm_encode_service(),
+                                                )
+                                                .with_component_h264_mp4_backing_service(
+                                                    services.component_h264_mp4_backing_service(),
+                                                )
+                                        } else {
+                                            executor
+                                        };
                                         native_image_executor = Some(executor);
                                         native_image_executor_provider_registry =
                                             worker_plan.provider_registry.clone();
@@ -1226,6 +1277,73 @@ async fn run_worker_process_with_configuration(
     Ok(())
 }
 
+fn initialize_general_video_codec_worker_services(
+    settings: Option<comfy_runtime::NativeGeneralVideoCodecPackageSettings>,
+    cpu_executor_backend: Option<Arc<CpuBackend>>,
+    memory_limit_bytes: u64,
+) -> anyhow::Result<Option<NativeVideoCodecWorkerServices>> {
+    let Some(settings) = settings else {
+        return Ok(None);
+    };
+    let cancellation = CancellationToken::default();
+    let closure =
+        certify_general_video_codec_package(&settings, &cancellation).map_err(|error| {
+            anyhow::anyhow!("general video codec package admission failed: {error}")
+        })?;
+    let codec_residency_bytes = closure
+        .startup_resident_bytes()
+        .checked_add(closure.codec_scratch_bytes())
+        .ok_or_else(|| anyhow::anyhow!("general video codec startup budget overflowed"))?;
+    MemoryPlanner::plan(
+        memory_limit_bytes,
+        0,
+        MemoryPlanRequest {
+            codec_bytes: codec_residency_bytes,
+            ..MemoryPlanRequest::default()
+        },
+    )
+    .map_err(|error| {
+        anyhow::anyhow!("general video codec startup memory preflight failed: {error}")
+    })?;
+    let codec_backend = match cpu_executor_backend {
+        Some(backend) => backend,
+        None => {
+            let (backend, _authority) = BackendWorkspaceAuthority::create_backend(
+                closure.codec_scratch_bytes(),
+            )
+            .map_err(|error| {
+                anyhow::anyhow!("general video codec CPU backend initialization failed: {error}")
+            })?;
+            Arc::new(backend)
+        }
+    };
+    let services = NativeVideoCodecWorkerServices::start(closure, codec_backend, &cancellation)
+        .map_err(|error| anyhow::anyhow!("general video codec worker startup failed: {error}"))?;
+    Ok(Some(services))
+}
+
+fn append_video_codec_cache_configuration(
+    memory_configuration: String,
+    services: Option<&NativeVideoCodecWorkerServices>,
+) -> String {
+    append_video_codec_cache_identity(
+        memory_configuration,
+        services.map(NativeVideoCodecWorkerServices::cache_configuration_sha256),
+    )
+}
+
+fn append_video_codec_cache_identity(
+    memory_configuration: String,
+    cache_configuration_sha256: Option<&str>,
+) -> String {
+    match cache_configuration_sha256 {
+        Some(cache_configuration_sha256) => {
+            format!("{memory_configuration}:codec={cache_configuration_sha256}")
+        }
+        None => memory_configuration,
+    }
+}
+
 fn validate_worker_plan_has_no_serialized_handles(
     worker_plan: &NativeImageWorkerPlan,
 ) -> Result<(), NativeImageRuntimeError> {
@@ -1266,6 +1384,7 @@ fn backend_neutral_executor_unavailable(device: Option<DeviceId>) -> Option<Back
 fn prepare_native_image_memory(
     session: &WorkerSession,
     worker_plan: &NativeImageWorkerPlan,
+    codec_bytes: u64,
 ) -> anyhow::Result<(AttemptMemoryController, String)> {
     let input_asset_bytes = worker_plan
         .input_assets
@@ -1279,8 +1398,12 @@ fn prepare_native_image_memory(
         })?;
     let node_count = u64::try_from(worker_plan.plan.nodes.len())
         .map_err(|_| anyhow::anyhow!("native image node accounting overflowed"))?;
-    let memory_request =
-        native_image_memory_request(input_asset_bytes, node_count, worker_plan.metadata_enabled)?;
+    let memory_request = native_image_memory_request_with_codec(
+        input_asset_bytes,
+        node_count,
+        worker_plan.metadata_enabled,
+        codec_bytes,
+    )?;
     let memory_snapshot = session.memory_snapshot()?;
     let backend = session
         .accepted_backend()
@@ -1542,13 +1665,70 @@ mod tests {
             .find("backend_neutral_executor_unavailable(session.backend_device())")
             .expect("selected backend rejection is present");
         let memory = source
-            .find("prepare_native_image_memory(&session, &worker_plan)")
+            .find("prepare_native_image_memory(")
             .expect("memory preflight is present");
         let executor = source
             .find("NativeImageExecutor::new_with_diffusion_provider")
             .expect("CPU executor construction is present");
         assert!(rejection < memory);
         assert!(rejection < executor);
+    }
+
+    #[test]
+    fn video_codec_package_bootstrap_uses_canonical_codec_memory_and_cache_dimensions() {
+        let codec_bytes = 512 * 1024 * 1024;
+        let request = native_image_memory_request_with_codec(1, 1, false, codec_bytes)
+            .expect("native memory request must be bounded");
+        assert_eq!(request.codec_bytes, codec_bytes);
+        let plan = MemoryPlanner::plan(2 * 1024 * 1024 * 1024, 17, request)
+            .expect("codec reservation and canonical margin must fit");
+        assert_eq!(plan.durable_baseline_bytes, 17);
+        assert!(plan.reservations.iter().any(|reservation| {
+            reservation.kind == MemoryReservationKind::Codec && reservation.bytes == codec_bytes
+        }));
+        assert!(plan.reservations.iter().any(|reservation| {
+            reservation.kind == MemoryReservationKind::SafetyMargin
+                && reservation.bytes == plan.safety_margin_bytes
+        }));
+        let exact_capacity = plan.committed_target_bytes;
+        MemoryPlanner::plan(exact_capacity, 17, request)
+            .expect("the exact canonical capacity must admit the codec reservation");
+        assert!(MemoryPlanner::plan(exact_capacity - 1, 17, request).is_err());
+
+        let memory_configuration = "memory-v1".to_owned();
+        assert_eq!(
+            append_video_codec_cache_identity(memory_configuration.clone(), None),
+            memory_configuration
+        );
+        assert_eq!(
+            append_video_codec_cache_identity("memory-v1".to_owned(), Some("codec-v1")),
+            "memory-v1:codec=codec-v1"
+        );
+
+        let source = include_str!("comfy_worker.rs");
+        let bootstrap = source
+            .find("initialize_general_video_codec_worker_services(")
+            .expect("package bootstrap must be retained");
+        let worker_loop = source
+            .find("'worker: loop")
+            .expect("worker loop must be explicit");
+        let memory = source[worker_loop..]
+            .find("prepare_native_image_memory(")
+            .map(|offset| worker_loop + offset)
+            .expect("attempt memory admission must be explicit");
+        let cache = source[worker_loop..]
+            .find("append_video_codec_cache_configuration(")
+            .map(|offset| worker_loop + offset)
+            .expect("cache configuration must bind the codec actor identity");
+        let attach = source[worker_loop..]
+            .find("with_ltxv_preprocess_service")
+            .map(|offset| worker_loop + offset)
+            .expect("executor must attach the existing actor ports");
+        assert!(
+            bootstrap < worker_loop && worker_loop < memory && memory < cache && cache < attach
+        );
+        assert!(source.contains("MemoryPlanner::plan(\n        memory_limit_bytes,\n        0,"));
+        assert!(source.contains("NativeVideoCodecWorkerServices::codec_residency_bytes"));
     }
 
     #[cfg(feature = "mlu")]

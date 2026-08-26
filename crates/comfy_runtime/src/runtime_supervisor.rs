@@ -25,11 +25,12 @@ use util::process::Child;
 use uuid::Uuid;
 
 use crate::{
-    NativeCudaPackageSettings, NativeDirectMlPackageSettings, NativeMetalPackageSettings,
-    NativeMluPackageSettings, NativeNpuPackageSettings, NativeRocmPackageSettings,
-    NativeRuntimeProfile, NativeXpuPackageSettings, PluginAuthorizationVerifier,
-    PluginCapabilityInvocation, PluginServiceWireFailure, PluginServiceWireRequest,
-    PluginServiceWireResponse, ResolvedProviderResult,
+    NativeCudaPackageSettings, NativeDirectMlPackageSettings,
+    NativeGeneralVideoCodecPackageSettings, NativeMetalPackageSettings, NativeMluPackageSettings,
+    NativeNpuPackageSettings, NativeRocmPackageSettings, NativeRuntimeProfile,
+    NativeXpuPackageSettings, PluginAuthorizationVerifier, PluginCapabilityInvocation,
+    PluginServiceWireFailure, PluginServiceWireRequest, PluginServiceWireResponse,
+    ResolvedProviderResult,
 };
 use comfy_plugin_sdk::ProviderResultReceiptSet;
 
@@ -136,6 +137,7 @@ pub struct WorkerLaunchConfig {
     pub registry_version: String,
     pub backend: BackendCapabilityMatrix,
     pub backend_selection: WorkerBackendSelection,
+    pub general_video_codec_package: Option<NativeGeneralVideoCodecPackageSettings>,
     pub memory_limit_bytes: u64,
     pub policy: SupervisorPolicy,
     pub registry_deployment: Option<WorkerRegistryDeploymentPlan>,
@@ -338,6 +340,27 @@ impl WorkerBackendSelection {
     }
 }
 
+fn general_video_codec_package_launch_arguments(
+    package: Option<&NativeGeneralVideoCodecPackageSettings>,
+) -> Result<Vec<String>, RuntimeSupervisorError> {
+    let Some(package) = package else {
+        return Ok(Vec::new());
+    };
+    let package_root = package.package_root().to_str().ok_or_else(|| {
+        RuntimeSupervisorError::InvalidConfiguration(
+            "general video codec package root is not valid UTF-8".to_owned(),
+        )
+    })?;
+    Ok(vec![
+        "--video-codec-package-root".to_owned(),
+        package_root.to_owned(),
+        "--video-codec-package-signer".to_owned(),
+        package.verification_key().signer().to_owned(),
+        "--video-codec-package-public-key".to_owned(),
+        package.public_key_hex(),
+    ])
+}
+
 #[derive(Clone, Debug)]
 pub struct WorkerRegistryDeploymentPlan {
     begin: WorkerRegistryDeploymentBegin,
@@ -412,7 +435,7 @@ impl WorkerLaunchConfig {
         memory_limit_bytes: u64,
     ) -> Result<Self, RuntimeSupervisorError> {
         let profile_id = ProfileId(profile.id);
-        match profile.device {
+        let config = match profile.device {
             DeviceKind::Cpu => Ok(Self::new(
                 packaged_worker_binary()?,
                 profile_id,
@@ -542,7 +565,8 @@ impl WorkerLaunchConfig {
                 "the selected native profile has no certified production worker session adapter",
             )
             .into()),
-        }
+        }?;
+        Ok(config.with_general_video_codec_package(profile.general_video_codec_package.clone()))
     }
 
     pub fn new(
@@ -790,6 +814,7 @@ impl WorkerLaunchConfig {
             registry_version: registry_version.into(),
             backend,
             backend_selection,
+            general_video_codec_package: None,
             memory_limit_bytes,
             policy: SupervisorPolicy::default(),
             registry_deployment: None,
@@ -800,6 +825,14 @@ impl WorkerLaunchConfig {
     pub fn with_registry_deployment(mut self, deployment: WorkerRegistryDeploymentPlan) -> Self {
         self.plugin_authorization_verifier = Some(deployment.authorization_verifier().clone());
         self.registry_deployment = Some(deployment);
+        self
+    }
+
+    pub fn with_general_video_codec_package(
+        mut self,
+        package: Option<NativeGeneralVideoCodecPackageSettings>,
+    ) -> Self {
+        self.general_video_codec_package = package;
         self
     }
 
@@ -1476,6 +1509,9 @@ impl RuntimeSupervisor {
         let mut command = std::process::Command::new(&config.binary);
         command.args(&config.arguments);
         command.args(config.backend_selection.launch_arguments()?);
+        command.args(general_video_codec_package_launch_arguments(
+            config.general_video_codec_package.as_ref(),
+        )?);
         command
             .arg("--memory-limit-bytes")
             .arg(config.memory_limit_bytes.to_string());
@@ -2359,6 +2395,9 @@ fn launch_record(
 ) -> Result<WorkerLaunchRecord, RuntimeSupervisorError> {
     let mut arguments = config.arguments.clone();
     arguments.extend(config.backend_selection.launch_arguments()?);
+    arguments.extend(general_video_codec_package_launch_arguments(
+        config.general_video_codec_package.as_ref(),
+    )?);
     arguments.push("--memory-limit-bytes".to_owned());
     arguments.push(config.memory_limit_bytes.to_string());
     Ok(WorkerLaunchRecord {
@@ -2866,6 +2905,57 @@ mod tests {
     }
 
     #[test]
+    fn general_video_codec_package_launch_is_backend_independent_and_redacted() {
+        let (profile_id, worker_id, _) = identifiers();
+        let package = NativeGeneralVideoCodecPackageSettings::from_public_authority(
+            "/reviewed/general-video",
+            "codec.release",
+            &"11".repeat(32),
+        )
+        .expect("checked general-video public authority");
+        let direct = WorkerLaunchConfig::new(
+            "/package/comfy-worker",
+            profile_id,
+            worker_id,
+            "registry-v1",
+            1024,
+        )
+        .with_general_video_codec_package(Some(package.clone()));
+        let arguments = general_video_codec_package_launch_arguments(
+            direct.general_video_codec_package.as_ref(),
+        )
+        .expect("general-video arguments");
+        assert_eq!(
+            arguments,
+            vec![
+                "--video-codec-package-root".to_owned(),
+                "/reviewed/general-video".to_owned(),
+                "--video-codec-package-signer".to_owned(),
+                "codec.release".to_owned(),
+                "--video-codec-package-public-key".to_owned(),
+                "11".repeat(32),
+            ]
+        );
+        let record = launch_record(&direct).expect("sanitized general-video launch record");
+        assert!(record.arguments.contains(&"codec.release".to_owned()));
+        assert!(!format!("{record:?}").contains("/reviewed/general-video"));
+        assert!(!format!("{record:?}").contains(&"11".repeat(32)));
+
+        let mut profile =
+            NativeRuntimeProfile::disabled_migration_replacement(profile_id.0, "General video")
+                .expect("valid profile");
+        profile.general_video_codec_package = Some(package);
+        let projected = WorkerLaunchConfig::for_packaged_worker_profile(
+            &profile,
+            worker_id,
+            "registry-v1",
+            1024,
+        )
+        .expect("CPU profile accepts general-video authority");
+        assert!(projected.general_video_codec_package.is_some());
+    }
+
+    #[test]
     fn worker_launch_device_selection_uses_the_canonical_backend_matrix() {
         let (profile_id, worker_id, _) = identifiers();
         for device in DeviceKind::ALL {
@@ -2994,6 +3084,7 @@ mod tests {
             cuda_package: None,
             xpu_package: None,
             directml_package: Some(package),
+            general_video_codec_package: None,
             provider_scope: "local".to_owned(),
             compatibility_version: crate::CURRENT_NATIVE_PROFILE_VERSION,
             unknown_fields: BTreeMap::new(),
@@ -3039,6 +3130,7 @@ mod tests {
             cuda_package: Some(package),
             xpu_package: None,
             directml_package: None,
+            general_video_codec_package: None,
             provider_scope: "local".to_owned(),
             compatibility_version: crate::CURRENT_NATIVE_PROFILE_VERSION,
             unknown_fields: BTreeMap::new(),
@@ -3110,6 +3202,7 @@ mod tests {
             cuda_package: None,
             xpu_package: None,
             directml_package: None,
+            general_video_codec_package: None,
             provider_scope: "local".to_owned(),
             compatibility_version: crate::CURRENT_NATIVE_PROFILE_VERSION,
             unknown_fields: BTreeMap::new(),
@@ -3155,6 +3248,7 @@ mod tests {
             cuda_package: None,
             xpu_package: Some(package),
             directml_package: None,
+            general_video_codec_package: None,
             provider_scope: "local".to_owned(),
             compatibility_version: crate::CURRENT_NATIVE_PROFILE_VERSION,
             unknown_fields: BTreeMap::new(),

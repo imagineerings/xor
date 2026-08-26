@@ -24,12 +24,15 @@ askpass.workspace = true
 async-trait.workspace = true
 base64.workspace = true
 collections.workspace = true
+collaboration_domain.workspace = true
 fs.workspace = true
 futures.workspace = true
 gpui.workspace = true
+iroh-base.workspace = true
 log.workspace = true
 parking_lot.workspace = true
 paths.workspace = true
+postcard.workspace = true
 prost.workspace = true
 release_channel.workspace = true
 rpc = { workspace = true, features = ["gpui"] }
@@ -45,6 +48,7 @@ tempfile.workspace = true
 thiserror.workspace = true
 urlencoding.workspace = true
 util.workspace = true
+uuid.workspace = true
 which.workspace = true
 
 [target.'cfg(windows)'.dependencies]

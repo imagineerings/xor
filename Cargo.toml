@@ -290,6 +290,7 @@ members = [
     # Tooling
     #
 
+    "tools/collaboration_migrate",
     "tools/git_credential_nostr",
     "tools/git_sign_nostr",
     "tooling/compliance",
@@ -733,6 +734,7 @@ imara-diff = "0.2.0"
 indexmap = { version = "2.7.0", features = ["serde"] }
 indoc = "2"
 inventory = "0.3.19"
+iroh-base = { version = "1.0.2", default-features = false, features = ["key"] }
 itertools = "0.14.0"
 json_dotpath = "1.1"
 jsonschema = "0.37.0"
@@ -832,6 +834,7 @@ pollster = "0.4.0"
 naga = { version = "29.0.4", features = ["glsl-in"] }
 pulldown-cmark = { version = "0.13.0", default-features = false }
 quick-xml = "0.38"
+qrcode = { version = "0.14.1", default-features = false }
 quote = "1.0.9"
 rand = "0.9"
 rayon = "1.8"

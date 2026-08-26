@@ -103,6 +103,12 @@ fn inspect_elf64_dynamic_contract_inner(
             "expected an ELF64 shared object for machine {expected_machine}"
         ));
     }
+    if read_u32(bytes, 20)? != 1 {
+        return Err("expected the current ELF header version".to_owned());
+    }
+    if read_u16(bytes, 52)? != 64 {
+        return Err("expected the ELF64 header size".to_owned());
+    }
     let program_offset = usize::try_from(read_u64(bytes, 32)?)
         .map_err(|_| "program table offset exceeds address space".to_owned())?;
     let program_entry_size = usize::from(read_u16(bytes, 54)?);
@@ -860,6 +866,7 @@ pub(crate) mod tests {
         bytes[6] = 1;
         write_u16(&mut bytes, 16, 3);
         write_u16(&mut bytes, 18, machine);
+        write_u32(&mut bytes, 20, 1);
         write_u64(
             &mut bytes,
             32,
@@ -870,6 +877,7 @@ pub(crate) mod tests {
             40,
             u64::try_from(section_offset).unwrap_or_default(),
         );
+        write_u16(&mut bytes, 52, 64);
         write_u16(
             &mut bytes,
             54,
@@ -1119,6 +1127,33 @@ pub(crate) mod tests {
         assert!(
             inspect_elf64_dynamic_contract(&bytes, 183, &CancellationToken::default()).is_err()
         );
+    }
+
+    #[test]
+    fn elf_inspection_rejects_invalid_elf64_header_contract() {
+        let bytes = fixture(
+            62,
+            &BTreeSet::from(["avcodec_open2".to_owned()]),
+            &[],
+            None,
+            "libavcodec.so.61",
+        );
+
+        for invalid_version in [0, 2] {
+            let mut invalid = bytes.clone();
+            write_u32(&mut invalid, 20, invalid_version);
+            let error = inspect_elf64_dynamic_contract(&invalid, 62, &CancellationToken::default())
+                .expect_err("a non-current ELF header version must fail closed");
+            assert!(error.to_string().contains("ELF header version"));
+        }
+
+        for invalid_size in [0, 63] {
+            let mut invalid = bytes.clone();
+            write_u16(&mut invalid, 52, invalid_size);
+            let error = inspect_elf64_dynamic_contract(&invalid, 62, &CancellationToken::default())
+                .expect_err("a non-ELF64 header size must fail closed");
+            assert!(error.to_string().contains("ELF64 header size"));
+        }
     }
 
     #[test]

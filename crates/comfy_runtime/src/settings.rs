@@ -14,10 +14,11 @@ use uuid::Uuid;
 
 use crate::{
     Capability, CapabilitySet, CredentialScope, CudaPackageVerificationKey,
-    DirectMlPackageVerificationKey, MetalPackageVerificationKey, MluPackageVerificationKey,
-    NpuPackageVerificationKey, PermissionGrant, PermissionPolicy, PluginTrustPolicy,
-    PluginVerificationKey, ProviderEndpoint, ProviderMode, ProviderPolicy,
-    RocmPackageVerificationKey, SecretId, XpuPackageVerificationKey,
+    DirectMlPackageVerificationKey, GENERAL_VIDEO_CODEC_FIXTURE_PUBLIC_KEY_HEX,
+    GENERAL_VIDEO_CODEC_FIXTURE_SIGNER, GeneralVideoCodecPackageVerificationKey,
+    MetalPackageVerificationKey, MluPackageVerificationKey, NpuPackageVerificationKey,
+    PermissionGrant, PermissionPolicy, PluginTrustPolicy, PluginVerificationKey, ProviderEndpoint,
+    ProviderMode, ProviderPolicy, RocmPackageVerificationKey, SecretId, XpuPackageVerificationKey,
 };
 
 pub const CURRENT_NATIVE_PROFILE_VERSION: u16 = 1;
@@ -99,9 +100,123 @@ pub struct NativeRuntimeProfile {
     pub xpu_package: Option<NativeXpuPackageSettings>,
     #[serde(default)]
     pub directml_package: Option<NativeDirectMlPackageSettings>,
+    #[serde(default)]
+    pub general_video_codec_package: Option<NativeGeneralVideoCodecPackageSettings>,
     pub provider_scope: String,
     pub compatibility_version: u16,
     pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(
+    try_from = "NativeGeneralVideoCodecPackageSettingsWire",
+    into = "NativeGeneralVideoCodecPackageSettingsWire"
+)]
+pub struct NativeGeneralVideoCodecPackageSettings {
+    package_root: PathBuf,
+    verification_key: GeneralVideoCodecPackageVerificationKey,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NativeGeneralVideoCodecPackageSettingsWire {
+    package_root: PathBuf,
+    signer: String,
+    public_key_hex: String,
+}
+
+impl TryFrom<NativeGeneralVideoCodecPackageSettingsWire>
+    for NativeGeneralVideoCodecPackageSettings
+{
+    type Error = String;
+
+    fn try_from(value: NativeGeneralVideoCodecPackageSettingsWire) -> Result<Self, Self::Error> {
+        Self::from_public_authority(value.package_root, value.signer, &value.public_key_hex)
+    }
+}
+
+impl From<NativeGeneralVideoCodecPackageSettings> for NativeGeneralVideoCodecPackageSettingsWire {
+    fn from(value: NativeGeneralVideoCodecPackageSettings) -> Self {
+        Self {
+            package_root: value.package_root,
+            signer: value.verification_key.signer().to_owned(),
+            public_key_hex: encode_public_key_hex(value.verification_key.public_key_bytes()),
+        }
+    }
+}
+
+impl NativeGeneralVideoCodecPackageSettings {
+    pub fn from_public_authority(
+        package_root: impl Into<PathBuf>,
+        signer: impl Into<String>,
+        public_key_hex: &str,
+    ) -> Result<Self, String> {
+        Self::from_authority(package_root, signer, public_key_hex, false)
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn from_fixture_authority(
+        package_root: impl Into<PathBuf>,
+        signer: impl Into<String>,
+        public_key_hex: &str,
+    ) -> Result<Self, String> {
+        Self::from_authority(package_root, signer, public_key_hex, true)
+    }
+
+    fn from_authority(
+        package_root: impl Into<PathBuf>,
+        signer: impl Into<String>,
+        public_key_hex: &str,
+        permit_fixture_authority: bool,
+    ) -> Result<Self, String> {
+        let package_root = package_root.into();
+        let package_root_text = package_root
+            .to_str()
+            .ok_or_else(|| "general video codec package root must be UTF-8".to_owned())?;
+        if package_root_text.is_empty()
+            || package_root_text != package_root_text.trim()
+            || package_root_text.len() > 4_096
+            || package_root_text.chars().any(char::is_control)
+        {
+            return Err("general video codec package root is invalid".to_owned());
+        }
+        let signer = signer.into();
+        if !permit_fixture_authority && signer == GENERAL_VIDEO_CODEC_FIXTURE_SIGNER {
+            return Err(
+                "the reserved general video codec fixture signer is not production authority"
+                    .to_owned(),
+            );
+        }
+        if !permit_fixture_authority && public_key_hex == GENERAL_VIDEO_CODEC_FIXTURE_PUBLIC_KEY_HEX
+        {
+            return Err(
+                "the reserved general video codec fixture key is not production authority"
+                    .to_owned(),
+            );
+        }
+        let public_key = decode_public_key_hex(public_key_hex).ok_or_else(|| {
+            "general video codec package public verification key must be 32 bytes of lowercase hexadecimal"
+                .to_owned()
+        })?;
+        let verification_key = GeneralVideoCodecPackageVerificationKey::new(signer, public_key)
+            .map_err(|error| error.to_string())?;
+        Ok(Self {
+            package_root,
+            verification_key,
+        })
+    }
+
+    pub fn package_root(&self) -> &std::path::Path {
+        &self.package_root
+    }
+
+    pub fn verification_key(&self) -> &GeneralVideoCodecPackageVerificationKey {
+        &self.verification_key
+    }
+
+    pub fn public_key_hex(&self) -> String {
+        encode_public_key_hex(self.verification_key.public_key_bytes())
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -761,6 +876,8 @@ pub enum RuntimeSettingsError {
     InvalidXpuPackageSecurity(String),
     #[error("native DirectML package security policy is invalid: {0}")]
     InvalidDirectMlPackageSecurity(String),
+    #[error("native general video codec package security policy is invalid: {0}")]
+    InvalidGeneralVideoCodecPackageSecurity(String),
     #[error("native runtime active profile is not present: {0}")]
     ActiveProfileNotFound(Uuid),
     #[error("native runtime active profile {profile_id} is inactive: {reason}")]
@@ -826,8 +943,19 @@ impl TryFrom<&ComfyRuntimeProfileContent> for NativeRuntimeProfile {
                 compatibility_version,
             ));
         }
+        let general_video_codec_configuration_present = value.video_codec_package_root.is_some()
+            || value.video_codec_package_signer.is_some()
+            || value.video_codec_package_public_key_hex.is_some();
+        if contains_general_video_codec_private_signing_material(&value.unknown_fields) {
+            return Err(invalid_general_video_codec_package_security(
+                "runtime profile settings must not contain private signing material",
+            ));
+        }
         if contains_private_signing_material(&value.unknown_fields) {
             let message = "runtime profile settings must not contain private signing material";
+            if general_video_codec_configuration_present {
+                return Err(invalid_general_video_codec_package_security(message));
+            }
             if device == DeviceKind::Mlu
                 || value.mlu_package_root.is_some()
                 || value.mlu_package_signer.is_some()
@@ -872,6 +1000,7 @@ impl TryFrom<&ComfyRuntimeProfileContent> for NativeRuntimeProfile {
             }
             return Err(invalid_rocm_package_security(message));
         }
+        let general_video_codec_package = project_general_video_codec_package_settings(value)?;
         let rocm_package = project_rocm_package_settings(value)?;
         let metal_package = project_metal_package_settings(value)?;
         let mlu_package = project_mlu_package_settings(value)?;
@@ -907,6 +1036,7 @@ impl TryFrom<&ComfyRuntimeProfileContent> for NativeRuntimeProfile {
             cuda_package,
             xpu_package,
             directml_package,
+            general_video_codec_package,
             provider_scope,
             compatibility_version,
             unknown_fields: value.unknown_fields.clone(),
@@ -943,6 +1073,7 @@ impl NativeRuntimeProfile {
             cuda_package: None,
             xpu_package: None,
             directml_package: None,
+            general_video_codec_package: None,
             provider_scope: "local".into(),
             compatibility_version: CURRENT_NATIVE_PROFILE_VERSION,
             unknown_fields: BTreeMap::new(),
@@ -1295,6 +1426,35 @@ fn invalid_directml_package_security(error: impl ToString) -> RuntimeSettingsErr
     RuntimeSettingsError::InvalidDirectMlPackageSecurity(error.to_string())
 }
 
+fn invalid_general_video_codec_package_security(error: impl ToString) -> RuntimeSettingsError {
+    RuntimeSettingsError::InvalidGeneralVideoCodecPackageSecurity(error.to_string())
+}
+
+fn project_general_video_codec_package_settings(
+    profile: &ComfyRuntimeProfileContent,
+) -> Result<Option<NativeGeneralVideoCodecPackageSettings>, RuntimeSettingsError> {
+    let fields = (
+        profile.video_codec_package_root.as_deref(),
+        profile.video_codec_package_signer.as_deref(),
+        profile.video_codec_package_public_key_hex.as_deref(),
+    );
+    let (Some(package_root), Some(signer), Some(public_key_hex)) = fields else {
+        if fields.0.is_none() && fields.1.is_none() && fields.2.is_none() {
+            return Ok(None);
+        }
+        return Err(invalid_general_video_codec_package_security(
+            "package root, signer, and public verification key must be configured together",
+        ));
+    };
+    NativeGeneralVideoCodecPackageSettings::from_public_authority(
+        package_root,
+        signer,
+        public_key_hex,
+    )
+    .map(Some)
+    .map_err(invalid_general_video_codec_package_security)
+}
+
 fn project_rocm_package_settings(
     profile: &ComfyRuntimeProfileContent,
 ) -> Result<Option<NativeRocmPackageSettings>, RuntimeSettingsError> {
@@ -1470,6 +1630,21 @@ fn contains_private_signing_material(fields: &BTreeMap<String, serde_json::Value
                 }),
                 _ => false,
             }
+    })
+}
+
+fn contains_general_video_codec_private_signing_material(
+    fields: &BTreeMap<String, serde_json::Value>,
+) -> bool {
+    fields.keys().any(|field| {
+        let field = field.to_ascii_lowercase();
+        (field.contains("video_codec") || field.contains("video-codec"))
+            && (field.contains("private")
+                || field.contains("signing_key")
+                || field.contains("signing-key")
+                || field.contains("signing_seed")
+                || field.contains("signing-seed")
+                || field.ends_with("seed"))
     })
 }
 
@@ -3050,5 +3225,88 @@ mod tests {
             .into());
         }
         write_settings_validation_artifact(&workspace_root, &cases)
+    }
+
+    fn general_video_profile() -> ComfyRuntimeProfileContent {
+        ComfyRuntimeProfileContent {
+            id: Some(Uuid::new_v4().to_string()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn general_video_codec_package_settings_require_exact_public_authority() {
+        let absent = general_video_profile();
+        assert!(
+            NativeRuntimeProfile::try_from(&absent)
+                .expect("absent codec authority is valid")
+                .general_video_codec_package
+                .is_none()
+        );
+
+        for mask in 1_u8..7 {
+            let mut profile = general_video_profile();
+            if mask & 1 != 0 {
+                profile.video_codec_package_root = Some("/reviewed/general-video".to_owned());
+            }
+            if mask & 2 != 0 {
+                profile.video_codec_package_signer = Some("codec.release".to_owned());
+            }
+            if mask & 4 != 0 {
+                profile.video_codec_package_public_key_hex = Some("11".repeat(32));
+            }
+            assert!(matches!(
+                NativeRuntimeProfile::try_from(&profile),
+                Err(RuntimeSettingsError::InvalidGeneralVideoCodecPackageSecurity(_))
+            ));
+        }
+
+        let mut profile = general_video_profile();
+        profile.video_codec_package_root = Some("/reviewed/general-video".to_owned());
+        profile.video_codec_package_signer = Some("codec.release".to_owned());
+        profile.video_codec_package_public_key_hex = Some("11".repeat(32));
+        let projected = NativeRuntimeProfile::try_from(&profile)
+            .expect("complete codec authority is valid")
+            .general_video_codec_package
+            .expect("codec authority is projected");
+        assert_eq!(
+            projected.package_root(),
+            std::path::Path::new("/reviewed/general-video")
+        );
+        assert_eq!(projected.verification_key().signer(), "codec.release");
+        assert_eq!(projected.public_key_hex(), "11".repeat(32));
+    }
+
+    #[test]
+    fn production_general_video_codec_settings_reject_fixture_and_private_authority() {
+        let mut fixture_signer = general_video_profile();
+        fixture_signer.video_codec_package_root = Some("/reviewed/general-video".to_owned());
+        fixture_signer.video_codec_package_signer =
+            Some(GENERAL_VIDEO_CODEC_FIXTURE_SIGNER.to_owned());
+        fixture_signer.video_codec_package_public_key_hex = Some("11".repeat(32));
+        assert!(matches!(
+            NativeRuntimeProfile::try_from(&fixture_signer),
+            Err(RuntimeSettingsError::InvalidGeneralVideoCodecPackageSecurity(_))
+        ));
+
+        let mut fixture_key = general_video_profile();
+        fixture_key.video_codec_package_root = Some("/reviewed/general-video".to_owned());
+        fixture_key.video_codec_package_signer = Some("codec.release".to_owned());
+        fixture_key.video_codec_package_public_key_hex =
+            Some(GENERAL_VIDEO_CODEC_FIXTURE_PUBLIC_KEY_HEX.to_owned());
+        assert!(matches!(
+            NativeRuntimeProfile::try_from(&fixture_key),
+            Err(RuntimeSettingsError::InvalidGeneralVideoCodecPackageSecurity(_))
+        ));
+
+        let mut private = general_video_profile();
+        private.unknown_fields.insert(
+            "video_codec_package_private_key".to_owned(),
+            serde_json::Value::String("not permitted".to_owned()),
+        );
+        assert!(matches!(
+            NativeRuntimeProfile::try_from(&private),
+            Err(RuntimeSettingsError::InvalidGeneralVideoCodecPackageSecurity(_))
+        ));
     }
 }

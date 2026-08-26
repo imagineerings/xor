@@ -20,6 +20,10 @@ multiplayer-tools = [
     "dep:chrono",
     "dep:collaboration_domain",
     "dep:git_ui",
+    "dep:nostr_compat",
+    "dep:qrcode",
+    "dep:remote",
+    "dep:zeroize",
     "agent_ui/multiplayer-tools",
     "git_ui/multiplayer-tools",
 ]
@@ -55,9 +59,12 @@ gpui.workspace = true
 git_ui = { workspace = true, optional = true }
 livekit_client.workspace = true
 menu.workspace = true
+nostr_compat = { workspace = true, optional = true }
 notifications.workspace = true
 picker.workspace = true
 project.workspace = true
+qrcode = { workspace = true, optional = true }
+remote = { workspace = true, optional = true }
 release_channel.workspace = true
 rpc.workspace = true
 serde.workspace = true
@@ -68,12 +75,14 @@ smol.workspace = true
 telemetry.workspace = true
 theme.workspace = true
 theme_settings.workspace = true
+thiserror.workspace = true
 time.workspace = true
 title_bar.workspace = true
 ui.workspace = true
 util.workspace = true
 workspace.workspace = true
 zed_actions.workspace = true
+zeroize = { workspace = true, optional = true }
 
 [dev-dependencies]
 call = { workspace = true, features = ["test-support"] }
@@ -83,11 +92,13 @@ collections = { workspace = true, features = ["test-support"] }
 db = { workspace = true, features = ["test-support"] }
 editor = { workspace = true, features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }
+iroh-base.workspace = true
 notifications = { workspace = true, features = ["test-support"] }
 
 project = { workspace = true, features = ["test-support"] }
 rpc = { workspace = true, features = ["test-support"] }
 settings = { workspace = true, features = ["test-support"] }
+title_bar = { workspace = true, features = ["test-support"] }
 
 util = { workspace = true, features = ["test-support"] }
 uuid.workspace = true

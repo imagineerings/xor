@@ -28,6 +28,7 @@ use zeroize::Zeroizing;
     feature = "xpu"
 ))]
 use comfy_model::ArtifactRoot;
+use comfy_model::artifact_index::CapturedPrivateArtifact;
 use comfy_plugin_sdk::{
     ED25519_PUBLIC_KEY_BYTES, ED25519_SIGNATURE_BYTES, PLUGIN_SIGNATURE_ALGORITHM,
     PluginContractError, PluginManifest, ProviderBindingSet, ProviderHttpMethodV2,
@@ -70,6 +71,10 @@ const CUDA_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-cuda-package-v1\0";
 const XPU_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-xpu-package-v1\0";
 const DIRECTML_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-directml-package-v1\0";
 const VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-video-codec-package-v1\0";
+pub(crate) const GENERAL_VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN: &[u8] =
+    b"zed-comfy-general-video-codec-package-v1\0";
+pub(crate) const GENERAL_VIDEO_CODEC_DEPENDENCY_CONTRACT_SIGNATURE_DOMAIN: &[u8] =
+    b"zed-comfy-general-video-codec-dependency-contract-v1\0";
 const VIDEO_CODEC_DEPENDENCY_CONTRACT_SIGNATURE_DOMAIN: &[u8] =
     b"zed-comfy-video-codec-dependency-contract-v1\0";
 const NATIVE_PACKAGE_SIGNATURE_ALGORITHM: &str = "ed25519";
@@ -169,6 +174,15 @@ pub struct DirectMlPackageVerificationKey {
 pub struct VideoCodecPackageVerificationKey {
     authority: NativePackageVerificationAuthority,
 }
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct GeneralVideoCodecPackageVerificationKey {
+    authority: NativePackageVerificationAuthority,
+}
+
+pub(crate) const GENERAL_VIDEO_CODEC_FIXTURE_SIGNER: &str = "comfy.fixture.general-video";
+pub(crate) const GENERAL_VIDEO_CODEC_FIXTURE_PUBLIC_KEY_HEX: &str =
+    "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
 
 #[derive(Clone, Eq, PartialEq)]
 struct NativePackageVerificationAuthority {
@@ -518,6 +532,58 @@ impl VideoCodecPackageVerificationKey {
     }
 }
 
+impl GeneralVideoCodecPackageVerificationKey {
+    pub fn new(signer: impl Into<String>, key: impl AsRef<[u8]>) -> Result<Self, TrustError> {
+        Ok(Self {
+            authority: NativePackageVerificationAuthority::new(
+                signer,
+                key,
+                TrustError::InvalidGeneralVideoCodecPackageVerificationKey,
+            )?,
+        })
+    }
+
+    pub fn signer(&self) -> &str {
+        &self.authority.signer
+    }
+
+    pub fn public_key_bytes(&self) -> &[u8; ED25519_PUBLIC_KEY_BYTES] {
+        &self.authority.public_key
+    }
+
+    pub fn verify_package(
+        &self,
+        signer: &str,
+        coverage: &[u8],
+        receipt_bytes: &[u8],
+    ) -> Result<(), TrustError> {
+        self.authority.verify(
+            GENERAL_VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN,
+            signer,
+            coverage,
+            receipt_bytes,
+            TrustError::UnknownGeneralVideoCodecPackageSigner,
+            TrustError::InvalidGeneralVideoCodecPackageSignature,
+        )
+    }
+
+    pub fn verify_dependency_contract(
+        &self,
+        signer: &str,
+        contract: &[u8],
+        receipt_bytes: &[u8],
+    ) -> Result<(), TrustError> {
+        self.authority.verify(
+            GENERAL_VIDEO_CODEC_DEPENDENCY_CONTRACT_SIGNATURE_DOMAIN,
+            signer,
+            contract,
+            receipt_bytes,
+            TrustError::UnknownGeneralVideoCodecPackageSigner,
+            TrustError::InvalidGeneralVideoCodecPackageSignature,
+        )
+    }
+}
+
 impl fmt::Debug for RocmPackageVerificationKey {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -582,6 +648,16 @@ impl fmt::Debug for DirectMlPackageVerificationKey {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("DirectMlPackageVerificationKey")
+            .field("signer", &self.authority.signer)
+            .field("public_key", &encode_hex(&self.authority.public_key))
+            .finish()
+    }
+}
+
+impl fmt::Debug for GeneralVideoCodecPackageVerificationKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("GeneralVideoCodecPackageVerificationKey")
             .field("signer", &self.authority.signer)
             .field("public_key", &encode_hex(&self.authority.public_key))
             .finish()
@@ -678,6 +754,32 @@ pub fn video_codec_package_signing_payload(
 }
 
 #[cfg(any(test, feature = "signing-tooling"))]
+pub fn general_video_codec_package_signing_payload(
+    signer: &str,
+    coverage: &[u8],
+) -> Result<Vec<u8>, TrustError> {
+    package_signing_payload(
+        GENERAL_VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN,
+        signer,
+        coverage,
+        TrustError::InvalidGeneralVideoCodecPackageSignature,
+    )
+}
+
+#[cfg(any(test, feature = "signing-tooling"))]
+pub fn general_video_codec_dependency_contract_signing_payload(
+    signer: &str,
+    contract: &[u8],
+) -> Result<Vec<u8>, TrustError> {
+    package_signing_payload(
+        GENERAL_VIDEO_CODEC_DEPENDENCY_CONTRACT_SIGNATURE_DOMAIN,
+        signer,
+        contract,
+        TrustError::InvalidGeneralVideoCodecPackageSignature,
+    )
+}
+
+#[cfg(any(test, feature = "signing-tooling"))]
 pub fn video_codec_dependency_contract_signing_payload(
     signer: &str,
     coverage: &[u8],
@@ -751,6 +853,30 @@ impl From<CancellationError> for NativeLibraryImageError {
 pub(crate) struct CapturedNativeLibraryImage {
     bytes: Vec<u8>,
     digest_sha256: String,
+}
+
+pub(crate) fn capture_native_library_bytes(
+    captured: CapturedPrivateArtifact,
+    expected_digest_sha256: &str,
+) -> Result<CapturedNativeLibraryImage, NativeLibraryImageError> {
+    let digest_sha256 = captured.digest_sha256().to_owned();
+    let bytes = captured.into_bytes();
+    if bytes.is_empty()
+        || u64::try_from(bytes.len()).unwrap_or(u64::MAX) > MAX_NATIVE_LIBRARY_IMAGE_BYTES
+    {
+        return Err(NativeLibraryImageError::Invalid(
+            "image must be nonempty and within the native-library byte bound".to_owned(),
+        ));
+    }
+    if digest_sha256 != expected_digest_sha256 {
+        return Err(NativeLibraryImageError::Invalid(
+            "captured native-library digest differs from signed coverage".to_owned(),
+        ));
+    }
+    Ok(CapturedNativeLibraryImage {
+        bytes,
+        digest_sha256,
+    })
 }
 
 impl CapturedNativeLibraryImage {
@@ -1240,23 +1366,123 @@ impl NativePackagePayloadLimit {
     }
 }
 
-#[cfg(any(
-    test,
-    feature = "directml",
-    feature = "metal",
-    feature = "mlu",
-    feature = "npu",
-    feature = "cuda",
-    feature = "xpu"
-))]
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub(crate) enum NativePackageAdmissionError {
+    #[cfg_attr(
+        not(any(
+            test,
+            feature = "directml",
+            feature = "metal",
+            feature = "mlu",
+            feature = "npu",
+            feature = "cuda",
+            feature = "xpu"
+        )),
+        expect(
+            dead_code,
+            reason = "constructed by feature-gated canonical native-package capture"
+        )
+    )]
     #[error("native package admission was cancelled")]
     Cancelled,
+    #[cfg_attr(
+        not(any(
+            test,
+            feature = "directml",
+            feature = "metal",
+            feature = "mlu",
+            feature = "npu",
+            feature = "cuda",
+            feature = "xpu"
+        )),
+        expect(
+            dead_code,
+            reason = "constructed by feature-gated canonical native-package capture"
+        )
+    )]
     #[error("native package tree is unsafe or incomplete: {0}")]
     UnsafePackage(String),
     #[error("native package signature coverage is invalid: {0}")]
     InvalidCoverage(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NativePackageCoverageEntry {
+    pub(crate) digest_sha256: String,
+    pub(crate) size: u64,
+}
+
+pub(crate) fn parse_native_package_coverage(
+    coverage: &[u8],
+    excludes: &[&str],
+    maximum_bytes: usize,
+) -> Result<BTreeMap<String, NativePackageCoverageEntry>, NativePackageAdmissionError> {
+    if maximum_bytes == 0
+        || coverage.is_empty()
+        || coverage.len() > maximum_bytes
+        || coverage.last() != Some(&b'\n')
+        || !coverage.is_ascii()
+    {
+        return Err(NativePackageAdmissionError::InvalidCoverage(
+            "coverage must be bounded nonempty newline-terminated ASCII".to_owned(),
+        ));
+    }
+    if excludes.windows(2).any(|pair| pair[0] >= pair[1])
+        || excludes.iter().any(|path| !valid_native_package_path(path))
+    {
+        return Err(NativePackageAdmissionError::InvalidCoverage(
+            "coverage exclusions must be strict, sorted package paths".to_owned(),
+        ));
+    }
+    let text = std::str::from_utf8(coverage).map_err(|_| {
+        NativePackageAdmissionError::InvalidCoverage("coverage must be UTF-8".to_owned())
+    })?;
+    let mut entries = BTreeMap::new();
+    let mut previous_path: Option<&str> = None;
+    for line in text.lines() {
+        let (digest_and_size, path) = line.split_once("  ").ok_or_else(|| {
+            NativePackageAdmissionError::InvalidCoverage(
+                "coverage row must contain digest, size, and path".to_owned(),
+            )
+        })?;
+        let (digest, size_text) = digest_and_size.split_once(' ').ok_or_else(|| {
+            NativePackageAdmissionError::InvalidCoverage(
+                "coverage row has an invalid digest/size separator".to_owned(),
+            )
+        })?;
+        let size = size_text.parse::<u64>().map_err(|_| {
+            NativePackageAdmissionError::InvalidCoverage(
+                "coverage size is not canonical decimal".to_owned(),
+            )
+        })?;
+        if !valid_lower_hex_sha256(digest)
+            || size.to_string() != size_text
+            || !valid_native_package_path(path)
+            || excludes.binary_search(&path).is_ok()
+            || previous_path.is_some_and(|previous| previous >= path)
+            || entries
+                .insert(
+                    path.to_owned(),
+                    NativePackageCoverageEntry {
+                        digest_sha256: digest.to_owned(),
+                        size,
+                    },
+                )
+                .is_some()
+        {
+            return Err(NativePackageAdmissionError::InvalidCoverage(
+                "coverage rows must be canonical, strictly sorted, unique, and non-excluded"
+                    .to_owned(),
+            ));
+        }
+        previous_path = Some(path);
+    }
+    if entries.is_empty() {
+        return Err(NativePackageAdmissionError::InvalidCoverage(
+            "coverage must contain at least one payload".to_owned(),
+        ));
+    }
+    Ok(entries)
 }
 
 #[cfg(any(
@@ -1408,73 +1634,34 @@ pub(crate) fn validate_native_package_coverage(
     excludes: &[&str],
     maximum_bytes: usize,
 ) -> Result<(), NativePackageAdmissionError> {
-    if maximum_bytes == 0
-        || coverage.is_empty()
-        || coverage.len() > maximum_bytes
-        || coverage.last() != Some(&b'\n')
-        || !coverage.is_ascii()
-    {
-        return Err(NativePackageAdmissionError::InvalidCoverage(
-            "coverage must be bounded nonempty newline-terminated ASCII".to_owned(),
-        ));
-    }
-    if excludes
-        .windows(2)
-        .any(|pair| matches!(pair, [left, right] if left >= right))
-        || excludes
-            .iter()
-            .any(|path| !valid_native_package_path(path) || !payloads.contains_key(*path))
-    {
+    if excludes.iter().any(|path| !payloads.contains_key(*path)) {
         return Err(NativePackageAdmissionError::InvalidCoverage(
             "coverage exclusions are not a strict sorted payload subset".to_owned(),
         ));
     }
+    let entries = parse_native_package_coverage(coverage, excludes, maximum_bytes)?;
     let expected_paths = payloads
         .keys()
         .filter(|path| excludes.binary_search(&path.as_str()).is_err())
-        .cloned()
-        .collect::<Vec<_>>();
-    let text = std::str::from_utf8(coverage).map_err(|_| {
-        NativePackageAdmissionError::InvalidCoverage("coverage must be UTF-8".to_owned())
-    })?;
-    let mut observed_paths = Vec::new();
-    for line in text.lines() {
-        let (digest_and_size, path) = line.split_once("  ").ok_or_else(|| {
-            NativePackageAdmissionError::InvalidCoverage(
-                "coverage row must contain digest, size, and path".to_owned(),
-            )
-        })?;
-        let (digest, size) = digest_and_size.split_once(' ').ok_or_else(|| {
-            NativePackageAdmissionError::InvalidCoverage(
-                "coverage row has an invalid digest/size separator".to_owned(),
-            )
-        })?;
-        if !valid_lower_hex_sha256(digest)
-            || size.is_empty()
-            || size.starts_with('0') && size != "0"
-            || !size.bytes().all(|byte| byte.is_ascii_digit())
-            || !valid_native_package_path(path)
-        {
-            return Err(NativePackageAdmissionError::InvalidCoverage(
-                "coverage row is not canonical".to_owned(),
-            ));
-        }
-        let payload = payloads.get(path).ok_or_else(|| {
+        .collect::<BTreeSet<_>>();
+    if entries.keys().collect::<BTreeSet<_>>() != expected_paths {
+        return Err(NativePackageAdmissionError::InvalidCoverage(
+            "coverage paths must exactly equal the non-excluded payload set".to_owned(),
+        ));
+    }
+    for (path, entry) in entries {
+        let payload = payloads.get(&path).ok_or_else(|| {
             NativePackageAdmissionError::InvalidCoverage(
                 "coverage references an unknown payload".to_owned(),
             )
         })?;
-        if size != payload.len().to_string() || digest != format!("{:x}", Sha256::digest(payload)) {
+        if entry.size != u64::try_from(payload.len()).unwrap_or(u64::MAX)
+            || entry.digest_sha256 != format!("{:x}", Sha256::digest(payload))
+        {
             return Err(NativePackageAdmissionError::InvalidCoverage(format!(
                 "coverage does not match payload {path}"
             )));
         }
-        observed_paths.push(path.to_owned());
-    }
-    if observed_paths != expected_paths {
-        return Err(NativePackageAdmissionError::InvalidCoverage(
-            "coverage paths must be exact, strictly sorted, and unique".to_owned(),
-        ));
     }
     Ok(())
 }
@@ -1534,15 +1721,6 @@ fn check_package_admission_cancellation(
         .map_err(|_| NativePackageAdmissionError::Cancelled)
 }
 
-#[cfg(any(
-    test,
-    feature = "directml",
-    feature = "metal",
-    feature = "mlu",
-    feature = "npu",
-    feature = "cuda",
-    feature = "xpu"
-))]
 fn valid_native_package_path(path: &str) -> bool {
     !path.is_empty()
         && !path.starts_with('/')
@@ -1555,15 +1733,6 @@ fn valid_native_package_path(path: &str) -> bool {
         })
 }
 
-#[cfg(any(
-    test,
-    feature = "directml",
-    feature = "metal",
-    feature = "mlu",
-    feature = "npu",
-    feature = "cuda",
-    feature = "xpu"
-))]
 fn valid_lower_hex_sha256(value: &str) -> bool {
     value.len() == 64
         && value
@@ -3760,7 +3929,8 @@ struct GeneralVideoCodecSourceDto {
     archive_sha256: String,
     signature_sha256: String,
     signing_key_fingerprint: String,
-    signature_verified: bool,
+    #[serde(rename = "signature_verified")]
+    reviewed_release_signature: bool,
     headers: BTreeMap<String, GeneralVideoCodecHeaderDto>,
 }
 
@@ -3808,7 +3978,8 @@ struct GeneralVideoCodecLibraryDto {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct GeneralVideoCodecClaimsDto {
-    official_release_signature_verified: bool,
+    #[serde(rename = "official_release_signature_verified")]
+    reviewed_official_release_signature: bool,
     reviewed_typed_declarations: bool,
     installed_ffmpeg_package: bool,
     loadable_native_library: bool,
@@ -3933,7 +4104,7 @@ fn validate_general_video_codec_abi(
         || source.signature_sha256
             != "9bd1689dce76b109034dcc4765a406e84e8799a2fd857b000c0a4d9744b70617"
         || source.signing_key_fingerprint != "FCF986EA15E6E293A5644F10B4322F04D67658D8"
-        || !source.signature_verified
+        || !source.reviewed_release_signature
         || compiler.compiler != "gcc 15.2.0"
         || compiler.compiler_target != "x86_64-linux-gnu"
         || compiler.oci_index_sha256
@@ -3954,7 +4125,7 @@ fn validate_general_video_codec_abi(
         || contract.runtime_loading
         || contract.runtime_symbol_resolution
         || contract.runtime_function_invocation
-        || !claims.official_release_signature_verified
+        || !claims.reviewed_official_release_signature
         || !claims.reviewed_typed_declarations
         || claims.installed_ffmpeg_package
         || claims.loadable_native_library
@@ -5898,6 +6069,12 @@ pub enum TrustError {
     UnknownVideoCodecPackageSigner,
     #[error("video codec package signature is missing, malformed, or invalid")]
     InvalidVideoCodecPackageSignature,
+    #[error("general video codec package verification key is invalid")]
+    InvalidGeneralVideoCodecPackageVerificationKey,
+    #[error("general video codec package signer is not the explicitly configured authority")]
+    UnknownGeneralVideoCodecPackageSigner,
+    #[error("general video codec package signature is missing, malformed, or invalid")]
+    InvalidGeneralVideoCodecPackageSignature,
     #[error("plugin authorization does not belong to this manifest")]
     AuthorizationManifestMismatch,
     #[error("sealed plugin authorization is malformed or internally inconsistent")]

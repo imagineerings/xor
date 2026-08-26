@@ -6961,6 +6961,106 @@
       "decision_reason": "The focused diffusion kernels map canonical Tensor storage and CpuBackend allocation into model-slice equations. Shared linear and convolution mechanics delegate to the canonical operator-indirection tensor owner, while layer norm, group norm, and SiLU delegate to the canonical functional activation/normalization owner; diffusion retains only Tensor-specific shape projection, upload/download, and model-equation composition. It introduces no duplicate kernel, storage, allocation, cancellation, memory-planning, cache, persistence, or transaction service."
     },
     {
+      "concern": "native_dinov2_backbone_execution",
+      "canonical_owner": "comfy_model::dino2::NativeDino2Backbone",
+      "owner_files": [
+        "crates/comfy_model/src/dino2.rs"
+      ],
+      "owner_symbols": [
+        "NativeDino2Backbone"
+      ],
+      "allowed_adapters": [
+        "comfy_model::NativeDepthAnything3Resource retains DA3 resource identity, complete state residency, invocation, geometry, payload, persistence, and restart authority while delegating every DINO state projection and execution phase to NativeDino2Backbone",
+        "future comfy_model::moge may consume NativeDino2Backbone but is not a Task391 production callsite and owns no DINO transformer, position, attention, or intermediate-feature equation",
+        "the pure-standard-library DINO fixture is an independent development-reference oracle and confers no production state, tensor, storage, mutation, callsite, or consumer authority"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/dino2.rs",
+          "qualified": "comfy_model::dino2::NativeDino2Backbone",
+          "role": "canonical",
+          "symbol": "NativeDino2Backbone"
+        },
+        {
+          "path": "crates/comfy_model/src/depth_anything_3.rs",
+          "qualified": "comfy_model::NativeDepthAnything3Resource",
+          "role": "adapter",
+          "symbol": "NativeDepthAnything3Resource"
+        }
+      ],
+      "call_symbols": [
+        "NativeDino2Backbone",
+        "NativeDepthAnything3Resource"
+      ],
+      "required_mappings": [
+        {
+          "name": "dinov2-module-remains-crate-private",
+          "path": "crates/comfy_model/src/comfy_model.rs",
+          "pattern": "mod dino2;"
+        },
+        {
+          "name": "da3-projects-dino-state-through-owner",
+          "path": "crates/comfy_model/src/depth_anything_3.rs",
+          "pattern": "backbone\\.project_state_tensor"
+        },
+        {
+          "name": "da3-executes-through-owner",
+          "path": "crates/comfy_model/src/depth_anything_3.rs",
+          "pattern": "get_intermediate_layers_da3"
+        },
+        {
+          "name": "owner-implements-ordinary-and-da3-routes",
+          "path": "crates/comfy_model/src/dino2.rs",
+          "pattern": "pub\\(crate\\) fn get_intermediate_layers_da3\\([\\s\\S]*pub\\(crate\\) fn get_intermediate_layers\\("
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-dinov2-backbone-owner-foundation"
+      ],
+      "production_consumers": [
+        "comfy_model::NativeDepthAnything3Resource"
+      ],
+      "requirements": [
+        "Requirement 6.3",
+        "Requirement 7.2",
+        "Requirement 18.1",
+        "Requirement 26.2",
+        "Requirement 28.2",
+        "Requirement 31.5",
+        "Requirement 34.2",
+        "Requirement 34.6",
+        "Requirement 35.2",
+        "Requirement 37.5",
+        "Requirement 38.3",
+        "Requirement 41.2",
+        "Requirement 44.1",
+        "Requirement 44.3"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeDino2Backbone is the only native owner of DINOv2 state schema, checked storage projection, position interpolation, transformer execution, and intermediate extraction. DA3 is a resource adapter; MoGe remains a future non-authoritative consumer until its later task."
+    },
+    {
       "concern": "native_execution_cache",
       "canonical_owner": "comfy_runtime::NativeCache",
       "owner_files": [
@@ -7103,6 +7203,11 @@
           "name": "video-dependency-closure-reuses-elf-owner-and-rejects-needed-duplicates",
           "path": "crates/comfy_runtime/src/native_ffi_elf.rs",
           "pattern": "PT_DYNAMIC contains duplicate DT_NEEDED entry[\\s\\S]*elf_inspection_rejects_duplicate_needed_entries"
+        },
+        {
+          "name": "general-video-package-bootstrap-delegates-every-image-to-shared-elf-owner",
+          "path": "crates/comfy_runtime/src/native_video_codec_package.rs",
+          "pattern": "inspect_elf64_dynamic_contract\\(captured\\.as_bytes\\(\\), X86_64_ELF_MACHINE, cancellation\\)[\\s\\S]*validate_primary_elf[\\s\\S]*validate_dependency_elf"
         }
       ],
       "known_open_reasons": [],
@@ -7110,7 +7215,8 @@
         "comfy-parity-authoritative-ownership-gate",
         "comfy-parity-native-video-codec-elf-inspection-foundation",
         "comfy-parity-native-video-codec-dependency-closure-certification-foundation",
-        "comfy-parity-native-video-codec-callable-symbol-certification-foundation"
+        "comfy-parity-native-video-codec-callable-symbol-certification-foundation",
+        "comfy-parity-native-video-codec-package-bootstrap-foundation"
       ],
       "production_consumers": [
         "ROCm retained native-library certification",
@@ -7325,6 +7431,11 @@
           "name": "video-codec-typed-binding-consumes-primary-certificates-and-rejects-callable-dependencies",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
           "pattern": "primary_certificates[\\s\\S]*dependency_certificates[\\s\\S]*required_symbols\\(\\)\\.is_empty[\\s\\S]*VIDEO_CODEC_FFI_UNSAFE_OWNER"
+        },
+        {
+          "name": "general-video-package-certifies-primary-and-dependency-contracts-through-registry",
+          "path": "crates/comfy_runtime/src/native_video_codec_package.rs",
+          "pattern": "NativeFfiRegistry::new[\\s\\S]*authorize\\([\\s\\S]*authorize_dependency\\([\\s\\S]*CertifiedGeneralVideoCodecDependencyClosure"
         }
       ],
       "known_open_reasons": [],
@@ -7348,7 +7459,8 @@
         "comfy-parity-native-video-codec-symbol-binding-foundation",
         "comfy-parity-security-platform",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab",
-        "comfy-parity-wave39-vendor-execution-ownership-consolidation"
+        "comfy-parity-wave39-vendor-execution-ownership-consolidation",
+        "comfy-parity-native-video-codec-package-bootstrap-foundation"
       ],
       "production_consumers": [
         "native codec registry",
@@ -9912,6 +10024,11 @@
           "name": "native-library-image-owner-oracle-rejects-duplicates",
           "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
           "pattern": "native_library_image_capture_and_sealing_have_one_owner"
+        },
+        {
+          "name": "general-video-bootstrap-captures-capability-bytes-and-seals-through-shared-owner",
+          "path": "crates/comfy_runtime/src/native_video_codec_package.rs",
+          "pattern": "capture_private_file[\\s\\S]*capture_native_library_bytes\\(captured[\\s\\S]*RetainedNativeLibraryImage"
         }
       ],
       "known_open_reasons": [],
@@ -9921,6 +10038,7 @@
         "comfy-parity-provision-native-ffi-contracts-intel-xpu-comfy-model-0021",
         "comfy-parity-provision-native-ffi-contracts-nvidia-cuda-comfy-model-0022",
         "comfy-parity-native-video-codec-dependency-closure-certification-foundation",
+        "comfy-parity-native-video-codec-package-bootstrap-foundation",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation",
         "comfy-parity-integrate-device-huawei-ascend-npu-comfy-model-0019"
       ],
@@ -14796,7 +14914,11 @@
         "crates/comfy_runtime/src/native_video_codec_ffi.rs"
       ],
       "owner_symbols": [
+        "NativeGeneralVideoCodecBinding",
+        "NativeGeneralVideoCodecLoad",
         "NativeVideoCodecLoad",
+        "bind_certified_general_video_codec_abi",
+        "load_certified_general_video_codec_closure",
         "load_certified_video_codec_closure"
       ],
       "allowed_adapters": [
@@ -14818,9 +14940,39 @@
           "qualified": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecLoad",
           "role": "sealed_lifecycle_projection",
           "symbol": "NativeVideoCodecLoad"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeGeneralVideoCodecLoad",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeGeneralVideoCodecLoad",
+          "pattern": "^pub\\(crate\\) struct NativeGeneralVideoCodecLoad"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeGeneralVideoCodecBinding",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeGeneralVideoCodecBinding",
+          "pattern": "^pub\\(crate\\) struct NativeGeneralVideoCodecBinding"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::load_certified_general_video_codec_closure",
+          "role": "canonical_service",
+          "symbol": "load_certified_general_video_codec_closure",
+          "pattern": "^pub\\(crate\\) fn load_certified_general_video_codec_closure\\("
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::bind_certified_general_video_codec_abi",
+          "role": "canonical_service",
+          "symbol": "bind_certified_general_video_codec_abi",
+          "pattern": "^pub\\(crate\\) fn bind_certified_general_video_codec_abi\\("
         }
       ],
       "call_symbols": [
+        "bind_certified_general_video_codec_abi",
+        "load_certified_general_video_codec_closure",
         "load_certified_video_codec_closure"
       ],
       "required_mappings": [
@@ -14843,13 +14995,19 @@
           "name": "video-codec-loader-fixture-records-relocation-and-forbids-callable-codec-claims",
           "path": "crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json",
           "pattern": "(?=[\\s\\S]*synthetic-glibc-isolated-loader)(?=[\\s\\S]*loader_relocation_binding)(?=[\\s\\S]*library_constructors_or_destructors_may_run)(?=[\\s\\S]*explicit_dlsym_or_callable_address_projection)(?=[\\s\\S]*encoder_availability_probed)(?=[\\s\\S]*zed_invoked_codec_api)"
+        },
+        {
+          "name": "general-video-profile-reuses-the-sole-loader-through-crate-private-projections",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "pub\\(crate\\) fn load_certified_general_video_codec_closure[\\s\\S]*load_video_codec_projection[\\s\\S]*pub\\(crate\\) fn bind_certified_general_video_codec_abi[\\s\\S]*NativeGeneralVideoCodecBinding"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
         "comfy-parity-native-video-codec-retained-loader-foundation",
-        "comfy-parity-native-video-codec-symbol-binding-foundation"
+        "comfy-parity-native-video-codec-symbol-binding-foundation",
+        "comfy-parity-native-video-codec-package-bootstrap-foundation"
       ],
       "production_consumers": [
         "native retained FFmpeg typed symbol binding"
@@ -16242,6 +16400,150 @@
       "decision_reason": "One thread-affine retained codec owner composes the source-compatible LTXV IMAGE transformation. It preserves compression-zero fresh-stack behavior, serially bounds compressed frames, delegates native sessions to their existing owners, and publishes only one final canonical tensor after all cancellation checks."
     },
     {
+      "concern": "native_video_reviewed_codec_registry_ltxv_thread_general_package_bootstrap",
+      "canonical_owner": "comfy_runtime::native_video_codec_package::certify_general_video_codec_package",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_package.rs",
+        "crates/comfy_runtime/src/native_video_codec_service.rs",
+        "crates/comfy_runtime/src/settings.rs",
+        "crates/comfy_runtime/src/trust.rs"
+      ],
+      "owner_symbols": [
+        "CertifiedGeneralVideoCodecDependencyClosure",
+        "GeneralVideoCodecPackageVerificationKey",
+        "NativeGeneralVideoCodecPackageSettings",
+        "NativeVideoCodecWorkerServices",
+        "certify_general_video_codec_package"
+      ],
+      "allowed_adapters": [
+        "settings_content supplies only an optional all-or-none root, signer, and public verification key; production settings reject private material and the reserved fixture signer and key independently",
+        "ArtifactRoot owns capability-relative recursive enumeration and cancellable bounded file capture while trust owns canonical coverage parsing, signature domains, immutable image capture, and NativeFfiRegistry certification",
+        "native_video_codec_package owns only the signed general-video manifest, exact six-library dependency closure, license and source dispositions, and path-independent semantic identity and delegates every ELF structural decision to inspect_elf64_dynamic_contract",
+        "native_video_codec_ffi projects the certified general closure through the existing sole unsafe loader and keeps all supplemental pointers crate-private; historical five-library APIs cannot acquire general authority",
+        "NativeVideoCodecWorkerServices consumes the one non-cloneable closure into the sole retained actor and publishes only the existing LTXV, WebM, and H.264 ports after readiness",
+        "comfy_worker retains one bundle, reserves exact codec residency through MemoryPlanRequest::codec_bytes without baseline inflation, and combines the bundle identity with the canonical memory cache configuration"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_package.rs",
+          "qualified": "comfy_runtime::native_video_codec_package::CertifiedGeneralVideoCodecDependencyClosure",
+          "role": "sealed_authorization",
+          "symbol": "CertifiedGeneralVideoCodecDependencyClosure"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_package.rs",
+          "qualified": "comfy_runtime::certify_general_video_codec_package",
+          "role": "canonical_service",
+          "symbol": "certify_general_video_codec_package",
+          "pattern": "^pub fn certify_general_video_codec_package\\("
+        },
+        {
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "qualified": "comfy_runtime::GeneralVideoCodecPackageVerificationKey",
+          "role": "canonical_policy",
+          "symbol": "GeneralVideoCodecPackageVerificationKey"
+        },
+        {
+          "path": "crates/comfy_runtime/src/settings.rs",
+          "qualified": "comfy_runtime::NativeGeneralVideoCodecPackageSettings",
+          "role": "canonical_policy",
+          "symbol": "NativeGeneralVideoCodecPackageSettings"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::NativeVideoCodecWorkerServices",
+          "role": "canonical_service",
+          "symbol": "NativeVideoCodecWorkerServices"
+        }
+      ],
+      "call_symbols": [
+        "CertifiedGeneralVideoCodecDependencyClosure",
+        "NativeGeneralVideoCodecPackageSettings",
+        "NativeVideoCodecWorkerServices",
+        "certify_general_video_codec_package"
+      ],
+      "call_path_prefixes": [
+        "crates/comfy_runtime/",
+        "crates/comfy_worker/"
+      ],
+      "required_mappings": [
+        {
+          "name": "general-video-settings-deny-partial-private-and-fixture-authority",
+          "path": "crates/comfy_runtime/src/settings.rs",
+          "pattern": "NativeGeneralVideoCodecPackageSettings[\\s\\S]*from_public_authority[\\s\\S]*GENERAL_VIDEO_CODEC_FIXTURE_SIGNER[\\s\\S]*GENERAL_VIDEO_CODEC_FIXTURE_PUBLIC_KEY_HEX"
+        },
+        {
+          "name": "general-video-package-delegates-canonical-coverage-and-elf-owners",
+          "path": "crates/comfy_runtime/src/native_video_codec_package.rs",
+          "pattern": "parse_native_package_coverage[\\s\\S]*inspect_elf64_dynamic_contract[\\s\\S]*capture_native_library_bytes[\\s\\S]*NativeFfiRegistry"
+        },
+        {
+          "name": "general-video-package-is-domain-separated-and-path-independent",
+          "path": "crates/comfy_runtime/src/native_video_codec_package.rs",
+          "pattern": "(?=[\\s\\S]*GENERAL_VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN)(?=[\\s\\S]*GENERAL_VIDEO_CODEC_DEPENDENCY_CONTRACT_SIGNATURE_DOMAIN)(?=[\\s\\S]*fn semantic_identity)(?=[\\s\\S]*verification_key\\.public_key_bytes\\(\\))"
+        },
+        {
+          "name": "general-video-binding-reuses-one-loader-and-hides-supplemental-authority",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "(?=[\\s\\S]*pub\\(crate\\) fn load_certified_general_video_codec_closure)(?=[\\s\\S]*load_video_codec_projection)(?=[\\s\\S]*pub\\(crate\\) fn bind_certified_general_video_codec_abi)(?=[\\s\\S]*avfilter_version)"
+        },
+        {
+          "name": "general-video-worker-bundle-consumes-one-closure-and-publishes-three-ready-ports",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "NativeVideoCodecWorkerServices[\\s\\S]*NativeLtxvCodecThreadService::start_general[\\s\\S]*ltxv_preprocess_service[\\s\\S]*NativeWebmCodecRequestService::checked[\\s\\S]*NativeComponentH264Mp4CodecRequestService::checked[\\s\\S]*worker_service_cache_configuration_identity"
+        },
+        {
+          "name": "general-video-worker-reserves-codec-memory-and-binds-cache-before-attachment",
+          "path": "crates/comfy_worker/src/comfy_worker.rs",
+          "pattern": "(?=[\\s\\S]*certify_general_video_codec_package)(?=[\\s\\S]*MemoryPlanRequest)(?=[\\s\\S]*codec_bytes)(?=[\\s\\S]*append_video_codec_cache_configuration)(?=[\\s\\S]*with_ltxv_preprocess_service)(?=[\\s\\S]*with_webm_encode_service)(?=[\\s\\S]*with_component_h264_mp4_backing_service)"
+        },
+        {
+          "name": "general-video-bootstrap-fixture-is-deterministic-offline-and-negative",
+          "path": "crates/comfy_test_support/tests/video_codec_package_bootstrap.rs",
+          "pattern": "signed_general_video_package_certifies_and_relocates_stably[\\s\\S]*signed_general_video_package_rejects_tree_and_payload_mutations[\\s\\S]*general_video_worker_publication_uses_one_ready_actor_and_three_shared_ports"
+        },
+        {
+          "name": "general-video-bootstrap-ownership-oracle-rejects-second-authority",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "val_ownership_task562_video_codec_package_bootstrap_001"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-video-codec-package-bootstrap-foundation"
+      ],
+      "production_consumers": [
+        "private worker general-video package bootstrap and native executor service attachment"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D11",
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-NATIVE-E2E-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-RECOVERY-005",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One backend-independent signed package authority admits the exact general FFmpeg closure and moves it once into the existing retained codec actor. Shared capability, coverage, ELF, certification, loader, memory-planning, and executor owners remain authoritative; the bootstrap adds no downloader, subprocess, private production key, second parser, second unsafe loader, second actor, filesystem cache identity, or partial service publication."
+    },
+    {
       "concern": "native_video_reviewed_codec_registry_ltxv_thread_service",
       "canonical_owner": "comfy_runtime::native_video_codec_service::NativeLtxvCodecThreadService",
       "owner_files": [
@@ -16313,6 +16615,11 @@
           "name": "ltxv-thread-service-fixture-bounds-runtime-and-integration-claims",
           "path": "crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json",
           "pattern": "synthetic-retained-ltxv-codec-thread-service[\\s\\S]*load_bind_admit_and_preprocess_execute_on_one_named_thread[\\s\\S]*actual_dlmopen_bind_or_codec_admission_executed[\\s\\S]*node_executor_controller_or_worker_injection"
+        },
+        {
+          "name": "general-video-worker-bundle-reuses-the-sole-retained-codec-actor",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "NativeVideoCodecWorkerServices[\\s\\S]*NativeLtxvCodecThreadService::start_general[\\s\\S]*start_ltxv_codec_thread[\\s\\S]*process_video_codec_request"
         }
       ],
       "known_open_reasons": [],
@@ -16321,7 +16628,8 @@
         "comfy-parity-native-video-codec-ltxv-thread-service-foundation",
         "comfy-parity-native-video-codec-av1-webm-thread-bridge-foundation",
         "comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation",
-        "comfy-parity-native-video-codec-h264-mp4-10bit-thread-bridge-foundation"
+        "comfy-parity-native-video-codec-h264-mp4-10bit-thread-bridge-foundation",
+        "comfy-parity-native-video-codec-package-bootstrap-foundation"
       ],
       "production_consumers": [
         "the following worker-owned service provisioning and LTXVPreprocess node adapter"
@@ -20699,7 +21007,7 @@
         {
           "name": "task412-runtime-authority-is-host-checked-and-provider-derived",
           "path": "crates/comfy_runtime/src/plugin_services.rs",
-          "pattern": "ProviderRuntimeActivationGrant[\\s\\S]*pub fn bind\\([\\s\\S]*ProviderRuntimeAuthorityInput[\\s\\S]*provider_binding\\(\\)[\\s\\S]*implementation_namespace[\\s\\S]*provider_policy[\\s\\S]*\\.authorize\\("
+          "pattern": "impl ProviderRuntimeActivationGrant[\\s\\S]*pub fn preflight_installed_component\\([\\s\\S]*PreflightedProviderRuntimeActivationGrant[\\s\\S]*impl PreflightedProviderRuntimeActivationGrant[\\s\\S]*pub fn bind\\([\\s\\S]*ProviderRuntimeAuthorityInput[\\s\\S]*provider_binding\\(\\)[\\s\\S]*implementation_namespace[\\s\\S]*provider_policy[\\s\\S]*\\.authorize\\("
         },
         {
           "name": "zed-provider-actuator-consumes-sealed-endpoint-without-policy-revalidation",
@@ -20712,7 +21020,8 @@
         "comfy-parity-trust-foundation",
         "comfy-parity-authoritative-domain-ownership",
         "comfy-parity-provider-worker-stream-protocol",
-        "comfy-parity-provider-runtime-stream-progress-foundation"
+        "comfy-parity-provider-runtime-stream-progress-foundation",
+        "comfy-parity-provider-runtime-component-activation-preflight-foundation"
       ],
       "production_consumers": [
         "native provider services",
@@ -20875,7 +21184,7 @@
         "ProviderRuntimeStreamService"
       ],
       "allowed_adapters": [
-        "NativeExecutionController constructs and shares the sole ProviderRuntimeStreamService, and delegates the existing v1 provider capability envelope only through its crate-owned legacy methods",
+        "NativeExecutionController constructs the sole ProviderRuntimeStreamService, delegates the existing v1 provider capability envelope only through crate-owned legacy methods, and exports only one opaque non-cloneable weak lifecycle attachment for the private executor",
         "comfy_plugin_sdk::ProviderStreamValidatorV2 remains the typed ABI-state validator and owns no runtime authorization or live session table",
         "comfy_runtime::materialize_provider_invocation_result_v2 maps a receipt-verified complete DTO to one canonical response and cannot publish a partial result",
         "The later component-host adapter alone claims a runtime-minted one-use activation grant and consumes it to bind a checked ProviderRuntimeAuthorityInput; worker and component fields cannot mint authority",
@@ -20899,6 +21208,12 @@
           "qualified": "comfy_runtime::ProviderRuntimeActivationGrant",
           "role": "sealed_authorization",
           "symbol": "ProviderRuntimeActivationGrant"
+        },
+        {
+          "path": "crates/comfy_runtime/src/plugin_services.rs",
+          "qualified": "comfy_runtime::PreflightedProviderRuntimeActivationGrant",
+          "role": "sealed_authorization",
+          "symbol": "PreflightedProviderRuntimeActivationGrant"
         },
         {
           "path": "crates/comfy_runtime/src/plugin_services.rs",
@@ -20930,15 +21245,29 @@
           "role": "allowed_adapter",
           "symbol": "materialize_provider_invocation_result_v2",
           "pattern": "^pub fn materialize_provider_invocation_result_v2\\("
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "qualified": "comfy_runtime::NativeProviderWorkerBridgeAttachment",
+          "role": "allowed_adapter",
+          "symbol": "NativeProviderWorkerBridgeAttachment"
+        },
+        {
+          "path": "crates/comfy_plugin_host/src/private_worker.rs",
+          "qualified": "comfy_plugin_host::PrivateWorkerPluginExecutor",
+          "role": "allowed_adapter",
+          "symbol": "PrivateWorkerPluginExecutor"
         }
       ],
       "call_symbols": [
         "ProviderRuntimeActuationProposal",
         "ProviderRuntimeActivationGrant",
         "ProviderRuntimeActivationGrantSource",
+        "PreflightedProviderRuntimeActivationGrant",
         "ProviderRuntimeAuthorityInput",
         "ProviderRuntimeProgressProjection",
         "ProviderRuntimeStreamService",
+        "NativeProviderWorkerBridgeAttachment",
         "materialize_provider_invocation_result_v2"
       ],
       "call_path_prefixes": [
@@ -20949,7 +21278,7 @@
         {
           "name": "task412-runtime-authority-is-host-checked-and-provider-derived",
           "path": "crates/comfy_runtime/src/plugin_services.rs",
-          "pattern": "ProviderRuntimeActivationGrant[\\s\\S]*pub fn bind\\([\\s\\S]*ProviderRuntimeAuthorityInput[\\s\\S]*provider_binding\\(\\)[\\s\\S]*implementation_namespace[\\s\\S]*provider_policy[\\s\\S]*\\.authorize\\("
+          "pattern": "impl ProviderRuntimeActivationGrant[\\s\\S]*pub fn preflight_installed_component\\([\\s\\S]*PreflightedProviderRuntimeActivationGrant[\\s\\S]*impl PreflightedProviderRuntimeActivationGrant[\\s\\S]*pub fn bind\\([\\s\\S]*ProviderRuntimeAuthorityInput[\\s\\S]*provider_binding\\(\\)[\\s\\S]*implementation_namespace[\\s\\S]*provider_policy[\\s\\S]*\\.authorize\\("
         },
         {
           "name": "task412-stream-service-retains-complete-v1-v2-lifecycle",
@@ -20969,7 +21298,12 @@
         {
           "name": "task412-controller-shares-service-and-delegates-v1-cleanup",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "provider_streams: ProviderRuntimeStreamService[\\s\\S]*ProviderRuntimeStreamService::new\\(\\)[\\s\\S]*provider_runtime_stream_service[\\s\\S]*\\.begin_legacy\\([\\s\\S]*\\.call_legacy\\([\\s\\S]*\\.resolve_legacy\\([\\s\\S]*\\.finish_legacy\\([\\s\\S]*abort_legacy\\([\\s\\S]*fn abort_provider_sessions\\([\\s\\S]*provider_streams\\.revoke_all\\("
+          "pattern": "provider_streams: ProviderRuntimeStreamService[\\s\\S]*provider_bridge_live: Arc<AtomicBool>[\\s\\S]*pub struct NativeProviderWorkerBridgeAttachment[\\s\\S]*Weak<NativeExecutionController>[\\s\\S]*provider_bridge_live\\.load\\(Ordering::Acquire\\)[\\s\\S]*pub fn start_with_provider_worker_bridge\\([\\s\\S]*ProviderRuntimeStreamService::new\\(\\)[\\s\\S]*runner_provider_bridge_live[\\s\\S]*invalidate_provider_worker_bridge\\([\\s\\S]*fn revoke_provider_worker_bridge\\([\\s\\S]*fn invalidate_provider_worker_bridge\\([\\s\\S]*live\\.swap\\(false, Ordering::AcqRel\\)[\\s\\S]*\\.begin_legacy\\([\\s\\S]*\\.call_legacy\\([\\s\\S]*\\.resolve_legacy\\([\\s\\S]*\\.finish_legacy\\([\\s\\S]*abort_legacy\\([\\s\\S]*fn abort_provider_sessions\\([\\s\\S]*provider_streams\\.revoke_all\\("
+        },
+        {
+          "name": "task423-private-executor-retains-only-one-live-weak-controller-attachment",
+          "path": "crates/comfy_plugin_host/src/private_worker.rs",
+          "pattern": "provider_worker_bridge: Mutex<Option<NativeProviderWorkerBridgeAttachment>>[\\s\\S]*pub fn attach_provider_worker_bridge\\([\\s\\S]*bind_to_worker_profile\\([\\s\\S]*is_some_and\\(NativeProviderWorkerBridgeAttachment::is_live\\)[\\s\\S]*\\*current = Some\\(attachment\\)"
         },
         {
           "name": "task412-root-exports-runtime-stream-authority",
@@ -20989,7 +21323,9 @@
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
-        "comfy-parity-provider-runtime-stream-progress-foundation"
+        "comfy-parity-provider-runtime-stream-progress-foundation",
+        "comfy-parity-provider-runtime-component-activation-preflight-foundation",
+        "comfy-parity-provider-controller-owned-worker-bridge-bootstrap"
       ],
       "production_consumers": [
         "native provider capability-envelope sessions",
@@ -21434,6 +21770,11 @@
           "name": "native-package-admission-ownership-oracle-rejects-duplicates",
           "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
           "pattern": "native_package_admission_uses_one_security_owner"
+        },
+        {
+          "name": "general-video-dynamic-coverage-delegates-canonical-grammar-to-trust",
+          "path": "crates/comfy_runtime/src/native_video_codec_package.rs",
+          "pattern": "parse_native_package_coverage\\([\\s\\S]*PACKAGE_COVERAGE_PATH[\\s\\S]*PACKAGE_RECEIPT_PATH[\\s\\S]*MAXIMUM_COVERAGE_BYTES"
         }
       ],
       "known_open_reasons": [],
@@ -21441,7 +21782,8 @@
         "comfy-parity-native-package-admission-ownership-consolidation",
         "comfy-parity-provision-native-ffi-contracts-intel-xpu-comfy-model-0021",
         "comfy-parity-provision-native-ffi-contracts-nvidia-cuda-comfy-model-0022",
-        "comfy-parity-wave39-vendor-execution-ownership-consolidation"
+        "comfy-parity-wave39-vendor-execution-ownership-consolidation",
+        "comfy-parity-native-video-codec-package-bootstrap-foundation"
       ],
       "production_consumers": [
         "signed DirectML package verification",
@@ -24097,13 +24439,20 @@
       "allowed_adapters": [
         "StorageId identifies only a physical backing allocation and cannot key autograd participation, saved-value identity, gradient publication, or checkpoint state",
         "Rust handle clones, views, detach, and data aliases preserve the canonical logical TensorId while true copies and fresh factory outputs receive a checked new identity",
-        "SavedTensor and AutogradTape read TensorId through immutable Tensor accessors and cannot construct, replace, or persist a parallel logical identity"
+        "SavedTensor and AutogradTape read TensorId through immutable Tensor accessors and cannot construct, replace, or persist a parallel logical identity",
+        "The pure-standard-library reduced Depth Anything 3 source-equation oracle defines only development-reference tensor values and owns no Rust Tensor identity, storage, or mutation authority"
       ],
       "definitions": [
         {
           "path": "crates/comfy_tensor/src/comfy_tensor.rs",
           "qualified": "comfy_tensor::Tensor",
           "role": "canonical",
+          "symbol": "Tensor"
+        },
+        {
+          "path": "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/source_graph.py",
+          "qualified": "depth_anything_3_source_graph::Tensor",
+          "role": "development_reference",
           "symbol": "Tensor"
         },
         {
@@ -24191,13 +24540,20 @@
       "allowed_adapters": [
         "TensorWrite is the unique mutable lease and increments the Tensor-owned shared MutationLineage exactly once before exposing mutable bytes",
         "Storage copy-on-write may replace the physical allocation but must preserve the shared mutation lineage for every logical alias",
-        "SavedTensor and CheckpointRecord retain immutable mutation witnesses and delegate comparison to Tensor; they own no version counter or increment path"
+        "SavedTensor and CheckpointRecord retain immutable mutation witnesses and delegate comparison to Tensor; they own no version counter or increment path",
+        "The pure-standard-library reduced Depth Anything 3 source-equation oracle defines only development-reference tensor values and owns no Rust Tensor identity, storage, or mutation authority"
       ],
       "definitions": [
         {
           "path": "crates/comfy_tensor/src/comfy_tensor.rs",
           "qualified": "comfy_tensor::Tensor",
           "role": "canonical",
+          "symbol": "Tensor"
+        },
+        {
+          "path": "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/source_graph.py",
+          "qualified": "depth_anything_3_source_graph::Tensor",
+          "role": "development_reference",
           "symbol": "Tensor"
         },
         {
@@ -25265,13 +25621,20 @@
         "Task 86 extends TensorDescriptor with the sole compatible-stride reshaped_view and checked reinterpreted_dtype_view validators; view, flatten, unsqueeze, movedim, and expand adapters build or request checked descriptors and Tensor alone admits read-only aliases, while CpuBackend alone owns flatten fallback copies",
         "Task 87 extends TensorDescriptor with the sole general permuted_view validator; permute, unbind, view_as, reshape, flatten, movedim, and stack adapters request canonical descriptors or Task 86 helpers and never admit aliases or own copy publication",
         "Task 88 method permute and transpose delegate Task 87's canonical descriptor adapter, squeeze requests a checked TensorDescriptor and Task 86 reshape inverse, method split delegates Task 60 read-only aliases, and functional pad stages private geometry into CpuBackend workspace before one fresh canonical publication",
-        "Task 91 clone, contiguous, copy_, numpy, and memory-format adapters use TensorDescriptor for layout admission, Tensor for host/storage identity, TensorWrite for the sole transactional mutation commit, and expose only an immutable NativeArrayView borrow."
+        "Task 91 clone, contiguous, copy_, numpy, and memory-format adapters use TensorDescriptor for layout admission, Tensor for host/storage identity, TensorWrite for the sole transactional mutation commit, and expose only an immutable NativeArrayView borrow.",
+        "The pure-standard-library reduced Depth Anything 3 source-equation oracle defines only development-reference tensor values and owns no Rust Tensor identity, storage, or mutation authority"
       ],
       "definitions": [
         {
           "path": "crates/comfy_tensor/src/comfy_tensor.rs",
           "qualified": "comfy_tensor::Tensor",
           "role": "canonical",
+          "symbol": "Tensor"
+        },
+        {
+          "path": "crates/comfy_test_support/fixtures/models/depth-anything-3-resource-foundation/source_graph.py",
+          "qualified": "depth_anything_3_source_graph::Tensor",
+          "role": "development_reference",
           "symbol": "Tensor"
         },
         {

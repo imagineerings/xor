@@ -11,7 +11,7 @@ pub const PROVIDER_COMPONENT_CONTRACT_CATALOG: &[u8] = include_bytes!(
     "../../../.agents/specs/comfy-parity/catalogs/provider-component-contracts.json"
 );
 pub const PROVIDER_COMPONENT_CONTRACT_CATALOG_SHA256: &str =
-    "93ca705baacbe8e6f2615a18ad8e782ad6df96a3734c8c915d031636658128de";
+    "bbdb8dc02ee698bd96d093b79e480da93ef52211927ea13420da69428a3cc34f";
 pub const PROVIDER_NODE_CONTRACT_COUNT: usize = 224;
 pub const PROVIDER_NAMESPACE_COUNT: usize = 33;
 

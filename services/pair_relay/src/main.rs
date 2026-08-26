@@ -552,20 +552,23 @@ fn current_time_millis() -> u64 {
         .unwrap_or(1)
 }
 
+pub fn router() -> Router {
+    let state = AppState {
+        relay: Arc::new(Mutex::new(PairRelay::new())),
+        next_connection_id: Arc::new(AtomicU64::new(1)),
+    };
+    Router::new()
+        .route("/pair", get(pair_upgrade))
+        .with_state(state)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let address: SocketAddr = std::env::var("PAIR_RELAY_BIND_ADDR")
         .unwrap_or_else(|_| "127.0.0.1:5000".into())
         .parse()?;
-    let state = AppState {
-        relay: Arc::new(Mutex::new(PairRelay::new())),
-        next_connection_id: Arc::new(AtomicU64::new(1)),
-    };
-    let app = Router::new()
-        .route("/pair", get(pair_upgrade))
-        .with_state(state);
     axum::Server::bind(&address)
-        .serve(app.into_make_service())
+        .serve(router().into_make_service())
         .await?;
     Ok(())
 }

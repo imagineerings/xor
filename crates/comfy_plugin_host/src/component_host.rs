@@ -1,24 +1,25 @@
 use crate::{
     ComponentLimits, InvocationInputs, InvocationResult, PluginCapabilityServices, PluginError,
-    PluginHost, ProviderInvocationResult,
+    PluginHost, ProviderInvocationResult, WasmPluginInstance,
 };
 use comfy_nodes::NativeSchemaValue;
-use comfy_plugin_sdk::PluginManifest;
+use comfy_plugin_sdk::{PluginManifest, ProviderPluginManifestV2};
 use comfy_runtime::{
     NativeNodeRegistry, NativeProviderInvocationAuthority, NativeProviderInvocationScope,
     NativeProviderRegistryPin, NodeContext, PermissionPolicy, PluginAuthorization,
     PluginAuthorizationSealer, PluginAuthorizationVerifier, PluginCapabilityBroker,
     PluginCapabilityInvocation, PluginServiceError, PluginServiceInvocationContext,
     PluginTrustPolicy, PreflightedProviderRuntimeActivationGrant,
-    ProviderCostAuthorizationAuthority, ProviderManifestAuthorizationV2,
+    ProviderCostAuthorizationAuthority, ProviderManifestAuthorizationV2, ProviderPolicy,
     ProviderResultReceiptAuthority, ProviderResultReceiptIssuer, ProviderRuntimeActivationGrant,
-    WorkerRegistryDeploymentPlan,
+    ProviderRuntimeAuthorityInput, WorkerRegistryDeploymentPlan,
 };
 use comfy_types::{
     CancellationToken, MAX_WORKER_COMPONENT_CHUNK_BYTES,
     MAX_WORKER_PLUGIN_CAPABILITY_PAYLOAD_BYTES, MAX_WORKER_PLUGIN_INVOCATION_BYTES,
-    WorkerComponentContent, WorkerComponentDescriptor, WorkerRegistryDeploymentBegin,
-    WorkerRegistryDeploymentChunk, WorkerRegistryGeneration, WorkerSha256Digest,
+    WorkerComponentContent, WorkerComponentDescriptor, WorkerProviderInvocationContext,
+    WorkerRegistryDeploymentBegin, WorkerRegistryDeploymentChunk, WorkerRegistryGeneration,
+    WorkerSha256Digest,
 };
 use extension_host::{ComponentLifecycleAdapter, ComponentRuntime, InstalledComponent};
 use sha2::{Digest, Sha256};
@@ -106,6 +107,12 @@ struct VerifiedPlugin {
     binding: InstalledComponentBinding,
     manifest: Arc<PluginManifest>,
     authorization: Arc<PluginAuthorization>,
+    provider_manifest_v2: Option<Arc<ProviderPluginManifestV2>>,
+    #[expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )]
+    provider_authorization_v2: Option<Arc<ProviderManifestAuthorizationV2>>,
     compiled: Arc<crate::CompiledPlugin>,
     manifest_bytes: Arc<[u8]>,
     component_bytes: Arc<[u8]>,
@@ -335,10 +342,12 @@ impl VerifiedComponentGeneration {
     ) -> Result<Option<NativeProviderRegistryPin>, ComponentHostError> {
         let mut binding_digests = Vec::new();
         for component in self.components.iter() {
-            let manifest: PluginManifest = serde_json::from_slice(component.manifest_bytes())
-                .map_err(|error| ComponentHostError::InvalidManifest {
-                    extension_id: component.extension_id.clone(),
-                    message: error.to_string(),
+            let (manifest, _) =
+                parse_component_manifest(component.manifest_bytes()).map_err(|error| {
+                    ComponentHostError::InvalidManifest {
+                        extension_id: component.extension_id.clone(),
+                        message: error.to_string(),
+                    }
                 })?;
             if let Some(provider_binding) = manifest.provider_binding {
                 binding_digests.push(provider_binding.bindings_sha256);
@@ -421,13 +430,17 @@ impl VerifiedComponentGeneration {
             .iter()
             .find(|component| component.extension_id() == extension_id)
             .ok_or_else(|| ComponentHostError::MissingExtension(extension_id.to_owned()))?;
-        let manifest: PluginManifest =
-            serde_json::from_slice(component.manifest_bytes()).map_err(|error| {
-                ComponentHostError::InvalidManifest {
-                    extension_id: component.extension_id.clone(),
-                    message: error.to_string(),
-                }
+        let (manifest, provider_manifest_v2) = parse_component_manifest(component.manifest_bytes())
+            .map_err(|error| ComponentHostError::InvalidManifest {
+                extension_id: component.extension_id.clone(),
+                message: error.to_string(),
             })?;
+        if provider_manifest_v2.is_some() {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "provider-v8 worker routing is unavailable until the canonical bridge is active"
+                    .to_owned(),
+            ));
+        }
         if !manifest.nodes.iter().any(|node| node.id == node_id) {
             return Err(ComponentHostError::Plugin(PluginError::UndeclaredNode(
                 node_id.to_owned(),
@@ -645,6 +658,36 @@ impl InstalledVerifiedPlugin {
     pub fn authorization(&self) -> &PluginAuthorization {
         &self.inner.authorization
     }
+
+    pub(crate) fn is_provider_v2(&self) -> bool {
+        self.inner.provider_manifest_v2.is_some()
+    }
+
+    #[expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )]
+    pub(crate) fn provider_manifest_v2(&self) -> Option<&ProviderPluginManifestV2> {
+        self.inner.provider_manifest_v2.as_deref()
+    }
+
+    #[expect(
+        dead_code,
+        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    )]
+    pub(crate) fn provider_authorization_v2(&self) -> Option<&ProviderManifestAuthorizationV2> {
+        self.inner.provider_authorization_v2.as_deref()
+    }
+
+    fn require_legacy_invocation_route(&self) -> Result<(), ComponentHostError> {
+        if self.is_provider_v2() {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "provider-v8 worker routing is unavailable until the canonical bridge is active"
+                    .to_owned(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 pub struct PreparedPluginInvocation {
@@ -658,24 +701,27 @@ pub struct PreparedPluginInvocation {
 }
 
 #[allow(dead_code)]
-struct PreflightedProviderComponentCapsule {
+pub(crate) struct PreflightedProviderComponentCapsule {
     grant: PreflightedProviderRuntimeActivationGrant,
+    worker_context: WorkerProviderInvocationContext,
+    manifest_authorization: ProviderManifestAuthorizationV2,
     plugin: InstalledVerifiedPlugin,
     generation: VerifiedComponentGeneration,
     node_id: Arc<str>,
+    plugin_host: Arc<PluginHost>,
     _lease: InvocationLease,
 }
 
 #[allow(dead_code)]
 impl PreflightedProviderComponentCapsule {
-    fn new(
+    pub(crate) fn new(
         host: &ComponentHost,
         grant: ProviderRuntimeActivationGrant,
+        worker_context: WorkerProviderInvocationContext,
         worker_start: &comfy_runtime::NativeProviderWorkerSessionStart,
         manifest_authorization: ProviderManifestAuthorizationV2,
     ) -> Result<Self, ComponentHostError> {
         let plugin = host.installed_plugin(&worker_start.extension_id)?;
-        let lease = host.begin_invocation_lease(&plugin)?;
         let generation = host.verified_generation()?;
         let deployment = generation.worker_deployment_plan()?;
         let node_id: Arc<str> = Arc::from(worker_start.node_id.as_str());
@@ -690,20 +736,205 @@ impl PreflightedProviderComponentCapsule {
             )));
         }
         let grant = grant
-            .preflight_installed_component(&deployment, worker_start, manifest_authorization)
+            .preflight_installed_component(
+                &worker_context,
+                &deployment,
+                worker_start,
+                manifest_authorization.clone(),
+            )
             .map_err(|error| match error {
                 PluginServiceError::Cancelled => ComponentHostError::Cancelled,
                 error => ComponentHostError::ExecutionBoundary(format!(
                     "provider component activation preflight failed: {error}"
                 )),
             })?;
+        let lease = host.begin_invocation_lease(&plugin)?;
         Ok(Self {
             grant,
+            worker_context,
+            manifest_authorization,
             plugin,
             generation,
             node_id,
+            plugin_host: host.inner.plugin_host.clone(),
             _lease: lease,
         })
+    }
+}
+
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+)]
+pub(crate) struct PreparedProviderV2Invocation {
+    grant: Option<PreflightedProviderRuntimeActivationGrant>,
+    worker_context: WorkerProviderInvocationContext,
+    manifest_authorization: ProviderManifestAuthorizationV2,
+    plugin: InstalledVerifiedPlugin,
+    generation: VerifiedComponentGeneration,
+    node_id: Arc<str>,
+    route: crate::ProviderV2StreamRouteReceiver,
+    runtime: crate::ProviderV2RuntimeHost,
+    cancellation: CancellationToken,
+    plugin_host: Arc<PluginHost>,
+    _lease: InvocationLease,
+}
+
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+)]
+pub(crate) struct ProviderV2ComponentInvocation {
+    instance: WasmPluginInstance,
+    node_id: Arc<str>,
+    _plugin: InstalledVerifiedPlugin,
+    _generation: VerifiedComponentGeneration,
+    _lease: InvocationLease,
+}
+
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+)]
+pub(crate) struct ProviderV2AppRoute {
+    grant: Option<PreflightedProviderRuntimeActivationGrant>,
+    worker_context: WorkerProviderInvocationContext,
+    manifest_authorization: ProviderManifestAuthorizationV2,
+    route: crate::ProviderV2StreamRouteReceiver,
+}
+
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+)]
+impl PreflightedProviderComponentCapsule {
+    pub(crate) fn prepare_stream_route(
+        self,
+        cancellation: CancellationToken,
+    ) -> Result<PreparedProviderV2Invocation, ComponentHostError> {
+        let contract =
+            crate::worker_streaming_contract(self.manifest_authorization.streaming_contract());
+        let (route, receiver) = crate::provider_v2_stream_route();
+        let runtime = crate::ProviderV2RuntimeHost::checked_from_certified_capsule(
+            self.worker_context.clone(),
+            contract,
+            cancellation.clone(),
+            route,
+        )
+        .map_err(|error| ComponentHostError::ExecutionBoundary(error.to_string()))?;
+        Ok(PreparedProviderV2Invocation {
+            grant: Some(self.grant),
+            worker_context: self.worker_context,
+            manifest_authorization: self.manifest_authorization,
+            plugin: self.plugin,
+            generation: self.generation,
+            node_id: self.node_id,
+            route: receiver,
+            runtime,
+            cancellation,
+            plugin_host: self.plugin_host,
+            _lease: self._lease,
+        })
+    }
+}
+
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+)]
+impl PreparedProviderV2Invocation {
+    pub(crate) fn into_execution(
+        self,
+        inputs: InvocationInputs,
+        services: Arc<dyn PluginCapabilityServices>,
+    ) -> Result<(ProviderV2ComponentInvocation, ProviderV2AppRoute), ComponentHostError> {
+        let invocation = self.plugin_host.begin_invocation(
+            self.plugin.manifest(),
+            self.plugin.authorization(),
+            self.node_id.as_ref(),
+            inputs,
+            services,
+            self.cancellation,
+        )?;
+        let instance = self.plugin_host.instantiate_provider_component_v2(
+            &self.plugin.inner.compiled,
+            invocation,
+            self.runtime,
+        )?;
+        Ok((
+            ProviderV2ComponentInvocation {
+                instance,
+                node_id: self.node_id,
+                _plugin: self.plugin,
+                _generation: self.generation,
+                _lease: self._lease,
+            },
+            ProviderV2AppRoute {
+                grant: self.grant,
+                worker_context: self.worker_context,
+                manifest_authorization: self.manifest_authorization,
+                route: self.route,
+            },
+        ))
+    }
+}
+
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+)]
+impl ProviderV2ComponentInvocation {
+    pub(crate) fn invoke(self) -> Result<crate::ProviderV2InvocationProposal, ComponentHostError> {
+        self.instance
+            .invoke_provider_v2(self.node_id.as_ref())
+            .map_err(ComponentHostError::from)
+    }
+}
+
+#[expect(
+    dead_code,
+    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+)]
+impl ProviderV2AppRoute {
+    pub(crate) fn bind_start_request(
+        &mut self,
+        call: crate::ProviderV2StreamRouteCall,
+        policy: &ProviderPolicy,
+    ) -> Result<
+        (
+            ProviderRuntimeAuthorityInput,
+            crate::ProviderV2BoundStartCall,
+        ),
+        ComponentHostError,
+    > {
+        let (call_id, context, head, reply) = call
+            .into_start()
+            .map_err(|error| ComponentHostError::ExecutionBoundary(error.to_string()))?;
+        if context != self.worker_context {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "provider-v2 route context differs from its certified activation".to_owned(),
+            ));
+        }
+        let authority = self
+            .grant
+            .take()
+            .ok_or_else(|| {
+                ComponentHostError::ExecutionBoundary(
+                    "provider-v2 activation grant was already consumed".to_owned(),
+                )
+            })?
+            .bind(&crate::sdk_request_head(&head), policy)
+            .map_err(|error| ComponentHostError::ExecutionBoundary(error.to_string()))?;
+        Ok((
+            authority,
+            crate::ProviderV2BoundStartCall { call_id, reply },
+        ))
+    }
+
+    pub(crate) fn try_receive_stream_call(
+        &self,
+    ) -> Result<crate::ProviderV2StreamRouteMessage, std::sync::mpsc::TryRecvError> {
+        self.route.try_receive()
     }
 }
 
@@ -712,8 +943,12 @@ mod activation_preflight_tests {
     #[test]
     fn provider_component_capsule_is_the_only_preflight_callsite() {
         let source = include_str!("component_host.rs");
+        let production = source
+            .split("#[cfg(test)]\nmod activation_preflight_tests")
+            .next()
+            .expect("component host production source is missing");
         let call = [".preflight_installed_", "component("].concat();
-        assert_eq!(source.matches(&call).count(), 1);
+        assert_eq!(production.matches(&call).count(), 1);
         let fields = source
             .split("struct PreflightedProviderComponentCapsule")
             .nth(1)
@@ -723,28 +958,55 @@ mod activation_preflight_tests {
                     .next()
             })
             .expect("private provider component capsule is missing");
-        for retained in ["grant:", "plugin:", "generation:", "node_id:", "_lease:"] {
+        for retained in [
+            "grant:",
+            "worker_context:",
+            "manifest_authorization:",
+            "plugin:",
+            "generation:",
+            "node_id:",
+            "plugin_host:",
+            "_lease:",
+        ] {
             assert!(fields.contains(retained));
         }
-        assert!(!fields.contains("pub "));
+        assert!(!fields.contains("pub grant:"));
+        assert!(!fields.contains("pub worker_context:"));
+        assert!(!fields.contains("pub manifest_authorization:"));
         let capsule = source
             .split("impl PreflightedProviderComponentCapsule")
             .nth(1)
-            .and_then(|source| source.split("impl PreparedPluginInvocation").next())
+            .and_then(|source| source.split("#[cfg(test)]").next())
             .expect("private provider component capsule implementation is missing");
+        let constructor_signature = capsule
+            .split("fn new(")
+            .nth(1)
+            .and_then(|source| source.split(") -> Result").next())
+            .expect("private capsule constructor signature is missing");
+        assert_eq!(constructor_signature.matches("worker_context").count(), 1);
+        assert_eq!(
+            constructor_signature
+                .matches("WorkerProviderInvocationContext")
+                .count(),
+            1
+        );
         assert!(capsule.contains("let plugin = host.installed_plugin"));
-        assert!(capsule.contains("let lease = host.begin_invocation_lease"));
         assert!(capsule.contains("let generation = host.verified_generation"));
         assert!(capsule.contains("let deployment = generation.worker_deployment_plan"));
-        assert!(capsule.contains("plugin.manifest().nodes.iter().any"));
+        let compact_capsule = capsule.split_whitespace().collect::<String>();
+        assert!(compact_capsule.contains("plugin.manifest().nodes.iter().any"));
+        assert!(compact_capsule.contains(
+            "grant.preflight_installed_component(&worker_context,&deployment,worker_start,manifest_authorization.clone(),)"
+        ));
         assert!(capsule.contains(&call));
+        assert!(capsule.contains("&worker_context"));
         let ordered = [
             "let plugin = host.installed_plugin",
-            "let lease = host.begin_invocation_lease",
             "let generation = host.verified_generation",
             "let deployment = generation.worker_deployment_plan",
-            "plugin.manifest().nodes.iter().any",
+            "node.id == node_id.as_ref()",
             call.as_str(),
+            "let lease = host.begin_invocation_lease",
             "Ok(Self",
         ];
         let mut previous = 0;
@@ -768,6 +1030,126 @@ mod activation_preflight_tests {
         ] {
             assert!(!capsule.contains(forbidden));
         }
+    }
+
+    #[test]
+    fn every_legacy_component_entrypoint_uses_the_early_provider_v2_guard() {
+        let source = include_str!("component_host.rs");
+        assert!(source.matches("require_legacy_invocation_route()?").count() >= 4);
+        for function in [
+            "pub fn prepare_plugin_invocation",
+            "pub fn prepare_provider_invocation",
+            "pub fn execute_plugin",
+            "pub fn invoke(",
+        ] {
+            let body = source
+                .split(function)
+                .nth(1)
+                .and_then(|source| source.split("\n    pub fn ").next())
+                .expect("legacy component entrypoint is missing");
+            let guard = body
+                .find("require_legacy_invocation_route")
+                .expect("provider-v2 legacy-route guard is missing");
+            for exposure in [
+                "begin_invocation(",
+                "instantiate_component(",
+                "execute_prepared_plugin(",
+                ".invoke(",
+            ] {
+                if let Some(position) = body.find(exposure) {
+                    assert!(
+                        guard < position,
+                        "{function} exposes state before its v2 guard"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn provider_v2_prepared_invocation_has_one_consuming_selector_free_execution_split() {
+        let source = include_str!("component_host.rs");
+        let prepared = source
+            .split("struct PreparedProviderV2Invocation")
+            .nth(1)
+            .and_then(|source| {
+                source
+                    .split("impl PreflightedProviderComponentCapsule")
+                    .next()
+            })
+            .expect("prepared provider-v2 invocation fields are missing");
+        for retained in [
+            "grant:",
+            "worker_context:",
+            "manifest_authorization:",
+            "plugin:",
+            "generation:",
+            "node_id:",
+            "route:",
+            "runtime:",
+            "cancellation:",
+            "plugin_host:",
+            "_lease:",
+        ] {
+            assert!(
+                prepared.contains(retained),
+                "missing retained field {retained}"
+            );
+        }
+        assert!(!prepared.contains("Clone"));
+
+        let execution = source
+            .split("fn into_execution(")
+            .nth(1)
+            .and_then(|source| source.split("impl ProviderV2ComponentInvocation").next())
+            .expect("consuming provider-v2 execution split is missing");
+        let signature = execution
+            .split(") -> Result")
+            .next()
+            .expect("execution split signature is missing");
+        for selector in [
+            "CompiledPlugin",
+            "WasmPluginInstance",
+            "InvocationHost",
+            "WorkerProviderInvocationContext",
+            "ProviderManifestAuthorizationV2",
+            "node_id",
+            "generation",
+            "plugin",
+            "runtime",
+        ] {
+            assert!(
+                !signature.contains(selector),
+                "caller can replace {selector}"
+            );
+        }
+        let compact = execution.split_whitespace().collect::<String>();
+        assert!(compact.contains("self.plugin_host.begin_invocation(self.plugin.manifest(),self.plugin.authorization(),self.node_id.as_ref()"));
+        assert!(compact.contains("&self.plugin.inner.compiled,invocation,self.runtime"));
+
+        let production_source = source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("component-host production source must exist");
+        let host_source = include_str!("comfy_plugin_host.rs");
+        let production_host_source = host_source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("plugin-host production source must exist");
+        assert_eq!(
+            production_source
+                .matches("instantiate_provider_component_v2(")
+                .count()
+                + production_host_source
+                    .matches("instantiate_provider_component_v2(")
+                    .count(),
+            2,
+            "v2 instantiation must have one definition and one production callsite"
+        );
+        assert!(
+            production_host_source.contains("pub(crate) fn instantiate_provider_component_v2(")
+        );
+        assert!(!production_host_source.contains("pub fn instantiate_provider_component_v2("));
     }
 }
 
@@ -1368,6 +1750,7 @@ impl ComponentHost {
         inputs: InvocationInputs,
         context: NodeContext,
     ) -> Result<PreparedPluginInvocation, ComponentHostError> {
+        plugin.require_legacy_invocation_route()?;
         let lease = self.begin_invocation_lease(plugin)?;
         let generation = self.verified_generation()?;
         let worker_invocation = generation.prepare_worker_invocation(
@@ -1398,6 +1781,7 @@ impl ComponentHost {
         provider_request: Vec<u8>,
         context: NodeContext,
     ) -> Result<PreparedPluginInvocation, ComponentHostError> {
+        plugin.require_legacy_invocation_route()?;
         let lease = self.begin_invocation_lease(plugin)?;
         let state = self
             .inner
@@ -1443,6 +1827,7 @@ impl ComponentHost {
         inputs: InvocationInputs,
         context: NodeContext,
     ) -> Result<InvocationResult, ComponentHostError> {
+        plugin.require_legacy_invocation_route()?;
         let prepared = self.prepare_plugin_invocation(plugin, node_id, inputs, context)?;
         self.executor().execute(prepared).await
     }
@@ -1467,6 +1852,7 @@ impl ComponentHost {
         inputs: InvocationInputs,
         cancellation: CancellationToken,
     ) -> Result<InvocationResult, ComponentHostError> {
+        plugin.require_legacy_invocation_route()?;
         let _invocation_lease = self.begin_invocation_lease(plugin)?;
         let services = self.inner.conformance_services.clone().ok_or_else(|| {
             ComponentHostError::ExecutionBoundary(
@@ -1568,31 +1954,60 @@ impl ComponentHost {
         let mut node_owners = BTreeMap::new();
         for component in components {
             let extension_id: Arc<str> = Arc::from(component.extension_id());
-            let manifest: PluginManifest = serde_json::from_slice(component.manifest_bytes())
-                .map_err(|error| ComponentHostError::InvalidManifest {
-                    extension_id: extension_id.clone(),
-                    message: error.to_string(),
+            let (manifest, provider_manifest_v2) =
+                parse_component_manifest(component.manifest_bytes()).map_err(|error| {
+                    ComponentHostError::InvalidManifest {
+                        extension_id: extension_id.clone(),
+                        message: error.to_string(),
+                    }
                 })?;
             let binding = InstalledComponentBinding::checked(&component, &manifest)?;
             if !plugin_ids.insert(manifest.identifier.clone()) {
                 return Err(ComponentHostError::DuplicatePlugin(manifest.identifier));
             }
-            let authorization = self
-                .inner
-                .trust_policy
-                .authorize_manifest(&manifest, &self.inner.permission_policy)
+            let provider_authorization_v2 = provider_manifest_v2
+                .as_ref()
+                .map(|provider_manifest| {
+                    self.inner.trust_policy.authorize_provider_manifest_v2(
+                        provider_manifest,
+                        &self.inner.permission_policy,
+                    )
+                })
+                .transpose()
                 .map_err(|error| ComponentHostError::Verification {
                     extension_id: extension_id.clone(),
                     message: error.to_string(),
                 })?;
-            let compiled = self
-                .inner
-                .plugin_host
-                .compile_component(component.component_bytes(), &manifest, &authorization)
-                .map_err(|error| ComponentHostError::Verification {
-                    extension_id: extension_id.clone(),
-                    message: error.to_string(),
-                })?;
+            let authorization = match &provider_authorization_v2 {
+                Some(authorization) => authorization.authorization().clone(),
+                None => self
+                    .inner
+                    .trust_policy
+                    .authorize_manifest(&manifest, &self.inner.permission_policy)
+                    .map_err(|error| ComponentHostError::Verification {
+                        extension_id: extension_id.clone(),
+                        message: error.to_string(),
+                    })?,
+            };
+            let compiled = match (&provider_manifest_v2, &provider_authorization_v2) {
+                (Some(provider_manifest), Some(provider_authorization)) => {
+                    self.inner.plugin_host.compile_provider_component_v2(
+                        component.component_bytes(),
+                        provider_manifest,
+                        provider_authorization,
+                    )
+                }
+                (None, None) => self.inner.plugin_host.compile_component(
+                    component.component_bytes(),
+                    &manifest,
+                    &authorization,
+                ),
+                _ => Err(PluginError::ProviderRuntimeActivationDenied),
+            }
+            .map_err(|error| ComponentHostError::Verification {
+                extension_id: extension_id.clone(),
+                message: error.to_string(),
+            })?;
             for node in &manifest.nodes {
                 if node_owners
                     .insert(node.id.clone(), extension_id.clone())
@@ -1606,6 +2021,8 @@ impl ComponentHost {
                     binding,
                     manifest: Arc::new(manifest),
                     authorization: Arc::new(authorization),
+                    provider_manifest_v2: provider_manifest_v2.map(Arc::new),
+                    provider_authorization_v2: provider_authorization_v2.map(Arc::new),
                     compiled: Arc::new(compiled),
                     manifest_bytes: Arc::from(component.manifest_bytes()),
                     component_bytes: Arc::from(component.component_bytes()),
@@ -1686,6 +2103,15 @@ fn empty_component_generation(
         authorization_verifier,
         components: Arc::from([]),
     }
+}
+
+fn parse_component_manifest(
+    bytes: &[u8],
+) -> Result<(PluginManifest, Option<ProviderPluginManifestV2>), serde_json::Error> {
+    if let Ok(provider_manifest) = serde_json::from_slice::<ProviderPluginManifestV2>(bytes) {
+        return Ok((provider_manifest.manifest.clone(), Some(provider_manifest)));
+    }
+    serde_json::from_slice(bytes).map(|manifest| (manifest, None))
 }
 
 fn append_worker_chunks(
