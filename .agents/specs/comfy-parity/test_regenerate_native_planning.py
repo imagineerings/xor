@@ -1751,12 +1751,14 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_test_support/tests/native_worker_resilience.rs",
             "crates/comfy_test_support/tests/native_image_e2e.rs",
             "crates/comfy_test_support/tests/support/native_controller.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ):
             self.assertIn(native_controller_diagnostic_read, provider_worker_bridge["reads"])
-        self.assertIn(
+        for provider_bridge_test_owner in (
             "crates/comfy_test_support/tests/support/native_controller.rs",
-            provider_worker_bridge["writes"],
-        )
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(provider_bridge_test_owner, provider_worker_bridge["writes"])
         for bridge_feature_manifest in (
             "crates/comfy_plugin_host/Cargo.toml",
             "crates/comfy_test_support/Cargo.toml",
@@ -1826,6 +1828,10 @@ class ValidationGenerationTests(unittest.TestCase):
             "initial Started, initial Cancelled, retry Started, retry Interrupted, and retry Succeeded",
             "exact target-attempt events observed so far including sequence and kind",
             "Diagnostic collection does not change any deadline, polling cadence, event consumption, canonical-event assertion, predicate, controller ordering, fixture, or success behavior",
+            "route_authority: Option<NativeProviderWorkerV2RouteAuthority>",
+            "consumes it exactly once through route_authority.take() before start(head, policy)",
+            "both PrivateWorkerCommand::Legacy and test-support ProviderV2",
+            "exactly two ensure_private_worker_supervisor(launch, state, &deployment).await callsites",
         ):
             self.assertIn(bridge_completion_gate, provider_worker_bridge["done"])
         provider_worker_bridge_commands = planning.task_validation_commands(
@@ -1835,6 +1841,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "cargo test --locked -p comfy_test_support --test native_controller_e2e native_controller_drives_packaged_worker_commands_and_typed_outputs -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test native_worker_resilience val_recovery_008 -- --nocapture",
             "cargo test --locked -p comfy_test_support --test native_image_e2e val_native_e2e_001 -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
         ):
             self.assertIn(diagnostic_command, provider_worker_bridge_commands)
         provider_deployment = tasks_by_id[
