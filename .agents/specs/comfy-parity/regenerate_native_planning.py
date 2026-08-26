@@ -9852,15 +9852,23 @@ def native_model_resource_precursor_tasks(
             "projects/comfy/ComfyUI/comfy/clip_model.py",
             "projects/comfy/ComfyUI/comfy/clip_vision.py",
             "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/tests/clip_vision.rs",
             "crates/comfy_model/src/native_ops.rs",
             "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+            "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [
             "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/tests/clip_vision.rs",
             "crates/comfy_test_support/tests/native_conditioning_integration.rs",
         ],
-        "NativeClipVision remains the sole owner of the fixed CLIP vision graph and adds one caller-context constructor over checked configuration and checkpoint state. The existing constructor delegates without changing its public behavior. The context-aware path checks the same CancellationToken during state projection, every layer and module construction phase, semantic digest, validation, and before publication; cancellation or malformed state publishes no partially constructed owner, digest, or residency. Exact checkpoint reconstruction preserves configuration, ordered state, storage dtype, semantic identity, residency, and output byte-for-byte. No PhotoMaker-specific fork, second CLIP transformer, public unchecked constructor, or test-only authority factory is introduced.",
+        "NativeClipVision remains the sole owner of the fixed CLIP vision graph. NativeClipVision::new_with_cancellation(configuration, weights, &CancellationToken) is the sole caller-cancellable construction path, while the existing new constructor delegates with a fresh default token without changing its public behavior or identity. NativeClipVision::reconstruct(&self, &CancellationToken) validates and strictly reprojects the complete retained ordered canonical checkpoint into ClipVisionWeights, then calls the same cancellable constructor rather than cloning the model. Construction and reconstruction check the same token at entry, during canonical-state projection, before and between every layer's layer-normalization, attention QKV and output, and MLP module phases, before optional projection modules, during semantic and module digests and validation, and immediately before return. They preserve configuration, ordered state names and tensors, StorageIds and alias deduplication, storage dtype, semantic identity and module digest, resident bytes, and output F32 bytes. Private deterministic checkpoint tests cancel every named phase and prove no model, payload, digest, or residency is returned. The existing native payload remains read-only and unchanged. No PhotoMaker-specific fork, second CLIP transformer, ExecutionContext requirement, public unchecked constructor, or test-only authority factory is introduced.",
+        include_model_payload=False,
     )
     append(
         "comfy-parity-native-photomaker-resource-foundation",
@@ -21651,6 +21659,12 @@ def task_validation_commands(item: dict[str, object]) -> str:
                 "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
                 "cargo test --locked -p comfy_test_support --test native_conditioning_integration style_model_resource -- --exact --nocapture",
                 "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task393_style_model_resource_001 -- --exact --nocapture",
+            ])
+        if identifier == "comfy-parity-native-clip-vision-context-construction":
+            commands.extend([
+                "cargo test --locked -p comfy_model --test clip_vision -- --nocapture",
+                "cargo test --locked -p comfy_test_support --test native_conditioning_integration native_clip_vision_context_construction -- --exact --nocapture",
+                "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task340_clip_vision_001 -- --exact --nocapture",
             ])
         commands.extend([
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",

@@ -711,7 +711,44 @@ class ValidationGenerationTests(unittest.TestCase):
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task393_style_model_resource_001 -- --exact --nocapture",
         ):
             self.assertIn(command, style_validation)
-        self.assertIn("crates/comfy_model/src/clip_vision.rs", clip_vision_context_task["writes"])
+        for clip_vision_read in (
+            "crates/comfy_model/tests/clip_vision.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(clip_vision_read, clip_vision_context_task["reads"])
+        self.assertEqual(
+            clip_vision_context_task["writes"],
+            [
+                "crates/comfy_model/src/clip_vision.rs",
+                "crates/comfy_model/tests/clip_vision.rs",
+                "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+            ],
+        )
+        for clip_vision_gate in (
+            "NativeClipVision::new_with_cancellation(configuration, weights, &CancellationToken)",
+            "NativeClipVision::reconstruct(&self, &CancellationToken)",
+            "strictly reprojects the complete retained ordered canonical checkpoint",
+            "rather than cloning the model",
+            "before and between every layer's layer-normalization, attention QKV and output, and MLP module phases",
+            "StorageIds and alias deduplication",
+            "output F32 bytes",
+            "native payload remains read-only and unchanged",
+            "No PhotoMaker-specific fork, second CLIP transformer, ExecutionContext requirement",
+        ):
+            self.assertIn(clip_vision_gate, clip_vision_context_task["done"])
+        clip_vision_validation = planning.task_validation_commands(
+            clip_vision_context_task
+        )
+        for command in (
+            "cargo test --locked -p comfy_model --test clip_vision -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_conditioning_integration native_clip_vision_context_construction -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task340_clip_vision_001 -- --exact --nocapture",
+        ):
+            self.assertIn(command, clip_vision_validation)
         for phrase in (
             "NativeGligenResource",
             "NativePhotoMakerResource",
