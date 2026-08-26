@@ -1702,6 +1702,12 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
             provider_worker_bridge["writes"],
         )
+        for bridge_feature_manifest in (
+            "crates/comfy_plugin_host/Cargo.toml",
+            "crates/comfy_test_support/Cargo.toml",
+        ):
+            self.assertIn(bridge_feature_manifest, provider_worker_bridge["reads"])
+            self.assertIn(bridge_feature_manifest, provider_worker_bridge["writes"])
         self.assertIn(
             "app-side native controller allocates the WorkerProviderInvocationContext",
             provider_worker_bridge["done"],
@@ -1740,7 +1746,9 @@ class ValidationGenerationTests(unittest.TestCase):
             "test-only scripted actuator",
             "Production provider-v2 remains fail-closed without an actuator",
             "focused provider_worker_stream_bridge integration target proves the desktop hermetic first valid-grant bridge path",
-            "no service getter, grant constructor, context constructor, or feature-gated authority factory",
+            "actuator construction, attachment, route response, finish, finalization, and scripted component-host execution surfaces exist only behind comfy_plugin_host's test-support feature",
+            "narrowly enables comfy_runtime/test-support and is enabled only by comfy_test_support",
+            "no service getter, grant constructor, context constructor, or raw authority factory",
             "comfy-parity-provider-hermetic-component-harness",
         ):
             self.assertIn(bridge_completion_gate, provider_worker_bridge["done"])
