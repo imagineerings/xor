@@ -6971,7 +6971,7 @@
       ],
       "allowed_adapters": [
         "comfy_model::NativeDepthAnything3Resource retains DA3 resource identity, complete state residency, invocation, geometry, payload, persistence, and restart authority while delegating every DINO state projection and execution phase to NativeDino2Backbone",
-        "future comfy_model::moge may consume NativeDino2Backbone but is not a Task391 production callsite and owns no DINO transformer, position, attention, or intermediate-feature equation",
+        "comfy_model::moge::NativeMogeResource retains MoGe state, head, geometry, payload, and invocation authority while delegating ordinary DINO execution and intermediate or class-token extraction to NativeDino2Backbone",
         "the pure-standard-library DINO fixture is an independent development-reference oracle and confers no production state, tensor, storage, mutation, callsite, or consumer authority"
       ],
       "definitions": [
@@ -6986,11 +6986,18 @@
           "qualified": "comfy_model::NativeDepthAnything3Resource",
           "role": "adapter",
           "symbol": "NativeDepthAnything3Resource"
+        },
+        {
+          "path": "crates/comfy_model/src/moge.rs",
+          "qualified": "comfy_model::moge::NativeMogeResource",
+          "role": "adapter",
+          "symbol": "NativeMogeResource"
         }
       ],
       "call_symbols": [
         "NativeDino2Backbone",
-        "NativeDepthAnything3Resource"
+        "NativeDepthAnything3Resource",
+        "NativeMogeResource"
       ],
       "required_mappings": [
         {
@@ -7009,6 +7016,11 @@
           "pattern": "get_intermediate_layers_da3"
         },
         {
+          "name": "moge-executes-through-ordinary-owner-route",
+          "path": "crates/comfy_model/src/moge.rs",
+          "pattern": "dino_backbone[\\s\\S]*bind_parent_preflighted[\\s\\S]*execution\\.get_intermediate_layers"
+        },
+        {
           "name": "owner-implements-ordinary-and-da3-routes",
           "path": "crates/comfy_model/src/dino2.rs",
           "pattern": "pub\\(crate\\) fn get_intermediate_layers_da3\\([\\s\\S]*pub\\(crate\\) fn get_intermediate_layers\\("
@@ -7016,10 +7028,12 @@
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
-        "comfy-parity-native-dinov2-backbone-owner-foundation"
+        "comfy-parity-native-dinov2-backbone-owner-foundation",
+        "comfy-parity-native-moge-resource-foundation"
       ],
       "production_consumers": [
-        "comfy_model::NativeDepthAnything3Resource"
+        "comfy_model::NativeDepthAnything3Resource",
+        "comfy_model::moge::NativeMogeResource"
       ],
       "requirements": [
         "Requirement 6.3",
@@ -7058,7 +7072,7 @@
         "VAL-CANCEL-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "NativeDino2Backbone is the only native owner of DINOv2 state schema, checked storage projection, position interpolation, transformer execution, and intermediate extraction. DA3 is a resource adapter; MoGe remains a future non-authoritative consumer until its later task."
+      "decision_reason": "NativeDino2Backbone is the only native owner of DINOv2 state schema, checked storage projection, position interpolation, transformer execution, and intermediate extraction. DA3 and MoGe retain their distinct resource, head, geometry, payload, and invocation domains while adapting exclusively through the DA3 or ordinary DINO route."
     },
     {
       "concern": "native_execution_cache",
@@ -10921,6 +10935,126 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "comfy_model::vae is the single authoritative VAE domain: it owns profile compatibility, persisted identity admission, descriptors, model binding, generic and typed structured execution boundaries, cancellation, and publication. The pinned-source vae_architecture module only recognizes and normalizes source checkpoint forms, then maps them through the canonical ModelStore, latent registry, VAE profile, descriptor, and NativeModule contracts. vae_structured owns only Hunyuan3D and TripoSplat source topology, exact state manifests, and equations; it consumes canonical Tensor handles plus caller workspace, RNG, and cancellation and does not create a 3D media, asset, path, index, plan, retry, queue, cache, persistence, or transaction owner."
+    },
+    {
+      "concern": "native_moge_model_resource",
+      "canonical_owner": "comfy_model::moge::NativeMogeResource",
+      "owner_files": [
+        "crates/comfy_model/src/moge.rs",
+        "crates/comfy_model/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeMogeResource",
+        "NativeMogeGeometry"
+      ],
+      "allowed_adapters": [
+        "NativeDino2Backbone retains the sole ordinary DINO state projection, interpolation, transformer, attention, and intermediate or class-token extraction owner",
+        "canonical comfy_tensor operators retain tensor storage, allocation, convolution, normalization, interpolation, linear algebra, cancellation, and workspace authority while NativeMogeResource composes only the source MoGe heads and geometry order",
+        "NativeModelPayload seals MOGE_MODEL role, identity, alias-aware residency, and reconstruction without creating handle, cache, persistence, restart, or stale-generation authority",
+        "the pure-standard-library reduced MoGe fixture is an independent development-reference equation oracle and confers no production model, tensor, geometry, or publication authority",
+        "panorama splitting, Poisson merge, rendering, triangulation, mesh or media publication, loader handles, cache, persistence, restart, and stale-generation behavior remain assigned to their later native node and model-resource tasks"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/moge.rs",
+          "qualified": "comfy_model::moge::NativeMogeResource",
+          "role": "canonical",
+          "symbol": "NativeMogeResource",
+          "pattern": "^pub struct NativeMogeResource \\{"
+        },
+        {
+          "path": "crates/comfy_model/src/moge.rs",
+          "qualified": "comfy_model::moge::NativeMogeGeometry",
+          "role": "canonical_state",
+          "symbol": "NativeMogeGeometry",
+          "pattern": "^pub struct NativeMogeGeometry \\{"
+        }
+      ],
+      "call_symbols": [
+        "NativeMogeResource::from_checkpoint",
+        "NativeMogeResource::from_nested_checkpoint",
+        "NativeMogeResource::execute",
+        "NativeModelPayload::moge",
+        "moge_resource"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "moge-admission-normalizes-and-strictly-binds-versioned-state",
+          "path": "crates/comfy_model/src/moge.rs",
+          "pattern": "pub fn from_checkpoint\\([\\s\\S]*normalize_state[\\s\\S]*detect_configuration[\\s\\S]*state_manifest[\\s\\S]*projected_resident_preflight"
+        },
+        {
+          "name": "moge-delegates-dino-and-executes-versioned-heads",
+          "path": "crates/comfy_model/src/moge.rs",
+          "pattern": "bind_parent_preflighted[\\s\\S]*get_intermediate_layers[\\s\\S]*execute_moge_head"
+        },
+        {
+          "name": "moge-geometry-recovers-and-publishes-checked-typed-results",
+          "path": "crates/comfy_model/src/moge.rs",
+          "pattern": "fn project_geometry\\([\\s\\S]*recover_focal_shift[\\s\\S]*publish_geometry"
+        },
+        {
+          "name": "moge-payload-seals-role-identity-and-residency",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "pub fn moge\\([\\s\\S]*NativeModelResourceRole::MogeModel[\\s\\S]*zed-native-moge-v1[\\s\\S]*NativeModelResource::Moge[\\s\\S]*NativeModelBackingKind::NativeMogeResource"
+        },
+        {
+          "name": "moge-fixture-is-source-pinned-independent-and-bounded",
+          "path": "crates/comfy_test_support/fixtures/models/moge-resource-foundation/provenance.json",
+          "pattern": "Pure Python standard-library source equations[\\s\\S]*independent f64 finite-difference source-equation oracle[\\s\\S]*SciPy is not executed or certified"
+        },
+        {
+          "name": "moge-e2e-publishes-typed-source-oracle-geometry",
+          "path": "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+          "pattern": "native_moge_resources_execute_source_oracle_and_publish_typed_geometry[\\s\\S]*NativeMogeGeometry[\\s\\S]*NativeMogeInvocation"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-moge-resource-foundation"
+      ],
+      "production_consumers": [
+        "native MOGE_MODEL payload admission and typed perspective geometry invocation"
+      ],
+      "requirements": [
+        "Requirement 6.3",
+        "Requirement 7.2",
+        "Requirement 18.1",
+        "Requirement 26.2",
+        "Requirement 28.2",
+        "Requirement 31.5",
+        "Requirement 34.2",
+        "Requirement 34.6",
+        "Requirement 35.2",
+        "Requirement 37.5",
+        "Requirement 38.3",
+        "Requirement 41.2",
+        "Requirement 44.1",
+        "Requirement 44.3"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeMogeResource is the sole retained owner of strict v1 or v2 MoGe checkpoint identity, source head composition, bounded invocation, focal and shift recovery, and checked typed perspective geometry. It delegates every DINO phase to NativeDino2Backbone and every shared tensor operation to canonical comfy_tensor owners. NativeMogeGeometry is the sealed checked result state; payload sealing, future handle lifecycle, panorama, rendering, triangulation, mesh, and media publication remain separate domains."
     },
     {
       "concern": "native_node_registry",

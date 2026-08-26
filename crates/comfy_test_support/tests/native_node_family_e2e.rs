@@ -1,18 +1,21 @@
 use comfy_media::{PngLimits, encode_png_frame};
 use comfy_model::{
     BackgroundRemovalFixtureMutation, DepthAnything3FixtureMutation, DepthAnything3FixtureProfile,
-    NATIVE_UPSCALE_ADMITTED_ARCHITECTURE_COUNT, NATIVE_UPSCALE_ARCHITECTURE_COUNT,
-    NATIVE_UPSCALE_CONTRACT_SHA256, NativeBackgroundRemovalError, NativeBackgroundRemovalResource,
-    NativeDepthAnything3Invocation, NativeDepthAnything3ReferenceStrategy,
-    NativeDepthAnything3ResizeMethod, NativeDepthAnything3Resource, NativeFrameInterpolationModel,
-    NativeLatentUpscaleCheckpoint, NativeLatentUpscaleModelResource, NativeModelPayload,
-    NativeModelPayloadError, NativeSdPoseHeatmapHead, NativeSdPoseModel, NativeSdPoseSd2Denoiser,
-    NativeUpscaleContractError, NativeUpscaleModelError, NativeUpscaleModelResource,
-    NativeUpscaleStateDictionaryLayout, NativeUpscaleUnavailableReason,
-    SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration, compiled_native_upscale_contract,
-    deterministic_reduced_depth_anything_3_checkpoint, mutate_reduced_depth_anything_3_checkpoint,
-    reduced_depth_anything_3_checkpoint_parity_for_fixture, sdpose_heatmap_head_weight_manifest,
-    sdpose_sd2_weight_manifest, select_reduced_depth_anything_3_reference_for_fixture,
+    MogeFixtureMutation, MogeFixtureProfile, NATIVE_UPSCALE_ADMITTED_ARCHITECTURE_COUNT,
+    NATIVE_UPSCALE_ARCHITECTURE_COUNT, NATIVE_UPSCALE_CONTRACT_SHA256,
+    NativeBackgroundRemovalError, NativeBackgroundRemovalResource, NativeDepthAnything3Invocation,
+    NativeDepthAnything3ReferenceStrategy, NativeDepthAnything3ResizeMethod,
+    NativeDepthAnything3Resource, NativeFrameInterpolationModel, NativeLatentUpscaleCheckpoint,
+    NativeLatentUpscaleModelResource, NativeModelPayload, NativeModelPayloadError,
+    NativeModelResourceRole, NativeMogeInvocation, NativeMogeResource, NativeSdPoseHeatmapHead,
+    NativeSdPoseModel, NativeSdPoseSd2Denoiser, NativeUpscaleContractError,
+    NativeUpscaleModelError, NativeUpscaleModelResource, NativeUpscaleStateDictionaryLayout,
+    NativeUpscaleUnavailableReason, SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration,
+    compiled_native_upscale_contract, deterministic_reduced_depth_anything_3_checkpoint,
+    deterministic_reduced_moge_checkpoint, mutate_reduced_depth_anything_3_checkpoint,
+    mutate_reduced_moge_checkpoint, reduced_depth_anything_3_checkpoint_parity_for_fixture,
+    sdpose_heatmap_head_weight_manifest, sdpose_sd2_weight_manifest,
+    select_reduced_depth_anything_3_reference_for_fixture,
 };
 use comfy_nodes::{
     NativePreparedEffectKind, NativeStoredModelPayload, NativeStructuredValue,
@@ -32,7 +35,10 @@ use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, ExecutionContext, ImageTensor,
     NativeTensorPayload, NativeTensorRole, RetryRngPolicy, RngStreamAddress, StreamId, Tensor,
     TensorBackend,
-    generated_comfy_operator_indirection_01::tensor_from_f32_with_context_exact_native,
+    generated_comfy_operator_indirection_01::{
+        tensor_from_f32_with_context_exact_native, tensor_to_f32_with_context_exact_native,
+    },
+    generated_elementwise_or_runtime_operation_21::exp_with_context_exact_native,
     generated_neural_network_functional_01::pixel_shuffle_tensor_with_context_exact_native,
     generated_spatial_functional_kernel_01::{
         InterpolateConfiguration, InterpolateMode, bislerp_tensor_with_context_exact_native,
@@ -77,6 +83,16 @@ const DEPTH_ANYTHING_3_RESOURCE_GENERATOR: &str =
     include_str!("../fixtures/models/depth-anything-3-resource-foundation/generate_oracle.py");
 const DEPTH_ANYTHING_3_RESOURCE_SOURCE_GRAPH: &str =
     include_str!("../fixtures/models/depth-anything-3-resource-foundation/source_graph.py");
+const MOGE_RESOURCE_FIXTURE: &str =
+    include_str!("../fixtures/models/moge-resource-foundation/manifest.json");
+const MOGE_RESOURCE_ORACLE: &str =
+    include_str!("../fixtures/models/moge-resource-foundation/oracle.json");
+const MOGE_RESOURCE_PROVENANCE: &str =
+    include_str!("../fixtures/models/moge-resource-foundation/provenance.json");
+const MOGE_RESOURCE_GENERATOR: &str =
+    include_str!("../fixtures/models/moge-resource-foundation/generate_oracle.py");
+const MOGE_RESOURCE_SOURCE_GRAPH: &str =
+    include_str!("../fixtures/models/moge-resource-foundation/source_graph.py");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -140,6 +156,44 @@ fn require_exact_fixture_bits(
         );
     }
     Ok(())
+}
+
+fn require_fixture_ulp_bound(
+    phase: &str,
+    actual: &[u32],
+    expected: &[u32],
+    maximum_ulp: u32,
+) -> Result<u32, Box<dyn Error>> {
+    if actual.len() != expected.len() {
+        return Err(format!(
+            "{phase}: actual length {}, expected {}",
+            actual.len(),
+            expected.len()
+        )
+        .into());
+    }
+    let ordered = |bits: u32| {
+        if bits & 0x8000_0000 == 0 {
+            bits | 0x8000_0000
+        } else {
+            !bits
+        }
+    };
+    let mut observed = 0_u32;
+    for (index, (&actual, &expected)) in actual.iter().zip(expected).enumerate() {
+        if !f32::from_bits(actual).is_finite() || !f32::from_bits(expected).is_finite() {
+            return Err(format!("{phase}[{index}]: non-finite ULP comparison").into());
+        }
+        let distance = ordered(actual).abs_diff(ordered(expected));
+        observed = observed.max(distance);
+        if distance > maximum_ulp {
+            return Err(format!(
+                "{phase}[{index}]: {distance} ULP exceeds {maximum_ulp}; actual {actual:#010x}, expected {expected:#010x}"
+            )
+            .into());
+        }
+    }
+    Ok(observed)
 }
 
 fn sdpose_tensor(
@@ -3413,6 +3467,386 @@ fn frame_interpolation_resource_handle_is_concrete_alias_aware_and_restart_safe(
         Err(NativeHandleStoreError::WrongStore | NativeHandleStoreError::WrongGeneration)
     ));
     assert_ne!(first.identifier(), second.identifier());
+    Ok(())
+}
+
+#[test]
+fn native_moge_resources_execute_source_oracle_and_publish_typed_geometry()
+-> Result<(), Box<dyn Error>> {
+    let oracle: Value = serde_json::from_str(MOGE_RESOURCE_ORACLE)?;
+    let manifest: Value = serde_json::from_str(MOGE_RESOURCE_FIXTURE)?;
+    let provenance: Value = serde_json::from_str(MOGE_RESOURCE_PROVENANCE)?;
+    let sha256 = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
+    assert_eq!(
+        manifest["oracle_sha256"],
+        sha256(MOGE_RESOURCE_ORACLE.as_bytes())
+    );
+    assert_eq!(
+        manifest["generator_sha256"],
+        sha256(MOGE_RESOURCE_GENERATOR.as_bytes())
+    );
+    assert_eq!(
+        manifest["source_graph_sha256"],
+        sha256(MOGE_RESOURCE_SOURCE_GRAPH.as_bytes())
+    );
+    assert_eq!(provenance["oracle_sha256"], manifest["oracle_sha256"]);
+    assert_eq!(
+        provenance["command"],
+        "PYTHONDONTWRITEBYTECODE=1 python3 crates/comfy_test_support/fixtures/models/moge-resource-foundation/generate_oracle.py --check"
+    );
+    let canonical_exp_max_ulp = u32::try_from(
+        oracle["numeric_contract"]["canonical_exp_max_ulp"]
+            .as_u64()
+            .ok_or("MoGe exponential ULP contract is missing")?,
+    )?;
+    let max_plus_one = u32::try_from(
+        oracle["numeric_contract"]["max_plus_one_must_reject"]
+            .as_u64()
+            .ok_or("MoGe exponential max+1 discriminator is missing")?,
+    )?;
+    let derived_geometry_distinct_nonzero_ulp_bounds =
+        oracle["numeric_contract"]["derived_geometry_distinct_nonzero_ulp_bounds"]
+            .as_array()
+            .ok_or("MoGe derived geometry ULP contracts are missing")?
+            .iter()
+            .map(|value| -> Result<u32, Box<dyn Error>> {
+                Ok(u32::try_from(value.as_u64().ok_or(
+                    "MoGe derived geometry ULP contract is not an integer",
+                )?)?)
+            })
+            .collect::<Result<Vec<u32>, Box<dyn Error>>>()?;
+    assert_eq!(
+        derived_geometry_distinct_nonzero_ulp_bounds,
+        [1, 2, 4, 6, 8, 10, 11, 14, 16, 18]
+    );
+    for bound in derived_geometry_distinct_nonzero_ulp_bounds {
+        let accepted = 0x3f80_0000u32
+            .checked_add(bound)
+            .ok_or("MoGe admitted ULP witness overflowed")?;
+        let rejected = accepted
+            .checked_add(1)
+            .ok_or("MoGe rejected ULP witness overflowed")?;
+        assert_eq!(
+            require_fixture_ulp_bound(
+                &format!("moge/derived-geometry-{bound}-admitted"),
+                &[accepted],
+                &[0x3f80_0000],
+                bound,
+            )?,
+            bound
+        );
+        assert!(
+            require_fixture_ulp_bound(
+                &format!("moge/derived-geometry-{bound}-plus-one"),
+                &[rejected],
+                &[0x3f80_0000],
+                bound,
+            )
+            .is_err()
+        );
+    }
+    assert_eq!(max_plus_one, canonical_exp_max_ulp + 1);
+    assert!(
+        require_fixture_ulp_bound(
+            "moge/exp-max-plus-one",
+            &[0x3f80_0000 + max_plus_one],
+            &[0x3f80_0000],
+            canonical_exp_max_ulp,
+        )
+        .is_err()
+    );
+
+    let workspace_bytes = 256 * 1024 * 1024;
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(workspace_bytes)?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority.authorize_workspace(workspace_bytes)?,
+        &cancellation,
+    );
+    let exp_probe_inputs =
+        fixture_raw_bits(&oracle["numeric_contract"]["canonical_exp_probe_input_bits"])?;
+    let exp_probe_expected =
+        fixture_raw_bits(&oracle["numeric_contract"]["source_exp_probe_output_bits"])?;
+    assert!(!exp_probe_inputs.is_empty());
+    assert_eq!(exp_probe_inputs.len(), exp_probe_expected.len());
+    let exp_probe_tensor = tensor_from_f32_with_context_exact_native(
+        &backend,
+        &[u64::try_from(exp_probe_inputs.len())?],
+        &exp_probe_inputs
+            .iter()
+            .copied()
+            .map(f32::from_bits)
+            .collect::<Vec<_>>(),
+        DType::F32,
+        comfy_tensor::DeviceId::CPU,
+        &context,
+    )?;
+    let exp_probe_actual = tensor_to_f32_with_context_exact_native(
+        &backend,
+        &exp_with_context_exact_native(&backend, &exp_probe_tensor, &context)?,
+        &context,
+    )?
+    .into_iter()
+    .map(f32::to_bits)
+    .collect::<Vec<_>>();
+    require_fixture_ulp_bound(
+        "moge/canonical-exp-admitted-range",
+        &exp_probe_actual,
+        &exp_probe_expected,
+        canonical_exp_max_ulp,
+    )?;
+    let input_values = fixture_raw_bits(&oracle["input_bits"])?
+        .into_iter()
+        .map(f32::from_bits)
+        .collect::<Vec<_>>();
+    let image = ImageTensor::from_f32(&backend, &context, 1, 4, 4, 3, &input_values)?;
+    let tensor_bits = |tensor: &Tensor| -> Result<Vec<u32>, Box<dyn Error>> {
+        Ok(
+            tensor_to_f32_with_context_exact_native(&backend, tensor, &context)?
+                .into_iter()
+                .map(f32::to_bits)
+                .collect(),
+        )
+    };
+    let compare_output = |phase: &str,
+                          geometry: &comfy_model::NativeMogeGeometry,
+                          expected: &Value|
+     -> Result<(), Box<dyn Error>> {
+        assert_eq!(
+            geometry.image().tensor().storage_id(),
+            image.tensor().storage_id(),
+            "{phase}/source-image"
+        );
+        for (name, tensor) in [
+            ("depth", geometry.depth()),
+            ("points", geometry.points()),
+            ("intrinsics", geometry.intrinsics()),
+            ("mask", geometry.mask()),
+        ] {
+            let tensor = tensor.ok_or_else(|| format!("{phase}/{name}: missing tensor"))?;
+            let expected_shape = expected[format!("{name}_shape")]
+                .as_array()
+                .ok_or_else(|| format!("{phase}/{name}: missing shape"))?
+                .iter()
+                .map(|value| value.as_u64().ok_or("fixture shape is not an integer"))
+                .collect::<Result<Vec<_>, _>>()?;
+            assert_eq!(
+                tensor.descriptor().shape(),
+                expected_shape,
+                "{phase}/{name}"
+            );
+            assert_eq!(
+                tensor.descriptor().dtype(),
+                if name == "mask" {
+                    DType::Bool
+                } else {
+                    DType::F32
+                },
+                "{phase}/{name} dtype"
+            );
+            assert_eq!(
+                tensor.descriptor().device(),
+                comfy_tensor::DeviceId::CPU,
+                "{phase}/{name} device"
+            );
+            assert_eq!(
+                tensor.descriptor().stream(),
+                context.stream,
+                "{phase}/{name} stream"
+            );
+            let actual = tensor_bits(tensor)?;
+            assert!(
+                actual
+                    .iter()
+                    .copied()
+                    .map(f32::from_bits)
+                    .all(f32::is_finite),
+                "{phase}/{name} unexpectedly contains a non-finite value"
+            );
+            let bound = if name == "mask" {
+                None
+            } else {
+                Some(u32::try_from(
+                    expected["output_ulp_bounds"][name]
+                        .as_u64()
+                        .ok_or_else(|| format!("{phase}/{name}: ULP bound is missing"))?,
+                )?)
+            };
+            let expected = fixture_raw_bits(&expected[format!("{name}_bits")])?;
+            if let Some(bound) = bound {
+                if bound == 0 {
+                    require_exact_fixture_bits(&format!("{phase}/{name}"), &actual, &expected)?;
+                } else {
+                    assert_eq!(
+                        require_fixture_ulp_bound(
+                            &format!("{phase}/{name}"),
+                            &actual,
+                            &expected,
+                            bound,
+                        )?,
+                        bound,
+                        "{phase}/{name}: recorded ULP bound is not tight"
+                    );
+                }
+            } else {
+                require_exact_fixture_bits(&format!("{phase}/{name}"), &actual, &expected)?;
+            }
+        }
+        if let Some(tensor) = geometry.normal() {
+            assert_eq!(tensor.descriptor().dtype(), DType::F32);
+            assert_eq!(tensor.descriptor().device(), comfy_tensor::DeviceId::CPU);
+            assert_eq!(tensor.descriptor().stream(), context.stream);
+            assert!(
+                tensor_bits(tensor)?
+                    .into_iter()
+                    .map(f32::from_bits)
+                    .all(f32::is_finite),
+                "{phase}/normal unexpectedly contains a non-finite value"
+            );
+        }
+        match (geometry.normal(), expected["normal_bits"].is_null()) {
+            (None, true) => {}
+            (Some(tensor), false) => {
+                let bound = u32::try_from(
+                    expected["output_ulp_bounds"]["normal"]
+                        .as_u64()
+                        .ok_or_else(|| format!("{phase}/normal: ULP bound is missing"))?,
+                )?;
+                let actual = tensor_bits(tensor)?;
+                let expected = fixture_raw_bits(&expected["normal_bits"])?;
+                if bound == 0 {
+                    require_exact_fixture_bits(&format!("{phase}/normal"), &actual, &expected)?;
+                } else {
+                    assert_eq!(
+                        require_fixture_ulp_bound(
+                            &format!("{phase}/normal"),
+                            &actual,
+                            &expected,
+                            bound,
+                        )?,
+                        bound,
+                        "{phase}/normal: recorded ULP bound is not tight"
+                    );
+                }
+            }
+            _ => return Err(format!("{phase}/normal: option disposition differs").into()),
+        }
+        Ok(())
+    };
+
+    for (profile_name, profile) in [
+        ("v1", MogeFixtureProfile::V1),
+        ("v2", MogeFixtureProfile::V2),
+    ] {
+        for (dtype_name, dtype) in [
+            ("f32", DType::F32),
+            ("f16", DType::F16),
+            ("bf16", DType::Bf16),
+        ] {
+            let resource = Arc::new(NativeMogeResource::from_reduced_fixture(
+                &backend,
+                deterministic_reduced_moge_checkpoint(
+                    &backend,
+                    profile,
+                    dtype,
+                    workspace_bytes,
+                    &context,
+                )?,
+                &context,
+            )?);
+            resource.validate(&cancellation)?;
+            let reconstructed = resource.reconstruct_checkpoint(&cancellation)?;
+            let reconstructed_resource =
+                NativeMogeResource::from_reduced_fixture(&backend, reconstructed, &context)?;
+            assert_eq!(
+                reconstructed_resource.semantic_digest_sha256(),
+                resource.semantic_digest_sha256()
+            );
+            let payload = NativeModelPayload::moge_test_fixture(resource.clone(), &cancellation)?;
+            payload.validate()?;
+            assert_eq!(
+                payload.identity().role(),
+                NativeModelResourceRole::MogeModel
+            );
+            assert_eq!(payload.identity().format(), "zed-native-moge-v1");
+            assert!(payload.moge_resource().is_some());
+            let geometry = resource.execute(
+                &backend,
+                NativeMogeInvocation {
+                    image: &image,
+                    resolution_level: 9,
+                    fov_x_degrees: Some(60.0),
+                    force_projection: true,
+                    apply_mask: false,
+                    apply_metric_scale: true,
+                },
+                &context,
+            )?;
+            compare_output(
+                &format!("{profile_name}/{dtype_name}"),
+                &geometry,
+                &oracle["profiles"][profile_name][dtype_name],
+            )?;
+        }
+    }
+
+    for (mutation_name, mutation) in oracle["mutations"]
+        .as_object()
+        .ok_or("MoGe mutations are not an object")?
+    {
+        let profile_name = mutation["profile"]
+            .as_str()
+            .ok_or("MoGe mutation profile is missing")?;
+        let profile = match profile_name {
+            "v1" => MogeFixtureProfile::V1,
+            "v2" => MogeFixtureProfile::V2,
+            _ => return Err("unknown MoGe mutation profile".into()),
+        };
+        let mut checkpoint = deterministic_reduced_moge_checkpoint(
+            &backend,
+            profile,
+            DType::F32,
+            workspace_bytes,
+            &context,
+        )?;
+        mutate_reduced_moge_checkpoint(
+            &backend,
+            &mut checkpoint,
+            MogeFixtureMutation {
+                state_key: mutation["state_key"]
+                    .as_str()
+                    .ok_or("MoGe mutation state key is missing")?,
+                lane: usize::try_from(
+                    mutation["lane"]
+                        .as_u64()
+                        .ok_or("MoGe mutation lane is missing")?,
+                )?,
+                delta: mutation["delta"]
+                    .as_f64()
+                    .ok_or("MoGe mutation delta is missing")? as f32,
+            },
+            &context,
+        )?;
+        let resource = NativeMogeResource::from_reduced_fixture(&backend, checkpoint, &context)?;
+        let geometry = resource.execute(
+            &backend,
+            NativeMogeInvocation {
+                image: &image,
+                resolution_level: 9,
+                fov_x_degrees: Some(60.0),
+                force_projection: true,
+                apply_mask: false,
+                apply_metric_scale: true,
+            },
+            &context,
+        )?;
+        compare_output(
+            &format!("mutation/{mutation_name}"),
+            &geometry,
+            &mutation["output"],
+        )?;
+    }
     Ok(())
 }
 

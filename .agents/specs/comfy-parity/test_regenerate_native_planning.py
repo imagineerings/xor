@@ -551,6 +551,7 @@ class ValidationGenerationTests(unittest.TestCase):
             ],
         )
         for moge_write in (
+            "crates/comfy_model/src/dino2.rs",
             "crates/comfy_model/src/moge.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
@@ -585,6 +586,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "invalid-focal 60-degree fallback",
             "F32/F16/BF16 retained storage",
             "shared-StorageId residency",
+            "now-fulfilled future-consumer dead-code expectation",
             "Panorama splitting and Poisson merge",
             "comfy-parity-native-model-resource-execution-foundation",
         ):

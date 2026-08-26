@@ -33,6 +33,7 @@ pub mod ltx_family;
 pub mod lumina_zimage_family;
 pub mod model_family;
 pub mod model_store;
+pub mod moge;
 pub mod native_node_payload;
 pub mod native_ops;
 pub mod omnigen2_boogu_family;
@@ -439,6 +440,17 @@ pub use model_store::{
     ModelOperationRecord, ModelOperationStage, ModelStore, ModelStoreError,
     VerifiedEmbeddingArchivePayload, VerifiedModelTensor, VerifiedModelTensorPayload,
     VerifiedSentencePieceVocabulary,
+};
+pub use moge::{
+    MOGE_DINO2_SOURCE_SHA256, MOGE_GEOMETRY_SOURCE_SHA256, MOGE_MODEL_SOURCE_SHA256,
+    MOGE_MODULES_SOURCE_SHA256, NODES_MOGE_SOURCE_SHA256, NativeMogeCheckpoint, NativeMogeError,
+    NativeMogeGeometry, NativeMogeInvocation, NativeMogeNestedCheckpoint, NativeMogeResource,
+    NativeMogeVersion,
+};
+#[cfg(any(test, feature = "test-support"))]
+pub use moge::{
+    MogeFixtureMutation, MogeFixtureProfile, deterministic_reduced_moge_checkpoint,
+    mutate_reduced_moge_checkpoint,
 };
 pub use native_node_payload::{
     AudioEncoderOutput, AudioEncoderOutputKind, IcLoraParameters, LossMap, NativeModelBackingKind,

@@ -581,7 +581,7 @@ fn task391_dinov2_has_one_crate_private_backbone_owner() -> Result<(), Box<dyn s
     );
     assert_eq!(
         concern["production_consumers"].as_array().map(Vec::len),
-        Some(1)
+        Some(2)
     );
 
     let catalog = fs::read_to_string(
@@ -603,6 +603,137 @@ fn task391_dinov2_has_one_crate_private_backbone_owner() -> Result<(), Box<dyn s
         row.iter()
             .any(|field| field.contains("canonical@crates/comfy_model/src/dino2.rs"))
     );
+    Ok(())
+}
+
+#[test]
+fn task392_moge_has_one_native_resource_and_dino_adapter_owner()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let crate_root = fs::read_to_string(root.join("crates/comfy_model/src/comfy_model.rs"))?;
+    let moge = fs::read_to_string(root.join("crates/comfy_model/src/moge.rs"))?;
+    let payload = fs::read_to_string(root.join("crates/comfy_model/src/native_node_payload.rs"))?;
+    assert_eq!(crate_root.matches("pub mod moge;").count(), 1);
+    assert_eq!(moge.matches("pub struct NativeMogeResource").count(), 1);
+    assert_eq!(moge.matches("pub struct NativeMogeGeometry").count(), 1);
+    for required in [
+        "pub fn from_checkpoint(",
+        "pub fn from_nested_checkpoint(",
+        "fn normalize_state(",
+        "fn detect_configuration(",
+        "fn state_manifest(",
+        "bind_parent_preflighted",
+        "execution.get_intermediate_layers",
+        "fn execute_moge_head(",
+        "fn recover_focal_shift(",
+        "fn publish_geometry(",
+    ] {
+        assert!(moge.contains(required), "MoGe owner lacks {required}");
+    }
+    for forbidden in [
+        "fn interpolated_position_embeddings(",
+        "fn transformer_block(",
+        "fn apply_da3_rotary(",
+        "fn select_reference_indices(",
+    ] {
+        assert!(
+            !moge.contains(forbidden),
+            "MoGe duplicates DINO equation {forbidden}"
+        );
+    }
+    assert!(payload.contains("NativeModelResourceRole::MogeModel"));
+    assert!(payload.contains("\"zed-native-moge-v1\""));
+    assert!(payload.contains("NativeModelResource::Moge"));
+    assert!(payload.contains("NativeModelBackingKind::NativeMogeResource"));
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concerns = policy["concerns"]
+        .as_array()
+        .ok_or("ownership policy has no concerns")?;
+    let moge_concern = concerns
+        .iter()
+        .find(|concern| concern["concern"].as_str() == Some("native_moge_model_resource"))
+        .ok_or("MoGe ownership concern is missing")?;
+    assert_eq!(
+        moge_concern["canonical_owner"].as_str(),
+        Some("comfy_model::moge::NativeMogeResource")
+    );
+    assert_eq!(
+        moge_concern["definitions"].as_array().map(Vec::len),
+        Some(2)
+    );
+    assert_eq!(
+        moge_concern["required_mappings"].as_array().map(Vec::len),
+        Some(6)
+    );
+    assert_eq!(
+        moge_concern["production_consumers"]
+            .as_array()
+            .map(Vec::len),
+        Some(1)
+    );
+    assert!(
+        moge_concern["known_open_reasons"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+    );
+    let dino_concern = concerns
+        .iter()
+        .find(|concern| concern["concern"].as_str() == Some("native_dinov2_backbone_execution"))
+        .ok_or("DINOv2 ownership concern is missing")?;
+    assert_eq!(
+        dino_concern["production_consumers"]
+            .as_array()
+            .map(Vec::len),
+        Some(2)
+    );
+    assert!(
+        dino_concern["definitions"]
+            .as_array()
+            .is_some_and(|definitions| definitions.iter().any(|definition| {
+                definition["path"].as_str() == Some("crates/comfy_model/src/moge.rs")
+                    && definition["symbol"].as_str() == Some("NativeMogeResource")
+                    && definition["role"].as_str() == Some("adapter")
+            }))
+    );
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let mut records = parse_csv_records(&catalog)?.into_iter();
+    let header = records.next().ok_or("ownership catalog has no header")?;
+    let column = |name: &str| {
+        header
+            .iter()
+            .position(|candidate| candidate == name)
+            .ok_or_else(|| format!("ownership catalog has no {name} column"))
+    };
+    let concern_column = column("concern")?;
+    let status_column = column("current_status")?;
+    let competing_column = column("competing_symbols")?;
+    let definitions_column = column("definition_hits")?;
+    let consumers_column = column("production_consumers")?;
+    let rows = records
+        .map(|row| (row[concern_column].clone(), row))
+        .collect::<BTreeMap<_, _>>();
+    let moge_row = rows
+        .get("native_moge_model_resource")
+        .ok_or("MoGe ownership catalog row is missing")?;
+    assert_eq!(moge_row[status_column], "authoritative_owner_confirmed");
+    assert!(moge_row[competing_column].is_empty());
+    assert!(moge_row[definitions_column].contains("canonical@crates/comfy_model/src/moge.rs"));
+    assert!(
+        moge_row[definitions_column].contains("canonical_state@crates/comfy_model/src/moge.rs")
+    );
+    let dino_row = rows
+        .get("native_dinov2_backbone_execution")
+        .ok_or("DINOv2 ownership catalog row is missing")?;
+    assert_eq!(dino_row[status_column], "authoritative_owner_confirmed");
+    assert!(dino_row[competing_column].is_empty());
+    assert!(dino_row[definitions_column].contains("adapter@crates/comfy_model/src/moge.rs"));
+    assert!(dino_row[consumers_column].contains("NativeMogeResource"));
     Ok(())
 }
 

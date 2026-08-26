@@ -653,13 +653,6 @@ impl NativeDino2Execution<'_> {
         )
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-native-moge-resource-foundation"
-        )
-    )]
     pub(crate) fn get_intermediate_layers(
         &self,
         backend: &CpuBackend,
@@ -691,13 +684,6 @@ impl NativeDino2Execution<'_> {
         )
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-native-moge-resource-foundation"
-        )
-    )]
     pub(crate) fn forward(
         &self,
         backend: &CpuBackend,
