@@ -1744,6 +1744,20 @@ class ValidationGenerationTests(unittest.TestCase):
         ):
             self.assertIn(bridge_feature_manifest, provider_worker_bridge["reads"])
             self.assertIn(bridge_feature_manifest, provider_worker_bridge["writes"])
+        for bridge_fixture_path in (
+            "crates/comfy_plugin_host/tests/component_contract.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component",
+            "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source/guest.rs",
+        ):
+            self.assertIn(bridge_fixture_path, provider_worker_bridge["reads"])
+            self.assertIn(bridge_fixture_path, provider_worker_bridge["writes"])
+        for bridge_fixture_source in (
+            "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source/Cargo.toml",
+            "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source/Cargo.lock",
+            "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source/rebuild_fixture.rs",
+        ):
+            self.assertIn(bridge_fixture_source, provider_worker_bridge["reads"])
+            self.assertNotIn(bridge_fixture_source, provider_worker_bridge["writes"])
         self.assertIn(
             "app-side native controller allocates the WorkerProviderInvocationContext",
             provider_worker_bridge["done"],
@@ -1786,6 +1800,9 @@ class ValidationGenerationTests(unittest.TestCase):
             "narrowly enables comfy_runtime/test-support and is enabled only by comfy_test_support",
             "no service getter, grant constructor, context constructor, or raw authority factory",
             "comfy-parity-provider-hermetic-component-harness",
+            "one catalog-valid COMFY-NODE four-digit feature identity",
+            "component-contract test and focused bridge test consume those same pinned bytes",
+            "no embedded replacement blob, runtime fixture compiler, subprocess, or alternate guest",
         ):
             self.assertIn(bridge_completion_gate, provider_worker_bridge["done"])
         provider_deployment = tasks_by_id[
