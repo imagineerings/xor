@@ -1571,6 +1571,14 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_types/src/worker_protocol.rs",
             provider_worker_bridge["writes"],
         )
+        self.assertIn(
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
+            provider_worker_bridge["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
+            provider_worker_bridge["writes"],
+        )
         for bridge_completion_owner in (
             "crates/comfy_plugin_host/src/component_host.rs",
             "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
@@ -1596,6 +1604,9 @@ class ValidationGenerationTests(unittest.TestCase):
             "one-use finalization nonce",
             "returns a typed success acknowledgement",
             "all legacy postcard bytes remain frozen",
+            "exhaustive test worker fixture classifies ProviderV2ProposalFinalization only as an unsupported supervisor-to-worker component input",
+            "ProviderV2ProposalFinalizationAck only as a worker-to-supervisor output",
+            "with no wildcard arm",
             "No public raw-field constructor",
         ):
             self.assertIn(worker_bridge_context_gate, provider_worker_bridge["done"])
