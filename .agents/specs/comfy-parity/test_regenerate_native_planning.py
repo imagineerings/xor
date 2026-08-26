@@ -792,6 +792,54 @@ class ValidationGenerationTests(unittest.TestCase):
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task340_clip_vision_001 -- --exact --nocapture",
         ):
             self.assertIn(command, photomaker_validation)
+        for gligen_read in (
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py",
+            "projects/comfy/ComfyUI/comfy/samplers.py",
+            "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/src/attention.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_02.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(gligen_read, gligen_task["reads"])
+        for gligen_gate in (
+            "input_blocks 0 through 19, middle_block 0 through 19, then output_blocks 0 through 19",
+            "Sparse structural locations are source-valid and never treated as gaps",
+            "exact 17-key suffix set",
+            "Strict ordered state is 8 plus 17 times fuser_count",
+            "positive 100 ** (arange(8)/8)",
+            "key_dim 768 to eight heads",
+            "GatedSelfAttentionDense",
+            "exclusively to canonical comfy_model::attention",
+            "GatedCrossAttentionDense and GatedSelfAttentionDense2",
+            "after node-level division of image coordinates by eight",
+            "without clamping",
+            "opaque non-Clone prepared-position object",
+            "alias-deduplicated StorageIds",
+            "quadratic (V+30)^2 workspace",
+            "sparse multi-region order and compact indices",
+            "max-plus-one OOM",
+        ):
+            self.assertIn(gligen_gate, gligen_task["done"])
+        gligen_validation = planning.task_validation_commands(gligen_task)
+        for command in (
+            "cargo test --locked -p comfy_model gligen_resource -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_conditioning_integration gligen_resource -- --exact --nocapture",
+            "cargo test --locked -p comfy_model attention -- --nocapture",
+            "cargo test --locked -p comfy_model photomaker_resource -- --nocapture",
+            "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+        ):
+            self.assertIn(command, gligen_validation)
         for phrase in (
             "NativeGligenResource",
             "NativePhotoMakerResource",

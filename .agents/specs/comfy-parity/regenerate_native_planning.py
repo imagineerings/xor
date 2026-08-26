@@ -9914,12 +9914,29 @@ def native_model_resource_precursor_tasks(
             "projects/comfy/ComfyUI/nodes.py",
             "projects/comfy/ComfyUI/comfy/gligen.py",
             "projects/comfy/ComfyUI/comfy/sd.py",
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "projects/comfy/ComfyUI/comfy/model_management.py",
             "projects/comfy/ComfyUI/comfy/t2i_adapter/adapter.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py",
+            "projects/comfy/ComfyUI/comfy/samplers.py",
+            "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/src/attention.rs",
             "crates/comfy_model/src/native_ops.rs",
             "crates/comfy_model/src/conditioning.rs",
             "crates/comfy_model/src/model_family.rs",
             "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_02.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_test_support/tests/native_conditioning_integration.rs",
             "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [
             "crates/comfy_model/src/conditioning_resources.rs",
@@ -9928,7 +9945,7 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_test_support/tests/native_conditioning_integration.rs",
             "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
         ],
-        "One sealed NativeGligenResource strictly discovers the source position_net and ordered indexed fuser state, rejects gaps, duplicates, missing state, or malformed indices, and exposes only the exact prepare-position and fuser-apply contracts. Position preparation admits at most 30 boxes, maps image xyxy coordinates into latent-normalized coordinates, and applies exact null padding; indexed fusers execute in source order with bounded memory and the caller CancellationToken. Resource identity binds artifact, architecture, complete ordered checkpoint state, storage dtype, semantic digest, and distinct-StorageId residency. Node-level conditioning metadata mutation remains assigned to the later GLIGEN node leaf. Cross-role use, malformed state or inputs, uncertified non-CPU/F32 execution, OOM, cancellation, or failed reconstruction publishes no GLIGEN resource or conditioning state. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-service-foundation.",
+        "One sealed NativeGligenResource scans source structural locations in exact input_blocks 0 through 19, middle_block 0 through 19, then output_blocks 0 through 19 order, skips absent locations, and compacts present modules into sequential transformer_index values. Sparse structural locations are source-valid and never treated as gaps. It requires at least one fuser and exactly one anchored .fuser. namespace at each present location; each has the exact 17-key suffix set, while partial sets, multiple paths or collisions at one location, duplicate suffixes, unknown regions, indices outside 0 through 19, and unrelated state reject. The structural-to-compact order is retained and reconstructed exactly, and out-of-range apply rejects typed. PositionNet owns exactly eight keys: null_positive_feature, null_position_feature[64], and three biased linears from input-plus-64 to 512 to 512 to output. Fourier embedding uses eight frequencies, temperature 100, positive 100 ** (arange(8)/8), sin then cos per frequency over xyxy, concatenated in source order, with SiLU after the first two linears. Each fuser owns a biased context linear; biasless q, k, and v; biased attention output; GEGLU projection and output linear; two affine layer normalizations; and scalar alpha_attn and alpha_dense. All fusers and PositionNet require a consistent key dimension. Query/head geometry is key_dim 768 to eight heads, otherwise d_head 64 with exact divisibility. Apply implements only source-reachable GatedSelfAttentionDense: project objects, concatenate visual plus objects, layer-normalize, delegate self-attention exclusively to canonical comfy_model::attention, slice the visual prefix, and add tanh(alpha_attn) times attention; then layer-normalize visual, GEGLU as split(linear(x), 2) into value times exact_gelu(gate), apply output linear, and add tanh(alpha_dense) times feed-forward, with fixed scale one. Linear, normalization, activation, reshape, concatenate, and residual mechanics delegate to canonical owners. Defined-but-loader-unreachable GatedCrossAttentionDense and GatedSelfAttentionDense2, mutable scale, bicubic grounding-token paths, and sampler patch installation are excluded. Position preparation receives latent-grid embedding, height, width, y, and x after node-level division of image coordinates by eight; it does not accept image xyxy. For latent shape [B,C,H,W], it computes exact f32 x/W, y/H, (x+width)/W, and (y+height)/H without clamping, accepts zero through 30 entries, requires every embedding [1,key_dim], repeats positions and embeddings across B, and pads to 30 with learned null features. Zero entries matches source set_empty and 31 rejects. It returns one opaque non-Clone prepared-position object bound to resource identity, batch, and device. Apply admits visual [B,V,query_dim(index)], checks prepared identity and batch, returns a fresh same-shape tensor, and never mutates inputs. Strict ordered state is 8 plus 17 times fuser_count. F32, F16, and BF16 retained storage projects checked to CPU/F32 execution; identity binds whole artifact bytes, architecture, structural-to-compact order, state, dtype, digest, and alias-deduplicated StorageIds. Reconstruction rebuilds from retained state rather than cloning and preserves identity, residency, and output. Conservative phase memory and cancellation cover construction, Fourier/null/MLP, context projection, concatenate/layer-normalization/QKV/SDP/output, both gated residuals, digest, and pre-publication; attention includes quadratic (V+30)^2 workspace. Every error publishes no resource, prepared position, or fuser output. A separately named pure-standard-library reduced GLIGEN fixture pins gligen.py, attention.py, samplers.py, and openaimodel.py source hashes without changing StyleAdapter, Flux Redux, or PhotoMaker hashes. It discriminates sparse multi-region order and compact indices, all 8+17F keys, both head-rule branches, zero/30/31 positions, unclamped coordinates, Fourier order, learned-null padding, attention/GEGLU/gates/residual order, wrong prepared-resource/index/batch, F32/F16/BF16 projection, alias residency, reconstruction, max-plus-one OOM, and every cancellation phase. Node-level conditioning metadata mutation remains assigned to the later GLIGEN node leaf. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-service-foundation.",
     )
     append(
         "comfy-parity-native-conditioning-auxiliary-resource-foundation",
@@ -21687,6 +21704,17 @@ def task_validation_commands(item: dict[str, object]) -> str:
                 "cargo test --locked -p comfy_model --test clip_vision -- --nocapture",
                 "cargo test --locked -p comfy_test_support --test native_conditioning_integration native_clip_vision_context_construction -- --exact --nocapture",
                 "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task340_clip_vision_001 -- --exact --nocapture",
+            ])
+        if identifier == "comfy-parity-native-gligen-resource-foundation":
+            commands.extend([
+                "cargo test --locked -p comfy_model gligen_resource -- --nocapture",
+                "cargo test --locked -p comfy_test_support --test native_conditioning_integration gligen_resource -- --exact --nocapture",
+                "cargo test --locked -p comfy_model attention -- --nocapture",
+                "cargo test --locked -p comfy_model photomaker_resource -- --nocapture",
+                "cargo test --locked -p comfy_test_support --test native_conditioning_integration photomaker_resource -- --exact --nocapture",
+                "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+                "cargo test --locked -p comfy_test_support --test native_conditioning_integration style_model_resource -- --exact --nocapture",
+                "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
             ])
         commands.extend([
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
