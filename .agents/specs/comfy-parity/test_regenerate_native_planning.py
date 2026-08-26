@@ -195,7 +195,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 729)
+        self.assertEqual(len(tasks), 731)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -335,6 +335,8 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-native-photomaker-resource-foundation",
             "comfy-parity-native-gligen-resource-foundation",
             "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+            "comfy-parity-native-model-store-stream-source-foundation",
+            "comfy-parity-native-model-source-worker-bridge-foundation",
             "comfy-parity-native-model-resource-service-foundation",
         ]
         self.assertEqual(
@@ -343,6 +345,33 @@ class ValidationGenerationTests(unittest.TestCase):
                 value_id,
                 "comfy-parity-native-asset-name-resolution-foundation",
                 "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        model_store_stream_task = tasks_by_id[
+            "comfy-parity-native-model-store-stream-source-foundation"
+        ]
+        model_source_bridge_task = tasks_by_id[
+            "comfy-parity-native-model-source-worker-bridge-foundation"
+        ]
+        model_resource_service_task = tasks_by_id[
+            "comfy-parity-native-model-resource-service-foundation"
+        ]
+        self.assertEqual(
+            model_store_stream_task["dependencies"],
+            ["comfy-parity-native-asset-name-resolution-foundation"],
+        )
+        self.assertEqual(
+            model_source_bridge_task["dependencies"],
+            [
+                "comfy-parity-native-model-store-stream-source-foundation",
+                "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+            ],
+        )
+        self.assertEqual(
+            model_resource_service_task["dependencies"],
+            [
+                "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+                "comfy-parity-native-model-source-worker-bridge-foundation",
             ],
         )
         clip_task = tasks_by_id["comfy-parity-native-clip-resource-foundation"]
@@ -887,6 +916,95 @@ class ValidationGenerationTests(unittest.TestCase):
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task393_style_model_resource_001 -- --exact --nocapture",
         ):
             self.assertIn(command, conditioning_validation)
+        self.assertEqual(
+            model_store_stream_task["writes"],
+            [
+                "crates/comfy_model/src/model_store.rs",
+                "crates/comfy_model/src/comfy_model.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ],
+        )
+        for phrase in (
+            "non-Clone opaque verified source manifest",
+            "exact ordered ArtifactKeys",
+            "tensor names, dtypes, shapes and byte ranges",
+            "revalidates ArtifactIndex and source identity",
+            "max-plus-one size",
+            "No path, file handle, parser, raw ArtifactIndex getter",
+            "ModelStore::load remains the sole parser and verified parse-cache owner",
+        ):
+            self.assertIn(phrase, model_store_stream_task["done"])
+        model_store_validation = planning.task_validation_commands(
+            model_store_stream_task
+        )
+        self.assertIn(
+            "cargo test --locked -p comfy_model model_store_stream_source -- --nocapture",
+            model_store_validation,
+        )
+        for bridge_write in (
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_runtime/src/runtime_supervisor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+        ):
+            self.assertIn(bridge_write, model_source_bridge_task["writes"])
+        for phrase in (
+            "never overloads provider streaming",
+            "one-use source-session ID",
+            "fixed chunk ceiling below the worker frame maximum",
+            "worker receives no path, file handle, authorization grant, ArtifactIndex, ModelStore",
+            "fresh attempt restarts at ordinal one",
+            "Legacy WorkerMessage bytes remain frozen",
+            "larger than the 12 MiB native execution frame",
+        ):
+            self.assertIn(phrase, model_source_bridge_task["done"])
+        bridge_validation = planning.task_validation_commands(
+            model_source_bridge_task
+        )
+        self.assertIn(
+            "native_worker_resilience model_source_worker_bridge_restarts_without_duplicate_publication",
+            bridge_validation,
+        )
+        self.assertNotIn(
+            "crates/comfy_model/src/native_node_payload.rs",
+            model_resource_service_task["writes"],
+        )
+        for service_write in (
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(service_write, model_resource_service_task["writes"])
+        for phrase in (
+            "object-safe Send+Sync NativeModelResourceService port",
+            "Arc<NativeModelPayload> only",
+            "same NativeNodeServiceIdentity attempt and node before and after every call",
+            "STYLE_MODEL from style_models, PHOTOMAKER from photomaker, and GLIGEN from gligen",
+            "paired and triple CLIP success remains exclusively assigned",
+            "already returned local Arcs are not retroactively revoked",
+            "Canonical verified ModelStore parse-cache retention",
+            "native_model_resource_service concern",
+            "forbids a second parser, store, index, path, grant, cache, handle/publication, or resource-constructor owner",
+        ):
+            self.assertIn(phrase, model_resource_service_task["done"])
+        service_validation = planning.task_validation_commands(
+            model_resource_service_task
+        )
+        for command in (
+            "cargo test --locked -p comfy_nodes native_model_resource_service -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_model_resource_service -- --nocapture",
+            "native_model_resource_service_loads_style_photomaker_and_gligen",
+            "native_worker_resilience val_recovery_005",
+            "val_ownership_task400_native_model_resource_service_001",
+        ):
+            self.assertIn(command, service_validation)
         for item in (
             style_task,
             clip_vision_context_task,
@@ -2188,8 +2306,14 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("current 217 external-service rows", catalog_outcome)
         self.assertIn("61 unresolved methods", catalog_done)
         self.assertIn("zero UNKNOWN", catalog_done)
+        sequential_model_resource_phases = model_resource_phases[
+            : model_resource_phases.index(
+                "comfy-parity-native-model-store-stream-source-foundation"
+            )
+        ]
         for previous, current in zip(
-            model_resource_phases, model_resource_phases[1:]
+            sequential_model_resource_phases,
+            sequential_model_resource_phases[1:],
         ):
             dependencies = tasks_by_id[current]["dependencies"]
             self.assertEqual(dependencies[0], previous)

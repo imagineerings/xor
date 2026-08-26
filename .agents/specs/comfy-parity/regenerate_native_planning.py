@@ -9984,24 +9984,102 @@ def native_model_resource_precursor_tasks(
         include_model_payload=False,
     )
     append(
+        "comfy-parity-native-model-store-stream-source-foundation",
+        "Expose verified model-store tensor ranges",
+        "Add one opaque ModelStore-bound verified source manifest and cancellable bounded tensor-range reader so large native model sources can cross a later private-worker bridge without exposing paths, parsers, cache mutation, or ArtifactIndex authority.",
+        [
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_model/src/artifact_index.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        [
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "ModelStore remains the only model parser and parse-cache owner and adds one non-Clone opaque verified source manifest plus a cancellable bounded tensor-range reader. The manifest is bound to the exact ordered ArtifactKeys, source SHA-256 and size, parsed format, tensor names, dtypes, shapes and byte ranges, nested-state disposition, aggregate limits, and the owning ModelStore identity. Every range read revalidates ArtifactIndex and source identity plus the caller CancellationToken before and after reading. Foreign or stale store identity, changed bytes, unknown tensor, invalid or overlapping range, out-of-range read, aggregate or per-read max-plus-one size, cancellation, and malformed metadata reject without returning bytes or mutating cache state. No path, file handle, parser, raw ArtifactIndex getter, cache mutation API, resource constructor, or unchecked byte reader is exposed. Existing ModelStore::load remains the sole parser and verified parse-cache owner, and its identity and cache behavior do not change.",
+        include_model_payload=False,
+    )
+    append(
+        "comfy-parity-native-model-source-worker-bridge-foundation",
+        "Bridge verified model sources to the private worker",
+        "Add a distinct capacity-one worker-to-app model-source open/read/close protocol that streams verified ModelStore tensor ranges without embedding checkpoints in the native execution frame or exposing app paths, grants, indexes, or stores to the worker.",
+        [
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_types/src/comfy_types.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_worker/tests/ipc_framing.rs",
+            "crates/comfy_runtime/src/runtime_supervisor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        [
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_types/src/comfy_types.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_worker/tests/ipc_framing.rs",
+            "crates/comfy_runtime/src/runtime_supervisor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "A distinct worker-to-app model-source open, read, and close protocol reuses the Task425 capacity-one backpressure pattern but never overloads provider streaming. Every request binds exact attempt, node, and service generations, a one-use source-session ID, checked call ordinal, ordered source-selection identity, tensor ordinal and bounded byte range; every response binds a fixed chunk ceiling below the worker frame maximum and an exact response digest. The app alone resolves names and authorization through NativeAssetResolverRegistry and AssetService, opens the canonical ModelStore verified manifest, and serves revalidated chunks. The worker receives no path, file handle, authorization grant, ArtifactIndex, ModelStore, raw service, or authority getter. Wrong direction, duplicate, replayed, late, or out-of-order calls, foreign or stale identity or generation, replacement, crash, cancellation between chunks, changed source bytes, oversized aggregate or chunk, digest mismatch, and post-close traffic cancel and close the exact session; a fresh attempt restarts at ordinal one with no duplicated publication. Legacy WorkerMessage bytes remain frozen. A hermetic multi-chunk source larger than the 12 MiB native execution frame crosses the bridge without being embedded in ExecuteNativeImagePlan, and worker loss, shutdown, and controller replacement revoke all session capacity and permit a clean retry.",
+        include_model_payload=False,
+    )
+    append(
         "comfy-parity-native-model-resource-service-foundation",
         "Load native model resources through one runtime service",
-        "Expose one cycle-free identity-checked NativeNodeServices loader and invocation contract over canonical asset-name resolution, AssetService, ArtifactIndex, and ModelStore. It resolves ordered one-to-three source assets, delegates to the typed resource owners, and returns complete validated resources without publishing handles or duplicating parsing, caching, path, or authorization authority.",
+        "Expose one cycle-free identity-checked NativeNodeServices loader over the verified model-source worker bridge. It loads the initial STYLE_MODEL, PHOTOMAKER, and GLIGEN roles from one authorized source each and returns complete typed payloads without publishing handles or duplicating parsing, caching, path, authorization, or invocation authority.",
         [
             "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/folder_paths.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py",
             "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_model/src/artifact_index.rs",
+            "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
             "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/executor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [
             "crates/comfy_nodes/src/execution.rs",
             "crates/comfy_nodes/src/comfy_nodes.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "Every supported single, paired, and triple source loader selection resolves one authorized immutable asset snapshot and delegates exactly once to the matching typed resource owner. Wrong category, changed bytes, partial selection, unsupported architecture, malformed weights, denied grants, OOM, cancellation, service replacement, and restart publish no resource, handle, cache entry, effect, or durable success; repository scans find no family-local loader or second ModelStore.",
+        "comfy_nodes defines one object-safe Send+Sync NativeModelResourceService port. Its checked request contains only a typed role, exact folder category, ordered source names, and no raw bytes, path, grant, parser, store, cache key, or memory ceiling; its result is Arc<NativeModelPayload> only, never NativeStoredModelPayload, handle, execution output, or effect. Runtime owns one non-Clone opaque implementation with the paired worker-source session and a private exact role dispatch. NativeNodeServices and NodeContext validate the same NativeNodeServiceIdentity attempt and node before and after every call; cancellation and source identity are revalidated immediately before return. Initial success is exactly STYLE_MODEL from style_models, PHOTOMAKER from photomaker, and GLIGEN from gligen, each with exactly one source and one delegation to its prerequisite typed owner. The request representation may preserve ordered one-through-three multiplicity for later recipes, but paired and triple CLIP success remains exclusively assigned to the following resource execution task. This service loads only; invocation remains in each typed resource owner. Old service, attempt, node, or generation requests fail; already returned local Arcs are not retroactively revoked. Wrong category or count, changed bytes, partial selection, unsupported architecture, malformed weights, denied authorization, OOM, cancellation, service replacement, worker loss, and restart publish no resource, NativeStoredModelPayload, handle, execution-cache entry, effect, or durable success. Canonical verified ModelStore parse-cache retention remains governed solely by ModelStore and is explicitly allowed after a later resource-construction rejection. Ownership registers one native_model_resource_service concern with the runtime implementation as canonical owner, NativeModelResourceService as the boundary port, and AssetService, ArtifactIndex, ModelStore, the three typed resource owners, the model-source worker bridge, and ExecutionEngine as allowed adapters. It forbids a second parser, store, index, path, grant, cache, handle/publication, or resource-constructor owner and any public raw bridge or service getter.",
+        include_model_payload=False,
     )
     ordered_ids = [
         "comfy-parity-native-vae-resource-foundation",
@@ -10027,6 +10105,8 @@ def native_model_resource_precursor_tasks(
         "comfy-parity-native-photomaker-resource-foundation",
         "comfy-parity-native-gligen-resource-foundation",
         "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+        "comfy-parity-native-model-store-stream-source-foundation",
+        "comfy-parity-native-model-source-worker-bridge-foundation",
         "comfy-parity-native-model-resource-service-foundation",
     ]
     tasks_by_id = {str(item["id"]): item for item in tasks}
@@ -10041,6 +10121,21 @@ def native_model_resource_precursor_tasks(
                 "comfy-parity-model-detection-any-of-key-selector-consolidation",
             ]
         )
+    tasks_by_id["comfy-parity-native-model-store-stream-source-foundation"][
+        "dependencies"
+    ] = [asset_dependency]
+    tasks_by_id["comfy-parity-native-model-source-worker-bridge-foundation"][
+        "dependencies"
+    ] = [
+        "comfy-parity-native-model-store-stream-source-foundation",
+        "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+    ]
+    tasks_by_id["comfy-parity-native-model-resource-service-foundation"][
+        "dependencies"
+    ] = [
+        "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+        "comfy-parity-native-model-source-worker-bridge-foundation",
+    ]
     return ordered
 
 
@@ -21734,6 +21829,44 @@ def task_validation_commands(item: dict[str, object]) -> str:
                 "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task393_style_model_resource_001 -- --exact --nocapture",
             ])
         commands.extend([
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-model-store-stream-source-foundation":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p comfy_model model_store_stream_source -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task398_model_store_stream_source_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-model-source-worker-bridge-foundation":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p comfy_worker --test ipc_framing model_source_worker_bridge -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_worker_resilience model_source_worker_bridge_restarts_without_duplicate_publication -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task399_model_source_worker_bridge_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-model-resource-service-foundation":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "PYTHONDONTWRITEBYTECODE=1 python3 crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation/generate_oracle.py --check",
+            "cargo test --locked -p comfy_nodes native_model_resource_service -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_model_resource_service -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_node_family_e2e native_model_resource_service_loads_style_photomaker_and_gligen -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_worker_resilience val_recovery_005 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task400_native_model_resource_service_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
