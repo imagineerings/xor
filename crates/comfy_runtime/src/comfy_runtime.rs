@@ -52,6 +52,7 @@ pub mod native_ffi_rocm;
 pub mod native_ffi_xpu;
 mod native_video_codec_abi;
 pub mod native_video_codec_ffi;
+pub mod native_video_codec_package;
 pub(crate) mod native_video_codec_service;
 pub mod output_committer;
 pub mod permissions;
@@ -91,6 +92,10 @@ pub use native_ffi_rocm::*;
 #[cfg(feature = "xpu")]
 pub use native_ffi_xpu::*;
 pub use native_video_codec_ffi::*;
+pub use native_video_codec_package::*;
+pub use native_video_codec_service::{
+    NativeVideoCodecWorkerServices, NativeVideoCodecWorkerServicesError,
+};
 pub use output_committer::*;
 pub use permissions::*;
 pub use persistence::*;

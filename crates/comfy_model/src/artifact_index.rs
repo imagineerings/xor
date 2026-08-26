@@ -16,7 +16,36 @@ use std::{
 };
 
 pub const ARTIFACT_INDEX_VERSION: u32 = 1;
+const PRIVATE_ARTIFACT_CAPTURE_CHUNK_BYTES: usize = 64 * 1024;
 static PRIVATE_FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CapturedPrivateArtifact {
+    bytes: Vec<u8>,
+    digest_sha256: String,
+}
+
+impl CapturedPrivateArtifact {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    pub fn digest_sha256(&self) -> &str {
+        &self.digest_sha256
+    }
+
+    pub fn len(&self) -> usize {
+        self.bytes.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.bytes.is_empty()
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+}
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ArtifactKey {
@@ -596,6 +625,156 @@ impl ArtifactRoot {
             return Err(ArtifactIndexError::ChangedDuringScan(path));
         }
         Ok(Some(bytes))
+    }
+
+    pub fn capture_private_file(
+        &self,
+        relative_path: impl AsRef<Path>,
+        maximum_bytes: usize,
+        cancellation: &CancellationToken,
+    ) -> Result<Option<CapturedPrivateArtifact>, ArtifactIndexError> {
+        self.capture_private_file_with_hook(
+            relative_path.as_ref(),
+            maximum_bytes,
+            cancellation,
+            |_| {},
+        )
+    }
+
+    fn capture_private_file_with_hook(
+        &self,
+        relative_path: &Path,
+        maximum_bytes: usize,
+        cancellation: &CancellationToken,
+        mut after_chunk: impl FnMut(usize),
+    ) -> Result<Option<CapturedPrivateArtifact>, ArtifactIndexError> {
+        check_cancelled(cancellation)?;
+        if maximum_bytes == 0 {
+            return Err(ArtifactIndexError::InvalidSnapshot(
+                "private artifact byte limit is zero".to_owned(),
+            ));
+        }
+        let relative_path =
+            normalize_relative_path_with_limits(relative_path, &ParserLimits::default())?;
+        self.validate_key_scope(&ArtifactKey {
+            root_id: self.id.clone(),
+            relative_path: relative_path.clone(),
+        })?;
+        let path = self.canonical_path.join(&relative_path);
+        let (parent, file_name) = match self.open_capability_parent(&relative_path, false) {
+            Ok(value) => value,
+            Err(ArtifactIndexError::Missing(_)) => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        let before = match parent.symlink_metadata(&file_name) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => {
+                return Err(ArtifactIndexError::Io {
+                    path,
+                    message: error.to_string(),
+                });
+            }
+        };
+        if before.file_type().is_symlink() {
+            return Err(ArtifactIndexError::SymbolicLink(path));
+        }
+        if !before.is_file() {
+            return Err(ArtifactIndexError::UnsafePath {
+                path,
+                reason: "private artifact is not a regular file".to_owned(),
+            });
+        }
+        let mut file = match parent.open(&file_name) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => {
+                return Err(ArtifactIndexError::Io {
+                    path,
+                    message: error.to_string(),
+                });
+            }
+        };
+        let opened = file.metadata().map_err(|error| ArtifactIndexError::Io {
+            path: path.clone(),
+            message: error.to_string(),
+        })?;
+        let current =
+            parent
+                .symlink_metadata(&file_name)
+                .map_err(|error| ArtifactIndexError::Io {
+                    path: path.clone(),
+                    message: error.to_string(),
+                })?;
+        if !opened.is_file()
+            || !same_capability_file_identity(&before, &opened)
+            || !same_capability_file_identity(&opened, &current)
+        {
+            return Err(ArtifactIndexError::ChangedDuringScan(path));
+        }
+        let opened_length = usize::try_from(opened.len()).unwrap_or(usize::MAX);
+        if opened_length > maximum_bytes {
+            return Err(ArtifactIndexError::InvalidSnapshot(format!(
+                "private artifact contains {opened_length} bytes, exceeding {maximum_bytes}"
+            )));
+        }
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(opened_length)
+            .map_err(|_| ArtifactIndexError::AllocationFailed(path.clone()))?;
+        let mut digest = Sha256::new();
+        let mut chunk = [0_u8; PRIVATE_ARTIFACT_CAPTURE_CHUNK_BYTES];
+        loop {
+            check_cancelled(cancellation)?;
+            let read = file
+                .read(&mut chunk)
+                .map_err(|error| ArtifactIndexError::Io {
+                    path: path.clone(),
+                    message: error.to_string(),
+                })?;
+            if read == 0 {
+                break;
+            }
+            let captured_length = bytes.len().checked_add(read).ok_or_else(|| {
+                ArtifactIndexError::InvalidSnapshot(
+                    "private artifact length overflowed during capture".to_owned(),
+                )
+            })?;
+            if captured_length > maximum_bytes {
+                return Err(ArtifactIndexError::InvalidSnapshot(format!(
+                    "private artifact exceeds {maximum_bytes} bytes during capture"
+                )));
+            }
+            bytes
+                .try_reserve(read)
+                .map_err(|_| ArtifactIndexError::AllocationFailed(path.clone()))?;
+            bytes.extend_from_slice(&chunk[..read]);
+            digest.update(&chunk[..read]);
+            after_chunk(bytes.len());
+        }
+        check_cancelled(cancellation)?;
+        let after =
+            parent
+                .symlink_metadata(&file_name)
+                .map_err(|error| ArtifactIndexError::Io {
+                    path: path.clone(),
+                    message: error.to_string(),
+                })?;
+        let opened_after = file.metadata().map_err(|error| ArtifactIndexError::Io {
+            path: path.clone(),
+            message: error.to_string(),
+        })?;
+        if bytes.len() != opened_length
+            || opened_after.len() != opened.len()
+            || !same_capability_file_identity(&opened, &opened_after)
+            || !same_capability_file_identity(&opened, &after)
+        {
+            return Err(ArtifactIndexError::ChangedDuringScan(path));
+        }
+        Ok(Some(CapturedPrivateArtifact {
+            bytes,
+            digest_sha256: format!("{:x}", digest.finalize()),
+        }))
     }
 
     pub fn write_private_file(
@@ -4538,6 +4717,83 @@ mod tests {
                 .is_some_and(|name| name.starts_with("state.json.quarantine."))
         );
         assert!(root.quarantine_private_file("nested/state.json")?.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn artifact_root_cancellable_private_capture_is_bounded_and_race_safe()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let root =
+            ArtifactRoot::canonical("package", "general-video-codec", directory.path(), ["bin"])?;
+        let payload = vec![7_u8; PRIVATE_ARTIFACT_CAPTURE_CHUNK_BYTES + 17];
+        fs::write(directory.path().join("library.bin"), &payload)?;
+
+        let captured = root
+            .capture_private_file("library.bin", payload.len(), &CancellationToken::default())?
+            .ok_or("captured artifact is absent")?;
+        assert_eq!(captured.as_bytes(), payload);
+        assert_eq!(captured.len(), payload.len());
+        assert!(!captured.is_empty());
+        assert_eq!(
+            captured.digest_sha256(),
+            format!("{:x}", Sha256::digest(&payload))
+        );
+        assert!(matches!(
+            root.capture_private_file(
+                "library.bin",
+                payload.len() - 1,
+                &CancellationToken::default()
+            ),
+            Err(ArtifactIndexError::InvalidSnapshot(_))
+        ));
+
+        let cancellation = CancellationToken::default();
+        cancellation.cancel();
+        assert!(matches!(
+            root.capture_private_file("library.bin", payload.len(), &cancellation),
+            Err(ArtifactIndexError::Cancelled)
+        ));
+
+        let cancellation = CancellationToken::default();
+        assert!(matches!(
+            root.capture_private_file_with_hook(
+                Path::new("library.bin"),
+                payload.len(),
+                &cancellation,
+                |_| {
+                    cancellation.cancel();
+                },
+            ),
+            Err(ArtifactIndexError::Cancelled)
+        ));
+
+        let path = directory.path().join("library.bin");
+        let replacement = vec![8_u8; payload.len() + 1];
+        let mut mutated = false;
+        assert!(matches!(
+            root.capture_private_file_with_hook(
+                Path::new("library.bin"),
+                replacement.len(),
+                &CancellationToken::default(),
+                |_| {
+                    if !mutated {
+                        fs::write(&path, &replacement).expect("mutate captured file");
+                        mutated = true;
+                    }
+                },
+            ),
+            Err(ArtifactIndexError::ChangedDuringScan(_))
+        ));
+
+        let retry = root
+            .capture_private_file(
+                "library.bin",
+                replacement.len(),
+                &CancellationToken::default(),
+            )?
+            .ok_or("retry artifact is absent")?;
+        assert_eq!(retry.as_bytes(), replacement);
         Ok(())
     }
 

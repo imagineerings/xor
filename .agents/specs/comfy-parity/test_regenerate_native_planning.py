@@ -894,11 +894,13 @@ class ValidationGenerationTests(unittest.TestCase):
         ):
             self.assertIn(path, video_package_task["reads"])
         for path in (
+            "crates/comfy_runtime/src/native_ffi_elf.rs",
             "crates/comfy_runtime/src/trust.rs",
             "crates/comfy_model/src/artifact_index.rs",
             "crates/comfy_worker/src/memory_modes.rs",
             "crates/comfy_test_support/src/bin/generate_video_codec_package_bootstrap_fixture.rs",
             "crates/comfy_test_support/tests/video_codec_package_bootstrap.rs",
+            "crates/comfy_test_support/tests/native_release_boundary.rs",
             "crates/comfy_test_support/fixtures/video/codec-package-bootstrap",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
@@ -928,6 +930,8 @@ class ValidationGenerationTests(unittest.TestCase):
             "port interfaces can reach only their historical symbol subset",
             "ReviewedGeneralVideoCodecDeclarations alone remains UncertifiedFfi",
             "historical five-library/54-symbol catalog",
+            "non-current ELF64 e_version",
+            "non-64 e_ehsize",
             "without a host compiler, subprocess, download, credential, or production private key",
         ):
             self.assertIn(phrase, video_package_task["done"])
@@ -946,6 +950,7 @@ class ValidationGenerationTests(unittest.TestCase):
         for command in (
             "generate_video_codec_package_bootstrap_fixture -- --check",
             "-p comfy_model artifact_root_cancellable_private_capture",
+            "elf_inspection_rejects_invalid_elf64_header_contract",
             "cargo test --locked -p comfy_model --all-targets",
             "general_video_codec_package_bootstrap",
             "--test video_codec_package_bootstrap",

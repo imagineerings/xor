@@ -14254,6 +14254,7 @@ def native_video_execution_precursor_tasks(
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            "crates/comfy_test_support/tests/native_release_boundary.rs",
             "crates/comfy_test_support/fixtures/video/codec-general-video-abi/manifest.json",
             "crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json",
             "crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json",
@@ -14270,6 +14271,7 @@ def native_video_execution_precursor_tasks(
         ],
         [
             "crates/comfy_runtime/src/native_video_codec_package.rs",
+            "crates/comfy_runtime/src/native_ffi_elf.rs",
             "crates/comfy_runtime/src/native_video_codec_ffi.rs",
             "crates/comfy_runtime/src/native_video_codec_service.rs",
             "crates/comfy_runtime/src/settings.rs",
@@ -14283,6 +14285,7 @@ def native_video_execution_precursor_tasks(
             "crates/comfy_worker/src/memory_modes.rs",
             "crates/comfy_test_support/src/bin/generate_video_codec_package_bootstrap_fixture.rs",
             "crates/comfy_test_support/tests/video_codec_package_bootstrap.rs",
+            "crates/comfy_test_support/tests/native_release_boundary.rs",
             "crates/comfy_test_support/fixtures/video/codec-package-bootstrap",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
@@ -14293,6 +14296,10 @@ def native_video_execution_precursor_tasks(
         "CPU and every accelerator worker launch project the same optional, backend-independent general-video package authority (ArtifactRoot path, signer id, and public verification key); partial configuration, private signing material, the reserved fixture signer, and the reserved fixture public-key fingerprint are each rejected independently by production settings and worker CLI parsing. Fixture construction and injection are available only through a cfg(test or test-support) boundary that settings and CLI production code cannot call. The canonical ArtifactRoot owner adds one cancellable bounded private-file capture that opens through the capability parent, rejects symlink or non-regular leaves, checks identity and length before and after fixed-size chunked reads, hashes the captured bytes, and exposes no raw path or file handle. General package admission captures only signed coverage and receipt first, derives the exact bounded dynamic path and size set, requires recursive enumeration equality, then captures bounded metadata and each native image one at a time; it never buffers the whole package, hands a raw host path to trust, or bypasses cancellation. Before publication it re-enumerates the tree, recaptures the initially excluded coverage and receipt byte-for-byte, re-verifies their signature, and revalidates every covered metadata and image against its signed size and digest; coverage-only or receipt-only mutation discards every unpublished seal and port. The canonical trust owner makes the shared native-package admission path available to ordinary production and verifies separate domain-separated general-video package and dependency profiles whose signed canonical manifest, coverage, license/notice/source-build dispositions, x86_64-unknown-linux-gnu target, six-library/78-symbol catalog, callable symbol versions/providers, and complete dependency graph all agree. General-package ELF admission delegates machine, PT_DYNAMIC, SONAME, export, DT_NEEDED, RPATH, and RUNPATH inspection exclusively to comfy_runtime::native_ffi_elf::inspect_elf64_dynamic_contract; native_video_codec_package and trust define no second ELF parser. Parallel general package, inspected-image, certified-closure, load, symbol, and binding types cannot be coerced into the frozen historical five-library/54-symbol profile. NativeFfiRegistry certifies the exact general closure before one shared unsafe loader projection binds all six libraries and 78 symbols, invokes and checks all six version functions including avfilter_version against the exact FFmpeg 7.1 releases, and retains the 24 supplemental pointers privately for Task563. General admission cannot downgrade to the historical bind path, the historical path cannot acquire supplemental authority, and the frozen LTXV, WebM, and H.264 port interfaces can reach only their historical symbol subset. The sole retained codec actor consumes the one non-cloneable certified inspected closure, and all four worker NativeImageExecutor constructor branches attach clones of the existing LTXV, WebM, and H.264 ports issued by that same actor. One opaque non-cloneable worker service bundle owns the actor and all three ports, publishes them only after readiness, and retains the bundle for the worker lifetime. CPU launch reuses the existing CPU backend; configured accelerator launch may retain a separately bounded codec-only CPU backend but claims no accelerator tensor or service execution before the later accelerator owner. Package capture and retained actor residency have a checked startup ceiling; every CPU native attempt injects the exact retained codec bytes into the canonical MemoryPlanRequest::codec_bytes reservation before dispatch so MemoryReservationKind::Codec and safety-margin accounting remain intact, while accelerator profiles retain a separately bounded codec-only CPU or host budget without publishing an executable service path before the later accelerator owner. No package-local planner, allocator, retry policy, or BackendMemorySnapshot baseline inflation is introduced. The historical five-library/54-symbol catalog, v1 signing domains, public identities, fixtures, and manifest hashes remain byte-exact; ReviewedGeneralVideoCodecDeclarations alone remains UncertifiedFfi. Missing, extra, tampered, racy, symlinked, non-regular, oversized, cancelled, incomplete, wrong-machine, wrong-target, RPATH/RUNPATH-bearing, unlicensed, signer-mismatched, or dependency-invalid packages fail atomically before dlopen, actor, port, service, or executor publication. Shutdown or restart revokes ports, drains the capacity-one actor, and drops loaded thread-affine state on its owner thread. Cache configuration binds the verified semantic package, six-library runtime versions, catalog, dependency, license, source/build, runtime-limit, signer, signature-domain, and public-key identities rather than filesystem path, so semantic or trust-root changes invalidate cache while an identical relocated package does not. A deterministic test-only generator emits the signed canonical metadata and synthetic x86_64 ELF fixtures without a host compiler, subprocess, download, credential, or production private key; non-Linux or non-x86_64 verification remains cross-platform while actual load and actor success fail typed as unsupported before dlopen.",
         ["28.6", "31.5", "41.4", "41.5", "44.3"],
         ["comfy_model", "comfy_runtime", "comfy_worker", "comfy_test_support"],
+    )
+    tasks[-1]["done"] = (
+        str(tasks[-1]["done"])
+        + " The canonical native_ffi_elf owner rejects a non-current ELF64 e_version or a non-64 e_ehsize before dynamic inspection, and the signed synthetic package fixtures encode both canonical header fields."
     )
     append(
         "comfy-parity-native-video-demux-decode-foundation",
@@ -21398,6 +21405,7 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "cargo fmt --all -- --check",
             "cargo run --locked -p comfy_test_support --bin generate_video_codec_package_bootstrap_fixture -- --check",
             "cargo test --locked -p comfy_model artifact_root_cancellable_private_capture -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_ffi_elf::tests::elf_inspection_rejects_invalid_elf64_header_contract --lib -- --exact --nocapture",
             "cargo test --locked -p comfy_runtime general_video_codec_package_bootstrap --lib -- --nocapture",
             "cargo test --locked -p comfy_test_support --test video_codec_package_bootstrap -- --nocapture",
             "cargo test --locked -p comfy_worker video_codec_package_bootstrap -- --nocapture",

@@ -1,24 +1,29 @@
 use std::{env, path::PathBuf};
 
 use comfy_runtime::{
-    NativeCudaPackageSettings, NativeDirectMlPackageSettings, NativeMetalPackageSettings,
-    NativeMluPackageSettings, NativeNpuPackageSettings, NativeRocmPackageSettings,
-    NativeXpuPackageSettings, PluginAuthorizationVerifier, WorkerBackendSelection,
+    NativeCudaPackageSettings, NativeDirectMlPackageSettings,
+    NativeGeneralVideoCodecPackageSettings, NativeMetalPackageSettings, NativeMluPackageSettings,
+    NativeNpuPackageSettings, NativeRocmPackageSettings, NativeXpuPackageSettings,
+    PluginAuthorizationVerifier, WorkerBackendSelection,
 };
 
 const DEFAULT_WORKER_MEMORY_LIMIT_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 fn main() -> anyhow::Result<()> {
     let configuration = parse_configuration()?;
-    smol::block_on(comfy_worker::run_worker_process_with_backend_selection(
-        configuration.memory_limit_bytes,
-        configuration.backend_selection,
-        configuration.plugin_authorization_verifier,
-    ))
+    smol::block_on(
+        comfy_worker::run_worker_process_with_backend_selection_and_video_codec_package(
+            configuration.memory_limit_bytes,
+            configuration.backend_selection,
+            configuration.general_video_codec_package,
+            configuration.plugin_authorization_verifier,
+        ),
+    )
 }
 
 struct WorkerConfiguration {
     memory_limit_bytes: u64,
     backend_selection: WorkerBackendSelection,
+    general_video_codec_package: Option<NativeGeneralVideoCodecPackageSettings>,
     plugin_authorization_verifier: Option<PluginAuthorizationVerifier>,
 }
 
@@ -54,6 +59,9 @@ fn parse_configuration_arguments(
     let mut directml_package_root = None;
     let mut directml_package_signer = None;
     let mut directml_package_public_key = None;
+    let mut video_codec_package_root = None;
+    let mut video_codec_package_signer = None;
+    let mut video_codec_package_public_key = None;
     while let Some(argument) = arguments.next() {
         if argument == "--memory-limit-bytes" {
             let value = arguments
@@ -228,6 +236,30 @@ fn parse_configuration_arguments(
             if directml_package_public_key.replace(value).is_some() {
                 return Err(anyhow::anyhow!(
                     "--directml-package-public-key was specified more than once"
+                ));
+            }
+        } else if argument == "--video-codec-package-root" {
+            let value = required_utf8_argument(&mut arguments, "--video-codec-package-root")?;
+            if video_codec_package_root
+                .replace(PathBuf::from(value))
+                .is_some()
+            {
+                return Err(anyhow::anyhow!(
+                    "--video-codec-package-root was specified more than once"
+                ));
+            }
+        } else if argument == "--video-codec-package-signer" {
+            let value = required_utf8_argument(&mut arguments, "--video-codec-package-signer")?;
+            if video_codec_package_signer.replace(value).is_some() {
+                return Err(anyhow::anyhow!(
+                    "--video-codec-package-signer was specified more than once"
+                ));
+            }
+        } else if argument == "--video-codec-package-public-key" {
+            let value = required_utf8_argument(&mut arguments, "--video-codec-package-public-key")?;
+            if video_codec_package_public_key.replace(value).is_some() {
+                return Err(anyhow::anyhow!(
+                    "--video-codec-package-public-key was specified more than once"
                 ));
             }
         } else if argument == "--plugin-authorization-verification-key" {
@@ -537,9 +569,30 @@ fn parse_configuration_arguments(
         }
         value => return Err(anyhow::anyhow!("unsupported worker backend {value}")),
     };
+    let general_video_codec_package = match (
+        video_codec_package_root,
+        video_codec_package_signer,
+        video_codec_package_public_key,
+    ) {
+        (None, None, None) => None,
+        (Some(package_root), Some(signer), Some(public_key)) => Some(
+            NativeGeneralVideoCodecPackageSettings::from_public_authority(
+                package_root,
+                signer,
+                &public_key,
+            )
+            .map_err(|error| anyhow::anyhow!(error))?,
+        ),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "general video codec package root, signer, and public key must be specified together"
+            ));
+        }
+    };
     Ok(WorkerConfiguration {
         memory_limit_bytes,
         backend_selection,
+        general_video_codec_package,
         plugin_authorization_verifier,
     })
 }
@@ -558,6 +611,87 @@ fn required_utf8_argument(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn codec_arguments() -> Vec<std::ffi::OsString> {
+        vec![
+            "--backend".into(),
+            "cpu".into(),
+            "--video-codec-package-root".into(),
+            "/reviewed/general-video".into(),
+            "--video-codec-package-signer".into(),
+            "codec.release".into(),
+            "--video-codec-package-public-key".into(),
+            "11".repeat(32).into(),
+        ]
+    }
+
+    #[test]
+    fn video_codec_package_bootstrap_cli_is_backend_independent_and_complete() {
+        let configuration = parse_configuration_arguments(codec_arguments().into_iter())
+            .expect("complete general-video authority is accepted");
+        assert!(matches!(
+            configuration.backend_selection,
+            WorkerBackendSelection::Cpu
+        ));
+        let package = configuration
+            .general_video_codec_package
+            .expect("codec authority is retained");
+        assert_eq!(
+            package.package_root(),
+            std::path::Path::new("/reviewed/general-video")
+        );
+        assert_eq!(package.verification_key().signer(), "codec.release");
+
+        for mask in 1_u8..7 {
+            let mut arguments = vec!["--backend".into(), "cpu".into()];
+            if mask & 1 != 0 {
+                arguments.extend([
+                    "--video-codec-package-root".into(),
+                    "/reviewed/general-video".into(),
+                ]);
+            }
+            if mask & 2 != 0 {
+                arguments.extend([
+                    "--video-codec-package-signer".into(),
+                    "codec.release".into(),
+                ]);
+            }
+            if mask & 4 != 0 {
+                arguments.extend([
+                    "--video-codec-package-public-key".into(),
+                    "11".repeat(32).into(),
+                ]);
+            }
+            assert!(parse_configuration_arguments(arguments.into_iter()).is_err());
+        }
+    }
+
+    #[test]
+    fn video_codec_package_bootstrap_cli_rejects_duplicates_and_fixture_authority() {
+        let mut duplicate = codec_arguments();
+        duplicate.extend([
+            "--video-codec-package-signer".into(),
+            "other.release".into(),
+        ]);
+        assert!(parse_configuration_arguments(duplicate.into_iter()).is_err());
+
+        let mut fixture_signer = codec_arguments();
+        let signer = fixture_signer
+            .iter_mut()
+            .position(|value| value == "codec.release")
+            .expect("signer value is present");
+        fixture_signer[signer] = "comfy.fixture.general-video".into();
+        assert!(parse_configuration_arguments(fixture_signer.into_iter()).is_err());
+
+        let mut fixture_key = codec_arguments();
+        let key = fixture_key
+            .iter_mut()
+            .position(|value| value == &std::ffi::OsString::from("11".repeat(32)))
+            .expect("key value is present");
+        fixture_key[key] =
+            "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a".into();
+        assert!(parse_configuration_arguments(fixture_key.into_iter()).is_err());
+    }
 
     #[test]
     fn authorization_verifier_cli_projection_requires_exact_lowercase_hex()

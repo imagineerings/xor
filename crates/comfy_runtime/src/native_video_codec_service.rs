@@ -1,11 +1,14 @@
 use crate::{
-    CertifiedVideoCodecDependencyClosure, NativeH264Mp4SequenceLimits,
+    CertifiedGeneralVideoCodecDependencyClosure, CertifiedVideoCodecDependencyClosure,
+    NativeGeneralVideoCodecRuntimeVersions, NativeH264Mp4SequenceLimits,
+    NativeLtxvH264DecodeLimits, NativeLtxvH264DemuxLimits, NativeLtxvH264EncodeLimits,
     NativeLtxvH264PreprocessLimits, NativeVideoCodecAv1EncodeError, NativeVideoCodecBindingError,
     NativeVideoCodecH264EncodeError, NativeVideoCodecLoadError, NativeVideoCodecLtxvAdmissionError,
     NativeVideoCodecLtxvPreprocessError, NativeVideoCodecRuntimeVersions, NativeVideoCodecSuite,
     NativeVideoCodecSuiteAdmissionError, NativeVideoCodecVp9EncodeError,
-    NativeVideoContainerMetadata, NativeVp9WebmBatchLimits, bind_certified_video_codec_abi,
-    load_certified_video_codec_closure,
+    NativeVideoContainerMetadata, NativeVp9WebmBatchLimits, NativeVp9WebmEncodeLimits,
+    bind_certified_general_video_codec_abi, bind_certified_video_codec_abi,
+    load_certified_general_video_codec_closure, load_certified_video_codec_closure,
 };
 use comfy_media::{
     NativeVideoAlphaPolicy, NativeVideoBitDepth, NativeVideoCodec, NativeVideoCodecLimits,
@@ -45,6 +48,13 @@ const WEBM_NODE_SERVICE_IDENTITY_VERSION: &str = "zed.comfy.webm-node-service.v1
 )]
 const COMPONENT_H264_MP4_BACKING_SERVICE_IDENTITY_VERSION: &str =
     "zed.comfy.component-h264-mp4-backing-service.v2";
+const REVIEWED_GENERAL_VIDEO_CODEC_SCRATCH_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const REVIEWED_GENERAL_VIDEO_CODEC_OUTPUT_BYTES: usize = 512 * 1024 * 1024;
+const REVIEWED_GENERAL_VIDEO_CODEC_AVIO_BYTES: usize = 64 * 1024;
+const REVIEWED_GENERAL_VIDEO_CODEC_NATIVE_SESSION_BYTES: u64 = 1024 * 1024 * 1024;
+const REVIEWED_GENERAL_VIDEO_CODEC_PACKET_ITERATIONS: usize = 1_000_000;
+const REVIEWED_GENERAL_VIDEO_CODEC_FRAMES: usize = 64;
+const REVIEWED_GENERAL_VIDEO_CODEC_PIXELS: u64 = 268_435_456;
 
 #[allow(
     dead_code,
@@ -385,6 +395,282 @@ pub(crate) struct NativeLtxvCodecThreadService {
     inner: Arc<NativeLtxvCodecThreadInner>,
 }
 
+#[derive(Debug, Error)]
+pub enum NativeVideoCodecWorkerServicesError {
+    #[error("general video codec worker service startup was cancelled")]
+    Cancelled,
+    #[error("general video codec package declared an unreviewed codec scratch limit")]
+    InvalidScratchLimit,
+    #[error("general video codec worker services are unsupported for this target")]
+    UnsupportedTarget,
+    #[error("general video codec worker service limits are invalid")]
+    InvalidReviewedLimits,
+    #[error("general video codec worker actor is unavailable")]
+    ActorUnavailable,
+}
+
+pub struct NativeVideoCodecWorkerServices {
+    ltxv_preprocess_service: Arc<dyn NativeLtxvPreprocessService>,
+    webm_encode_service: Arc<dyn NativeWebmEncodeService>,
+    component_h264_mp4_backing_service: Arc<dyn NativeComponentH264Mp4BackingService>,
+    cache_configuration_sha256: String,
+    startup_resident_bytes: u64,
+    codec_scratch_bytes: u64,
+    codec_residency_bytes: u64,
+    actor: NativeLtxvCodecThreadService,
+}
+
+impl NativeVideoCodecWorkerServices {
+    pub fn start(
+        closure: CertifiedGeneralVideoCodecDependencyClosure,
+        backend: Arc<CpuBackend>,
+        startup_cancellation: &CancellationToken,
+    ) -> Result<Self, NativeVideoCodecWorkerServicesError> {
+        startup_cancellation
+            .check()
+            .map_err(|_| NativeVideoCodecWorkerServicesError::Cancelled)?;
+        if closure.codec_scratch_bytes() != REVIEWED_GENERAL_VIDEO_CODEC_SCRATCH_BYTES {
+            return Err(NativeVideoCodecWorkerServicesError::InvalidScratchLimit);
+        }
+        let startup_resident_bytes = closure.startup_resident_bytes();
+        let codec_scratch_bytes = closure.codec_scratch_bytes();
+        let codec_residency_bytes = startup_resident_bytes
+            .checked_add(codec_scratch_bytes)
+            .ok_or(NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?;
+        let limits = reviewed_general_video_codec_service_limits()?;
+        let actor = NativeLtxvCodecThreadService::start_general(
+            closure,
+            backend,
+            limits.preprocess,
+            startup_cancellation,
+        )
+        .map_err(map_worker_actor_startup_error)?;
+        let proxy = actor.proxy();
+        let ltxv_preprocess_service: Arc<dyn NativeLtxvPreprocessService> = Arc::new(proxy.clone());
+        let webm_encode_service: Arc<dyn NativeWebmEncodeService> = Arc::new(
+            NativeWebmCodecRequestService::checked(
+                proxy.clone(),
+                limits.webm_batch,
+                limits.metadata,
+            )
+            .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?,
+        );
+        let component_h264_mp4_backing_service: Arc<dyn NativeComponentH264Mp4BackingService> =
+            Arc::new(
+                NativeComponentH264Mp4CodecRequestService::checked(
+                    proxy,
+                    limits.planning,
+                    limits.h264_sequence,
+                )
+                .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?,
+            );
+        let cache_configuration_sha256 = worker_service_cache_configuration_identity(
+            ltxv_preprocess_service.as_ref(),
+            webm_encode_service.as_ref(),
+            component_h264_mp4_backing_service.as_ref(),
+        );
+        startup_cancellation
+            .check()
+            .map_err(|_| NativeVideoCodecWorkerServicesError::Cancelled)?;
+        Ok(Self {
+            ltxv_preprocess_service,
+            webm_encode_service,
+            component_h264_mp4_backing_service,
+            cache_configuration_sha256,
+            startup_resident_bytes,
+            codec_scratch_bytes,
+            codec_residency_bytes,
+            actor,
+        })
+    }
+
+    pub fn ltxv_preprocess_service(&self) -> Arc<dyn NativeLtxvPreprocessService> {
+        self.ltxv_preprocess_service.clone()
+    }
+
+    pub fn webm_encode_service(&self) -> Arc<dyn NativeWebmEncodeService> {
+        self.webm_encode_service.clone()
+    }
+
+    pub fn component_h264_mp4_backing_service(
+        &self,
+    ) -> Arc<dyn NativeComponentH264Mp4BackingService> {
+        self.component_h264_mp4_backing_service.clone()
+    }
+
+    pub fn startup_resident_bytes(&self) -> u64 {
+        self.startup_resident_bytes
+    }
+
+    pub fn cache_configuration_sha256(&self) -> &str {
+        &self.cache_configuration_sha256
+    }
+
+    pub fn codec_scratch_bytes(&self) -> u64 {
+        self.codec_scratch_bytes
+    }
+
+    pub fn codec_residency_bytes(&self) -> u64 {
+        self.codec_residency_bytes
+    }
+
+    pub fn shutdown(self) -> Result<(), NativeVideoCodecWorkerServicesError> {
+        self.actor
+            .shutdown()
+            .map_err(|_| NativeVideoCodecWorkerServicesError::ActorUnavailable)
+    }
+}
+
+struct ReviewedGeneralVideoCodecServiceLimits {
+    preprocess: NativeLtxvH264PreprocessLimits,
+    webm_batch: NativeVp9WebmBatchLimits,
+    metadata: crate::NativeVideoContainerMetadataLimits,
+    planning: NativeVideoCodecLimits,
+    h264_sequence: NativeH264Mp4SequenceLimits,
+}
+
+fn reviewed_general_video_codec_service_limits()
+-> Result<ReviewedGeneralVideoCodecServiceLimits, NativeVideoCodecWorkerServicesError> {
+    let encode = NativeLtxvH264EncodeLimits::checked(
+        REVIEWED_GENERAL_VIDEO_CODEC_OUTPUT_BYTES,
+        REVIEWED_GENERAL_VIDEO_CODEC_AVIO_BYTES,
+        REVIEWED_GENERAL_VIDEO_CODEC_NATIVE_SESSION_BYTES,
+        REVIEWED_GENERAL_VIDEO_CODEC_PACKET_ITERATIONS,
+    )
+    .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?;
+    let demux = NativeLtxvH264DemuxLimits::checked(
+        REVIEWED_GENERAL_VIDEO_CODEC_OUTPUT_BYTES,
+        REVIEWED_GENERAL_VIDEO_CODEC_AVIO_BYTES,
+        REVIEWED_GENERAL_VIDEO_CODEC_NATIVE_SESSION_BYTES,
+        32,
+    )
+    .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?;
+    let decode = NativeLtxvH264DecodeLimits::checked(
+        REVIEWED_GENERAL_VIDEO_CODEC_PACKET_ITERATIONS,
+        REVIEWED_GENERAL_VIDEO_CODEC_PACKET_ITERATIONS,
+        16_384,
+        16_384,
+        REVIEWED_GENERAL_VIDEO_CODEC_PIXELS,
+        1024 * 1024 * 1024,
+        REVIEWED_GENERAL_VIDEO_CODEC_NATIVE_SESSION_BYTES,
+    )
+    .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?;
+    let preprocess = NativeLtxvH264PreprocessLimits::checked(
+        u64::try_from(REVIEWED_GENERAL_VIDEO_CODEC_FRAMES)
+            .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?,
+        usize::try_from(REVIEWED_GENERAL_VIDEO_CODEC_PIXELS)
+            .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?,
+        encode,
+        demux,
+        decode,
+    )
+    .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?;
+    let webm_session = NativeVp9WebmEncodeLimits::checked(
+        REVIEWED_GENERAL_VIDEO_CODEC_OUTPUT_BYTES,
+        REVIEWED_GENERAL_VIDEO_CODEC_AVIO_BYTES,
+        REVIEWED_GENERAL_VIDEO_CODEC_NATIVE_SESSION_BYTES,
+        REVIEWED_GENERAL_VIDEO_CODEC_PACKET_ITERATIONS,
+    )
+    .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?;
+    let webm_batch = NativeVp9WebmBatchLimits::checked(
+        webm_session,
+        REVIEWED_GENERAL_VIDEO_CODEC_FRAMES,
+        REVIEWED_GENERAL_VIDEO_CODEC_PIXELS,
+    )
+    .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?;
+    let metadata =
+        crate::NativeVideoContainerMetadataLimits::checked(256, 1024, 16 * 1024, 1024 * 1024)
+            .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?;
+    let planning = NativeVideoCodecLimits::checked(
+        u64::try_from(REVIEWED_GENERAL_VIDEO_CODEC_FRAMES)
+            .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?,
+        REVIEWED_GENERAL_VIDEO_CODEC_PIXELS,
+        10_000_000,
+        u64::try_from(REVIEWED_GENERAL_VIDEO_CODEC_OUTPUT_BYTES)
+            .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?,
+    )
+    .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?;
+    let h264_sequence = NativeH264Mp4SequenceLimits::checked(
+        REVIEWED_GENERAL_VIDEO_CODEC_OUTPUT_BYTES,
+        REVIEWED_GENERAL_VIDEO_CODEC_AVIO_BYTES,
+        REVIEWED_GENERAL_VIDEO_CODEC_NATIVE_SESSION_BYTES,
+        REVIEWED_GENERAL_VIDEO_CODEC_PACKET_ITERATIONS,
+        REVIEWED_GENERAL_VIDEO_CODEC_FRAMES,
+        REVIEWED_GENERAL_VIDEO_CODEC_PIXELS,
+    )
+    .map_err(|_| NativeVideoCodecWorkerServicesError::InvalidReviewedLimits)?;
+    Ok(ReviewedGeneralVideoCodecServiceLimits {
+        preprocess,
+        webm_batch,
+        metadata,
+        planning,
+        h264_sequence,
+    })
+}
+
+fn map_worker_actor_startup_error(
+    error: NativeLtxvCodecThreadError,
+) -> NativeVideoCodecWorkerServicesError {
+    match error {
+        NativeLtxvCodecThreadError::Cancelled => NativeVideoCodecWorkerServicesError::Cancelled,
+        NativeLtxvCodecThreadError::Load(error)
+            if matches!(*error, NativeVideoCodecLoadError::UnsupportedTarget) =>
+        {
+            NativeVideoCodecWorkerServicesError::UnsupportedTarget
+        }
+        NativeLtxvCodecThreadError::Binding(error)
+            if matches!(*error, NativeVideoCodecBindingError::UnsupportedTarget) =>
+        {
+            NativeVideoCodecWorkerServicesError::UnsupportedTarget
+        }
+        NativeLtxvCodecThreadError::Admission(error)
+            if matches!(
+                *error,
+                NativeVideoCodecLtxvAdmissionError::UnsupportedTarget
+            ) =>
+        {
+            NativeVideoCodecWorkerServicesError::UnsupportedTarget
+        }
+        NativeLtxvCodecThreadError::SuiteAdmission(error)
+            if matches!(
+                *error,
+                NativeVideoCodecSuiteAdmissionError::UnsupportedTarget
+            ) =>
+        {
+            NativeVideoCodecWorkerServicesError::UnsupportedTarget
+        }
+        _ => NativeVideoCodecWorkerServicesError::ActorUnavailable,
+    }
+}
+
+fn worker_service_cache_configuration_identity(
+    ltxv: &dyn NativeLtxvPreprocessService,
+    webm: &dyn NativeWebmEncodeService,
+    h264: &dyn NativeComponentH264Mp4BackingService,
+) -> String {
+    worker_service_cache_configuration_identity_from_parts(
+        ltxv.identity().configuration_sha256(),
+        webm.identity().configuration_sha256(),
+        h264.identity().configuration_sha256(),
+    )
+}
+
+fn worker_service_cache_configuration_identity_from_parts(
+    ltxv_configuration_sha256: &str,
+    webm_configuration_sha256: &str,
+    h264_configuration_sha256: &str,
+) -> String {
+    let mut digest = Sha256::new();
+    hash_identity_field(
+        &mut digest,
+        b"zed.comfy.general-video-codec-worker-services.v1",
+    );
+    hash_identity_field(&mut digest, ltxv_configuration_sha256.as_bytes());
+    hash_identity_field(&mut digest, webm_configuration_sha256.as_bytes());
+    hash_identity_field(&mut digest, h264_configuration_sha256.as_bytes());
+    format!("{:x}", digest.finalize())
+}
+
 #[allow(
     dead_code,
     reason = "consumed by the native LTXVPreprocess adapter and VP9 owned-byte bridge"
@@ -544,6 +830,51 @@ impl NativeLtxvCodecThreadService {
                     codec.runtime_versions(),
                 ),
                 runtime_versions: codec.runtime_versions(),
+            };
+            let processor = move |request: NativeLtxvCodecThreadInvocation| {
+                process_video_codec_request(&codec, &backend, limits, request)
+            };
+            Ok((identity, processor))
+        })
+    }
+
+    pub(crate) fn start_general(
+        closure: CertifiedGeneralVideoCodecDependencyClosure,
+        backend: Arc<CpuBackend>,
+        limits: NativeLtxvH264PreprocessLimits,
+        startup_cancellation: &CancellationToken,
+    ) -> Result<Self, NativeLtxvCodecThreadError> {
+        startup_cancellation
+            .check()
+            .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
+        let base_configuration_sha256 = general_video_codec_thread_base_identity(&closure, limits);
+        let startup_cancellation = startup_cancellation.clone();
+        start_ltxv_codec_thread(move || {
+            startup_cancellation
+                .check()
+                .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
+            let load = load_certified_general_video_codec_closure(closure, &startup_cancellation)
+                .map_err(|error| NativeLtxvCodecThreadError::Load(Box::new(error)))?;
+            let binding = bind_certified_general_video_codec_abi(load, &startup_cancellation)
+                .map_err(|error| NativeLtxvCodecThreadError::Binding(Box::new(error)))?;
+            let general_versions = binding.runtime_versions();
+            let codec = binding
+                .admit_ltxv_h264(&startup_cancellation)
+                .map_err(|error| NativeLtxvCodecThreadError::Admission(Box::new(error)))?;
+            let codec = codec
+                .admit_video_suite(&startup_cancellation)
+                .map_err(|error| NativeLtxvCodecThreadError::SuiteAdmission(Box::new(error)))?;
+            startup_cancellation
+                .check()
+                .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
+            let identity = NativeLtxvCodecThreadIdentity {
+                target: codec.target().to_owned(),
+                primary_catalog_sha256: codec.primary_catalog_sha256().to_owned(),
+                configuration_sha256: finalize_general_video_codec_thread_identity(
+                    &base_configuration_sha256,
+                    general_versions,
+                ),
+                runtime_versions: general_versions.historical(),
             };
             let processor = move |request: NativeLtxvCodecThreadInvocation| {
                 process_video_codec_request(&codec, &backend, limits, request)
@@ -1847,6 +2178,37 @@ fn video_codec_thread_base_identity(
     format!("{:x}", digest.finalize())
 }
 
+fn general_video_codec_thread_base_identity(
+    closure: &CertifiedGeneralVideoCodecDependencyClosure,
+    limits: NativeLtxvH264PreprocessLimits,
+) -> String {
+    let mut digest = Sha256::new();
+    hash_identity_field(&mut digest, VIDEO_CODEC_THREAD_IDENTITY_VERSION.as_bytes());
+    hash_identity_field(&mut digest, b"general-video-codec-package-v1");
+    hash_identity_field(&mut digest, closure.semantic_identity().as_bytes());
+    for (identity, library) in closure.libraries() {
+        hash_identity_field(&mut digest, identity.as_bytes());
+        hash_identity_field(&mut digest, library.filename().as_bytes());
+        hash_identity_field(&mut digest, library.digest_sha256().as_bytes());
+        hash_identity_field(&mut digest, &library.abi_major().to_le_bytes());
+        hash_identity_field(&mut digest, library.soname().as_bytes());
+    }
+    if let Ok(dependency_first_order) = closure.dependency_first_order() {
+        for identity in dependency_first_order {
+            hash_identity_field(&mut digest, identity.as_bytes());
+        }
+    } else {
+        hash_identity_field(&mut digest, b"invalid-dependency-order");
+    }
+    hash_identity_field(&mut digest, &closure.retained_image_bytes().to_le_bytes());
+    hash_identity_field(&mut digest, &closure.startup_resident_bytes().to_le_bytes());
+    hash_identity_field(&mut digest, &closure.codec_scratch_bytes().to_le_bytes());
+    for value in limits.configuration_values() {
+        hash_identity_field(&mut digest, &value.to_le_bytes());
+    }
+    format!("{:x}", digest.finalize())
+}
+
 fn finalize_video_codec_thread_identity(
     base_configuration_sha256: &str,
     versions: NativeVideoCodecRuntimeVersions,
@@ -1859,6 +2221,26 @@ fn finalize_video_codec_thread_identity(
         versions.avutil(),
         versions.swresample(),
         versions.swscale(),
+    ] {
+        hash_identity_field(&mut digest, &version.to_le_bytes());
+    }
+    format!("{:x}", digest.finalize())
+}
+
+fn finalize_general_video_codec_thread_identity(
+    base_configuration_sha256: &str,
+    versions: NativeGeneralVideoCodecRuntimeVersions,
+) -> String {
+    let mut digest = Sha256::new();
+    hash_identity_field(&mut digest, base_configuration_sha256.as_bytes());
+    let historical = versions.historical();
+    for version in [
+        historical.avcodec(),
+        historical.avformat(),
+        historical.avutil(),
+        historical.swresample(),
+        historical.swscale(),
+        versions.avfilter(),
     ] {
         hash_identity_field(&mut digest, &version.to_le_bytes());
     }
@@ -1923,6 +2305,35 @@ mod tests {
             scratch,
             rng_phase: None,
             cancellation,
+        }
+    }
+
+    #[test]
+    fn general_video_codec_package_bootstrap_cache_identity_binds_all_three_port_limits() {
+        let base = worker_service_cache_configuration_identity_from_parts(
+            &"11".repeat(32),
+            &"22".repeat(32),
+            &"33".repeat(32),
+        );
+        assert_eq!(base.len(), 64);
+        for changed in [
+            worker_service_cache_configuration_identity_from_parts(
+                &"44".repeat(32),
+                &"22".repeat(32),
+                &"33".repeat(32),
+            ),
+            worker_service_cache_configuration_identity_from_parts(
+                &"11".repeat(32),
+                &"44".repeat(32),
+                &"33".repeat(32),
+            ),
+            worker_service_cache_configuration_identity_from_parts(
+                &"11".repeat(32),
+                &"22".repeat(32),
+                &"44".repeat(32),
+            ),
+        ] {
+            assert_ne!(base, changed);
         }
     }
 

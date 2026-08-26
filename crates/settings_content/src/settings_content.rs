@@ -391,6 +391,9 @@ pub struct ComfyRuntimeProfileContent {
     pub directml_package_root: Option<String>,
     pub directml_package_signer: Option<String>,
     pub directml_package_public_key_hex: Option<String>,
+    pub video_codec_package_root: Option<String>,
+    pub video_codec_package_signer: Option<String>,
+    pub video_codec_package_public_key_hex: Option<String>,
     pub provider_scope: Option<String>,
     pub compatibility_version: Option<u16>,
     #[serde(default, flatten)]

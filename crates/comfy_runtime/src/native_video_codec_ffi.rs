@@ -1,6 +1,6 @@
 use crate::{
-    CertifiedVideoCodecDependencyClosure, VIDEO_CODEC_FFI_UNSAFE_OWNER,
-    native_video_codec_abi as abi,
+    CertifiedGeneralVideoCodecDependencyClosure, CertifiedVideoCodecDependencyClosure,
+    VIDEO_CODEC_FFI_UNSAFE_OWNER, native_video_codec_abi as abi,
 };
 use comfy_media::{NativeVideoBitDepth, NativeVideoCrf};
 use comfy_tensor::{
@@ -44,6 +44,11 @@ impl From<CancellationError> for NativeVideoCodecLoadError {
 pub struct NativeVideoCodecLoad {
     loaded: LoadedVideoCodecLibraries,
     closure: CertifiedVideoCodecDependencyClosure,
+}
+
+pub(crate) struct NativeGeneralVideoCodecLoad {
+    loaded: LoadedVideoCodecLibraries,
+    closure: CertifiedGeneralVideoCodecDependencyClosure,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -100,8 +105,157 @@ pub struct NativeVideoCodecBinding {
     load: NativeVideoCodecLoad,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct NativeGeneralVideoCodecRuntimeVersions {
+    historical: NativeVideoCodecRuntimeVersions,
+    avfilter: u32,
+}
+
+impl NativeGeneralVideoCodecRuntimeVersions {
+    pub fn historical(&self) -> NativeVideoCodecRuntimeVersions {
+        self.historical
+    }
+
+    pub fn avfilter(&self) -> u32 {
+        self.avfilter
+    }
+}
+
+pub(crate) struct NativeGeneralVideoCodecBinding {
+    historical_symbols: NativeVideoCodecSymbols,
+    #[allow(
+        dead_code,
+        reason = "retained privately for Task563 general-video execution"
+    )]
+    supplemental_symbols: NativeGeneralVideoCodecSupplementalSymbols,
+    versions: NativeGeneralVideoCodecRuntimeVersions,
+    load: NativeGeneralVideoCodecLoad,
+}
+
+enum NativeVideoCodecBindingOwner {
+    Historical(NativeVideoCodecBinding),
+    General(NativeGeneralVideoCodecBinding),
+}
+
+impl NativeVideoCodecBindingOwner {
+    fn target(&self) -> &str {
+        match self {
+            Self::Historical(binding) => binding.target(),
+            Self::General(_) => "x86_64-unknown-linux-gnu",
+        }
+    }
+
+    fn primary_catalog_sha256(&self) -> &str {
+        match self {
+            Self::Historical(binding) => binding.primary_catalog_sha256(),
+            Self::General(binding) => binding.load.closure.semantic_identity(),
+        }
+    }
+
+    fn runtime_versions(&self) -> NativeVideoCodecRuntimeVersions {
+        match self {
+            Self::Historical(binding) => binding.runtime_versions(),
+            Self::General(binding) => binding.versions.historical,
+        }
+    }
+
+    fn symbols(&self) -> &NativeVideoCodecSymbols {
+        match self {
+            Self::Historical(binding) => &binding._symbols,
+            Self::General(binding) => &binding.historical_symbols,
+        }
+    }
+
+    fn loaded(&self) -> &LoadedVideoCodecLibraries {
+        match self {
+            Self::Historical(binding) => &binding.load.loaded,
+            Self::General(binding) => &binding.load.loaded,
+        }
+    }
+
+    fn open_bounded_avio_borrowed_input<'binding, 'bytes>(
+        &'binding self,
+        bytes: &'bytes [u8],
+        maximum_input_bytes: usize,
+        buffer_bytes: usize,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeVideoCodecMemoryInput<'binding, 'bytes>, NativeVideoCodecIoError> {
+        let state = NativeVideoCodecInputState {
+            bytes: NonNull::new(bytes.as_ptr().cast_mut())
+                .ok_or(NativeVideoCodecIoError::InvalidBounds)?,
+            byte_length: bytes.len(),
+            position: 0,
+            maximum_position: maximum_input_bytes,
+            cancellation: context.cancellation.clone(),
+            failure: None,
+            #[cfg(test)]
+            panic_on_next_callback: false,
+        };
+        if state.byte_length > maximum_input_bytes {
+            return Err(NativeVideoCodecIoError::InvalidBounds);
+        }
+        let owner = NativeVideoCodecInputOwner::Borrowed(bytes);
+        let functions = NativeVideoCodecAvioFunctions::from_symbols(self.symbols());
+        let avio = allocate_native_video_codec_avio(
+            self,
+            state,
+            functions,
+            buffer_bytes,
+            false,
+            Some(native_video_codec_input_read),
+            None,
+            Some(native_video_codec_input_seek),
+            backend,
+            context,
+            &mut || context.cancellation.check(),
+        )?;
+        Ok(NativeVideoCodecMemoryInput {
+            avio,
+            _owner: owner,
+        })
+    }
+
+    fn open_bounded_avio_output<'binding>(
+        &'binding self,
+        maximum_output_bytes: usize,
+        buffer_bytes: usize,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeVideoCodecMemoryOutput<'binding>, NativeVideoCodecIoError> {
+        if maximum_output_bytes == 0 {
+            return Err(NativeVideoCodecIoError::InvalidBounds);
+        }
+        let bytes = backend.workspace_vec::<u8>(context, maximum_output_bytes)?;
+        let state = NativeVideoCodecOutputState {
+            bytes,
+            position: 0,
+            maximum_bytes: maximum_output_bytes,
+            cancellation: context.cancellation.clone(),
+            failure: None,
+            #[cfg(test)]
+            panic_on_next_callback: false,
+        };
+        let functions = NativeVideoCodecAvioFunctions::from_symbols(self.symbols());
+        let avio = allocate_native_video_codec_avio(
+            self,
+            state,
+            functions,
+            buffer_bytes,
+            true,
+            None,
+            Some(native_video_codec_output_write),
+            Some(native_video_codec_output_seek),
+            backend,
+            context,
+            &mut || context.cancellation.check(),
+        )?;
+        Ok(NativeVideoCodecMemoryOutput { avio })
+    }
+}
+
 pub struct NativeLtxvH264Codec {
-    binding: NativeVideoCodecBinding,
+    binding: NativeVideoCodecBindingOwner,
     #[allow(dead_code, reason = "consumed by the bounded LTXV H.264 session")]
     encoder: NonNull<abi::AvCodec>,
     #[allow(dead_code, reason = "consumed by the bounded LTXV H.264 session")]
@@ -1064,11 +1218,10 @@ impl NativeLtxvH264Codec {
         if !has_exact_video_codec_suite_dependency_contract(&self.binding) {
             return Err(NativeVideoCodecSuiteAdmissionError::InvalidDependencyContract);
         }
-        let descriptors = admit_video_suite_with_check(
-            &self.binding._symbols,
-            &self.binding.load.loaded,
-            || cancellation.check(),
-        )?;
+        let descriptors =
+            admit_video_suite_with_check(self.binding.symbols(), self.binding.loaded(), || {
+                cancellation.check()
+            })?;
         cancellation.check()?;
         Ok(NativeVideoCodecSuite {
             ltxv_h264: self,
@@ -2608,14 +2761,15 @@ impl NativeVideoCodecBinding {
         )) {
             return Err(NativeVideoCodecLtxvAdmissionError::UnsupportedTarget);
         }
-        if !has_exact_ltxv_h264_dependency_contract(&self) {
+        let owner = NativeVideoCodecBindingOwner::Historical(self);
+        if !has_exact_ltxv_h264_dependency_contract(&owner) {
             return Err(NativeVideoCodecLtxvAdmissionError::InvalidDependencyContract);
         }
         let (encoder, decoder) =
-            admit_ltxv_h264_with_check(&self._symbols, &self.load.loaded, || cancellation.check())?;
+            admit_ltxv_h264_with_check(owner.symbols(), owner.loaded(), || cancellation.check())?;
         cancellation.check()?;
         Ok(NativeLtxvH264Codec {
-            binding: self,
+            binding: owner,
             encoder,
             decoder,
         })
@@ -2757,6 +2911,37 @@ impl NativeVideoCodecBinding {
     }
 }
 
+impl NativeGeneralVideoCodecBinding {
+    pub fn runtime_versions(&self) -> NativeGeneralVideoCodecRuntimeVersions {
+        self.versions
+    }
+
+    pub fn admit_ltxv_h264(
+        self,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeLtxvH264Codec, NativeVideoCodecLtxvAdmissionError> {
+        if !cfg!(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_env = "gnu"
+        )) {
+            return Err(NativeVideoCodecLtxvAdmissionError::UnsupportedTarget);
+        }
+        let owner = NativeVideoCodecBindingOwner::General(self);
+        if !has_exact_ltxv_h264_dependency_contract(&owner) {
+            return Err(NativeVideoCodecLtxvAdmissionError::InvalidDependencyContract);
+        }
+        let (encoder, decoder) =
+            admit_ltxv_h264_with_check(owner.symbols(), owner.loaded(), || cancellation.check())?;
+        cancellation.check()?;
+        Ok(NativeLtxvH264Codec {
+            binding: owner,
+            encoder,
+            decoder,
+        })
+    }
+}
+
 #[allow(
     dead_code,
     reason = "consumed by the following bounded codec operation"
@@ -2824,11 +3009,15 @@ struct NativeVideoCodecAvioFunctions {
 )]
 impl NativeVideoCodecAvioFunctions {
     fn from_binding(binding: &NativeVideoCodecBinding) -> Self {
+        Self::from_symbols(&binding._symbols)
+    }
+
+    fn from_symbols(symbols: &NativeVideoCodecSymbols) -> Self {
         Self {
-            av_malloc: binding._symbols.avutil.av_malloc,
-            av_free: binding._symbols.avutil.av_free,
-            avio_alloc_context: binding._symbols.avformat.avio_alloc_context,
-            avio_context_free: binding._symbols.avformat.avio_context_free,
+            av_malloc: symbols.avutil.av_malloc,
+            av_free: symbols.avutil.av_free,
+            avio_alloc_context: symbols.avformat.avio_alloc_context,
+            avio_context_free: symbols.avformat.avio_context_free,
         }
     }
 }
@@ -2872,7 +3061,7 @@ struct NativeVideoCodecAvio<'binding, State> {
     state: Box<[State]>,
     functions: NativeVideoCodecAvioFunctions,
     _workspace: CpuWorkspaceLease,
-    _binding: PhantomData<&'binding NativeVideoCodecBinding>,
+    _binding: PhantomData<&'binding ()>,
     _thread_bound: PhantomData<std::rc::Rc<()>>,
 }
 
@@ -2968,8 +3157,8 @@ fn callback_status(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn allocate_native_video_codec_avio<'binding, State>(
-    _binding: &'binding NativeVideoCodecBinding,
+fn allocate_native_video_codec_avio<'binding, State, Binding>(
+    _binding: &'binding Binding,
     state: State,
     functions: NativeVideoCodecAvioFunctions,
     buffer_bytes: usize,
@@ -3326,7 +3515,7 @@ impl NativeLtxvH264DemuxFunctions {
         reason = "consumed by the following retained H.264 decode leaf"
     )]
     fn from_codec(codec: &NativeLtxvH264Codec) -> Self {
-        let symbols = &codec.binding._symbols.avformat;
+        let symbols = &codec.binding.symbols().avformat;
         Self {
             av_find_best_stream: symbols.av_find_best_stream,
             avformat_alloc_context: symbols.avformat_alloc_context,
@@ -3535,7 +3724,7 @@ impl NativeLtxvH264DecodeFunctions {
         reason = "consumed by the following source-compatible LTXV tensor adapter"
     )]
     fn from_codec(codec: &NativeLtxvH264Codec) -> Self {
-        let symbols = &codec.binding._symbols;
+        let symbols = codec.binding.symbols();
         Self {
             av_packet_alloc: symbols.avcodec.av_packet_alloc,
             av_packet_free: symbols.avcodec.av_packet_free,
@@ -3563,7 +3752,7 @@ impl NativeLtxvH264DecodeFunctions {
 )]
 impl NativeLtxvH264EncodeFunctions {
     fn from_codec(codec: &NativeLtxvH264Codec) -> Self {
-        let symbols = &codec.binding._symbols;
+        let symbols = codec.binding.symbols();
         Self {
             av_packet_alloc: symbols.avcodec.av_packet_alloc,
             av_packet_free: symbols.avcodec.av_packet_free,
@@ -5232,6 +5421,37 @@ pub fn bind_certified_video_codec_abi(
     })
 }
 
+pub(crate) fn bind_certified_general_video_codec_abi(
+    load: NativeGeneralVideoCodecLoad,
+    cancellation: &CancellationToken,
+) -> Result<NativeGeneralVideoCodecBinding, NativeVideoCodecBindingError> {
+    cancellation.check()?;
+    if !cfg!(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_env = "gnu"
+    )) {
+        return Err(NativeVideoCodecBindingError::UnsupportedTarget);
+    }
+    let projection = VideoCodecBindingProjection::from_general_load(&load)?;
+    let (historical_symbols, historical_versions) =
+        bind_video_codec_projection_with_check(&load.loaded, &projection, || cancellation.check())?;
+    let (supplemental_symbols, avfilter) =
+        bind_general_video_codec_supplemental_with_check(&load.loaded, &projection, || {
+            cancellation.check()
+        })?;
+    cancellation.check()?;
+    Ok(NativeGeneralVideoCodecBinding {
+        historical_symbols,
+        supplemental_symbols,
+        versions: NativeGeneralVideoCodecRuntimeVersions {
+            historical: historical_versions,
+            avfilter,
+        },
+        load,
+    })
+}
+
 impl NativeVideoCodecLoad {
     pub fn target(&self) -> &str {
         self.closure.target()
@@ -5268,6 +5488,31 @@ pub fn load_certified_video_codec_closure(
     let loaded = load_video_codec_projection(&projection, cancellation)?;
     cancellation.check()?;
     Ok(NativeVideoCodecLoad { loaded, closure })
+}
+
+pub(crate) fn load_certified_general_video_codec_closure(
+    closure: CertifiedGeneralVideoCodecDependencyClosure,
+    cancellation: &CancellationToken,
+) -> Result<NativeGeneralVideoCodecLoad, NativeVideoCodecLoadError> {
+    cancellation.check()?;
+    if !cfg!(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_env = "gnu"
+    )) {
+        return Err(NativeVideoCodecLoadError::UnsupportedTarget);
+    }
+    let dependency_first_order = closure
+        .dependency_first_order()
+        .map_err(|_| NativeVideoCodecLoadError::InvalidClosure)?;
+    let paths = closure
+        .retained_loader_paths()
+        .ok_or(NativeVideoCodecLoadError::UnsupportedTarget)?;
+    let projection =
+        VideoCodecLoadProjection::from_general_closure(&closure, dependency_first_order, paths)?;
+    let loaded = load_video_codec_projection(&projection, cancellation)?;
+    cancellation.check()?;
+    Ok(NativeGeneralVideoCodecLoad { loaded, closure })
 }
 
 #[derive(Clone)]
@@ -5371,6 +5616,87 @@ impl VideoCodecBindingProjection {
         }
         Ok(Self { libraries })
     }
+
+    fn from_general_load(
+        load: &NativeGeneralVideoCodecLoad,
+    ) -> Result<Self, NativeVideoCodecBindingError> {
+        if load.closure.libraries().len() != 6
+            || load.closure.primary_contracts().len() != 6
+            || load.closure.primary_certificates().len() != 6
+        {
+            return Err(NativeVideoCodecBindingError::InvalidLoadedContract);
+        }
+        let mut libraries = BTreeMap::new();
+        for (identity, abi_major, expected_symbols) in abi::general_video_codec_library_contracts()
+        {
+            let library = load
+                .closure
+                .libraries()
+                .get(identity)
+                .ok_or(NativeVideoCodecBindingError::InvalidLoadedContract)?;
+            let elf = load
+                .closure
+                .primary_contracts()
+                .get(identity)
+                .ok_or(NativeVideoCodecBindingError::InvalidLoadedContract)?;
+            let certificate = load
+                .closure
+                .primary_certificates()
+                .get(identity)
+                .ok_or(NativeVideoCodecBindingError::InvalidLoadedContract)?;
+            let expected_symbols = expected_symbols
+                .iter()
+                .map(|symbol| (*symbol).to_owned())
+                .collect::<BTreeSet<_>>();
+            if library.abi_major() != abi_major
+                || certificate.library_id() != identity
+                || certificate.digest_sha256() != library.digest_sha256()
+                || certificate.abi_version() != abi_major.to_string()
+                || certificate.required_symbols() != &expected_symbols
+                || certificate.unsafe_owner() != VIDEO_CODEC_FFI_UNSAFE_OWNER
+                || !expected_symbols.is_subset(elf.symbols())
+                || !load
+                    .loaded
+                    .libraries
+                    .iter()
+                    .any(|loaded| loaded.identity == identity)
+            {
+                return Err(NativeVideoCodecBindingError::CertificateMismatch {
+                    library: identity,
+                });
+            }
+            let symbols = expected_symbols
+                .iter()
+                .map(|symbol| {
+                    let identity_row = elf
+                        .symbol_identities()
+                        .get(symbol)
+                        .and_then(|identities| {
+                            identities.iter().find(|row| {
+                                row.binding == 1
+                                    && row.kind == 2
+                                    && row.visibility == 0
+                                    && row.section_index != 0
+                                    && row.executable
+                                    && row.version.as_ref().is_some_and(|version| {
+                                        version.is_default
+                                            && abi::general_video_codec_symbol_version_namespace(
+                                                identity,
+                                            ) == Some(version.name.as_str())
+                                    })
+                            })
+                        })
+                        .ok_or(NativeVideoCodecBindingError::InvalidLoadedContract)?;
+                    Ok((symbol.clone(), identity_row.value))
+                })
+                .collect::<Result<BTreeMap<_, _>, NativeVideoCodecBindingError>>()?;
+            libraries.insert(
+                identity.to_owned(),
+                VideoCodecBindingLibraryProjection { symbols },
+            );
+        }
+        Ok(Self { libraries })
+    }
 }
 
 #[allow(
@@ -5383,6 +5709,37 @@ struct NativeVideoCodecSymbols {
     avutil: NativeAvutilSymbols,
     swresample: NativeSwresampleSymbols,
     swscale: NativeSwscaleSymbols,
+}
+
+#[allow(
+    dead_code,
+    reason = "retained privately for Task563 general-video execution"
+)]
+struct NativeGeneralVideoCodecSupplementalSymbols {
+    av_packet_rescale_timestamps: abi::AvPacketRescaleTimestamps,
+    avcodec_flush_buffers: abi::AvcodecFlushBuffers,
+    avcodec_parameters_copy: abi::AvcodecParametersCopy,
+    av_guess_frame_rate: abi::AvGuessFrameRate,
+    av_seek_frame: abi::AvSeekFrame,
+    avformat_seek_file: abi::AvformatSeekFile,
+    av_channel_layout_copy: abi::AvChannelLayoutCopy,
+    av_dict_iterate: abi::AvDictIterate,
+    av_display_rotation_get: abi::AvDisplayRotationGet,
+    av_frame_get_side_data: abi::AvFrameGetSideData,
+    av_frame_unref: abi::AvFrameUnref,
+    av_get_pixel_format_name: abi::AvGetPixelFormatName,
+    av_pixel_format_descriptor_get: abi::AvPixelFormatDescriptorGet,
+    av_rescale_rounded: abi::AvRescaleRounded,
+    swr_get_delay: abi::SwrGetDelay,
+    av_buffersink_get_frame: abi::AvBufferSinkGetFrame,
+    av_buffersrc_add_frame_flags: abi::AvBufferSourceAddFrameFlags,
+    avfilter_get_by_name: abi::AvfilterGetByName,
+    avfilter_graph_alloc: abi::AvfilterGraphAlloc,
+    avfilter_graph_config: abi::AvfilterGraphConfig,
+    avfilter_graph_create_filter: abi::AvfilterGraphCreateFilter,
+    avfilter_graph_free: abi::AvfilterGraphFree,
+    avfilter_link: abi::AvfilterLink,
+    avfilter_version: abi::AvfilterVersion,
 }
 
 #[allow(
@@ -5474,47 +5831,79 @@ struct NativeSwscaleSymbols {
     swscale_version: abi::SwscaleVersion,
 }
 
-fn has_exact_ltxv_h264_dependency_contract(binding: &NativeVideoCodecBinding) -> bool {
-    let closure = &binding.load.closure;
-    closure
-        .encoder_providers()
-        .get("libx264")
-        .is_some_and(|provider| provider == "x264")
-        && closure.dependencies().contains_key("x264")
-        && closure.dependency_certificates().contains_key("x264")
-        && closure
-            .edges()
-            .iter()
-            .any(|edge| edge.consumer() == "avcodec" && edge.dependency() == "x264")
+fn has_exact_ltxv_h264_dependency_contract(binding: &NativeVideoCodecBindingOwner) -> bool {
+    let authorized = match binding {
+        NativeVideoCodecBindingOwner::Historical(binding) => {
+            let closure = &binding.load.closure;
+            closure
+                .encoder_providers()
+                .get("libx264")
+                .is_some_and(|provider| provider == "x264")
+                && closure.dependencies().contains_key("x264")
+                && closure.dependency_certificates().contains_key("x264")
+                && closure
+                    .edges()
+                    .iter()
+                    .any(|edge| edge.consumer() == "avcodec" && edge.dependency() == "x264")
+        }
+        NativeVideoCodecBindingOwner::General(binding) => {
+            let closure = &binding.load.closure;
+            closure
+                .encoder_providers()
+                .get("libx264")
+                .is_some_and(|provider| provider == "x264")
+                && closure.has_dependency("x264")
+                && closure.has_dependency_edge("avcodec", "x264")
+        }
+    };
+    authorized
         && binding
-            .load
-            .loaded
+            .loaded()
             .libraries
             .iter()
             .any(|library| library.identity == "x264")
 }
 
-fn has_exact_video_codec_suite_dependency_contract(binding: &NativeVideoCodecBinding) -> bool {
-    let closure = &binding.load.closure;
+fn has_exact_video_codec_suite_dependency_contract(binding: &NativeVideoCodecBindingOwner) -> bool {
     let expected_providers = BTreeMap::from([
         ("aac".to_owned(), "avcodec".to_owned()),
         ("libsvtav1".to_owned(), "svtav1".to_owned()),
         ("libvpx-vp9".to_owned(), "vpx".to_owned()),
         ("libx264".to_owned(), "x264".to_owned()),
     ]);
-    if closure.encoder_providers() != &expected_providers {
+    let providers_match = match binding {
+        NativeVideoCodecBindingOwner::Historical(binding) => {
+            binding.load.closure.encoder_providers() == &expected_providers
+        }
+        NativeVideoCodecBindingOwner::General(binding) => {
+            binding.load.closure.encoder_providers() == &expected_providers
+        }
+    };
+    if !providers_match {
         return false;
     }
     for dependency in ["svtav1", "vpx", "x264"] {
-        if !closure.dependencies().contains_key(dependency)
-            || !closure.dependency_certificates().contains_key(dependency)
-            || !closure
-                .edges()
-                .iter()
-                .any(|edge| edge.consumer() == "avcodec" && edge.dependency() == dependency)
+        let authorized = match binding {
+            NativeVideoCodecBindingOwner::Historical(binding) => {
+                let closure = &binding.load.closure;
+                closure.dependencies().contains_key(dependency)
+                    && closure.dependency_certificates().contains_key(dependency)
+                    && closure
+                        .edges()
+                        .iter()
+                        .any(|edge| edge.consumer() == "avcodec" && edge.dependency() == dependency)
+            }
+            NativeVideoCodecBindingOwner::General(binding) => {
+                binding.load.closure.has_dependency(dependency)
+                    && binding
+                        .load
+                        .closure
+                        .has_dependency_edge("avcodec", dependency)
+            }
+        };
+        if !authorized
             || !binding
-                .load
-                .loaded
+                .loaded()
                 .libraries
                 .iter()
                 .any(|library| library.identity == dependency)
@@ -5523,8 +5912,7 @@ fn has_exact_video_codec_suite_dependency_contract(binding: &NativeVideoCodecBin
         }
     }
     binding
-        .load
-        .loaded
+        .loaded()
         .libraries
         .iter()
         .any(|library| library.identity == "avcodec")
@@ -6068,6 +6456,129 @@ fn bind_video_codec_projection_with_check(
     }
 }
 
+fn bind_general_video_codec_supplemental_with_check(
+    loaded: &LoadedVideoCodecLibraries,
+    projection: &VideoCodecBindingProjection,
+    mut check_cancellation: impl FnMut() -> Result<(), CancellationError>,
+) -> Result<(NativeGeneralVideoCodecSupplementalSymbols, u32), NativeVideoCodecBindingError> {
+    #[cfg(not(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")))]
+    {
+        let _ = loaded;
+        let _ = projection;
+        let _ = &mut check_cancellation;
+        Err(NativeVideoCodecBindingError::UnsupportedTarget)
+    }
+
+    #[cfg(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu"))]
+    {
+        check_cancellation()?;
+        macro_rules! bind {
+            ($library:literal, $symbol:literal, $kind:ty) => {{
+                let symbol_name =
+                    std::ffi::CStr::from_bytes_with_nul(concat!($symbol, "\0").as_bytes())
+                        .map_err(|_| NativeVideoCodecBindingError::InvalidLoadedContract)?;
+                resolve_video_codec_symbol::<$kind>(
+                    loaded,
+                    projection,
+                    $library,
+                    $symbol,
+                    symbol_name,
+                    &mut check_cancellation,
+                )?
+            }};
+        }
+        let symbols = NativeGeneralVideoCodecSupplementalSymbols {
+            av_packet_rescale_timestamps: bind!(
+                "avcodec",
+                "av_packet_rescale_ts",
+                abi::AvPacketRescaleTimestamps
+            ),
+            avcodec_flush_buffers: bind!(
+                "avcodec",
+                "avcodec_flush_buffers",
+                abi::AvcodecFlushBuffers
+            ),
+            avcodec_parameters_copy: bind!(
+                "avcodec",
+                "avcodec_parameters_copy",
+                abi::AvcodecParametersCopy
+            ),
+            av_guess_frame_rate: bind!("avformat", "av_guess_frame_rate", abi::AvGuessFrameRate),
+            av_seek_frame: bind!("avformat", "av_seek_frame", abi::AvSeekFrame),
+            avformat_seek_file: bind!("avformat", "avformat_seek_file", abi::AvformatSeekFile),
+            av_channel_layout_copy: bind!(
+                "avutil",
+                "av_channel_layout_copy",
+                abi::AvChannelLayoutCopy
+            ),
+            av_dict_iterate: bind!("avutil", "av_dict_iterate", abi::AvDictIterate),
+            av_display_rotation_get: bind!(
+                "avutil",
+                "av_display_rotation_get",
+                abi::AvDisplayRotationGet
+            ),
+            av_frame_get_side_data: bind!(
+                "avutil",
+                "av_frame_get_side_data",
+                abi::AvFrameGetSideData
+            ),
+            av_frame_unref: bind!("avutil", "av_frame_unref", abi::AvFrameUnref),
+            av_get_pixel_format_name: bind!(
+                "avutil",
+                "av_get_pix_fmt_name",
+                abi::AvGetPixelFormatName
+            ),
+            av_pixel_format_descriptor_get: bind!(
+                "avutil",
+                "av_pix_fmt_desc_get",
+                abi::AvPixelFormatDescriptorGet
+            ),
+            av_rescale_rounded: bind!("avutil", "av_rescale_rnd", abi::AvRescaleRounded),
+            swr_get_delay: bind!("swresample", "swr_get_delay", abi::SwrGetDelay),
+            av_buffersink_get_frame: bind!(
+                "avfilter",
+                "av_buffersink_get_frame",
+                abi::AvBufferSinkGetFrame
+            ),
+            av_buffersrc_add_frame_flags: bind!(
+                "avfilter",
+                "av_buffersrc_add_frame_flags",
+                abi::AvBufferSourceAddFrameFlags
+            ),
+            avfilter_get_by_name: bind!("avfilter", "avfilter_get_by_name", abi::AvfilterGetByName),
+            avfilter_graph_alloc: bind!(
+                "avfilter",
+                "avfilter_graph_alloc",
+                abi::AvfilterGraphAlloc
+            ),
+            avfilter_graph_config: bind!(
+                "avfilter",
+                "avfilter_graph_config",
+                abi::AvfilterGraphConfig
+            ),
+            avfilter_graph_create_filter: bind!(
+                "avfilter",
+                "avfilter_graph_create_filter",
+                abi::AvfilterGraphCreateFilter
+            ),
+            avfilter_graph_free: bind!("avfilter", "avfilter_graph_free", abi::AvfilterGraphFree),
+            avfilter_link: bind!("avfilter", "avfilter_link", abi::AvfilterLink),
+            avfilter_version: bind!("avfilter", "avfilter_version", abi::AvfilterVersion),
+        };
+        check_cancellation()?;
+        let avfilter = unsafe { (symbols.avfilter_version)() };
+        check_cancellation()?;
+        if avfilter != abi::FFMPEG_7_1_AVFILTER_VERSION {
+            return Err(NativeVideoCodecBindingError::RuntimeVersionMismatch {
+                library: "avfilter",
+                expected: abi::FFMPEG_7_1_AVFILTER_VERSION,
+                actual: avfilter,
+            });
+        }
+        Ok((symbols, avfilter))
+    }
+}
+
 #[cfg(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu"))]
 fn resolve_video_codec_symbol<T: Copy>(
     loaded: &LoadedVideoCodecLibraries,
@@ -6171,6 +6682,7 @@ fn video_codec_version_namespace_cstr(identity: &str) -> Option<&'static std::ff
         "avutil" => Some(c"LIBAVUTIL_59"),
         "swresample" => Some(c"LIBSWRESAMPLE_5"),
         "swscale" => Some(c"LIBSWSCALE_8"),
+        "avfilter" => Some(c"LIBAVFILTER_10"),
         _ => None,
     }
 }
@@ -6240,6 +6752,33 @@ impl VideoCodecLoadProjection {
             sonames,
             needed,
             system_libraries: closure.reviewed_system_libraries().clone(),
+            dependency_first_order,
+        })
+    }
+
+    fn from_general_closure(
+        closure: &CertifiedGeneralVideoCodecDependencyClosure,
+        dependency_first_order: Vec<String>,
+        paths: BTreeMap<String, PathBuf>,
+    ) -> Result<Self, NativeVideoCodecLoadError> {
+        let sonames = closure.sonames();
+        let needed = closure.needed();
+        if paths.len() != dependency_first_order.len()
+            || sonames.len() != dependency_first_order.len()
+            || needed.len() != dependency_first_order.len()
+            || dependency_first_order.iter().any(|identity| {
+                !paths.contains_key(identity)
+                    || !sonames.contains_key(identity)
+                    || !needed.contains_key(identity)
+            })
+        {
+            return Err(NativeVideoCodecLoadError::InvalidClosure);
+        }
+        Ok(Self {
+            paths,
+            sonames,
+            needed,
+            system_libraries: closure.reviewed_system_sonames(),
             dependency_first_order,
         })
     }

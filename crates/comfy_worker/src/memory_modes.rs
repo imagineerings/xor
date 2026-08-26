@@ -1844,6 +1844,15 @@ pub fn native_image_memory_request(
     node_count: u64,
     previews_enabled: bool,
 ) -> Result<MemoryPlanRequest, MemoryPolicyError> {
+    native_image_memory_request_with_codec(input_asset_bytes, node_count, previews_enabled, 0)
+}
+
+pub fn native_image_memory_request_with_codec(
+    input_asset_bytes: u64,
+    node_count: u64,
+    previews_enabled: bool,
+    codec_bytes: u64,
+) -> Result<MemoryPlanRequest, MemoryPolicyError> {
     let decoded_bytes =
         input_asset_bytes
             .checked_mul(4)
@@ -1862,6 +1871,7 @@ pub fn native_image_memory_request(
         staging_bytes: input_asset_bytes,
         preview_bytes: if previews_enabled { decoded_bytes } else { 0 },
         output_bytes: decoded_bytes,
+        codec_bytes,
         ..MemoryPlanRequest::default()
     })
 }

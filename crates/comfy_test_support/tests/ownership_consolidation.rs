@@ -5829,11 +5829,14 @@ fn run_ownership_validation(
             && model_artifact_index_production.contains("symlink_metadata(&file_name)")
             && model_artifact_index_production.contains("metadata.file_type().is_symlink()")
             && runtime_trust_production.contains("pub(crate) fn capture_native_package(")
+            && runtime_trust_production.contains("pub(crate) fn parse_native_package_coverage(")
             && runtime_trust_production.contains("pub(crate) fn validate_native_package_coverage(")
             && runtime_trust_production.contains("if observed_paths != expected_paths")
             && runtime_trust_production.contains("package tree changed while it was captured")
             && runtime_trust_production.contains("if total_bytes > maximum_total_bytes")
-            && runtime_trust_production.contains("coverage paths must be exact, strictly sorted")
+            && runtime_trust_production.contains(
+                "coverage rows must be canonical, strictly sorted, unique, and non-excluded",
+            )
             && !runtime_trust_production.contains("fs::read_dir(")
             && runtime_metal_ffi_production.contains("capture_native_package(")
             && runtime_metal_ffi_production.contains("validate_native_package_coverage(")
@@ -14916,6 +14919,172 @@ fn val_ownership_task555_general_video_codec_declarations_001()
             "missing general video ownership mapping {mapping}"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn val_ownership_task562_video_codec_package_bootstrap_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let package =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_package.rs"))?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    let service =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    let worker = fs::read_to_string(root.join("crates/comfy_worker/src/comfy_worker.rs"))?;
+    let worker_production = worker
+        .split("#[cfg(test)]")
+        .next()
+        .ok_or("worker production source must precede tests")?;
+    let runtime_root = fs::read_to_string(root.join("crates/comfy_runtime/src/comfy_runtime.rs"))?;
+
+    assert_eq!(
+        package
+            .matches("pub fn certify_general_video_codec_package(")
+            .count(),
+        1
+    );
+    for required in [
+        "parse_native_package_coverage(",
+        "inspect_elf64_dynamic_contract(captured.as_bytes()",
+        "capture_native_library_bytes(captured",
+        "NativeFfiRegistry::new",
+        "GENERAL_VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN",
+        "GENERAL_VIDEO_CODEC_DEPENDENCY_CONTRACT_SIGNATURE_DOMAIN",
+    ] {
+        assert!(package.contains(required), "package owner lacks {required}");
+    }
+    for forbidden in [
+        "fn parse_elf",
+        "canonical_path().join(",
+        "resolve_existing(",
+    ] {
+        assert!(
+            !package.contains(forbidden),
+            "package owner duplicates or bypasses shared authority: {forbidden}"
+        );
+    }
+
+    for private_owner in [
+        "pub(crate) struct NativeGeneralVideoCodecLoad",
+        "pub(crate) struct NativeGeneralVideoCodecBinding",
+        "pub(crate) fn load_certified_general_video_codec_closure(",
+        "pub(crate) fn bind_certified_general_video_codec_abi(",
+    ] {
+        assert!(
+            ffi.contains(private_owner),
+            "general loader lacks {private_owner}"
+        );
+    }
+    for escaped_owner in [
+        "pub fn load_certified_general_video_codec_closure(",
+        "pub fn bind_certified_general_video_codec_abi(",
+    ] {
+        assert!(
+            !ffi.contains(escaped_owner),
+            "general loader escaped: {escaped_owner}"
+        );
+    }
+    for escaped_type in [
+        "NativeGeneralVideoCodecLoad,",
+        "NativeGeneralVideoCodecBinding,",
+    ] {
+        assert!(
+            !runtime_root.contains(escaped_type),
+            "general type escaped: {escaped_type}"
+        );
+    }
+    assert!(ffi.contains("pub fn load_certified_video_codec_closure("));
+
+    let actor = service
+        .find("let actor = NativeLtxvCodecThreadService::start_general")
+        .ok_or("general worker bundle does not consume the closure into the sole actor")?;
+    assert_eq!(
+        service
+            .matches("let actor = NativeLtxvCodecThreadService::start_general")
+            .count(),
+        1
+    );
+    let webm = service[actor..]
+        .find("NativeWebmCodecRequestService::checked")
+        .map(|offset| actor + offset)
+        .ok_or("general worker bundle lacks WebM port")?;
+    let h264 = service[webm..]
+        .find("NativeComponentH264Mp4CodecRequestService::checked")
+        .map(|offset| webm + offset)
+        .ok_or("general worker bundle lacks H264 port")?;
+    let cache = service[h264..]
+        .find("worker_service_cache_configuration_identity")
+        .map(|offset| h264 + offset)
+        .ok_or("general worker bundle lacks aggregate cache identity")?;
+    assert!(actor < webm && webm < h264 && h264 < cache);
+    for port in [
+        "with_ltxv_preprocess_service",
+        "with_webm_encode_service",
+        "with_component_h264_mp4_backing_service",
+    ] {
+        assert_eq!(
+            worker_production.matches(port).count(),
+            1,
+            "worker duplicated {port}"
+        );
+    }
+    assert!(worker.contains("NativeVideoCodecWorkerServices::codec_residency_bytes"));
+    assert!(worker.contains("append_video_codec_cache_configuration("));
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concerns = policy["concerns"]
+        .as_array()
+        .ok_or("ownership concerns are absent")?;
+    let package_concern = concerns
+        .iter()
+        .find(|concern| {
+            concern["concern"]
+                == "native_video_reviewed_codec_registry_ltxv_thread_general_package_bootstrap"
+        })
+        .ok_or("general video package ownership concern is absent")?;
+    assert_eq!(
+        package_concern["canonical_owner"],
+        "comfy_runtime::native_video_codec_package::certify_general_video_codec_package"
+    );
+    for concern_name in [
+        "native_video_reviewed_codec_registry_ltxv_thread_general_package_bootstrap",
+        "native_video_retained_codec_library_loading",
+        "native_video_reviewed_codec_registry_ltxv_thread_service",
+        "native_execution_elf_dynamic_contract_inspection",
+        "native_ffi_certification",
+        "native_library_image_capture_and_sealing",
+        "runtime_backend_native_package_admission",
+    ] {
+        let concern = concerns
+            .iter()
+            .find(|concern| concern["concern"] == concern_name)
+            .ok_or("required general video ownership concern is absent")?;
+        assert!(
+            concern["consolidation_tasks"]
+                .as_array()
+                .is_some_and(|tasks| tasks.iter().any(|task| {
+                    task == "comfy-parity-native-video-codec-package-bootstrap-foundation"
+                })),
+            "{concern_name} does not name Task562"
+        );
+    }
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let row = catalog
+        .lines()
+        .find(|line| {
+            line.starts_with(
+                "native_video_reviewed_codec_registry_ltxv_thread_general_package_bootstrap,",
+            )
+        })
+        .ok_or("general video package catalog row is absent")?;
+    assert!(row.contains("authoritative_owner_confirmed"));
+    assert!(!row.contains("consolidation_required"));
     Ok(())
 }
 
