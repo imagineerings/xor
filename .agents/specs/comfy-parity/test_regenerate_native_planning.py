@@ -1746,6 +1746,17 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
             provider_worker_bridge["writes"],
         )
+        for native_controller_diagnostic_read in (
+            "crates/comfy_test_support/tests/native_controller_e2e.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            "crates/comfy_test_support/tests/native_image_e2e.rs",
+            "crates/comfy_test_support/tests/support/native_controller.rs",
+        ):
+            self.assertIn(native_controller_diagnostic_read, provider_worker_bridge["reads"])
+        self.assertIn(
+            "crates/comfy_test_support/tests/support/native_controller.rs",
+            provider_worker_bridge["writes"],
+        )
         for bridge_feature_manifest in (
             "crates/comfy_plugin_host/Cargo.toml",
             "crates/comfy_test_support/Cargo.toml",
@@ -1811,8 +1822,21 @@ class ValidationGenerationTests(unittest.TestCase):
             "one catalog-valid COMFY-NODE four-digit feature identity",
             "component-contract test and focused bridge test consume those same pinned bytes",
             "no embedded replacement blob, runtime fixture compiler, subprocess, or alternate guest",
+            "explicit non-empty phase label at all five waits",
+            "initial Started, initial Cancelled, retry Started, retry Interrupted, and retry Succeeded",
+            "exact target-attempt events observed so far including sequence and kind",
+            "Diagnostic collection does not change any deadline, polling cadence, event consumption, canonical-event assertion, predicate, controller ordering, fixture, or success behavior",
         ):
             self.assertIn(bridge_completion_gate, provider_worker_bridge["done"])
+        provider_worker_bridge_commands = planning.task_validation_commands(
+            provider_worker_bridge
+        )
+        for diagnostic_command in (
+            "cargo test --locked -p comfy_test_support --test native_controller_e2e native_controller_drives_packaged_worker_commands_and_typed_outputs -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_worker_resilience val_recovery_008 -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_image_e2e val_native_e2e_001 -- --nocapture",
+        ):
+            self.assertIn(diagnostic_command, provider_worker_bridge_commands)
         provider_deployment = tasks_by_id[
             "comfy-parity-provider-deployment-lifecycle"
         ]
