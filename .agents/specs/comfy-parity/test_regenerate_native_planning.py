@@ -840,14 +840,53 @@ class ValidationGenerationTests(unittest.TestCase):
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
         ):
             self.assertIn(command, gligen_validation)
+        for conditioning_read in (
+            "projects/comfy/ComfyUI/comfy/clip_vision.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/src/attention.rs",
+            "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+        ):
+            self.assertIn(conditioning_read, conditioning_auxiliary["reads"])
+        self.assertEqual(
+            conditioning_auxiliary["writes"],
+            [
+                "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ],
+        )
         for phrase in (
-            "NativeGligenResource",
-            "NativePhotoMakerResource",
-            "NativeStyleModelResource",
-            "reduced dimensions are never labeled source-exact production profiles",
+            "three concrete non-Clone resource structs",
+            "NativeModelPayload and its private NativeModelResource backing remain intentionally Clone through Arc",
+            "Option<&Arc<T>> views that return None on the wrong role",
+            "exact ResourceMismatch",
+            "preserves the existing native_style_model_resource ownership concern byte-for-byte",
+            "native_photomaker_model_resource and native_gligen_model_resource",
+            "no aggregate or generic conditioning-resource concern",
+            "NativeClipVision's exact pooled-hidden adapter for PhotoMaker",
+            "canonical comfy_model::attention for GLIGEN",
+            "exactly four cases: GLIGEN, PhotoMaker, StyleAdapter, and Flux Redux",
+            "full three-by-three wrong-role matrix",
+            "This task owns only role registration and ownership, cross-role, and frozen-fixture evidence",
             "Handle publication, cache, durable persistence, restart, and stale-generation behavior remain exclusively assigned",
         ):
             self.assertIn(phrase, conditioning_auxiliary["done"])
+        conditioning_validation = planning.task_validation_commands(
+            conditioning_auxiliary
+        )
+        for command in (
+            "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+            "cargo test --locked -p comfy_model photomaker_resource -- --nocapture",
+            "cargo test --locked -p comfy_model gligen_resource -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_conditioning_integration conditioning_auxiliary_resource_roles -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/generate_ownership_catalog.py",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task397_conditioning_auxiliary_resources_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task393_style_model_resource_001 -- --exact --nocapture",
+        ):
+            self.assertIn(command, conditioning_validation)
         for item in (
             style_task,
             clip_vision_context_task,

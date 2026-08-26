@@ -9950,19 +9950,24 @@ def native_model_resource_precursor_tasks(
     append(
         "comfy-parity-native-conditioning-auxiliary-resource-foundation",
         "Close GLIGEN, PhotoMaker, and style resource ownership",
-        "Register the three distinct retained resource roles and close cross-role, reconstruction, fixture, and ownership evidence without adding another execution or lifecycle owner.",
+        "Register the three distinct retained resource roles and close cross-role, frozen-fixture, and ownership evidence without adding another execution, reconstruction, or lifecycle owner.",
         [
             "projects/comfy/ComfyUI/nodes.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py",
             "projects/comfy/ComfyUI/comfy/gligen.py",
+            "projects/comfy/ComfyUI/comfy/clip_vision.py",
             "projects/comfy/ComfyUI/comfy/t2i_adapter/adapter.py",
             "projects/comfy/ComfyUI/comfy/ldm/flux/redux.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
             "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/src/attention.rs",
             "crates/comfy_model/src/native_ops.rs",
             "crates/comfy_model/src/conditioning.rs",
             "crates/comfy_model/src/model_family.rs",
             "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_test_support/tests/native_conditioning_integration.rs",
             "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
             ".agents/specs/comfy-parity/generate_ownership_catalog.py",
             ".agents/specs/comfy-parity/ownership-policy.json",
@@ -9970,15 +9975,13 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [
-            "crates/comfy_model/src/conditioning_resources.rs",
-            "crates/comfy_model/src/comfy_model.rs",
-            "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_test_support/tests/native_conditioning_integration.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "Three non-cloneable concrete NativeModelResource variants and typed accessors exist: NativeGligenResource, NativePhotoMakerResource, and NativeStyleModelResource. STYLE_MODEL alone owns the internal StyleAdapter versus FluxRedux architecture enum. Each variant preserves its resource-local ordered checkpoint reconstruction, semantic digest, alias-aware residency, exact invocation output, conservative memory admission, CPU/F32 placement contract, cancellation, and typed atomic failure while delegating shared tensor, conditioning, and CLIP-vision mechanics to their canonical owners. The tracked fixture directory contains separate GLIGEN, PhotoMaker, StyleAdapter, and Flux Redux reduced executable cases with pinned source hashes, manifest, provenance, source-equation oracle, generator check, and mutation discriminators; reduced dimensions are never labeled source-exact production profiles. Cross-role use cannot compile through the typed accessors and fails typed at dynamic boundaries. Ownership scans prove no generic coefficient facade, second CLIP transformer, second checkpoint owner, or duplicate conditioning implementation. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain exclusively assigned to comfy-parity-native-model-resource-service-foundation; this task claims only resource-local reconstruction and identity equality.",
+        "The prerequisite implementations already provide three concrete non-Clone resource structs: NativeGligenResource, NativePhotoMakerResource, and NativeStyleModelResource. NativeModelPayload and its private NativeModelResource backing remain intentionally Clone through Arc. Typed constructors cannot accept another resource type; generic payload accessors are borrowed selector-free Option<&Arc<T>> views that return None on the wrong role, and dynamic admission and validation return exact ResourceMismatch without reinterpretation. STYLE_MODEL alone owns the internal StyleAdapter versus FluxRedux architecture enum. This closure changes no resource equation, checkpoint, reconstruction, identity, memory, cancellation, or execution behavior. It preserves the existing native_style_model_resource ownership concern byte-for-byte and adds two separate non-overlapping native_photomaker_model_resource and native_gligen_model_resource concerns owned by comfy_model::conditioning_resources::{NativePhotoMakerResource, NativeGligenResource}; no aggregate or generic conditioning-resource concern is introduced. Each concern pins the exact concrete resource definition and callsites plus payload role, format, variant, typed constructor, and borrowed accessor mappings. Allowed adapters are only canonical tensor and NativeModule operations, NativeClipVision's exact pooled-hidden adapter for PhotoMaker, canonical comfy_model::attention for GLIGEN and inherited StyleAdapter attention, and the tracked fixture as a development oracle. Ownership scans forbid a second checkpoint or reconstruction owner, second CLIP transformer, post-layernorm, or projection owner, second scaled-dot-product attention owner, generic coefficient, trait-object, or string-role facade, as_any or raw selector, and lifecycle, cache, or persistence authority. The final prerequisite-owned fixture is consumed read-only and frozen as exactly four cases: GLIGEN, PhotoMaker, StyleAdapter, and Flux Redux. Manifest, provenance, oracle, generator, and pinned source hashes cross-link exactly; reduced dimensions remain distinct from production profiles; inherited case hashes and mutation coverage do not change; generate_oracle.py --check produces no diff. Closure tests build each prerequisite resource through its existing owner, wrap and reconstruct it only through its existing typed payload API, prove exact identity, residency, and output preservation, and prove the full three-by-three wrong-role matrix returns None or exact ResourceMismatch. This task owns only role registration and ownership, cross-role, and frozen-fixture evidence. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain exclusively assigned to comfy-parity-native-model-resource-service-foundation.",
+        include_model_payload=False,
     )
     append(
         "comfy-parity-native-model-resource-service-foundation",
@@ -21715,6 +21718,20 @@ def task_validation_commands(item: dict[str, object]) -> str:
                 "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
                 "cargo test --locked -p comfy_test_support --test native_conditioning_integration style_model_resource -- --exact --nocapture",
                 "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            ])
+        if identifier == "comfy-parity-native-conditioning-auxiliary-resource-foundation":
+            commands.extend([
+                "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+                "cargo test --locked -p comfy_test_support --test native_conditioning_integration style_model_resource -- --exact --nocapture",
+                "cargo test --locked -p comfy_model photomaker_resource -- --nocapture",
+                "cargo test --locked -p comfy_test_support --test native_conditioning_integration photomaker_resource -- --exact --nocapture",
+                "cargo test --locked -p comfy_model gligen_resource -- --nocapture",
+                "cargo test --locked -p comfy_test_support --test native_conditioning_integration gligen_resource -- --exact --nocapture",
+                "cargo test --locked -p comfy_test_support --test native_conditioning_integration conditioning_auxiliary_resource_roles -- --exact --nocapture",
+                "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/generate_ownership_catalog.py",
+                "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task397_conditioning_auxiliary_resources_001 -- --exact --nocapture",
+                "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+                "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task393_style_model_resource_001 -- --exact --nocapture",
             ])
         commands.extend([
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
