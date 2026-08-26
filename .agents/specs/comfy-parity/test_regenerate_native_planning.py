@@ -11,6 +11,37 @@ import validate_backend_dependencies as backend_dependencies
 
 
 class ValidationGenerationTests(unittest.TestCase):
+    def test_generated_tasks_preserve_in_progress_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.joinpath("tasks.md").write_text(
+                "- [~] 1. Active task\n"
+                "  - _id: active-task\n",
+                encoding="utf-8",
+            )
+            task = {
+                "id": "active-task",
+                "title": "Active task",
+                "outcome": "Retain the active task.",
+                "done": "The active task remains incomplete.",
+                "requirements": [],
+                "criterion_ids": [],
+                "designs": [],
+                "validations": [],
+                "reads": [],
+                "writes": [],
+                "dependencies": [],
+                "validation_packages": [],
+                "cargo_features": {},
+                "locked": True,
+            }
+            with patch.object(planning, "ROOT", root):
+                annotation = planning.existing_task_annotations()["active-task"]
+                self.assertTrue(annotation["started"])
+                self.assertFalse(annotation["complete"])
+                planning.write_tasks([task], {})
+            self.assertIn("- [~] 1. Active task", root.joinpath("tasks.md").read_text())
+
     def test_dependency_ledger_reopens_until_current_lock_allowlist_evidence_is_fresh(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repository_root = Path(directory)
@@ -1536,6 +1567,10 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_plugin_host/src/private_worker.rs",
             provider_worker_bridge["writes"],
         )
+        self.assertIn(
+            "crates/comfy_types/src/worker_protocol.rs",
+            provider_worker_bridge["writes"],
+        )
         for bridge_completion_owner in (
             "crates/comfy_plugin_host/src/component_host.rs",
             "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
@@ -1557,11 +1592,15 @@ class ValidationGenerationTests(unittest.TestCase):
             "distinct app-to-worker provider-v2 invocation envelope",
             "NativeProviderWorkerRequest::Begin bytes remain unchanged",
             "canonical transport validator only from that envelope",
+            "distinct bounded app-to-worker ProviderV2ProposalFinalization control",
+            "one-use finalization nonce",
+            "returns a typed success acknowledgement",
+            "all legacy postcard bytes remain frozen",
             "No public raw-field constructor",
         ):
             self.assertIn(worker_bridge_context_gate, provider_worker_bridge["done"])
         self.assertIn(
-            "first valid-grant end-to-end success path",
+            "first valid-grant bridge path with a test-only scripted actuator",
             provider_worker_bridge["done"],
         )
         for bridge_completion_gate in (
@@ -1574,6 +1613,9 @@ class ValidationGenerationTests(unittest.TestCase):
             "unrelated valid receipt",
             "completion token, no-argument disarm",
             "proposal/context/handle/receipt/materialization binding",
+            "test-only scripted actuator",
+            "Production provider-v2 remains fail-closed without an actuator",
+            "comfy-parity-provider-hermetic-component-harness",
         ):
             self.assertIn(bridge_completion_gate, provider_worker_bridge["done"])
         provider_deployment = tasks_by_id[
@@ -4001,6 +4043,75 @@ class ValidationGenerationTests(unittest.TestCase):
                 "writes"
             ],
         )
+        demux_decode_task = tasks_by_id[
+            "comfy-parity-native-video-demux-decode-foundation"
+        ]
+        for path in [
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/basic_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "projects/comfy/ComfyUI/requirements.txt",
+            ".agents/specs/comfy-parity/baseline.md",
+            "crates/comfy_model/src/artifact_index.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_video_codec_package.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_test_support/tests/video_codec_package_bootstrap.rs",
+        ]:
+            self.assertIn(path, demux_decode_task["reads"])
+        for path in [
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_test_support/src/bin/generate_video_general_demux_decode_fixture.rs",
+            "crates/comfy_test_support/fixtures/video/general-demux-decode",
+            "crates/comfy_test_support/tests/video_general_demux_decode.rs",
+        ]:
+            self.assertIn(path, demux_decode_task["writes"])
+        demux_decode_done = demux_decode_task["done"]
+        for phrase in [
+            "deterministic offline fixture checker",
+            "first-video and last-decodable-audio selection",
+            "component frame rate uses average-rate then one-fps fallback",
+            "bounded backward keyframe seek",
+            "non-yuvj conversion width is not 32-aligned",
+            "height-only nonalignment does not enter that branch",
+            "same capacity-one retained actor",
+            "No second loader, binding, actor, thread, FFmpeg namespace, path, or subprocess",
+            "same CancellationToken",
+            "NativeVideoPayload::Components",
+            "canonical cancellable audio/video constructors",
+            "fixed-size finite-value validation and tensor hashing",
+            "actually certified FFmpeg 7.1 general-video package",
+            "synthetic package symbols or mock callbacks are not accepted",
+        ]:
+            self.assertIn(phrase, demux_decode_done)
+        demux_decode_commands = planning.task_validation_commands(demux_decode_task)
+        for command in [
+            "cargo run --locked -p comfy_test_support --bin generate_video_general_demux_decode_fixture -- --check",
+            "cargo test --locked -p comfy_test_support --test video_general_demux_decode",
+            "COMFY_CERTIFIED_FFMPEG_7_1_PACKAGE_ROOT=/path/to/certified-package",
+            "--features hardware-certification --test video_general_demux_decode certified_ffmpeg_7_1_goldens_match -- --ignored --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task563_video_demux_decode_001 -- --exact",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+        ]:
+            self.assertIn(command, demux_decode_commands)
+        video_slice_task = tasks_by_id[
+            "comfy-parity-native-video-source-slice-materialization-foundation"
+        ]
+        for path in [
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
+        ]:
+            self.assertIn(path, video_slice_task["reads"])
+        for path in [
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
+        ]:
+            self.assertIn(path, video_slice_task["writes"])
         self.assertIn(
             "crates/comfy_model/src/frame_interpolation.rs",
             tasks_by_id[video_foundation_id]["reads"],

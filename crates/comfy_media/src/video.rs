@@ -1,8 +1,529 @@
-use crate::{NativeVideoBitDepth, NativeVideoComponentsPayload, NativeVideoPayload};
+use crate::{
+    NativeCancellableMediaPayloadError, NativeMediaPayloadError, NativeVideoBitDepth,
+    NativeVideoComponentsPayload, NativeVideoPayload,
+};
+use comfy_tensor::{DType, DeviceId};
 use comfy_types::CancellationToken;
+use std::{collections::BTreeMap, mem::size_of, sync::Arc};
 use thiserror::Error;
 
 const SOURCE_RATE_DENOMINATOR: u64 = 1_000;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeVideoDecodeWindow {
+    start_seconds_bits: u64,
+    duration_seconds_bits: u64,
+}
+
+impl NativeVideoDecodeWindow {
+    pub fn checked(
+        start_seconds: f64,
+        duration_seconds: f64,
+    ) -> Result<Self, NativeVideoDecodePlanError> {
+        if !start_seconds.is_finite()
+            || start_seconds < 0.0
+            || !duration_seconds.is_finite()
+            || duration_seconds < 0.0
+            || !matches!(start_seconds + duration_seconds, value if value.is_finite())
+        {
+            return Err(NativeVideoDecodePlanError::InvalidWindow);
+        }
+        let start_seconds = if start_seconds == 0.0 {
+            0.0
+        } else {
+            start_seconds
+        };
+        let duration_seconds = if duration_seconds == 0.0 {
+            0.0
+        } else {
+            duration_seconds
+        };
+        Ok(Self {
+            start_seconds_bits: start_seconds.to_bits(),
+            duration_seconds_bits: duration_seconds.to_bits(),
+        })
+    }
+
+    pub const fn start_seconds(self) -> f64 {
+        f64::from_bits(self.start_seconds_bits)
+    }
+
+    pub const fn duration_seconds(self) -> f64 {
+        f64::from_bits(self.duration_seconds_bits)
+    }
+
+    pub const fn identity_bits(self) -> (u64, u64) {
+        (self.start_seconds_bits, self.duration_seconds_bits)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeVideoDecodeLimits {
+    maximum_input_bytes: usize,
+    maximum_streams: usize,
+    maximum_packet_iterations: usize,
+    maximum_receive_iterations: usize,
+    maximum_frames: usize,
+    maximum_pixels_per_frame: u64,
+    maximum_audio_samples: usize,
+    maximum_metadata_entries: usize,
+    maximum_metadata_key_bytes: usize,
+    maximum_metadata_value_bytes: usize,
+    maximum_metadata_bytes: usize,
+    maximum_output_bytes: usize,
+    maximum_native_session_bytes: u64,
+    avio_buffer_bytes: usize,
+}
+
+impl NativeVideoDecodeLimits {
+    #[cfg(test)]
+    #[allow(clippy::too_many_arguments)]
+    fn checked(
+        maximum_input_bytes: usize,
+        maximum_streams: usize,
+        maximum_packet_iterations: usize,
+        maximum_receive_iterations: usize,
+        maximum_frames: usize,
+        maximum_pixels_per_frame: u64,
+        maximum_audio_samples: usize,
+        maximum_metadata_entries: usize,
+        maximum_metadata_key_bytes: usize,
+        maximum_metadata_value_bytes: usize,
+        maximum_metadata_bytes: usize,
+        maximum_output_bytes: usize,
+        maximum_native_session_bytes: u64,
+        avio_buffer_bytes: usize,
+    ) -> Result<Self, NativeVideoDecodePlanError> {
+        if maximum_input_bytes == 0
+            || maximum_streams == 0
+            || maximum_packet_iterations == 0
+            || maximum_receive_iterations == 0
+            || maximum_frames == 0
+            || maximum_pixels_per_frame == 0
+            || maximum_audio_samples == 0
+            || !(1..=128).contains(&maximum_metadata_entries)
+            || !(1..=4_096).contains(&maximum_metadata_key_bytes)
+            || !(1..=4_096).contains(&maximum_metadata_value_bytes)
+            || maximum_metadata_bytes == 0
+            || maximum_output_bytes == 0
+            || maximum_native_session_bytes == 0
+            || avio_buffer_bytes == 0
+            || avio_buffer_bytes > maximum_input_bytes
+        {
+            return Err(NativeVideoDecodePlanError::InvalidLimits);
+        }
+        Ok(Self {
+            maximum_input_bytes,
+            maximum_streams,
+            maximum_packet_iterations,
+            maximum_receive_iterations,
+            maximum_frames,
+            maximum_pixels_per_frame,
+            maximum_audio_samples,
+            maximum_metadata_entries,
+            maximum_metadata_key_bytes,
+            maximum_metadata_value_bytes,
+            maximum_metadata_bytes,
+            maximum_output_bytes,
+            maximum_native_session_bytes,
+            avio_buffer_bytes,
+        })
+    }
+
+    pub const fn reviewed() -> Self {
+        Self {
+            maximum_input_bytes: 512 * 1024 * 1024,
+            maximum_streams: 32,
+            maximum_packet_iterations: 2_000_000,
+            maximum_receive_iterations: 4_000_000,
+            maximum_frames: 56,
+            maximum_pixels_per_frame: 1_280 * 736,
+            maximum_audio_samples: 11_520_000,
+            maximum_metadata_entries: 128,
+            maximum_metadata_key_bytes: 4_096,
+            maximum_metadata_value_bytes: 4_096,
+            maximum_metadata_bytes: 1024 * 1024,
+            maximum_output_bytes: 900_000_000,
+            maximum_native_session_bytes: 128 * 1024 * 1024,
+            avio_buffer_bytes: 64 * 1024,
+        }
+    }
+
+    pub const fn maximum_input_bytes(self) -> usize {
+        self.maximum_input_bytes
+    }
+
+    pub const fn maximum_streams(self) -> usize {
+        self.maximum_streams
+    }
+
+    pub const fn maximum_packet_iterations(self) -> usize {
+        self.maximum_packet_iterations
+    }
+
+    pub const fn maximum_receive_iterations(self) -> usize {
+        self.maximum_receive_iterations
+    }
+
+    pub const fn maximum_frames(self) -> usize {
+        self.maximum_frames
+    }
+
+    pub const fn maximum_pixels_per_frame(self) -> u64 {
+        self.maximum_pixels_per_frame
+    }
+
+    pub const fn maximum_audio_samples(self) -> usize {
+        self.maximum_audio_samples
+    }
+
+    pub const fn maximum_metadata_entries(self) -> usize {
+        self.maximum_metadata_entries
+    }
+
+    pub const fn maximum_metadata_key_bytes(self) -> usize {
+        self.maximum_metadata_key_bytes
+    }
+
+    pub const fn maximum_metadata_value_bytes(self) -> usize {
+        self.maximum_metadata_value_bytes
+    }
+
+    pub const fn maximum_metadata_bytes(self) -> usize {
+        self.maximum_metadata_bytes
+    }
+
+    pub const fn maximum_output_bytes(self) -> usize {
+        self.maximum_output_bytes
+    }
+
+    pub const fn maximum_native_session_bytes(self) -> u64 {
+        self.maximum_native_session_bytes
+    }
+
+    pub const fn avio_buffer_bytes(self) -> usize {
+        self.avio_buffer_bytes
+    }
+
+    pub const fn configuration_values(self) -> [u64; 14] {
+        [
+            self.maximum_input_bytes as u64,
+            self.maximum_streams as u64,
+            self.maximum_packet_iterations as u64,
+            self.maximum_receive_iterations as u64,
+            self.maximum_frames as u64,
+            self.maximum_pixels_per_frame,
+            self.maximum_audio_samples as u64,
+            self.maximum_metadata_entries as u64,
+            self.maximum_metadata_key_bytes as u64,
+            self.maximum_metadata_value_bytes as u64,
+            self.maximum_metadata_bytes as u64,
+            self.maximum_output_bytes as u64,
+            self.maximum_native_session_bytes,
+            self.avio_buffer_bytes as u64,
+        ]
+    }
+
+    pub fn maximum_workspace_peak_bytes(self) -> Result<u64, NativeVideoDecodePlanError> {
+        let pixels = self
+            .maximum_pixels_per_frame
+            .checked_mul(
+                u64::try_from(self.maximum_frames)
+                    .map_err(|_| NativeVideoDecodePlanError::InvalidLimits)?,
+            )
+            .ok_or(NativeVideoDecodePlanError::InvalidLimits)?;
+        let frame_bytes = pixels
+            .checked_mul(3)
+            .and_then(|value| value.checked_mul(size_of::<f32>() as u64))
+            .ok_or(NativeVideoDecodePlanError::InvalidLimits)?;
+        let alpha_bytes = pixels
+            .checked_mul(size_of::<f32>() as u64)
+            .ok_or(NativeVideoDecodePlanError::InvalidLimits)?;
+        let audio_bytes = u64::try_from(self.maximum_audio_samples)
+            .map_err(|_| NativeVideoDecodePlanError::InvalidLimits)?
+            .checked_mul(size_of::<f32>() as u64)
+            .ok_or(NativeVideoDecodePlanError::InvalidLimits)?;
+        let staging_bytes = frame_bytes
+            .checked_add(alpha_bytes)
+            .and_then(|value| value.checked_add(audio_bytes))
+            .filter(|value| {
+                usize::try_from(*value).is_ok_and(|value| value <= self.maximum_output_bytes)
+            })
+            .ok_or(NativeVideoDecodePlanError::InvalidLimits)?;
+        let maximum_video_conversion_bytes = self
+            .maximum_pixels_per_frame
+            .checked_mul(4)
+            .and_then(|value| value.checked_mul(size_of::<f32>() as u64))
+            .ok_or(NativeVideoDecodePlanError::InvalidLimits)?;
+        let conversion_bytes = maximum_video_conversion_bytes.max(audio_bytes);
+        staging_bytes
+            .checked_mul(2)
+            .and_then(|value| value.checked_add(conversion_bytes))
+            .and_then(|value| value.checked_add(self.maximum_native_session_bytes))
+            .and_then(|value| value.checked_add(self.maximum_metadata_bytes as u64))
+            .and_then(|value| value.checked_add(self.avio_buffer_bytes as u64))
+            .ok_or(NativeVideoDecodePlanError::InvalidLimits)
+    }
+
+    pub fn checked_workspace_peak_bytes(
+        self,
+        maximum_workspace_bytes: u64,
+    ) -> Result<u64, NativeVideoDecodePlanError> {
+        let peak = self.maximum_workspace_peak_bytes()?;
+        if peak > maximum_workspace_bytes {
+            return Err(NativeVideoDecodePlanError::LimitExceeded);
+        }
+        Ok(peak)
+    }
+}
+
+#[derive(Clone)]
+pub struct NativeVideoDecodeRequest {
+    encoded_bytes: Arc<[u8]>,
+    window: NativeVideoDecodeWindow,
+}
+
+impl std::fmt::Debug for NativeVideoDecodeRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("NativeVideoDecodeRequest")
+            .field("encoded_byte_length", &self.encoded_bytes.len())
+            .field("window", &self.window)
+            .finish()
+    }
+}
+
+impl NativeVideoDecodeRequest {
+    pub fn checked(
+        encoded_bytes: Arc<[u8]>,
+        window: NativeVideoDecodeWindow,
+    ) -> Result<Self, NativeVideoDecodePlanError> {
+        if encoded_bytes.is_empty() {
+            return Err(NativeVideoDecodePlanError::EmptyInput);
+        }
+        Ok(Self {
+            encoded_bytes,
+            window,
+        })
+    }
+
+    pub fn encoded_bytes(&self) -> &[u8] {
+        &self.encoded_bytes
+    }
+
+    pub const fn window(&self) -> NativeVideoDecodeWindow {
+        self.window
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeVideoSkippedStreamKind {
+    Audio,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeVideoSkippedStreamReason {
+    MissingDecoder,
+    UnsupportedCodec,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeVideoSkippedStreamDiagnostic {
+    stream_index: u32,
+    kind: NativeVideoSkippedStreamKind,
+    codec_id: i32,
+    reason: NativeVideoSkippedStreamReason,
+}
+
+impl NativeVideoSkippedStreamDiagnostic {
+    pub const fn checked(
+        stream_index: u32,
+        kind: NativeVideoSkippedStreamKind,
+        codec_id: i32,
+        reason: NativeVideoSkippedStreamReason,
+    ) -> Self {
+        Self {
+            stream_index,
+            kind,
+            codec_id,
+            reason,
+        }
+    }
+
+    pub const fn stream_index(&self) -> u32 {
+        self.stream_index
+    }
+
+    pub const fn kind(&self) -> NativeVideoSkippedStreamKind {
+        self.kind
+    }
+
+    pub const fn codec_id(&self) -> i32 {
+        self.codec_id
+    }
+
+    pub const fn reason(&self) -> NativeVideoSkippedStreamReason {
+        self.reason
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct NativeVideoDecodeDiagnostics {
+    skipped_streams: Vec<NativeVideoSkippedStreamDiagnostic>,
+}
+
+impl NativeVideoDecodeDiagnostics {
+    pub fn checked(
+        skipped_streams: Vec<NativeVideoSkippedStreamDiagnostic>,
+        maximum_streams: usize,
+    ) -> Result<Self, NativeVideoDecodePlanError> {
+        if skipped_streams.len() > maximum_streams
+            || skipped_streams.iter().any(|diagnostic| {
+                diagnostic.codec_id < 0
+                    || usize::try_from(diagnostic.stream_index)
+                        .map_or(true, |index| index >= maximum_streams)
+            })
+            || skipped_streams
+                .windows(2)
+                .any(|pair| pair[0].stream_index >= pair[1].stream_index)
+        {
+            return Err(NativeVideoDecodePlanError::InvalidOutput);
+        }
+        Ok(Self { skipped_streams })
+    }
+
+    pub fn skipped_streams(&self) -> &[NativeVideoSkippedStreamDiagnostic] {
+        &self.skipped_streams
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeDecodedVideo {
+    video: NativeVideoPayload,
+    diagnostics: NativeVideoDecodeDiagnostics,
+}
+
+impl NativeDecodedVideo {
+    pub fn checked(
+        video: NativeVideoPayload,
+        diagnostics: NativeVideoDecodeDiagnostics,
+    ) -> Result<Self, NativeVideoDecodePlanError> {
+        validate_decoded_video_shape(&video)?;
+        video
+            .validate()
+            .map_err(|_| NativeVideoDecodePlanError::InvalidOutput)?;
+        Ok(Self { video, diagnostics })
+    }
+
+    pub fn checked_cancellable(
+        video: NativeVideoPayload,
+        diagnostics: NativeVideoDecodeDiagnostics,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeCancellableMediaPayloadError> {
+        validate_decoded_video_shape(&video).map_err(|_| NativeMediaPayloadError::InvalidVideo)?;
+        video.validate_components_cancellable(cancellation)?;
+        Ok(Self { video, diagnostics })
+    }
+
+    pub const fn video(&self) -> &NativeVideoPayload {
+        &self.video
+    }
+
+    pub const fn diagnostics(&self) -> &NativeVideoDecodeDiagnostics {
+        &self.diagnostics
+    }
+
+    pub fn into_video(self) -> NativeVideoPayload {
+        self.video
+    }
+}
+
+fn validate_decoded_video_shape(
+    video: &NativeVideoPayload,
+) -> Result<(), NativeVideoDecodePlanError> {
+    let components = video
+        .components()
+        .ok_or(NativeVideoDecodePlanError::InvalidOutput)?;
+    let frames = components.frames().descriptor();
+    let frame_shape = frames.shape();
+    let valid_alpha = match components.alpha() {
+        Some(alpha) => {
+            let descriptor = alpha.descriptor();
+            descriptor.dtype() == DType::F32
+                && descriptor.device() == DeviceId::CPU
+                && descriptor
+                    .is_contiguous()
+                    .map_err(|_| NativeVideoDecodePlanError::InvalidOutput)?
+        }
+        None => true,
+    };
+    let valid_audio = match components.audio() {
+        Some(audio) => {
+            let descriptor = audio.waveform().descriptor();
+            descriptor.dtype() == DType::F32
+                && descriptor.device() == DeviceId::CPU
+                && descriptor.shape().first() == Some(&1)
+                && descriptor
+                    .is_contiguous()
+                    .map_err(|_| NativeVideoDecodePlanError::InvalidOutput)?
+        }
+        None => true,
+    };
+    if frames.dtype() != DType::F32
+        || frames.device() != DeviceId::CPU
+        || frame_shape.len() != 4
+        || frame_shape[3] != 3
+        || !frames
+            .is_contiguous()
+            .map_err(|_| NativeVideoDecodePlanError::InvalidOutput)?
+        || !valid_alpha
+        || !valid_audio
+    {
+        return Err(NativeVideoDecodePlanError::InvalidOutput);
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+pub enum NativeVideoDecodePlanError {
+    #[error("native video decode input is empty")]
+    EmptyInput,
+    #[error("native video decode window is invalid")]
+    InvalidWindow,
+    #[error("native video decode limits are invalid")]
+    InvalidLimits,
+    #[error("native video decode input or output exceeds its checked limits")]
+    LimitExceeded,
+    #[error("native video decode output is invalid")]
+    InvalidOutput,
+}
+
+pub fn checked_decode_metadata(
+    entries: impl IntoIterator<Item = (String, String)>,
+    limits: NativeVideoDecodeLimits,
+) -> Result<BTreeMap<String, String>, NativeVideoDecodePlanError> {
+    let mut metadata = BTreeMap::new();
+    let mut aggregate_bytes = 0_usize;
+    for (key, value) in entries {
+        if key.is_empty()
+            || key.chars().any(char::is_control)
+            || value.chars().any(char::is_control)
+            || metadata.contains_key(&key)
+            || metadata.len() >= limits.maximum_metadata_entries
+            || key.len() > limits.maximum_metadata_key_bytes
+            || value.len() > limits.maximum_metadata_value_bytes
+        {
+            return Err(NativeVideoDecodePlanError::InvalidOutput);
+        }
+        aggregate_bytes = aggregate_bytes
+            .checked_add(key.len())
+            .and_then(|bytes| bytes.checked_add(value.len()))
+            .filter(|bytes| *bytes <= limits.maximum_metadata_bytes)
+            .ok_or(NativeVideoDecodePlanError::LimitExceeded)?;
+        metadata.insert(key, value);
+    }
+    Ok(metadata)
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NativeVideoContainer {
@@ -548,6 +1069,86 @@ mod tests {
 
     fn limits() -> Result<NativeVideoCodecLimits, NativeVideoCodecPlanError> {
         NativeVideoCodecLimits::checked(16, 64, 1_000_000, 8_000_000)
+    }
+
+    #[test]
+    fn general_video_decode_window_and_request_identity_are_canonical_and_redacted()
+    -> Result<(), Box<dyn Error>> {
+        let positive = NativeVideoDecodeWindow::checked(0.0, 0.0)?;
+        let negative = NativeVideoDecodeWindow::checked(-0.0, -0.0)?;
+        assert_eq!(positive, negative);
+        assert_eq!(positive.identity_bits(), (0, 0));
+        for (start, duration) in [
+            (-1.0, 0.0),
+            (0.0, -1.0),
+            (f64::INFINITY, 0.0),
+            (0.0, f64::NAN),
+            (f64::MAX, f64::MAX),
+        ] {
+            assert!(NativeVideoDecodeWindow::checked(start, duration).is_err());
+        }
+
+        let distinctive_bytes: Arc<[u8]> = Arc::from(&b"do-not-log-this-video"[..]);
+        let request = NativeVideoDecodeRequest::checked(distinctive_bytes, positive)?;
+        let debug = format!("{request:?}");
+        assert!(debug.contains("encoded_byte_length: 21"));
+        assert!(!debug.contains("do-not-log-this-video"));
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_decode_reviewed_peak_fits_exact_frozen_workspace() -> Result<(), Box<dyn Error>>
+    {
+        const FROZEN_CODEC_WORKSPACE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+        let reviewed = NativeVideoDecodeLimits::reviewed();
+        let peak = reviewed.maximum_workspace_peak_bytes()?;
+        assert_eq!(peak, 1_961_779_200);
+        assert_eq!(
+            reviewed.checked_workspace_peak_bytes(FROZEN_CODEC_WORKSPACE_BYTES)?,
+            peak
+        );
+        assert!(
+            reviewed
+                .checked_workspace_peak_bytes(peak.saturating_sub(1))
+                .is_err()
+        );
+
+        let invalid_output_limit = NativeVideoDecodeLimits::checked(
+            reviewed.maximum_input_bytes,
+            reviewed.maximum_streams,
+            reviewed.maximum_packet_iterations,
+            reviewed.maximum_receive_iterations,
+            reviewed.maximum_frames,
+            reviewed.maximum_pixels_per_frame,
+            reviewed.maximum_audio_samples,
+            reviewed.maximum_metadata_entries,
+            reviewed.maximum_metadata_key_bytes,
+            reviewed.maximum_metadata_value_bytes,
+            reviewed.maximum_metadata_bytes,
+            1,
+            reviewed.maximum_native_session_bytes,
+            reviewed.avio_buffer_bytes,
+        )?;
+        assert!(invalid_output_limit.maximum_workspace_peak_bytes().is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_decode_diagnostics_reject_out_of_range_streams() {
+        let diagnostic = NativeVideoSkippedStreamDiagnostic::checked(
+            2,
+            NativeVideoSkippedStreamKind::Audio,
+            86018,
+            NativeVideoSkippedStreamReason::UnsupportedCodec,
+        );
+        assert!(NativeVideoDecodeDiagnostics::checked(vec![diagnostic], 2).is_err());
+        let diagnostic = NativeVideoSkippedStreamDiagnostic::checked(
+            u32::MAX,
+            NativeVideoSkippedStreamKind::Audio,
+            86018,
+            NativeVideoSkippedStreamReason::UnsupportedCodec,
+        );
+        assert!(NativeVideoDecodeDiagnostics::checked(vec![diagnostic], 2).is_err());
     }
 
     #[test]

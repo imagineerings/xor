@@ -14923,6 +14923,165 @@ fn val_ownership_task555_general_video_codec_declarations_001()
 }
 
 #[test]
+fn val_ownership_task563_video_demux_decode_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    let service =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    let media = fs::read_to_string(root.join("crates/comfy_media/src/native_node_payload.rs"))?;
+
+    assert_eq!(
+        ffi.matches("fn decode_general_video_with_check(").count(),
+        1
+    );
+    let decode_start = ffi
+        .find("fn decode_general_video_with_check(")
+        .ok_or("general decode owner is absent")?;
+    let decode_end = ffi[decode_start..]
+        .find("\nfn seek_general_decode_window(")
+        .map(|offset| decode_start + offset)
+        .ok_or("general decode owner has no bounded end")?;
+    let decode = &ffi[decode_start..decode_end];
+    let mut previous = 0;
+    for operation in [
+        "open_general_bounded_input(",
+        "open_general_input(",
+        "select_general_decode_streams(",
+        "seek_general_decode_window(",
+        "read_general_decode_metadata(",
+        "run_general_decode_loop(",
+        "materialize_general_audio(",
+        "NativeVideoPayload::checked_cancellable(",
+        "NativeDecodedVideo::checked_cancellable(",
+    ] {
+        let position = decode[previous..]
+            .find(operation)
+            .map(|offset| previous + offset)
+            .ok_or("general decode owner omits an ordered admission step")?;
+        assert!(position >= previous, "general decode step order regressed");
+        previous = position;
+    }
+    for forbidden in ["std::process::Command", "File::open(", "PathBuf::from("] {
+        assert!(
+            !decode.contains(forbidden),
+            "general decode owner contains forbidden {forbidden}"
+        );
+    }
+    let audio_materializer = ffi
+        .find("fn materialize_general_audio(")
+        .ok_or("general audio materializer is absent")?;
+    assert!(ffi[audio_materializer..].contains("NativeAudioPayload::checked_cancellable("));
+
+    assert_eq!(
+        service
+            .matches("NativeLtxvCodecThreadService::start_general")
+            .count(),
+        1
+    );
+    assert_eq!(
+        service
+            .matches("let general_video_decode_service =")
+            .count(),
+        1
+    );
+    assert_eq!(
+        service
+            .matches("pub(crate) fn general_video_decode_service(&self)")
+            .count(),
+        1
+    );
+    assert_eq!(
+        service.matches(".general_video_decode_service()").count(),
+        0,
+        "Task563 decode port escaped the actor bundle before Task564"
+    );
+    let decode_service_start = service
+        .find("impl NativeGeneralVideoDecodeService")
+        .ok_or("general decode service implementation is absent")?;
+    let decode_service_end = service[decode_service_start..]
+        .find("\n}\n\nfn admit_general_video_decode_request")
+        .map(|offset| decode_service_start + offset)
+        .ok_or("general decode service implementation has no bounded end")?;
+    let decode_service = &service[decode_service_start..decode_service_end];
+    assert!(decode_service.contains("proxy.identity().configuration_sha256()"));
+    assert!(decode_service.contains("limits.configuration_values()"));
+    let worker_cache_start = service
+        .find("fn worker_service_cache_configuration_identity(")
+        .ok_or("worker service cache owner is absent")?;
+    let worker_cache_end = service[worker_cache_start..]
+        .find("\nfn worker_service_cache_configuration_identity_from_parts(")
+        .map(|offset| worker_cache_start + offset)
+        .ok_or("worker service cache owner has no bounded end")?;
+    assert!(
+        service[worker_cache_start..worker_cache_end].contains("decode.configuration_sha256()")
+    );
+    let reviewed_limits_start = service
+        .find("fn reviewed_general_video_codec_service_limits(")
+        .ok_or("reviewed general codec limits owner is absent")?;
+    let reviewed_limits_end = service[reviewed_limits_start..]
+        .find("\nfn map_worker_actor_startup_error(")
+        .map(|offset| reviewed_limits_start + offset)
+        .ok_or("reviewed general codec limits owner has no bounded end")?;
+    let reviewed_limits = &service[reviewed_limits_start..reviewed_limits_end];
+    assert!(reviewed_limits.contains("let decode = NativeVideoDecodeLimits::reviewed()"));
+    assert!(
+        reviewed_limits
+            .contains("checked_workspace_peak_bytes(REVIEWED_GENERAL_VIDEO_CODEC_SCRATCH_BYTES)")
+    );
+    for required in [
+        "validate_finite_f32_cancellable",
+        "hash_tensor_cancellable",
+        "NativeAudioPayload::checked_cancellable",
+        "NativeVideoPayload::checked_cancellable",
+        "general_video_demux_decode_cancels_chunked_media_scans_and_rejects_projection_drift",
+    ] {
+        assert!(
+            media.contains(required),
+            "canonical media owner lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy["concerns"]
+        .as_array()
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern["concern"]
+                    == "native_video_reviewed_codec_registry_ltxv_thread_general_video_demux_decode"
+            })
+        })
+        .ok_or("general demux/decode ownership concern is absent")?;
+    assert_eq!(
+        concern["canonical_owner"],
+        "comfy_runtime::native_video_codec_ffi::decode_general_video_with_check"
+    );
+    assert!(
+        concern["consolidation_tasks"]
+            .as_array()
+            .is_some_and(|tasks| tasks
+                .iter()
+                .any(|task| task == "comfy-parity-native-video-demux-decode-foundation"))
+    );
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let row = catalog
+        .lines()
+        .find(|line| {
+            line.starts_with(
+                "native_video_reviewed_codec_registry_ltxv_thread_general_video_demux_decode,",
+            )
+        })
+        .ok_or("general demux/decode ownership catalog row is absent")?;
+    assert!(row.contains("consolidation_required[known_integration_gap]"));
+    assert!(!row.contains("adapter_mapping_missing"));
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task562_video_codec_package_bootstrap_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
@@ -15226,12 +15385,7 @@ fn val_ownership_native_video_codec_symbol_binding_001() -> Result<(), Box<dyn s
             "native video codec typed binding lacks {required}"
         );
     }
-    for forbidden in [
-        "NativeCache",
-        "OutputCommitter",
-        "NativeStoredPayload",
-        "NativeVideoPayload",
-    ] {
+    for forbidden in ["NativeCache", "OutputCommitter", "NativeStoredPayload"] {
         assert!(
             !binding.contains(forbidden),
             "native video codec typed binding contains forbidden {forbidden}"

@@ -11110,14 +11110,15 @@ def provider_component_foundation_tasks(
             "crates/comfy_worker/src/comfy_worker.rs",
             "crates/comfy_worker/src/supervisor.rs",
             "crates/comfy_worker/tests/ipc_framing.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
             "crates/comfy_plugin_host/src/component_host.rs",
             "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
             "crates/comfy_plugin_host/src/private_worker.rs",
             "crates/comfy_runtime/src/runtime_supervisor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
         ],
-        "The bridge consumes only the current live controller attachment and never constructs a ProviderRuntimeStreamService. The app-side native controller allocates the WorkerProviderInvocationContext, mints and registers the one-use runtime activation grant only from the current active deployment and full sealed generation identity, and passes that exact context into the consuming component-host preflight before serializing or starting a provider-v2 guest. Only the successful private capsule retains the certified context, grant, plugin, generation, node, lease, and authorization. The bridge then sends that certified context in a distinct app-to-worker provider-v2 invocation envelope; legacy worker-to-app NativeProviderWorkerRequest::Begin bytes remain unchanged and never establish authority. The worker constructs the canonical transport validator only from that envelope and routes capacity-one typed requests back to the exact app-side capsule and ProviderRuntimeStreamService. Task421's ProviderV2InvocationProposal remains armed after a completed terminal frame. The bridge retains that exact proposal and the exact main stream handle returned by Start while its app-side ProviderRuntimeStreamService finishes that handle, verifies the resulting ProviderRuntimeReceiptV2 against the exact session-derived identity, and completes canonical all-or-none materialization; only a consuming private transition after all three checks may compare the exact proposal context, handle, receipt identity, and materialization identity and mark the proposal successfully finalized without revocation. ProviderRuntimeReceiptV2 alone never disarms because it does not carry WorkerProviderInvocationContext. An unrelated valid receipt, context/session/handle mismatch, dropped proposal, failed receipt verification, failed materialization, cancellation, worker loss, or any abnormal terminal path revokes and cannot publish. No public raw-field constructor, completion token, no-argument disarm, raw receipt escape hatch, second context selector, component-supplied authority, generic transport closure, network client, secret resolver, provider actuator, purchase, or charge path exists. IPC tests prove the desktop hermetic first valid-grant end-to-end success path while headless remains denied until comfy-parity-provider-deployment-lifecycle attaches the same controller capability; preflight precedes envelope serialization, worker instantiation, WIT context, input exposure, and the first provider-v8 request; exact proposal/context/handle/receipt/materialization binding precedes non-revoking finalization; unrelated-receipt and proposal-drop revocation, interleaved bounded sessions, strict sequence and generation checks, backpressure, cancellation between chunks, terminal revocation, late progress rejection, worker crash/restart cleanup, and clean retry cannot duplicate a request, receipt, output, or effect.",
-        ["comfy_plugin_host", "comfy_worker", "comfy_runtime"],
+        "The bridge consumes only the current live controller attachment and never constructs a ProviderRuntimeStreamService. The app-side native controller allocates the WorkerProviderInvocationContext, mints and registers the one-use runtime activation grant only from the current active deployment and full sealed generation identity, and passes that exact context into the consuming component-host preflight before serializing or starting a provider-v2 guest. Only the successful private capsule retains the certified context, grant, plugin, generation, node, lease, and authorization. The bridge then sends that certified context in a distinct app-to-worker provider-v2 invocation envelope; legacy worker-to-app NativeProviderWorkerRequest::Begin bytes remain unchanged and never establish authority. The worker constructs the canonical transport validator only from that envelope and routes capacity-one typed requests back to the exact app-side capsule and ProviderRuntimeStreamService. Task421's ProviderV2InvocationProposal remains armed after a completed terminal frame. The bridge retains that exact proposal and the exact main stream handle returned by Start while its app-side ProviderRuntimeStreamService finishes that handle, verifies the resulting ProviderRuntimeReceiptV2 against the exact session-derived identity, and completes canonical all-or-none materialization. Only then does the app send a distinct bounded app-to-worker ProviderV2ProposalFinalization control carrying the exact checked invocation context, stream handle identity, proposal generation, one-use finalization nonce, receipt identity, and materialization identity. The worker rejects wrong-direction, duplicate, stale, foreign, revoked, mismatched-generation, or post-cancellation controls, consumes the exact retained proposal once, and returns a typed success acknowledgement only after non-revoking finalization; disconnect or a missing acknowledgement revokes. Existing provider request/response variants, NativeProviderWorkerRequest::Begin, PluginResult, and all legacy postcard bytes remain frozen, and protocol tests pin the new direction, bounds, round trip, and bytes independently. ProviderRuntimeReceiptV2 alone never disarms because it does not carry WorkerProviderInvocationContext. An unrelated valid receipt, context/session/handle mismatch, dropped proposal, failed receipt verification, failed materialization, cancellation, worker loss, or any abnormal terminal path revokes and cannot publish. No public raw-field constructor, completion token, no-argument disarm, raw receipt escape hatch, second context selector, component-supplied authority, generic transport closure, network client, secret resolver, provider actuator, purchase, or charge path exists. IPC tests prove the desktop hermetic first valid-grant bridge path with a test-only scripted actuator while headless remains denied until comfy-parity-provider-deployment-lifecycle attaches the same controller capability. Production provider-v2 remains fail-closed without an actuator until comfy-parity-provider-hermetic-component-harness and its reviewed vendor leaves supply the separately owned scripted and production component behavior; this bridge neither invents nor defaults one. Preflight precedes envelope serialization, worker instantiation, WIT context, input exposure, and the first provider-v8 request; exact proposal/context/handle/receipt/materialization binding and the consuming finalization acknowledgement precede non-revoking publication; unrelated-receipt and proposal-drop revocation, interleaved bounded sessions, strict sequence and generation checks, backpressure, cancellation between chunks, terminal revocation, late progress rejection, worker crash/restart cleanup, and clean retry cannot duplicate a request, receipt, output, or effect.",
+        ["comfy_plugin_host", "comfy_worker", "comfy_runtime", "comfy_types"],
     )
     append_shared(
         "comfy-parity-provider-deployment-lifecycle",
@@ -14307,22 +14308,39 @@ def native_video_execution_precursor_tasks(
         "Implement bounded in-memory MP4/H.264 and WebM VP9 or AV1 demux and full-sequence decode through the retained codec actor. Select the first video stream and last decodable audio stream, retain typed diagnostics for skipped unsupported streams, recover exact rate, depth, alpha, metadata, rotation, and AAC samples, and reproduce the source pre-conversion pad/smear/crop behavior without paths or subprocesses.",
         [
             "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/basic_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "projects/comfy/ComfyUI/requirements.txt",
+            ".agents/specs/comfy-parity/baseline.md",
+            "crates/comfy_model/src/artifact_index.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
             "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_package.rs",
             "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
             "crates/comfy_media/src/video.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_test_support/tests/video_codec_package_bootstrap.rs",
         ],
         [
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
             "crates/comfy_runtime/src/native_video_codec_ffi.rs",
             "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
             "crates/comfy_media/src/video.rs",
+            "crates/comfy_test_support/src/bin/generate_video_general_demux_decode_fixture.rs",
             "crates/comfy_test_support/fixtures/video/general-demux-decode",
+            "crates/comfy_test_support/tests/video_general_demux_decode.rs",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
             ".agents/specs/comfy-parity/regenerate_native_planning.py",
             ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ],
-        "Golden 8/10-bit MP4, VP9-alpha WebM, AV1 WebM, AAC, rotation, odd-width, truncated, malformed, and missing-stream fixtures prove average-rate fallback, bounded packet/frame loops, source-exact padding/filter order, float-planar resampling, seek windows, and typed diagnostics. Cancellation and exhaustion at every demux, decode, filter, conversion, and resample boundary publish nothing and retry cleanly.",
+        "A deterministic offline fixture checker owns committed canonical golden 8/10-bit MP4, VP9-alpha WebM, AV1 WebM, AAC, rotation, non-32-aligned-width, height-only-nonalignment, truncated, malformed, and missing-stream inputs plus pinned generation provenance, content hashes, a source-derived manifest, and numeric oracle; the checker itself requires no host codec, compiler, subprocess, network, or credential. The fixture and owner-local differentials prove first-video and last-decodable-audio selection with typed skipped-stream diagnostics, component frame rate uses average-rate then one-fps fallback, bounded backward keyframe seek and packet/frame/flush loops, exact bit-depth and alpha detection, bounded metadata, source-exact pre-conversion pad then smear then crop only when the non-yuvj conversion width is not 32-aligned, including an even-width case while height-only nonalignment does not enter that branch, rotation after conversion, and float-planar audio resampling and trim. One new opaque actor-internal decode port is constructed by the existing NativeVideoCodecWorkerServices bundle only after the same capacity-one retained actor has loaded and admitted the general six-library binding; it is retained but is not injected into worker executors or NativeNodeServices until Task564. No second loader, binding, actor, thread, FFmpeg namespace, path, or subprocess is introduced, and the supplemental symbols remain actor-private. Decode requests carry only sealed bytes and a normalized trim window plus the existing stream/scratch authority and same CancellationToken. Immutable reviewed decode ceilings are bound into the actor service and its cache identity; no caller-selected value can amplify input, native-session, output, metadata, stream, packet, receive, frame, pixel, or audio bounds, and all maxima-plus-one fail before allocation or native calls. Checked aggregate frame, alpha, audio, metadata, and native-session ceilings are admitted before allocation and rechecked progressively. Cancellation, malformed or unsupported data, missing streams, exhaustion, actor loss, and failure at every demux, decode, filter, conversion, and resample boundary publish no component payload or partial port state, drain native packets and frames on the actor thread, and retry cleanly. The completed actor result materializes exactly one validated NativeVideoPayload::Components value through the canonical media payload owner; the canonical cancellable audio/video constructors preserve the existing semantic digest and residency projection while checking the same CancellationToken during fixed-size finite-value validation and tensor hashing, so no partially decoded tensor, borrowed native pointer, or uncancellable payload scan crosses the actor boundary. Mocked owner tests prove bounded native-call choreography on every platform, but completion additionally requires an x86_64-linux-gnu run against an actually certified FFmpeg 7.1 general-video package that decodes every committed golden clip to the pinned numeric oracle; synthetic package symbols or mock callbacks are not accepted as interoperability evidence.",
         ["26.2", "28.2", "31.5", "34.4", "36.4", "41.2", "44.1"],
         ["comfy_media", "comfy_runtime", "comfy_test_support"],
     )
@@ -14334,17 +14352,22 @@ def native_video_execution_precursor_tasks(
             "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
             "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
             "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
             "crates/comfy_media/src/native_node_payload.rs",
             "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
             "crates/comfy_runtime/src/executor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
         ],
         [
             "crates/comfy_media/src/native_node_payload.rs",
             "crates/comfy_media/src/video.rs",
             "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
             "crates/comfy_runtime/src/executor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
             "crates/comfy_test_support/fixtures/video/source-slice-materialization",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
@@ -14354,7 +14377,13 @@ def native_video_execution_precursor_tasks(
         ],
         "No path survives prompt compilation. Content replacement, probe changes, and trim changes alter semantic identity; stale references fail closed. Nested and negative slices, zero duration, strict overflow, alias residency, cancellation, cache retry, persistence, and restart recovery are deterministic. Encoded GetVideoComponents uses the canonical decoder while already materialized component VIDEO retains its existing zero-copy path.",
         ["11.4", "18.1", "28.2", "31.5", "36.4", "37.5", "41.2", "44.1"],
-        ["comfy_media", "comfy_nodes", "comfy_runtime", "comfy_test_support"],
+        [
+            "comfy_media",
+            "comfy_nodes",
+            "comfy_runtime",
+            "comfy_worker",
+            "comfy_test_support",
+        ],
     )
     append(
         "comfy-parity-native-video-save-remux-audio-effects-foundation",
@@ -20005,7 +20034,26 @@ def task_validation_commands(item: dict[str, object]) -> str:
             packages.append(str(package))
     cargo_features = {str(key): str(value) for key, value in item["cargo_features"].items()}
     locked = " --locked" if bool(item["locked"]) else ""
-    if identifier == "comfy-parity-catalog-ledgers":
+    if identifier == "comfy-parity-native-video-demux-decode-foundation":
+        commands = [
+            "cargo fmt --all -- --check",
+            "env PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py -v",
+            "cargo run --locked -p comfy_test_support --bin generate_video_general_demux_decode_fixture -- --check",
+            "cargo test --locked -p comfy_runtime --lib general_video_demux_decode",
+            "cargo test --locked -p comfy_media --lib general_video_demux_decode",
+            "cargo test --locked -p comfy_test_support --test video_general_demux_decode",
+            "env COMFY_CERTIFIED_FFMPEG_7_1_PACKAGE_ROOT=/path/to/certified-package cargo test --locked -p comfy_test_support --features hardware-certification --test video_general_demux_decode certified_ffmpeg_7_1_goldens_match -- --ignored --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task563_video_demux_decode_001 -- --exact",
+            "cargo check --locked -p comfy_runtime -p comfy_media -p comfy_test_support",
+            "cargo test --locked -p comfy_runtime --all-targets",
+            "cargo test --locked -p comfy_media --all-targets",
+            "cargo test --locked -p comfy_test_support --all-targets",
+            "./script/clippy -p comfy_runtime -p comfy_media -p comfy_test_support",
+            "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "git diff --check",
+        ]
+    elif identifier == "comfy-parity-catalog-ledgers":
         commands = ["python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice"]
     elif identifier == "comfy-parity-conditioning-contract-catalog":
         commands = [
@@ -22801,6 +22849,7 @@ def existing_task_annotations() -> dict[str, dict[str, str | bool]]:
                 )
         annotations[identifier] = {
             "complete": match.group(1).lower() == "x" and not workspace_reopened,
+            "started": match.group(1) == "~" and not workspace_reopened,
             "evidence": evidence,
         }
     return annotations
@@ -22836,7 +22885,13 @@ def write_tasks(tasks: list[dict[str, object]], criteria: dict[int, list[str]]) 
                 "without same-version ambiguity."
             )
         annotation = annotations.get(str(item["id"]), {})
-        checkbox = "x" if annotation.get("complete") is True else " "
+        checkbox = (
+            "x"
+            if annotation.get("complete") is True
+            else "~"
+            if annotation.get("started") is True
+            else " "
+        )
         requirements = sorted(set(int(value) for value in item["requirements"]))
         explicit_criterion_ids = [str(value) for value in item["criterion_ids"]]
         criterion_ids = explicit_criterion_ids or [

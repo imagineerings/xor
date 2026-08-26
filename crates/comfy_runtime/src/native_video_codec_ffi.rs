@@ -2,7 +2,13 @@ use crate::{
     CertifiedGeneralVideoCodecDependencyClosure, CertifiedVideoCodecDependencyClosure,
     VIDEO_CODEC_FFI_UNSAFE_OWNER, native_video_codec_abi as abi,
 };
-use comfy_media::{NativeVideoBitDepth, NativeVideoCrf};
+use comfy_media::{
+    NativeAudioPayload, NativeCancellableMediaPayloadError, NativeDecodedVideo,
+    NativeVideoBitDepth, NativeVideoCrf, NativeVideoDecodeDiagnostics, NativeVideoDecodeLimits,
+    NativeVideoDecodePlanError, NativeVideoDecodeWindow, NativeVideoPayload,
+    NativeVideoSkippedStreamDiagnostic, NativeVideoSkippedStreamKind,
+    NativeVideoSkippedStreamReason, checked_decode_metadata,
+};
 use comfy_tensor::{
     CpuBackend, CpuWorkspaceLease, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, ImageTensor,
     Layout, Rgb8ImageTensor, TensorDescriptor, TensorError, ViewAccess,
@@ -10,7 +16,7 @@ use comfy_tensor::{
 use comfy_types::{CancellationError, CancellationToken};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    ffi::{CString, c_void},
+    ffi::{CStr, CString, c_void},
     io::{self, Write},
     marker::PhantomData,
     path::PathBuf,
@@ -276,6 +282,48 @@ pub(crate) struct NativeVideoCodecSuite {
     vp9_decoder: NonNull<abi::AvCodec>,
     #[allow(dead_code, reason = "consumed by the bounded AV1 decode session")]
     av1_decoder: NonNull<abi::AvCodec>,
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum NativeVideoCodecDecodeError {
+    #[error("native general-video decode was cancelled")]
+    Cancelled,
+    #[error("native general-video decode is unavailable through the historical codec profile")]
+    HistoricalProfile,
+    #[error("native general-video decode received invalid resource limits")]
+    InvalidLimits,
+    #[error("native general-video decode exhausted resources during {phase}")]
+    ResourceExhausted { phase: &'static str },
+    #[error("native general-video decode allocation failed during {phase}")]
+    NativeAllocation { phase: &'static str },
+    #[error("native general-video decode failed during {phase} with status {status}")]
+    NativeCall { phase: &'static str, status: i32 },
+    #[error("native general-video input has no video stream")]
+    MissingVideoStream,
+    #[error("native general-video input has an unsupported first video stream")]
+    UnsupportedVideoStream,
+    #[error("native general-video input has no decoded video frames")]
+    MissingVideoFrame,
+    #[error("native general-video stream or frame layout is invalid")]
+    InvalidLayout,
+    #[error("native general-video metadata is invalid or exceeds its limits")]
+    InvalidMetadata,
+    #[error("native general-video packet loop exceeded its checked bound")]
+    PacketIterationLimit,
+    #[error("native general-video decoder receive loop exceeded its checked bound")]
+    ReceiveIterationLimit,
+    #[error(transparent)]
+    Io(#[from] NativeVideoCodecIoError),
+    #[error("native general-video tensor operation failed: {0}")]
+    Tensor(#[source] TensorError),
+    #[error("native general-video component admission failed: {0}")]
+    Media(#[source] comfy_media::NativeMediaPayloadError),
+}
+
+impl From<CancellationError> for NativeVideoCodecDecodeError {
+    fn from(_: CancellationError) -> Self {
+        Self::Cancelled
+    }
 }
 
 #[allow(
@@ -1325,6 +1373,29 @@ impl NativeVideoCodecSuite {
 
     pub(crate) fn runtime_versions(&self) -> NativeVideoCodecRuntimeVersions {
         self.ltxv_h264.runtime_versions()
+    }
+
+    pub(crate) fn decode_general_video(
+        &self,
+        encoded_bytes: &[u8],
+        window: NativeVideoDecodeWindow,
+        limits: NativeVideoDecodeLimits,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeDecodedVideo, NativeVideoCodecDecodeError> {
+        let NativeVideoCodecBindingOwner::General(binding) = &self.ltxv_h264.binding else {
+            return Err(NativeVideoCodecDecodeError::HistoricalProfile);
+        };
+        decode_general_video_with_check(
+            binding,
+            self,
+            encoded_bytes,
+            window,
+            limits,
+            backend,
+            context,
+            &mut || context.cancellation.check(),
+        )
     }
 
     pub(crate) fn preprocess_image(
@@ -7210,6 +7281,4880 @@ fn prove_exact_loaded_bindings(
         }
     }
     Ok(())
+}
+
+#[derive(Clone, Copy)]
+struct NativeGeneralDecodeFunctions {
+    av_packet_alloc: abi::AvPacketAlloc,
+    av_packet_free: abi::AvPacketFree,
+    av_packet_unref: abi::AvPacketUnref,
+    avcodec_alloc_context3: abi::AvcodecAllocContext3,
+    avcodec_find_decoder: abi::AvcodecFindDecoder,
+    avcodec_free_context: abi::AvcodecFreeContext,
+    avcodec_open2: abi::AvcodecOpen2,
+    avcodec_parameters_to_context: abi::AvcodecParametersToContext,
+    avcodec_receive_frame: abi::AvcodecReceiveFrame,
+    avcodec_send_packet: abi::AvcodecSendPacket,
+    av_read_frame: abi::AvReadFrame,
+    avformat_alloc_context: abi::AvformatAllocContext,
+    avformat_close_input: abi::AvformatCloseInput,
+    avformat_find_stream_info: abi::AvformatFindStreamInfo,
+    avformat_free_context: abi::AvformatFreeContext,
+    avformat_open_input: abi::AvformatOpenInput,
+    av_seek_frame: abi::AvSeekFrame,
+    av_channel_layout_copy: abi::AvChannelLayoutCopy,
+    av_channel_layout_uninit: abi::AvChannelLayoutUninit,
+    av_dict_iterate: abi::AvDictIterate,
+    av_display_rotation_get: abi::AvDisplayRotationGet,
+    av_frame_alloc: abi::AvFrameAlloc,
+    av_frame_free: abi::AvFrameFree,
+    av_frame_get_side_data: abi::AvFrameGetSideData,
+    av_frame_unref: abi::AvFrameUnref,
+    av_opt_set_int: abi::AvOptSetInt,
+    av_pixel_format_descriptor_get: abi::AvPixelFormatDescriptorGet,
+    swr_alloc: abi::SwrAlloc,
+    swr_alloc_set_opts2: abi::SwrAllocSetOpts2,
+    swr_convert: abi::SwrConvert,
+    swr_free: abi::SwrFree,
+    swr_get_delay: abi::SwrGetDelay,
+    swr_init: abi::SwrInit,
+    av_buffersink_get_frame: abi::AvBufferSinkGetFrame,
+    av_buffersrc_add_frame_flags: abi::AvBufferSourceAddFrameFlags,
+    avfilter_get_by_name: abi::AvfilterGetByName,
+    avfilter_graph_alloc: abi::AvfilterGraphAlloc,
+    avfilter_graph_config: abi::AvfilterGraphConfig,
+    avfilter_graph_create_filter: abi::AvfilterGraphCreateFilter,
+    avfilter_graph_free: abi::AvfilterGraphFree,
+    avfilter_link: abi::AvfilterLink,
+    sws_free_context: abi::SwsFreeContext,
+    sws_get_context: abi::SwsGetContext,
+    sws_scale: abi::SwsScale,
+}
+
+impl NativeGeneralDecodeFunctions {
+    fn from_binding(binding: &NativeGeneralVideoCodecBinding) -> Self {
+        let historical = &binding.historical_symbols;
+        let supplemental = &binding.supplemental_symbols;
+        Self {
+            av_packet_alloc: historical.avcodec.av_packet_alloc,
+            av_packet_free: historical.avcodec.av_packet_free,
+            av_packet_unref: historical.avcodec.av_packet_unref,
+            avcodec_alloc_context3: historical.avcodec.avcodec_alloc_context3,
+            avcodec_find_decoder: historical.avcodec.avcodec_find_decoder,
+            avcodec_free_context: historical.avcodec.avcodec_free_context,
+            avcodec_open2: historical.avcodec.avcodec_open2,
+            avcodec_parameters_to_context: historical.avcodec.avcodec_parameters_to_context,
+            avcodec_receive_frame: historical.avcodec.avcodec_receive_frame,
+            avcodec_send_packet: historical.avcodec.avcodec_send_packet,
+            av_read_frame: historical.avformat.av_read_frame,
+            avformat_alloc_context: historical.avformat.avformat_alloc_context,
+            avformat_close_input: historical.avformat.avformat_close_input,
+            avformat_find_stream_info: historical.avformat.avformat_find_stream_info,
+            avformat_free_context: historical.avformat.avformat_free_context,
+            avformat_open_input: historical.avformat.avformat_open_input,
+            av_seek_frame: supplemental.av_seek_frame,
+            av_channel_layout_copy: supplemental.av_channel_layout_copy,
+            av_channel_layout_uninit: historical.avutil.av_channel_layout_uninit,
+            av_dict_iterate: supplemental.av_dict_iterate,
+            av_display_rotation_get: supplemental.av_display_rotation_get,
+            av_frame_alloc: historical.avutil.av_frame_alloc,
+            av_frame_free: historical.avutil.av_frame_free,
+            av_frame_get_side_data: supplemental.av_frame_get_side_data,
+            av_frame_unref: supplemental.av_frame_unref,
+            av_opt_set_int: historical.avutil.av_opt_set_int,
+            av_pixel_format_descriptor_get: supplemental.av_pixel_format_descriptor_get,
+            swr_alloc: historical.swresample.swr_alloc,
+            swr_alloc_set_opts2: historical.swresample.swr_alloc_set_opts2,
+            swr_convert: historical.swresample.swr_convert,
+            swr_free: historical.swresample.swr_free,
+            swr_init: historical.swresample.swr_init,
+            swr_get_delay: supplemental.swr_get_delay,
+            av_buffersink_get_frame: supplemental.av_buffersink_get_frame,
+            av_buffersrc_add_frame_flags: supplemental.av_buffersrc_add_frame_flags,
+            avfilter_get_by_name: supplemental.avfilter_get_by_name,
+            avfilter_graph_alloc: supplemental.avfilter_graph_alloc,
+            avfilter_graph_config: supplemental.avfilter_graph_config,
+            avfilter_graph_create_filter: supplemental.avfilter_graph_create_filter,
+            avfilter_graph_free: supplemental.avfilter_graph_free,
+            avfilter_link: supplemental.avfilter_link,
+            sws_free_context: historical.swscale.sws_free_context,
+            sws_get_context: historical.swscale.sws_get_context,
+            sws_scale: historical.swscale.sws_scale,
+        }
+    }
+}
+
+enum NativeGeneralDecoderAuthority<'binding> {
+    Certified(&'binding LoadedVideoCodecLibraries),
+    #[cfg(test)]
+    Exact(&'binding [NonNull<abi::AvCodec>]),
+}
+
+impl NativeGeneralDecoderAuthority<'_> {
+    fn proves(&self, decoder: NonNull<abi::AvCodec>) -> bool {
+        match self {
+            Self::Certified(loaded) => prove_codec_descriptor_provider(loaded, decoder).is_ok(),
+            #[cfg(test)]
+            Self::Exact(decoders) => decoders.contains(&decoder),
+        }
+    }
+}
+
+struct NativeGeneralDecodeDependencies<'binding> {
+    functions: NativeGeneralDecodeFunctions,
+    avio_functions: NativeVideoCodecAvioFunctions,
+    h264_decoder: NonNull<abi::AvCodec>,
+    vp9_decoder: NonNull<abi::AvCodec>,
+    av1_decoder: NonNull<abi::AvCodec>,
+    decoder_authority: NativeGeneralDecoderAuthority<'binding>,
+}
+
+impl<'binding> NativeGeneralDecodeDependencies<'binding> {
+    fn from_binding(
+        binding: &'binding NativeGeneralVideoCodecBinding,
+        suite: &NativeVideoCodecSuite,
+    ) -> Self {
+        Self {
+            functions: NativeGeneralDecodeFunctions::from_binding(binding),
+            avio_functions: NativeVideoCodecAvioFunctions::from_symbols(
+                &binding.historical_symbols,
+            ),
+            h264_decoder: suite.ltxv_h264.decoder,
+            vp9_decoder: suite.vp9_decoder,
+            av1_decoder: suite.av1_decoder,
+            decoder_authority: NativeGeneralDecoderAuthority::Certified(&binding.load.loaded),
+        }
+    }
+}
+
+enum NativeGeneralFormatCleanup {
+    Allocated(abi::AvformatFreeContext),
+    Opened(abi::AvformatCloseInput),
+}
+
+struct NativeGeneralFormatContext {
+    pointer: Option<NonNull<abi::AvFormatContext>>,
+    cleanup: NativeGeneralFormatCleanup,
+}
+
+impl NativeGeneralFormatContext {
+    fn pointer(&self) -> Result<NonNull<abi::AvFormatContext>, NativeVideoCodecDecodeError> {
+        self.pointer
+            .ok_or(NativeVideoCodecDecodeError::NativeAllocation {
+                phase: "retain input format context",
+            })
+    }
+}
+
+impl Drop for NativeGeneralFormatContext {
+    fn drop(&mut self) {
+        let Some(pointer) = self.pointer.take() else {
+            return;
+        };
+        unsafe {
+            match self.cleanup {
+                NativeGeneralFormatCleanup::Allocated(free) => free(pointer.as_ptr()),
+                NativeGeneralFormatCleanup::Opened(close) => {
+                    let mut pointer = pointer.as_ptr();
+                    close(std::ptr::addr_of_mut!(pointer));
+                }
+            }
+        }
+    }
+}
+
+struct NativeGeneralSwrContext {
+    pointer: Option<NonNull<abi::SwrContext>>,
+    free: abi::SwrFree,
+    output_layout: abi::AvChannelLayout,
+    uninit_layout: abi::AvChannelLayoutUninit,
+    channels: usize,
+    sample_rate: u32,
+    input_identity: NativeGeneralAudioInputIdentity,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct NativeGeneralAudioInputIdentity {
+    sample_format: i32,
+    sample_rate: u32,
+    channels: usize,
+    channel_mask: u64,
+}
+
+impl NativeGeneralSwrContext {
+    fn pointer(&self) -> Result<NonNull<abi::SwrContext>, NativeVideoCodecDecodeError> {
+        self.pointer
+            .ok_or(NativeVideoCodecDecodeError::NativeAllocation {
+                phase: "retain decoded audio resampler",
+            })
+    }
+}
+
+struct NativeGeneralChannelLayout {
+    value: Option<abi::AvChannelLayout>,
+    uninit: abi::AvChannelLayoutUninit,
+}
+
+impl NativeGeneralChannelLayout {
+    fn take(&mut self) -> Result<abi::AvChannelLayout, NativeVideoCodecDecodeError> {
+        self.value
+            .take()
+            .ok_or(NativeVideoCodecDecodeError::InvalidLayout)
+    }
+}
+
+impl Drop for NativeGeneralChannelLayout {
+    fn drop(&mut self) {
+        if let Some(mut value) = self.value.take() {
+            unsafe { (self.uninit)(std::ptr::addr_of_mut!(value)) };
+        }
+    }
+}
+
+struct NativeGeneralFilterGraph {
+    pointer: NonNull<abi::AvFilterGraph>,
+    source: NonNull<abi::AvFilterContext>,
+    sink: NonNull<abi::AvFilterContext>,
+    free: abi::AvfilterGraphFree,
+    source_width: i32,
+    source_height: i32,
+    source_format: i32,
+    time_base: abi::AvRational,
+}
+
+impl Drop for NativeGeneralFilterGraph {
+    fn drop(&mut self) {
+        unsafe {
+            let mut pointer = self.pointer.as_ptr();
+            (self.free)(std::ptr::addr_of_mut!(pointer));
+        }
+    }
+}
+
+impl Drop for NativeGeneralSwrContext {
+    fn drop(&mut self) {
+        unsafe {
+            if let Some(pointer) = self.pointer.take() {
+                let mut pointer = pointer.as_ptr();
+                (self.free)(std::ptr::addr_of_mut!(pointer));
+            }
+            (self.uninit_layout)(std::ptr::addr_of_mut!(self.output_layout));
+        }
+    }
+}
+
+struct NativeGeneralDecodeStreams {
+    video_index: i32,
+    video_stream: NonNull<abi::AvStream>,
+    video_decoder: NonNull<abi::AvCodec>,
+    video_bit_depth: NativeVideoBitDepth,
+    audio: Option<NativeGeneralAudioStream>,
+    diagnostics: NativeVideoDecodeDiagnostics,
+}
+
+#[derive(Clone, Copy)]
+struct NativeGeneralAudioStream {
+    index: i32,
+    stream: NonNull<abi::AvStream>,
+    decoder: NonNull<abi::AvCodec>,
+    input_identity: NativeGeneralAudioInputIdentity,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NativeGeneralVideoContainer {
+    Mp4,
+    Webm,
+}
+
+struct NativeGeneralDecodedStaging {
+    frames: CpuWorkspaceVec<f32>,
+    alpha: CpuWorkspaceVec<f32>,
+    audio: CpuWorkspaceVec<f32>,
+    frame_count: usize,
+    width: usize,
+    height: usize,
+    bit_depth: NativeVideoBitDepth,
+    has_alpha: Option<bool>,
+    direct_u8: Option<bool>,
+    audio_channels: usize,
+    audio_sample_rate: u32,
+}
+
+fn open_general_bounded_input<'dependencies, 'bytes>(
+    dependencies: &'dependencies NativeGeneralDecodeDependencies<'_>,
+    bytes: &'bytes [u8],
+    limits: NativeVideoDecodeLimits,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<NativeVideoCodecMemoryInput<'dependencies, 'bytes>, NativeVideoCodecDecodeError> {
+    if bytes.is_empty() {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    if bytes.len() > limits.maximum_input_bytes() {
+        return Err(NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "admit encoded input",
+        });
+    }
+    let state = NativeVideoCodecInputState {
+        bytes: NonNull::new(bytes.as_ptr().cast_mut())
+            .ok_or(NativeVideoCodecDecodeError::InvalidLimits)?,
+        byte_length: bytes.len(),
+        position: 0,
+        maximum_position: limits.maximum_input_bytes(),
+        cancellation: context.cancellation.clone(),
+        failure: None,
+        #[cfg(test)]
+        panic_on_next_callback: false,
+    };
+    let avio = allocate_native_video_codec_avio(
+        dependencies,
+        state,
+        dependencies.avio_functions,
+        limits.avio_buffer_bytes(),
+        false,
+        Some(native_video_codec_input_read),
+        None,
+        Some(native_video_codec_input_seek),
+        backend,
+        context,
+        &mut || context.cancellation.check(),
+    )
+    .map_err(map_general_decode_io_error)?;
+    Ok(NativeVideoCodecMemoryInput {
+        avio,
+        _owner: NativeVideoCodecInputOwner::Borrowed(bytes),
+    })
+}
+
+fn map_general_decode_tensor_error(error: TensorError) -> NativeVideoCodecDecodeError {
+    match error {
+        TensorError::Cancelled => NativeVideoCodecDecodeError::Cancelled,
+        TensorError::AllocationFailed { .. }
+        | TensorError::WorkspaceAuthorizationExceeded { .. }
+        | TensorError::ResourceLimitExceeded { .. }
+        | TensorError::ShapeOverflow
+        | TensorError::StorageLength { .. } => NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "authorize decoded video memory",
+        },
+        error => NativeVideoCodecDecodeError::Tensor(error),
+    }
+}
+
+fn map_general_decode_io_error(error: NativeVideoCodecIoError) -> NativeVideoCodecDecodeError {
+    match error {
+        NativeVideoCodecIoError::Cancelled => NativeVideoCodecDecodeError::Cancelled,
+        NativeVideoCodecIoError::Tensor(error) => map_general_decode_tensor_error(error),
+        NativeVideoCodecIoError::NativeAllocationFailed
+        | NativeVideoCodecIoError::OutputLimitExceeded
+        | NativeVideoCodecIoError::CallbackResourceExhausted => {
+            NativeVideoCodecDecodeError::ResourceExhausted {
+                phase: "authorize encoded input I/O",
+            }
+        }
+        error => NativeVideoCodecDecodeError::Io(error),
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct NativeGeneralInputOpenLimits {
+    probe_bytes: i64,
+    analysis_duration_microseconds: i64,
+    maximum_streams: i64,
+}
+
+fn checked_general_input_open_limits(
+    limits: NativeVideoDecodeLimits,
+) -> Result<NativeGeneralInputOpenLimits, NativeVideoCodecDecodeError> {
+    let probe_bytes = u64::try_from(limits.maximum_input_bytes())
+        .map_err(|_| NativeVideoCodecDecodeError::InvalidLimits)?
+        .min(limits.maximum_native_session_bytes());
+    Ok(NativeGeneralInputOpenLimits {
+        probe_bytes: i64::try_from(probe_bytes)
+            .map_err(|_| NativeVideoCodecDecodeError::InvalidLimits)?,
+        analysis_duration_microseconds: 10_000_000,
+        maximum_streams: i64::try_from(limits.maximum_streams())
+            .map_err(|_| NativeVideoCodecDecodeError::InvalidLimits)?,
+    })
+}
+
+fn open_general_input(
+    functions: &NativeGeneralDecodeFunctions,
+    input: &NativeVideoCodecMemoryInput<'_, '_>,
+    limits: NativeVideoDecodeLimits,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<NativeGeneralFormatContext, NativeVideoCodecDecodeError> {
+    let input_limits = checked_general_input_open_limits(limits)?;
+    check_cancellation()?;
+    let pointer = unsafe { (functions.avformat_alloc_context)() };
+    let pointer = NonNull::new(pointer).ok_or(NativeVideoCodecDecodeError::NativeAllocation {
+        phase: "allocate input format context",
+    })?;
+    let mut format = NativeGeneralFormatContext {
+        pointer: Some(pointer),
+        cleanup: NativeGeneralFormatCleanup::Allocated(functions.avformat_free_context),
+    };
+    let mut opened = format.pointer()?;
+    unsafe {
+        opened.as_mut().io_context = input.context_ptr();
+        opened.as_mut().context_flags |= abi::AV_FORMAT_FLAG_CUSTOM_IO;
+    }
+    check_cancellation()?;
+    check_general_native_status("bound input probe bytes", unsafe {
+        (functions.av_opt_set_int)(
+            opened.as_ptr().cast(),
+            c"probesize".as_ptr(),
+            input_limits.probe_bytes,
+            0,
+        )
+    })?;
+    check_cancellation()?;
+    check_general_native_status("bound input analysis duration", unsafe {
+        (functions.av_opt_set_int)(
+            opened.as_ptr().cast(),
+            c"analyzeduration".as_ptr(),
+            input_limits.analysis_duration_microseconds,
+            0,
+        )
+    })?;
+    check_cancellation()?;
+    check_general_native_status("bound input stream count", unsafe {
+        (functions.av_opt_set_int)(
+            opened.as_ptr().cast(),
+            c"max_streams".as_ptr(),
+            input_limits.maximum_streams,
+            0,
+        )
+    })?;
+    check_cancellation()?;
+    let mut opened = opened.as_ptr();
+    check_cancellation()?;
+    let status = unsafe {
+        (functions.avformat_open_input)(
+            std::ptr::addr_of_mut!(opened),
+            std::ptr::null(),
+            std::ptr::null(),
+            std::ptr::null_mut(),
+        )
+    };
+    format.pointer = NonNull::new(opened);
+    if status >= 0 && format.pointer.is_some() {
+        format.cleanup = NativeGeneralFormatCleanup::Opened(functions.avformat_close_input);
+    }
+    let post_open = check_cancellation();
+    let callback_status = input
+        .check_callback_status()
+        .map_err(map_general_decode_io_error);
+    if format.pointer.is_none() {
+        post_open?;
+        callback_status?;
+        return Err(map_general_native_status("open input", status));
+    }
+    post_open?;
+    callback_status?;
+    if status < 0 {
+        return Err(map_general_native_status("open input", status));
+    }
+    let opened = format.pointer()?;
+    if unsafe { opened.as_ref().io_context } != input.context_ptr() {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let status =
+        unsafe { (functions.avformat_find_stream_info)(opened.as_ptr(), std::ptr::null_mut()) };
+    let post_info = check_cancellation();
+    input
+        .check_callback_status()
+        .map_err(map_general_decode_io_error)?;
+    post_info?;
+    if status < 0 {
+        return Err(map_general_native_status("read stream information", status));
+    }
+    Ok(format)
+}
+
+fn map_general_native_status(phase: &'static str, status: i32) -> NativeVideoCodecDecodeError {
+    if status == abi::AV_ERROR_OUT_OF_MEMORY {
+        NativeVideoCodecDecodeError::ResourceExhausted { phase }
+    } else {
+        NativeVideoCodecDecodeError::NativeCall { phase, status }
+    }
+}
+
+fn general_streams(
+    format: &NativeGeneralFormatContext,
+    maximum_streams: usize,
+) -> Result<&[*mut abi::AvStream], NativeVideoCodecDecodeError> {
+    let pointer = format.pointer()?;
+    let stream_count = usize::try_from(unsafe { pointer.as_ref().stream_count })
+        .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+    if stream_count > maximum_streams {
+        return Err(NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "admit container stream table",
+        });
+    }
+    if stream_count == 0 {
+        return Ok(&[]);
+    }
+    let streams = unsafe { pointer.as_ref().streams };
+    if streams.is_null() {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    Ok(unsafe { std::slice::from_raw_parts(streams, stream_count) })
+}
+
+unsafe fn stream_parameters(
+    _format: &NativeGeneralFormatContext,
+    stream: NonNull<abi::AvStream>,
+) -> Result<&abi::AvCodecParametersGeneralProjection, NativeVideoCodecDecodeError> {
+    let parameters = unsafe { stream.as_ref().codec_parameters };
+    let parameters = NonNull::new(parameters)
+        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?
+        .cast::<abi::AvCodecParametersGeneralProjection>();
+    Ok(unsafe { parameters.as_ref() })
+}
+
+fn select_general_decode_streams(
+    dependencies: &NativeGeneralDecodeDependencies<'_>,
+    format: &NativeGeneralFormatContext,
+    limits: NativeVideoDecodeLimits,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<NativeGeneralDecodeStreams, NativeVideoCodecDecodeError> {
+    let functions = &dependencies.functions;
+    let container = general_input_container(format.pointer()?)?;
+    let streams = general_streams(format, limits.maximum_streams())?;
+    let mut first_video = None;
+    let mut audio_candidates = Vec::new();
+    audio_candidates
+        .try_reserve_exact(streams.len())
+        .map_err(|_| NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "record audio stream diagnostics",
+        })?;
+    for (index, pointer) in streams.iter().copied().enumerate() {
+        check_cancellation()?;
+        let stream = NonNull::new(pointer).ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+        let parameters = unsafe { stream_parameters(format, stream)? };
+        match parameters.codec_type {
+            abi::AV_MEDIA_TYPE_VIDEO if first_video.is_none() => {
+                first_video = Some((index, stream, parameters.codec_id, parameters.format));
+            }
+            abi::AV_MEDIA_TYPE_AUDIO => audio_candidates.push((
+                index,
+                stream,
+                parameters.codec_id,
+                checked_general_audio_input_identity(
+                    parameters.format,
+                    parameters.sample_rate,
+                    &parameters.channel_layout,
+                )
+                .ok(),
+            )),
+            _ => {}
+        }
+    }
+    let (video_index, video_stream, video_codec_id, video_format) =
+        first_video.ok_or(NativeVideoCodecDecodeError::MissingVideoStream)?;
+    let video_decoder = match video_codec_id {
+        abi::AV_CODEC_ID_H264 if container == NativeGeneralVideoContainer::Mp4 => {
+            dependencies.h264_decoder
+        }
+        abi::AV_CODEC_ID_VP9 if container == NativeGeneralVideoContainer::Webm => {
+            dependencies.vp9_decoder
+        }
+        abi::AV_CODEC_ID_AV1 if container == NativeGeneralVideoContainer::Webm => {
+            dependencies.av1_decoder
+        }
+        _ => return Err(NativeVideoCodecDecodeError::UnsupportedVideoStream),
+    };
+    let mut selected_audio = None;
+    let mut skipped = Vec::new();
+    skipped
+        .try_reserve_exact(audio_candidates.len())
+        .map_err(|_| NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "record skipped audio streams",
+        })?;
+    for (index, stream, codec_id, input_identity) in audio_candidates.into_iter().rev() {
+        check_cancellation()?;
+        let decoder = unsafe { (functions.avcodec_find_decoder)(codec_id) };
+        let decoder = NonNull::new(decoder.cast_mut());
+        let provider_matches =
+            decoder.is_some_and(|decoder| dependencies.decoder_authority.proves(decoder));
+        if selected_audio.is_none() && provider_matches && input_identity.is_some() {
+            let index =
+                i32::try_from(index).map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+            selected_audio = decoder
+                .zip(input_identity)
+                .map(|(decoder, input_identity)| NativeGeneralAudioStream {
+                    index,
+                    stream,
+                    decoder,
+                    input_identity,
+                });
+        } else if !provider_matches || input_identity.is_none() {
+            let reason = if decoder.is_some() {
+                NativeVideoSkippedStreamReason::UnsupportedCodec
+            } else {
+                NativeVideoSkippedStreamReason::MissingDecoder
+            };
+            skipped.push(NativeVideoSkippedStreamDiagnostic::checked(
+                u32::try_from(index).map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+                NativeVideoSkippedStreamKind::Audio,
+                codec_id,
+                reason,
+            ));
+        }
+    }
+    skipped.sort_by_key(NativeVideoSkippedStreamDiagnostic::stream_index);
+    let diagnostics = NativeVideoDecodeDiagnostics::checked(skipped, limits.maximum_streams())
+        .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+    let video_bit_depth = general_stream_bit_depth(video_format, functions, check_cancellation)?;
+    Ok(NativeGeneralDecodeStreams {
+        video_index: i32::try_from(video_index)
+            .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+        video_stream,
+        video_decoder,
+        video_bit_depth,
+        audio: selected_audio,
+        diagnostics,
+    })
+}
+
+fn general_input_container(
+    format: NonNull<abi::AvFormatContext>,
+) -> Result<NativeGeneralVideoContainer, NativeVideoCodecDecodeError> {
+    let input_format = NonNull::new(unsafe { format.as_ref().input_format.cast_mut() })
+        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?
+        .cast::<abi::AvInputFormatNameProjection>();
+    let name = unsafe { input_format.as_ref().name };
+    if name.is_null() {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let name = unsafe { CStr::from_ptr(name) }.to_bytes();
+    if name.len() > 64 {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    general_video_container_from_demuxer_name(name)
+}
+
+fn general_video_container_from_demuxer_name(
+    name: &[u8],
+) -> Result<NativeGeneralVideoContainer, NativeVideoCodecDecodeError> {
+    match name {
+        b"mov,mp4,m4a,3gp,3g2,mj2" => Ok(NativeGeneralVideoContainer::Mp4),
+        b"matroska,webm" => Ok(NativeGeneralVideoContainer::Webm),
+        _ => Err(NativeVideoCodecDecodeError::UnsupportedVideoStream),
+    }
+}
+
+fn general_stream_bit_depth(
+    pixel_format: i32,
+    functions: &NativeGeneralDecodeFunctions,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<NativeVideoBitDepth, NativeVideoCodecDecodeError> {
+    if pixel_format < 0 {
+        return Ok(NativeVideoBitDepth::Eight);
+    }
+    check_cancellation()?;
+    let descriptor = NonNull::new(unsafe {
+        (functions.av_pixel_format_descriptor_get)(pixel_format).cast_mut()
+    });
+    check_cancellation()?;
+    let Some(descriptor) = descriptor else {
+        return Ok(NativeVideoBitDepth::Eight);
+    };
+    let descriptor = unsafe { descriptor.as_ref() };
+    let component_count = usize::from(descriptor.component_count);
+    if component_count == 0 {
+        return Ok(NativeVideoBitDepth::Eight);
+    }
+    if component_count > descriptor.components.len() {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    match descriptor.components[..component_count]
+        .iter()
+        .map(|component| component.depth)
+        .max()
+    {
+        Some(8) => Ok(NativeVideoBitDepth::Eight),
+        Some(10) => Ok(NativeVideoBitDepth::Ten),
+        _ => Err(NativeVideoCodecDecodeError::InvalidLayout),
+    }
+}
+
+fn read_general_decode_metadata(
+    format: NonNull<abi::AvFormatContext>,
+    limits: NativeVideoDecodeLimits,
+    functions: &NativeGeneralDecodeFunctions,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<BTreeMap<String, String>, NativeVideoCodecDecodeError> {
+    let projection = format.cast::<abi::AvFormatContextGeneralProjection>();
+    let dictionary = unsafe { projection.as_ref().metadata };
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(limits.maximum_metadata_entries())
+        .map_err(|_| NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "reserve container metadata",
+        })?;
+    let mut previous = std::ptr::null();
+    let mut aggregate_bytes = 0_usize;
+    loop {
+        check_cancellation()?;
+        let entry = unsafe { (functions.av_dict_iterate)(dictionary, previous) };
+        let Some(entry) = NonNull::new(entry.cast_mut()) else {
+            break;
+        };
+        if entries.len() == limits.maximum_metadata_entries() {
+            return Err(NativeVideoCodecDecodeError::InvalidMetadata);
+        }
+        let entry = unsafe { entry.as_ref() };
+        if entry.key.is_null() || entry.value.is_null() {
+            return Err(NativeVideoCodecDecodeError::InvalidMetadata);
+        }
+        let key = unsafe { CStr::from_ptr(entry.key) };
+        let value = unsafe { CStr::from_ptr(entry.value) };
+        if key.to_bytes().len() > limits.maximum_metadata_key_bytes()
+            || value.to_bytes().len() > limits.maximum_metadata_value_bytes()
+        {
+            return Err(NativeVideoCodecDecodeError::InvalidMetadata);
+        }
+        aggregate_bytes = aggregate_bytes
+            .checked_add(key.to_bytes().len())
+            .and_then(|bytes| bytes.checked_add(value.to_bytes().len()))
+            .filter(|bytes| *bytes <= limits.maximum_metadata_bytes())
+            .ok_or(NativeVideoCodecDecodeError::ResourceExhausted {
+                phase: "capture container metadata",
+            })?;
+        let key = key
+            .to_str()
+            .map_err(|_| NativeVideoCodecDecodeError::InvalidMetadata)?;
+        let value = value
+            .to_str()
+            .map_err(|_| NativeVideoCodecDecodeError::InvalidMetadata)?;
+        if key.is_empty()
+            || key.chars().any(char::is_control)
+            || value.chars().any(char::is_control)
+        {
+            return Err(NativeVideoCodecDecodeError::InvalidMetadata);
+        }
+        let mut key_owned = String::new();
+        key_owned.try_reserve_exact(key.len()).map_err(|_| {
+            NativeVideoCodecDecodeError::ResourceExhausted {
+                phase: "capture container metadata key",
+            }
+        })?;
+        key_owned.push_str(key);
+        let mut value_owned = String::new();
+        value_owned.try_reserve_exact(value.len()).map_err(|_| {
+            NativeVideoCodecDecodeError::ResourceExhausted {
+                phase: "capture container metadata value",
+            }
+        })?;
+        value_owned.push_str(value);
+        entries.push((key_owned, value_owned));
+        previous = entry;
+    }
+    checked_decode_metadata(entries, limits).map_err(|error| match error {
+        NativeVideoDecodePlanError::LimitExceeded => {
+            NativeVideoCodecDecodeError::ResourceExhausted {
+                phase: "capture container metadata",
+            }
+        }
+        _ => NativeVideoCodecDecodeError::InvalidMetadata,
+    })
+}
+
+fn general_component_frame_rate(
+    stream: NonNull<abi::AvStream>,
+) -> Result<(u64, u64), NativeVideoCodecDecodeError> {
+    let projection = stream.cast::<abi::AvStreamGeneralProjection>();
+    let rate = unsafe { projection.as_ref().average_frame_rate };
+    if rate.numerator <= 0 || rate.denominator <= 0 {
+        return Ok((1, 1));
+    }
+    reduce_positive_rational(rate.numerator, rate.denominator)
+}
+
+fn reduce_positive_rational(
+    numerator: i32,
+    denominator: i32,
+) -> Result<(u64, u64), NativeVideoCodecDecodeError> {
+    let mut numerator =
+        u64::try_from(numerator).map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+    let mut denominator =
+        u64::try_from(denominator).map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+    if numerator == 0 || denominator == 0 {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let mut left = numerator;
+    let mut right = denominator;
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    numerator /= left;
+    denominator /= left;
+    Ok((numerator, denominator))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn decode_general_video_with_check(
+    binding: &NativeGeneralVideoCodecBinding,
+    suite: &NativeVideoCodecSuite,
+    encoded_bytes: &[u8],
+    window: NativeVideoDecodeWindow,
+    limits: NativeVideoDecodeLimits,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<NativeDecodedVideo, NativeVideoCodecDecodeError> {
+    let dependencies = NativeGeneralDecodeDependencies::from_binding(binding, suite);
+    decode_general_video_with_dependencies(
+        &dependencies,
+        encoded_bytes,
+        window,
+        limits,
+        backend,
+        context,
+        check_cancellation,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn decode_general_video_with_dependencies(
+    dependencies: &NativeGeneralDecodeDependencies<'_>,
+    encoded_bytes: &[u8],
+    window: NativeVideoDecodeWindow,
+    limits: NativeVideoDecodeLimits,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<NativeDecodedVideo, NativeVideoCodecDecodeError> {
+    check_cancellation()?;
+    if encoded_bytes.is_empty() {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    if encoded_bytes.len() > limits.maximum_input_bytes() {
+        return Err(NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "admit encoded input",
+        });
+    }
+    let maximum_pixels = usize::try_from(limits.maximum_pixels_per_frame())
+        .map_err(|_| NativeVideoCodecDecodeError::InvalidLimits)?;
+    let maximum_frame_values = limits
+        .maximum_frames()
+        .checked_mul(maximum_pixels)
+        .and_then(|value| value.checked_mul(3))
+        .ok_or(NativeVideoCodecDecodeError::InvalidLimits)?;
+    let maximum_alpha_values = limits
+        .maximum_frames()
+        .checked_mul(maximum_pixels)
+        .ok_or(NativeVideoCodecDecodeError::InvalidLimits)?;
+    let authorized_output_bytes = maximum_frame_values
+        .checked_add(maximum_alpha_values)
+        .and_then(|value| value.checked_add(limits.maximum_audio_samples()))
+        .and_then(|value| value.checked_mul(std::mem::size_of::<f32>()))
+        .filter(|value| *value <= limits.maximum_output_bytes())
+        .ok_or(NativeVideoCodecDecodeError::InvalidLimits)?;
+    if authorized_output_bytes == 0 {
+        return Err(NativeVideoCodecDecodeError::InvalidLimits);
+    }
+    let _native_session = backend
+        .reserve_workspace(context, limits.maximum_native_session_bytes())
+        .map_err(map_general_decode_tensor_error)?;
+    let mut staging = NativeGeneralDecodedStaging {
+        frames: backend
+            .workspace_vec(context, maximum_frame_values)
+            .map_err(map_general_decode_tensor_error)?,
+        alpha: backend
+            .workspace_vec(context, maximum_alpha_values)
+            .map_err(map_general_decode_tensor_error)?,
+        audio: backend
+            .workspace_vec(context, limits.maximum_audio_samples())
+            .map_err(map_general_decode_tensor_error)?,
+        frame_count: 0,
+        width: 0,
+        height: 0,
+        bit_depth: NativeVideoBitDepth::Eight,
+        has_alpha: None,
+        direct_u8: None,
+        audio_channels: 0,
+        audio_sample_rate: 0,
+    };
+    let functions = &dependencies.functions;
+    let input = open_general_bounded_input(dependencies, encoded_bytes, limits, backend, context)?;
+    let format = open_general_input(functions, &input, limits, check_cancellation)?;
+    let streams = select_general_decode_streams(dependencies, &format, limits, check_cancellation)?;
+    staging.bit_depth = streams.video_bit_depth;
+    let format_pointer = format.pointer()?;
+    seek_general_decode_window(
+        format_pointer,
+        streams.video_stream,
+        streams.video_index,
+        window,
+        functions,
+        check_cancellation,
+    )?;
+    let metadata =
+        read_general_decode_metadata(format_pointer, limits, functions, check_cancellation)?;
+    run_general_decode_loop(
+        format_pointer,
+        &input,
+        &streams,
+        window,
+        limits,
+        functions,
+        backend,
+        context,
+        &mut staging,
+        check_cancellation,
+    )?;
+    if staging.frame_count == 0 {
+        return Err(NativeVideoCodecDecodeError::MissingVideoFrame);
+    }
+    check_cancellation()?;
+    let frame_rate = general_component_frame_rate(streams.video_stream)?;
+    let descriptor = TensorDescriptor::contiguous(
+        vec![
+            u64::try_from(staging.frame_count)
+                .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+            u64::try_from(staging.height)
+                .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+            u64::try_from(staging.width).map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+            3,
+        ],
+        DType::F32,
+        DeviceId::CPU,
+        context.stream,
+    )
+    .map_err(map_general_decode_tensor_error)?;
+    let (frames, _) = backend
+        .upload_f32(descriptor, &staging.frames, context)
+        .map_err(map_general_decode_tensor_error)?;
+    let alpha = if staging.has_alpha == Some(true) {
+        let descriptor = TensorDescriptor::contiguous(
+            vec![
+                u64::try_from(staging.frame_count)
+                    .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+                u64::try_from(staging.height)
+                    .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+                u64::try_from(staging.width)
+                    .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+                1,
+            ],
+            DType::F32,
+            DeviceId::CPU,
+            context.stream,
+        )
+        .map_err(map_general_decode_tensor_error)?;
+        Some(
+            backend
+                .upload_f32(descriptor, &staging.alpha, context)
+                .map_err(map_general_decode_tensor_error)?
+                .0,
+        )
+    } else {
+        None
+    };
+    let audio = materialize_general_audio(&mut staging, backend, context)?;
+    let video = NativeVideoPayload::checked_cancellable(
+        frames,
+        frame_rate.0,
+        frame_rate.1,
+        staging.bit_depth,
+        audio,
+        alpha,
+        metadata,
+        context.cancellation,
+    )
+    .map_err(map_cancellable_media_payload_error)?;
+    NativeDecodedVideo::checked_cancellable(video, streams.diagnostics, context.cancellation)
+        .map_err(map_cancellable_media_payload_error)
+}
+
+fn seek_general_decode_window(
+    format: NonNull<abi::AvFormatContext>,
+    video_stream: NonNull<abi::AvStream>,
+    video_stream_index: i32,
+    window: NativeVideoDecodeWindow,
+    functions: &NativeGeneralDecodeFunctions,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<(), NativeVideoCodecDecodeError> {
+    if window.start_seconds() == 0.0 {
+        return Ok(());
+    }
+    let time_base = unsafe { video_stream.as_ref().time_base };
+    let timestamp = seconds_to_stream_timestamp(window.start_seconds(), time_base)?;
+    if timestamp == 0 {
+        return Ok(());
+    }
+    check_cancellation()?;
+    let status = unsafe {
+        (functions.av_seek_frame)(
+            format.as_ptr(),
+            video_stream_index,
+            timestamp,
+            abi::AV_SEEK_FLAG_BACKWARD,
+        )
+    };
+    check_cancellation()?;
+    if status < 0 {
+        return Err(map_general_native_status("seek input", status));
+    }
+    Ok(())
+}
+
+fn seconds_to_stream_timestamp(
+    seconds: f64,
+    time_base: abi::AvRational,
+) -> Result<i64, NativeVideoCodecDecodeError> {
+    if !seconds.is_finite()
+        || seconds < 0.0
+        || time_base.numerator <= 0
+        || time_base.denominator <= 0
+    {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let timestamp = seconds * f64::from(time_base.denominator) / f64::from(time_base.numerator);
+    if !timestamp.is_finite() || timestamp < i64::MIN as f64 || timestamp > i64::MAX as f64 {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    Ok(timestamp.trunc() as i64)
+}
+
+fn stream_timestamp_seconds(
+    timestamp: i64,
+    time_base: abi::AvRational,
+) -> Result<f64, NativeVideoCodecDecodeError> {
+    if time_base.numerator <= 0 || time_base.denominator <= 0 {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let seconds =
+        timestamp as f64 * f64::from(time_base.numerator) / f64::from(time_base.denominator);
+    if !seconds.is_finite() {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    Ok(seconds)
+}
+
+fn open_general_decoder(
+    stream: NonNull<abi::AvStream>,
+    decoder: NonNull<abi::AvCodec>,
+    functions: &NativeGeneralDecodeFunctions,
+    limits: NativeVideoDecodeLimits,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<NativeLtxvCodecContext, NativeVideoCodecDecodeError> {
+    let parameters = unsafe { stream.as_ref().codec_parameters };
+    if parameters.is_null() {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let projection = unsafe { &*parameters.cast::<abi::AvCodecParametersGeneralProjection>() };
+    let maximum_pixels = if projection.codec_type == abi::AV_MEDIA_TYPE_VIDEO {
+        let width = u64::try_from(projection.width)
+            .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+        let height = u64::try_from(projection.height)
+            .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+        let pixels = width
+            .checked_mul(height)
+            .filter(|pixels| *pixels > 0 && *pixels <= limits.maximum_pixels_per_frame())
+            .ok_or(NativeVideoCodecDecodeError::ResourceExhausted {
+                phase: "admit coded video dimensions",
+            })?;
+        Some(i64::try_from(pixels).map_err(|_| NativeVideoCodecDecodeError::InvalidLimits)?)
+    } else if projection.codec_type == abi::AV_MEDIA_TYPE_AUDIO {
+        checked_general_audio_input_identity(
+            projection.format,
+            projection.sample_rate,
+            &projection.channel_layout,
+        )?;
+        None
+    } else {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    };
+    check_cancellation()?;
+    let pointer = unsafe { (functions.avcodec_alloc_context3)(decoder.as_ptr()) };
+    let codec = NativeLtxvCodecContext {
+        pointer: NonNull::new(pointer).ok_or(NativeVideoCodecDecodeError::NativeAllocation {
+            phase: "allocate decoder context",
+        })?,
+        free: functions.avcodec_free_context,
+    };
+    if let Some(maximum_pixels) = maximum_pixels {
+        check_cancellation()?;
+        check_general_native_status("bound decoder pixels", unsafe {
+            (functions.av_opt_set_int)(
+                codec.pointer.as_ptr().cast(),
+                c"max_pixels".as_ptr(),
+                maximum_pixels,
+                0,
+            )
+        })?;
+        check_cancellation()?;
+    }
+    check_cancellation()?;
+    check_general_native_status("copy decoder parameters", unsafe {
+        (functions.avcodec_parameters_to_context)(codec.pointer.as_ptr(), parameters)
+    })?;
+    check_cancellation()?;
+    check_general_native_status("set decoder threads", unsafe {
+        (functions.av_opt_set_int)(codec.pointer.as_ptr().cast(), c"threads".as_ptr(), 1, 0)
+    })?;
+    check_cancellation()?;
+    check_general_native_status("open decoder", unsafe {
+        (functions.avcodec_open2)(
+            codec.pointer.as_ptr(),
+            decoder.as_ptr(),
+            std::ptr::null_mut(),
+        )
+    })?;
+    check_cancellation()?;
+    Ok(codec)
+}
+
+fn check_general_native_status(
+    phase: &'static str,
+    status: i32,
+) -> Result<(), NativeVideoCodecDecodeError> {
+    if status < 0 {
+        Err(map_general_native_status(phase, status))
+    } else {
+        Ok(())
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_general_decode_loop(
+    format: NonNull<abi::AvFormatContext>,
+    input: &NativeVideoCodecMemoryInput<'_, '_>,
+    streams: &NativeGeneralDecodeStreams,
+    window: NativeVideoDecodeWindow,
+    limits: NativeVideoDecodeLimits,
+    functions: &NativeGeneralDecodeFunctions,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    staging: &mut NativeGeneralDecodedStaging,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<(), NativeVideoCodecDecodeError> {
+    let video_codec = open_general_decoder(
+        streams.video_stream,
+        streams.video_decoder,
+        functions,
+        limits,
+        check_cancellation,
+    )?;
+    let audio_codec = streams
+        .audio
+        .map(|audio| {
+            open_general_decoder(
+                audio.stream,
+                audio.decoder,
+                functions,
+                limits,
+                check_cancellation,
+            )
+        })
+        .transpose()?;
+    let packet_pointer = unsafe { (functions.av_packet_alloc)() };
+    let packet = NativeLtxvPacket {
+        pointer: NonNull::new(packet_pointer).ok_or(
+            NativeVideoCodecDecodeError::NativeAllocation {
+                phase: "allocate demux packet",
+            },
+        )?,
+        free: functions.av_packet_free,
+    };
+    let video_frame_pointer = unsafe { (functions.av_frame_alloc)() };
+    let video_frame = NativeLtxvFrame {
+        pointer: NonNull::new(video_frame_pointer).ok_or(
+            NativeVideoCodecDecodeError::NativeAllocation {
+                phase: "allocate video frame",
+            },
+        )?,
+        free: functions.av_frame_free,
+    };
+    let audio_frame = if audio_codec.is_some() {
+        let pointer = unsafe { (functions.av_frame_alloc)() };
+        Some(NativeLtxvFrame {
+            pointer: NonNull::new(pointer).ok_or(
+                NativeVideoCodecDecodeError::NativeAllocation {
+                    phase: "allocate audio frame",
+                },
+            )?,
+            free: functions.av_frame_free,
+        })
+    } else {
+        None
+    };
+    let mut packet_iterations = limits.maximum_packet_iterations();
+    let mut receive_iterations = limits.maximum_receive_iterations();
+    let mut resampler = None;
+    let mut alignment_graph = None;
+    let mut video_done = false;
+    let mut audio_done = audio_codec.is_none();
+    loop {
+        check_cancellation()?;
+        if video_done && audio_done {
+            break;
+        }
+        consume_general_iteration(&mut packet_iterations, true)?;
+        let status = unsafe { (functions.av_read_frame)(format.as_ptr(), packet.pointer.as_ptr()) };
+        let mut packet_content = (status == 0)
+            .then(|| NativeLtxvPacketContent::new(packet.pointer, functions.av_packet_unref));
+        let post_read = check_cancellation();
+        input
+            .check_callback_status()
+            .map_err(map_general_decode_io_error)?;
+        post_read?;
+        match status {
+            0 => {
+                let stream_index = unsafe { packet.pointer.as_ref().stream_index };
+                if stream_index == streams.video_index && !video_done {
+                    send_general_packet(
+                        video_codec.pointer,
+                        packet.pointer,
+                        functions,
+                        &video_frame,
+                        &mut receive_iterations,
+                        check_cancellation,
+                        |frame, cancellation| {
+                            process_general_video_frame(
+                                frame,
+                                streams.video_stream,
+                                window,
+                                limits,
+                                functions,
+                                backend,
+                                context,
+                                staging,
+                                &mut alignment_graph,
+                                &mut video_done,
+                                cancellation,
+                            )
+                        },
+                    )?;
+                } else if streams
+                    .audio
+                    .is_some_and(|audio| audio.index == stream_index)
+                    && !audio_done
+                {
+                    let codec = audio_codec
+                        .as_ref()
+                        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+                    let frame = audio_frame
+                        .as_ref()
+                        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+                    let audio_stream = streams
+                        .audio
+                        .map(|audio| audio.stream)
+                        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+                    let audio_input_identity = streams
+                        .audio
+                        .map(|audio| audio.input_identity)
+                        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+                    send_general_packet(
+                        codec.pointer,
+                        packet.pointer,
+                        functions,
+                        frame,
+                        &mut receive_iterations,
+                        check_cancellation,
+                        |frame, cancellation| {
+                            process_general_audio_frame(
+                                frame,
+                                audio_stream,
+                                audio_input_identity,
+                                window,
+                                limits,
+                                functions,
+                                backend,
+                                context,
+                                staging,
+                                &mut resampler,
+                                &mut audio_done,
+                                cancellation,
+                            )
+                        },
+                    )?;
+                }
+                if let Some(content) = packet_content.as_mut() {
+                    content.clear();
+                }
+            }
+            abi::AV_ERROR_TRY_AGAIN => continue,
+            abi::AV_ERROR_END_OF_FILE => {
+                flush_general_decoder(
+                    video_codec.pointer,
+                    functions,
+                    &video_frame,
+                    &mut receive_iterations,
+                    check_cancellation,
+                    |frame, cancellation| {
+                        process_general_video_frame(
+                            frame,
+                            streams.video_stream,
+                            window,
+                            limits,
+                            functions,
+                            backend,
+                            context,
+                            staging,
+                            &mut alignment_graph,
+                            &mut video_done,
+                            cancellation,
+                        )
+                    },
+                )?;
+                if let (Some(codec), Some(frame), Some(audio_stream)) =
+                    (&audio_codec, &audio_frame, streams.audio)
+                {
+                    flush_general_decoder(
+                        codec.pointer,
+                        functions,
+                        frame,
+                        &mut receive_iterations,
+                        check_cancellation,
+                        |frame, cancellation| {
+                            process_general_audio_frame(
+                                frame,
+                                audio_stream.stream,
+                                audio_stream.input_identity,
+                                window,
+                                limits,
+                                functions,
+                                backend,
+                                context,
+                                staging,
+                                &mut resampler,
+                                &mut audio_done,
+                                cancellation,
+                            )
+                        },
+                    )?;
+                }
+                break;
+            }
+            status => return Err(map_general_native_status("read demux packet", status)),
+        }
+    }
+    check_cancellation()?;
+    Ok(())
+}
+
+fn consume_general_iteration(
+    remaining: &mut usize,
+    packet: bool,
+) -> Result<(), NativeVideoCodecDecodeError> {
+    *remaining = remaining.checked_sub(1).ok_or(if packet {
+        NativeVideoCodecDecodeError::PacketIterationLimit
+    } else {
+        NativeVideoCodecDecodeError::ReceiveIterationLimit
+    })?;
+    Ok(())
+}
+
+fn send_general_packet(
+    codec: NonNull<abi::AvCodecContext>,
+    packet: NonNull<abi::AvPacket>,
+    functions: &NativeGeneralDecodeFunctions,
+    frame: &NativeLtxvFrame,
+    receive_iterations: &mut usize,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+    mut process: impl FnMut(
+        NonNull<abi::AvFrame>,
+        &mut dyn FnMut() -> Result<(), CancellationError>,
+    ) -> Result<(), NativeVideoCodecDecodeError>,
+) -> Result<(), NativeVideoCodecDecodeError> {
+    check_cancellation()?;
+    let mut status = unsafe { (functions.avcodec_send_packet)(codec.as_ptr(), packet.as_ptr()) };
+    check_cancellation()?;
+    if status == abi::AV_ERROR_TRY_AGAIN {
+        receive_general_frames(
+            codec,
+            functions,
+            frame,
+            receive_iterations,
+            check_cancellation,
+            &mut process,
+        )?;
+        status = unsafe { (functions.avcodec_send_packet)(codec.as_ptr(), packet.as_ptr()) };
+        check_cancellation()?;
+    }
+    if status < 0 {
+        return Err(map_general_native_status("send decoder packet", status));
+    }
+    receive_general_frames(
+        codec,
+        functions,
+        frame,
+        receive_iterations,
+        check_cancellation,
+        &mut process,
+    )
+}
+
+fn flush_general_decoder(
+    codec: NonNull<abi::AvCodecContext>,
+    functions: &NativeGeneralDecodeFunctions,
+    frame: &NativeLtxvFrame,
+    receive_iterations: &mut usize,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+    mut process: impl FnMut(
+        NonNull<abi::AvFrame>,
+        &mut dyn FnMut() -> Result<(), CancellationError>,
+    ) -> Result<(), NativeVideoCodecDecodeError>,
+) -> Result<(), NativeVideoCodecDecodeError> {
+    check_cancellation()?;
+    let status = unsafe { (functions.avcodec_send_packet)(codec.as_ptr(), std::ptr::null()) };
+    check_cancellation()?;
+    if !matches!(status, 0 | abi::AV_ERROR_END_OF_FILE) {
+        return Err(map_general_native_status("flush decoder", status));
+    }
+    receive_general_frames(
+        codec,
+        functions,
+        frame,
+        receive_iterations,
+        check_cancellation,
+        &mut process,
+    )
+}
+
+fn receive_general_frames(
+    codec: NonNull<abi::AvCodecContext>,
+    functions: &NativeGeneralDecodeFunctions,
+    frame: &NativeLtxvFrame,
+    receive_iterations: &mut usize,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+    process: &mut impl FnMut(
+        NonNull<abi::AvFrame>,
+        &mut dyn FnMut() -> Result<(), CancellationError>,
+    ) -> Result<(), NativeVideoCodecDecodeError>,
+) -> Result<(), NativeVideoCodecDecodeError> {
+    loop {
+        consume_general_iteration(receive_iterations, false)?;
+        check_cancellation()?;
+        let status =
+            unsafe { (functions.avcodec_receive_frame)(codec.as_ptr(), frame.pointer.as_ptr()) };
+        check_cancellation()?;
+        match status {
+            0 => {
+                let result = process(frame.pointer, check_cancellation);
+                unsafe { (functions.av_frame_unref)(frame.pointer.as_ptr()) };
+                result?;
+            }
+            abi::AV_ERROR_TRY_AGAIN | abi::AV_ERROR_END_OF_FILE => return Ok(()),
+            status => return Err(map_general_native_status("receive decoded frame", status)),
+        }
+    }
+}
+
+fn general_frame_rotation_steps(
+    frame: NonNull<abi::AvFrame>,
+    functions: &NativeGeneralDecodeFunctions,
+    check_cancellation: &mut dyn FnMut() -> Result<(), CancellationError>,
+) -> Result<u8, NativeVideoCodecDecodeError> {
+    check_cancellation()?;
+    let side_data = unsafe {
+        (functions.av_frame_get_side_data)(frame.as_ptr(), abi::AV_FRAME_DATA_DISPLAY_MATRIX)
+    };
+    check_cancellation()?;
+    let Some(side_data) = NonNull::new(side_data) else {
+        return Ok(0);
+    };
+    let side_data = unsafe { side_data.as_ref() };
+    if side_data.data.is_null() || side_data.size < 9 * std::mem::size_of::<i32>() {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    check_cancellation()?;
+    let rotation = unsafe { (functions.av_display_rotation_get)(side_data.data.cast()) };
+    check_cancellation()?;
+    general_rotation_steps(rotation)
+}
+
+fn general_rotation_steps(rotation: f64) -> Result<u8, NativeVideoCodecDecodeError> {
+    if !rotation.is_finite() {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let quarter_turns = (rotation / 90.0).floor();
+    if quarter_turns < f64::from(i32::MIN) || quarter_turns > f64::from(i32::MAX) {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    Ok((quarter_turns as i32).rem_euclid(4) as u8)
+}
+
+fn rotated_source_coordinate(
+    destination_y: usize,
+    destination_x: usize,
+    source_height: usize,
+    source_width: usize,
+    quarter_turns: u8,
+) -> Result<(usize, usize), NativeVideoCodecDecodeError> {
+    let coordinate = match quarter_turns {
+        0 => (destination_y, destination_x),
+        1 => (
+            destination_x,
+            source_width
+                .checked_sub(destination_y + 1)
+                .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?,
+        ),
+        2 => (
+            source_height
+                .checked_sub(destination_y + 1)
+                .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?,
+            source_width
+                .checked_sub(destination_x + 1)
+                .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?,
+        ),
+        3 => (
+            source_height
+                .checked_sub(destination_x + 1)
+                .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?,
+            destination_y,
+        ),
+        _ => return Err(NativeVideoCodecDecodeError::InvalidLayout),
+    };
+    if coordinate.0 >= source_height || coordinate.1 >= source_width {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    Ok(coordinate)
+}
+
+fn general_frame_time_seconds(
+    frame: NonNull<abi::AvFrame>,
+    stream: NonNull<abi::AvStream>,
+) -> Result<f64, NativeVideoCodecDecodeError> {
+    let timestamp = unsafe { frame.as_ref().presentation_timestamp };
+    if timestamp == abi::AV_NO_PRESENTATION_TIMESTAMP {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    stream_timestamp_seconds(timestamp, unsafe { stream.as_ref().time_base })
+}
+
+fn fill_workspace<T: Copy>(
+    values: &mut CpuWorkspaceVec<T>,
+    length: usize,
+    value: T,
+    check_cancellation: &mut dyn FnMut() -> Result<(), CancellationError>,
+) -> Result<(), NativeVideoCodecDecodeError> {
+    for index in 0..length {
+        if index & 0xffff == 0 {
+            check_cancellation()?;
+        }
+        values
+            .try_push(value)
+            .map_err(map_general_decode_tensor_error)?;
+    }
+    Ok(())
+}
+
+fn checked_general_alignment_dimensions(
+    source_width: i32,
+    source_height: i32,
+    maximum_pixels: u64,
+) -> Result<(i32, i32), NativeVideoCodecDecodeError> {
+    let padded_width = source_width
+        .checked_add(31)
+        .map(|value| value / 32 * 32)
+        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+    let padded_height = source_height
+        .checked_add(31)
+        .map(|value| value / 32 * 32)
+        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+    usize::try_from(padded_width)
+        .ok()
+        .and_then(|width| {
+            usize::try_from(padded_height)
+                .ok()
+                .and_then(|height| width.checked_mul(height))
+        })
+        .filter(|pixels| {
+            *pixels > 0 && u64::try_from(*pixels).is_ok_and(|value| value <= maximum_pixels)
+        })
+        .ok_or(NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "admit aligned video frame",
+        })?;
+    Ok((padded_width, padded_height))
+}
+
+fn checked_general_audio_frame_values(
+    sample_count: i32,
+    channels: usize,
+    maximum_values: usize,
+) -> Result<usize, NativeVideoCodecDecodeError> {
+    usize::try_from(sample_count)
+        .ok()
+        .filter(|samples| *samples > 0)
+        .and_then(|samples| samples.checked_mul(channels))
+        .filter(|values| *values <= maximum_values)
+        .ok_or(NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "admit decoded audio frame",
+        })
+}
+
+fn create_general_alignment_frame(
+    frame: NonNull<abi::AvFrame>,
+    stream: NonNull<abi::AvStream>,
+    limits: NativeVideoDecodeLimits,
+    retained_graph: &mut Option<NativeGeneralFilterGraph>,
+    functions: &NativeGeneralDecodeFunctions,
+    check_cancellation: &mut dyn FnMut() -> Result<(), CancellationError>,
+) -> Result<NativeLtxvFrame, NativeVideoCodecDecodeError> {
+    let frame_ref = unsafe { frame.as_ref() };
+    let (padded_width, padded_height) = checked_general_alignment_dimensions(
+        frame_ref.width,
+        frame_ref.height,
+        limits.maximum_pixels_per_frame(),
+    )?;
+    let time_base = unsafe { stream.as_ref().time_base };
+    if time_base.numerator <= 0 || time_base.denominator <= 0 {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    if let Some(graph) = retained_graph.as_ref() {
+        if graph.source_width != frame_ref.width
+            || graph.source_height != frame_ref.height
+            || graph.source_format != frame_ref.format
+            || graph.time_base.numerator != time_base.numerator
+            || graph.time_base.denominator != time_base.denominator
+        {
+            return Err(NativeVideoCodecDecodeError::InvalidLayout);
+        }
+    } else {
+        let source_arguments = CString::new(format!(
+            "video_size={}x{}:pix_fmt={}:time_base={}/{}:pixel_aspect=1/1",
+            frame_ref.width,
+            frame_ref.height,
+            frame_ref.format,
+            time_base.numerator,
+            time_base.denominator,
+        ))
+        .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+        let pad_arguments = CString::new(format!("{padded_width}:{padded_height}:0:0"))
+            .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+        let fill_arguments = CString::new(format!(
+            "left=0:right={}:top=0:bottom={}:mode=smear",
+            padded_width - frame_ref.width,
+            padded_height - frame_ref.height,
+        ))
+        .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+        check_cancellation()?;
+        let graph_pointer = unsafe { (functions.avfilter_graph_alloc)() };
+        let graph_pointer =
+            NonNull::new(graph_pointer).ok_or(NativeVideoCodecDecodeError::NativeAllocation {
+                phase: "allocate alignment filter graph",
+            })?;
+        let mut graph = NativeGeneralFilterGraph {
+            pointer: graph_pointer,
+            source: NonNull::dangling(),
+            sink: NonNull::dangling(),
+            free: functions.avfilter_graph_free,
+            source_width: frame_ref.width,
+            source_height: frame_ref.height,
+            source_format: frame_ref.format,
+            time_base,
+        };
+        let filter = |name: &CStr| {
+            NonNull::new(unsafe { (functions.avfilter_get_by_name)(name.as_ptr()).cast_mut() })
+                .ok_or(NativeVideoCodecDecodeError::InvalidLayout)
+        };
+        let mut source = std::ptr::null_mut();
+        let mut pad = std::ptr::null_mut();
+        let mut fill = std::ptr::null_mut();
+        let mut sink = std::ptr::null_mut();
+        for (output, filter_name, instance_name, arguments) in [
+            (
+                &mut source,
+                c"buffer",
+                c"general_decode_source",
+                Some(source_arguments.as_c_str()),
+            ),
+            (
+                &mut pad,
+                c"pad",
+                c"general_decode_pad",
+                Some(pad_arguments.as_c_str()),
+            ),
+            (
+                &mut fill,
+                c"fillborders",
+                c"general_decode_smear",
+                Some(fill_arguments.as_c_str()),
+            ),
+            (&mut sink, c"buffersink", c"general_decode_sink", None),
+        ] {
+            check_cancellation()?;
+            let status = unsafe {
+                (functions.avfilter_graph_create_filter)(
+                    output,
+                    filter(filter_name)?.as_ptr(),
+                    instance_name.as_ptr(),
+                    arguments.map_or(std::ptr::null(), CStr::as_ptr),
+                    std::ptr::null_mut(),
+                    graph.pointer.as_ptr(),
+                )
+            };
+            check_cancellation()?;
+            check_general_native_status("create alignment filter", status)?;
+        }
+        let source = NonNull::new(source).ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+        let pad = NonNull::new(pad).ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+        let fill = NonNull::new(fill).ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+        let sink = NonNull::new(sink).ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+        for (left, right) in [(source, pad), (pad, fill), (fill, sink)] {
+            check_cancellation()?;
+            let status = unsafe { (functions.avfilter_link)(left.as_ptr(), 0, right.as_ptr(), 0) };
+            check_cancellation()?;
+            check_general_native_status("link alignment filter", status)?;
+        }
+        check_cancellation()?;
+        let status = unsafe {
+            (functions.avfilter_graph_config)(graph.pointer.as_ptr(), std::ptr::null_mut())
+        };
+        check_cancellation()?;
+        check_general_native_status("configure alignment filter", status)?;
+        graph.source = source;
+        graph.sink = sink;
+        *retained_graph = Some(graph);
+    }
+    let graph = retained_graph
+        .as_ref()
+        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+    let output_pointer = unsafe { (functions.av_frame_alloc)() };
+    let output = NativeLtxvFrame {
+        pointer: NonNull::new(output_pointer).ok_or(
+            NativeVideoCodecDecodeError::NativeAllocation {
+                phase: "allocate aligned video frame",
+            },
+        )?,
+        free: functions.av_frame_free,
+    };
+    check_cancellation()?;
+    let status = unsafe {
+        (functions.av_buffersrc_add_frame_flags)(
+            graph.source.as_ptr(),
+            frame.as_ptr(),
+            abi::AV_BUFFER_SOURCE_FLAG_KEEP_REFERENCE,
+        )
+    };
+    check_cancellation()?;
+    check_general_native_status("push alignment frame", status)?;
+    let status = unsafe {
+        (functions.av_buffersink_get_frame)(graph.sink.as_ptr(), output.pointer.as_ptr())
+    };
+    check_cancellation()?;
+    check_general_native_status("pull alignment frame", status)?;
+    Ok(output)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn process_general_video_frame(
+    frame: NonNull<abi::AvFrame>,
+    stream: NonNull<abi::AvStream>,
+    window: NativeVideoDecodeWindow,
+    limits: NativeVideoDecodeLimits,
+    functions: &NativeGeneralDecodeFunctions,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    staging: &mut NativeGeneralDecodedStaging,
+    alignment_graph: &mut Option<NativeGeneralFilterGraph>,
+    video_done: &mut bool,
+    check_cancellation: &mut dyn FnMut() -> Result<(), CancellationError>,
+) -> Result<(), NativeVideoCodecDecodeError> {
+    let time_base = unsafe { stream.as_ref().time_base };
+    let frame_timestamp = unsafe { frame.as_ref().presentation_timestamp };
+    if frame_timestamp == abi::AV_NO_PRESENTATION_TIMESTAMP {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let start_timestamp = seconds_to_stream_timestamp(window.start_seconds(), time_base)?;
+    if frame_timestamp < start_timestamp {
+        return Ok(());
+    }
+    if window.duration_seconds() > 0.0 {
+        let end_timestamp = seconds_to_stream_timestamp(
+            window.start_seconds() + window.duration_seconds(),
+            time_base,
+        )?;
+        if frame_timestamp >= end_timestamp {
+            *video_done = true;
+            return Ok(());
+        }
+    }
+    if staging.frame_count == limits.maximum_frames() {
+        return Err(NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "retain decoded video frames",
+        });
+    }
+    let frame_ref = unsafe { frame.as_ref() };
+    let source_width =
+        usize::try_from(frame_ref.width).map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+    let source_height = usize::try_from(frame_ref.height)
+        .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+    let source_pixels = source_width
+        .checked_mul(source_height)
+        .filter(|pixels| {
+            *pixels > 0
+                && u64::try_from(*pixels)
+                    .is_ok_and(|value| value <= limits.maximum_pixels_per_frame())
+        })
+        .ok_or(NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "admit decoded video frame",
+        })?;
+    check_cancellation()?;
+    let descriptor = NonNull::new(unsafe {
+        (functions.av_pixel_format_descriptor_get)(frame_ref.format).cast_mut()
+    })
+    .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+    check_cancellation()?;
+    let descriptor = unsafe { descriptor.as_ref() };
+    let has_alpha = descriptor.flags & abi::AV_PIXEL_FORMAT_FLAG_ALPHA != 0
+        || matches!(
+            frame_ref.format,
+            abi::AV_PIXEL_FORMAT_PAL8 | abi::AV_PIXEL_FORMAT_RGBA
+        );
+    let required_frame_values = source_pixels
+        .checked_mul(3)
+        .and_then(|values| staging.frames.len().checked_add(values))
+        .filter(|values| *values <= staging.frames.capacity())
+        .ok_or(NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "retain decoded video frame",
+        })?;
+    if required_frame_values == 0 {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let decoded_direct_u8 = matches!(
+        frame_ref.format,
+        abi::AV_PIXEL_FORMAT_YUVJ420P
+            | abi::AV_PIXEL_FORMAT_YUVJ422P
+            | abi::AV_PIXEL_FORMAT_YUVJ444P
+            | abi::AV_PIXEL_FORMAT_RGB24
+            | abi::AV_PIXEL_FORMAT_RGBA
+            | abi::AV_PIXEL_FORMAT_PAL8
+    );
+    let direct_u8 = staging.direct_u8.unwrap_or(decoded_direct_u8);
+    let has_alpha = staging.has_alpha.unwrap_or(has_alpha);
+    if has_alpha
+        && source_pixels
+            .checked_add(staging.alpha.len())
+            .filter(|values| *values <= staging.alpha.capacity())
+            .is_none()
+    {
+        return Err(NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "retain decoded alpha frame",
+        });
+    }
+    let alignment = (!direct_u8 && frame_ref.width % 32 != 0)
+        .then(|| {
+            create_general_alignment_frame(
+                frame,
+                stream,
+                limits,
+                alignment_graph,
+                functions,
+                check_cancellation,
+            )
+        })
+        .transpose()?;
+    let conversion_frame = alignment.as_ref().map_or(frame, |output| output.pointer);
+    let conversion_ref = unsafe { conversion_frame.as_ref() };
+    let conversion_width = usize::try_from(conversion_ref.width)
+        .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+    let conversion_height = usize::try_from(conversion_ref.height)
+        .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+    if conversion_width < source_width || conversion_height < source_height {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let channel_count = if has_alpha { 4 } else { 3 };
+    let conversion_pixels = conversion_width
+        .checked_mul(conversion_height)
+        .filter(|pixels| {
+            u64::try_from(*pixels).is_ok_and(|value| value <= limits.maximum_pixels_per_frame())
+        })
+        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+    let output_values = conversion_pixels
+        .checked_mul(channel_count)
+        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+    let rotation = general_frame_rotation_steps(frame, functions, check_cancellation)?;
+    let (output_height, output_width) = if rotation % 2 == 0 {
+        (source_height, source_width)
+    } else {
+        (source_width, source_height)
+    };
+    if staging.frame_count == 0 {
+        staging.width = output_width;
+        staging.height = output_height;
+        staging.has_alpha = Some(has_alpha);
+        staging.direct_u8 = Some(direct_u8);
+    } else if staging.width != output_width || staging.height != output_height {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    check_cancellation()?;
+    let sws_pointer = unsafe {
+        (functions.sws_get_context)(
+            conversion_ref.width,
+            conversion_ref.height,
+            conversion_ref.format,
+            conversion_ref.width,
+            conversion_ref.height,
+            if direct_u8 {
+                if has_alpha {
+                    abi::AV_PIXEL_FORMAT_RGBA
+                } else {
+                    abi::AV_PIXEL_FORMAT_RGB24
+                }
+            } else if has_alpha {
+                abi::AV_PIXEL_FORMAT_GBRAPF32LE
+            } else {
+                abi::AV_PIXEL_FORMAT_GBRPF32LE
+            },
+            abi::SWS_BILINEAR,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null(),
+        )
+    };
+    let sws = NativeLtxvSwsContext {
+        pointer: NonNull::new(sws_pointer).ok_or(
+            NativeVideoCodecDecodeError::NativeAllocation {
+                phase: "allocate general video conversion",
+            },
+        )?,
+        free: functions.sws_free_context,
+    };
+    check_cancellation()?;
+    if direct_u8 {
+        let mut converted = backend
+            .workspace_vec::<u8>(context, output_values)
+            .map_err(map_general_decode_tensor_error)?;
+        fill_workspace(&mut converted, output_values, 0, check_cancellation)?;
+        let mut data = [std::ptr::null_mut(); abi::AV_NUM_DATA_POINTERS];
+        data[0] = converted.as_mut_ptr();
+        let mut lines = [0; abi::AV_NUM_DATA_POINTERS];
+        lines[0] = conversion_ref
+            .width
+            .checked_mul(
+                i32::try_from(channel_count)
+                    .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+            )
+            .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+        check_cancellation()?;
+        let converted_height = unsafe {
+            (functions.sws_scale)(
+                sws.pointer.as_ptr(),
+                conversion_ref.data.as_ptr().cast(),
+                conversion_ref.line_size.as_ptr(),
+                0,
+                conversion_ref.height,
+                data.as_mut_ptr(),
+                lines.as_ptr(),
+            )
+        };
+        check_cancellation()?;
+        if converted_height != conversion_ref.height {
+            return Err(map_general_native_status(
+                "convert decoded video frame",
+                converted_height,
+            ));
+        }
+        for destination_y in 0..output_height {
+            check_cancellation()?;
+            for destination_x in 0..output_width {
+                let (source_y, source_x) = rotated_source_coordinate(
+                    destination_y,
+                    destination_x,
+                    source_height,
+                    source_width,
+                    rotation,
+                )?;
+                let source = (source_y * conversion_width + source_x) * channel_count;
+                for channel in 0..3 {
+                    staging
+                        .frames
+                        .try_push(f32::from(converted[source + channel]) / 255.0)
+                        .map_err(map_general_decode_tensor_error)?;
+                }
+                if has_alpha {
+                    staging
+                        .alpha
+                        .try_push(f32::from(converted[source + 3]) / 255.0)
+                        .map_err(map_general_decode_tensor_error)?;
+                }
+            }
+        }
+    } else {
+        let mut converted = backend
+            .workspace_vec::<f32>(context, output_values)
+            .map_err(map_general_decode_tensor_error)?;
+        fill_workspace(&mut converted, output_values, 0.0, check_cancellation)?;
+        let mut data = [std::ptr::null_mut(); abi::AV_NUM_DATA_POINTERS];
+        let mut lines = [0; abi::AV_NUM_DATA_POINTERS];
+        let plane_values = conversion_pixels;
+        for plane in 0..channel_count {
+            data[plane] = unsafe { converted.as_mut_ptr().add(plane * plane_values).cast() };
+            lines[plane] = conversion_ref
+                .width
+                .checked_mul(
+                    i32::try_from(std::mem::size_of::<f32>())
+                        .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+                )
+                .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+        }
+        check_cancellation()?;
+        let converted_height = unsafe {
+            (functions.sws_scale)(
+                sws.pointer.as_ptr(),
+                conversion_ref.data.as_ptr().cast(),
+                conversion_ref.line_size.as_ptr(),
+                0,
+                conversion_ref.height,
+                data.as_mut_ptr(),
+                lines.as_ptr(),
+            )
+        };
+        check_cancellation()?;
+        if converted_height != conversion_ref.height {
+            return Err(map_general_native_status(
+                "convert decoded video frame",
+                converted_height,
+            ));
+        }
+        for destination_y in 0..output_height {
+            check_cancellation()?;
+            for destination_x in 0..output_width {
+                let (source_y, source_x) = rotated_source_coordinate(
+                    destination_y,
+                    destination_x,
+                    source_height,
+                    source_width,
+                    rotation,
+                )?;
+                let pixel = source_y * conversion_width + source_x;
+                for plane in [2, 0, 1] {
+                    staging
+                        .frames
+                        .try_push(converted[plane * plane_values + pixel])
+                        .map_err(map_general_decode_tensor_error)?;
+                }
+                if has_alpha {
+                    staging
+                        .alpha
+                        .try_push(converted[3 * plane_values + pixel])
+                        .map_err(map_general_decode_tensor_error)?;
+                }
+            }
+        }
+    }
+    staging.frame_count += 1;
+    Ok(())
+}
+
+fn general_audio_layout_identity(
+    layout: &abi::AvChannelLayout,
+) -> Result<(usize, u64), NativeVideoCodecDecodeError> {
+    let channels = usize::try_from(layout.channel_count)
+        .ok()
+        .filter(|channels| (1..=abi::AV_NUM_DATA_POINTERS).contains(channels))
+        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+    if layout.order != abi::AV_CHANNEL_ORDER_NATIVE || !layout.opaque.is_null() {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let mask = unsafe { layout.data.mask };
+    if mask == 0 || usize::try_from(mask.count_ones()).map_or(true, |count| count != channels) {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    Ok((channels, mask))
+}
+
+fn checked_general_audio_input_identity(
+    sample_format: i32,
+    sample_rate: i32,
+    layout: &abi::AvChannelLayout,
+) -> Result<NativeGeneralAudioInputIdentity, NativeVideoCodecDecodeError> {
+    let (channels, channel_mask) = general_audio_layout_identity(layout)?;
+    let sample_rate = u32::try_from(sample_rate)
+        .ok()
+        .filter(|rate| (8_000..=384_000).contains(rate))
+        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+    Ok(NativeGeneralAudioInputIdentity {
+        sample_format,
+        sample_rate,
+        channels,
+        channel_mask,
+    })
+}
+
+fn create_general_resampler(
+    frame: NonNull<abi::AvFrame>,
+    input_identity: NativeGeneralAudioInputIdentity,
+    functions: &NativeGeneralDecodeFunctions,
+    check_cancellation: &mut dyn FnMut() -> Result<(), CancellationError>,
+) -> Result<NativeGeneralSwrContext, NativeVideoCodecDecodeError> {
+    let projection = frame.cast::<abi::AvFrameGeneralProjection>();
+    let projection = unsafe { projection.as_ref() };
+    let channels = input_identity.channels;
+    let sample_rate = input_identity.sample_rate;
+    let mut output_layout = NativeGeneralChannelLayout {
+        value: Some(unsafe { std::mem::zeroed() }),
+        uninit: functions.av_channel_layout_uninit,
+    };
+    check_cancellation()?;
+    let status = unsafe {
+        (functions.av_channel_layout_copy)(
+            output_layout
+                .value
+                .as_mut()
+                .map(std::ptr::from_mut)
+                .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?,
+            std::ptr::addr_of!(projection.channel_layout),
+        )
+    };
+    check_cancellation()?;
+    check_general_native_status("copy decoded audio layout", status)?;
+    check_cancellation()?;
+    let pointer = unsafe { (functions.swr_alloc)() };
+    let pointer = NonNull::new(pointer).ok_or(NativeVideoCodecDecodeError::NativeAllocation {
+        phase: "allocate decoded audio resampler",
+    })?;
+    let mut resampler = NativeGeneralSwrContext {
+        pointer: Some(pointer),
+        free: functions.swr_free,
+        output_layout: output_layout.take()?,
+        uninit_layout: functions.av_channel_layout_uninit,
+        channels,
+        sample_rate,
+        input_identity,
+    };
+    check_cancellation()?;
+    let mut pointer = resampler.pointer()?.as_ptr();
+    let status = unsafe {
+        (functions.swr_alloc_set_opts2)(
+            std::ptr::addr_of_mut!(pointer),
+            std::ptr::addr_of!(resampler.output_layout),
+            abi::AV_SAMPLE_FORMAT_FLTP,
+            i32::try_from(sample_rate).map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+            std::ptr::addr_of!(projection.channel_layout),
+            projection.prefix.format,
+            projection.sample_rate,
+            0,
+            std::ptr::null_mut(),
+        )
+    };
+    resampler.pointer = NonNull::new(pointer);
+    check_cancellation()?;
+    if status < 0 {
+        return Err(map_general_native_status(
+            "configure decoded audio resampler",
+            status,
+        ));
+    }
+    let pointer = resampler.pointer()?;
+    check_cancellation()?;
+    let status = unsafe { (functions.swr_init)(pointer.as_ptr()) };
+    check_cancellation()?;
+    check_general_native_status("initialize decoded audio resampler", status)?;
+    Ok(resampler)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn process_general_audio_frame(
+    frame: NonNull<abi::AvFrame>,
+    stream: NonNull<abi::AvStream>,
+    stream_input_identity: NativeGeneralAudioInputIdentity,
+    window: NativeVideoDecodeWindow,
+    limits: NativeVideoDecodeLimits,
+    functions: &NativeGeneralDecodeFunctions,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    staging: &mut NativeGeneralDecodedStaging,
+    resampler: &mut Option<NativeGeneralSwrContext>,
+    audio_done: &mut bool,
+    check_cancellation: &mut dyn FnMut() -> Result<(), CancellationError>,
+) -> Result<(), NativeVideoCodecDecodeError> {
+    let frame_time = general_frame_time_seconds(frame, stream)?;
+    if window.duration_seconds() > 0.0
+        && frame_time > window.start_seconds() + window.duration_seconds()
+    {
+        *audio_done = true;
+        return Ok(());
+    }
+    let projection = frame.cast::<abi::AvFrameGeneralProjection>();
+    let projection = unsafe { projection.as_ref() };
+    let frame_identity = checked_general_audio_input_identity(
+        projection.prefix.format,
+        projection.sample_rate,
+        &projection.channel_layout,
+    )?;
+    if frame_identity != stream_input_identity || projection.prefix.sample_count <= 0 {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    checked_general_audio_frame_values(
+        projection.prefix.sample_count,
+        frame_identity.channels,
+        limits.maximum_audio_samples(),
+    )?;
+    if resampler.is_none() {
+        *resampler = Some(create_general_resampler(
+            frame,
+            stream_input_identity,
+            functions,
+            check_cancellation,
+        )?);
+    }
+    let resampler = resampler
+        .as_ref()
+        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+    if frame_identity != resampler.input_identity {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    check_cancellation()?;
+    let delay = unsafe {
+        (functions.swr_get_delay)(
+            resampler.pointer()?.as_ptr(),
+            i64::from(projection.sample_rate),
+        )
+    };
+    check_cancellation()?;
+    if delay < 0 {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let output_samples = usize::try_from(
+        delay
+            .checked_add(i64::from(projection.prefix.sample_count))
+            .filter(|samples| *samples > 0)
+            .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?,
+    )
+    .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?;
+    let output_values = output_samples
+        .checked_mul(resampler.channels)
+        .filter(|values| *values <= limits.maximum_audio_samples())
+        .ok_or(NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "resample decoded audio frame",
+        })?;
+    let mut converted = backend
+        .workspace_vec::<f32>(context, output_values)
+        .map_err(map_general_decode_tensor_error)?;
+    fill_workspace(&mut converted, output_values, 0.0, check_cancellation)?;
+    let mut output_data = [std::ptr::null_mut(); abi::AV_NUM_DATA_POINTERS];
+    for (channel, output) in output_data.iter_mut().take(resampler.channels).enumerate() {
+        *output = unsafe { converted.as_mut_ptr().add(channel * output_samples).cast() };
+    }
+    let input_data = if projection.prefix.extended_data.is_null() {
+        projection.prefix.data.as_ptr()
+    } else {
+        projection.prefix.extended_data.cast_const()
+    };
+    check_cancellation()?;
+    let converted_samples = unsafe {
+        (functions.swr_convert)(
+            resampler.pointer()?.as_ptr(),
+            output_data.as_mut_ptr(),
+            i32::try_from(output_samples)
+                .map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+            input_data.cast(),
+            projection.prefix.sample_count,
+        )
+    };
+    check_cancellation()?;
+    let converted_samples = checked_general_converted_samples(converted_samples, output_samples)?;
+    let skip_samples = if staging.audio.is_empty() {
+        checked_general_audio_sample_count(
+            (window.start_seconds() - frame_time).max(0.0),
+            resampler.sample_rate,
+        )?
+    } else {
+        0
+    };
+    if skip_samples >= converted_samples {
+        return Ok(());
+    }
+    let maximum_window_samples = if window.duration_seconds() == 0.0 {
+        usize::MAX
+    } else {
+        checked_general_audio_sample_count(window.duration_seconds(), resampler.sample_rate)?
+    };
+    let retained_samples = staging.audio.len() / resampler.channels;
+    let available_samples = maximum_window_samples.saturating_sub(retained_samples);
+    let accepted_samples = (converted_samples - skip_samples).min(available_samples);
+    let appended_values = accepted_samples
+        .checked_mul(resampler.channels)
+        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+    if staging
+        .audio
+        .len()
+        .checked_add(appended_values)
+        .is_none_or(|values| values > limits.maximum_audio_samples())
+    {
+        return Err(NativeVideoCodecDecodeError::ResourceExhausted {
+            phase: "retain decoded audio samples",
+        });
+    }
+    for sample in skip_samples..skip_samples + accepted_samples {
+        if sample & 0xffff == 0 {
+            check_cancellation()?;
+        }
+        for channel in 0..resampler.channels {
+            staging
+                .audio
+                .try_push(converted[channel * output_samples + sample])
+                .map_err(map_general_decode_tensor_error)?;
+        }
+    }
+    staging.audio_channels = resampler.channels;
+    staging.audio_sample_rate = resampler.sample_rate;
+    if accepted_samples < converted_samples - skip_samples
+        || retained_samples + accepted_samples == maximum_window_samples
+    {
+        *audio_done = true;
+    }
+    Ok(())
+}
+
+fn checked_general_audio_sample_count(
+    duration_seconds: f64,
+    sample_rate: u32,
+) -> Result<usize, NativeVideoCodecDecodeError> {
+    let samples = duration_seconds * f64::from(sample_rate);
+    if !samples.is_finite() || samples < 0.0 || samples > usize::MAX as f64 {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    Ok(samples.trunc() as usize)
+}
+
+fn checked_general_converted_samples(
+    converted_samples: i32,
+    output_samples: usize,
+) -> Result<usize, NativeVideoCodecDecodeError> {
+    if converted_samples < 0 {
+        return Err(map_general_native_status(
+            "resample decoded audio frame",
+            converted_samples,
+        ));
+    }
+    usize::try_from(converted_samples)
+        .ok()
+        .filter(|converted_samples| *converted_samples <= output_samples)
+        .ok_or(NativeVideoCodecDecodeError::InvalidLayout)
+}
+
+fn materialize_general_audio(
+    staging: &mut NativeGeneralDecodedStaging,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<Option<NativeAudioPayload>, NativeVideoCodecDecodeError> {
+    if staging.audio.is_empty() {
+        return Ok(None);
+    }
+    let channels = staging.audio_channels;
+    if channels == 0 || !staging.audio.len().is_multiple_of(channels) {
+        return Err(NativeVideoCodecDecodeError::InvalidLayout);
+    }
+    let samples = staging.audio.len() / channels;
+    let mut planar_audio = backend
+        .workspace_vec(context, staging.audio.len())
+        .map_err(map_general_decode_tensor_error)?;
+    for channel in 0..channels {
+        for sample in 0..samples {
+            let output_index = channel
+                .checked_mul(samples)
+                .and_then(|index| index.checked_add(sample))
+                .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+            if output_index & 0xffff == 0 {
+                context.check().map_err(map_general_decode_tensor_error)?;
+            }
+            let input_index = sample
+                .checked_mul(channels)
+                .and_then(|index| index.checked_add(channel))
+                .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+            let value = staging
+                .audio
+                .get(input_index)
+                .copied()
+                .ok_or(NativeVideoCodecDecodeError::InvalidLayout)?;
+            planar_audio
+                .try_push(value)
+                .map_err(map_general_decode_tensor_error)?;
+        }
+    }
+    let descriptor = TensorDescriptor::contiguous(
+        vec![
+            1,
+            u64::try_from(channels).map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+            u64::try_from(samples).map_err(|_| NativeVideoCodecDecodeError::InvalidLayout)?,
+        ],
+        DType::F32,
+        DeviceId::CPU,
+        context.stream,
+    )
+    .map_err(map_general_decode_tensor_error)?;
+    let (waveform, _) = backend
+        .upload_f32(descriptor, &planar_audio, context)
+        .map_err(map_general_decode_tensor_error)?;
+    Ok(Some(
+        NativeAudioPayload::checked_cancellable(
+            waveform,
+            staging.audio_sample_rate,
+            context.cancellation,
+        )
+        .map_err(map_cancellable_media_payload_error)?,
+    ))
+}
+
+fn map_cancellable_media_payload_error(
+    error: NativeCancellableMediaPayloadError,
+) -> NativeVideoCodecDecodeError {
+    match error {
+        NativeCancellableMediaPayloadError::Cancelled => NativeVideoCodecDecodeError::Cancelled,
+        NativeCancellableMediaPayloadError::Payload(error) => {
+            NativeVideoCodecDecodeError::Media(error)
+        }
+    }
+}
+
+#[cfg(test)]
+mod general_decode_portable_tests {
+    use super::*;
+    use comfy_tensor::{CpuWorkspaceAuthority, StreamId};
+    use std::{
+        cell::{Cell, RefCell},
+        collections::HashMap,
+        ffi::{CString, c_char},
+    };
+
+    const GENERAL_MOCK_10_BIT_FORMAT: i32 = 10_001;
+    const GENERAL_MOCK_PLANAR_8_BIT_FORMAT: i32 = 10_002;
+    const GENERAL_MOCK_PLANAR_ALPHA_FORMAT: i32 = 10_003;
+
+    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+    enum GeneralDecodeMockProfile {
+        #[default]
+        H264,
+        H264WithAudio,
+        PlanarWidthUnaligned,
+        PlanarHeightOnly,
+        H264TenBit,
+        Vp9Alpha,
+        Av1WithoutAverageRate,
+    }
+
+    #[derive(Default)]
+    struct GeneralDecodeMockState {
+        events: Vec<&'static str>,
+        event_counts: HashMap<&'static str, usize>,
+        allocations: HashMap<usize, Vec<u8>>,
+        live_avio_contexts: usize,
+        live_formats: usize,
+        live_codecs: usize,
+        live_packets: usize,
+        live_frames: usize,
+        live_sws_contexts: usize,
+        live_swr_contexts: usize,
+        live_filter_graphs: usize,
+        live_channel_layouts: usize,
+        cleanup_underflow: bool,
+        profile: GeneralDecodeMockProfile,
+        allocated_decoders: Vec<usize>,
+        sws_width: usize,
+        sws_height: usize,
+        send_try_again_once: bool,
+        sent_try_again: bool,
+        read_count: usize,
+        fail_at: Option<&'static str>,
+        fail_occurrence: Option<usize>,
+    }
+
+    thread_local! {
+        static GENERAL_DECODE_MOCK: RefCell<GeneralDecodeMockState> = RefCell::default();
+        static GENERAL_DECODE_AUDIO_DECODER: Cell<usize> = const { Cell::new(0) };
+    }
+
+    fn record_general_decode_event(event: &'static str) {
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| state.events.push(event));
+    }
+
+    fn reset_general_decode_mock() {
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| *state = GeneralDecodeMockState::default());
+    }
+
+    fn fail_general_decode_at(event: &'static str) -> bool {
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+            state.events.push(event);
+            let occurrence = state.event_counts.entry(event).or_insert(0);
+            *occurrence += 1;
+            state.fail_at == Some(event) && state.fail_occurrence == Some(*occurrence)
+        })
+    }
+
+    fn configure_general_decode_failure(event: &'static str) {
+        reset_general_decode_mock();
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+            state.fail_at = Some(event);
+            state.fail_occurrence = Some(1);
+        });
+    }
+
+    fn configure_general_decode_profile_failure(
+        profile: GeneralDecodeMockProfile,
+        event: &'static str,
+    ) {
+        reset_general_decode_mock();
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+            state.profile = profile;
+            state.fail_at = Some(event);
+            state.fail_occurrence = Some(1);
+        });
+    }
+
+    fn configure_general_decode_occurrence_failure(
+        profile: GeneralDecodeMockProfile,
+        event: &'static str,
+        occurrence: usize,
+    ) {
+        reset_general_decode_mock();
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+            state.profile = profile;
+            state.fail_at = Some(event);
+            state.fail_occurrence = Some(occurrence);
+        });
+    }
+
+    fn configure_general_decode_profile(profile: GeneralDecodeMockProfile) {
+        reset_general_decode_mock();
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| state.profile = profile);
+    }
+
+    fn configure_general_decode_send_try_again() {
+        reset_general_decode_mock();
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| state.send_try_again_once = true);
+    }
+
+    fn assert_general_decode_mock_released(state: &GeneralDecodeMockState, phase: &str) {
+        assert!(state.allocations.is_empty(), "{phase}: AVIO buffer");
+        assert_eq!(state.live_avio_contexts, 0, "{phase}: AVIO context");
+        assert_eq!(state.live_formats, 0, "{phase}: format context");
+        assert_eq!(state.live_codecs, 0, "{phase}: codec context");
+        assert_eq!(state.live_packets, 0, "{phase}: packet");
+        assert_eq!(state.live_frames, 0, "{phase}: frame");
+        assert_eq!(state.live_sws_contexts, 0, "{phase}: conversion context");
+        assert_eq!(state.live_swr_contexts, 0, "{phase}: resampler context");
+        assert_eq!(state.live_filter_graphs, 0, "{phase}: filter graph");
+        assert_eq!(state.live_channel_layouts, 0, "{phase}: channel layout");
+        assert!(
+            !state.cleanup_underflow,
+            "{phase}: duplicate native cleanup"
+        );
+    }
+
+    #[repr(C)]
+    struct GeneralDecodeMockAvio {
+        prefix: abi::AvIoContext,
+        opaque: *mut c_void,
+        read_packet: Option<abi::AvIoReadPacket>,
+        seek: Option<abi::AvIoSeek>,
+    }
+
+    unsafe extern "C" fn general_mock_malloc(byte_count: usize) -> *mut c_void {
+        if fail_general_decode_at("avio_malloc") {
+            return std::ptr::null_mut();
+        }
+        let mut bytes = Vec::new();
+        if bytes.try_reserve_exact(byte_count).is_err() {
+            return std::ptr::null_mut();
+        }
+        bytes.resize(byte_count, 0);
+        let pointer = bytes.as_mut_ptr();
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+            state.allocations.insert(pointer as usize, bytes);
+        });
+        pointer.cast()
+    }
+
+    unsafe extern "C" fn general_mock_free(pointer: *mut c_void) {
+        record_general_decode_event("avio_free");
+        if !pointer.is_null() {
+            GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+                state.allocations.remove(&(pointer as usize));
+            });
+        }
+    }
+
+    unsafe extern "C" fn general_mock_avio_alloc_context(
+        buffer: *mut u8,
+        _buffer_size: i32,
+        _write: i32,
+        opaque: *mut c_void,
+        read_packet: Option<abi::AvIoReadPacket>,
+        _write_packet: Option<abi::AvIoWritePacket>,
+        seek: Option<abi::AvIoSeek>,
+    ) -> *mut abi::AvIoContext {
+        if fail_general_decode_at("avio_context_alloc") {
+            return std::ptr::null_mut();
+        }
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| state.live_avio_contexts += 1);
+        Box::into_raw(Box::new(GeneralDecodeMockAvio {
+            prefix: abi::AvIoContext {
+                class: std::ptr::null(),
+                buffer,
+            },
+            opaque,
+            read_packet,
+            seek,
+        }))
+        .cast()
+    }
+
+    unsafe extern "C" fn general_mock_avio_context_free(context: *mut *mut abi::AvIoContext) {
+        record_general_decode_event("avio_context_free");
+        if context.is_null() {
+            return;
+        }
+        let pointer = unsafe { *context };
+        if !pointer.is_null() {
+            drop(unsafe { Box::from_raw(pointer.cast::<GeneralDecodeMockAvio>()) });
+            GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+                if state.live_avio_contexts == 0 {
+                    state.cleanup_underflow = true;
+                } else {
+                    state.live_avio_contexts -= 1;
+                }
+            });
+            unsafe { *context = std::ptr::null_mut() };
+        }
+    }
+
+    #[repr(C)]
+    struct GeneralDecodeMockFormat {
+        projection: abi::AvFormatContextGeneralProjection,
+        input_format: Box<abi::AvInputFormatNameProjection>,
+        input_name: CString,
+        parameters: Box<[abi::AvCodecParametersGeneralProjection]>,
+        streams: Box<[abi::AvStreamGeneralProjection]>,
+        stream_pointers: Box<[*mut abi::AvStream]>,
+        metadata_strings: Box<[CString]>,
+        metadata_entries: Box<[abi::AvDictionaryEntry]>,
+    }
+
+    impl GeneralDecodeMockFormat {
+        fn video_parameters(
+            codec_id: i32,
+            pixel_format: i32,
+        ) -> abi::AvCodecParametersGeneralProjection {
+            abi::AvCodecParametersGeneralProjection {
+                codec_type: abi::AV_MEDIA_TYPE_VIDEO,
+                codec_id,
+                codec_tag: 0,
+                _pointer_alignment: 0,
+                extra_data: std::ptr::null_mut(),
+                extra_data_size: 0,
+                _side_data_alignment: 0,
+                coded_side_data: std::ptr::null_mut(),
+                coded_side_data_count: 0,
+                format: pixel_format,
+                bit_rate: 0,
+                bits_per_coded_sample: 8,
+                bits_per_raw_sample: 8,
+                profile: 0,
+                level: 0,
+                width: 2,
+                height: 1,
+                sample_aspect_ratio: abi::AvRational {
+                    numerator: 1,
+                    denominator: 1,
+                },
+                frame_rate: abi::AvRational {
+                    numerator: 24,
+                    denominator: 1,
+                },
+                field_order: 0,
+                color_range: 0,
+                color_primaries: 0,
+                color_transfer: 0,
+                color_space: 0,
+                chroma_location: 0,
+                video_delay: 0,
+                _channel_layout_alignment: 0,
+                channel_layout: abi::AvChannelLayout {
+                    order: 0,
+                    channel_count: 0,
+                    data: abi::AvChannelLayoutData { mask: 0 },
+                    opaque: std::ptr::null_mut(),
+                },
+                sample_rate: 0,
+                _frame_size_through_initial_padding: [0; 20],
+            }
+        }
+
+        fn audio_parameters(codec_id: i32) -> abi::AvCodecParametersGeneralProjection {
+            let mut parameters = Self::video_parameters(codec_id, abi::AV_SAMPLE_FORMAT_FLTP);
+            parameters.codec_type = abi::AV_MEDIA_TYPE_AUDIO;
+            parameters.width = 0;
+            parameters.height = 0;
+            parameters.channel_layout = abi::AvChannelLayout {
+                order: abi::AV_CHANNEL_ORDER_NATIVE,
+                channel_count: 2,
+                data: abi::AvChannelLayoutData { mask: 3 },
+                opaque: std::ptr::null_mut(),
+            };
+            parameters.sample_rate = 48_000;
+            parameters
+        }
+
+        fn stream(
+            index: i32,
+            time_base: abi::AvRational,
+            average_frame_rate: abi::AvRational,
+        ) -> abi::AvStreamGeneralProjection {
+            abi::AvStreamGeneralProjection {
+                prefix: abi::AvStream {
+                    class: std::ptr::null(),
+                    index,
+                    identifier: 0,
+                    codec_parameters: std::ptr::null_mut(),
+                    private_data: std::ptr::null_mut(),
+                    time_base,
+                },
+                start_time: 0,
+                duration: 24,
+                frame_count: 1,
+                disposition: 0,
+                discard: 0,
+                sample_aspect_ratio: abi::AvRational {
+                    numerator: 1,
+                    denominator: 1,
+                },
+                metadata: std::ptr::null_mut(),
+                average_frame_rate,
+                _attached_picture_through_codec_properties: [0; 136],
+            }
+        }
+
+        fn for_profile(profile: GeneralDecodeMockProfile) -> Self {
+            let (input_format_name, codec_id, pixel_format, average_frame_rate) = match profile {
+                GeneralDecodeMockProfile::H264 | GeneralDecodeMockProfile::H264WithAudio => (
+                    "mov,mp4,m4a,3gp,3g2,mj2",
+                    abi::AV_CODEC_ID_H264,
+                    abi::AV_PIXEL_FORMAT_RGBA,
+                    abi::AvRational {
+                        numerator: 24,
+                        denominator: 1,
+                    },
+                ),
+                GeneralDecodeMockProfile::PlanarWidthUnaligned
+                | GeneralDecodeMockProfile::PlanarHeightOnly => (
+                    "mov,mp4,m4a,3gp,3g2,mj2",
+                    abi::AV_CODEC_ID_H264,
+                    GENERAL_MOCK_PLANAR_8_BIT_FORMAT,
+                    abi::AvRational {
+                        numerator: 24,
+                        denominator: 1,
+                    },
+                ),
+                GeneralDecodeMockProfile::H264TenBit => (
+                    "mov,mp4,m4a,3gp,3g2,mj2",
+                    abi::AV_CODEC_ID_H264,
+                    GENERAL_MOCK_10_BIT_FORMAT,
+                    abi::AvRational {
+                        numerator: 24,
+                        denominator: 1,
+                    },
+                ),
+                GeneralDecodeMockProfile::Vp9Alpha => (
+                    "matroska,webm",
+                    abi::AV_CODEC_ID_VP9,
+                    GENERAL_MOCK_PLANAR_ALPHA_FORMAT,
+                    abi::AvRational {
+                        numerator: 24,
+                        denominator: 1,
+                    },
+                ),
+                GeneralDecodeMockProfile::Av1WithoutAverageRate => (
+                    "matroska,webm",
+                    abi::AV_CODEC_ID_AV1,
+                    abi::AV_PIXEL_FORMAT_RGBA,
+                    abi::AvRational {
+                        numerator: 0,
+                        denominator: 1,
+                    },
+                ),
+            };
+            let input_name =
+                CString::new(input_format_name).unwrap_or_else(|_| std::process::abort());
+            let mut parameters = vec![Self::video_parameters(codec_id, pixel_format)];
+            if let Some(video) = parameters.first_mut() {
+                match profile {
+                    GeneralDecodeMockProfile::PlanarWidthUnaligned => {
+                        video.width = 33;
+                        video.height = 1;
+                    }
+                    GeneralDecodeMockProfile::PlanarHeightOnly => {
+                        video.width = 32;
+                        video.height = 1;
+                    }
+                    GeneralDecodeMockProfile::H264TenBit | GeneralDecodeMockProfile::Vp9Alpha => {
+                        video.width = 32;
+                        video.height = 1;
+                    }
+                    _ => {}
+                }
+            }
+            let mut streams = vec![Self::stream(
+                0,
+                abi::AvRational {
+                    numerator: 1,
+                    denominator: 24,
+                },
+                average_frame_rate,
+            )];
+            if profile == GeneralDecodeMockProfile::H264WithAudio {
+                parameters.push(Self::video_parameters(
+                    abi::AV_CODEC_ID_H264,
+                    abi::AV_PIXEL_FORMAT_RGBA,
+                ));
+                parameters.push(Self::audio_parameters(abi::AV_CODEC_ID_AAC));
+                parameters.push(Self::audio_parameters(abi::AV_CODEC_ID_AAC));
+                parameters.push(Self::audio_parameters(abi::AV_CODEC_ID_AAC + 2));
+                if let Some(earlier_audio) = parameters.get_mut(2) {
+                    earlier_audio.sample_rate = 44_100;
+                }
+                streams.push(Self::stream(
+                    1,
+                    abi::AvRational {
+                        numerator: 1,
+                        denominator: 24,
+                    },
+                    average_frame_rate,
+                ));
+                for index in 2..=4 {
+                    streams.push(Self::stream(
+                        index,
+                        abi::AvRational {
+                            numerator: 1,
+                            denominator: 48_000,
+                        },
+                        abi::AvRational {
+                            numerator: 0,
+                            denominator: 1,
+                        },
+                    ));
+                }
+            }
+            let mut parameters = parameters.into_boxed_slice();
+            let mut streams = streams.into_boxed_slice();
+            for (stream, parameters) in streams.iter_mut().zip(parameters.iter_mut()) {
+                stream.prefix.codec_parameters =
+                    std::ptr::from_mut(parameters).cast::<abi::AvCodecParameters>();
+            }
+            let stream_count =
+                u32::try_from(streams.len()).unwrap_or_else(|_| std::process::abort());
+            let stream_pointers = streams
+                .iter_mut()
+                .map(|stream| std::ptr::from_mut(&mut stream.prefix))
+                .collect::<Vec<_>>()
+                .into_boxed_slice();
+            let metadata_strings = if profile == GeneralDecodeMockProfile::H264WithAudio {
+                vec![
+                    CString::new("title").unwrap_or_else(|_| std::process::abort()),
+                    CString::new("portable decode").unwrap_or_else(|_| std::process::abort()),
+                    CString::new("source").unwrap_or_else(|_| std::process::abort()),
+                    CString::new("owner mock").unwrap_or_else(|_| std::process::abort()),
+                ]
+                .into_boxed_slice()
+            } else {
+                Vec::new().into_boxed_slice()
+            };
+            let metadata_entries = if metadata_strings.is_empty() {
+                Vec::new().into_boxed_slice()
+            } else {
+                vec![
+                    abi::AvDictionaryEntry {
+                        key: metadata_strings[0].as_ptr().cast_mut(),
+                        value: metadata_strings[1].as_ptr().cast_mut(),
+                    },
+                    abi::AvDictionaryEntry {
+                        key: metadata_strings[2].as_ptr().cast_mut(),
+                        value: metadata_strings[3].as_ptr().cast_mut(),
+                    },
+                ]
+                .into_boxed_slice()
+            };
+            let mut fixture = Self {
+                projection: abi::AvFormatContextGeneralProjection {
+                    prefix: abi::AvFormatContext {
+                        class: std::ptr::null(),
+                        input_format: std::ptr::null(),
+                        output_format: std::ptr::null(),
+                        private_data: std::ptr::null_mut(),
+                        io_context: std::ptr::null_mut(),
+                        context_flags: 0,
+                        stream_count,
+                        streams: std::ptr::null_mut(),
+                    },
+                    _stream_groups_through_url: [0; 40],
+                    start_time: 0,
+                    duration: 1_000_000,
+                    _bit_rate_through_metadata: [0; 80],
+                    metadata: std::ptr::null_mut(),
+                    _control_and_timing_tail: [0; 272],
+                },
+                input_format: Box::new(abi::AvInputFormatNameProjection {
+                    name: std::ptr::null(),
+                }),
+                input_name,
+                parameters,
+                streams,
+                stream_pointers,
+                metadata_strings,
+                metadata_entries,
+            };
+            fixture.input_format.name = fixture.input_name.as_ptr();
+            fixture.projection.prefix.input_format =
+                std::ptr::from_ref(fixture.input_format.as_ref()).cast::<abi::AvInputFormat>();
+            fixture.projection.prefix.streams = fixture.stream_pointers.as_mut_ptr();
+            if !fixture.metadata_entries.is_empty() {
+                fixture.projection.metadata = fixture
+                    .metadata_entries
+                    .as_mut_ptr()
+                    .cast::<abi::AvDictionary>();
+            }
+            fixture
+        }
+    }
+
+    unsafe extern "C" fn general_mock_format_alloc() -> *mut abi::AvFormatContext {
+        if fail_general_decode_at("format_alloc") {
+            return std::ptr::null_mut();
+        }
+        let profile = GENERAL_DECODE_MOCK.with_borrow(|state| state.profile);
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| state.live_formats += 1);
+        Box::into_raw(Box::new(GeneralDecodeMockFormat::for_profile(profile))).cast()
+    }
+
+    unsafe extern "C" fn general_mock_format_free(format: *mut abi::AvFormatContext) {
+        record_general_decode_event("format_free");
+        if !format.is_null() {
+            drop(unsafe { Box::from_raw(format.cast::<GeneralDecodeMockFormat>()) });
+            GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+                if state.live_formats == 0 {
+                    state.cleanup_underflow = true;
+                } else {
+                    state.live_formats -= 1;
+                }
+            });
+        }
+    }
+
+    unsafe extern "C" fn general_mock_format_close(format: *mut *mut abi::AvFormatContext) {
+        record_general_decode_event("format_close");
+        if format.is_null() {
+            return;
+        }
+        let pointer = unsafe { *format };
+        if !pointer.is_null() {
+            drop(unsafe { Box::from_raw(pointer.cast::<GeneralDecodeMockFormat>()) });
+            GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+                if state.live_formats == 0 {
+                    state.cleanup_underflow = true;
+                } else {
+                    state.live_formats -= 1;
+                }
+            });
+            unsafe { *format = std::ptr::null_mut() };
+        }
+    }
+
+    unsafe extern "C" fn general_mock_format_open(
+        format: *mut *mut abi::AvFormatContext,
+        _url: *const c_char,
+        _input_format: *const abi::AvInputFormat,
+        _options: *mut *mut abi::AvDictionary,
+    ) -> i32 {
+        if fail_general_decode_at("format_open") {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        if format.is_null() || unsafe { (*format).is_null() } {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let io_context = unsafe { (**format).io_context };
+        if io_context.is_null() {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let avio = unsafe { &mut *io_context.cast::<GeneralDecodeMockAvio>() };
+        let Some(read_packet) = avio.read_packet else {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        };
+        let mut byte = 0_u8;
+        if unsafe { read_packet(avio.opaque, std::ptr::addr_of_mut!(byte), 1) } != 1 {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let Some(seek) = avio.seek else {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        };
+        if unsafe { seek(avio.opaque, 0, abi::AV_SEEK_SIZE) } <= 0 {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        0
+    }
+
+    unsafe extern "C" fn general_mock_find_stream_info(
+        _format: *mut abi::AvFormatContext,
+        _options: *mut *mut abi::AvDictionary,
+    ) -> i32 {
+        if fail_general_decode_at("stream_info") {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        0
+    }
+
+    unsafe extern "C" fn general_mock_seek_frame(
+        _format: *mut abi::AvFormatContext,
+        stream_index: i32,
+        timestamp: i64,
+        flags: i32,
+    ) -> i32 {
+        if fail_general_decode_at("seek_frame") {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        if stream_index == 0 && timestamp == 1 && flags == abi::AV_SEEK_FLAG_BACKWARD {
+            0
+        } else {
+            abi::AV_ERROR_INVALID_ARGUMENT
+        }
+    }
+
+    unsafe extern "C" fn general_mock_opt_set_int(
+        _object: *mut c_void,
+        _name: *const c_char,
+        _value: i64,
+        _flags: i32,
+    ) -> i32 {
+        if fail_general_decode_at("opt_set_int") {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        0
+    }
+
+    unsafe extern "C" fn general_mock_dict_iterate(
+        dictionary: *const abi::AvDictionary,
+        previous: *const abi::AvDictionaryEntry,
+    ) -> *const abi::AvDictionaryEntry {
+        if dictionary.is_null() {
+            record_general_decode_event("dict_iterate");
+            return std::ptr::null();
+        }
+        let first = dictionary.cast::<abi::AvDictionaryEntry>();
+        if fail_general_decode_at("dict_iterate") {
+            unsafe { (*first.cast_mut()).key = std::ptr::null_mut() };
+            return first;
+        }
+        if previous.is_null() {
+            first
+        } else if previous == first {
+            unsafe { first.add(1) }
+        } else {
+            std::ptr::null()
+        }
+    }
+
+    unsafe extern "C" fn general_mock_find_decoder(codec_id: i32) -> *const abi::AvCodec {
+        if fail_general_decode_at("find_decoder") || codec_id != abi::AV_CODEC_ID_AAC {
+            return std::ptr::null();
+        }
+        GENERAL_DECODE_AUDIO_DECODER.with(|decoder| decoder.get() as *const abi::AvCodec)
+    }
+
+    struct GeneralDecodeMockCodec {
+        media_type: i32,
+        frame_pending: bool,
+        flushing: bool,
+    }
+
+    unsafe extern "C" fn general_mock_codec_alloc(
+        decoder: *const abi::AvCodec,
+    ) -> *mut abi::AvCodecContext {
+        if fail_general_decode_at("codec_alloc") {
+            return std::ptr::null_mut();
+        }
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+            state.live_codecs += 1;
+            state.allocated_decoders.push(decoder as usize);
+        });
+        Box::into_raw(Box::new(GeneralDecodeMockCodec {
+            media_type: -1,
+            frame_pending: false,
+            flushing: false,
+        }))
+        .cast()
+    }
+
+    unsafe extern "C" fn general_mock_codec_free(context: *mut *mut abi::AvCodecContext) {
+        record_general_decode_event("codec_free");
+        if context.is_null() {
+            return;
+        }
+        let pointer = unsafe { *context };
+        if !pointer.is_null() {
+            drop(unsafe { Box::from_raw(pointer.cast::<GeneralDecodeMockCodec>()) });
+            GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+                if state.live_codecs == 0 {
+                    state.cleanup_underflow = true;
+                } else {
+                    state.live_codecs -= 1;
+                }
+            });
+            unsafe { *context = std::ptr::null_mut() };
+        }
+    }
+
+    unsafe extern "C" fn general_mock_parameters_to_context(
+        context: *mut abi::AvCodecContext,
+        parameters: *const abi::AvCodecParameters,
+    ) -> i32 {
+        if fail_general_decode_at("parameters_to_context") {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        if context.is_null() || parameters.is_null() {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let context = unsafe { &mut *context.cast::<GeneralDecodeMockCodec>() };
+        let parameters = unsafe { &*parameters.cast::<abi::AvCodecParametersGeneralProjection>() };
+        context.media_type = parameters.codec_type;
+        0
+    }
+
+    unsafe extern "C" fn general_mock_codec_open(
+        _context: *mut abi::AvCodecContext,
+        _decoder: *const abi::AvCodec,
+        _options: *mut *mut abi::AvDictionary,
+    ) -> i32 {
+        if fail_general_decode_at("codec_open") {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        0
+    }
+
+    fn empty_general_packet() -> abi::AvPacket {
+        abi::AvPacket {
+            buffer: std::ptr::null_mut(),
+            presentation_timestamp: abi::AV_NO_PRESENTATION_TIMESTAMP,
+            decoding_timestamp: abi::AV_NO_PRESENTATION_TIMESTAMP,
+            data: std::ptr::null_mut(),
+            size: 0,
+            stream_index: -1,
+            flags: 0,
+            side_data: std::ptr::null_mut(),
+            side_data_count: 0,
+            duration: 0,
+        }
+    }
+
+    unsafe extern "C" fn general_mock_packet_alloc() -> *mut abi::AvPacket {
+        if fail_general_decode_at("packet_alloc") {
+            return std::ptr::null_mut();
+        }
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| state.live_packets += 1);
+        Box::into_raw(Box::new(empty_general_packet()))
+    }
+
+    unsafe extern "C" fn general_mock_packet_free(packet: *mut *mut abi::AvPacket) {
+        record_general_decode_event("packet_free");
+        if packet.is_null() {
+            return;
+        }
+        let pointer = unsafe { *packet };
+        if !pointer.is_null() {
+            drop(unsafe { Box::from_raw(pointer) });
+            GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+                if state.live_packets == 0 {
+                    state.cleanup_underflow = true;
+                } else {
+                    state.live_packets -= 1;
+                }
+            });
+            unsafe { *packet = std::ptr::null_mut() };
+        }
+    }
+
+    unsafe extern "C" fn general_mock_packet_unref(packet: *mut abi::AvPacket) {
+        record_general_decode_event("packet_unref");
+        if !packet.is_null() {
+            unsafe { *packet = empty_general_packet() };
+        }
+    }
+
+    fn empty_general_frame() -> abi::AvFrameGeneralProjection {
+        abi::AvFrameGeneralProjection {
+            prefix: abi::AvFrame {
+                data: [std::ptr::null_mut(); abi::AV_NUM_DATA_POINTERS],
+                line_size: [0; abi::AV_NUM_DATA_POINTERS],
+                extended_data: std::ptr::null_mut(),
+                width: 0,
+                height: 0,
+                sample_count: 0,
+                format: -1,
+                key_frame: 0,
+                picture_type: 0,
+                sample_aspect_ratio: abi::AvRational {
+                    numerator: 0,
+                    denominator: 1,
+                },
+                presentation_timestamp: abi::AV_NO_PRESENTATION_TIMESTAMP,
+            },
+            _packet_dts_through_color_range: [0; 48],
+            sample_rate: 0,
+            _legacy_channel_layout_through_side_data: [0; 124],
+            best_effort_timestamp: abi::AV_NO_PRESENTATION_TIMESTAMP,
+            _packet_position: [0; 8],
+            metadata: std::ptr::null_mut(),
+            _decode_flags_through_crop: [0; 64],
+            channel_layout: abi::AvChannelLayout {
+                order: 0,
+                channel_count: 0,
+                data: abi::AvChannelLayoutData { mask: 0 },
+                opaque: std::ptr::null_mut(),
+            },
+            duration: 0,
+        }
+    }
+
+    unsafe extern "C" fn general_mock_frame_alloc() -> *mut abi::AvFrame {
+        if fail_general_decode_at("frame_alloc") {
+            return std::ptr::null_mut();
+        }
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| state.live_frames += 1);
+        Box::into_raw(Box::new(empty_general_frame())).cast()
+    }
+
+    unsafe extern "C" fn general_mock_frame_free(frame: *mut *mut abi::AvFrame) {
+        record_general_decode_event("frame_free");
+        if frame.is_null() {
+            return;
+        }
+        let pointer = unsafe { *frame };
+        if !pointer.is_null() {
+            drop(unsafe { Box::from_raw(pointer.cast::<abi::AvFrameGeneralProjection>()) });
+            GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+                if state.live_frames == 0 {
+                    state.cleanup_underflow = true;
+                } else {
+                    state.live_frames -= 1;
+                }
+            });
+            unsafe { *frame = std::ptr::null_mut() };
+        }
+    }
+
+    unsafe extern "C" fn general_mock_frame_unref(_frame: *mut abi::AvFrame) {
+        record_general_decode_event("frame_unref");
+    }
+
+    unsafe extern "C" fn general_mock_read_frame(
+        _format: *mut abi::AvFormatContext,
+        packet: *mut abi::AvPacket,
+    ) -> i32 {
+        if fail_general_decode_at("read_frame") {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let stream_index = GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+            let stream_index = match (state.profile, state.read_count) {
+                (_, 0) => Some(0),
+                (GeneralDecodeMockProfile::H264WithAudio, 1) => Some(3),
+                _ => None,
+            };
+            state.read_count += 1;
+            stream_index
+        });
+        let Some(stream_index) = stream_index else {
+            return abi::AV_ERROR_END_OF_FILE;
+        };
+        if packet.is_null() {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        unsafe {
+            (*packet).data = NonNull::<u8>::dangling().as_ptr();
+            (*packet).size = 1;
+            (*packet).stream_index = stream_index;
+        }
+        0
+    }
+
+    unsafe extern "C" fn general_mock_send_packet(
+        context: *mut abi::AvCodecContext,
+        packet: *const abi::AvPacket,
+    ) -> i32 {
+        if context.is_null() {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let context = unsafe { &mut *context.cast::<GeneralDecodeMockCodec>() };
+        if packet.is_null() {
+            if fail_general_decode_at("flush_decoder") {
+                return abi::AV_ERROR_INVALID_ARGUMENT;
+            }
+            context.flushing = true;
+        } else {
+            if fail_general_decode_at("send_packet") {
+                return abi::AV_ERROR_INVALID_ARGUMENT;
+            }
+            let emit_try_again = GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+                if state.send_try_again_once && !state.sent_try_again {
+                    state.sent_try_again = true;
+                    state.events.push("send_packet_try_again");
+                    true
+                } else {
+                    false
+                }
+            });
+            if emit_try_again {
+                return abi::AV_ERROR_TRY_AGAIN;
+            }
+            context.frame_pending = true;
+        }
+        0
+    }
+
+    unsafe extern "C" fn general_mock_receive_frame(
+        context: *mut abi::AvCodecContext,
+        frame: *mut abi::AvFrame,
+    ) -> i32 {
+        if fail_general_decode_at("receive_frame") {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        if context.is_null() {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let context = unsafe { &mut *context.cast::<GeneralDecodeMockCodec>() };
+        let disposition = if context.frame_pending {
+            context.frame_pending = false;
+            0
+        } else if context.flushing {
+            abi::AV_ERROR_END_OF_FILE
+        } else {
+            abi::AV_ERROR_TRY_AGAIN
+        };
+        if disposition != 0 {
+            return disposition;
+        }
+        if frame.is_null() {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let frame = unsafe { &mut *frame.cast::<abi::AvFrameGeneralProjection>() };
+        if context.media_type == abi::AV_MEDIA_TYPE_VIDEO {
+            let (width, height, format) =
+                GENERAL_DECODE_MOCK.with_borrow(|state| match state.profile {
+                    GeneralDecodeMockProfile::PlanarWidthUnaligned => {
+                        (33, 1, GENERAL_MOCK_PLANAR_8_BIT_FORMAT)
+                    }
+                    GeneralDecodeMockProfile::PlanarHeightOnly => {
+                        (32, 1, GENERAL_MOCK_PLANAR_8_BIT_FORMAT)
+                    }
+                    GeneralDecodeMockProfile::H264TenBit => (32, 1, GENERAL_MOCK_10_BIT_FORMAT),
+                    GeneralDecodeMockProfile::Vp9Alpha => (32, 1, GENERAL_MOCK_PLANAR_ALPHA_FORMAT),
+                    _ => (2, 1, abi::AV_PIXEL_FORMAT_RGBA),
+                });
+            frame.prefix.width = width;
+            frame.prefix.height = height;
+            frame.prefix.format = format;
+            frame.prefix.presentation_timestamp = 1;
+            frame.prefix.data[0] = NonNull::<u8>::dangling().as_ptr();
+            frame.prefix.line_size[0] = 8;
+            frame.best_effort_timestamp = 1;
+        } else if context.media_type == abi::AV_MEDIA_TYPE_AUDIO {
+            frame.prefix.sample_count = 4;
+            frame.prefix.format = abi::AV_SAMPLE_FORMAT_FLTP;
+            frame.prefix.presentation_timestamp = 0;
+            frame.sample_rate = 48_000;
+            frame.channel_layout = abi::AvChannelLayout {
+                order: abi::AV_CHANNEL_ORDER_NATIVE,
+                channel_count: 2,
+                data: abi::AvChannelLayoutData { mask: 3 },
+                opaque: std::ptr::null_mut(),
+            };
+            frame.prefix.data[0] = NonNull::<u8>::dangling().as_ptr();
+            frame.prefix.data[1] = NonNull::<u8>::dangling().as_ptr();
+        } else {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        0
+    }
+
+    thread_local! {
+        static GENERAL_PIXEL_DESCRIPTOR: Box<abi::AvPixelFormatDescriptor> = Box::new(
+            abi::AvPixelFormatDescriptor {
+                name: std::ptr::null(),
+                component_count: 4,
+                log2_chroma_width: 0,
+                log2_chroma_height: 0,
+                _flags_alignment: [0; 5],
+                flags: abi::AV_PIXEL_FORMAT_FLAG_ALPHA,
+                components: [
+                    abi::AvComponentDescriptor { plane: 0, step: 4, offset: 0, shift: 0, depth: 8 },
+                    abi::AvComponentDescriptor { plane: 0, step: 4, offset: 1, shift: 0, depth: 8 },
+                    abi::AvComponentDescriptor { plane: 0, step: 4, offset: 2, shift: 0, depth: 8 },
+                    abi::AvComponentDescriptor { plane: 0, step: 4, offset: 3, shift: 0, depth: 8 },
+                ],
+                alias: std::ptr::null(),
+            }
+        );
+        static GENERAL_10_BIT_PIXEL_DESCRIPTOR: Box<abi::AvPixelFormatDescriptor> = Box::new(
+            abi::AvPixelFormatDescriptor {
+                name: std::ptr::null(),
+                component_count: 3,
+                log2_chroma_width: 1,
+                log2_chroma_height: 1,
+                _flags_alignment: [0; 5],
+                flags: 0,
+                components: [
+                    abi::AvComponentDescriptor { plane: 0, step: 2, offset: 0, shift: 0, depth: 10 },
+                    abi::AvComponentDescriptor { plane: 1, step: 2, offset: 0, shift: 0, depth: 10 },
+                    abi::AvComponentDescriptor { plane: 2, step: 2, offset: 0, shift: 0, depth: 10 },
+                    abi::AvComponentDescriptor { plane: 0, step: 0, offset: 0, shift: 0, depth: 0 },
+                ],
+                alias: std::ptr::null(),
+            }
+        );
+        static GENERAL_PLANAR_PIXEL_DESCRIPTOR: Box<abi::AvPixelFormatDescriptor> = Box::new(
+            abi::AvPixelFormatDescriptor {
+                name: std::ptr::null(),
+                component_count: 3,
+                log2_chroma_width: 0,
+                log2_chroma_height: 0,
+                _flags_alignment: [0; 5],
+                flags: 0,
+                components: [
+                    abi::AvComponentDescriptor { plane: 0, step: 1, offset: 0, shift: 0, depth: 8 },
+                    abi::AvComponentDescriptor { plane: 1, step: 1, offset: 0, shift: 0, depth: 8 },
+                    abi::AvComponentDescriptor { plane: 2, step: 1, offset: 0, shift: 0, depth: 8 },
+                    abi::AvComponentDescriptor { plane: 0, step: 0, offset: 0, shift: 0, depth: 0 },
+                ],
+                alias: std::ptr::null(),
+            }
+        );
+        static GENERAL_PLANAR_ALPHA_DESCRIPTOR: Box<abi::AvPixelFormatDescriptor> = Box::new(
+            abi::AvPixelFormatDescriptor {
+                name: std::ptr::null(),
+                component_count: 4,
+                log2_chroma_width: 0,
+                log2_chroma_height: 0,
+                _flags_alignment: [0; 5],
+                flags: abi::AV_PIXEL_FORMAT_FLAG_ALPHA,
+                components: [
+                    abi::AvComponentDescriptor { plane: 0, step: 1, offset: 0, shift: 0, depth: 8 },
+                    abi::AvComponentDescriptor { plane: 1, step: 1, offset: 0, shift: 0, depth: 8 },
+                    abi::AvComponentDescriptor { plane: 2, step: 1, offset: 0, shift: 0, depth: 8 },
+                    abi::AvComponentDescriptor { plane: 3, step: 1, offset: 0, shift: 0, depth: 8 },
+                ],
+                alias: std::ptr::null(),
+            }
+        );
+        static GENERAL_ROTATION_MATRIX: Box<[i32; 9]> = Box::new([0; 9]);
+        static GENERAL_ROTATION_SIDE_DATA: RefCell<Box<abi::AvFrameSideData>> = RefCell::new(
+            Box::new(abi::AvFrameSideData {
+                side_data_type: abi::AV_FRAME_DATA_DISPLAY_MATRIX,
+                _data_alignment: 0,
+                data: std::ptr::null_mut(),
+                size: 9 * std::mem::size_of::<i32>(),
+                metadata: std::ptr::null_mut(),
+                buffer: std::ptr::null_mut(),
+            })
+        );
+    }
+
+    unsafe extern "C" fn general_mock_pixel_descriptor(
+        format: i32,
+    ) -> *const abi::AvPixelFormatDescriptor {
+        if fail_general_decode_at("pixel_descriptor") {
+            return std::ptr::null();
+        }
+        if format == GENERAL_MOCK_10_BIT_FORMAT {
+            GENERAL_10_BIT_PIXEL_DESCRIPTOR
+                .with(|descriptor| std::ptr::from_ref(descriptor.as_ref()))
+        } else if format == GENERAL_MOCK_PLANAR_8_BIT_FORMAT {
+            GENERAL_PLANAR_PIXEL_DESCRIPTOR
+                .with(|descriptor| std::ptr::from_ref(descriptor.as_ref()))
+        } else if format == GENERAL_MOCK_PLANAR_ALPHA_FORMAT {
+            GENERAL_PLANAR_ALPHA_DESCRIPTOR
+                .with(|descriptor| std::ptr::from_ref(descriptor.as_ref()))
+        } else {
+            GENERAL_PIXEL_DESCRIPTOR.with(|descriptor| std::ptr::from_ref(descriptor.as_ref()))
+        }
+    }
+
+    unsafe extern "C" fn general_mock_frame_side_data(
+        _frame: *const abi::AvFrame,
+        kind: i32,
+    ) -> *mut abi::AvFrameSideData {
+        record_general_decode_event("frame_side_data");
+        let rotated = GENERAL_DECODE_MOCK
+            .with_borrow(|state| state.profile == GeneralDecodeMockProfile::H264WithAudio);
+        if !rotated || kind != abi::AV_FRAME_DATA_DISPLAY_MATRIX {
+            return std::ptr::null_mut();
+        }
+        GENERAL_ROTATION_MATRIX.with(|matrix| {
+            GENERAL_ROTATION_SIDE_DATA.with_borrow_mut(|side_data| {
+                side_data.data = matrix.as_ptr().cast_mut().cast::<u8>();
+                std::ptr::from_mut(side_data.as_mut())
+            })
+        })
+    }
+
+    unsafe extern "C" fn general_mock_rotation(_matrix: *const i32) -> f64 {
+        if fail_general_decode_at("rotation") {
+            return f64::NAN;
+        }
+        GENERAL_DECODE_MOCK.with_borrow(|state| {
+            if state.profile == GeneralDecodeMockProfile::H264WithAudio {
+                90.0
+            } else {
+                0.0
+            }
+        })
+    }
+
+    unsafe extern "C" fn general_mock_sws_get(
+        source_width: i32,
+        source_height: i32,
+        _source_format: i32,
+        _destination_width: i32,
+        _destination_height: i32,
+        _destination_format: i32,
+        _flags: i32,
+        _source_filter: *mut abi::SwsFilter,
+        _destination_filter: *mut abi::SwsFilter,
+        _parameters: *const f64,
+    ) -> *mut abi::SwsContext {
+        if fail_general_decode_at("sws_get") {
+            return std::ptr::null_mut();
+        }
+        let Ok(width) = usize::try_from(source_width) else {
+            return std::ptr::null_mut();
+        };
+        let Ok(height) = usize::try_from(source_height) else {
+            return std::ptr::null_mut();
+        };
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+            state.live_sws_contexts += 1;
+            state.sws_width = width;
+            state.sws_height = height;
+        });
+        NonNull::<abi::SwsContext>::dangling().as_ptr()
+    }
+
+    unsafe extern "C" fn general_mock_sws_scale(
+        _context: *mut abi::SwsContext,
+        _source_data: *const *const u8,
+        _source_line_size: *const i32,
+        _source_y: i32,
+        source_height: i32,
+        destination_data: *const *mut u8,
+        _destination_line_size: *const i32,
+    ) -> i32 {
+        if fail_general_decode_at("sws_scale") {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        if destination_data.is_null() || unsafe { (*destination_data).is_null() } {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let profile = GENERAL_DECODE_MOCK.with_borrow(|state| state.profile);
+        if matches!(
+            profile,
+            GeneralDecodeMockProfile::PlanarWidthUnaligned
+                | GeneralDecodeMockProfile::PlanarHeightOnly
+                | GeneralDecodeMockProfile::H264TenBit
+                | GeneralDecodeMockProfile::Vp9Alpha
+        ) {
+            let (width, height) =
+                GENERAL_DECODE_MOCK.with_borrow(|state| (state.sws_width, state.sws_height));
+            let pixels = width
+                .checked_mul(height)
+                .unwrap_or_else(|| std::process::abort());
+            let plane_values: &[f32] = if profile == GeneralDecodeMockProfile::Vp9Alpha {
+                &[0.2, 0.3, 0.1, 0.25]
+            } else {
+                &[0.2, 0.3, 0.1]
+            };
+            for (plane, value) in plane_values.iter().copied().enumerate() {
+                let output = unsafe { *destination_data.add(plane) }.cast::<f32>();
+                if output.is_null() {
+                    return abi::AV_ERROR_INVALID_ARGUMENT;
+                }
+                for pixel in 0..pixels {
+                    let value = if plane == 3 && pixel % 2 == 1 {
+                        0.75
+                    } else {
+                        value
+                    };
+                    unsafe { *output.add(pixel) = value };
+                }
+            }
+        } else {
+            let rgba = [10_u8, 20, 30, 255, 40, 50, 60, 128];
+            unsafe { std::ptr::copy_nonoverlapping(rgba.as_ptr(), *destination_data, rgba.len()) };
+        }
+        source_height
+    }
+
+    unsafe extern "C" fn general_mock_sws_free(_context: *mut abi::SwsContext) {
+        record_general_decode_event("sws_free");
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+            if state.live_sws_contexts == 0 {
+                state.cleanup_underflow = true;
+            } else {
+                state.live_sws_contexts -= 1;
+            }
+        });
+    }
+
+    unsafe extern "C" fn general_mock_channel_layout_copy(
+        destination: *mut abi::AvChannelLayout,
+        source: *const abi::AvChannelLayout,
+    ) -> i32 {
+        if fail_general_decode_at("channel_layout_copy")
+            || destination.is_null()
+            || source.is_null()
+        {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        unsafe {
+            (*destination).order = (*source).order;
+            (*destination).channel_count = (*source).channel_count;
+            (*destination).data.mask = (*source).data.mask;
+            (*destination).opaque = (*source).opaque;
+        }
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| state.live_channel_layouts += 1);
+        0
+    }
+
+    unsafe extern "C" fn general_mock_channel_layout_uninit(layout: *mut abi::AvChannelLayout) {
+        record_general_decode_event("channel_layout_uninit");
+        if !layout.is_null() && unsafe { (*layout).channel_count } != 0 {
+            GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+                if state.live_channel_layouts == 0 {
+                    state.cleanup_underflow = true;
+                } else {
+                    state.live_channel_layouts -= 1;
+                }
+            });
+        }
+    }
+
+    unsafe extern "C" fn general_mock_swr_alloc() -> *mut abi::SwrContext {
+        if fail_general_decode_at("swr_alloc") {
+            return std::ptr::null_mut();
+        }
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| state.live_swr_contexts += 1);
+        NonNull::<abi::SwrContext>::dangling().as_ptr()
+    }
+
+    unsafe extern "C" fn general_mock_swr_alloc_set_opts(
+        _context: *mut *mut abi::SwrContext,
+        _output_layout: *const abi::AvChannelLayout,
+        _output_format: i32,
+        _output_rate: i32,
+        _input_layout: *const abi::AvChannelLayout,
+        _input_format: i32,
+        _input_rate: i32,
+        _log_offset: i32,
+        _log_context: *mut c_void,
+    ) -> i32 {
+        if fail_general_decode_at("swr_opts") {
+            abi::AV_ERROR_INVALID_ARGUMENT
+        } else {
+            0
+        }
+    }
+
+    unsafe extern "C" fn general_mock_swr_init(_context: *mut abi::SwrContext) -> i32 {
+        if fail_general_decode_at("swr_init") {
+            abi::AV_ERROR_INVALID_ARGUMENT
+        } else {
+            0
+        }
+    }
+
+    unsafe extern "C" fn general_mock_swr_delay(_context: *mut abi::SwrContext, _base: i64) -> i64 {
+        if fail_general_decode_at("swr_delay") {
+            -1
+        } else {
+            0
+        }
+    }
+
+    unsafe extern "C" fn general_mock_swr_convert(
+        _context: *mut abi::SwrContext,
+        output: *mut *mut u8,
+        output_samples: i32,
+        _input: *const *const u8,
+        input_samples: i32,
+    ) -> i32 {
+        if fail_general_decode_at("swr_convert") {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        if output.is_null() || output_samples < input_samples || input_samples < 0 {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let input_samples =
+            usize::try_from(input_samples).unwrap_or_else(|_| std::process::abort());
+        for channel in 0..2_usize {
+            let channel_output = unsafe { *output.add(channel) }.cast::<f32>();
+            if channel_output.is_null() {
+                return abi::AV_ERROR_INVALID_ARGUMENT;
+            }
+            for sample in 0..input_samples {
+                unsafe {
+                    *channel_output.add(sample) =
+                        (channel * input_samples + sample + 1) as f32 / 10.0;
+                }
+            }
+        }
+        i32::try_from(input_samples).unwrap_or_else(|_| std::process::abort())
+    }
+
+    unsafe extern "C" fn general_mock_swr_free(context: *mut *mut abi::SwrContext) {
+        record_general_decode_event("swr_free");
+        if !context.is_null() {
+            if unsafe { !(*context).is_null() } {
+                GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+                    if state.live_swr_contexts == 0 {
+                        state.cleanup_underflow = true;
+                    } else {
+                        state.live_swr_contexts -= 1;
+                    }
+                });
+            }
+            unsafe { *context = std::ptr::null_mut() };
+        }
+    }
+
+    unsafe extern "C" fn general_mock_filter_get(_name: *const c_char) -> *const abi::AvFilter {
+        if fail_general_decode_at("filter_get") {
+            return std::ptr::null();
+        }
+        NonNull::<abi::AvFilter>::dangling().as_ptr()
+    }
+
+    unsafe extern "C" fn general_mock_filter_graph_alloc() -> *mut abi::AvFilterGraph {
+        if fail_general_decode_at("filter_graph_alloc") {
+            return std::ptr::null_mut();
+        }
+        GENERAL_DECODE_MOCK.with_borrow_mut(|state| state.live_filter_graphs += 1);
+        NonNull::<abi::AvFilterGraph>::dangling().as_ptr()
+    }
+
+    unsafe extern "C" fn general_mock_filter_graph_free(graph: *mut *mut abi::AvFilterGraph) {
+        record_general_decode_event("filter_graph_free");
+        if !graph.is_null() {
+            if unsafe { !(*graph).is_null() } {
+                GENERAL_DECODE_MOCK.with_borrow_mut(|state| {
+                    if state.live_filter_graphs == 0 {
+                        state.cleanup_underflow = true;
+                    } else {
+                        state.live_filter_graphs -= 1;
+                    }
+                });
+            }
+            unsafe { *graph = std::ptr::null_mut() };
+        }
+    }
+
+    unsafe extern "C" fn general_mock_filter_create(
+        output: *mut *mut abi::AvFilterContext,
+        _filter: *const abi::AvFilter,
+        name: *const c_char,
+        _arguments: *const c_char,
+        _opaque: *mut c_void,
+        _graph: *mut abi::AvFilterGraph,
+    ) -> i32 {
+        if fail_general_decode_at("filter_create") || output.is_null() || name.is_null() {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let name = unsafe { CStr::from_ptr(name) }.to_bytes();
+        let (event, identity) = match name {
+            b"general_decode_source" => ("filter_create_source", 0x10_usize),
+            b"general_decode_pad" => ("filter_create_pad", 0x20),
+            b"general_decode_smear" => ("filter_create_smear", 0x30),
+            b"general_decode_sink" => ("filter_create_sink", 0x40),
+            _ => return abi::AV_ERROR_INVALID_ARGUMENT,
+        };
+        record_general_decode_event(event);
+        unsafe { *output = identity as *mut abi::AvFilterContext };
+        0
+    }
+
+    unsafe extern "C" fn general_mock_filter_link(
+        left: *mut abi::AvFilterContext,
+        _left_pad: u32,
+        right: *mut abi::AvFilterContext,
+        _right_pad: u32,
+    ) -> i32 {
+        if fail_general_decode_at("filter_link") {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let event = match (left as usize, right as usize) {
+            (0x10, 0x20) => "filter_link_source_pad",
+            (0x20, 0x30) => "filter_link_pad_smear",
+            (0x30, 0x40) => "filter_link_smear_sink",
+            _ => return abi::AV_ERROR_INVALID_ARGUMENT,
+        };
+        record_general_decode_event(event);
+        0
+    }
+
+    unsafe extern "C" fn general_mock_filter_config(
+        _graph: *mut abi::AvFilterGraph,
+        _log: *mut c_void,
+    ) -> i32 {
+        if fail_general_decode_at("filter_config") {
+            abi::AV_ERROR_INVALID_ARGUMENT
+        } else {
+            0
+        }
+    }
+
+    unsafe extern "C" fn general_mock_filter_push(
+        _source: *mut abi::AvFilterContext,
+        _frame: *mut abi::AvFrame,
+        _flags: i32,
+    ) -> i32 {
+        if fail_general_decode_at("filter_push") {
+            abi::AV_ERROR_INVALID_ARGUMENT
+        } else {
+            0
+        }
+    }
+
+    unsafe extern "C" fn general_mock_filter_pull(
+        _sink: *mut abi::AvFilterContext,
+        frame: *mut abi::AvFrame,
+    ) -> i32 {
+        if fail_general_decode_at("filter_pull") || frame.is_null() {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let frame = unsafe { &mut *frame.cast::<abi::AvFrameGeneralProjection>() };
+        frame.prefix.width = 64;
+        frame.prefix.height = 32;
+        frame.prefix.format = GENERAL_MOCK_PLANAR_8_BIT_FORMAT;
+        frame.prefix.data[0] = NonNull::<u8>::dangling().as_ptr();
+        frame.prefix.line_size[0] = 64;
+        0
+    }
+
+    fn general_mock_functions() -> NativeGeneralDecodeFunctions {
+        NativeGeneralDecodeFunctions {
+            av_packet_alloc: general_mock_packet_alloc,
+            av_packet_free: general_mock_packet_free,
+            av_packet_unref: general_mock_packet_unref,
+            avcodec_alloc_context3: general_mock_codec_alloc,
+            avcodec_find_decoder: general_mock_find_decoder,
+            avcodec_free_context: general_mock_codec_free,
+            avcodec_open2: general_mock_codec_open,
+            avcodec_parameters_to_context: general_mock_parameters_to_context,
+            avcodec_receive_frame: general_mock_receive_frame,
+            avcodec_send_packet: general_mock_send_packet,
+            av_read_frame: general_mock_read_frame,
+            avformat_alloc_context: general_mock_format_alloc,
+            avformat_close_input: general_mock_format_close,
+            avformat_find_stream_info: general_mock_find_stream_info,
+            avformat_free_context: general_mock_format_free,
+            avformat_open_input: general_mock_format_open,
+            av_seek_frame: general_mock_seek_frame,
+            av_channel_layout_copy: general_mock_channel_layout_copy,
+            av_channel_layout_uninit: general_mock_channel_layout_uninit,
+            av_dict_iterate: general_mock_dict_iterate,
+            av_display_rotation_get: general_mock_rotation,
+            av_frame_alloc: general_mock_frame_alloc,
+            av_frame_free: general_mock_frame_free,
+            av_frame_get_side_data: general_mock_frame_side_data,
+            av_frame_unref: general_mock_frame_unref,
+            av_opt_set_int: general_mock_opt_set_int,
+            av_pixel_format_descriptor_get: general_mock_pixel_descriptor,
+            swr_alloc: general_mock_swr_alloc,
+            swr_alloc_set_opts2: general_mock_swr_alloc_set_opts,
+            swr_convert: general_mock_swr_convert,
+            swr_free: general_mock_swr_free,
+            swr_get_delay: general_mock_swr_delay,
+            swr_init: general_mock_swr_init,
+            av_buffersink_get_frame: general_mock_filter_pull,
+            av_buffersrc_add_frame_flags: general_mock_filter_push,
+            avfilter_get_by_name: general_mock_filter_get,
+            avfilter_graph_alloc: general_mock_filter_graph_alloc,
+            avfilter_graph_config: general_mock_filter_config,
+            avfilter_graph_create_filter: general_mock_filter_create,
+            avfilter_graph_free: general_mock_filter_graph_free,
+            avfilter_link: general_mock_filter_link,
+            sws_free_context: general_mock_sws_free,
+            sws_get_context: general_mock_sws_get,
+            sws_scale: general_mock_sws_scale,
+        }
+    }
+
+    fn general_mock_dependencies<'a>(
+        decoders: &'a [NonNull<abi::AvCodec>],
+    ) -> NativeGeneralDecodeDependencies<'a> {
+        let [h264_decoder, vp9_decoder, av1_decoder, audio_decoder, ..] = decoders else {
+            std::process::abort();
+        };
+        GENERAL_DECODE_AUDIO_DECODER.with(|decoder| decoder.set(audio_decoder.as_ptr() as usize));
+        NativeGeneralDecodeDependencies {
+            functions: general_mock_functions(),
+            avio_functions: NativeVideoCodecAvioFunctions {
+                av_malloc: general_mock_malloc,
+                av_free: general_mock_free,
+                avio_alloc_context: general_mock_avio_alloc_context,
+                avio_context_free: general_mock_avio_context_free,
+            },
+            h264_decoder: *h264_decoder,
+            vp9_decoder: *vp9_decoder,
+            av1_decoder: *av1_decoder,
+            decoder_authority: NativeGeneralDecoderAuthority::Exact(decoders),
+        }
+    }
+
+    #[test]
+    fn general_video_demux_decode_drives_private_portable_native_dependencies()
+    -> Result<(), Box<dyn std::error::Error>> {
+        reset_general_decode_mock();
+        let mut codec_tokens = [0_u8; 4];
+        let [h264_token, vp9_token, av1_token, audio_token] = &mut codec_tokens;
+        let decoders = [
+            NonNull::from(h264_token).cast::<abi::AvCodec>(),
+            NonNull::from(vp9_token).cast::<abi::AvCodec>(),
+            NonNull::from(av1_token).cast::<abi::AvCodec>(),
+            NonNull::from(audio_token).cast::<abi::AvCodec>(),
+        ];
+        let dependencies = general_mock_dependencies(&decoders);
+        let limits = NativeVideoDecodeLimits::reviewed();
+        let scratch_bytes = limits.maximum_workspace_peak_bytes()?;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(scratch_bytes)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(scratch_bytes)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let decoded = decode_general_video_with_dependencies(
+            &dependencies,
+            b"portable-mp4",
+            NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+            limits,
+            &backend,
+            &context,
+            &mut || cancellation.check(),
+        )?;
+        assert!(decoded.diagnostics().skipped_streams().is_empty());
+        let components = decoded
+            .video()
+            .components()
+            .ok_or("portable decode did not produce video components")?;
+        assert_eq!(components.dimensions(), (2, 1));
+        assert_eq!(components.frame_count(), 1);
+        assert_eq!(components.frame_rate(), (24, 1));
+        assert_eq!(components.bit_depth(), NativeVideoBitDepth::Eight);
+        assert!(components.audio().is_none());
+        let alpha = components
+            .alpha()
+            .ok_or("portable RGBA decode did not retain alpha")?;
+        let frame_values = components
+            .frames()
+            .contiguous_bytes()?
+            .chunks_exact(std::mem::size_of::<f32>())
+            .map(|chunk| {
+                let bytes: [u8; 4] = chunk.try_into()?;
+                Ok::<_, std::array::TryFromSliceError>(f32::from_ne_bytes(bytes))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let alpha_values = alpha
+            .contiguous_bytes()?
+            .chunks_exact(std::mem::size_of::<f32>())
+            .map(|chunk| {
+                let bytes: [u8; 4] = chunk.try_into()?;
+                Ok::<_, std::array::TryFromSliceError>(f32::from_ne_bytes(bytes))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let expected_frames = [10_u8, 20, 30, 40, 50, 60].map(|value| f32::from(value) / 255.0);
+        assert_eq!(frame_values, expected_frames);
+        assert_eq!(alpha_values, [1.0, 128.0 / 255.0]);
+        drop(decoded);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        GENERAL_DECODE_MOCK.with_borrow(|state| {
+            assert_general_decode_mock_released(state, "portable success");
+            assert!(state.events.starts_with(&[
+                "avio_malloc",
+                "avio_context_alloc",
+                "format_alloc",
+                "opt_set_int",
+                "opt_set_int",
+                "opt_set_int",
+                "format_open",
+                "stream_info",
+            ]));
+            assert!(state.events.windows(7).any(|events| {
+                events
+                    == [
+                        "send_packet",
+                        "receive_frame",
+                        "pixel_descriptor",
+                        "frame_side_data",
+                        "sws_get",
+                        "sws_scale",
+                        "sws_free",
+                    ]
+            }));
+            assert!(state.events.ends_with(&[
+                "frame_free",
+                "packet_free",
+                "codec_free",
+                "format_close",
+                "avio_free",
+                "avio_context_free",
+            ]));
+        });
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_demux_decode_selects_each_reviewed_video_decoder_and_rate_fallback()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut codec_tokens = [0_u8; 4];
+        let [h264_token, vp9_token, av1_token, audio_token] = &mut codec_tokens;
+        let decoders = [
+            NonNull::from(h264_token).cast::<abi::AvCodec>(),
+            NonNull::from(vp9_token).cast::<abi::AvCodec>(),
+            NonNull::from(av1_token).cast::<abi::AvCodec>(),
+            NonNull::from(audio_token).cast::<abi::AvCodec>(),
+        ];
+        let dependencies = general_mock_dependencies(&decoders);
+        let limits = NativeVideoDecodeLimits::reviewed();
+        let scratch_bytes = limits.maximum_workspace_peak_bytes()?;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(scratch_bytes)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(scratch_bytes)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        for (profile, expected_decoder, expected_depth, expected_rate) in [
+            (
+                GeneralDecodeMockProfile::H264,
+                decoders[0],
+                NativeVideoBitDepth::Eight,
+                (24, 1),
+            ),
+            (
+                GeneralDecodeMockProfile::H264TenBit,
+                decoders[0],
+                NativeVideoBitDepth::Ten,
+                (24, 1),
+            ),
+            (
+                GeneralDecodeMockProfile::Vp9Alpha,
+                decoders[1],
+                NativeVideoBitDepth::Eight,
+                (24, 1),
+            ),
+            (
+                GeneralDecodeMockProfile::Av1WithoutAverageRate,
+                decoders[2],
+                NativeVideoBitDepth::Eight,
+                (1, 1),
+            ),
+        ] {
+            configure_general_decode_profile(profile);
+            let decoded = decode_general_video_with_dependencies(
+                &dependencies,
+                b"portable-reviewed-video-codec",
+                NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+                limits,
+                &backend,
+                &context,
+                &mut || cancellation.check(),
+            )?;
+            assert_eq!(decoded.video().bit_depth(), expected_depth, "{profile:?}");
+            assert_eq!(decoded.video().frame_rate(), expected_rate, "{profile:?}");
+            if profile == GeneralDecodeMockProfile::H264TenBit {
+                let components = decoded
+                    .video()
+                    .components()
+                    .ok_or("H264 10-bit mock did not produce components")?;
+                assert!(components.alpha().is_none());
+                assert_eq!(components.dimensions(), (32, 1));
+            }
+            if profile == GeneralDecodeMockProfile::Vp9Alpha {
+                let alpha = decoded
+                    .video()
+                    .components()
+                    .and_then(|components| components.alpha())
+                    .ok_or("VP9 alpha mock did not produce alpha")?;
+                let values = alpha
+                    .contiguous_bytes()?
+                    .chunks_exact(std::mem::size_of::<f32>())
+                    .take(2)
+                    .map(|chunk| {
+                        let bytes: [u8; 4] = chunk.try_into()?;
+                        Ok::<_, std::array::TryFromSliceError>(f32::from_ne_bytes(bytes))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                assert_eq!(values, [0.25, 0.75]);
+            }
+            GENERAL_DECODE_MOCK.with_borrow(|state| {
+                assert_eq!(
+                    state.allocated_decoders,
+                    [expected_decoder.as_ptr() as usize],
+                    "{profile:?}",
+                );
+                assert_general_decode_mock_released(state, "reviewed decoder selection");
+            });
+            drop(decoded);
+            assert_eq!(context.scratch.in_use_bytes(), 0, "{profile:?}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_demux_decode_selects_first_video_and_last_decodable_audio()
+    -> Result<(), Box<dyn std::error::Error>> {
+        configure_general_decode_profile(GeneralDecodeMockProfile::H264WithAudio);
+        let mut codec_tokens = [0_u8; 4];
+        let [h264_token, vp9_token, av1_token, audio_token] = &mut codec_tokens;
+        let decoders = [
+            NonNull::from(h264_token).cast::<abi::AvCodec>(),
+            NonNull::from(vp9_token).cast::<abi::AvCodec>(),
+            NonNull::from(av1_token).cast::<abi::AvCodec>(),
+            NonNull::from(audio_token).cast::<abi::AvCodec>(),
+        ];
+        let dependencies = general_mock_dependencies(&decoders);
+        let limits = NativeVideoDecodeLimits::reviewed();
+        let scratch_bytes = limits.maximum_workspace_peak_bytes()?;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(scratch_bytes)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(scratch_bytes)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let decoded = decode_general_video_with_dependencies(
+            &dependencies,
+            b"portable-mp4-multiple-streams",
+            NativeVideoDecodeWindow::checked(0.0, 0.0)?,
+            limits,
+            &backend,
+            &context,
+            &mut || cancellation.check(),
+        )?;
+        let skipped = decoded.diagnostics().skipped_streams();
+        assert_eq!(skipped.len(), 1);
+        assert_eq!(skipped[0].stream_index(), 4);
+        assert_eq!(
+            skipped[0].reason(),
+            NativeVideoSkippedStreamReason::MissingDecoder
+        );
+        let components = decoded
+            .video()
+            .components()
+            .ok_or("portable decode did not produce components")?;
+        assert_eq!(components.dimensions(), (1, 2));
+        assert_eq!(
+            components.metadata().get("title").map(String::as_str),
+            Some("portable decode")
+        );
+        assert_eq!(
+            components.metadata().get("source").map(String::as_str),
+            Some("owner mock")
+        );
+        let rotated_frames = components
+            .frames()
+            .contiguous_bytes()?
+            .chunks_exact(std::mem::size_of::<f32>())
+            .map(|chunk| {
+                let bytes: [u8; 4] = chunk.try_into()?;
+                Ok::<_, std::array::TryFromSliceError>(f32::from_ne_bytes(bytes))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let rotated_alpha = components
+            .alpha()
+            .ok_or("rotated portable decode did not retain alpha")?
+            .contiguous_bytes()?
+            .chunks_exact(std::mem::size_of::<f32>())
+            .map(|chunk| {
+                let bytes: [u8; 4] = chunk.try_into()?;
+                Ok::<_, std::array::TryFromSliceError>(f32::from_ne_bytes(bytes))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(
+            rotated_frames,
+            [40_u8, 50, 60, 10, 20, 30].map(|value| f32::from(value) / 255.0)
+        );
+        assert_eq!(rotated_alpha, [128.0 / 255.0, 1.0]);
+        let audio = components
+            .audio()
+            .ok_or("portable decode did not retain selected audio")?;
+        assert_eq!(audio.sample_rate(), 48_000);
+        assert_eq!(audio.waveform().descriptor().shape(), &[1, 2, 4]);
+        let samples = audio
+            .waveform()
+            .contiguous_bytes()?
+            .chunks_exact(std::mem::size_of::<f32>())
+            .map(|chunk| {
+                let bytes: [u8; 4] = chunk.try_into()?;
+                Ok::<_, std::array::TryFromSliceError>(f32::from_ne_bytes(bytes))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(samples, [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]);
+        GENERAL_DECODE_MOCK.with_borrow(|state| {
+            assert_eq!(
+                state.allocated_decoders,
+                [decoders[0].as_ptr() as usize, decoders[3].as_ptr() as usize],
+            );
+            assert!(state.events.contains(&"swr_convert"));
+            assert_general_decode_mock_released(state, "portable audio selection");
+        });
+        drop(decoded);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_demux_decode_filters_width_alignment_but_not_height_only()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut codec_tokens = [0_u8; 4];
+        let [h264_token, vp9_token, av1_token, audio_token] = &mut codec_tokens;
+        let decoders = [
+            NonNull::from(h264_token).cast::<abi::AvCodec>(),
+            NonNull::from(vp9_token).cast::<abi::AvCodec>(),
+            NonNull::from(av1_token).cast::<abi::AvCodec>(),
+            NonNull::from(audio_token).cast::<abi::AvCodec>(),
+        ];
+        let dependencies = general_mock_dependencies(&decoders);
+        let limits = NativeVideoDecodeLimits::reviewed();
+        let scratch_bytes = limits.maximum_workspace_peak_bytes()?;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(scratch_bytes)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(scratch_bytes)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        configure_general_decode_profile(GeneralDecodeMockProfile::PlanarWidthUnaligned);
+        let aligned = decode_general_video_with_dependencies(
+            &dependencies,
+            b"portable-width-unaligned",
+            NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+            limits,
+            &backend,
+            &context,
+            &mut || cancellation.check(),
+        )?;
+        assert_eq!(aligned.video().dimensions(), (33, 1));
+        GENERAL_DECODE_MOCK.with_borrow(|state| {
+            let topology = state
+                .events
+                .iter()
+                .copied()
+                .filter(|event| {
+                    event.starts_with("filter_create_") || event.starts_with("filter_link_")
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                topology,
+                [
+                    "filter_create_source",
+                    "filter_create_pad",
+                    "filter_create_smear",
+                    "filter_create_sink",
+                    "filter_link_source_pad",
+                    "filter_link_pad_smear",
+                    "filter_link_smear_sink",
+                ],
+            );
+            assert_eq!(
+                state
+                    .events
+                    .iter()
+                    .filter(|event| **event == "filter_graph_alloc")
+                    .count(),
+                1,
+            );
+            assert_general_decode_mock_released(state, "width alignment");
+        });
+        drop(aligned);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        configure_general_decode_profile(GeneralDecodeMockProfile::PlanarHeightOnly);
+        let height_only = decode_general_video_with_dependencies(
+            &dependencies,
+            b"portable-height-only-unaligned",
+            NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+            limits,
+            &backend,
+            &context,
+            &mut || cancellation.check(),
+        )?;
+        assert_eq!(height_only.video().dimensions(), (32, 1));
+        GENERAL_DECODE_MOCK.with_borrow(|state| {
+            assert!(!state.events.contains(&"filter_graph_alloc"));
+            assert_general_decode_mock_released(state, "height-only nonalignment");
+        });
+        drop(height_only);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_demux_decode_filter_and_resampler_failures_are_atomic()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut codec_tokens = [0_u8; 4];
+        let [h264_token, vp9_token, av1_token, audio_token] = &mut codec_tokens;
+        let decoders = [
+            NonNull::from(h264_token).cast::<abi::AvCodec>(),
+            NonNull::from(vp9_token).cast::<abi::AvCodec>(),
+            NonNull::from(av1_token).cast::<abi::AvCodec>(),
+            NonNull::from(audio_token).cast::<abi::AvCodec>(),
+        ];
+        let dependencies = general_mock_dependencies(&decoders);
+        let limits = NativeVideoDecodeLimits::reviewed();
+        let scratch_bytes = limits.maximum_workspace_peak_bytes()?;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(scratch_bytes)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(scratch_bytes)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        for failure in [
+            "filter_graph_alloc",
+            "filter_get",
+            "filter_create",
+            "filter_link",
+            "filter_config",
+            "filter_push",
+            "filter_pull",
+        ] {
+            configure_general_decode_profile_failure(
+                GeneralDecodeMockProfile::PlanarWidthUnaligned,
+                failure,
+            );
+            let result = decode_general_video_with_dependencies(
+                &dependencies,
+                b"portable-filter-failure",
+                NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+                limits,
+                &backend,
+                &context,
+                &mut || cancellation.check(),
+            );
+            assert!(result.is_err(), "{failure} unexpectedly succeeded");
+            assert_eq!(context.scratch.in_use_bytes(), 0, "{failure}");
+            GENERAL_DECODE_MOCK.with_borrow(|state| {
+                assert!(state.events.contains(&failure), "{failure}");
+                assert_general_decode_mock_released(state, failure);
+            });
+        }
+        for failure in [
+            "dict_iterate",
+            "rotation",
+            "channel_layout_copy",
+            "swr_alloc",
+            "swr_opts",
+            "swr_init",
+            "swr_delay",
+            "swr_convert",
+        ] {
+            configure_general_decode_profile_failure(
+                GeneralDecodeMockProfile::H264WithAudio,
+                failure,
+            );
+            let result = decode_general_video_with_dependencies(
+                &dependencies,
+                b"portable-audio-failure",
+                NativeVideoDecodeWindow::checked(0.0, 0.0)?,
+                limits,
+                &backend,
+                &context,
+                &mut || cancellation.check(),
+            );
+            assert!(result.is_err(), "{failure} unexpectedly succeeded");
+            assert_eq!(context.scratch.in_use_bytes(), 0, "{failure}");
+            GENERAL_DECODE_MOCK.with_borrow(|state| {
+                assert!(state.events.contains(&failure), "{failure}");
+                assert_general_decode_mock_released(state, failure);
+            });
+        }
+        for (profile, failure, occurrence, window) in [
+            (
+                GeneralDecodeMockProfile::H264,
+                "opt_set_int",
+                2,
+                NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+            ),
+            (
+                GeneralDecodeMockProfile::H264,
+                "opt_set_int",
+                3,
+                NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+            ),
+            (
+                GeneralDecodeMockProfile::H264,
+                "pixel_descriptor",
+                2,
+                NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+            ),
+            (
+                GeneralDecodeMockProfile::H264WithAudio,
+                "codec_alloc",
+                2,
+                NativeVideoDecodeWindow::checked(0.0, 0.0)?,
+            ),
+            (
+                GeneralDecodeMockProfile::H264WithAudio,
+                "frame_alloc",
+                2,
+                NativeVideoDecodeWindow::checked(0.0, 0.0)?,
+            ),
+            (
+                GeneralDecodeMockProfile::PlanarWidthUnaligned,
+                "filter_create",
+                4,
+                NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+            ),
+            (
+                GeneralDecodeMockProfile::PlanarWidthUnaligned,
+                "filter_link",
+                3,
+                NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+            ),
+        ] {
+            configure_general_decode_occurrence_failure(profile, failure, occurrence);
+            let result = decode_general_video_with_dependencies(
+                &dependencies,
+                b"portable-repeated-boundary-failure",
+                window,
+                limits,
+                &backend,
+                &context,
+                &mut || cancellation.check(),
+            );
+            assert!(
+                result.is_err(),
+                "{profile:?} {failure} occurrence {occurrence} unexpectedly succeeded",
+            );
+            assert_eq!(context.scratch.in_use_bytes(), 0);
+            GENERAL_DECODE_MOCK.with_borrow(|state| {
+                assert_eq!(state.event_counts.get(failure), Some(&occurrence));
+                assert_general_decode_mock_released(
+                    state,
+                    &format!("{profile:?} {failure} occurrence {occurrence}"),
+                );
+            });
+        }
+        configure_general_decode_profile(GeneralDecodeMockProfile::H264WithAudio);
+        let retry = decode_general_video_with_dependencies(
+            &dependencies,
+            b"portable-branch-retry",
+            NativeVideoDecodeWindow::checked(0.0, 0.0)?,
+            limits,
+            &backend,
+            &context,
+            &mut || cancellation.check(),
+        )?;
+        assert!(
+            retry
+                .video()
+                .components()
+                .is_some_and(|components| components.audio().is_some())
+        );
+        drop(retry);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_demux_decode_retries_packet_after_try_again()
+    -> Result<(), Box<dyn std::error::Error>> {
+        configure_general_decode_send_try_again();
+        let mut codec_tokens = [0_u8; 4];
+        let [h264_token, vp9_token, av1_token, audio_token] = &mut codec_tokens;
+        let decoders = [
+            NonNull::from(h264_token).cast::<abi::AvCodec>(),
+            NonNull::from(vp9_token).cast::<abi::AvCodec>(),
+            NonNull::from(av1_token).cast::<abi::AvCodec>(),
+            NonNull::from(audio_token).cast::<abi::AvCodec>(),
+        ];
+        let dependencies = general_mock_dependencies(&decoders);
+        let limits = NativeVideoDecodeLimits::reviewed();
+        let scratch_bytes = limits.maximum_workspace_peak_bytes()?;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(scratch_bytes)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(scratch_bytes)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let decoded = decode_general_video_with_dependencies(
+            &dependencies,
+            b"portable-send-try-again",
+            NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+            limits,
+            &backend,
+            &context,
+            &mut || cancellation.check(),
+        )?;
+        assert_eq!(decoded.video().frame_count(), 1);
+        GENERAL_DECODE_MOCK.with_borrow(|state| {
+            assert!(state.sent_try_again);
+            assert_eq!(
+                state
+                    .events
+                    .iter()
+                    .filter(|event| **event == "send_packet")
+                    .count(),
+                2,
+            );
+            assert_general_decode_mock_released(state, "packet try-again retry");
+        });
+        drop(decoded);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_demux_decode_native_failures_are_atomic_and_retryable()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut codec_tokens = [0_u8; 4];
+        let [h264_token, vp9_token, av1_token, audio_token] = &mut codec_tokens;
+        let decoders = [
+            NonNull::from(h264_token).cast::<abi::AvCodec>(),
+            NonNull::from(vp9_token).cast::<abi::AvCodec>(),
+            NonNull::from(av1_token).cast::<abi::AvCodec>(),
+            NonNull::from(audio_token).cast::<abi::AvCodec>(),
+        ];
+        let dependencies = general_mock_dependencies(&decoders);
+        let limits = NativeVideoDecodeLimits::reviewed();
+        let scratch_bytes = limits.maximum_workspace_peak_bytes()?;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(scratch_bytes)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(scratch_bytes)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let window = NativeVideoDecodeWindow::checked(0.05, 0.0)?;
+        for failure in [
+            "avio_malloc",
+            "avio_context_alloc",
+            "format_alloc",
+            "opt_set_int",
+            "format_open",
+            "stream_info",
+            "seek_frame",
+            "codec_alloc",
+            "parameters_to_context",
+            "codec_open",
+            "packet_alloc",
+            "frame_alloc",
+            "read_frame",
+            "send_packet",
+            "receive_frame",
+            "sws_get",
+            "sws_scale",
+            "flush_decoder",
+        ] {
+            configure_general_decode_failure(failure);
+            let result = decode_general_video_with_dependencies(
+                &dependencies,
+                b"portable-mp4",
+                window,
+                limits,
+                &backend,
+                &context,
+                &mut || cancellation.check(),
+            );
+            assert!(result.is_err(), "{failure} unexpectedly succeeded");
+            assert_eq!(context.scratch.in_use_bytes(), 0, "{failure}");
+            GENERAL_DECODE_MOCK.with_borrow(|state| {
+                assert_general_decode_mock_released(state, failure);
+                assert!(state.events.contains(&failure), "{failure}");
+            });
+        }
+        reset_general_decode_mock();
+        let retry = decode_general_video_with_dependencies(
+            &dependencies,
+            b"portable-mp4",
+            window,
+            limits,
+            &backend,
+            &context,
+            &mut || cancellation.check(),
+        )?;
+        assert_eq!(retry.video().dimensions(), (2, 1));
+        drop(retry);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_demux_decode_cancellation_sweeps_every_checked_boundary()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut codec_tokens = [0_u8; 4];
+        let [h264_token, vp9_token, av1_token, audio_token] = &mut codec_tokens;
+        let decoders = [
+            NonNull::from(h264_token).cast::<abi::AvCodec>(),
+            NonNull::from(vp9_token).cast::<abi::AvCodec>(),
+            NonNull::from(av1_token).cast::<abi::AvCodec>(),
+            NonNull::from(audio_token).cast::<abi::AvCodec>(),
+        ];
+        let dependencies = general_mock_dependencies(&decoders);
+        let limits = NativeVideoDecodeLimits::reviewed();
+        let scratch_bytes = limits.maximum_workspace_peak_bytes()?;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(scratch_bytes)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(scratch_bytes)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        for (profile, window, bytes) in [
+            (
+                GeneralDecodeMockProfile::H264,
+                NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+                b"portable-mp4".as_slice(),
+            ),
+            (
+                GeneralDecodeMockProfile::H264WithAudio,
+                NativeVideoDecodeWindow::checked(0.0, 0.0)?,
+                b"portable-mp4-audio".as_slice(),
+            ),
+            (
+                GeneralDecodeMockProfile::PlanarWidthUnaligned,
+                NativeVideoDecodeWindow::checked(0.05, 0.0)?,
+                b"portable-mp4-filter".as_slice(),
+            ),
+        ] {
+            configure_general_decode_profile(profile);
+            let mut total_checks = 0_usize;
+            let success = decode_general_video_with_dependencies(
+                &dependencies,
+                bytes,
+                window,
+                limits,
+                &backend,
+                &context,
+                &mut || {
+                    total_checks += 1;
+                    Ok(())
+                },
+            )?;
+            drop(success);
+            assert!(total_checks > 32, "{profile:?}");
+            for cancellation_at in 1..=total_checks {
+                configure_general_decode_profile(profile);
+                let mut checks = 0_usize;
+                let result = decode_general_video_with_dependencies(
+                    &dependencies,
+                    bytes,
+                    window,
+                    limits,
+                    &backend,
+                    &context,
+                    &mut || {
+                        checks += 1;
+                        if checks == cancellation_at {
+                            Err(CancellationError)
+                        } else {
+                            Ok(())
+                        }
+                    },
+                );
+                assert!(
+                    matches!(result, Err(NativeVideoCodecDecodeError::Cancelled)),
+                    "{profile:?} cancellation checkpoint {cancellation_at} returned {result:?}",
+                );
+                assert_eq!(
+                    context.scratch.in_use_bytes(),
+                    0,
+                    "{profile:?} cancellation checkpoint {cancellation_at}",
+                );
+                GENERAL_DECODE_MOCK.with_borrow(|state| {
+                    assert_general_decode_mock_released(
+                        state,
+                        &format!("{profile:?} cancellation checkpoint {cancellation_at}"),
+                    );
+                });
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_demux_decode_uses_source_trim_rotation_and_audio_bounds()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let exact_decoder = NonNull::<abi::AvCodec>::dangling();
+        let exact_decoders = [exact_decoder];
+        let exact_authority = NativeGeneralDecoderAuthority::Exact(&exact_decoders);
+        assert!(exact_authority.proves(exact_decoder));
+        assert!(
+            !exact_authority.proves(
+                NonNull::new(2_usize as *mut abi::AvCodec)
+                    .ok_or("second exact decoder pointer was null",)?
+            )
+        );
+
+        let time_base = abi::AvRational {
+            numerator: 1,
+            denominator: 24,
+        };
+        assert_eq!(seconds_to_stream_timestamp(0.041, time_base)?, 0);
+        assert_eq!(seconds_to_stream_timestamp(0.042, time_base)?, 1);
+        assert_eq!(seconds_to_stream_timestamp(1.5, time_base)?, 36);
+
+        assert_eq!(rotated_source_coordinate(0, 0, 2, 3, 0)?, (0, 0));
+        assert_eq!(rotated_source_coordinate(0, 0, 2, 3, 1)?, (0, 2));
+        assert_eq!(rotated_source_coordinate(0, 0, 2, 3, 2)?, (1, 2));
+        assert_eq!(rotated_source_coordinate(0, 0, 2, 3, 3)?, (1, 0));
+        assert_eq!(general_rotation_steps(0.0)?, 0);
+        assert_eq!(general_rotation_steps(-0.0)?, 0);
+        assert_eq!(general_rotation_steps(90.0)?, 1);
+        assert_eq!(general_rotation_steps(-90.0)?, 3);
+        assert_eq!(general_rotation_steps(180.0)?, 2);
+        assert_eq!(general_rotation_steps(270.0)?, 3);
+        assert_eq!(general_rotation_steps(89.999)?, 0);
+        assert_eq!(general_rotation_steps(45.0)?, 0);
+        assert_eq!(general_rotation_steps(-1.0)?, 3);
+
+        assert_eq!(checked_general_audio_sample_count(0.0, 48_000)?, 0);
+        assert_eq!(checked_general_audio_sample_count(0.000_021, 48_000)?, 1);
+        assert_eq!(checked_general_audio_sample_count(0.5, 48_000)?, 24_000);
+        assert!(checked_general_audio_sample_count(f64::MAX, u32::MAX).is_err());
+        assert_eq!(checked_general_converted_samples(2, 2)?, 2);
+        assert!(checked_general_converted_samples(3, 2).is_err());
+
+        let reviewed_limits = NativeVideoDecodeLimits::reviewed();
+        assert_eq!(
+            checked_general_alignment_dimensions(
+                1_279,
+                736,
+                reviewed_limits.maximum_pixels_per_frame(),
+            )?,
+            (1_280, 736)
+        );
+        assert!(matches!(
+            checked_general_alignment_dimensions(
+                1,
+                942_080,
+                reviewed_limits.maximum_pixels_per_frame(),
+            ),
+            Err(NativeVideoCodecDecodeError::ResourceExhausted {
+                phase: "admit aligned video frame"
+            })
+        ));
+        assert_eq!(
+            checked_general_audio_frame_values(
+                5_760_000,
+                2,
+                reviewed_limits.maximum_audio_samples(),
+            )?,
+            reviewed_limits.maximum_audio_samples()
+        );
+        assert!(matches!(
+            checked_general_audio_frame_values(
+                5_760_001,
+                2,
+                reviewed_limits.maximum_audio_samples(),
+            ),
+            Err(NativeVideoCodecDecodeError::ResourceExhausted {
+                phase: "admit decoded audio frame"
+            })
+        ));
+        let source = include_str!("native_video_codec_ffi.rs");
+        let alignment_owner = source
+            .split("fn create_general_alignment_frame(")
+            .nth(1)
+            .and_then(|source| source.split("fn process_general_video_frame(").next())
+            .ok_or("alignment owner source slice is missing")?;
+        let alignment_admission = alignment_owner
+            .find("checked_general_alignment_dimensions(")
+            .ok_or("alignment admission call is missing")?;
+        let alignment_allocation = alignment_owner
+            .find("functions.avfilter_graph_alloc")
+            .ok_or("alignment allocation call is missing")?;
+        assert!(alignment_admission < alignment_allocation);
+        let audio_owner = source
+            .split("fn process_general_audio_frame(")
+            .nth(1)
+            .and_then(|source| {
+                source
+                    .split("fn checked_general_audio_sample_count(")
+                    .next()
+            })
+            .ok_or("audio owner source slice is missing")?;
+        let audio_admission = audio_owner
+            .find("checked_general_audio_frame_values(")
+            .ok_or("audio admission call is missing")?;
+        let audio_allocation = audio_owner
+            .find("create_general_resampler(")
+            .ok_or("audio resampler call is missing")?;
+        assert!(audio_admission < audio_allocation);
+
+        let stereo = abi::AvChannelLayout {
+            order: abi::AV_CHANNEL_ORDER_NATIVE,
+            channel_count: 2,
+            data: abi::AvChannelLayoutData { mask: 0b11 },
+            opaque: std::ptr::null_mut(),
+        };
+        let alternate_stereo = abi::AvChannelLayout {
+            order: abi::AV_CHANNEL_ORDER_NATIVE,
+            channel_count: 2,
+            data: abi::AvChannelLayoutData { mask: 0b101 },
+            opaque: std::ptr::null_mut(),
+        };
+        let identity = checked_general_audio_input_identity(8, 48_000, &stereo)?;
+        assert_ne!(
+            identity,
+            checked_general_audio_input_identity(9, 48_000, &stereo)?
+        );
+        assert_ne!(
+            identity,
+            checked_general_audio_input_identity(8, 48_000, &alternate_stereo)?
+        );
+        assert!(checked_general_audio_input_identity(8, 7_999, &stereo).is_err());
+        assert!(checked_general_audio_input_identity(8, 384_001, &stereo).is_err());
+        let nine_channels = abi::AvChannelLayout {
+            order: abi::AV_CHANNEL_ORDER_NATIVE,
+            channel_count: 9,
+            data: abi::AvChannelLayoutData { mask: 0x1ff },
+            opaque: std::ptr::null_mut(),
+        };
+        assert!(checked_general_audio_input_identity(8, 48_000, &nine_channels).is_err());
+
+        assert_eq!(
+            general_video_container_from_demuxer_name(b"mov,mp4,m4a,3gp,3g2,mj2")?,
+            NativeGeneralVideoContainer::Mp4
+        );
+        assert_eq!(
+            general_video_container_from_demuxer_name(b"matroska,webm")?,
+            NativeGeneralVideoContainer::Webm
+        );
+        assert!(general_video_container_from_demuxer_name(b"mpegts").is_err());
+        assert!(general_video_container_from_demuxer_name(b"matroska").is_err());
+
+        let input_limits = checked_general_input_open_limits(NativeVideoDecodeLimits::reviewed())?;
+        assert_eq!(input_limits.probe_bytes, 128 * 1024 * 1024);
+        assert_eq!(input_limits.analysis_duration_microseconds, 10_000_000);
+        assert_eq!(input_limits.maximum_streams, 32);
+        assert!(matches!(
+            map_general_decode_io_error(NativeVideoCodecIoError::Cancelled),
+            NativeVideoCodecDecodeError::Cancelled
+        ));
+        assert!(matches!(
+            map_general_decode_io_error(NativeVideoCodecIoError::Tensor(TensorError::Cancelled)),
+            NativeVideoCodecDecodeError::Cancelled
+        ));
+        assert!(matches!(
+            map_general_decode_io_error(NativeVideoCodecIoError::CallbackResourceExhausted),
+            NativeVideoCodecDecodeError::ResourceExhausted { .. }
+        ));
+        Ok(())
+    }
 }
 
 #[cfg(all(test, target_os = "linux", target_arch = "x86_64", target_env = "gnu"))]

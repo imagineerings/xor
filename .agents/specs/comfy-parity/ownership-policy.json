@@ -10028,7 +10028,7 @@
         {
           "name": "general-video-bootstrap-captures-capability-bytes-and-seals-through-shared-owner",
           "path": "crates/comfy_runtime/src/native_video_codec_package.rs",
-          "pattern": "capture_private_file[\\s\\S]*capture_native_library_bytes\\(captured[\\s\\S]*RetainedNativeLibraryImage"
+          "pattern": "(?=[\\s\\S]*fn required_capture[\\s\\S]*root\\.capture_private_file\\(Path::new\\(path\\), maximum_bytes, cancellation\\))(?=[\\s\\S]*fn inspect_and_seal_images[\\s\\S]*capture_native_library_bytes\\(captured, &digest\\)[\\s\\S]*\\.seal\\([\\s\\S]*GeneralVideoCodecImageSet::Loadable\\(retained_images\\))"
         }
       ],
       "known_open_reasons": [],
@@ -14999,7 +14999,7 @@
         {
           "name": "general-video-profile-reuses-the-sole-loader-through-crate-private-projections",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "pub\\(crate\\) fn load_certified_general_video_codec_closure[\\s\\S]*load_video_codec_projection[\\s\\S]*pub\\(crate\\) fn bind_certified_general_video_codec_abi[\\s\\S]*NativeGeneralVideoCodecBinding"
+          "pattern": "(?=[\\s\\S]*pub\\(crate\\) fn load_certified_general_video_codec_closure[\\s\\S]*let loaded = load_video_codec_projection\\(&projection, cancellation\\)\\?;[\\s\\S]*Ok\\(NativeGeneralVideoCodecLoad)(?=[\\s\\S]*pub\\(crate\\) fn bind_certified_general_video_codec_abi[\\s\\S]*Ok\\(NativeGeneralVideoCodecBinding)"
         }
       ],
       "known_open_reasons": [],
@@ -16542,6 +16542,175 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "One backend-independent signed package authority admits the exact general FFmpeg closure and moves it once into the existing retained codec actor. Shared capability, coverage, ELF, certification, loader, memory-planning, and executor owners remain authoritative; the bootstrap adds no downloader, subprocess, private production key, second parser, second unsafe loader, second actor, filesystem cache identity, or partial service publication."
+    },
+    {
+      "concern": "native_video_reviewed_codec_registry_ltxv_thread_general_video_demux_decode",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::decode_general_video_with_check",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+        "crates/comfy_runtime/src/native_video_codec_service.rs",
+        "crates/comfy_media/src/native_node_payload.rs",
+        "crates/comfy_media/src/video.rs"
+      ],
+      "owner_symbols": [
+        "NativeVideoCodecDecodeError",
+        "NativeGeneralVideoDecodeService",
+        "NativeCancellableMediaPayloadError",
+        "NativeVideoDecodeLimits",
+        "NativeVideoDecodeRequest",
+        "NativeDecodedVideo",
+        "decode_general_video_with_check"
+      ],
+      "allowed_adapters": [
+        "the signed general-video package and retained binding owners supply only the already certified six-library function table inside the sole codec actor",
+        "the bounded memory AVIO and CPU workspace owners supply caller-authorized input, staging, tensor materialization, and cancellation without a path, subprocess, second allocator, or second loader",
+        "the canonical media payload owner alone validates and hashes completed audio and component VIDEO values with the same cancellation token before actor publication",
+        "NativeVideoCodecWorkerServices retains one actor-internal decode port but no worker executor or NativeNodeServices adapter may receive that port before Task564"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::decode_general_video_with_check",
+          "role": "canonical_service",
+          "symbol": "decode_general_video_with_check",
+          "pattern": "^fn decode_general_video_with_check\\("
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecDecodeError",
+          "role": "canonical_policy",
+          "symbol": "NativeVideoCodecDecodeError"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::native_video_codec_service::NativeGeneralVideoDecodeService",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeGeneralVideoDecodeService"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeCancellableMediaPayloadError",
+          "role": "canonical_policy",
+          "symbol": "NativeCancellableMediaPayloadError"
+        },
+        {
+          "path": "crates/comfy_media/src/video.rs",
+          "qualified": "comfy_media::NativeVideoDecodeLimits",
+          "role": "canonical_policy",
+          "symbol": "NativeVideoDecodeLimits"
+        },
+        {
+          "path": "crates/comfy_media/src/video.rs",
+          "qualified": "comfy_media::NativeVideoDecodeRequest",
+          "role": "sealed_authorization",
+          "symbol": "NativeVideoDecodeRequest"
+        },
+        {
+          "path": "crates/comfy_media/src/video.rs",
+          "qualified": "comfy_media::NativeDecodedVideo",
+          "role": "canonical",
+          "symbol": "NativeDecodedVideo"
+        }
+      ],
+      "call_symbols": [
+        "NativeVideoCodecDecodeError",
+        "NativeGeneralVideoDecodeService",
+        "NativeCancellableMediaPayloadError",
+        "NativeVideoDecodeLimits",
+        "NativeVideoDecodeRequest",
+        "NativeDecodedVideo",
+        "decode_general_video_with_check"
+      ],
+      "call_path_prefixes": [
+        "crates/comfy_media/",
+        "crates/comfy_runtime/"
+      ],
+      "required_mappings": [
+        {
+          "name": "general-video-decode-reuses-bounded-avio-and-one-certified-binding",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "fn decode_general_video_with_check[\\s\\S]*open_general_bounded_input[\\s\\S]*open_general_input[\\s\\S]*select_general_decode_streams[\\s\\S]*seek_general_decode_window[\\s\\S]*run_general_decode_loop"
+        },
+        {
+          "name": "general-video-decode-materializes-only-through-cancellable-media-owner",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "fn decode_general_video_with_check[\\s\\S]*materialize_general_audio[\\s\\S]*NativeVideoPayload::checked_cancellable[\\s\\S]*NativeDecodedVideo::checked_cancellable"
+        },
+        {
+          "name": "general-video-audio-materialization-uses-cancellable-media-owner",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "fn materialize_general_audio[\\s\\S]*NativeAudioPayload::checked_cancellable"
+        },
+        {
+          "name": "general-video-decode-port-is-retained-by-the-existing-single-actor-bundle",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "NativeGeneralVideoDecodeService[\\s\\S]*NativeVideoCodecWorkerServices[\\s\\S]*general_video_decode_service[\\s\\S]*NativeLtxvCodecThreadService::start_general"
+        },
+        {
+          "name": "general-video-decode-limits-fit-the-frozen-codec-scratch",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "let decode = NativeVideoDecodeLimits::reviewed\\(\\)[\\s\\S]*decode[\\s\\S]*checked_workspace_peak_bytes\\(REVIEWED_GENERAL_VIDEO_CODEC_SCRATCH_BYTES\\)"
+        },
+        {
+          "name": "general-video-decode-service-identity-binds-reviewed-limits",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "impl NativeGeneralVideoDecodeService[\\s\\S]*proxy.identity\\(\\).configuration_sha256\\(\\)[\\s\\S]*limits.configuration_values\\(\\)"
+        },
+        {
+          "name": "general-video-worker-cache-binds-decode-service-identity",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "fn worker_service_cache_configuration_identity[\\s\\S]*decode.configuration_sha256\\(\\)"
+        },
+        {
+          "name": "general-video-cancellable-payload-owner-chunks-validation-and-hashing",
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "pattern": "validate_finite_f32_cancellable[\\s\\S]*hash_tensor_cancellable[\\s\\S]*general_video_demux_decode_cancels_chunked_media_scans_and_rejects_projection_drift"
+        },
+        {
+          "name": "general-video-demux-decode-ownership-oracle-rejects-second-authority",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "val_ownership_task563_video_demux_decode_001"
+        }
+      ],
+      "known_open_reasons": [
+        "Task563 remains incomplete until an x86_64-linux-gnu certified FFmpeg 7.1 package decodes the committed real golden media to its pinned oracle"
+      ],
+      "consolidation_tasks": [
+        "comfy-parity-native-video-demux-decode-foundation"
+      ],
+      "production_consumers": [
+        "the following Task564 worker, executor, NativeNodeServices, and GetVideoComponents adapters"
+      ],
+      "requirements": [
+        "Requirement 26",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 36",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D11",
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-NATIVE-E2E-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-RECOVERY-005",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One actor-internal owner demuxes and decodes sealed bytes through the existing certified general-video binding, bounded AVIO, workspace, and sole codec actor. It publishes only a completed canonical component VIDEO after cancellable media validation and does not expose the retained port to worker executors before Task564 or claim real-codec interoperability before the required Linux golden run."
     },
     {
       "concern": "native_video_reviewed_codec_registry_ltxv_thread_service",
