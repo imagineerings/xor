@@ -673,6 +673,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "projects/comfy/ComfyUI/comfy/sd.py",
             "projects/comfy/ComfyUI/comfy/ops.py",
             "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/src/attention.rs",
             "crates/comfy_tensor/src/comfy_tensor.rs",
             "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
             "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_08.rs",
@@ -690,6 +691,11 @@ class ValidationGenerationTests(unittest.TestCase):
             self.assertIn(ownership_path, style_task["writes"])
         for style_gate in (
             "strict complete ordered schema for every source checkpoint entry",
+            "exact 42-entry source schema",
+            "checked-splits each fused attn.in_proj_weight and attn.in_proj_bias",
+            "reconstructs the exact fused source keys",
+            "exclusively to canonical comfy_model::attention",
+            "without owning a second attention equation or policy",
             "asserts the exact source key sets",
             "manual-cast disposition",
             "canonical ClipVisionOutput last_hidden_state",
