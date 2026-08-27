@@ -2,6 +2,7 @@ mod components;
 mod page_data;
 pub mod pages;
 
+#[cfg(feature = "agentic")]
 use agent_skills::SkillIndex;
 use anyhow::{Context as _, Result};
 use cloud_api_types::OrganizationConfiguration;
@@ -24,13 +25,14 @@ use serde::Deserialize;
 use settings::{
     IntoGpui, Settings, SettingsContent, SettingsStore, initial_project_settings_content,
 };
+#[cfg(feature = "agentic")]
+use std::path::PathBuf;
 use std::{
     any::{Any, TypeId, type_name},
     cell::RefCell,
     collections::{HashMap, HashSet},
     num::{NonZero, NonZeroU32},
     ops::Range,
-    path::PathBuf,
     rc::Rc,
     sync::{Arc, LazyLock, RwLock},
     time::Duration,
@@ -47,9 +49,10 @@ use workspace::{
     AppState, MultiWorkspace, OpenOptions, OpenVisible, Workspace, WorkspaceSettings,
     client_side_decorations,
 };
+#[cfg(feature = "agentic")]
+use zed_actions::AGENT_SKILLS_SETTINGS_PATH;
 use zed_actions::{
-    AGENT_SKILLS_SETTINGS_PATH, OpenProjectSettings, OpenSettings, OpenSettingsAt,
-    OpenSettingsAtTarget, OpenSettingsPage,
+    OpenProjectSettings, OpenSettings, OpenSettingsAt, OpenSettingsAtTarget, OpenSettingsPage,
 };
 
 use crate::components::{
@@ -57,10 +60,9 @@ use crate::components::{
     SettingsSectionHeader, font_picker, icon_theme_picker, render_ollama_model_picker,
     text_field_a11y_state, theme_picker,
 };
-use crate::pages::{
-    CustomAgentForm, LlmProviderForm, McpServerForm, render_input_audio_device_dropdown,
-    render_output_audio_device_dropdown,
-};
+#[cfg(feature = "agentic")]
+use crate::pages::{CustomAgentForm, LlmProviderForm, McpServerForm};
+use crate::pages::{render_input_audio_device_dropdown, render_output_audio_device_dropdown};
 
 const NAVBAR_CONTAINER_TAB_INDEX: isize = 0;
 const NAVBAR_GROUP_TAB_INDEX: isize = 1;
@@ -436,13 +438,16 @@ pub fn init(cx: &mut App) {
     cx.on_action(|_: &OpenSettings, cx| {
         open_settings_editor(None, None, None, cx);
     });
-    cx.on_action(|_: &zed_actions::assistant::OpenSkillCreator, cx| {
-        open_skill_creator(pages::SkillCreatorOpenMode::Form, None, cx);
-    });
-    cx.on_action(|_: &zed_actions::assistant::CreateSkillFromUrl, cx| {
-        let initial_url = pages::skill_url_from_clipboard(cx);
-        open_skill_creator(pages::SkillCreatorOpenMode::Url { initial_url }, None, cx);
-    });
+    #[cfg(feature = "agentic")]
+    {
+        cx.on_action(|_: &zed_actions::assistant::OpenSkillCreator, cx| {
+            open_skill_creator(pages::SkillCreatorOpenMode::Form, None, cx);
+        });
+        cx.on_action(|_: &zed_actions::assistant::CreateSkillFromUrl, cx| {
+            let initial_url = pages::skill_url_from_clipboard(cx);
+            open_skill_creator(pages::SkillCreatorOpenMode::Url { initial_url }, None, cx);
+        });
+    }
 
     cx.observe_new(|workspace: &mut workspace::Workspace, _, _| {
         workspace
@@ -481,7 +486,9 @@ pub fn init(cx: &mut App) {
                             .then_some(tree.read(cx).id())
                     });
                 open_settings_editor(None, target_worktree_id, window_handle, cx);
-            })
+            });
+        #[cfg(feature = "agentic")]
+        workspace
             .register_action(
                 |_, _: &zed_actions::assistant::OpenSkillCreator, window, cx| {
                     let window_handle = window.window_handle().downcast::<MultiWorkspace>();
@@ -810,6 +817,7 @@ fn open_settings_editor_at_target(
     });
 }
 
+#[cfg(feature = "agentic")]
 pub fn open_skill_creator(
     open_mode: pages::SkillCreatorOpenMode,
     workspace_handle: Option<WindowHandle<MultiWorkspace>>,
@@ -955,36 +963,47 @@ pub struct SettingsWindow {
     search_index: Option<Arc<SearchIndex>>,
     list_state: ListState,
     shown_errors: HashSet<String>,
+    #[cfg(feature = "agentic")]
     pub(crate) hidden_deleted_skill_directory_paths: HashSet<PathBuf>,
     pub(crate) regex_validation_error: Option<String>,
     pub(crate) sandbox_host_validation_error: Option<String>,
     last_copied_link_path: Option<&'static str>,
     /// Cached configuration views per provider, created lazily.
+    #[cfg(feature = "agentic")]
     pub(crate) provider_configuration_views:
         HashMap<language_model::LanguageModelProviderId, gpui::AnyView>,
     /// The provider whose configuration sub-page is currently open, if any.
+    #[cfg(feature = "agentic")]
     pub(crate) configuring_provider: Option<language_model::LanguageModelProviderId>,
     /// Directory path of the skill whose share link was most recently copied,
     /// used to show a transient "copied" checkmark on its share button.
+    #[cfg(feature = "agentic")]
     pub(crate) last_copied_skill_directory_path: Option<PathBuf>,
     /// State for the active "add OpenAI/Anthropic-compatible provider" form sub-page, if open.
+    #[cfg(feature = "agentic")]
     pub(crate) llm_provider_form: Option<LlmProviderForm>,
     /// Stable focus handle for the LLM "Add Provider" button, so it can show a
     /// focus ring when the page auto-focuses it on open (which happens via mouse,
     /// where `focus_visible` styling would otherwise be suppressed).
+    #[cfg(feature = "agentic")]
     pub(crate) llm_provider_add_focus_handle: FocusHandle,
     /// State for the active "add/edit custom MCP server" form sub-page, if open.
+    #[cfg(feature = "agentic")]
     pub(crate) mcp_server_form: Option<McpServerForm>,
     /// Stable focus handle for the MCP "Add Server" button, so it can show a
     /// focus ring when the page auto-focuses it on open (which happens via mouse,
     /// where `focus_visible` styling would otherwise be suppressed).
+    #[cfg(feature = "agentic")]
     pub(crate) mcp_add_server_focus_handle: FocusHandle,
     /// State for the active "add/edit custom external agent" form sub-page, if open.
+    #[cfg(feature = "agentic")]
     pub(crate) custom_agent_form: Option<CustomAgentForm>,
     /// Stable focus handle for the external agents "Add Agent" button, so it can
     /// show a focus ring when the page auto-focuses it on open (which happens via
     /// mouse, where `focus_visible` styling would otherwise be suppressed).
+    #[cfg(feature = "agentic")]
     pub(crate) external_agent_add_focus_handle: FocusHandle,
+    #[cfg(feature = "agentic")]
     skill_creator_page: Option<(Entity<pages::SkillCreatorPage>, Subscription)>,
 }
 
@@ -1643,6 +1662,7 @@ impl PartialEq for SettingItem {
 #[derive(Clone, PartialEq, Default)]
 enum SubPageType {
     Language,
+    #[cfg(feature = "agentic")]
     SkillCreator,
     #[default]
     Other,
@@ -1818,6 +1838,7 @@ impl SettingsWindow {
         })
         .detach();
 
+        #[cfg(feature = "agentic")]
         cx.observe_global_in::<SkillIndex>(window, |this, _window, cx| {
             if let Some(skill_index) = cx.try_global::<SkillIndex>() {
                 this.hidden_deleted_skill_directory_paths
@@ -1840,7 +1861,9 @@ impl SettingsWindow {
         })
         .detach();
 
+        #[cfg(feature = "agentic")]
         let language_model_registry = language_model::LanguageModelRegistry::global(cx);
+        #[cfg(feature = "agentic")]
         cx.subscribe(&language_model_registry, |_, _, _event, cx| {
             cx.notify();
         })
@@ -1993,20 +2016,31 @@ impl SettingsWindow {
                 .tab_stop(false),
             search_index: None,
             shown_errors: HashSet::default(),
+            #[cfg(feature = "agentic")]
             hidden_deleted_skill_directory_paths: HashSet::default(),
             regex_validation_error: None,
             sandbox_host_validation_error: None,
             list_state,
             last_copied_link_path: None,
+            #[cfg(feature = "agentic")]
             provider_configuration_views: HashMap::default(),
+            #[cfg(feature = "agentic")]
             configuring_provider: None,
+            #[cfg(feature = "agentic")]
             last_copied_skill_directory_path: None,
+            #[cfg(feature = "agentic")]
             llm_provider_form: None,
+            #[cfg(feature = "agentic")]
             llm_provider_add_focus_handle: cx.focus_handle(),
+            #[cfg(feature = "agentic")]
             mcp_server_form: None,
+            #[cfg(feature = "agentic")]
             mcp_add_server_focus_handle: cx.focus_handle(),
+            #[cfg(feature = "agentic")]
             custom_agent_form: None,
+            #[cfg(feature = "agentic")]
             external_agent_add_focus_handle: cx.focus_handle(),
+            #[cfg(feature = "agentic")]
             skill_creator_page: None,
         };
 
@@ -2618,7 +2652,10 @@ impl SettingsWindow {
     fn open_navbar_entry_page(&mut self, navbar_entry: usize) {
         // Navigating to another page dismisses the transient "copied share
         // link" checkmark shown on a Skills page row.
-        self.last_copied_skill_directory_path = None;
+        #[cfg(feature = "agentic")]
+        {
+            self.last_copied_skill_directory_path = None;
+        }
 
         if !self.is_nav_entry_visible(navbar_entry) {
             self.open_first_nav_page();
@@ -2745,7 +2782,10 @@ impl SettingsWindow {
             telemetry::event!("Setting Project Clicked");
         }
 
-        self.last_copied_skill_directory_path = None;
+        #[cfg(feature = "agentic")]
+        {
+            self.last_copied_skill_directory_path = None;
+        }
 
         let sub_page_stack = std::mem::take(&mut self.sub_page_stack);
         self.build_ui(window, cx);
@@ -3725,11 +3765,15 @@ impl SettingsWindow {
         let page_content;
 
         if let Some(current_sub_page) = self.sub_page_stack.last() {
+            #[cfg(feature = "agentic")]
             let is_skills_page =
                 current_sub_page.link.json_path == Some(AGENT_SKILLS_SETTINGS_PATH);
+            #[cfg(feature = "agentic")]
             let is_llm_providers_page = current_sub_page.link.json_path == Some("llm_providers")
                 && current_sub_page.link.title.as_ref() == "LLM Providers";
+            #[cfg(feature = "agentic")]
             let is_external_agents_page = current_sub_page.link.json_path == Some("agent_servers");
+            #[cfg(feature = "agentic")]
             let is_mcp_servers_page = current_sub_page.link.json_path == Some("context_servers");
 
             page_header = h_flex()
@@ -3751,24 +3795,27 @@ impl SettingsWindow {
                         )
                         .child(self.render_sub_page_breadcrumbs(window, cx)),
                 )
-                .child(
-                    div()
-                        .flex_shrink_0()
-                        .when(current_sub_page.link.in_json, |this| {
-                            this.child(
-                                Button::new("open-in-settings-file", "Edit in settings.json")
-                                    .tab_index(0_isize)
-                                    .style(ButtonStyle::OutlinedGhost)
-                                    .tooltip(Tooltip::for_action_title_in(
-                                        "Edit in settings.json",
-                                        &OpenCurrentFile,
-                                        &self.focus_handle,
-                                    ))
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.open_current_settings_file(window, cx);
-                                    })),
-                            )
-                        })
+                .child({
+                    let actions =
+                        div()
+                            .flex_shrink_0()
+                            .when(current_sub_page.link.in_json, |this| {
+                                this.child(
+                                    Button::new("open-in-settings-file", "Edit in settings.json")
+                                        .tab_index(0_isize)
+                                        .style(ButtonStyle::OutlinedGhost)
+                                        .tooltip(Tooltip::for_action_title_in(
+                                            "Edit in settings.json",
+                                            &OpenCurrentFile,
+                                            &self.focus_handle,
+                                        ))
+                                        .on_click(cx.listener(|this, _, window, cx| {
+                                            this.open_current_settings_file(window, cx);
+                                        })),
+                                )
+                            });
+                    #[cfg(feature = "agentic")]
+                    let actions = actions
                         .when(is_llm_providers_page, |this| {
                             this.child(pages::render_add_llm_provider_popover(self, window, cx))
                         })
@@ -3791,8 +3838,9 @@ impl SettingsWindow {
                         })
                         .when(is_mcp_servers_page, |this| {
                             this.child(pages::render_add_server_popover(self, window, cx))
-                        }),
-                )
+                        });
+                    actions
+                })
                 .into_any_element();
 
             let active_page_render_fn = &current_sub_page.link.render;
@@ -4233,6 +4281,7 @@ impl SettingsWindow {
         self.push_sub_page(sub_page_link, section_header.into(), window, cx);
     }
 
+    #[cfg(feature = "agentic")]
     pub(crate) fn skill_creator_page(&self) -> Option<Entity<pages::SkillCreatorPage>> {
         self.skill_creator_page
             .as_ref()
@@ -4241,6 +4290,7 @@ impl SettingsWindow {
 
     /// If the creator is already the active sub-page, the open mode is applied
     /// to the existing form instead
+    #[cfg(feature = "agentic")]
     pub fn open_skill_creator_sub_page(
         &mut self,
         open_mode: pages::SkillCreatorOpenMode,
@@ -4301,6 +4351,7 @@ impl SettingsWindow {
         }
     }
 
+    #[cfg(feature = "agentic")]
     pub fn navigate_to_skill_creator(
         &mut self,
         open_mode: pages::SkillCreatorOpenMode,
@@ -4403,15 +4454,21 @@ impl SettingsWindow {
     pub(crate) fn pop_sub_page(&mut self, window: &mut Window, cx: &mut Context<SettingsWindow>) {
         self.regex_validation_error = None;
         self.sandbox_host_validation_error = None;
-        if let Some(popped) = self.sub_page_stack.pop()
-            && popped.link.r#type == SubPageType::SkillCreator
+        let popped = self.sub_page_stack.pop();
+        #[cfg(feature = "agentic")]
+        if popped
+            .as_ref()
+            .is_some_and(|popped| popped.link.r#type == SubPageType::SkillCreator)
         {
             self.skill_creator_page = None;
         }
+        #[cfg(not(feature = "agentic"))]
+        drop(popped);
         self.content_focus_handle.focus_handle(cx).focus(window, cx);
         cx.notify();
     }
 
+    #[cfg(feature = "agentic")]
     pub(crate) fn active_project(&self, cx: &App) -> Option<Entity<Project>> {
         let original_window = self.original_window.as_ref()?;
         let multi_workspace = original_window.read(cx).ok()?;
@@ -5310,18 +5367,23 @@ pub mod test {
                 search_index: None,
                 list_state: ListState::new(0, gpui::ListAlignment::Top, px(0.0)),
                 shown_errors: HashSet::default(),
+                #[cfg(feature = "agentic")]
                 hidden_deleted_skill_directory_paths: HashSet::default(),
                 regex_validation_error: None,
                 sandbox_host_validation_error: None,
                 last_copied_link_path: None,
                 provider_configuration_views: HashMap::default(),
                 configuring_provider: None,
+                #[cfg(feature = "agentic")]
                 last_copied_skill_directory_path: None,
                 llm_provider_form: None,
+                #[cfg(feature = "agentic")]
                 llm_provider_add_focus_handle: cx.focus_handle(),
                 mcp_server_form: None,
+                #[cfg(feature = "agentic")]
                 mcp_add_server_focus_handle: cx.focus_handle(),
                 custom_agent_form: None,
+                #[cfg(feature = "agentic")]
                 external_agent_add_focus_handle: cx.focus_handle(),
                 skill_creator_page: None,
             }
@@ -5449,18 +5511,23 @@ pub mod test {
             search_index: None,
             list_state: ListState::new(0, gpui::ListAlignment::Top, px(0.0)),
             shown_errors: HashSet::default(),
+            #[cfg(feature = "agentic")]
             hidden_deleted_skill_directory_paths: HashSet::default(),
             regex_validation_error: None,
             sandbox_host_validation_error: None,
             last_copied_link_path: None,
             provider_configuration_views: HashMap::default(),
             configuring_provider: None,
+            #[cfg(feature = "agentic")]
             last_copied_skill_directory_path: None,
             llm_provider_form: None,
+            #[cfg(feature = "agentic")]
             llm_provider_add_focus_handle: cx.focus_handle(),
             mcp_server_form: None,
+            #[cfg(feature = "agentic")]
             mcp_add_server_focus_handle: cx.focus_handle(),
             custom_agent_form: None,
+            #[cfg(feature = "agentic")]
             external_agent_add_focus_handle: cx.focus_handle(),
             skill_creator_page: None,
         };

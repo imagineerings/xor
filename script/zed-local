@@ -169,6 +169,16 @@ if (isReleaseMode) {
   buildArgs.push("--release");
   zedBinary = "target/release/zed";
 }
+const cargoFeatures = process.env.ZED_LOCAL_CARGO_FEATURES;
+if (cargoFeatures) {
+  buildArgs.push(
+    "--package",
+    "zed",
+    "--no-default-features",
+    "--features",
+    cargoFeatures,
+  );
+}
 
 try {
   execFileSync("cargo", buildArgs, {
@@ -207,7 +217,8 @@ setTimeout(() => {
         ZED_ALWAYS_ACTIVE: "1",
         ZED_SERVER_URL: "http://localhost:3000",
         ZED_RPC_URL: "http://localhost:8080/rpc",
-        ZED_ADMIN_API_TOKEN: "internal-api-key-secret",
+        ZED_ADMIN_API_TOKEN:
+          process.env.ZED_ADMIN_API_TOKEN || "internal-api-key-secret",
         ZED_WINDOW_SIZE: size,
         ZED_CLIENT_CHECKSUM_SEED: "development-checksum-seed",
         RUST_LOG: process.env.RUST_LOG || "info",

@@ -20,7 +20,7 @@ pub enum ReviewSuccess {
     ApprovingComment(Vec<PullRequestComment>),
     CoAuthored(Vec<CommitAuthor>),
     PullRequestReviewed(Vec<PullRequestReview>),
-    SimZippyCommit(AutomatedChangeKind, GithubLogin),
+    ZedZippyCommit(AutomatedChangeKind, GithubLogin),
 }
 
 impl ReviewSuccess {
@@ -36,7 +36,7 @@ impl ReviewSuccess {
                 .iter()
                 .map(|comment| format!("@{}", comment.user.login))
                 .collect_vec(),
-            Self::SimZippyCommit(_, login) => vec![login.to_string()],
+            Self::ZedZippyCommit(_, login) => vec![login.to_string()],
         };
 
         let reviewers = reviewers.into_iter().unique().collect_vec();
@@ -59,7 +59,7 @@ impl fmt::Display for ReviewSuccess {
             Self::ApprovingComment(_) => {
                 formatter.write_str("Approved by an organization approval comment")
             }
-            Self::SimZippyCommit(kind, _) => {
+            Self::ZedZippyCommit(kind, _) => {
                 write!(formatter, "Fully untampered automated {kind}")
             }
         }
@@ -305,7 +305,7 @@ impl Reporter {
             .validate_changes(metadata, &files)
             .map_err(ReviewFailure::UnexpectedZippyAction)?;
 
-        Ok(ReviewSuccess::SimZippyCommit(
+        Ok(ReviewSuccess::ZedZippyCommit(
             change_kind,
             GithubLogin::new(responsible_actor.to_owned()),
         ))
@@ -1030,12 +1030,12 @@ mod tests {
         let result = TestScenario::zippy_version_bump().run_scenario().await;
         assert!(matches!(
             result,
-            Ok(ReviewSuccess::SimZippyCommit(
+            Ok(ReviewSuccess::ZedZippyCommit(
                 AutomatedChangeKind::VersionBump,
                 _
             ))
         ));
-        if let Ok(ReviewSuccess::SimZippyCommit(_, login)) = &result {
+        if let Ok(ReviewSuccess::ZedZippyCommit(_, login)) = &result {
             assert_eq!(login.as_str(), "cole-miller");
         }
     }
@@ -1202,12 +1202,12 @@ mod tests {
             .await;
         assert!(matches!(
             result,
-            Ok(ReviewSuccess::SimZippyCommit(
+            Ok(ReviewSuccess::ZedZippyCommit(
                 AutomatedChangeKind::ReleaseChannelUpdate,
                 _
             ))
         ));
-        if let Ok(ReviewSuccess::SimZippyCommit(_, login)) = &result {
+        if let Ok(ReviewSuccess::ZedZippyCommit(_, login)) = &result {
             assert_eq!(login.as_str(), "cole-miller");
         }
     }

@@ -24,7 +24,7 @@ fi
 day_of_week=$(date +%u)
 if [[ $day_of_week -ne 3 ]]; then
   day_name=$(date +%A)
-  echo "Warning: Today is $day_name. Release version bumps are typically only done on Simnesdays."
+  echo "Warning: Today is $day_name. Release version bumps are typically only done on Zednesdays."
   read -r -p "Continue anyway? (y/N) " confirm
   if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
     echo "Aborted."

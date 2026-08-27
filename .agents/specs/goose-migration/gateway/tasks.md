@@ -1,5 +1,7 @@
 # Implementation Plan: Gateway System
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Overview
 
 Implement the multi-channel gateway system as a new `crates/gateway/` crate, starting with the Telegram gateway. The gateway manager routes messages between external platforms and the agent.

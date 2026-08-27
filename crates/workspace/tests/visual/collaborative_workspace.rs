@@ -5,7 +5,7 @@ const COLLABORATIVE_VISUAL_CONTRACT: &str = include_str!(
 use sha2::{Digest as _, Sha256};
 
 #[gpui::test]
-async fn collaborative_workspace_visual_fixtures(cx: &mut TestAppContext) {
+async fn collaborative_workspace_structural_contract(cx: &mut TestAppContext) {
     let contract: serde_json::Value = serde_json::from_str(COLLABORATIVE_VISUAL_CONTRACT)
         .expect("collaborative visual contract should be valid JSON");
     assert_eq!(contract["version"].as_u64(), Some(1));
@@ -17,6 +17,9 @@ async fn collaborative_workspace_visual_fixtures(cx: &mut TestAppContext) {
     let project = init_test_project("/visual-collaborative-project", cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
+    let workspace = multi_workspace.read_with(cx, |multi_workspace, _| {
+        multi_workspace.workspace().clone()
+    });
     setup_sidebar_closed(&multi_workspace, cx);
     cx.dispatch_action(workspace::SwitchToCollaborativeWorkspace);
     cx.run_until_parked();
@@ -61,10 +64,7 @@ async fn collaborative_workspace_visual_fixtures(cx: &mut TestAppContext) {
             .debug_bounds("COLLABORATIVE-REVIEW-REGION")
             .is_some();
         if currently_visible != review_visible {
-            let toggle = cx
-                .debug_bounds("COLLABORATIVE-TOP-BAR-REVIEW-LAYOUT")
-                .expect("review layout toggle should render");
-            cx.simulate_click(toggle.center(), gpui::Modifiers::default());
+            cx.dispatch_action(workspace::ToggleCollaborativeReview);
             cx.run_until_parked();
             cx.debug_bounds("COLLABORATIVE-LAYOUT");
             cx.refresh()
@@ -79,6 +79,12 @@ async fn collaborative_workspace_visual_fixtures(cx: &mut TestAppContext) {
             let selector = selector
                 .as_str()
                 .expect("required selector should be a string");
+            if selector == "COLLABORATIVE-TOP-BAR" {
+                assert!(workspace.read_with(cx, |workspace, cx| {
+                    workspace.collaborative_title_bar(cx).is_some()
+                }));
+                continue;
+            }
             assert!(
                 collaborative_visual_bounds(cx, selector).is_some(),
                 "{id}: required visual region {selector} should render"
@@ -151,9 +157,6 @@ fn assert_collaborative_visual_geometry(
     let rail = cx
         .debug_bounds("COLLABORATIVE-RAIL")
         .expect("collaborative rail should render");
-    let top_bar = cx
-        .debug_bounds("COLLABORATIVE-TOP-BAR")
-        .expect("collaborative top bar should render");
     let layout = cx
         .debug_bounds("COLLABORATIVE-LAYOUT")
         .expect("collaborative layout should render");
@@ -173,14 +176,13 @@ fn assert_collaborative_visual_geometry(
         rail.size.width <= px(viewport_width as f32 * 0.35),
         "{id}: rail should leave room for the timeline"
     );
-    for bounds in [top_bar, layout, composer] {
+    for bounds in [layout, composer] {
         assert!(
             (f32::from(bounds.left()) - f32::from(rail.right())).abs() <= 1.0,
             "{id}: main surface should follow the rail border"
         );
         assert_eq!(bounds.right(), px(viewport_width as f32));
     }
-    assert!(top_bar.bottom() <= layout.top());
     assert!(layout.bottom() <= composer.top());
     assert!(project_status.bottom() <= px(viewport_height as f32));
     assert_eq!(timeline.left(), layout.left());

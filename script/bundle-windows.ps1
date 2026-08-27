@@ -30,6 +30,18 @@ $PSNativeCommandUseErrorActionPreference = $true
 $buildSuccess = $false
 $canCodeSign = $false
 
+$requiredProductVariables = @(
+    'ZED_PRODUCT_ID', 'ZED_PRODUCT_DISPLAY_NAME', 'ZED_PRODUCT_EXECUTABLE',
+    'ZED_PRODUCT_BUNDLE_ID', 'ZED_PRODUCT_URL_SCHEME', 'ZED_PRODUCT_DATA_NAMESPACE', 'ZED_PRODUCT_ICON_SET',
+    'ZED_PRODUCT_APP_FEATURES', 'ZED_PRODUCT_REMOTE_FEATURES',
+    'ZED_PRODUCT_WINDOWS_INSTALLER_ID', 'ZED_PRODUCT_ARTIFACT_NAME'
+)
+foreach ($variableName in $requiredProductVariables) {
+    if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($variableName))) {
+        throw "Missing resolved product variable: $variableName. Run cargo xtask bundle --product <id>."
+    }
+}
+
 $OSArchitecture = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
     "X64" { "x86_64" }
     "Arm64" { "aarch64" }
@@ -42,7 +54,8 @@ $Architecture = if ($Architecture) {
     $OSArchitecture
 }
 
-$CargoOutDir = "./target/$Architecture-pc-windows-msvc/release"
+$CargoTargetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { "./target" }
+$CargoOutDir = "$CargoTargetDir/$Architecture-pc-windows-msvc/release"
 
 function Get-VSArch {
     param(
@@ -55,8 +68,17 @@ function Get-VSArch {
     }
 }
 
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+if (-not (Test-Path $vswhere -PathType Leaf)) {
+    throw "Visual Studio Installer discovery tool was not found at $vswhere"
+}
+$visualStudioPath = & $vswhere -latest -products * -property installationPath
+$visualStudioShell = Join-Path $visualStudioPath "Common7\Tools\Launch-VsDevShell.ps1"
+if (-not (Test-Path $visualStudioShell -PathType Leaf)) {
+    throw "Visual Studio developer shell was not found at $visualStudioShell"
+}
 Push-Location
-& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1" -Arch (Get-VSArch -Arch $Architecture) -HostArch (Get-VSArch -Arch $OSArchitecture)
+& $visualStudioShell -Arch (Get-VSArch -Arch $Architecture) -HostArch (Get-VSArch -Arch $OSArchitecture)
 Pop-Location
 
 $target = "$Architecture-pc-windows-msvc"
@@ -74,24 +96,29 @@ if ($Help) {
     exit 0
 }
 
-Push-Location -Path crates/zed
-$channel = Get-Content "RELEASE_CHANNEL"
+$channel = if ($env:ZED_RELEASE_CHANNEL) {
+    $env:ZED_RELEASE_CHANNEL
+} else {
+    Get-Content "crates/zed/RELEASE_CHANNEL"
+}
 $env:ZED_RELEASE_CHANNEL = $channel
 $env:RELEASE_CHANNEL = $channel
-Pop-Location
 
 function CheckEnvironmentVariables {
-    if(-not $env:CI) {
-        return
+    if($env:CI) {
+        $requiredVars = @('ZED_WORKSPACE', 'RELEASE_VERSION', 'ZED_RELEASE_CHANNEL')
+
+        foreach ($var in $requiredVars) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($var))) {
+                Write-Error "$var is not set"
+                exit 1
+            }
+        }
     }
 
-    $requiredVars = @('ZED_WORKSPACE', 'RELEASE_VERSION', 'ZED_RELEASE_CHANNEL')
-
-    foreach ($var in $requiredVars) {
-        if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($var))) {
-            Write-Error "$var is not set"
-            exit 1
-        }
+    if ($env:ZED_DISABLE_SIGNING) {
+        Write-Host "Code signing disabled by the product bundle plan"
+        return
     }
 
     # On PRs from forks the signing secrets are not populated,
@@ -119,6 +146,7 @@ function PrepareForBundle {
     }
     New-Item -Path "$innoDir" -ItemType Directory -Force
     Copy-Item -Path "$env:ZED_WORKSPACE\crates\zed\resources\windows\*" -Destination "$innoDir" -Recurse -Force
+    Copy-Item -Path "$env:ZED_PRODUCT_ICON_SET\app-icon.ico" -Destination "$innoDir\product-app-icon.ico" -Force
     New-Item -Path "$innoDir\make_appx" -ItemType Directory -Force
     New-Item -Path "$innoDir\appx" -ItemType Directory -Force
     New-Item -Path "$innoDir\bin" -ItemType Directory -Force
@@ -131,8 +159,8 @@ function GenerateLicenses {
     . $PSScriptRoot/generate-licenses.ps1
 }
 
-function BuildSimAndItsFriends {
-    Write-Output "Building Zed and its friends, for channel: $channel"
+function BuildProductBinaries {
+    Write-Output "Building product binaries for channel: $channel"
     if ($Comfy) {
         $features = "zed/comfy,zed/rocm,comfy_worker/rocm,zed/directml,comfy_worker/directml"
         if ($RustTools) {
@@ -140,125 +168,63 @@ function BuildSimAndItsFriends {
         }
         cargo build --release --package zed --package cli --package comfy_worker --package auto_update_helper --features $features --target $target
     }
-    elseif ($RustTools) {
-        cargo build --release --package zed --package cli --package auto_update_helper --features zed/rust-tools --target $target
-    }
     else {
-        cargo build --release --package zed --package cli --package auto_update_helper --target $target
+        $applicationFeatures = (($env:ZED_PRODUCT_APP_FEATURES -split ',') | ForEach-Object { "zed/$_" }) -join ','
+        cargo build --release --package zed --package cli --package auto_update_helper --no-default-features --features $applicationFeatures --target $target
     }
-    Copy-Item -Path ".\$CargoOutDir\zed.exe" -Destination "$innoDir\Zed.exe" -Force
-    Copy-Item -Path ".\$CargoOutDir\cli.exe" -Destination "$innoDir\cli.exe" -Force
+    Copy-Item -Path "$CargoOutDir\zed.exe" -Destination "$innoDir\$env:ZED_PRODUCT_EXECUTABLE.exe" -Force
+    Copy-Item -Path "$CargoOutDir\cli.exe" -Destination "$innoDir\cli.exe" -Force
     if ($Comfy) {
         Copy-Item -Path ".\$CargoOutDir\comfy-worker.exe" -Destination "$innoDir\comfy-worker.exe" -Force
     }
-    Copy-Item -Path ".\$CargoOutDir\auto_update_helper.exe" -Destination "$innoDir\auto_update_helper.exe" -Force
-    # Build explorer_command_injector.dll
-    switch ($channel) {
-        "stable" {
-            cargo build --release --features stable --no-default-features --package explorer_command_injector --target $target
-        }
-        "preview" {
-            cargo build --release --features preview --no-default-features --package explorer_command_injector --target $target
-        }
-        default {
-            cargo build --release --package explorer_command_injector --target $target
-        }
-    }
-    Copy-Item -Path ".\$CargoOutDir\explorer_command_injector.dll" -Destination "$innoDir\zed_explorer_command_injector.dll" -Force
+    Copy-Item -Path "$CargoOutDir\auto_update_helper.exe" -Destination "$innoDir\auto_update_helper.exe" -Force
 }
 
 function BuildRemoteServer {
     Write-Output "Building remote_server for $target"
-    if ($RustTools) {
-        cargo build --release --package remote_server --features rust-tools --target $target
+    if (-not [string]::IsNullOrWhiteSpace($env:ZED_PRODUCT_REMOTE_FEATURES)) {
+        cargo build --release --package remote_server --no-default-features --features $env:ZED_PRODUCT_REMOTE_FEATURES --target $target
     }
     else {
-        cargo build --release --package remote_server --target $target
+        cargo build --release --package remote_server --no-default-features --target $target
     }
 
     # Create zipped remote server binary
-    $remoteServerSrc = (Resolve-Path ".\$CargoOutDir\remote_server.exe").Path
+    $remoteServerSrc = (Resolve-Path "$CargoOutDir\remote_server.exe").Path
 
     if ($canCodeSign) {
         Write-Output "Code signing remote_server.exe"
         & "$innoDir\sign.ps1" $remoteServerSrc
     }
 
-    $remoteServerDst = "$env:ZED_WORKSPACE\target\zed-remote-server-windows-$Architecture.zip"
+    $remoteServerDst = "$CargoTargetDir\$env:ZED_PRODUCT_ID-remote-server-windows-$Architecture.zip"
     Write-Output "Compressing remote_server to $remoteServerDst"
     Compress-Archive -Path $remoteServerSrc -DestinationPath $remoteServerDst -Force
 
     Write-Output "Remote server compressed successfully"
 }
 
-function ZipSimAndItsFriendsDebug {
+function ZipProductDebugSymbols {
     $items = @(
-        ".\$CargoOutDir\zed.pdb",
-        ".\$CargoOutDir\cli.pdb",
-        ".\$CargoOutDir\auto_update_helper.pdb",
-        ".\$CargoOutDir\explorer_command_injector.pdb",
-        ".\$CargoOutDir\remote_server.pdb"
+        "$CargoOutDir\zed.pdb",
+        "$CargoOutDir\cli.pdb",
+        "$CargoOutDir\auto_update_helper.pdb",
+        "$CargoOutDir\remote_server.pdb"
     )
     if ($Comfy) {
         $items += ".\$CargoOutDir\comfy-worker.pdb"
     }
 
-    Compress-Archive -Path $items -DestinationPath ".\$CargoOutDir\zed-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip" -Force
+    Compress-Archive -Path $items -DestinationPath $debugArchive -Force
 }
 
 
-function UploadToSentry {
-    if (-not (Get-Command "sentry-cli" -ErrorAction SilentlyContinue)) {
-        Write-Output "sentry-cli not found. skipping sentry upload."
-        Write-Output "install with: 'winget install -e --id=Sentry.sentry-cli'"
-        return
-    }
-    if ([string]::IsNullOrWhiteSpace($env:SENTRY_AUTH_TOKEN)) {
-        Write-Output "missing SENTRY_AUTH_TOKEN. skipping sentry upload."
-        return
-    }
-    Write-Output "Uploading zed debug symbols to sentry..."
-    for ($i = 1; $i -le 3; $i++) {
-        try {
-            sentry-cli debug-files upload --include-sources --wait -p zed -o zed-dev $CargoOutDir
-            break
-        }
-        catch {
-            Write-Output "Sentry upload attempt $i failed: $_"
-            if ($i -eq 3) {
-                Write-Output "All sentry upload attempts failed"
-                throw
-            }
-            Start-Sleep -Seconds 2
-        }
-    }
-}
-
-function MakeAppx {
-    switch ($channel) {
-        "stable" {
-            $manifestFile = "$env:ZED_WORKSPACE\crates\explorer_command_injector\AppxManifest.xml"
-        }
-        "preview" {
-            $manifestFile = "$env:ZED_WORKSPACE\crates\explorer_command_injector\AppxManifest-Preview.xml"
-        }
-        default {
-            $manifestFile = "$env:ZED_WORKSPACE\crates\explorer_command_injector\AppxManifest-Nightly.xml"
-        }
-    }
-    Copy-Item -Path "$manifestFile" -Destination "$innoDir\make_appx\AppxManifest.xml"
-    # Add makeAppx.exe to Path
-    $sdk = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64"
-    $env:Path += ';' + $sdk
-    makeAppx.exe pack /d "$innoDir\make_appx" /p "$innoDir\zed_explorer_command_injector.appx" /nv
-}
-
-function SignSimAndItsFriends {
+function SignZedAndItsFriends {
     if (-not $canCodeSign) {
         return
     }
 
-    $files = "$innoDir\Zed.exe,$innoDir\cli.exe,$innoDir\auto_update_helper.exe,$innoDir\zed_explorer_command_injector.dll,$innoDir\zed_explorer_command_injector.appx"
+    $files = "$innoDir\$env:ZED_PRODUCT_EXECUTABLE.exe,$innoDir\cli.exe,$innoDir\auto_update_helper.exe"
     if ($Comfy) {
         $files += ",$innoDir\comfy-worker.exe"
     }
@@ -283,10 +249,8 @@ function DownloadConpty {
 }
 
 function CollectFiles {
-    Move-Item -Path "$innoDir\zed_explorer_command_injector.appx" -Destination "$innoDir\appx\zed_explorer_command_injector.appx" -Force
-    Move-Item -Path "$innoDir\zed_explorer_command_injector.dll" -Destination "$innoDir\appx\zed_explorer_command_injector.dll" -Force
-    Move-Item -Path "$innoDir\cli.exe" -Destination "$innoDir\bin\zed.exe" -Force
-    Move-Item -Path "$innoDir\zed.sh" -Destination "$innoDir\bin\zed" -Force
+    Move-Item -Path "$innoDir\cli.exe" -Destination "$innoDir\bin\$env:ZED_PRODUCT_EXECUTABLE.exe" -Force
+    Move-Item -Path "$innoDir\zed.sh" -Destination "$innoDir\bin\$env:ZED_PRODUCT_EXECUTABLE" -Force
     Move-Item -Path "$innoDir\auto_update_helper.exe" -Destination "$innoDir\tools\auto_update_helper.exe" -Force
     if($Architecture -eq "aarch64") {
         New-Item -Type Directory -Path "$innoDir\arm64" -Force
@@ -305,68 +269,19 @@ function CollectFiles {
 
 function BuildInstaller {
     $issFilePath = "$innoDir\zed.iss"
-    switch ($channel) {
-        "stable" {
-            $appId = "{{2DB0DA96-CA55-49BB-AF4F-64AF36A86712}"
-            $appIconName = "app-icon"
-            $appName = "Zed"
-            $appDisplayName = "Zed"
-            $appSetupName = "Zed-$Architecture"
-            # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
-            $appMutex = "Zed-Stable-Instance-Mutex"
-            $appExeName = "Zed"
-            $regValueName = "Zed"
-            $appUserId = "Simtropolis.Zed"
-            $appShellNameShort = "Z&ed"
-            $appAppxFullName = "Simtropolis.Sim_1.0.0.0_neutral__japxn1gcva8rg"
-        }
-        "preview" {
-            $appId = "{{F70E4811-D0E2-4D88-AC99-D63752799F95}"
-            $appIconName = "app-icon-preview"
-            $appName = "Zed Preview"
-            $appDisplayName = "Zed Preview"
-            $appSetupName = "Zed-$Architecture"
-            # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
-            $appMutex = "Zed-Preview-Instance-Mutex"
-            $appExeName = "Zed"
-            $regValueName = "SimPreview"
-            $appUserId = "Simtropolis.Zed.Preview"
-            $appShellNameShort = "Z&ed Preview"
-            $appAppxFullName = "Simtropolis.Zed.Preview_1.0.0.0_neutral__japxn1gcva8rg"
-        }
-        "nightly" {
-            $appId = "{{1BDB21D3-14E7-433C-843C-9C97382B2FE0}"
-            $appIconName = "app-icon-nightly"
-            $appName = "Zed Nightly"
-            $appDisplayName = "Zed Nightly"
-            $appSetupName = "Zed-$Architecture"
-            # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
-            $appMutex = "Zed-Nightly-Instance-Mutex"
-            $appExeName = "Zed"
-            $regValueName = "SimNightly"
-            $appUserId = "Simtropolis.Zed.Nightly"
-            $appShellNameShort = "Z&ed Editor Nightly"
-            $appAppxFullName = "Simtropolis.Zed.Nightly_1.0.0.0_neutral__japxn1gcva8rg"
-        }
-        "dev" {
-            $appId = "{{8357632E-24A4-4F32-BA97-E575B4D1FE5D}"
-            $appIconName = "app-icon-dev"
-            $appName = "Zed Dev"
-            $appDisplayName = "Zed Dev"
-            $appSetupName = "Zed-$Architecture"
-            # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
-            $appMutex = "Zed-Dev-Instance-Mutex"
-            $appExeName = "Zed"
-            $regValueName = "SimDev"
-            $appUserId = "Simtropolis.Zed.Dev"
-            $appShellNameShort = "Z&ed Dev"
-            $appAppxFullName = "Simtropolis.Zed.Dev_1.0.0.0_neutral__japxn1gcva8rg"
-        }
-        default {
-            Write-Error "can't bundle installer for $channel."
-            exit 1
-        }
+    if (@('stable', 'preview', 'nightly', 'dev') -notcontains $channel) {
+        throw "Can't bundle installer for unsupported channel $channel."
     }
+    $appId = $env:ZED_PRODUCT_WINDOWS_INSTALLER_ID
+    $appIconName = "product-app-icon"
+    $appName = $env:ZED_PRODUCT_DISPLAY_NAME
+    $appDisplayName = $appName
+    $appSetupName = [System.IO.Path]::GetFileNameWithoutExtension($env:ZED_PRODUCT_ARTIFACT_NAME)
+    $appMutex = "$env:ZED_PRODUCT_ID-$channel-Instance-Mutex"
+    $appExeName = $env:ZED_PRODUCT_EXECUTABLE
+    $regValueName = $env:ZED_PRODUCT_DATA_NAMESPACE
+    $appUserId = $env:ZED_PRODUCT_BUNDLE_ID
+    $appShellNameShort = "&$env:ZED_PRODUCT_DISPLAY_NAME"
 
     # Windows runner 2022 default has iscc in PATH, https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
     # Currently, we are using Windows 2022 runner.
@@ -376,7 +291,7 @@ function BuildInstaller {
     $definitions = @{
         "AppId"          = $appId
         "AppIconName"    = $appIconName
-        "OutputDir"      = "$env:ZED_WORKSPACE\target"
+        "OutputDir"      = "$CargoTargetDir\release"
         "AppSetupName"   = $appSetupName
         "AppName"        = $appName
         "AppDisplayName" = $appDisplayName
@@ -386,9 +301,9 @@ function BuildInstaller {
         "ResourcesDir"   = "$innoDir"
         "ShellNameShort" = $appShellNameShort
         "AppUserId"      = $appUserId
+        "UrlScheme"      = $env:ZED_PRODUCT_URL_SCHEME
         "Version"        = "$env:RELEASE_VERSION"
         "SourceDir"      = "$env:ZED_WORKSPACE"
-        "AppxFullName"   = $appAppxFullName
     }
     if ($Comfy) {
         $definitions["Comfy"] = "1"
@@ -412,8 +327,12 @@ function BuildInstaller {
     $process = Start-Process -FilePath $innoSetupPath -ArgumentList $innoArgs -NoNewWindow -Wait -PassThru
 
     if ($process.ExitCode -eq 0) {
+        $expectedSetupPath = "$CargoTargetDir\release\$appSetupName.exe"
+        if (-not (Test-Path $expectedSetupPath -PathType Leaf)) {
+            throw "Inno Setup did not produce the expected product artifact: $expectedSetupPath"
+        }
         Write-Host "✅ Inno Setup successfully compiled the installer"
-        Write-Output "SETUP_PATH=target/$appSetupName.exe" >> $env:GITHUB_ENV
+        Write-Output "SETUP_PATH=$CargoTargetDir/release/$appSetupName.exe" >> $env:GITHUB_ENV
         $script:buildSuccess = $true
     }
     else {
@@ -422,33 +341,27 @@ function BuildInstaller {
     }
 }
 
-ParseSimWorkspace
+ParseZedWorkspace
 $innoDir = "$env:ZED_WORKSPACE\inno\$Architecture"
-$debugArchive = "$CargoOutDir\zed-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip"
-$debugStoreKey = "$env:ZED_RELEASE_CHANNEL/zed-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip"
+$debugArchive = "$CargoOutDir\$env:ZED_PRODUCT_ID-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip"
 
 CheckEnvironmentVariables
 PrepareForBundle
 GenerateLicenses
-BuildSimAndItsFriends
+BuildProductBinaries
 BuildRemoteServer
-MakeAppx
-SignSimAndItsFriends
-ZipSimAndItsFriendsDebug
+SignZedAndItsFriends
+ZipProductDebugSymbols
 DownloadAMDGpuServices
 DownloadConpty
 CollectFiles
 BuildInstaller
 
-if($env:CI) {
-    UploadToSentry
-}
-
 if ($buildSuccess) {
     Write-Output "Build successful"
     if ($Install) {
-        Write-Output "Installing Zed..."
-        Start-Process -FilePath "$env:ZED_WORKSPACE/target/SimEditorUserSetup-x64-$env:RELEASE_VERSION.exe"
+        Write-Output "Installing $env:ZED_PRODUCT_DISPLAY_NAME..."
+        Start-Process -FilePath "$CargoTargetDir/release/$env:ZED_PRODUCT_ARTIFACT_NAME"
     }
     exit 0
 }

@@ -27,8 +27,8 @@ use crate::{
         CargoConfigurationDiagnosticCategory, CargoHostCompilerModel, CargoHostCompilerStatus,
         CargoSnapshotCompleteness, CargoWorkspaceErrorCategory, CargoWorkspaceModel,
         CargoWorkspaceSnapshot, MAX_RUSTC_VERBOSE_VERSION_BYTES, deduplicate_workspaces,
-        parse_cargo_profiles, parse_metadata, parse_rust_toolchain, parse_rustc_verbose_version,
-        workspace_from_metadata,
+        enrich_dependency_provenance, parse_cargo_profiles, parse_metadata, parse_rust_toolchain,
+        parse_rustc_verbose_version, workspace_from_metadata,
     },
     trusted_worktrees::TrustedWorktrees,
     worktree_store::{WorktreeStore, WorktreeStoreEvent},
@@ -197,6 +197,7 @@ struct Candidate {
     worktree_root: PathBuf,
     environment: Shared<Task<Option<HashMap<String, String>>>>,
     manifest_text: Task<Result<String>>,
+    lock_text: Option<(ProjectPath, Task<Result<String>>)>,
     toolchain_text: Option<(ProjectPath, Task<Result<String>>)>,
     trusted: bool,
     private_paths: Arc<[Arc<RelPath>]>,
@@ -559,6 +560,15 @@ fn collect_candidates(
                     let text = load_visible_worktree_text(&worktree, path, cx);
                     (project_path, text)
                 });
+            let lock_text =
+                nearest_cargo_lock_path(&snapshot, manifest_path.as_ref()).map(|path| {
+                    let project_path = ProjectPath {
+                        worktree_id,
+                        path: path.clone(),
+                    };
+                    let text = load_visible_worktree_text(&worktree, path, cx);
+                    (project_path, text)
+                });
             candidates.push(Candidate {
                 project_path: ProjectPath {
                     worktree_id,
@@ -568,6 +578,7 @@ fn collect_candidates(
                 worktree_root: worktree_root.clone(),
                 environment: worktree_environment.clone(),
                 manifest_text,
+                lock_text,
                 toolchain_text,
                 trusted,
                 private_paths: private_paths.clone(),
@@ -589,6 +600,24 @@ fn collect_candidates(
     });
     let input_fingerprint = cargo_input_fingerprint(worktree_store, allowed_worktree_ids, cx);
     (candidates, input_fingerprint)
+}
+
+fn nearest_cargo_lock_path(
+    snapshot: &worktree::Snapshot,
+    manifest_path: &RelPath,
+) -> Option<Arc<RelPath>> {
+    let manifest_directory = manifest_path.parent().unwrap_or(RelPath::empty());
+    let lock_name = RelPath::from_unix_str("Cargo.lock").ok()?;
+    for directory in manifest_directory.ancestors() {
+        let path = directory.join(lock_name);
+        if snapshot
+            .entry_for_path(path.as_ref())
+            .is_some_and(|entry| !entry.is_private && entry.is_file())
+        {
+            return Some(path.into());
+        }
+    }
+    None
 }
 
 fn load_visible_worktree_text(
@@ -673,19 +702,8 @@ async fn collect_snapshot(
     runner: Arc<dyn CargoMetadataRunner>,
     configuration_probe: Arc<dyn CargoConfigurationProbe>,
 ) -> Result<CargoWorkspaceSnapshot> {
-    let roots = candidates
-        .iter()
-        .map(|candidate| {
-            (
-                candidate.project_path.worktree_id,
-                candidate.worktree_root.clone(),
-                candidate.private_paths.clone(),
-            )
-        })
-        .collect::<Vec<_>>();
-    let mut covered = HashSet::new();
-    let mut workspaces = Vec::new();
-    let mut failures = Vec::new();
+    let mut loaded_candidates = Vec::with_capacity(candidates.len());
+    let mut manifest_contents = std::collections::BTreeMap::new();
     for candidate in candidates {
         let Candidate {
             project_path,
@@ -693,10 +711,56 @@ async fn collect_snapshot(
             worktree_root,
             environment,
             manifest_text,
+            lock_text,
             toolchain_text,
             trusted,
-            private_paths: _,
+            private_paths,
         } = candidate;
+        let manifest_text = manifest_text.await;
+        if let Ok(contents) = &manifest_text {
+            manifest_contents.insert(project_path.clone(), contents.clone());
+        }
+        let lock_text = match lock_text {
+            Some((path, text)) => Some((path, text.await)),
+            None => None,
+        };
+        loaded_candidates.push((
+            project_path,
+            absolute_path,
+            worktree_root,
+            environment,
+            manifest_text,
+            lock_text,
+            toolchain_text,
+            trusted,
+            private_paths,
+        ));
+    }
+    let roots = loaded_candidates
+        .iter()
+        .map(|candidate| {
+            (
+                candidate.0.worktree_id,
+                candidate.2.clone(),
+                candidate.8.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut covered = HashSet::new();
+    let mut workspaces = Vec::new();
+    let mut failures = Vec::new();
+    for candidate in loaded_candidates {
+        let (
+            project_path,
+            absolute_path,
+            worktree_root,
+            environment,
+            manifest_text,
+            lock_text,
+            toolchain_text,
+            trusted,
+            _,
+        ) = candidate;
         if covered.contains(&absolute_path) {
             continue;
         }
@@ -736,10 +800,18 @@ async fn collect_snapshot(
                         project_path_for_absolute_path(path, &roots)
                     }) {
                         Ok(mut workspace) => {
+                            enrich_dependency_provenance(
+                                &mut workspace,
+                                &manifest_contents,
+                                lock_text
+                                    .as_ref()
+                                    .and_then(|(_, contents)| contents.as_ref().ok())
+                                    .map(String::as_str),
+                            );
                             enrich_workspace_configuration(
                                 &mut workspace,
                                 project_path.clone(),
-                                manifest_text.await,
+                                manifest_text,
                                 toolchain_text,
                                 working_directory,
                                 environment,
@@ -1146,7 +1218,16 @@ fn target_to_proto(target: crate::cargo_workspace::CargoTargetModel) -> proto::C
 fn dependency_to_proto(
     dependency: crate::cargo_workspace::CargoDependencyModel,
 ) -> proto::CargoDependency {
-    use crate::cargo_workspace::{CargoDependencyKind, CargoDependencySourceKind};
+    use crate::cargo_workspace::{
+        CargoDependencyDeclarationOrigin, CargoDependencyFeatureCausality, CargoDependencyKind,
+        CargoDependencyLockStatus, CargoDependencySourceKind,
+    };
+    let source_kind_to_proto = |source_kind| match source_kind {
+        CargoDependencySourceKind::Other => 0,
+        CargoDependencySourceKind::Path => 1,
+        CargoDependencySourceKind::Registry => 2,
+        CargoDependencySourceKind::Git => 3,
+    };
     proto::CargoDependency {
         declaration_name: dependency.declaration_name,
         rename: dependency.rename,
@@ -1161,18 +1242,44 @@ fn dependency_to_proto(
         uses_default_features: dependency.uses_default_features,
         requested_features: dependency.requested_features,
         target: dependency.target,
-        source_kind: match dependency.source_kind {
-            CargoDependencySourceKind::Other => 0,
-            CargoDependencySourceKind::Path => 1,
-            CargoDependencySourceKind::Registry => 2,
-            CargoDependencySourceKind::Git => 3,
-        },
+        source_kind: source_kind_to_proto(dependency.source_kind),
         resolved_name: dependency.resolved_name,
         resolved_version: dependency.resolved_version,
         resolved_workspace_member: dependency
             .resolved_workspace_member
             .map(|path| path.to_proto()),
         local_manifest: dependency.local_manifest.map(|path| path.to_proto()),
+        declaration_manifest: dependency.declaration_manifest.map(|path| path.to_proto()),
+        declaration_origin: match dependency.declaration_origin {
+            CargoDependencyDeclarationOrigin::Unknown => 0,
+            CargoDependencyDeclarationOrigin::Direct => 1,
+            CargoDependencyDeclarationOrigin::WorkspaceInherited => 2,
+        },
+        resolved_instances: dependency
+            .resolved_instances
+            .into_iter()
+            .map(|resolved| proto::CargoResolvedDependency {
+                name: resolved.name,
+                version: resolved.version,
+                source_kind: source_kind_to_proto(resolved.source_kind),
+                enabled_features: resolved.enabled_features,
+                lock_status: match resolved.lock_status {
+                    CargoDependencyLockStatus::Unknown => 0,
+                    CargoDependencyLockStatus::Locked => 1,
+                    CargoDependencyLockStatus::NotLocked => 2,
+                    CargoDependencyLockStatus::MissingLockfile => 3,
+                },
+                workspace_member: resolved.workspace_member.map(|path| path.to_proto()),
+                local_manifest: resolved.local_manifest.map(|path| path.to_proto()),
+            })
+            .collect(),
+        resolution_truncated: dependency.resolution_truncated,
+        feature_causality: match dependency.feature_causality {
+            CargoDependencyFeatureCausality::Unknown => 0,
+            CargoDependencyFeatureCausality::Validated => 1,
+            CargoDependencyFeatureCausality::Ambiguous => 2,
+        },
+        cycle_detected: dependency.cycle_detected,
     }
 }
 
@@ -1388,32 +1495,83 @@ fn package_from_proto(
         dependencies: package
             .dependencies
             .into_iter()
-            .map(|dependency| CargoDependencyModel {
-                declaration_name: dependency.declaration_name,
-                rename: dependency.rename,
-                kind: match dependency.kind {
-                    1 => CargoDependencyKind::Normal,
-                    2 => CargoDependencyKind::Development,
-                    3 => CargoDependencyKind::Build,
-                    _ => CargoDependencyKind::Unknown,
-                },
-                version_requirement: dependency.version_requirement,
-                optional: dependency.optional,
-                uses_default_features: dependency.uses_default_features,
-                requested_features: dependency.requested_features,
-                target: dependency.target,
-                source_kind: match dependency.source_kind {
-                    1 => CargoDependencySourceKind::Path,
-                    2 => CargoDependencySourceKind::Registry,
-                    3 => CargoDependencySourceKind::Git,
-                    _ => CargoDependencySourceKind::Other,
-                },
-                resolved_name: dependency.resolved_name,
-                resolved_version: dependency.resolved_version,
-                resolved_workspace_member: dependency
-                    .resolved_workspace_member
-                    .and_then(ProjectPath::from_proto),
-                local_manifest: dependency.local_manifest.and_then(ProjectPath::from_proto),
+            .map(|dependency| {
+                let resolved_instance_count = dependency.resolved_instances.len();
+                CargoDependencyModel {
+                    declaration_name: dependency.declaration_name,
+                    rename: dependency.rename,
+                    kind: match dependency.kind {
+                        1 => CargoDependencyKind::Normal,
+                        2 => CargoDependencyKind::Development,
+                        3 => CargoDependencyKind::Build,
+                        _ => CargoDependencyKind::Unknown,
+                    },
+                    version_requirement: dependency.version_requirement,
+                    optional: dependency.optional,
+                    uses_default_features: dependency.uses_default_features,
+                    requested_features: dependency.requested_features,
+                    target: dependency.target,
+                    source_kind: match dependency.source_kind {
+                        1 => CargoDependencySourceKind::Path,
+                        2 => CargoDependencySourceKind::Registry,
+                        3 => CargoDependencySourceKind::Git,
+                        _ => CargoDependencySourceKind::Other,
+                    },
+                    resolved_name: dependency.resolved_name,
+                    resolved_version: dependency.resolved_version,
+                    resolved_workspace_member: dependency
+                        .resolved_workspace_member
+                        .and_then(ProjectPath::from_proto),
+                    local_manifest: dependency.local_manifest.and_then(ProjectPath::from_proto),
+                    declaration_manifest: dependency
+                        .declaration_manifest
+                        .and_then(ProjectPath::from_proto),
+                    declaration_origin: match dependency.declaration_origin {
+                        1 => CargoDependencyDeclarationOrigin::Direct,
+                        2 => CargoDependencyDeclarationOrigin::WorkspaceInherited,
+                        _ => CargoDependencyDeclarationOrigin::Unknown,
+                    },
+                    resolved_instances: dependency
+                        .resolved_instances
+                        .into_iter()
+                        .take(MAX_CARGO_DEPENDENCY_INSTANCES)
+                        .map(|resolved| CargoResolvedDependencyModel {
+                            name: resolved.name,
+                            version: resolved.version,
+                            source_kind: match resolved.source_kind {
+                                1 => CargoDependencySourceKind::Path,
+                                2 => CargoDependencySourceKind::Registry,
+                                3 => CargoDependencySourceKind::Git,
+                                _ => CargoDependencySourceKind::Other,
+                            },
+                            enabled_features: resolved
+                                .enabled_features
+                                .into_iter()
+                                .take(MAX_CARGO_DEPENDENCY_FEATURES)
+                                .collect(),
+                            lock_status: match resolved.lock_status {
+                                1 => CargoDependencyLockStatus::Locked,
+                                2 => CargoDependencyLockStatus::NotLocked,
+                                3 => CargoDependencyLockStatus::MissingLockfile,
+                                _ => CargoDependencyLockStatus::Unknown,
+                            },
+                            workspace_member: resolved
+                                .workspace_member
+                                .and_then(ProjectPath::from_proto),
+                            local_manifest: resolved
+                                .local_manifest
+                                .and_then(ProjectPath::from_proto),
+                        })
+                        .collect(),
+                    resolution_truncated: dependency.resolution_truncated
+                        || resolved_instance_count > MAX_CARGO_DEPENDENCY_INSTANCES,
+                    feature_causality: match dependency.feature_causality {
+                        1 => CargoDependencyFeatureCausality::Validated,
+                        2 => CargoDependencyFeatureCausality::Ambiguous,
+                        _ => CargoDependencyFeatureCausality::Unknown,
+                    },
+                    cycle_detected: dependency.cycle_detected,
+                }
             })
             .collect(),
     })
@@ -1539,6 +1697,7 @@ mod tests {
                 "[workspace]\nresolver = \"2\"\n[profile.ship]\ninherits = \"release\"\n"
                     .to_string(),
             )),
+            lock_text: None,
             toolchain_text: None,
             trusted,
             private_paths: Arc::from([]),
@@ -1576,6 +1735,7 @@ mod tests {
             worktree_root: PathBuf::from("/workspace"),
             environment: Task::ready(Some(environment.clone())).shared(),
             manifest_text: Task::ready(Ok("[workspace]\nresolver = \"2\"\n".to_string())),
+            lock_text: None,
             toolchain_text: None,
             trusted: true,
             private_paths: Arc::from([]),

@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use gpui::{App, IntoElement, RenderOnce, Role, Window};
-use ui::{Button, ButtonStyle, Color, Label, LabelSize, TintColor, prelude::*};
+use ui::{Button, ButtonStyle, Color, Label, LabelSize, TintColor, Tooltip, prelude::*};
 
 use crate::activity_projection::{
-    ActivityDetailHandle, ActivityItem, ActivityItemId, ActivityLifecycle, ActivityLink,
-    ActivityObjectKind, ActivityOutcomeStatus, ActivitySemanticClass,
+    ActivityActorKind, ActivityDetailHandle, ActivityItem, ActivityItemId, ActivityLifecycle,
+    ActivityLink, ActivityObjectKind, ActivityOutcomeStatus, ActivitySemanticClass,
 };
 
 #[cfg(feature = "multiplayer-tools")]
@@ -204,6 +204,8 @@ impl CollaborativeActivityCard {
 impl RenderOnce for CollaborativeActivityCard {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let presentation = ActivityCardPresentation::new(&self.item, &self.sources);
+        let actor = self.item.actor.clone();
+        let object_label = self.item.object.label.clone();
         let tone_color = tone_color(presentation.tone);
         let background = match presentation.tone {
             ActivityCardTone::Attention => cx.theme().status().warning_background,
@@ -217,63 +219,139 @@ impl RenderOnce for CollaborativeActivityCard {
             .unwrap_or_default();
         let interventions = presentation.interventions.clone();
         let on_intervention = self.on_intervention.clone();
+        let conversational = presentation.kind == ActivityCardKind::Message;
+        let actor_fallback_icon = match actor.kind {
+            ActivityActorKind::Agent => IconName::AcpRegistry,
+            ActivityActorKind::Human => IconName::Person,
+            ActivityActorKind::Service => IconName::Server,
+            ActivityActorKind::System => IconName::Settings,
+        };
 
         v_flex()
             .id(("collaborative-activity-card", self.index))
             .role(Role::ListItem)
             .aria_label(presentation.accessibility_label())
             .w_full()
-            .px_4()
+            .px_3()
             .py_2()
-            .gap_1p5()
-            .border_b_1()
-            .border_color(cx.theme().colors().border_variant)
+            .gap_1()
             .bg(background)
-            .child(
-                h_flex()
-                    .w_full()
-                    .items_start()
-                    .justify_between()
-                    .gap_3()
-                    .child(
-                        v_flex()
-                            .min_w_0()
-                            .gap_0p5()
-                            .child(Label::new(presentation.summary.clone()).size(LabelSize::Small))
-                            .child(
-                                h_flex()
-                                    .gap_1()
-                                    .child(
-                                        Label::new(presentation.kind_label)
-                                            .size(LabelSize::XSmall)
-                                            .color(tone_color),
+            .when(conversational, |this| {
+                this.child(
+                    h_flex()
+                        .w_full()
+                        .items_start()
+                        .gap_3()
+                        .child(
+                            div()
+                                .mt_0p5()
+                                .size_5()
+                                .flex_none()
+                                .rounded_full()
+                                .border_1()
+                                .border_color(cx.theme().colors().border)
+                                .bg(cx.theme().colors().element_background)
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .child(
+                                    Icon::new(actor_fallback_icon)
+                                        .size(IconSize::XSmall)
+                                        .color(Color::Muted),
+                                ),
+                        )
+                        .child(
+                            v_flex()
+                                .min_w_0()
+                                .flex_1()
+                                .gap_1()
+                                .child(
+                                    Label::new(actor.label.clone())
+                                        .size(LabelSize::XSmall)
+                                        .color(Color::Muted),
+                                )
+                                .child(div().text_sm().child(object_label.clone())),
+                        )
+                        .when(presentation.has_progressive_detail(), |this| {
+                            this.when_some(self.on_toggle.clone(), |this, on_toggle| {
+                                this.child(
+                                    IconButton::new(
+                                        ("collaborative-activity-details", self.index),
+                                        if self.expanded {
+                                            IconName::ChevronDown
+                                        } else {
+                                            IconName::ChevronRight
+                                        },
                                     )
-                                    .child(
-                                        Label::new(format!("· {}", presentation.lifecycle_label))
-                                            .size(LabelSize::XSmall)
-                                            .color(Color::Muted),
-                                    ),
-                            ),
-                    )
-                    .when(presentation.has_progressive_detail(), |this| {
-                        this.when_some(self.on_toggle.clone(), |this, on_toggle| {
-                            this.child(
-                                Button::new(
-                                    ("collaborative-activity-details", self.index),
-                                    if self.expanded {
+                                    .icon_size(IconSize::XSmall)
+                                    .tooltip(Tooltip::text(if self.expanded {
                                         "Hide details"
                                     } else {
                                         "Show details"
-                                    },
+                                    }))
+                                    .aria_expanded(self.expanded)
+                                    .on_click(move |_, window, cx| on_toggle(window, cx)),
                                 )
-                                .style(ButtonStyle::Subtle)
-                                .label_size(LabelSize::Small)
-                                .aria_expanded(self.expanded)
-                                .on_click(move |_, window, cx| on_toggle(window, cx)),
-                            )
-                        })
-                    }),
-            )
+                            })
+                        }),
+                )
+            })
+            .when(!conversational, |this| {
+                this.child(
+                    h_flex()
+                        .w_full()
+                        .items_start()
+                        .justify_between()
+                        .gap_3()
+                        .child(
+                            v_flex()
+                                .min_w_0()
+                                .gap_0p5()
+                                .child(
+                                    Label::new(presentation.summary.clone()).size(LabelSize::Small),
+                                )
+                                .child(
+                                    h_flex()
+                                        .gap_1()
+                                        .child(
+                                            Label::new(presentation.kind_label)
+                                                .size(LabelSize::XSmall)
+                                                .color(tone_color),
+                                        )
+                                        .child(
+                                            Label::new(format!(
+                                                "· {}",
+                                                presentation.lifecycle_label
+                                            ))
+                                            .size(LabelSize::XSmall)
+                                            .color(Color::Muted),
+                                        ),
+                                ),
+                        )
+                        .when(presentation.has_progressive_detail(), |this| {
+                            this.when_some(self.on_toggle.clone(), |this, on_toggle| {
+                                this.child(
+                                    IconButton::new(
+                                        ("collaborative-activity-details", self.index),
+                                        if self.expanded {
+                                            IconName::ChevronDown
+                                        } else {
+                                            IconName::ChevronRight
+                                        },
+                                    )
+                                    .icon_size(IconSize::XSmall)
+                                    .tooltip(Tooltip::text(if self.expanded {
+                                        "Hide details"
+                                    } else {
+                                        "Show details"
+                                    }))
+                                    .aria_expanded(self.expanded)
+                                    .on_click(move |_, window, cx| on_toggle(window, cx)),
+                                )
+                            })
+                        }),
+                )
+            })
             .when(presentation.waiting_for_user, |this| {
                 this.child(
                     Label::new("Waiting for you — this work will not continue without input.")

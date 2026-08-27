@@ -1,5 +1,7 @@
 # Tasks: Goose Documentation Coverage in Zed
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 - [ ] 1. Build a documentation claim matrix from approved migration capabilities
   - Map each user-facing capability to setup, configuration, use, failures, security/privacy, platform gates, compatibility, examples, implementation evidence, and verification
   - Reject or label planned behavior that has no implementation evidence

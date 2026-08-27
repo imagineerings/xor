@@ -3356,6 +3356,14 @@ impl ConversationView {
         }
     }
 
+    pub fn scroll_thread_to_entry_for_tests(&mut self, entry_index: usize, cx: &mut Context<Self>) {
+        if let Some(active) = self.active_thread() {
+            active.update(cx, |active, cx| {
+                active.scroll_to_entry_for_tests(entry_index, cx);
+            });
+        }
+    }
+
     #[cfg(any(test, feature = "test-support"))]
     pub fn set_updated_at(&mut self, updated_at: Instant, cx: &mut Context<Self>) {
         let Some(connected) = self.as_connected_mut() else {

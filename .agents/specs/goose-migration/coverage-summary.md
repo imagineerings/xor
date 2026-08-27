@@ -118,3 +118,4 @@
 - Updated all 17 migration feature packs (`requirements.md`, `design.md`, and `tasks.md`) under this directory, preserving existing requirement/task IDs where possible and adding stable acceptance-criterion IDs and traceability.
 - All task checkboxes remain unchecked.
 - Repository spec validator: all 17 feature packs pass. Non-fatal warnings identify repeated write ownership that implementation sequencing must serialize; no unknown, untraced, or uncovered acceptance criteria remain.
+- Cross-cutting compile-time coverage is specified by `agentic-feature/{requirements,design,tasks}.md` and `feature-boundary.md`. All 18 current migration task plans inherit its production-write classification, disabled dependency/registration checks, persistence compatibility rules, and future-task evidence requirement.

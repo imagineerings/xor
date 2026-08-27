@@ -1,5 +1,7 @@
 # Implementation Plan: TypeScript ACP SDK
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Approach
 
 Publish this package only after the SDK product decision and ACP server compatibility set are approved. Compose the upstream ACP client and generate extension bindings from canonical definitions.

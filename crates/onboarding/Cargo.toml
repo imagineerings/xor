@@ -13,6 +13,7 @@ path = "src/onboarding.rs"
 
 [features]
 default = []
+agentic = ["zed_actions/agentic"]
 multiplayer-tools = ["workspace/multiplayer-tools"]
 
 [dependencies]
@@ -30,6 +31,7 @@ menu.workspace = true
 notifications.workspace = true
 picker.workspace = true
 project.workspace = true
+product_flavor.workspace = true
 schemars.workspace = true
 serde.workspace = true
 settings.workspace = true

@@ -2,7 +2,21 @@
 
 Date: 2026-08-25
 
-Status: **PARITY EVIDENCE PASS — REPOSITORY IMPLEMENTATION SIGNED 2026-08-26**
+Status: **REOPENED — NATIVE DESKTOP PARITY INCOMPLETE (2026-08-26 AUDIT)**
+
+The 2026-08-26 running-interface audit supersedes the report's prior overall
+PASS conclusion without rewriting its historical evidence. The audit found
+that CAP-036 and acceptance criteria 4.1–4.5 were not supported by production
+composition evidence: the center surface rendered a literal `"Timeline"`
+label, the visual test compared only selector geometry and reference-file
+hashes, ACP/collaboration timelines had no production registration, top-bar
+share/invite/connection controls were permanently disabled, pinned and
+community navigation lacked production sources, and the claimed populated
+cross-surface visual comparison had not been captured. Corrective Epic 50 in
+`tasks.md` is the current completion authority. Until every leaf and its
+running-application evidence passes, CAP-036 and criteria 4.1–4.5 are
+**INCOMPLETE**, the 45/45 and 93/93 totals below are historical claims, and no
+Collaborative Workspace parity sign-off is valid.
 
 This report establishes complete implementation, reuse, compatibility, migration, security and failure-semantic evidence for all 45 capability IDs and all 93 acceptance criteria. It finds zero unexplained behavior gaps, zero unresolved architecture decisions and zero prohibited duplicate owners. It does not authorize production activation, irreversible migration, source/data deletion or retirement of a component whose live usage, rollback-window, immutable-history or human-approval gate remains unsatisfied.
 
@@ -53,7 +67,7 @@ Every implementation count links to the exact completed leaf IDs in `catalogs/fi
 | CAP-008 Authentication and authorization | Collab authentication and collaboration-domain authorization policy; Extend | F,T — 21 completed leaves | RPC, API-token and Nostr authentication adapters over one policy | M,C,R | P,S,T — Cross-transport fail-closed policy, replay and revocation negatives | PASS |
 | CAP-009 Secret and signing-key custody | credentials_provider and zed_credentials_provider; Reuse + extend Zed credentials | F,T — 14 completed leaves | Nostr backup/pairing formats under native credential custody | M,C,R | S,M,T — Protected-storage round trip, redaction, fallback and rollback failures | PASS |
 | CAP-010 Channels and membership | collaboration-domain channel/membership aggregates and Collab persistence; Extend existing channel/collab owners | F,T — 16 completed leaves | NIP-29 compatibility adapter | M,C,R | P,S,L,T — Type/visibility/role/invite lifecycle plus tenant and queue bounds | PASS |
-| CAP-011 Messaging and threads | collaboration-domain message/thread aggregates, Collab repositories and native activity UI; Port messaging domain; reuse UI primitives | F,T — 20 completed leaves | NIP-CW wire adapter and native activity projection | M,C,R | P,S,L,T — Stable windows/aux closure/overlays under approved OL-DAT budgets | PASS |
+| CAP-011 Messaging and threads | collaboration-domain message/thread aggregates, Collab repositories and native activity UI; Port messaging domain; reuse UI primitives | F,T — 20 completed leaves | NIP-CW wire adapter and native activity projection | M,C,R | Historical repository/window evidence does not prove the production Zed RPC, PostgreSQL replay and desktop composition added under Epic 51 | HISTORICAL PASS — CURRENT INCOMPLETE |
 | CAP-012 Direct messages and privacy | collaboration-domain direct-message policy and Collab service; Port into collab domain/service | F,T — 8 completed leaves | NIP-17/NIP-44/NIP-DV encrypted compatibility wire | M,C,R | P,S,T — Participant/result gates and encrypted visibility failures | PASS |
 | CAP-013 Read, unread, reminders, drafts | Collab read/reminder authority plus native local draft storage; Merge | F,T — 14 completed leaves | NIP-RS/NIP-ER adapters and native local draft cache | M,C,R | P,S,L,T — Bounded convergent frontier/override state and reconnect semantics | PASS |
 | CAP-014 Presence and typing | Collab presence/typing projection with source and expiry; Extend collab presence | F,T — 6 completed leaves | Nostr presence/typing and existing room-presence inputs | M,C,R | P,S,L,T — Scoped ephemeral state, expiry and cleanup | PASS |
@@ -78,7 +92,7 @@ Every implementation count links to the exact completed leaf IDs in `catalogs/fi
 | CAP-033 Pairing and identity transfer | Zed credential custody plus NIP-AB pair relay/adapter; Port + compatibility | F,T — 9 completed leaves | NIP-AB pair relay and CLI interoperability boundary | M,C,R | P,S,M,T — Six-direction NIP-AB interop, replay/expiry/cancel and verified import | PASS |
 | CAP-034 Remote-agent providers | Agent JobExecutionCoordinator plus Remote provider lifecycle; Merge | F,T — 13 completed leaves | Provider ABI/Sprig compatibility under one executor; duplicate runtime removal remains gated | M,C,R | S,O,T — Pre-secret negotiation, exactly once, hostile output and process cleanup | PASS |
 | CAP-035 Relay mesh and shared compute | Remote-agent scheduler plus isolated Iroh mesh transport; Port unique transport behind remote-agent scheduling | F,T — 12 completed leaves | Default-off Iroh mesh wire behind canonical remote scheduling | M,C,R | S,O,T — OL-MSH queue/fairness/lease/resource limits and no silent fallback | PASS |
-| CAP-036 Native collaborative desktop | workspace, sidebar, agent_ui, collab_ui, git_ui and terminal_view; Native compose/extend | F,T — 62 completed leaves | Approved visual baselines; Buzz React/Tauri desktop remains removal-gated | M,C,R | T — Approved GPUI/visual/a11y geometry, state and native-owner evidence | PASS |
+| CAP-036 Native collaborative desktop | workspace, sidebar, agent_ui, collab_ui, git_ui and terminal_view; Native compose/extend | F,T — 62 completed leaves | Approved visual baselines; Buzz React/Tauri desktop remains removal-gated | M,C,R | T — Approved GPUI/visual/a11y geometry, state and native-owner evidence | HISTORICAL PASS — CURRENT INCOMPLETE: corrective Epic 50 remains open |
 | CAP-037 Onboarding and workspace selection | onboarding and workspace presentation settings; Extend existing onboarding | F,T — 14 completed leaves | Legacy presentation-setting importer; Buzz desktop remains removal-gated | M,C,R | T — Reversible shared-data presentation and Standard fallback | PASS |
 | CAP-038 Agent-first CLI | Zed CLI collaboration namespace; Adapt into Zed CLI; retain `buzz` compatibility binary/symlink until usage gate | F,T — 22 completed leaves | Versioned standalone buzz CLI compatibility shim | M,C,R | P,S,T — Frozen commands, links, exit/error and unsupported-version contracts | PASS |
 | CAP-039 Web client | Migrated web companion client; Retain compatibility client, rebrand/repoint after server consolidation | F,T — 10 completed leaves | Migrated web companion client against canonical endpoints | M,C,R | P,S,T — Frozen routes/auth/version and pre-mutation failure contract | PASS |
@@ -89,7 +103,8 @@ Every implementation count links to the exact completed leaf IDs in `catalogs/fi
 | CAP-044 Test, conformance and formal evidence | Independent collaboration conformance and Zed CI; Retain independent checker and black-box suites; integrate into Zed CI | F,T — 48 completed leaves | Independent Buzz conformance, formal-model and fixture corpus | M,C,R | P,S,M,L,O,T — Independent protocol, threat, fault, load and orchestration gates | PASS |
 | CAP-045 Migration and local archive | Collab/Zed migration importers, checkpoints, cutover and rollback owners; Port importers, not Tauri runtime | F,T — 37 completed leaves | Read-only importers, receipts, rollback evidence and removal-gated source history | M,C,R | M,T — Resumable/checksummed import, schema lifecycle and rollback fixtures | PASS |
 
-Capability total: **45 PASS; 0 missing; 0 unexplained; 0 deferred implementations**.
+Historical capability total: **45 PASS**. Current corrective accounting: **44
+qualified; CAP-036 INCOMPLETE; 0 unexplained states**.
 
 ## Acceptance-criterion evidence ledger
 
@@ -109,11 +124,11 @@ The capability column is the union of the completed leaves that cite the criteri
 | 3.2 | WHEN a choice is made, THEN Zed SHALL persist the presentation preference and open the selected presentation on subsequent launches. | CAP-036,CAP-037,CAP-044 | 5.2,5.4,10.7 | T | PASS |
 | 3.3 | WHEN the user switches presentation later, THEN Zed SHALL preserve project, worktree, Git, identity, credentials, agent session and collaboration state without copying or forking it. | CAP-018,CAP-036,CAP-037 | 5.2,5.3,5.5,7.3 | T | PASS |
 | 3.4 | IF an existing user has not selected Collaborative Workspace, THEN current Editor Workspace behavior SHALL remain unchanged. | CAP-036,CAP-037 | 5.1,5.5 | T | PASS |
-| 4.1 | WHILE Collaborative Workspace is active, THE GPUI layout SHALL provide a left navigation rail, participant/task top bar, central timeline/composer, optional resizable review pane and bottom/status surface with the hierarchy shown in `screenshots/screenshot-1.png` and `screenshots/screenshot-2.png`. | CAP-007,CAP-011,CAP-012,CAP-018,CAP-020,CAP-021,CAP-025,CAP-036 | 6.1,6.2,6.3,6.4,6.6,7.2,7.4,8.5,9.1,9.6,9.7,9.8,10.1,10.2,10.3,10.8,10.9,10.10,19.7,20.4,27.6 | T | PASS |
-| 4.2 | WHEN the review pane is collapsed or the window narrows, THEN the timeline SHALL expand into the reference full-width composition without losing review state or navigation context. | CAP-020,CAP-036,CAP-044 | 6.3,6.4,6.5,9.5,9.8,10.6 | T | PASS |
-| 4.3 | THE workspace SHALL persist pane visibility/widths, active community/project/task, navigation history and relevant filters across restart. | CAP-007,CAP-010,CAP-013,CAP-014,CAP-018,CAP-020,CAP-021,CAP-025,CAP-036,CAP-037,CAP-042,CAP-044 | 6.5,7.1,7.2,7.3,7.4,7.5,7.6,10.2,10.3,10.7,10.8,10.9,10.10,21.6,24.4 | T | PASS |
-| 4.4 | THE workspace SHALL support keyboard navigation, visible focus, screen-reader labels, logical focus order, zoom, theme tokens, reduced motion and usable narrow-window behavior without hardcoded light-theme colors. | CAP-015,CAP-017,CAP-023,CAP-025,CAP-029,CAP-031,CAP-032,CAP-033,CAP-035,CAP-036,CAP-037,CAP-040,CAP-044 | 6.2,10.4,10.5,10.7,22.3,23.2,23.4,29.6,32.5,36.5,38.5,39.7,40.6,41.4 | T | PASS |
-| 4.5 | WHEN compared with the checked-in baselines at their native 1930×1262 and 1928×1298 viewports, THEN approved visual tests SHALL verify major geometry, typography, density, feed spacing, participant/state indicators and expanded/collapsed review compositions; replacement of either baseline SHALL require explicit visual-review approval. | CAP-036,CAP-037,CAP-044 | 10.6,10.7 | T | PASS |
+| 4.1 | WHILE Collaborative Workspace is active, THE GPUI layout SHALL provide a left navigation rail, participant/task top bar, central timeline/composer, optional resizable review pane and bottom/status surface with the hierarchy shown in `screenshots/screenshot-1.png` and `screenshots/screenshot-2.png`. | CAP-007,CAP-011,CAP-012,CAP-018,CAP-020,CAP-021,CAP-025,CAP-036 | 6.1,6.2,6.3,6.4,6.6,7.2,7.4,8.5,9.1,9.6,9.7,9.8,10.1,10.2,10.3,10.8,10.9,10.10,19.7,20.4,27.6,50.1–50.10 | T | HISTORICAL PASS — CURRENT INCOMPLETE |
+| 4.2 | WHEN the review pane is collapsed or the window narrows, THEN the timeline SHALL expand into the reference full-width composition without losing review state or navigation context. | CAP-020,CAP-036,CAP-044 | 6.3,6.4,6.5,9.5,9.8,10.6,50.7–50.10 | T | HISTORICAL PASS — CURRENT INCOMPLETE |
+| 4.3 | THE workspace SHALL persist pane visibility/widths, active community/project/task, navigation history and relevant filters across restart. | CAP-007,CAP-010,CAP-013,CAP-014,CAP-018,CAP-020,CAP-021,CAP-025,CAP-036,CAP-037,CAP-042,CAP-044 | 6.5,7.1,7.2,7.3,7.4,7.5,7.6,10.2,10.3,10.7,10.8,10.9,10.10,21.6,24.4,50.3,50.8,50.10 | T | HISTORICAL PASS — CURRENT INCOMPLETE |
+| 4.4 | THE workspace SHALL support keyboard navigation, visible focus, screen-reader labels, logical focus order, zoom, theme tokens, reduced motion and usable narrow-window behavior without hardcoded light-theme colors. | CAP-015,CAP-017,CAP-023,CAP-025,CAP-029,CAP-031,CAP-032,CAP-033,CAP-035,CAP-036,CAP-037,CAP-040,CAP-044 | 6.2,10.4,10.5,10.7,22.3,23.2,23.4,29.6,32.5,36.5,38.5,39.7,40.6,41.4,50.8,50.10 | T | HISTORICAL PASS — CURRENT INCOMPLETE |
+| 4.5 | WHEN compared with the checked-in baselines at their native 1930×1262 and 1928×1298 viewports, THEN approved visual tests SHALL verify major geometry, typography, density, feed spacing, participant/state indicators and expanded/collapsed review compositions; replacement of either baseline SHALL require explicit visual-review approval. | CAP-036,CAP-037,CAP-044 | 10.6,10.7,50.9,50.10 | T | HISTORICAL PASS — CURRENT INCOMPLETE |
 | 5.1 | THE system SHALL preserve verification and encoding semantics for all registered standard and Buzz event kinds, including replaceable/addressable head selection, exact tag grammars, privacy gates and ephemeral non-persistence. | CAP-001,CAP-002,CAP-003,CAP-004,CAP-005,CAP-006,CAP-009,CAP-014,CAP-019,CAP-020,CAP-025,CAP-026,CAP-031,CAP-033,CAP-035,CAP-044 | 1.2,3.1,11.1,11.2,11.3,11.4,11.5,14.4,15.1,15.2,15.6,21.5,25.1,25.2,31.4,40.1,41.1,45.1 | P,S,T | PASS |
 | 5.2 | WHEN a Nostr client uses supported NIP-01, NIP-11, NIP-29, NIP-42, NIP-45, NIP-50 or NIP-98 behavior, THEN the compatibility adapter SHALL produce protocol-equivalent results and failure frames. | CAP-001,CAP-002,CAP-004,CAP-008,CAP-019,CAP-031,CAP-032,CAP-033,CAP-043,CAP-044 | 3.1,14.1,14.2,14.3,14.4,14.5,38.6,39.3,45.1 | P,S,T | PASS |
 | 5.3 | WHEN a client uses NIP-AA, AE, AM, AO, AP, CW, DV, ER, GS, IA, MP, OA, PL, PMA, RS or WP, THEN the system SHALL preserve the documented security, ordering, encryption, visibility, version and degradation contracts. | CAP-001,CAP-002,CAP-004,CAP-005,CAP-007,CAP-008,CAP-011,CAP-012,CAP-013,CAP-014,CAP-016,CAP-018,CAP-019,CAP-021,CAP-023,CAP-024,CAP-025,CAP-027,CAP-031,CAP-033,CAP-044 | 3.1,11.5,11.6,11.7,11.8,11.9,11.10,11.11,11.12,15.6,19.4,20.1,28.1,30.1,45.1 | P,S,T | PASS |
@@ -126,13 +141,13 @@ The capability column is the union of the completed leaves that cite the criteri
 | 7.2 | WHEN a signing key is imported, generated, paired, rotated, backed up or restored, THEN Zed's canonical credentials provider SHALL use protected storage, verify round trips, redact outputs and avoid deleting the prior source before successful verification. | CAP-007,CAP-009,CAP-019,CAP-033,CAP-038,CAP-045 | 12.4,12.5,12.6,25.7,25.9,40.3 | P,S,M,T | PASS |
 | 7.3 | IF protected key storage is unavailable or corrupt, THEN the system SHALL fail safely or use an explicitly documented owner-only fallback without silently generating a replacement identity. | CAP-007,CAP-009,CAP-033,CAP-034,CAP-045 | 12.4,12.5,33.4,40.3 | P,S,M,T | PASS |
 | 7.4 | WHEN an identity is archived, revoked or rotated, THEN historical authorship SHALL remain intact while active access, autocomplete, agent authorization and future signatures reflect the new state. | CAP-005,CAP-007,CAP-008,CAP-009,CAP-023,CAP-029 | 2.2,12.1,12.2,12.3,12.5,12.7,36.3 | P,S,M,T | PASS |
-| 8.1 | THE service SHALL support bounded authenticated connections, subscriptions, historical queries, live fan-out, counts, backpressure and cross-replica delivery without duplicate local echoes. | CAP-001,CAP-002,CAP-004,CAP-005,CAP-006,CAP-008,CAP-011,CAP-015,CAP-016,CAP-044 | 14.2,14.3,14.4,15.2,15.4,16.1,16.2,45.4 | P,L,C,T | PASS |
-| 8.2 | WHEN a client disconnects and reconnects, THEN it SHALL reauthenticate, refetch the authoritative head/window, rearm live subscriptions and reconcile optimistic/local items deterministically. | CAP-004,CAP-006,CAP-011,CAP-013,CAP-016,CAP-017,CAP-020,CAP-033,CAP-040,CAP-044 | 14.6,16.2,19.5,19.6,23.7,26.5,43.7 | P,L,C,T | PASS |
+| 8.1 | THE service SHALL support bounded authenticated connections, subscriptions, historical queries, live fan-out, counts, backpressure and cross-replica delivery without duplicate local echoes. | CAP-001,CAP-002,CAP-004,CAP-005,CAP-006,CAP-008,CAP-011,CAP-015,CAP-016,CAP-044 | 14.2,14.3,14.4,15.2,15.4,16.1,16.2,45.4,51.2–51.7 | P,L,C,T | HISTORICAL PASS — CURRENT INCOMPLETE (production channel path unproved) |
+| 8.2 | WHEN a client disconnects and reconnects, THEN it SHALL reauthenticate, refetch the authoritative head/window, rearm live subscriptions and reconcile optimistic/local items deterministically. | CAP-004,CAP-006,CAP-011,CAP-013,CAP-016,CAP-017,CAP-020,CAP-033,CAP-040,CAP-044 | 14.6,16.2,19.5,19.6,23.7,26.5,43.7,51.4–51.7 | P,L,C,T | HISTORICAL PASS — CURRENT INCOMPLETE (live channel RPC disconnect/replay passes; desktop GPUI/Compose proof pending) |
 | 8.3 | IF delivery, persistence, projection, pub/sub or replica freshness is partial or unavailable, THEN the UI and operator surfaces SHALL expose the affected scope, retry/recovery action and last trustworthy state. | CAP-004,CAP-005,CAP-006,CAP-013,CAP-014,CAP-015,CAP-016,CAP-027,CAP-028,CAP-030,CAP-035,CAP-036,CAP-041,CAP-043,CAP-044,CAP-045 | 6.6,14.6,15.5,15.7,16.3,16.5,21.6,22.12,34.7,34.8,37.6,41.5,46.4 | P,L,C,T | PASS |
 | 8.4 | THE system SHALL bound frames, queries, subscriptions, queues, retries and retained realtime state, and SHALL clean up connection, process and subscription resources on cancellation or shutdown. | CAP-001,CAP-002,CAP-004,CAP-006,CAP-011,CAP-014,CAP-015,CAP-016,CAP-028,CAP-033,CAP-043,CAP-044 | 4.4,11.4,14.3,16.1,16.2,21.5,22.12,40.2,45.4 | P,L,C,T | PASS |
-| 9.1 | THE system SHALL support Buzz channel types, membership/roles/invites, DMs, messages, replies, edits, deletions, reactions, pins, bookmarks, schedules, canvases, forum posts, custom emoji and entity links with equivalent visibility rules. | CAP-001,CAP-003,CAP-005,CAP-008,CAP-010,CAP-011,CAP-012,CAP-013,CAP-015,CAP-016,CAP-017,CAP-020,CAP-025,CAP-029,CAP-030,CAP-031,CAP-032,CAP-036,CAP-038,CAP-040,CAP-044 | 11.9,18.1,18.2,18.3,18.4,18.5,18.6,18.7,19.1,19.2,19.3,19.4,19.7,19.8,19.9,20.1,20.2,20.4,23.1,23.2,23.3,23.4,23.5,23.6,23.7,26.2,26.4,42.3,42.10,42.11,43.8 | P,S,L,T | PASS |
-| 9.2 | WHEN timelines or threads are paged, THEN rows, replies, aux events, summaries and bounds SHALL retain stable order and exact continuation under same-second events, deletions and concurrent live updates. | CAP-001,CAP-005,CAP-011,CAP-012,CAP-013,CAP-017,CAP-025,CAP-036,CAP-038 | 11.9,19.1,19.4,19.5,19.6,19.7,23.3,42.3 | P,S,L,T | PASS |
-| 9.3 | THE system SHALL synchronize read/unread/manual-unread state, drafts, reminders, presence and typing with documented privacy, expiry, cross-device and offline behavior. | CAP-001,CAP-006,CAP-011,CAP-012,CAP-013,CAP-014,CAP-015,CAP-016,CAP-017,CAP-030,CAP-031,CAP-034,CAP-036,CAP-038,CAP-040,CAP-044,CAP-045 | 11.9,17.5,19.8,19.9,20.3,20.4,20.5,21.1,21.2,21.3,21.4,21.5,21.6,23.1,23.2,23.7,42.11,43.8 | P,S,L,T | PASS |
+| 9.1 | THE system SHALL support Buzz channel types, membership/roles/invites, DMs, messages, replies, edits, deletions, reactions, pins, bookmarks, schedules, canvases, forum posts, custom emoji and entity links with equivalent visibility rules. | CAP-001,CAP-003,CAP-005,CAP-008,CAP-010,CAP-011,CAP-012,CAP-013,CAP-015,CAP-016,CAP-017,CAP-020,CAP-025,CAP-029,CAP-030,CAP-031,CAP-032,CAP-036,CAP-038,CAP-040,CAP-044 | 11.9,18.1,18.2,18.3,18.4,18.5,18.6,18.7,19.1,19.2,19.3,19.4,19.7,19.8,19.9,20.1,20.2,20.4,23.1,23.2,23.3,23.4,23.5,23.6,23.7,26.2,26.4,42.3,42.10,42.11,43.8,51.1–51.7 | P,S,L,T | HISTORICAL PASS — CURRENT INCOMPLETE (native production messaging proof pending) |
+| 9.2 | WHEN timelines or threads are paged, THEN rows, replies, aux events, summaries and bounds SHALL retain stable order and exact continuation under same-second events, deletions and concurrent live updates. | CAP-001,CAP-005,CAP-011,CAP-012,CAP-013,CAP-017,CAP-025,CAP-036,CAP-038 | 11.9,19.1,19.4,19.5,19.6,19.7,23.3,42.3,51.3–51.6 | P,S,L,T | HISTORICAL PASS — CURRENT INCOMPLETE (live dense channel pagination passes; production message-thread UI and concurrent-live GPUI proof pending) |
+| 9.3 | THE system SHALL synchronize read/unread/manual-unread state, drafts, reminders, presence and typing with documented privacy, expiry, cross-device and offline behavior. | CAP-001,CAP-006,CAP-011,CAP-012,CAP-013,CAP-014,CAP-015,CAP-016,CAP-017,CAP-030,CAP-031,CAP-034,CAP-036,CAP-038,CAP-040,CAP-044,CAP-045 | 11.9,17.5,19.8,19.9,20.3,20.4,20.5,21.1,21.2,21.3,21.4,21.5,21.6,23.1,23.2,23.7,42.11,43.8,51.3–51.7 | P,S,L,T | HISTORICAL PASS — CURRENT INCOMPLETE (live channel acknowledgement and reconnect pass; full cross-device awareness matrix pending) |
 | 9.4 | WHEN search or discovery runs, THEN authorization and privacy exclusions SHALL be applied before limit/ranking, and results MAY compose with existing Zed file/project search without exposing private event content. | CAP-012,CAP-013,CAP-015,CAP-016,CAP-030,CAP-031,CAP-036,CAP-040,CAP-044 | 16.4,16.5,22.1,22.2,22.3,22.11,43.8 | P,S,L,T | PASS |
 | 9.5 | WHEN a native or push notification is emitted, THEN it SHALL be deduplicated, permission-aware and privacy-preserving; push payloads SHALL be wake-only and authoritative data SHALL be fetched after reconnect. | CAP-001,CAP-005,CAP-012,CAP-013,CAP-015,CAP-016,CAP-031,CAP-033,CAP-040,CAP-042,CAP-044,CAP-045 | 2.5,4.6,11.11,17.8,22.4,22.5,22.6,22.7,22.8,22.9,22.11,22.13,43.7,43.8 | P,S,L,T | PASS |
 | 10.1 | THE system SHALL support cross-owner multi-repository projects and channel binding without granting project signers authority over member repositories. | CAP-001,CAP-005,CAP-010,CAP-018,CAP-019,CAP-020,CAP-027,CAP-036,CAP-038,CAP-044 | 2.3,11.10,24.1,24.2,24.3,24.4,24.5,42.4 | P,S,T | PASS |
@@ -177,13 +192,13 @@ The capability column is the union of the completed leaves that cite the criteri
 | 19.3 | THE consolidated services SHALL provide health/readiness, metrics, structured redacted logs, migration status, projection drift, queue/backpressure, replica freshness and compatibility-version observability. | CAP-004,CAP-006,CAP-011,CAP-015,CAP-016,CAP-028,CAP-034,CAP-035,CAP-043,CAP-044,CAP-045 | 4.4,16.3,22.8,22.10,22.12,35.5,41.5,44.2,44.3,44.5,44.7,45.4,46.4 | A,S,M,L,O,T | PASS |
 | 19.4 | WHEN deployed through local, Compose, Helm or release pipelines, THEN configuration/schema validation, signed artifacts, migration jobs, rollback inputs and platform packages SHALL follow Zed's canonical release conventions. | CAP-003,CAP-005,CAP-016,CAP-034,CAP-035,CAP-036,CAP-038,CAP-039,CAP-040,CAP-043,CAP-045 | 22.10,44.1,44.2,44.3,44.4,44.6,44.7 | A,S,M,L,O,T | PASS |
 | 19.5 | WHILE telemetry is disabled by Zed settings, THE collaborative workspace SHALL not re-enable client telemetry through Buzz-derived code; local operational logging and server observability SHALL remain available under their documented policies. | CAP-004,CAP-006,CAP-024,CAP-027,CAP-028,CAP-043 | 4.4,30.4,35.4,44.5 | A,S,M,L,O,T | PASS |
-| 20.1 | THE verification program SHALL include focused unit, GPUI, integration, end-to-end, migration, compatibility, security, fault-injection, load and visual tests appropriate to each capability. | CAP-001,CAP-003,CAP-004,CAP-005,CAP-006,CAP-008,CAP-009,CAP-011,CAP-012,CAP-013,CAP-015,CAP-016,CAP-017,CAP-019,CAP-020,CAP-021,CAP-022,CAP-024,CAP-025,CAP-026,CAP-027,CAP-028,CAP-029,CAP-030,CAP-031,CAP-032,CAP-034,CAP-035,CAP-036,CAP-037,CAP-038,CAP-039,CAP-040,CAP-041,CAP-042,CAP-043,CAP-044,CAP-045 | 3.2,3.3,3.4,8.6,9.5,10.7,15.7,17.6,22.12,23.7,25.8,26.5,27.7,32.6,34.8,34.10,35.5,36.7,37.7,39.8,41.5,43.5,43.8,43.11,45.2,45.3,45.4,45.5,45.6,46.6,48.2 | P,S,M,L,O,C,R,F,T | PASS |
+| 20.1 | THE verification program SHALL include focused unit, GPUI, integration, end-to-end, migration, compatibility, security, fault-injection, load and visual tests appropriate to each capability. | CAP-001,CAP-003,CAP-004,CAP-005,CAP-006,CAP-008,CAP-009,CAP-011,CAP-012,CAP-013,CAP-015,CAP-016,CAP-017,CAP-019,CAP-020,CAP-021,CAP-022,CAP-024,CAP-025,CAP-026,CAP-027,CAP-028,CAP-029,CAP-030,CAP-031,CAP-032,CAP-034,CAP-035,CAP-036,CAP-037,CAP-038,CAP-039,CAP-040,CAP-041,CAP-042,CAP-043,CAP-044,CAP-045 | 3.2,3.3,3.4,8.6,9.5,10.7,15.7,17.6,22.12,23.7,25.8,26.5,27.7,32.6,34.8,34.10,35.5,36.7,37.7,39.8,41.5,43.5,43.8,43.11,45.2,45.3,45.4,45.5,45.6,46.6,48.2,51.8 | P,S,M,L,O,C,R,F,T | HISTORICAL PASS — CURRENT INCOMPLETE (Epic 51 end-to-end matrix pending) |
 | 20.2 | THE multitenant conformance checker and protocol fixtures SHALL remain independent of production reducers and SHALL run against both compatibility and consolidated service paths during migration. | CAP-001,CAP-002,CAP-003,CAP-004,CAP-006,CAP-008,CAP-012,CAP-015,CAP-016,CAP-019,CAP-021,CAP-022,CAP-024,CAP-031,CAP-032,CAP-033,CAP-034,CAP-040,CAP-044 | 3.1,11.12,13.6,14.6,20.5,22.11,25.8,28.6,30.6,33.6,38.7,39.8,40.5,45.1 | P,S,M,L,O,C,R,F,T | PASS |
 | 20.3 | WHEN behavior is reused unchanged from Zed, THEN parity SHALL require semantic evidence covering security, persistence, failure and user-visible behavior, not a matching component name. | CAP-001,CAP-006,CAP-015,CAP-016,CAP-018,CAP-019,CAP-024,CAP-027,CAP-035,CAP-044,CAP-045 | 3.4,24.5,30.6,45.6,48.2 | P,S,M,L,O,C,R,F,T | PASS |
 | 20.4 | THE migration SHALL NOT declare complete until every CAP ID and acceptance criterion has passing evidence, all approved migration/removal gates are satisfied, documented known Buzz gaps are completed or explicitly accepted, and no prohibited duplicate owner remains. | CAP-001,CAP-045 | 45.6,47.6,48.1,48.2 | P,S,M,L,O,C,R,F,T | PASS — all evidence conditions pass and the completion guard remains active through Task 48.4 |
 | 21.1 | THE canonical `zed` application package SHALL define one public Cargo feature named `multiplayer-tools`, SHALL keep it outside the default feature set, and SHALL forward it only to narrowly scoped internal crate features and optional dependencies. | CAP-001,CAP-002,CAP-005,CAP-009,CAP-021,CAP-036,CAP-037,CAP-043,CAP-044,CAP-045 | 49.1,49.2,49.3,49.15 | A,K,T | PASS |
 | 21.2 | WHILE `multiplayer-tools` is disabled, THE Zed application SHALL build, test, package and start without multiplayer-only crates, dependencies, services, transports, migrations, assets, actions, settings surfaces or background jobs, and Editor Workspace behavior SHALL remain unchanged. | CAP-001,CAP-002,CAP-005,CAP-007,CAP-009,CAP-010,CAP-011,CAP-013,CAP-016,CAP-020,CAP-021,CAP-025,CAP-035,CAP-036,CAP-037,CAP-043,CAP-044,CAP-045 | 49.1,49.4,49.5,49.6,49.7,49.8,49.9,49.10,49.12,49.13,49.14,49.15 | A,K,T | PASS |
-| 21.3 | WHILE `multiplayer-tools` is enabled, THE Zed application SHALL offer the approved Collaborative Workspace, adapters and services without forking canonical Editor, project, worktree, Git, identity, credential, transcript or agent-session state. | CAP-001,CAP-002,CAP-005,CAP-007,CAP-009,CAP-010,CAP-011,CAP-013,CAP-016,CAP-020,CAP-021,CAP-025,CAP-035,CAP-036,CAP-037,CAP-043,CAP-044,CAP-045 | 49.2,49.4,49.5,49.6,49.7,49.8,49.9,49.10,49.12,49.13,49.14,49.15 | A,K,T | PASS |
+| 21.3 | WHILE `multiplayer-tools` is enabled, THE Zed application SHALL offer the approved Collaborative Workspace, adapters and services without forking canonical Editor, project, worktree, Git, identity, credential, transcript or agent-session state. | CAP-001,CAP-002,CAP-005,CAP-007,CAP-009,CAP-010,CAP-011,CAP-013,CAP-016,CAP-020,CAP-021,CAP-025,CAP-035,CAP-036,CAP-037,CAP-043,CAP-044,CAP-045 | 49.2,49.4,49.5,49.6,49.7,49.8,49.9,49.10,49.12,49.13,49.14,49.15,51.5–51.8 | A,K,T | HISTORICAL PASS — CURRENT INCOMPLETE (production channel composition proof pending) |
 | 21.4 | IF an unflagged build reads a persisted Collaborative Workspace preference, THEN it SHALL use Editor Workspace for that run without deleting collaborative data, overwriting the saved preference or requiring a multiplayer-only crate; WHEN a compatible flagged build returns, THEN it SHALL restore that preference. | CAP-020,CAP-025,CAP-036,CAP-037,CAP-043,CAP-044 | 49.6,49.13 | A,K,T | PASS |
 | 21.5 | WHILE `multiplayer-tools` is disabled, THE application SHALL omit multiplayer onboarding choices, workspace-switch actions, menus, settings pages and service registrations; IF a retained compatibility entry point recognizes a multiplayer-only operation, THEN it SHALL return a deterministic “not included in this build” result without disclosing tenant or resource existence. | CAP-002,CAP-020,CAP-021,CAP-025,CAP-036,CAP-037,CAP-038,CAP-039,CAP-040,CAP-041,CAP-042,CAP-043,CAP-044 | 49.7,49.9,49.10,49.11,49.13 | A,K,T | PASS |
 | 21.6 | WHEN a desktop, service or companion client negotiates capabilities, THEN it SHALL advertise multiplayer availability explicitly and SHALL reject unsupported multiplayer-only writes before tenant or resource lookup. | CAP-002,CAP-005,CAP-016,CAP-035,CAP-038,CAP-039,CAP-040,CAP-041,CAP-042,CAP-043,CAP-045 | 49.11,49.12 | A,K,T | PASS |
@@ -191,7 +206,8 @@ The capability column is the union of the completed leaves that cite the criteri
 | 21.8 | WHEN Standard Zed is packaged or deployed, THEN exclusive Buzz services, migrations and assets SHALL be absent; WHEN Multiplayer Zed is packaged or deployed, THEN its release command SHALL enable `multiplayer-tools` explicitly and record that capability in artifact metadata. | CAP-001,CAP-002,CAP-005,CAP-009,CAP-016,CAP-021,CAP-035,CAP-036,CAP-037,CAP-043,CAP-044,CAP-045 | 49.1,49.12,49.13,49.14,49.15 | A,K,T | PASS |
 | 21.9 | CI SHALL build, test, warning-denied lint and smoke both configurations, inspect the default dependency tree for forbidden multiplayer-only packages, and fail when feature unification or packaging causes an unflagged artifact to include multiplayer code or dependencies. | CAP-001,CAP-036,CAP-037,CAP-043,CAP-044,CAP-045 | 49.13,49.14,49.15 | A,K,T | PASS |
 
-Criterion total: **93 PASS; 0 missing; 0 unexplained; 0 deferred criteria**.
+Historical criterion total: **93 PASS**. Current corrective accounting: **88
+qualified or held; criteria 4.1–4.5 INCOMPLETE; 0 unexplained states**.
 
 ## Architecture-decision closure
 
@@ -252,3 +268,83 @@ The valid statement is **REPOSITORY IMPLEMENTATION PARITY COMPLETE AND SIGNED**.
 ## Validation contract
 
 The focused checker for this report requires exactly 45 unique PASS capability rows, 93 unique PASS criterion rows, six accepted ADR rows, all evidence codes, ten classified catalog exceptions, six bounded observations, zero unexplained-gap markers and zero prohibited-owner findings. It additionally verifies that every reported capability owner/boundary matches `catalogs/final-coverage.csv`, every criterion has at least one checked leaf and capability, the compatibility/runtime/chart/migration schema ceiling is `20260825000100`, and all referenced evidence files exist.
+
+## 2026-08-27 corrective visual-parity snapshot
+
+This additive snapshot supersedes the historical visual conclusion without
+rewriting it. The new native captures materially correct scale, contrast,
+density, authenticated navigation, compact composition and review geometry, but
+they do not close CAP-036 or Requirement 4.
+
+| Region | Native production owners | Measured result | Current disposition |
+| --- | --- | --- | --- |
+| Global/title bar | `title_bar::TitleBar`, `PlatformTitleBar`, theme/settings owners | Exact 1930×1262 and 1928×1298 Retina rasters; top-bar contrast 0.135 vs 0.124 reference when expanded and 0.110 vs 0.123 when collapsed | Improved; host macOS traffic-light controls are outside raw GPUI capture and are not synthesized |
+| Rail | `sidebar::CollaborativeRail`, `ChannelStore`, `Project`, `ThreadMetadataStore`, `UserStore` | Physical rail edge x=452 vs reference x=453; contrast/edge/coverage meet the independent reference-relative gate in both captures | Qualified for this visual scenario |
+| Timeline | `workspace::CollaborativeTimelineAdapter`, native ACP thread, `agent_ui::CollaborativeTimeline` | Expanded contrast/edge/coverage 0.169/0.070/0.091 vs 0.150/0.078/0.130; collapsed right-side 0.116/0.030/0.051 vs 0.113/0.044/0.098 | Incomplete: populated and readable, but inline ACP code/diff cards and richer avatar semantics still differ visibly |
+| Composer/status | native collaborative composer, ACP composer lifecycle, project/branch/status owners | Compact region passes contrast, edge-density and foreground-coverage gates in both captures | Qualified for this visual scenario |
+| Review | `ProjectDiff`, `AgentDiffPane`, real Project/Git diff | Expanded boundary x=1230 vs reference x=1221; focused +7/−3 Rust change; collapsed capture asserts no review pane and scores the released timeline width | Qualified for expanded/collapsed behavior |
+
+The generated evidence is
+`test-results/collaborative-workspace/{actual,side-by-side,diff}-screenshot-{1,2}.png`
+plus `region-metrics-screenshot-{1,2}.txt`. Structural similarity is 96.83%
+and 97.14%, but it is deliberately secondary to per-region contrast,
+edge-density, coverage, exact-size and review-state assertions. Exact-pixel
+similarity remains 27.85% and 48.07% because the test does not copy the
+reference users, conversations or avatars.
+
+CAP-036 and Requirements 4.1–4.5 remain **INCOMPLETE**. Visual Task 52.3
+remains corrective work; channel-service end-to-end evidence under Epic 51 is
+also still required before a new parity sign-off.
+
+## 2026-08-27 shared native ACP renderer follow-up
+
+This additive follow-up supersedes only the measurements and missing-rich-entry
+observations in the preceding corrective snapshot. It does not rewrite the
+historical result or grant parity sign-off.
+
+| Region | Canonical owner reused | Fresh evidence | Disposition |
+| --- | --- | --- | --- |
+| ACP timeline | `AgentThread`, `ConversationView`, `ThreadView`, `EntryViewState`, themed Markdown and native code/tool/diff/terminal renderers | The production workspace adapter hosts the active `ThreadView` list. The runner independently observes assistant Markdown, a fenced Rust block, `ToolCallContent::Diff`, content output, terminal output and a failed tool state before capture. | Rich-entry gap closed for the populated ACP scenario; channel selection still uses `collab_ui::MessageTimeline` |
+| Identity | `UserStore`, `CollaborativeParticipantProvider`, `ui::Avatar`, native ACP identity presentation | The populated scenario supplies an authoritative avatar URI through `UserStore`; the raster gate rejects fallback-only rendering when that URI exists. Literal `AI`, `You`, `Svc` and `Sys` activity badges are removed. | Improved; complete stable actor-ID/avatar resolution for every service/system event and active ACP profile is still incomplete |
+| Review geometry | `CollaborativeLayoutPersistence`, native divider, `ProjectDiff`/`AgentDiffPane` | Expanded split x=1221.0 physical pixels against reference x=1221 with ±2 tolerance; collapsed review absent and timeline right edge x=1928.0. Narrow/wide semantic geometry tests pass. | Reference split and collapse behavior pass; user resizing and persisted custom widths remain intact |
+| Title bar/chrome | `title_bar::TitleBar`, `PlatformTitleBar`, host window | Deterministic content capture asserts the real `PlatformTitleBar`. No traffic lights are painted. `host-window-chrome-evidence.md` records the permission-dependent native capture procedure. | GPUI content ownership passes; permission-granted host-window screenshot remains incomplete |
+| Raster gates | Production workspace composition and native visual runner | 1930×1262 expanded: 96.61% structural, 12.77% exact. 1928×1298 collapsed: 96.88% structural, 24.93% exact. Both pass per-region contrast/edge/coverage, rich-entry, avatar, density and geometry gates. | Exact visual identity is not claimed; reference conversations/users are not copied |
+
+The generated evidence now includes `actual`, `native`, `side-by-side`, `diff`,
+`amplified-diff` and `region-metrics` artifacts for both reference sizes. The
+remaining product gates are not visual-layout work: Epic 51 still needs the
+checked-in local hosted topology, two authenticated desktop clients, complete
+mutation/reconnect/restart/denial evidence and real server-backed GPUI
+composition. Native macOS host-window chrome evidence and the remaining actor
+metadata coverage are also open. CAP-036 and Requirements 4.1–4.5 therefore
+remain **INCOMPLETE**.
+
+## 2026-08-27 native ownership reuse audit
+
+This additive audit does not revise historical completion evidence. The full
+type-level disposition is recorded in `reuse-ownership-matrix.md`; an
+architecture test requires every `Collaborative*` declaration in the approved
+paths to remain represented there.
+
+| Visible region | Authoritative flow after refactor | Duplicate disposition | Evidence |
+| --- | --- | --- | --- |
+| ACP timeline/composer | `AgentThread` -> active `ThreadView`/`EntryViewState` and its native `MessageEditor` | Collaborative types retain registration, selection and hosting only; no entry or draft store | shared renderer/composer tests and matrix path pins pass |
+| Participants/presence | `UserStore`, active `ThreadView`, `ThreadMetadataStore`, optional `ActiveCall` -> live provider reader -> top/status surfaces | removed synchronized participant snapshots and the unregistered awareness store | the same ThreadView changes Idle -> Running without provider replacement; unregister drops the reader |
+| Review | `Project`/Git store -> exact `Entity<ProjectDiff>` or active `AgentDiffPane` | removed copied file/hunk/revision index; retained only routing and stale-action token | native ProjectDiff identity/action tests pass |
+| Rail | `Project`, worktrees/repositories, `ChannelStore`, `ThreadMetadataStore` and canonical task owners -> render-time rows | rail retains only selection, expansion, scroll and pinned query cache | ownership scanner and existing rail tests pass |
+| Status/title | native `StatusBar`, `TitleBar`, `PlatformTitleBar`, project/branch/Git/call owners | deleted the parallel collaborative status reducer; retained one presentation-active boolean | Workspace status tests and exact-size raster gates pass |
+| Channel messages | Collab/PostgreSQL -> versioned desktop transport/reconciler -> `MessageTimeline` | classified as new canonical capability, not reuse of the retired chat table; UI is not durable authority | Epic 51 remains incomplete pending live two-client service evidence |
+
+The audit removed `CollaborativeAwarenessStore` and
+`CollaborativeStatusProjection`, reduced `CollaborativeProjectReviewAdapter`
+to native entity handles, and reduced review summaries to source tokens. No
+production `Collaborative*Store`, `Repository`, `Database` or persistence owner
+remains in the audited paths. This closes the duplicate-owner findings for the
+reuse audit; it does **not** close CAP-036, Requirement 4, Epic 51, complete
+actor-metadata evidence or host-window-chrome evidence.
+
+The post-audit exact-size rerun retained the approved geometry and semantic
+gates: the expanded 1930×1262 capture places the review boundary at x=1221 and
+scores 96.63% structural similarity; the collapsed 1928×1298 capture has no
+review pane, reaches x=1928 and scores 96.89%. These values describe content
+raster evidence, not host-window chrome or hosted-channel production proof.

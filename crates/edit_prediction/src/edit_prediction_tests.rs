@@ -4549,7 +4549,7 @@ async fn test_upsell_shown_by_default(cx: &mut TestAppContext) {
     kvp.delete_kvp(ZED_PREDICT_DATA_COLLECTION_CHOICE.into())
         .await
         .ok();
-    kvp.delete_kvp(SimPredictUpsell::KEY.into()).await.ok();
+    kvp.delete_kvp(ZedPredictUpsell::KEY.into()).await.ok();
 
     cx.update(|cx| assert!(should_show_upsell_modal(cx)));
 }
@@ -4587,13 +4587,13 @@ async fn test_upsell_dismissed_when_dismissed_key_set(cx: &mut TestAppContext) {
     kvp.delete_kvp(ZED_PREDICT_DATA_COLLECTION_CHOICE.into())
         .await
         .ok();
-    kvp.write_kvp(SimPredictUpsell::KEY.into(), "1".into())
+    kvp.write_kvp(ZedPredictUpsell::KEY.into(), "1".into())
         .await
         .unwrap();
 
     cx.update(|cx| assert!(!should_show_upsell_modal(cx)));
 
-    kvp.delete_kvp(SimPredictUpsell::KEY.into()).await.unwrap();
+    kvp.delete_kvp(ZedPredictUpsell::KEY.into()).await.unwrap();
 }
 
 #[gpui::test]
@@ -4603,17 +4603,17 @@ async fn test_upsell_dismissed_via_dismissable_api(cx: &mut TestAppContext) {
     kvp.delete_kvp(ZED_PREDICT_DATA_COLLECTION_CHOICE.into())
         .await
         .ok();
-    kvp.delete_kvp(SimPredictUpsell::KEY.into()).await.ok();
+    kvp.delete_kvp(ZedPredictUpsell::KEY.into()).await.ok();
 
     cx.update(|cx| {
         assert!(should_show_upsell_modal(cx));
-        SimPredictUpsell::set_dismissed(true, cx);
+        ZedPredictUpsell::set_dismissed(true, cx);
     });
     cx.run_until_parked();
 
     cx.update(|cx| assert!(!should_show_upsell_modal(cx)));
 
-    kvp.delete_kvp(SimPredictUpsell::KEY.into()).await.unwrap();
+    kvp.delete_kvp(ZedPredictUpsell::KEY.into()).await.unwrap();
 }
 
 #[ctor::ctor(unsafe)]

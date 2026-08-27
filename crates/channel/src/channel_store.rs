@@ -1080,6 +1080,27 @@ impl ChannelStore {
         self.channel_states.clear();
     }
 
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_channels_for_tests(
+        &mut self,
+        channels: impl IntoIterator<Item = (ChannelId, SharedString, Option<ChannelId>)>,
+        cx: &mut Context<Self>,
+    ) {
+        self.channel_index.clear();
+        let mut index = self.channel_index.bulk_insert();
+        for (order, (id, name, parent)) in channels.into_iter().enumerate() {
+            index.insert(proto::Channel {
+                id: id.0,
+                name: name.to_string(),
+                visibility: ChannelVisibility::Members as i32,
+                parent_path: parent.into_iter().map(|parent| parent.0).collect(),
+                channel_order: i32::try_from(order).unwrap_or(i32::MAX),
+            });
+        }
+        drop(index);
+        cx.notify();
+    }
+
     pub(crate) fn update_channels(
         &mut self,
         payload: proto::UpdateChannels,

@@ -1,5 +1,7 @@
 # Implementation Plan: Miscellaneous Services
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Overview
 
 Implement the remaining smaller goose components: session import formats, Nostr sharing, Ask AI bot, examples, dev/CI scripts, and provider error proxy.

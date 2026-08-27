@@ -687,6 +687,13 @@ impl UserStore {
         self.current_user.borrow().clone()
     }
 
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_current_user_for_tests(&mut self, user: Arc<User>, cx: &mut Context<Self>) {
+        self.users.insert(user.legacy_id, user.clone());
+        self.current_user = watch::channel_with(Some(user)).1;
+        cx.notify();
+    }
+
     pub fn current_organization(&self) -> Option<Arc<Organization>> {
         self.current_organization.clone()
     }
@@ -768,9 +775,9 @@ impl UserStore {
             use cloud_api_client::Plan;
 
             return match plan.as_str() {
-                "free" => Some(Plan::SimFree),
-                "trial" => Some(Plan::SimProTrial),
-                "pro" => Some(Plan::SimPro),
+                "free" => Some(Plan::ZedFree),
+                "trial" => Some(Plan::ZedProTrial),
+                "pro" => Some(Plan::ZedPro),
                 _ => {
                     panic!("ZED_SIMULATE_PLAN must be one of 'free', 'trial', or 'pro'");
                 }
@@ -883,7 +890,7 @@ impl UserStore {
                     KnownOrUnknown::Known(plan) => plan,
                     KnownOrUnknown::Unknown(_) => {
                         // If we get a plan that we don't recognize, fall back to the Free plan.
-                        Plan::SimFree
+                        Plan::ZedFree
                     }
                 };
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{EditPredictionStore, SimPredictUpsell};
+use crate::{EditPredictionStore, ZedPredictUpsell};
 use ai_onboarding::EditPredictionOnboarding;
 use client::{Client, UserStore};
 use db::kvp::Dismissable;
@@ -25,7 +25,7 @@ macro_rules! onboarding_event {
 }
 
 /// Introduces user to Zed's Edit Prediction feature
-pub struct SimPredictModal {
+pub struct ZedPredictModal {
     onboarding: Entity<EditPredictionOnboarding>,
     focus_handle: FocusHandle,
 }
@@ -42,7 +42,7 @@ pub(crate) fn set_edit_prediction_provider(provider: EditPredictionProvider, cx:
     });
 }
 
-impl SimPredictModal {
+impl ZedPredictModal {
     pub fn toggle(
         workspace: &mut Workspace,
         user_store: Entity<UserStore>,
@@ -66,7 +66,7 @@ impl SimPredictModal {
                         Arc::new({
                             let this = weak_entity.clone();
                             move |_window, cx| {
-                                SimPredictUpsell::set_dismissed(true, cx);
+                                ZedPredictUpsell::set_dismissed(true, cx);
                                 set_edit_prediction_provider(EditPredictionProvider::Zed, cx);
                                 this.update(cx, |_, cx| cx.emit(DismissEvent)).ok();
                             }
@@ -74,7 +74,7 @@ impl SimPredictModal {
                         Arc::new({
                             let this = weak_entity.clone();
                             move |window, cx| {
-                                SimPredictUpsell::set_dismissed(true, cx);
+                                ZedPredictUpsell::set_dismissed(true, cx);
                                 set_edit_prediction_provider(EditPredictionProvider::Copilot, cx);
                                 this.update(cx, |_, cx| cx.emit(DismissEvent)).ok();
                                 if let Some(copilot) = copilot.clone() {
@@ -91,31 +91,31 @@ impl SimPredictModal {
     }
 
     fn cancel(&mut self, _: &menu::Cancel, _: &mut Window, cx: &mut Context<Self>) {
-        SimPredictUpsell::set_dismissed(true, cx);
+        ZedPredictUpsell::set_dismissed(true, cx);
         cx.emit(DismissEvent);
     }
 }
 
-impl EventEmitter<DismissEvent> for SimPredictModal {}
+impl EventEmitter<DismissEvent> for ZedPredictModal {}
 
-impl Focusable for SimPredictModal {
+impl Focusable for ZedPredictModal {
     fn focus_handle(&self, _cx: &App) -> FocusHandle {
         self.focus_handle.clone()
     }
 }
 
-impl ModalView for SimPredictModal {
+impl ModalView for ZedPredictModal {
     fn on_before_dismiss(
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) -> workspace::DismissDecision {
-        SimPredictUpsell::set_dismissed(true, cx);
+        ZedPredictUpsell::set_dismissed(true, cx);
         workspace::DismissDecision::Dismiss(true)
     }
 }
 
-impl Render for SimPredictModal {
+impl Render for ZedPredictModal {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let window_height = window.viewport_size().height;
         let max_height = window_height - px(200.);

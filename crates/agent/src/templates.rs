@@ -17,6 +17,32 @@ impl Templates {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(true);
         handlebars.register_helper("contains", Box::new(contains));
+        handlebars.register_helper(
+            "product_display_name",
+            Box::new(
+                |_: &handlebars::Helper<'_, '_>,
+                 _: &Handlebars<'_>,
+                 _: &handlebars::Context,
+                 _: &mut handlebars::RenderContext<'_, '_>,
+                 out: &mut dyn handlebars::Output| {
+                    out.write(product_flavor::DISPLAY_NAME)?;
+                    Ok(())
+                },
+            ),
+        );
+        handlebars.register_helper(
+            "product_instructions",
+            Box::new(
+                |_: &handlebars::Helper<'_, '_>,
+                 _: &Handlebars<'_>,
+                 _: &handlebars::Context,
+                 _: &mut handlebars::RenderContext<'_, '_>,
+                 out: &mut dyn handlebars::Output| {
+                    out.write(product_flavor::AGENT_INSTRUCTIONS.trim())?;
+                    Ok(())
+                },
+            ),
+        );
         handlebars.register_embed_templates::<Assets>().unwrap();
         Arc::new(Self(handlebars))
     }
@@ -40,7 +66,7 @@ pub struct SystemPromptTemplate<'a> {
     pub available_tools: Vec<SharedString>,
     pub model_name: Option<String>,
     pub date: String,
-    /// Contents of the user-global `~/.config/zed/AGENTS.md` file (or the
+    /// Contents of the user-global product `AGENTS.md` file (or the
     /// platform equivalent), if present and non-empty.
     pub user_agents_md: Option<SharedString>,
     /// Whether agent-run terminal commands are wrapped in an OS-level
@@ -108,7 +134,11 @@ mod tests {
         };
         let templates = Templates::new();
         let rendered = template.render(&templates).unwrap();
-        assert!(rendered.contains("You are the Zed coding agent"));
+        assert!(rendered.contains(&format!(
+            "You are the coding agent running inside {}",
+            product_flavor::DISPLAY_NAME
+        )));
+        assert!(rendered.contains(product_flavor::AGENT_INSTRUCTIONS.trim()));
         assert!(rendered.contains("Today's Date: 2026-01-01"));
         assert!(rendered.contains("## Fixing Diagnostics"));
         assert!(rendered.contains("test-model"));
@@ -173,8 +203,10 @@ mod tests {
         );
         assert_eq!(rendered.matches("## User's Custom Instructions").count(), 1);
 
+        let product_idx = rendered.find("## Product Focus").unwrap();
         let personal_idx = rendered.find("### Personal `AGENTS.md`").unwrap();
         let project_idx = rendered.find("### Project Rules").unwrap();
+        assert!(product_idx < personal_idx);
         assert!(
             personal_idx < project_idx,
             "personal AGENTS.md should render before project rules so project rules can override it"

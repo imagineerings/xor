@@ -100,7 +100,7 @@ use crate::example_spec::RecentFile;
 use crate::license_detection::LicenseDetectionWatcher;
 use crate::mercury::Mercury;
 pub use crate::metrics::{KeptRateResult, compute_kept_rate};
-use crate::onboarding_modal::SimPredictModal;
+use crate::onboarding_modal::ZedPredictModal;
 use crate::prediction::EditPredictionResult;
 pub use crate::prediction::{EditPrediction, EditPredictionId, EditPredictionInputs};
 pub use language_model::ApiKeyState;
@@ -3077,7 +3077,7 @@ impl EditPredictionStore {
         {
             anyhow::ensure!(
                 *app_version >= minimum_required_version,
-                SimUpdateRequiredError {
+                ZedUpdateRequiredError {
                     minimum_version: minimum_required_version
                 }
             );
@@ -3466,7 +3466,7 @@ fn merge_anchor_ranges(
 #[error(
     "You must update to Zed version {minimum_version} or higher to continue using edit predictions."
 )]
-pub struct SimUpdateRequiredError {
+pub struct ZedUpdateRequiredError {
     minimum_version: Version,
 }
 
@@ -3474,7 +3474,7 @@ pub struct SimUpdateRequiredError {
 #[error("Cloud request timed out")]
 pub(crate) struct CloudRequestTimeoutError;
 
-struct SimPredictUpsell;
+struct ZedPredictUpsell;
 
 fn is_upsell_dismissed(cx: &App) -> bool {
     // To make this backwards compatible with older versions of Zed, we
@@ -3490,12 +3490,12 @@ fn is_upsell_dismissed(cx: &App) -> bool {
         return true;
     }
 
-    kvp.read_kvp(SimPredictUpsell::KEY)
+    kvp.read_kvp(ZedPredictUpsell::KEY)
         .log_err()
         .is_some_and(|s| s.is_some())
 }
 
-impl Dismissable for SimPredictUpsell {
+impl Dismissable for ZedPredictUpsell {
     const KEY: &'static str = "dismissed-edit-predict-upsell";
 
     fn dismissed(cx: &App) -> bool {
@@ -3510,8 +3510,8 @@ pub fn should_show_upsell_modal(cx: &App) -> bool {
 pub fn init(cx: &mut App) {
     cx.observe_new(move |workspace: &mut Workspace, _, _cx| {
         workspace.register_action(
-            move |workspace, _: &zed_actions::OpenSimPredictOnboarding, window, cx| {
-                SimPredictModal::toggle(
+            move |workspace, _: &zed_actions::OpenZedPredictOnboarding, window, cx| {
+                ZedPredictModal::toggle(
                     workspace,
                     workspace.user_store().clone(),
                     workspace.client().clone(),

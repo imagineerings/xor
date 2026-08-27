@@ -3,17 +3,21 @@ use std::{cmp::Reverse, collections::HashMap};
 use agent_client_protocol::schema::v1 as acp;
 use agent_ui::thread_metadata_store::{ThreadMetadata, ThreadMetadataStore};
 use agent_ui::{Agent, AgentPanel, AgentThreadSource};
-use gpui::{Context, Entity, InteractiveElement, Render, SharedString, WeakEntity};
-use ui::{AgentThreadStatus, Window, prelude::*};
+use gpui::{
+    Context, Entity, InteractiveElement, KeyDownEvent, Render, Role, SharedString, WeakEntity,
+};
+use ui::{AgentThreadStatus, Tooltip, Window, prelude::*};
 use workspace::{
     MultiWorkspace, ProjectGroupKey,
     collaborative_navigation::{CollaborativeNavigationError, CollaborativeNavigationTarget},
 };
 
 use crate::{
-    collaborative_awareness::{observe_collaborative_awareness, render_collaborative_awareness},
     collaborative_live_thread_statuses,
-    collaborative_navigation::{CollaborativeNavigationBadge, CollaborativeNavigationRow},
+    collaborative_navigation::{
+        CollaborativeNavigationBadge, CollaborativeNavigationRow,
+        render_collaborative_navigation_badges,
+    },
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,7 +123,6 @@ pub(crate) struct CollaborativeTasks {
 
 impl CollaborativeTasks {
     pub(crate) fn new(multi_workspace: WeakEntity<MultiWorkspace>, cx: &mut Context<Self>) -> Self {
-        observe_collaborative_awareness(cx);
         if let Some(thread_store) = ThreadMetadataStore::try_global(cx) {
             cx.observe(&thread_store, |_, _, cx| cx.notify()).detach();
         }
@@ -141,6 +144,47 @@ impl CollaborativeTasks {
             metadata_store.read(cx).entries().cloned(),
             &live_statuses,
         ))
+    }
+
+    fn selected_thread_id(&self, cx: &gpui::App) -> Option<String> {
+        let multi_workspace = self.multi_workspace.upgrade()?;
+        let workspace = multi_workspace.read(cx).workspace().clone();
+        match workspace.read(cx).collaborative_navigation().current()? {
+            CollaborativeNavigationTarget::Thread { thread_id } => Some(thread_id.clone()),
+            _ => None,
+        }
+    }
+
+    fn is_pinned(&self, target: &CollaborativeNavigationTarget, cx: &gpui::App) -> bool {
+        let Some(multi_workspace) = self.multi_workspace.upgrade() else {
+            return false;
+        };
+        let workspace = multi_workspace.read(cx).workspace().clone();
+        workspace
+            .read(cx)
+            .collaborative_navigation()
+            .is_pinned(target)
+    }
+
+    fn toggle_pin(
+        &mut self,
+        target: CollaborativeNavigationTarget,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(multi_workspace) = self.multi_workspace.upgrade() else {
+            self.activation_error = Some("Pinning is unavailable".into());
+            cx.notify();
+            return;
+        };
+        let workspace = multi_workspace.read(cx).workspace().clone();
+        self.activation_error = workspace
+            .update(cx, |workspace, cx| {
+                workspace.toggle_collaborative_pin(target, window, cx)
+            })
+            .err()
+            .map(|error| error.to_string().into());
+        cx.notify();
     }
 
     fn activate(&mut self, metadata: ThreadMetadata, window: &mut Window, cx: &mut Context<Self>) {
@@ -231,6 +275,7 @@ fn navigation_error_message(error: CollaborativeNavigationError) -> SharedString
 
 impl Render for CollaborativeTasks {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let selected_thread_id = self.selected_thread_id(cx);
         let contents = match self.rows(cx) {
             None => v_flex()
                 .debug_selector(|| "COLLABORATIVE-TASKS-UNAVAILABLE".to_owned())
@@ -259,7 +304,22 @@ impl Render for CollaborativeTasks {
                 })
                 .children(rows.into_iter().map(|row| {
                     let metadata = row.metadata.clone();
-                    let awareness = render_collaborative_awareness(&row.navigation, cx);
+                    let keyboard_metadata = metadata.clone();
+                    let target = task_target(&metadata);
+                    let is_pinned = self.is_pinned(&target, cx);
+                    let pin_target = target;
+                    let selected = selected_thread_id
+                        .as_ref()
+                        .is_some_and(|thread_id| *thread_id == metadata.thread_id.to_key_string());
+                    let badges = render_collaborative_navigation_badges(&row.navigation);
+                    let state_color = match row.state {
+                        CollaborativeTaskState::Running => Color::Info,
+                        CollaborativeTaskState::WaitingForUser => Color::Warning,
+                        CollaborativeTaskState::Failed => Color::Error,
+                        CollaborativeTaskState::Draft
+                        | CollaborativeTaskState::Completed
+                        | CollaborativeTaskState::Archived => Color::Muted,
+                    };
                     h_flex()
                         .id(SharedString::from(format!(
                             "collaborative-thread-target-{}",
@@ -267,21 +327,69 @@ impl Render for CollaborativeTasks {
                         )))
                         .h_7()
                         .min_w_0()
+                        .tab_index(0)
+                        .role(Role::Link)
+                        .aria_label(format!(
+                            "{} · {}",
+                            row.navigation.label(),
+                            row.state.label()
+                        ))
+                        .when(selected, |this| {
+                            this.bg(cx.theme().colors().element_selected)
+                        })
                         .justify_between()
                         .gap_1()
                         .child(
-                            Label::new(row.navigation.label().clone())
-                                .size(LabelSize::Small)
-                                .truncate(),
+                            h_flex()
+                                .min_w_0()
+                                .gap_1()
+                                .child(
+                                    Icon::new(IconName::Circle)
+                                        .size(IconSize::XSmall)
+                                        .color(state_color),
+                                )
+                                .child(
+                                    Label::new(row.navigation.label().clone())
+                                        .size(LabelSize::Small)
+                                        .flex_1()
+                                        .truncate(),
+                                ),
                         )
                         .child(
                             Label::new(SharedString::from(row.state.label()))
                                 .size(LabelSize::XSmall)
                                 .color(Color::Muted),
                         )
-                        .when_some(awareness, |this, awareness| this.child(awareness))
+                        .when_some(badges, |this, badges| this.child(badges))
+                        .child(
+                            IconButton::new(
+                                SharedString::from(format!(
+                                    "pin-thread-{}",
+                                    metadata.thread_id.to_key_string()
+                                )),
+                                if is_pinned {
+                                    IconName::Unpin
+                                } else {
+                                    IconName::Pin
+                                },
+                            )
+                            .icon_size(IconSize::XSmall)
+                            .tooltip(Tooltip::text(if is_pinned { "Unpin" } else { "Pin" }))
+                            .on_click(cx.listener(
+                                move |this, _, window, cx| {
+                                    cx.stop_propagation();
+                                    this.toggle_pin(pin_target.clone(), window, cx);
+                                },
+                            )),
+                        )
                         .on_click(cx.listener(move |this, _, window, cx| {
                             this.activate(metadata.clone(), window, cx);
+                        }))
+                        .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
+                            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                cx.stop_propagation();
+                                this.activate(keyboard_metadata.clone(), window, cx);
+                            }
                         }))
                 }))
                 .into_any_element(),

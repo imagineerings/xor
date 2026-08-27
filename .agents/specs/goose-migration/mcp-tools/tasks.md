@@ -1,5 +1,7 @@
 # Implementation Plan: MCP Tools
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Overview
 
 Implement the MCP tool servers from goose as a combination of native agent tools and standalone MCP servers. Document tools (PDF, DOCX, XLSX) become native agent tools in `crates/agent/src/tools/`. Memory, Peekaboo, AutoVisualiser, and Tutorial become MCP server binaries that the context server can launch.

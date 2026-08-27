@@ -60,6 +60,7 @@ pub mod text_diff_view;
 pub mod unstaged_diff;
 
 pub use blame_ui::GitBlameStatus;
+#[cfg(feature = "agentic")]
 pub use conflict_view::MergeConflictIndicator;
 
 pub fn init(cx: &mut App) {

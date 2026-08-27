@@ -10,7 +10,7 @@ actions!(
     zed,
     [
         /// Opens the Zed repository on GitHub.
-        OpenSimRepo,
+        OpenZedRepo,
         /// Copies installed extensions to the clipboard for bug reports.
         CopyInstalledExtensionsIntoClipboard
     ]
@@ -108,7 +108,7 @@ pub fn init(cx: &mut App) {
                 })
                 .detach();
             })
-            .register_action(move |_, _: &OpenSimRepo, _, cx| {
+            .register_action(move |_, _: &OpenZedRepo, _, cx| {
                 cx.open_url(ZED_REPO_URL);
             });
     })

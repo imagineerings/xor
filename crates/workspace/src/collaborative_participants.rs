@@ -1,4 +1,4 @@
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, rc::Rc};
 
 use client::{LegacyUserId, User};
 use gpui::{Entity, EntityId, SharedString, SharedUri};
@@ -135,6 +135,32 @@ fn non_empty_label(value: Option<&SharedString>, unknown_label: &'static str) ->
 pub struct CollaborativeParticipantViewData {
     pub participants: Vec<CollaborativeParticipant>,
     pub execution: Option<CollaborativeExecutionStatus>,
+    pub task_title: Option<SharedString>,
+    pub connection: CollaborativeConnectionState,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum CollaborativeConnectionState {
+    #[default]
+    Disconnected,
+    Connecting,
+    Connected,
+    Failed,
+}
+
+impl CollaborativeConnectionState {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Disconnected => "No active collaboration call",
+            Self::Connecting => "Collaboration call reconnecting",
+            Self::Connected => "Collaboration call connected",
+            Self::Failed => "Collaboration call offline",
+        }
+    }
+
+    pub fn supports_room_actions(self) -> bool {
+        self == Self::Connected
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -155,10 +181,13 @@ impl CollaborativeParticipantProviderState {
     }
 }
 
+type ParticipantStateReader = Rc<dyn Fn(&gpui::App) -> CollaborativeParticipantProviderState>;
+
+#[derive(Clone)]
 pub struct CollaborativeParticipantProvider {
     project: Entity<Project>,
     source_id: EntityId,
-    state: CollaborativeParticipantProviderState,
+    state_reader: ParticipantStateReader,
 }
 
 impl CollaborativeParticipantProvider {
@@ -167,11 +196,23 @@ impl CollaborativeParticipantProvider {
         source_id: EntityId,
         state: CollaborativeParticipantProviderState,
     ) -> Self {
+        Self::from_reader(project, source_id, move |_| state.clone())
+    }
+
+    pub fn from_reader(
+        project: Entity<Project>,
+        source_id: EntityId,
+        state_reader: impl Fn(&gpui::App) -> CollaborativeParticipantProviderState + 'static,
+    ) -> Self {
         Self {
             project,
             source_id,
-            state,
+            state_reader: Rc::new(state_reader),
         }
+    }
+
+    pub fn state(&self, cx: &gpui::App) -> CollaborativeParticipantProviderState {
+        (self.state_reader)(cx)
     }
 }
 
@@ -249,21 +290,6 @@ impl CollaborativeParticipantHost {
         Ok(registration)
     }
 
-    pub fn update(
-        &mut self,
-        registration: CollaborativeParticipantRegistration,
-        state: CollaborativeParticipantProviderState,
-    ) -> Result<(), CollaborativeParticipantProviderError> {
-        let provider = self
-            .provider
-            .as_mut()
-            .filter(|provider| provider.source_id == registration.source_id)
-            .filter(|_| self.provider_generation == Some(registration.generation))
-            .ok_or(CollaborativeParticipantProviderError::StaleRegistration)?;
-        provider.state = state;
-        Ok(())
-    }
-
     pub fn unregister(&mut self, registration: CollaborativeParticipantRegistration) -> bool {
         let is_current = self
             .provider
@@ -278,17 +304,21 @@ impl CollaborativeParticipantHost {
         true
     }
 
-    pub fn state(&self) -> CollaborativeParticipantProviderState {
+    pub fn state(&self, cx: &gpui::App) -> CollaborativeParticipantProviderState {
         self.provider
             .as_ref()
-            .map(|provider| provider.state.clone())
+            .map(|provider| provider.state(cx))
             .unwrap_or(CollaborativeParticipantProviderState::Unavailable)
+    }
+
+    pub fn provider(&self) -> Option<CollaborativeParticipantProvider> {
+        self.provider.clone()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{cell::Cell, path::Path};
 
     use fs::FakeFs;
     use gpui::{AppContext as _, Empty, TestAppContext};
@@ -361,7 +391,7 @@ mod tests {
 
         let mut host = CollaborativeParticipantHost::new(project.clone());
         assert_eq!(
-            host.state(),
+            cx.update(|cx| host.state(cx)),
             CollaborativeParticipantProviderState::Unavailable
         );
         let mismatch = CollaborativeParticipantProvider::new(
@@ -378,15 +408,28 @@ mod tests {
             CollaborativeParticipantProviderState::Ready(CollaborativeParticipantViewData {
                 participants: vec![human, agent],
                 execution: Some(execution),
+                task_title: Some("Review changes".into()),
+                connection: CollaborativeConnectionState::Connected,
             });
+        let source_ready = Rc::new(Cell::new(true));
         let registration = host
-            .register(CollaborativeParticipantProvider::new(
+            .register(CollaborativeParticipantProvider::from_reader(
                 project.clone(),
                 source.entity_id(),
-                ready.clone(),
+                {
+                    let source_ready = source_ready.clone();
+                    let ready = ready.clone();
+                    move |_| {
+                        if source_ready.get() {
+                            ready.clone()
+                        } else {
+                            CollaborativeParticipantProviderState::failed("")
+                        }
+                    }
+                },
             ))
             .expect("canonical participant provider should register");
-        assert_eq!(host.state(), ready);
+        assert_eq!(cx.update(|cx| host.state(cx)), ready);
         assert_eq!(
             host.register(CollaborativeParticipantProvider::new(
                 project.clone(),
@@ -395,13 +438,9 @@ mod tests {
             )),
             Err(CollaborativeParticipantProviderError::ProviderOccupied)
         );
-        host.update(
-            registration,
-            CollaborativeParticipantProviderState::failed(""),
-        )
-        .expect("current provider should update");
+        source_ready.set(false);
         assert_eq!(
-            host.state(),
+            cx.update(|cx| host.state(cx)),
             CollaborativeParticipantProviderState::Failed(PROVIDER_FAILURE_LABEL.into())
         );
         assert!(host.unregister(registration));
@@ -413,13 +452,6 @@ mod tests {
                 CollaborativeParticipantProviderState::Unavailable,
             ))
             .expect("replacement provider should register");
-        assert_eq!(
-            host.update(
-                registration,
-                CollaborativeParticipantProviderState::Unavailable
-            ),
-            Err(CollaborativeParticipantProviderError::StaleRegistration)
-        );
         assert!(!host.unregister(registration));
         assert!(host.unregister(replacement));
     }

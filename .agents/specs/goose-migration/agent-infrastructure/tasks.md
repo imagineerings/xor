@@ -1,5 +1,7 @@
 # Implementation Plan: Agent Infrastructure
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Overview
 
 Implement ~17 agent infrastructure features across existing and new crates. Most features extend `crates/agent/`; some get their own crate (doctor, download_manager, plugins).

@@ -6,16 +6,15 @@ use crate::{
         CollaborativeParticipantProviderState,
     },
     collaborative_shell_state::{CollaborativeShellPhase, CollaborativeShellScope},
-    collaborative_status::{CollaborativeStatusProjection, CollaborativeTaskPhase},
 };
 
-pub const WORKSPACE_LABEL: &str = "Collaborative Workspace";
-pub const TOP_BAR_LABEL: &str = "Collaborative workspace controls";
-pub const NAVIGATION_LABEL: &str = "Collaborative navigation";
-pub const TIMELINE_LABEL: &str = "Collaborative activity timeline";
+pub const WORKSPACE_LABEL: &str = "Multiplayer Workspace";
+pub const TOP_BAR_LABEL: &str = "Multiplayer Workspace controls";
+pub const NAVIGATION_LABEL: &str = "Multiplayer Workspace navigation";
+pub const TIMELINE_LABEL: &str = "Multiplayer Workspace activity timeline";
 pub const COMPOSER_LABEL: &str = "Message and agent prompt composer";
 pub const REVIEW_LABEL: &str = "Review changes";
-pub const STATUS_LABEL: &str = "Collaborative workspace status";
+pub const STATUS_LABEL: &str = "Multiplayer Workspace status";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CollaborativeAnnouncementRole {
@@ -170,32 +169,9 @@ pub(crate) fn shell_announcement(
     })
 }
 
-pub(crate) fn project_status_label(projection: &CollaborativeStatusProjection) -> SharedString {
-    let task = projection.task.map_or("No active task", task_label);
-    format!(
-        "{STATUS_LABEL}: project {}, repository {}, branch {}, {} changed files, {} additions, {} deletions, {task}",
-        projection.project,
-        projection.repository_label(),
-        projection.branch_label(),
-        projection.changed_files,
-        projection.additions,
-        projection.deletions,
-    )
-    .into()
-}
-
-fn task_label(task: CollaborativeTaskPhase) -> &'static str {
-    match task {
-        CollaborativeTaskPhase::Running => "task running",
-        CollaborativeTaskPhase::WaitingForUser => "task waiting for user",
-        CollaborativeTaskPhase::Failed => "task failed",
-        CollaborativeTaskPhase::Completed => "task completed",
-    }
-}
-
 fn scope_label(scope: CollaborativeShellScope) -> &'static str {
     match scope {
-        CollaborativeShellScope::Workspace => "Collaborative Workspace",
+        CollaborativeShellScope::Workspace => "Multiplayer Workspace",
         CollaborativeShellScope::Timeline => "timeline",
         CollaborativeShellScope::Realtime => "realtime synchronization",
     }
@@ -252,6 +228,8 @@ mod tests {
                     runtime: None,
                     location: CollaborativeExecutionLocation::Local,
                 }),
+                task_title: Some("Run checks".into()),
+                connection: Default::default(),
             });
         assert_eq!(
             participant_label(&running).as_ref(),
@@ -282,9 +260,8 @@ mod tests {
             shell_announcement(&shell_failure),
             Some(CollaborativeAnnouncement {
                 role: CollaborativeAnnouncementRole::Alert,
-                label:
-                    "Unable to initialize collaboration. Affected scope: Collaborative Workspace"
-                        .into(),
+                label: "Unable to initialize collaboration. Affected scope: Multiplayer Workspace"
+                    .into(),
             })
         );
     }

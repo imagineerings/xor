@@ -1,16 +1,20 @@
 use std::{collections::HashSet, path::PathBuf};
 
-use gpui::{Context, Entity, FontWeight, InteractiveElement, Render, SharedString, WeakEntity};
+use channel::ChannelStore;
+use gpui::{
+    Action, Context, Entity, FontWeight, InteractiveElement, KeyDownEvent, Render, Role,
+    SharedString, WeakEntity,
+};
 use project::{ProjectGroupKey, WorktreeId};
-use ui::{Window, prelude::*};
+use ui::{Tooltip, Window, prelude::*};
 use workspace::{
     MultiWorkspace,
     collaborative_navigation::{CollaborativeNavigationError, CollaborativeNavigationTarget},
 };
 
-use crate::{
-    collaborative_awareness::{observe_collaborative_awareness, render_collaborative_awareness},
-    collaborative_navigation::{CollaborativeNavigationRow, CollaborativeNavigationRowId},
+use crate::collaborative_navigation::{
+    CollaborativeNavigationBadge, CollaborativeNavigationRow, CollaborativeNavigationRowId,
+    CollaborativeNavigationSourceId, render_collaborative_navigation_badges,
 };
 
 #[derive(Clone, Debug)]
@@ -90,10 +94,12 @@ pub(crate) struct CollaborativeProjects {
 
 impl CollaborativeProjects {
     pub(crate) fn new(multi_workspace: WeakEntity<MultiWorkspace>, cx: &mut Context<Self>) -> Self {
-        observe_collaborative_awareness(cx);
         if let Some(multi_workspace) = multi_workspace.upgrade() {
             cx.observe(&multi_workspace, |_, _, cx| cx.notify())
                 .detach();
+        }
+        if let Some(channel_store) = ChannelStore::try_global(cx) {
+            cx.observe(&channel_store, |_, _, cx| cx.notify()).detach();
         }
         Self {
             multi_workspace,
@@ -166,6 +172,121 @@ impl CollaborativeProjects {
             )),
             _ => None,
         }
+    }
+
+    fn channel_rows(&self, cx: &gpui::App) -> Option<Vec<CollaborativeNavigationRow>> {
+        let channel_store = ChannelStore::try_global(cx)?;
+        let channel_store = channel_store.read(cx);
+        Some(
+            channel_store
+                .ordered_channels()
+                .map(|(_, channel)| {
+                    let badges = channel_store
+                        .has_channel_buffer_changed(channel.id)
+                        .then_some(CollaborativeNavigationBadge::Unread(1))
+                        .into_iter()
+                        .collect();
+                    CollaborativeNavigationRow::from_channel(channel, badges)
+                })
+                .collect(),
+        )
+    }
+
+    fn selected_target(&self, cx: &gpui::App) -> Option<CollaborativeNavigationTarget> {
+        let multi_workspace = self.multi_workspace.upgrade()?;
+        let workspace = multi_workspace.read(cx).workspace().clone();
+        workspace
+            .read(cx)
+            .collaborative_navigation()
+            .current()
+            .cloned()
+    }
+
+    fn is_pinned(&self, target: &CollaborativeNavigationTarget, cx: &gpui::App) -> bool {
+        let Some(multi_workspace) = self.multi_workspace.upgrade() else {
+            return false;
+        };
+        let workspace = multi_workspace.read(cx).workspace().clone();
+        workspace
+            .read(cx)
+            .collaborative_navigation()
+            .is_pinned(target)
+    }
+
+    fn toggle_pin(
+        &mut self,
+        target: CollaborativeNavigationTarget,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(multi_workspace) = self.multi_workspace.upgrade() else {
+            self.activation_error = Some("Pinning is unavailable".into());
+            cx.notify();
+            return;
+        };
+        let workspace = multi_workspace.read(cx).workspace().clone();
+        self.activation_error = workspace
+            .update(cx, |workspace, cx| {
+                workspace.toggle_collaborative_pin(target, window, cx)
+            })
+            .err()
+            .map(|error| error.to_string().into());
+        cx.notify();
+    }
+
+    fn toggle_channel_favorite(&mut self, channel_id: u64, cx: &mut Context<Self>) {
+        let Some(channel_store) = ChannelStore::try_global(cx) else {
+            self.activation_error = Some("Channel favorites are unavailable".into());
+            cx.notify();
+            return;
+        };
+        channel_store.update(cx, |store, cx| {
+            let channel_id = {
+                store
+                    .channels()
+                    .find(|channel| channel.id.0 == channel_id)
+                    .map(|channel| channel.id)
+            };
+            if let Some(channel_id) = channel_id {
+                store.toggle_favorite_channel(channel_id, cx);
+            }
+        });
+        self.activation_error = None;
+        cx.notify();
+    }
+
+    fn activate_channel(&mut self, channel_id: u64, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(multi_workspace) = self.multi_workspace.upgrade() else {
+            self.activation_error = Some("Navigation is unavailable".into());
+            cx.notify();
+            return;
+        };
+        let available = ChannelStore::try_global(cx).is_some_and(|store| {
+            store
+                .read(cx)
+                .channels()
+                .any(|channel| channel.id.0 == channel_id)
+        });
+        if !available {
+            self.activation_error = Some("The selected channel is no longer available".into());
+            cx.notify();
+            return;
+        }
+        let workspace = multi_workspace.read(cx).workspace().clone();
+        let target = CollaborativeNavigationTarget::channel(channel_id.to_string());
+        self.activation_error = workspace
+            .update(cx, |workspace, cx| {
+                workspace.navigate_collaborative_to(target, |_| true, window, cx)
+            })
+            .err()
+            .map(|error| error.to_string().into());
+        if self.activation_error.is_none() {
+            window.dispatch_action(
+                workspace::OpenChannelNotesById { channel_id }.boxed_clone(),
+                cx,
+            );
+        }
+        cx.notify();
     }
 
     fn activate(
@@ -249,6 +370,105 @@ fn navigation_error_message(error: CollaborativeNavigationError) -> SharedString
 
 impl Render for CollaborativeProjects {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let selected_target = self.selected_target(cx);
+        let communities = match self.channel_rows(cx) {
+            None => v_flex()
+                .debug_selector(|| "COLLABORATIVE-COMMUNITIES-UNAVAILABLE".to_owned())
+                .child(
+                    Label::new("Communities require a signed-in collaboration service")
+                        .size(LabelSize::XSmall)
+                        .color(Color::Muted),
+                )
+                .into_any_element(),
+            Some(rows) if rows.is_empty() => v_flex()
+                .debug_selector(|| "COLLABORATIVE-COMMUNITIES-EMPTY".to_owned())
+                .child(
+                    Label::new("No joined communities")
+                        .size(LabelSize::XSmall)
+                        .color(Color::Muted),
+                )
+                .into_any_element(),
+            Some(rows) => v_flex()
+                .debug_selector(|| "COLLABORATIVE-COMMUNITIES".to_owned())
+                .gap_0p5()
+                .children(rows.into_iter().map(|row| {
+                    let CollaborativeNavigationSourceId::Channel(channel_id) = row.source_id()
+                    else {
+                        return unavailable_projects("Channel target is unavailable");
+                    };
+                    let channel_id = *channel_id;
+                    let is_favorite = ChannelStore::try_global(cx).is_some_and(|store| {
+                        let store = store.read(cx);
+                        store
+                            .channels()
+                            .find(|channel| channel.id.0 == channel_id)
+                            .is_some_and(|channel| store.is_channel_favorited(channel.id))
+                    });
+                    let selected = selected_target.as_ref()
+                        == Some(&CollaborativeNavigationTarget::channel(
+                            channel_id.to_string(),
+                        ));
+                    let badges = render_collaborative_navigation_badges(&row);
+                    h_flex()
+                        .id(SharedString::from(format!(
+                            "collaborative-channel-target-{channel_id}"
+                        )))
+                        .h_6()
+                        .min_w_0()
+                        .gap_1()
+                        .tab_index(0)
+                        .role(Role::Link)
+                        .aria_label(format!("Open community {}", row.label()))
+                        .when(selected, |this| {
+                            this.bg(cx.theme().colors().element_selected)
+                        })
+                        .child(
+                            Icon::new(IconName::Hash)
+                                .size(IconSize::XSmall)
+                                .color(Color::Muted),
+                        )
+                        .child(
+                            Label::new(row.label().clone())
+                                .size(LabelSize::Small)
+                                .flex_1()
+                                .truncate(),
+                        )
+                        .when_some(badges, |this, badges| this.child(badges))
+                        .child(
+                            IconButton::new(
+                                ("collaborative-channel-favorite", channel_id as usize),
+                                if is_favorite {
+                                    IconName::StarFilled
+                                } else {
+                                    IconName::Star
+                                },
+                            )
+                            .icon_size(IconSize::XSmall)
+                            .tooltip(Tooltip::text(if is_favorite {
+                                "Remove from pinned"
+                            } else {
+                                "Add to pinned"
+                            }))
+                            .on_click(cx.listener(
+                                move |this, _, _, cx| {
+                                    cx.stop_propagation();
+                                    this.toggle_channel_favorite(channel_id, cx);
+                                },
+                            )),
+                        )
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.activate_channel(channel_id, window, cx);
+                        }))
+                        .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
+                            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                cx.stop_propagation();
+                                this.activate_channel(channel_id, window, cx);
+                            }
+                        }))
+                        .into_any_element()
+                }))
+                .into_any_element(),
+        };
         let contents = match self.sources(cx) {
             None => unavailable_projects("Projects are unavailable"),
             Some(sources) => match project_hierarchy(sources) {
@@ -260,26 +480,36 @@ impl Render for CollaborativeProjects {
                             .color(Color::Muted),
                     )
                     .into_any_element(),
-                Ok(groups) => v_flex()
-                    .gap_1()
-                    .when_some(self.activation_error.clone(), |this, error| {
-                        this.child(
-                            Label::new(error)
-                                .size(LabelSize::XSmall)
-                                .color(Color::Error),
-                        )
-                    })
-                    .children(
-                        groups
-                            .into_iter()
-                            .map(|group| render_project_group(group, cx)),
-                    )
-                    .into_any_element(),
+                Ok(groups) => {
+                    let groups = groups
+                        .into_iter()
+                        .map(|group| {
+                            let is_pinned = Self::target(&group.project)
+                                .is_some_and(|target| self.is_pinned(&target, cx));
+                            (group, is_pinned)
+                        })
+                        .collect::<Vec<_>>();
+                    v_flex()
+                        .gap_1()
+                        .when_some(self.activation_error.clone(), |this, error| {
+                            this.child(
+                                Label::new(error)
+                                    .size(LabelSize::XSmall)
+                                    .color(Color::Error),
+                            )
+                        })
+                        .children(groups.into_iter().map(|(group, is_pinned)| {
+                            render_project_group(group, is_pinned, selected_target.as_ref(), cx)
+                        }))
+                        .into_any_element()
+                }
                 Err(error) => unavailable_projects(error),
             },
         };
         v_flex()
             .debug_selector(|| "COLLABORATIVE-PROJECTS".to_owned())
+            .gap_1()
+            .child(communities)
             .child(contents)
     }
 }
@@ -297,12 +527,17 @@ fn unavailable_projects(message: impl Into<SharedString>) -> AnyElement {
 
 fn render_project_group(
     group: CollaborativeProjectGroupProjection,
+    is_pinned: bool,
+    selected_target: Option<&CollaborativeNavigationTarget>,
     cx: &mut Context<CollaborativeProjects>,
 ) -> AnyElement {
-    let awareness = render_collaborative_awareness(&group.project, cx);
+    let badges = render_collaborative_navigation_badges(&group.project);
     let Some(project_target) = CollaborativeProjects::target(&group.project) else {
         return unavailable_projects("Project target is unavailable");
     };
+    let selected = selected_target == Some(&project_target);
+    let keyboard_target = project_target.clone();
+    let pin_target = project_target.clone();
     v_flex()
         .gap_0p5()
         .child(
@@ -312,28 +547,63 @@ fn render_project_group(
                 )))
                 .h_6()
                 .min_w_0()
+                .tab_index(0)
+                .role(Role::Link)
+                .aria_label(format!("Open project {}", group.project.label()))
+                .gap_1()
+                .when(selected, |this| {
+                    this.bg(cx.theme().colors().element_selected)
+                })
+                .child(
+                    Icon::new(IconName::Folder)
+                        .size(IconSize::XSmall)
+                        .color(Color::Muted),
+                )
                 .child(
                     Label::new(group.project.label().clone())
                         .size(LabelSize::Small)
                         .weight(FontWeight::MEDIUM)
+                        .flex_1()
                         .truncate(),
                 )
-                .when_some(awareness, |this, awareness| this.child(awareness))
+                .when_some(badges, |this, badges| this.child(badges))
+                .child(
+                    IconButton::new(
+                        SharedString::from(format!("pin-project-{pin_target:?}")),
+                        if is_pinned {
+                            IconName::Unpin
+                        } else {
+                            IconName::Pin
+                        },
+                    )
+                    .icon_size(IconSize::XSmall)
+                    .tooltip(Tooltip::text(if is_pinned { "Unpin" } else { "Pin" }))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        cx.stop_propagation();
+                        this.toggle_pin(pin_target.clone(), window, cx);
+                    })),
+                )
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.activate(project_target.clone(), window, cx);
+                }))
+                .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
+                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                        cx.stop_propagation();
+                        this.activate(keyboard_target.clone(), window, cx);
+                    }
                 })),
         )
         .children(
             group
                 .repositories
                 .into_iter()
-                .map(|row| render_project_child("Repository", row, cx)),
+                .map(|row| render_project_child("Repository", row, selected_target, cx)),
         )
         .children(
             group
                 .worktrees
                 .into_iter()
-                .map(|row| render_project_child("Worktree", row, cx)),
+                .map(|row| render_project_child("Worktree", row, selected_target, cx)),
         )
         .into_any_element()
 }
@@ -341,12 +611,15 @@ fn render_project_group(
 fn render_project_child(
     kind: &'static str,
     row: CollaborativeNavigationRow,
+    selected_target: Option<&CollaborativeNavigationTarget>,
     cx: &mut Context<CollaborativeProjects>,
 ) -> AnyElement {
-    let awareness = render_collaborative_awareness(&row, cx);
+    let badges = render_collaborative_navigation_badges(&row);
     let Some(target) = CollaborativeProjects::target(&row) else {
         return unavailable_projects(format!("{kind} target is unavailable"));
     };
+    let selected = selected_target == Some(&target);
+    let keyboard_target = target.clone();
     h_flex()
         .id(SharedString::from(format!(
             "collaborative-{}-target-{target:?}",
@@ -355,14 +628,36 @@ fn render_project_child(
         .h_6()
         .pl_2()
         .min_w_0()
+        .tab_index(0)
+        .role(Role::Link)
+        .aria_label(format!("Open {kind} {}", row.label()))
+        .gap_1()
+        .when(selected, |this| {
+            this.bg(cx.theme().colors().element_selected)
+        })
+        .child(
+            Icon::new(if kind == "Repository" {
+                IconName::GitBranch
+            } else {
+                IconName::Folder
+            })
+            .size(IconSize::XSmall)
+            .color(Color::Muted),
+        )
         .child(
             Label::new(format!("{kind} · {}", row.label()))
                 .size(LabelSize::XSmall)
                 .truncate(),
         )
-        .when_some(awareness, |this, awareness| this.child(awareness))
+        .when_some(badges, |this, badges| this.child(badges))
         .on_click(cx.listener(move |this, _, window, cx| {
             this.activate(target.clone(), window, cx);
+        }))
+        .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
+            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                cx.stop_propagation();
+                this.activate(keyboard_target.clone(), window, cx);
+            }
         }))
         .into_any_element()
 }

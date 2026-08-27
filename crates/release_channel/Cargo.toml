@@ -10,4 +10,5 @@ workspace = true
 
 [dependencies]
 gpui.workspace = true
+product_flavor.workspace = true
 semver.workspace = true

@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use super::*;
 use crate::item::test::TestItem;
+#[cfg(feature = "agentic")]
 use agent_settings::AgentSettings;
 use client::proto;
 use fs::{FakeFs, Fs};
@@ -118,6 +119,7 @@ async fn test_sidebar_disabled_when_disable_ai_is_enabled(cx: &mut TestAppContex
 }
 
 #[gpui::test]
+#[cfg(feature = "agentic")]
 async fn test_multi_workspace_collapses_when_agent_is_disabled(cx: &mut TestAppContext) {
     init_test(cx);
     let fs = FakeFs::new(cx.executor());

@@ -43,6 +43,7 @@ mod rust_analyzer_ext;
 pub mod scroll;
 mod selections_collection;
 pub mod semantic_tokens;
+pub mod source_coverage;
 mod split;
 pub mod split_editor_view;
 
@@ -106,15 +107,20 @@ pub use element::{
     CursorLayout, EditorElement, HighlightedRange, HighlightedRangeLine, PointForPosition,
     file_status_label_color, render_breadcrumb_text,
 };
+pub(crate) use git::DisplayDiffHunk;
+use git::InlineBlamePopover;
+#[cfg(feature = "agentic")]
+pub(crate) use git::PhantomDiffReviewIndicator;
 pub use git::blame::BlameRenderer;
 pub use git::{
     DiffHunkDelegate, ResolvedDiffHunk, ResolvedDiffHunks, RestoreOnlyDiffHunkDelegate,
     RestoreOnlyUnstagedDiffHunkDelegate, UncommittedDiffHunkDelegate, render_diff_hunk_controls,
     set_blame_renderer,
 };
+#[cfg(feature = "agentic")]
 pub(crate) use git::{DiffHunkKey, StoredReviewComment};
-use git::{DiffReviewDragState, DiffReviewOverlay, InlineBlamePopover};
-pub(crate) use git::{DisplayDiffHunk, PhantomDiffReviewIndicator};
+#[cfg(feature = "agentic")]
+use git::{DiffReviewDragState, DiffReviewOverlay};
 pub use hover_popover::hover_markdown_style;
 pub use inlays::Inlay;
 pub use items::MAX_TAB_TITLE_LEN;
@@ -159,13 +165,15 @@ use futures::{
 };
 use fuzzy::{StringMatch, StringMatchCandidate};
 use git::blame::{GitBlame, GlobalBlameRenderer};
+#[cfg(feature = "agentic")]
+use gpui::SharedUri;
 use gpui::{
     Action, Animation, AnimationExt, AnyElement, App, AppContext, AsyncWindowContext,
     AvailableSpace, Background, Bounds, ClickEvent, ClipboardEntry, ClipboardItem, Context,
     DispatchPhase, Edges, Entity, EntityId, EntityInputHandler, EventEmitter, FocusHandle,
     FocusOutEvent, Focusable, FontId, FontStyle, FontWeight, Global, HighlightStyle, Hsla, IsZero,
     KeyContext, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, PaintQuad, ParentElement,
-    Pixels, PressureStage, Render, ScrollHandle, SharedString, SharedUri, Size, Stateful, Styled,
+    Pixels, PressureStage, Render, ScrollHandle, SharedString, Size, Stateful, Styled,
     Subscription, Task, TextRun, TextStyle, TextStyleRefinement, UTF16Selection, UnderlineStyle,
     UniformListScrollHandle, WeakEntity, WeakFocusHandle, Window, div, point, prelude::*,
     pulsating_between, px, relative, size,
@@ -255,9 +263,11 @@ use theme::{
     AccentColors, ActiveTheme, GlobalTheme, PlayerColor, StatusColors, SyntaxTheme, Theme,
 };
 use theme_settings::{ThemeSettings, observe_buffer_font_size_adjustment};
+#[cfg(feature = "agentic")]
+use ui::Avatar;
 use ui::{
-    Avatar, ContextMenu, Disclosure, IconButtonShape, Indicator, Key, KeyBinding, Tooltip,
-    prelude::*, scrollbars::ScrollbarAutoHide, tooltip_container, utils::WithRemSize,
+    ContextMenu, Disclosure, IconButtonShape, Indicator, Key, KeyBinding, Tooltip, prelude::*,
+    scrollbars::ScrollbarAutoHide, tooltip_container, utils::WithRemSize,
 };
 use ui_input::ErasedEditor;
 use util::{RangeExt, ResultExt, TryFutureExt, maybe, post_inc};
@@ -987,6 +997,7 @@ pub struct Editor {
     show_runnables: Option<bool>,
     show_bookmarks: Option<bool>,
     show_breakpoints: Option<bool>,
+    #[cfg(feature = "agentic")]
     show_diff_review_button: bool,
     show_wrap_guides: Option<bool>,
     show_indent_guides: Option<bool>,
@@ -1108,16 +1119,21 @@ pub struct Editor {
     bookmark_store: Option<Entity<BookmarkStore>>,
     breakpoint_store: Option<Entity<BreakpointStore>>,
     gutter_hover_button: (Option<GutterHoverButton>, Option<Task<()>>),
+    #[cfg(feature = "agentic")]
     pub(crate) gutter_diff_review_indicator: (Option<PhantomDiffReviewIndicator>, Option<Task<()>>),
+    #[cfg(feature = "agentic")]
     pub(crate) diff_review_drag_state: Option<DiffReviewDragState>,
     /// Active diff review overlays. Multiple overlays can be open simultaneously
     /// when hunks have comments stored.
+    #[cfg(feature = "agentic")]
     pub(crate) diff_review_overlays: Vec<DiffReviewOverlay>,
     /// Stored review comments grouped by hunk.
     /// Uses a Vec instead of HashMap because DiffHunkKey contains an Anchor
     /// which doesn't implement Hash/Eq in a way suitable for HashMap keys.
+    #[cfg(feature = "agentic")]
     stored_review_comments: Vec<(DiffHunkKey, Vec<StoredReviewComment>)>,
     /// Counter for generating unique comment IDs.
+    #[cfg(feature = "agentic")]
     next_review_comment_id: usize,
     hovered_diff_hunk_row: Option<DisplayRow>,
     pull_diagnostics_task: Task<()>,
@@ -2306,6 +2322,7 @@ impl Editor {
             show_runnables: None,
             show_bookmarks: None,
             show_breakpoints: None,
+            #[cfg(feature = "agentic")]
             show_diff_review_button: false,
             show_wrap_guides: None,
             show_indent_guides,
@@ -2414,10 +2431,15 @@ impl Editor {
             bookmark_store,
             breakpoint_store,
             gutter_hover_button: (None, None),
+            #[cfg(feature = "agentic")]
             gutter_diff_review_indicator: (None, None),
+            #[cfg(feature = "agentic")]
             diff_review_drag_state: None,
+            #[cfg(feature = "agentic")]
             diff_review_overlays: Vec::new(),
+            #[cfg(feature = "agentic")]
             stored_review_comments: Vec::new(),
+            #[cfg(feature = "agentic")]
             next_review_comment_id: 0,
             hovered_diff_hunk_row: None,
             _subscriptions: (!is_minimap)
@@ -3363,13 +3385,16 @@ impl Editor {
         dismissed |= is_user_requested
             && self.discard_edit_prediction(EditPredictionDiscardReason::Rejected, cx);
         dismissed |= self.snippet_stack.pop().is_some();
-        if self.diff_review_drag_state.is_some() {
-            self.cancel_diff_review_drag(cx);
-            dismissed = true;
-        }
-        if !self.diff_review_overlays.is_empty() {
-            self.dismiss_all_diff_review_overlays(cx);
-            dismissed = true;
+        #[cfg(feature = "agentic")]
+        {
+            if self.diff_review_drag_state.is_some() {
+                self.cancel_diff_review_drag(cx);
+                dismissed = true;
+            }
+            if !self.diff_review_overlays.is_empty() {
+                self.dismiss_all_diff_review_overlays(cx);
+                dismissed = true;
+            }
         }
 
         if self.mode.is_full() && self.has_active_diagnostic_group() {
@@ -8608,7 +8633,7 @@ impl Editor {
         cx: &mut Context<Self>,
     ) -> Entity<Self> {
         const MINIMAP_FONT_WEIGHT: gpui::FontWeight = gpui::FontWeight::BLACK;
-        const MINIMAP_FONT_FAMILY: SharedString = SharedString::new_static(".SimMono");
+        const MINIMAP_FONT_FAMILY: SharedString = SharedString::new_static(".ZedMono");
 
         let mut minimap = Editor::new_internal(
             EditorMode::Minimap {
@@ -9627,7 +9652,7 @@ impl Editor {
                     self.update_visible_edit_prediction(window, cx);
                 }
 
-                // Clean up orphaned review comments after edits
+                #[cfg(feature = "agentic")]
                 self.cleanup_orphaned_review_comments(cx);
 
                 if let Some(buffer) = edited_buffer {
@@ -11846,6 +11871,7 @@ impl Deref for EditorSnapshot {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EditorEvent {
+    #[cfg(feature = "agentic")]
     /// Emitted when the stored review comments change (added, removed, or updated).
     ReviewCommentsChanged {
         /// The new total count of review comments.

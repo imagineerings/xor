@@ -21,7 +21,7 @@ use std::sync::Arc;
 pub use adapter_schema::{AdapterSchema, AdapterSchemas};
 pub use debug_format::{
     AttachRequest, BuildTaskDefinition, DebugRequest, DebugScenario, DebugTaskFile, LaunchRequest,
-    Request, SimDebugConfig, TcpArgumentsTemplate,
+    Request, TcpArgumentsTemplate, ZedDebugConfig,
 };
 pub use task_template::{
     DebugArgsRequest, HideStrategy, RevealStrategy, SaveStrategy, TaskHook, TaskTemplate,
@@ -32,6 +32,88 @@ pub use util::shell_builder::ShellBuilder;
 pub use vscode_debug_format::VsCodeDebugTaskFile;
 pub use vscode_format::VsCodeTaskFile;
 pub use zed_actions::RevealTarget;
+
+pub const MAX_TASK_ARTIFACT_BYTES: u64 = 32 * 1024 * 1024;
+pub const MAX_TASK_ARTIFACT_PATH_BYTES: usize = 1024;
+
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskArtifactKind {
+    Svg,
+    Html,
+    /// A machine-readable artifact consumed by a feature after task completion.
+    Data,
+    #[default]
+    File,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TaskArtifact {
+    pub path: String,
+    #[serde(default)]
+    pub kind: TaskArtifactKind,
+    #[serde(default = "default_task_artifact_max_bytes")]
+    pub max_bytes: u64,
+}
+
+fn default_task_artifact_max_bytes() -> u64 {
+    MAX_TASK_ARTIFACT_BYTES
+}
+
+impl TaskArtifact {
+    pub fn with_resolved_path(&self, path: String) -> anyhow::Result<Self> {
+        use std::path::Component;
+
+        if path.is_empty() || path.len() > MAX_TASK_ARTIFACT_PATH_BYTES {
+            anyhow::bail!("task artifact path is empty or exceeds the supported length");
+        }
+        if path.contains("://")
+            || path.starts_with('/')
+            || path.starts_with('\\')
+            || path.as_bytes().get(1) == Some(&b':')
+            || PathBuf::from(&path).components().any(|component| {
+                matches!(
+                    component,
+                    Component::ParentDir | Component::RootDir | Component::Prefix(_)
+                )
+            })
+        {
+            anyhow::bail!("task artifact must be a project-relative path");
+        }
+        if self.max_bytes == 0 || self.max_bytes > MAX_TASK_ARTIFACT_BYTES {
+            anyhow::bail!(
+                "task artifact byte limit must be between 1 and {MAX_TASK_ARTIFACT_BYTES}"
+            );
+        }
+        let extension = PathBuf::from(&path)
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(str::to_ascii_lowercase);
+        match self.kind {
+            TaskArtifactKind::Svg if extension.as_deref() != Some("svg") => {
+                anyhow::bail!("SVG task artifacts must use the .svg extension")
+            }
+            TaskArtifactKind::Html if !matches!(extension.as_deref(), Some("html" | "htm")) => {
+                anyhow::bail!("HTML task artifacts must use the .html or .htm extension")
+            }
+            TaskArtifactKind::Data if extension.as_deref() != Some("json") => {
+                anyhow::bail!("data task artifacts must use the .json extension")
+            }
+            TaskArtifactKind::Svg
+            | TaskArtifactKind::Html
+            | TaskArtifactKind::Data
+            | TaskArtifactKind::File => {}
+        }
+        Ok(Self {
+            path,
+            kind: self.kind,
+            max_bytes: self.max_bytes,
+        })
+    }
+}
 
 /// Task identifier, unique within the application.
 /// Based on it, task reruns and terminal tabs are managed.
@@ -381,6 +463,7 @@ pub struct ResolvedTask {
     pub id: TaskId,
     /// A template the task got resolved from.
     original_task: TaskTemplate,
+    resolved_artifact: Option<TaskArtifact>,
     /// Full, unshortened label of the task after all resolutions are made.
     pub resolved_label: String,
     /// Variables that were substituted during the task template resolution.
@@ -399,6 +482,10 @@ impl ResolvedTask {
     /// Variables that were substituted during the task template resolution.
     pub fn substituted_variables(&self) -> &HashSet<VariableName> {
         &self.substituted_variables
+    }
+
+    pub fn resolved_artifact(&self) -> Option<&TaskArtifact> {
+        self.resolved_artifact.as_ref()
     }
 
     /// A human-readable label to display in the UI.
@@ -663,15 +750,15 @@ pub fn shell_to_proto(shell: Shell) -> proto::Shell {
 
 type VsCodeEnvVariable = String;
 type VsCodeCommand = String;
-type SimEnvVariable = String;
+type ZedEnvVariable = String;
 
 struct EnvVariableReplacer {
-    variables: HashMap<VsCodeEnvVariable, SimEnvVariable>,
-    commands: HashMap<VsCodeCommand, SimEnvVariable>,
+    variables: HashMap<VsCodeEnvVariable, ZedEnvVariable>,
+    commands: HashMap<VsCodeCommand, ZedEnvVariable>,
 }
 
 impl EnvVariableReplacer {
-    fn new(variables: HashMap<VsCodeEnvVariable, SimEnvVariable>) -> Self {
+    fn new(variables: HashMap<VsCodeEnvVariable, ZedEnvVariable>) -> Self {
         Self {
             variables,
             commands: HashMap::default(),
@@ -680,7 +767,7 @@ impl EnvVariableReplacer {
 
     fn with_commands(
         mut self,
-        commands: impl IntoIterator<Item = (VsCodeCommand, SimEnvVariable)>,
+        commands: impl IntoIterator<Item = (VsCodeCommand, ZedEnvVariable)>,
     ) -> Self {
         self.commands = commands.into_iter().collect();
         self

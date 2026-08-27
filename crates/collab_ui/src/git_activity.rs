@@ -4,9 +4,6 @@ use agent_ui::activity_projection::{
     ActivityDetailHandle, ActivityItem, ActivityLifecycle, ActivityObjectKind,
     ActivityOutcomeStatus, ActivitySourceKind,
 };
-use git_ui::collaborative_review::{
-    CollaborativeReviewDiffResolution, CollaborativeReviewStaleReason,
-};
 use gpui::{Context, EventEmitter, Render, Role, Window};
 use ui::{Button, ButtonStyle, LabelSize, prelude::*};
 use util::ResultExt as _;
@@ -15,7 +12,8 @@ use workspace::{
     collaborative_review_actions::{
         CollaborativeReviewAction, CollaborativeReviewActionContext,
         CollaborativeReviewActionError, CollaborativeReviewActionRequest,
-        ExecutedCollaborativeReviewAction, route_collaborative_review_action,
+        CollaborativeReviewActionState, ExecutedCollaborativeReviewAction,
+        route_collaborative_review_action,
     },
 };
 
@@ -55,7 +53,6 @@ pub enum GitActivityCardEvent {
 
 pub struct GitActivityCard {
     item: ActivityItem,
-    review_resolution: Option<CollaborativeReviewDiffResolution>,
     action_context: Option<CollaborativeReviewActionContext>,
     details_expanded: bool,
 }
@@ -75,7 +72,6 @@ impl GitActivityCard {
         }
         Ok(Self {
             item,
-            review_resolution: None,
             action_context: None,
             details_expanded: false,
         })
@@ -83,8 +79,7 @@ impl GitActivityCard {
 
     pub fn with_review(
         mut self,
-        resolution: CollaborativeReviewDiffResolution,
-        action_context: Option<CollaborativeReviewActionContext>,
+        action_context: CollaborativeReviewActionContext,
     ) -> Result<Self, GitActivityCardError> {
         if self.item.id.source_kind() != ActivitySourceKind::Git
             || !matches!(
@@ -100,15 +95,10 @@ impl GitActivityCard {
         {
             return Err(GitActivityCardError::InvalidReviewActivity);
         }
-        if let Some(context) = action_context.as_ref() {
-            if context.source().slot() != CollaborativeReviewSlot::ProjectChanges
-                || !review_state_matches_context(&resolution, context)
-            {
-                return Err(GitActivityCardError::InvalidActionContext);
-            }
+        if action_context.source().slot() != CollaborativeReviewSlot::ProjectChanges {
+            return Err(GitActivityCardError::InvalidActionContext);
         }
-        self.review_resolution = Some(resolution);
-        self.action_context = action_context;
+        self.action_context = Some(action_context);
         Ok(self)
     }
 
@@ -117,19 +107,16 @@ impl GitActivityCard {
     }
 
     pub fn status(&self) -> GitActivityCardStatus {
-        if let Some(resolution) = &self.review_resolution {
-            match resolution {
-                CollaborativeReviewDiffResolution::Conflicting { .. } => {
+        if let Some(context) = &self.action_context {
+            match context.state() {
+                CollaborativeReviewActionState::Conflict => {
                     return GitActivityCardStatus::Conflict;
                 }
-                CollaborativeReviewDiffResolution::Stale { .. } => {
-                    return GitActivityCardStatus::Stale;
+                CollaborativeReviewActionState::Stale => return GitActivityCardStatus::Stale,
+                CollaborativeReviewActionState::Rejected => {
+                    return GitActivityCardStatus::Failure;
                 }
-                CollaborativeReviewDiffResolution::Deleted { .. } => {
-                    return GitActivityCardStatus::Deleted;
-                }
-                CollaborativeReviewDiffResolution::Exact { .. }
-                | CollaborativeReviewDiffResolution::Moved { .. } => {}
+                CollaborativeReviewActionState::Ready => {}
             }
         }
         match self.item.lifecycle {
@@ -172,13 +159,7 @@ impl GitActivityCard {
         let Some(context) = &self.action_context else {
             return Vec::new();
         };
-        if !matches!(
-            self.review_resolution,
-            Some(
-                CollaborativeReviewDiffResolution::Exact { .. }
-                    | CollaborativeReviewDiffResolution::Moved { .. }
-            )
-        ) {
+        if context.state() != CollaborativeReviewActionState::Ready {
             return Vec::new();
         }
         [
@@ -241,7 +222,8 @@ impl Render for GitActivityCard {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let status = self.status();
         let details_expanded = self.details_expanded;
-        let details = details_expanded.then(|| detail_text(&self.item, &self.review_resolution));
+        let details =
+            details_expanded.then(|| detail_text(&self.item, self.action_context.as_ref()));
         let actions = self.available_actions();
 
         v_flex()
@@ -366,29 +348,6 @@ impl Error for GitActivityCardError {
     }
 }
 
-fn review_state_matches_context(
-    resolution: &CollaborativeReviewDiffResolution,
-    context: &CollaborativeReviewActionContext,
-) -> bool {
-    use workspace::collaborative_review_actions::CollaborativeReviewActionState;
-
-    matches!(
-        (resolution, context.state()),
-        (
-            CollaborativeReviewDiffResolution::Exact { .. }
-                | CollaborativeReviewDiffResolution::Moved { .. },
-            CollaborativeReviewActionState::Ready
-        ) | (
-            CollaborativeReviewDiffResolution::Conflicting { .. },
-            CollaborativeReviewActionState::Conflict
-        ) | (
-            CollaborativeReviewDiffResolution::Stale { .. }
-                | CollaborativeReviewDiffResolution::Deleted { .. },
-            CollaborativeReviewActionState::Stale
-        )
-    )
-}
-
 fn headline(item: &ActivityItem) -> String {
     format!("{} {} {}", item.actor.label, item.verb, item.object.label)
 }
@@ -413,7 +372,7 @@ fn action_index(action: CollaborativeReviewAction) -> usize {
 
 fn detail_text(
     item: &ActivityItem,
-    resolution: &Option<CollaborativeReviewDiffResolution>,
+    action_context: Option<&CollaborativeReviewActionContext>,
 ) -> String {
     let source = match &item.details {
         Some(ActivityDetailHandle::GitChange {
@@ -435,46 +394,13 @@ fn detail_text(
         }
         Some(_) | None => "No progressive Git detail is available".into(),
     };
-    let review = resolution.as_ref().map(|resolution| match resolution {
-        CollaborativeReviewDiffResolution::Exact { target } => format!(
-            "Exact native hunk {} at {}",
-            target.hunk_id().as_str(),
-            target.project_path().path.as_unix_str()
-        ),
-        CollaborativeReviewDiffResolution::Moved {
-            original_file_path,
-            target,
-        } => format!(
-            "Moved from {} to {}",
-            original_file_path.as_str(),
-            target.project_path().path.as_unix_str()
-        ),
-        CollaborativeReviewDiffResolution::Stale { reason } => {
-            format!("Stale native review: {}", stale_reason_label(reason))
-        }
-        CollaborativeReviewDiffResolution::Deleted {
-            last_known_file_path,
-            ..
-        } => format!("Deleted file {}", last_known_file_path.as_str()),
-        CollaborativeReviewDiffResolution::Conflicting { target } => format!(
-            "Conflicting native hunk {} at {}",
-            target.hunk_id().as_str(),
-            target.project_path().path.as_unix_str()
-        ),
+    let review = action_context.map(|context| match context.state() {
+        CollaborativeReviewActionState::Ready => "Native review ready",
+        CollaborativeReviewActionState::Conflict => "Native review has conflicts",
+        CollaborativeReviewActionState::Rejected => "Native review rejected",
+        CollaborativeReviewActionState::Stale => "Native review changed",
     });
     review.map_or(source.clone(), |review| format!("{source}. {review}"))
-}
-
-fn stale_reason_label(reason: &CollaborativeReviewStaleReason) -> &'static str {
-    match reason {
-        CollaborativeReviewStaleReason::Sources => "native sources changed",
-        CollaborativeReviewStaleReason::Repository => "repository changed",
-        CollaborativeReviewStaleReason::Review => "review changed",
-        CollaborativeReviewStaleReason::Revision { .. } => "revision changed",
-        CollaborativeReviewStaleReason::Commit { .. } => "commit changed",
-        CollaborativeReviewStaleReason::File => "file is unavailable",
-        CollaborativeReviewStaleReason::Hunk => "hunk is unavailable",
-    }
 }
 
 #[cfg(test)]
@@ -492,15 +418,9 @@ mod tests {
         AggregateId, BranchCollaborationIdentity, BranchGeneration, BranchRefName, CiCheckStatus,
         CiCheckSuite, CiCheckSuiteIdentity, CiLabel, CiWorkflowLink, CommunityId, GitCommitId,
         PatchRevision, PatchRevisionNumber, PrincipalId, ReviewApproval, ReviewDecision,
-        ReviewDiffSide, ReviewFilePath, ReviewHunkId, ReviewIdentity,
-    };
-    use git_ui::collaborative_review::{
-        CollaborativeReviewDiffTarget, CollaborativeReviewHunkState,
+        ReviewIdentity,
     };
     use gpui::{AppContext as _, TestAppContext};
-    use project::ProjectPath;
-    use settings::WorktreeId;
-    use util::rel_path::RelPath;
     use uuid::Uuid;
     use workspace::{
         collaborative_review::CollaborativeReviewSlot,
@@ -597,28 +517,6 @@ mod tests {
         .expect("pending CI should project")
     }
 
-    fn project_path(path: &str) -> ProjectPath {
-        ProjectPath {
-            worktree_id: WorktreeId::from_usize(1),
-            path: RelPath::from_unix_str(path)
-                .expect("valid project path")
-                .into(),
-        }
-    }
-
-    fn target(state: CollaborativeReviewHunkState) -> CollaborativeReviewDiffTarget {
-        CollaborativeReviewDiffTarget::new(
-            "stable-file-1",
-            ReviewHunkId::parse("a".repeat(64)).expect("valid hunk"),
-            ReviewDiffSide::Head,
-            ReviewFilePath::new("src/lib.rs").expect("valid path"),
-            project_path("src/lib.rs"),
-            Default::default()..Default::default(),
-            state,
-        )
-        .expect("valid native target")
-    }
-
     fn action_context(
         cx: &mut TestAppContext,
         state: CollaborativeReviewActionState,
@@ -660,12 +558,7 @@ mod tests {
     fn git_activity_card_blocks_conflicting_review(cx: &mut TestAppContext) {
         let card = GitActivityCard::new(approval_item())
             .expect("valid approval card")
-            .with_review(
-                CollaborativeReviewDiffResolution::Conflicting {
-                    target: target(CollaborativeReviewHunkState::Conflicting),
-                },
-                Some(action_context(cx, CollaborativeReviewActionState::Conflict)),
-            )
+            .with_review(action_context(cx, CollaborativeReviewActionState::Conflict))
             .expect("matching conflict card");
         assert_eq!(card.status(), GitActivityCardStatus::Conflict);
         assert!(card.available_actions().is_empty());
@@ -675,15 +568,7 @@ mod tests {
     fn git_activity_card_exposes_stale_review(cx: &mut TestAppContext) {
         let card = GitActivityCard::new(approval_item())
             .expect("valid approval card")
-            .with_review(
-                CollaborativeReviewDiffResolution::Stale {
-                    reason: CollaborativeReviewStaleReason::Revision {
-                        requested: PatchRevisionNumber::FIRST,
-                        current: PatchRevisionNumber::new(2).expect("revision two"),
-                    },
-                },
-                Some(action_context(cx, CollaborativeReviewActionState::Stale)),
-            )
+            .with_review(action_context(cx, CollaborativeReviewActionState::Stale))
             .expect("matching stale card");
         assert_eq!(card.status(), GitActivityCardStatus::Stale);
         assert!(card.available_actions().is_empty());
@@ -693,12 +578,7 @@ mod tests {
     fn git_activity_card_routes_valid_native_actions(cx: &mut TestAppContext) {
         let card = GitActivityCard::new(approval_item())
             .expect("valid approval card")
-            .with_review(
-                CollaborativeReviewDiffResolution::Exact {
-                    target: target(CollaborativeReviewHunkState::Available),
-                },
-                Some(action_context(cx, CollaborativeReviewActionState::Ready)),
-            )
+            .with_review(action_context(cx, CollaborativeReviewActionState::Ready))
             .expect("matching ready card");
         assert_eq!(
             card.available_actions(),

@@ -9,6 +9,7 @@ pub const CURRENT_COMMAND_CONTRACT_VERSION: u16 = 1;
 pub enum CommandAdapter {
     NostrInProcess,
     NostrTemporarySidecar,
+    ZedRpc,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

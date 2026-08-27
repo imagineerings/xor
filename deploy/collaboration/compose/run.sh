@@ -80,6 +80,15 @@ case "${1:-help}" in
     shift
     compose logs --follow "${@:-collaboration}"
     ;;
+  clients)
+    require_environment
+    shift
+    repository_root="$(cd "${script_directory}/../../.." && pwd)"
+    ZED_PRODUCT_ID=rust \
+      ZED_LOCAL_CARGO_FEATURES=multiplayer-tools,rust-tools \
+      ZED_ADMIN_API_TOKEN="$(environment_value ZED_CLOUD_INTERNAL_API_KEY)" \
+      "${repository_root}/script/zed-local" -2 --stateful "$@"
+    ;;
   rollback)
     require_environment
     previous_image="${COLLABORATION_PREVIOUS_IMAGE:-}"
@@ -104,6 +113,7 @@ Commands:
   stop      Stop containers without deleting canonical data volumes
   status    Show Compose service status
   logs      Follow service logs (default: collaboration)
+  clients   Build and launch two authenticated Rust-product clients
   rollback  Recreate only Collab from COLLABORATION_PREVIOUS_IMAGE
   smoke     Exercise health ordering with an isolated validation-only stack
 

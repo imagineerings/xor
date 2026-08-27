@@ -52,6 +52,7 @@ pub struct DiffMultibuffer {
     workspace: WeakEntity<Workspace>,
     focus_handle: FocusHandle,
     pending_scroll: Option<PathKey>,
+    #[cfg(feature = "agentic")]
     review_comment_count: usize,
     empty_label: SharedString,
     _task: Task<Result<()>>,
@@ -85,6 +86,7 @@ impl DiffMultibuffer {
                 cx,
             );
             configure_editor(&mut diff_display_editor, cx);
+            #[cfg(feature = "agentic")]
             diff_display_editor.rhs_editor().update(cx, |editor, cx| {
                 editor.set_show_diff_review_button(true, cx);
             });
@@ -92,7 +94,9 @@ impl DiffMultibuffer {
         });
         let editor_subscription = cx.subscribe_in(&editor, window, Self::handle_editor_event);
 
+        #[cfg(feature = "agentic")]
         let primary_editor = editor.read(cx).rhs_editor().clone();
+        #[cfg(feature = "agentic")]
         let review_comment_subscription =
             cx.subscribe(&primary_editor, |this, _editor, event: &EditorEvent, cx| {
                 if let EditorEvent::ReviewCommentsChanged { total_count } = event {
@@ -156,6 +160,14 @@ impl DiffMultibuffer {
             async |cx| Self::refresh(this, cx).await
         });
 
+        #[cfg(feature = "agentic")]
+        let subscription = Subscription::join(
+            branch_diff_subscription,
+            Subscription::join(editor_subscription, review_comment_subscription),
+        );
+        #[cfg(not(feature = "agentic"))]
+        let subscription = Subscription::join(branch_diff_subscription, editor_subscription);
+
         Self {
             workspace: workspace.downgrade(),
             branch_diff,
@@ -164,13 +176,11 @@ impl DiffMultibuffer {
             multibuffer,
             buffer_subscriptions: Default::default(),
             pending_scroll: None,
+            #[cfg(feature = "agentic")]
             review_comment_count: 0,
             empty_label: empty_label.into(),
             _task: task,
-            _subscription: Subscription::join(
-                branch_diff_subscription,
-                Subscription::join(editor_subscription, review_comment_subscription),
-            ),
+            _subscription: subscription,
         }
     }
 
@@ -290,6 +300,7 @@ impl DiffMultibuffer {
     }
 
     /// Returns the total count of review comments across all hunks/files.
+    #[cfg(feature = "agentic")]
     pub(crate) fn total_review_comment_count(&self) -> usize {
         self.review_comment_count
     }

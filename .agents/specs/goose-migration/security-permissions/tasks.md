@@ -1,5 +1,7 @@
 # Implementation Plan: Security and Permissions
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Overview
 
 Extend Zed's existing tool-permission, ACP confirmation, sandbox, HTTP, settings, and agent UI boundaries. Add a separate component only if implementation review proves the existing owner cannot maintain the security boundary.

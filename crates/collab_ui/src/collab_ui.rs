@@ -1,4 +1,6 @@
 mod call_stats_modal;
+#[cfg(feature = "multiplayer-tools")]
+pub mod channel_messaging;
 pub mod channel_view;
 pub mod collab_panel;
 #[cfg(feature = "multiplayer-tools")]

@@ -1,6 +1,6 @@
 use std::process::ExitStatus;
 
-use anyhow::Result;
+use anyhow::{Context as _, Result, anyhow, bail};
 use collections::HashSet;
 use gpui::{AppContext, AsyncWindowContext, Context, Entity, Task, TaskExt, WeakEntity};
 use language::Buffer;
@@ -8,7 +8,8 @@ use project::{TaskSourceKind, WorktreeId};
 use remote::ConnectionState;
 use task::{
     DebugScenario, ResolvedTask, SaveStrategy, SharedTaskContext, SpawnInTerminal,
-    StructuredTaskHandle, TaskContext, TaskHook, TaskTemplate, TaskVariables, VariableName,
+    StructuredTaskHandle, TaskArtifact, TaskContext, TaskHook, TaskTemplate, TaskVariables,
+    VariableName,
 };
 use ui::Window;
 use util::TryFutureExt;
@@ -25,7 +26,99 @@ pub enum ScheduledTaskResult {
 
 type TaskCompletionHandler = Box<dyn FnOnce(ScheduledTaskResult, &mut AsyncWindowContext)>;
 
+pub fn resolve_task_reference(
+    tasks: Vec<(TaskSourceKind, TaskTemplate)>,
+    label: &str,
+    task_context: &TaskContext,
+) -> Result<(TaskSourceKind, ResolvedTask)> {
+    let mut matches = tasks
+        .into_iter()
+        .filter(|(_, template)| template.label == label);
+    let (source, template) = matches
+        .next()
+        .with_context(|| format!("pre-launch task `{label}` was not found"))?;
+    if matches.next().is_some() {
+        bail!("pre-launch task reference `{label}` is ambiguous");
+    }
+    let resolved = template
+        .resolve_task(&source.to_id_base(), task_context)
+        .with_context(|| format!("pre-launch task `{label}` could not be resolved"))?;
+    Ok((source, resolved))
+}
+
 impl Workspace {
+    pub fn schedule_task_reference_with_completion(
+        &mut self,
+        label: String,
+        worktree_id: WorktreeId,
+        task_context: TaskContext,
+        omit_history: bool,
+        on_complete: impl FnOnce(ScheduledTaskResult, &mut AsyncWindowContext) + 'static,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let inventory = self
+            .project
+            .read(cx)
+            .task_store()
+            .read(cx)
+            .task_inventory()
+            .cloned();
+        let task_list = inventory.map(|inventory| {
+            inventory
+                .read(cx)
+                .list_tasks(None, None, Some(worktree_id), cx)
+        });
+        let workspace = cx.entity().downgrade();
+        let mut on_complete = Some(Box::new(on_complete) as TaskCompletionHandler);
+        let task = cx.spawn_in(window, async move |_workspace, cx| {
+            let resolution = match task_list {
+                Some(task_list) => resolve_task_reference(task_list.await, &label, &task_context),
+                None => Err(anyhow::anyhow!("task inventory is unavailable")),
+            };
+            match resolution {
+                Ok((source, resolved)) => {
+                    let Some(completion) = on_complete.take() else {
+                        log::error!("Pre-launch completion handler is unavailable");
+                        return;
+                    };
+                    if let Err(error) = workspace.update_in(cx, |workspace, window, cx| {
+                        workspace.schedule_resolved_task_with_completion(
+                            source,
+                            resolved,
+                            omit_history,
+                            completion,
+                            window,
+                            cx,
+                        );
+                    }) {
+                        log::debug!(
+                            "Workspace closed before pre-launch task scheduling: {error:#}"
+                        );
+                    }
+                }
+                Err(error) => {
+                    log::error!("Cargo pre-launch task could not start: {error:#}");
+                    if let Err(update_error) = workspace.update(cx, |workspace, cx| {
+                        let id = NotificationId::unique::<ResolvedTask>();
+                        workspace.show_toast(
+                            Toast::new(id, format!("Pre-launch task could not start: {error}")),
+                            cx,
+                        );
+                    }) {
+                        log::debug!(
+                            "Workspace closed before pre-launch error display: {update_error:#}"
+                        );
+                    }
+                    if let Some(on_complete) = on_complete.take() {
+                        on_complete(ScheduledTaskResult::SpawnFailed, cx);
+                    }
+                }
+            }
+        });
+        self.scheduled_tasks.push(task);
+    }
+
     pub fn schedule_task(
         self: &mut Workspace,
         task_source_kind: TaskSourceKind,
@@ -138,6 +231,8 @@ impl Workspace {
         cx: &mut Context<Workspace>,
     ) {
         let spawn_in_terminal = resolved_task.resolved.clone();
+        let task_artifact = resolved_task.resolved_artifact().cloned();
+        let task_working_directory = spawn_in_terminal.cwd.clone();
         if !omit_history {
             if let Some(debugger_provider) = self.debugger_provider.as_ref() {
                 debugger_provider.task_scheduled(cx);
@@ -230,6 +325,22 @@ impl Workspace {
                             ScheduledTaskResult::Cancelled
                         }
                     };
+                    if result == ScheduledTaskResult::Success
+                        && let Some(artifact) = task_artifact
+                        && artifact.kind != task::TaskArtifactKind::Data
+                        && let Err(error) = workspace.update_in(cx, |workspace, window, cx| {
+                            workspace.open_task_artifact(
+                                artifact,
+                                task_working_directory.as_deref(),
+                                window,
+                                cx,
+                            );
+                        })
+                    {
+                        log::debug!(
+                            "Task artifact could not be opened after workspace close: {error:#}"
+                        );
+                    }
                     if let Some(on_complete) = on_complete {
                         on_complete(result, cx);
                     }
@@ -249,6 +360,27 @@ impl Workspace {
             self.scheduled_tasks.push(task);
         } else if let Some(handle) = structured_handle {
             handle.mark_spawn_error("No terminal provider is available", cx);
+        }
+    }
+
+    fn open_task_artifact(
+        &mut self,
+        artifact: TaskArtifact,
+        task_working_directory: Option<&std::path::Path>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match resolve_task_artifact(self.project.read(cx), &artifact, task_working_directory, cx) {
+            Ok(project_path) => self
+                .open_path(project_path, None, true, window, cx)
+                .detach_and_log_err(cx),
+            Err(error) => self.show_toast(
+                Toast::new(
+                    NotificationId::unique::<TaskArtifact>(),
+                    format!("Task artifact could not be opened: {error}"),
+                ),
+                cx,
+            ),
         }
     }
 
@@ -418,6 +550,34 @@ impl Workspace {
     }
 }
 
+pub fn resolve_task_artifact(
+    project: &project::Project,
+    artifact: &TaskArtifact,
+    task_working_directory: Option<&std::path::Path>,
+    cx: &gpui::App,
+) -> Result<project::ProjectPath> {
+    let candidate = task_working_directory
+        .map(|working_directory| working_directory.join(&artifact.path))
+        .unwrap_or_else(|| artifact.path.clone().into());
+    let project_path = project
+        .find_project_path(&candidate, cx)
+        .ok_or_else(|| anyhow!("{} is not visible in the project", artifact.path))?;
+    let entry = project
+        .entry_for_path(&project_path, cx)
+        .ok_or_else(|| anyhow!("{} was not created", artifact.path))?;
+    if !entry.is_file() {
+        bail!("{} is not a file", artifact.path);
+    }
+    if entry.size > artifact.max_bytes {
+        bail!(
+            "{} exceeds the declared {}-byte limit",
+            artifact.path,
+            artifact.max_bytes
+        );
+    }
+    Ok(project_path)
+}
+
 fn structured_task_connection_error(state: Option<ConnectionState>) -> Option<&'static str> {
     match state {
         None | Some(ConnectionState::Connected) => None,
@@ -443,7 +603,7 @@ mod tests {
     use project::{FakeFs, Project, TaskSourceKind};
     use serde_json::json;
     use std::sync::Arc;
-    use task::TaskTemplate;
+    use task::{TaskArtifactKind, TaskTemplate};
 
     struct Fixture {
         workspace: Entity<Workspace>,
@@ -533,6 +693,94 @@ mod tests {
         cx.executor().run_until_parked();
 
         assert_eq!(*task_result.lock(), Some(ScheduledTaskResult::Success));
+    }
+
+    #[gpui::test]
+    async fn profile_artifact_opening_is_bounded_to_visible_project_files(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            let settings_store = settings::SettingsStore::test(cx);
+            cx.set_global(settings_store);
+        });
+        let fs = FakeFs::new(cx.executor());
+        fs.insert_tree(
+            "/root",
+            json!({
+                "target": {
+                    "profile.svg": "<svg></svg>",
+                    "oversized.svg": "0123456789abcdef",
+                }
+            }),
+        )
+        .await;
+        let project = Project::test(fs, ["/root".as_ref()], cx).await;
+        let artifact = TaskArtifact {
+            path: "target/profile.svg".to_string(),
+            kind: TaskArtifactKind::Svg,
+            max_bytes: 1024,
+        };
+        let project_path = project
+            .read_with(cx, |project, cx| {
+                resolve_task_artifact(project, &artifact, Some("/root".as_ref()), cx)
+            })
+            .expect("visible bounded artifact should resolve");
+        assert_eq!(project_path.path.as_unix_str(), "target/profile.svg");
+
+        let missing = TaskArtifact {
+            path: "target/missing.svg".to_string(),
+            kind: TaskArtifactKind::Svg,
+            max_bytes: 1024,
+        };
+        assert!(project.read_with(cx, |project, cx| {
+            resolve_task_artifact(project, &missing, Some("/root".as_ref()), cx).is_err()
+        }));
+        let oversized = TaskArtifact {
+            path: "target/oversized.svg".to_string(),
+            max_bytes: 8,
+            ..artifact
+        };
+        assert!(project.read_with(cx, |project, cx| {
+            resolve_task_artifact(project, &oversized, Some("/root".as_ref()), cx).is_err()
+        }));
+    }
+
+    #[test]
+    fn cargo_pre_launch_task_reference_is_unique_and_uses_existing_task_resolution() {
+        let context = TaskContext::default();
+        let template = TaskTemplate {
+            label: "Generate bindings".to_string(),
+            command: "generator".to_string(),
+            args: vec!["--checked".to_string()],
+            ..TaskTemplate::default()
+        };
+        let (source, resolved) = resolve_task_reference(
+            vec![(TaskSourceKind::UserInput, template.clone())],
+            "Generate bindings",
+            &context,
+        )
+        .expect("an exact existing Tasks label should resolve");
+        assert_eq!(source, TaskSourceKind::UserInput);
+        assert_eq!(resolved.resolved.command.as_deref(), Some("generator"));
+        assert_eq!(resolved.resolved.args, vec!["--checked"]);
+
+        assert!(
+            resolve_task_reference(Vec::new(), "Generate bindings", &context)
+                .expect_err("a missing reference must be isolated")
+                .to_string()
+                .contains("not found")
+        );
+        assert!(
+            resolve_task_reference(
+                vec![
+                    (TaskSourceKind::UserInput, template.clone()),
+                    (TaskSourceKind::UserInput, template),
+                ],
+                "Generate bindings",
+                &context,
+            )
+            .expect_err("an ambiguous reference must not select arbitrarily")
+            .to_string()
+            .contains("ambiguous")
+        );
     }
 
     async fn create_fixture(

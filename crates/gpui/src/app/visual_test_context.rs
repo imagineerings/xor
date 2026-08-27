@@ -181,6 +181,17 @@ impl VisualTestAppContext {
         lock.update_window(window, f)
     }
 
+    /// Returns the most recently rendered bounds for a debug selector.
+    pub fn debug_bounds(
+        &mut self,
+        window: AnyWindowHandle,
+        selector: &str,
+    ) -> Result<Option<Bounds<Pixels>>> {
+        self.update_window(window, |_, window, _| {
+            window.rendered_frame.debug_bounds.get(selector).copied()
+        })
+    }
+
     /// Spawns a task on the foreground executor.
     pub fn spawn<F, R>(&self, f: F) -> Task<R>
     where

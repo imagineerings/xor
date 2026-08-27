@@ -1,15 +1,25 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, error::Error, fmt, sync::Arc};
 
 use gpui::{
-    AnyElement, Context, EventEmitter, ListAlignment, ListState, Render, Role, Window, list, px,
+    AnyElement, App, Context, Entity, EntityId, EventEmitter, ListAlignment, ListState, Render,
+    Role, Subscription, Window, list, px,
 };
 use ui::prelude::*;
-use workspace::collaborative_accessibility::TIMELINE_LABEL;
+use workspace::{
+    Workspace,
+    collaborative_accessibility::TIMELINE_LABEL,
+    collaborative_timeline::{
+        CollaborativeTimelineProvider, CollaborativeTimelineRegistration,
+        CollaborativeTimelineRegistrationError,
+    },
+};
 
 use crate::{
+    AgentPanel,
     activity_projection::{ActivityItem, ActivityItemId},
     activity_reducer::{ActivityReducer, ActivityReduction, ActivityReductionError},
     collaborative_activity_cards::{ActivityCardIntervention, CollaborativeActivityCard},
+    conversation_view::ThreadView,
 };
 
 #[derive(Clone, Debug)]
@@ -132,7 +142,7 @@ impl Render for CollaborativeTimeline {
             return div()
                 .id("collaborative-activity-empty")
                 .role(Role::Status)
-                .aria_label("Collaborative activity timeline is empty")
+                .aria_label("Multiplayer Workspace activity timeline is empty")
                 .size_full()
                 .flex()
                 .items_center()
@@ -160,6 +170,99 @@ impl Render for CollaborativeTimeline {
 }
 
 impl EventEmitter<CollaborativeTimelineEvent> for CollaborativeTimeline {}
+
+pub struct CollaborativeTimelineAdapter {
+    thread_view_id: EntityId,
+    provider: CollaborativeTimelineProvider,
+}
+
+impl CollaborativeTimelineAdapter {
+    pub fn from_agent_panel(
+        agent_panel: &Entity<AgentPanel>,
+        workspace: &Entity<Workspace>,
+        cx: &mut App,
+    ) -> Result<Self, CollaborativeTimelineAdapterError> {
+        let thread_view = agent_panel
+            .read(cx)
+            .active_thread_view(cx)
+            .ok_or(CollaborativeTimelineAdapterError::ThreadUnavailable)?;
+        let project = thread_view.read(cx).project.upgrade();
+        let project = project.ok_or(CollaborativeTimelineAdapterError::ProjectUnavailable)?;
+        if project.entity_id() != workspace.read(cx).project().entity_id() {
+            return Err(CollaborativeTimelineAdapterError::ProjectMismatch);
+        }
+        let timeline = cx.new(|cx| CollaborativeAcpTimeline::new(thread_view.clone(), cx));
+        Ok(Self {
+            thread_view_id: thread_view.entity_id(),
+            provider: CollaborativeTimelineProvider::new(project, timeline.into()),
+        })
+    }
+
+    pub fn thread_view_id(&self) -> EntityId {
+        self.thread_view_id
+    }
+
+    pub fn register_in_workspace(
+        self,
+        workspace: &mut Workspace,
+        cx: &mut gpui::Context<Workspace>,
+    ) -> Result<CollaborativeTimelineRegistration, CollaborativeTimelineAdapterError> {
+        workspace
+            .register_collaborative_timeline_provider(self.provider, cx)
+            .map_err(CollaborativeTimelineAdapterError::Registration)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CollaborativeTimelineAdapterError {
+    ThreadUnavailable,
+    ProjectUnavailable,
+    ProjectMismatch,
+    Registration(CollaborativeTimelineRegistrationError),
+}
+
+impl fmt::Display for CollaborativeTimelineAdapterError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ThreadUnavailable => formatter.write_str("active agent thread is unavailable"),
+            Self::ProjectUnavailable => formatter.write_str("active agent project is unavailable"),
+            Self::ProjectMismatch => {
+                formatter.write_str("active agent thread belongs to a different project")
+            }
+            Self::Registration(error) => write!(formatter, "timeline registration failed: {error}"),
+        }
+    }
+}
+
+impl Error for CollaborativeTimelineAdapterError {}
+
+struct CollaborativeAcpTimeline {
+    thread_view: Entity<ThreadView>,
+    _thread_view_observation: Subscription,
+}
+
+impl CollaborativeAcpTimeline {
+    fn new(thread_view: Entity<ThreadView>, cx: &mut Context<Self>) -> Self {
+        let _thread_view_observation = cx.observe(&thread_view, |_, _, cx| cx.notify());
+        Self {
+            thread_view,
+            _thread_view_observation,
+        }
+    }
+}
+
+impl Render for CollaborativeAcpTimeline {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let thread_view = self.thread_view.clone();
+        div()
+            .id("collaborative-native-acp-timeline")
+            .debug_selector(|| "COLLABORATIVE-NATIVE-ACP-TIMELINE".to_owned())
+            .size_full()
+            .child(thread_view.update(cx, |thread_view, cx| {
+                thread_view.render_collaborative_entries(window, cx)
+            }))
+    }
+}
 
 #[cfg(test)]
 mod tests {

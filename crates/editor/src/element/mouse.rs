@@ -2,6 +2,7 @@ use std::ops::Range;
 use std::time::{Duration, Instant};
 
 use collections::HashMap;
+#[cfg(feature = "agentic")]
 use feature_flags::{DiffReviewFeatureFlag, FeatureFlagAppExt as _};
 use gpui::{
     AnyElement, App, AvailableSpace, ClickEvent, Context, DefiniteLength, DispatchPhase, Element,
@@ -10,6 +11,7 @@ use gpui::{
     Window, anchored, deferred, point, px,
 };
 use multi_buffer::MultiBufferRow;
+#[cfg(feature = "agentic")]
 use project::DisableAiSettings;
 use settings::Settings;
 use sum_tree::Bias;
@@ -18,12 +20,14 @@ use theme_settings::BufferLineHeight;
 use util::{RangeExt, debug_panic, post_inc};
 
 use super::{EditorElement, EditorLayout, LineNumberLayout, PositionMap, SplitSide};
+#[cfg(feature = "agentic")]
+use crate::PhantomDiffReviewIndicator;
 use crate::{
     CURSORS_VISIBLE_FOR, ColumnarMode, DisplayDiffHunk, DisplayPoint, DisplayRow, Editor,
-    EditorSettings, EditorSnapshot, GutterHoverButton, HoveredCursor, JumpData,
-    PhantomDiffReviewIndicator, SelectPhase, Selection, SelectionDragState,
-    display_map::ToDisplayPoint, editor_settings::DoubleClickInMultibuffer,
-    hover_popover::hover_at, mouse_context_menu, scroll::ScrollPixelOffset,
+    EditorSettings, EditorSnapshot, GutterHoverButton, HoveredCursor, JumpData, SelectPhase,
+    Selection, SelectionDragState, display_map::ToDisplayPoint,
+    editor_settings::DoubleClickInMultibuffer, hover_popover::hover_at, mouse_context_menu,
+    scroll::ScrollPixelOffset,
 };
 
 impl EditorElement {
@@ -45,7 +49,7 @@ impl EditorElement {
         let point_for_position = position_map.point_for_position(event.position);
         let valid_point = point_for_position.nearest_valid;
 
-        // Update diff review drag state if we're dragging
+        #[cfg(feature = "agentic")]
         if editor.diff_review_drag_state.is_some() {
             editor.update_diff_review_drag(valid_point.row(), window, cx);
         }
@@ -112,69 +116,72 @@ impl EditorElement {
             }
         }
 
-        // Handle diff review indicator when gutter is hovered in diff mode with AI enabled
-        let show_diff_review = editor.show_diff_review_button()
-            && cx.has_flag::<DiffReviewFeatureFlag>()
-            && !DisableAiSettings::is_ai_disabled_for_buffer(
-                editor.buffer.read(cx).as_singleton().as_ref(),
-                cx,
-            );
+        #[cfg(feature = "agentic")]
+        let is_on_diff_review_button_row = {
+            let show_diff_review = editor.show_diff_review_button()
+                && cx.has_flag::<DiffReviewFeatureFlag>()
+                && !DisableAiSettings::is_ai_disabled_for_buffer(
+                    editor.buffer.read(cx).as_singleton().as_ref(),
+                    cx,
+                );
 
-        let diff_review_indicator = if gutter_hovered && show_diff_review {
-            let is_visible = editor
-                .gutter_diff_review_indicator
-                .0
-                .is_some_and(|indicator| indicator.is_active);
-
-            if !is_visible {
-                editor
+            let diff_review_indicator = if gutter_hovered && show_diff_review {
+                let is_visible = editor
                     .gutter_diff_review_indicator
-                    .1
-                    .get_or_insert_with(|| {
-                        cx.spawn(async move |this, cx| {
-                            cx.background_executor()
-                                .timer(Duration::from_millis(200))
-                                .await;
+                    .0
+                    .is_some_and(|indicator| indicator.is_active);
 
-                            this.update(cx, |this, cx| {
-                                if let Some(indicator) =
-                                    this.gutter_diff_review_indicator.0.as_mut()
-                                {
-                                    indicator.is_active = true;
-                                    cx.notify();
-                                }
+                if !is_visible {
+                    editor
+                        .gutter_diff_review_indicator
+                        .1
+                        .get_or_insert_with(|| {
+                            cx.spawn(async move |this, cx| {
+                                cx.background_executor()
+                                    .timer(Duration::from_millis(200))
+                                    .await;
+
+                                this.update(cx, |this, cx| {
+                                    if let Some(indicator) =
+                                        this.gutter_diff_review_indicator.0.as_mut()
+                                    {
+                                        indicator.is_active = true;
+                                        cx.notify();
+                                    }
+                                })
+                                .ok();
                             })
-                            .ok();
-                        })
-                    });
+                        });
+                }
+
+                let anchor = position_map
+                    .snapshot
+                    .display_point_to_anchor(valid_point, Bias::Left);
+                Some(PhantomDiffReviewIndicator {
+                    start: anchor,
+                    end: anchor,
+                    is_active: is_visible,
+                })
+            } else {
+                editor.gutter_diff_review_indicator.1 = None;
+                None
+            };
+
+            if diff_review_indicator != editor.gutter_diff_review_indicator.0 {
+                editor.gutter_diff_review_indicator.0 = diff_review_indicator;
+                cx.notify();
             }
 
-            let anchor = position_map
-                .snapshot
-                .display_point_to_anchor(valid_point, Bias::Left);
-            Some(PhantomDiffReviewIndicator {
-                start: anchor,
-                end: anchor,
-                is_active: is_visible,
+            diff_review_indicator.is_some_and(|indicator| {
+                let start_row = indicator
+                    .start
+                    .to_display_point(&position_map.snapshot.display_snapshot)
+                    .row();
+                indicator.is_active && start_row == valid_point.row()
             })
-        } else {
-            editor.gutter_diff_review_indicator.1 = None;
-            None
         };
-
-        if diff_review_indicator != editor.gutter_diff_review_indicator.0 {
-            editor.gutter_diff_review_indicator.0 = diff_review_indicator;
-            cx.notify();
-        }
-
-        // Don't show breakpoint indicator when diff review indicator is active on this row
-        let is_on_diff_review_button_row = diff_review_indicator.is_some_and(|indicator| {
-            let start_row = indicator
-                .start
-                .to_display_point(&position_map.snapshot.display_snapshot)
-                .row();
-            indicator.is_active && start_row == valid_point.row()
-        });
+        #[cfg(not(feature = "agentic"))]
+        let is_on_diff_review_button_row = false;
 
         let gutter_hover_button = if gutter_hovered
             && !is_on_diff_review_button_row
@@ -834,7 +841,7 @@ impl EditorElement {
         window: &mut Window,
         cx: &mut Context<Editor>,
     ) {
-        // Handle diff review drag completion
+        #[cfg(feature = "agentic")]
         if editor.diff_review_drag_state.is_some() {
             editor.end_diff_review_drag(window, cx);
             cx.stop_propagation();

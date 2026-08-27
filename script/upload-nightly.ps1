@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\lib\blob-store.ps1"
 . "$PSScriptRoot\lib\workspace.ps1"
 
-ParseSimWorkspace
+ParseZedWorkspace
 Write-Host "Uploading nightly for target: $target"
 
 $bucketName = "zed-nightly-host"

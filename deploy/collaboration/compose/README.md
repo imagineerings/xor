@@ -34,9 +34,23 @@ Collab's dependency-aware `/healthz` endpoint. The local override also publishes
 Postgres, Redis and object-store ports for development tools. Do not enable it
 on an Internet-facing host.
 
-Task 44.4 owns fresh-schema migration jobs. Until those jobs land, initialize or
-migrate the database through the currently approved Collab release procedure
-before expecting `/healthz` to become ready.
+The checked-in Collab binary runs its embedded SQLx migrations before opening
+the application database. A fresh local Postgres volume therefore acquires the
+canonical collaboration message projections, operation receipts and outbox as
+part of startup.
+
+After the stack is healthy, launch two independently authenticated Rust-product
+clients with the existing local seed users:
+
+```sh
+./run.sh clients /absolute/path/to/a/project
+```
+
+The launcher builds `zed` with `--no-default-features --features
+multiplayer-tools,rust-tools`, sets `ZED_PRODUCT_ID=rust`, and reuses
+`script/zed-local -2 --stateful`. It reads the local admin token from the chosen
+Compose environment file without printing it. Both clients connect to the local
+Collab RPC listener and retain separate application state directories.
 
 ## Self-hosting and rollback
 

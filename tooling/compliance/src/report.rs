@@ -400,7 +400,7 @@ mod tests {
         );
         report.add(
             make_commit("ddd", "Dave", "dave@test.com", "Bump Version", ""),
-            Ok(ReviewSuccess::SimZippyCommit(
+            Ok(ReviewSuccess::ZedZippyCommit(
                 AutomatedChangeKind::VersionBump,
                 GithubLogin::new("dave".to_string()),
             )),

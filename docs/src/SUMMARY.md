@@ -221,6 +221,7 @@
 # Developing Zed
 
 - [Developing Zed](./development.md)
+  - [Product Flavors](./development/product-flavors.md)
   - [macOS](./development/macos.md)
   - [Linux](./development/linux.md)
   - [Windows](./development/windows.md)

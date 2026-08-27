@@ -3,11 +3,11 @@ use gpui::actions;
 actions!(
     workspace,
     [
-        /// Moves focus to the next control in the Collaborative Workspace.
+        /// Moves focus to the next control in the Multiplayer Workspace.
         FocusNextCollaborativeRegion,
-        /// Moves focus to the previous control in the Collaborative Workspace.
+        /// Moves focus to the previous control in the Multiplayer Workspace.
         FocusPreviousCollaborativeRegion,
-        /// Restores focus to the Collaborative Workspace's first available control.
+        /// Restores focus to the Multiplayer Workspace's first available control.
         RestoreCollaborativeFocus
     ]
 );

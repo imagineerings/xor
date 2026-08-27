@@ -20,12 +20,17 @@ multiplayer-tools = [
     "dep:chrono",
     "dep:collaboration_domain",
     "dep:git_ui",
+    "dep:hex",
+    "dep:log",
+    "dep:multi_buffer",
     "dep:nostr_compat",
     "dep:qrcode",
     "dep:remote",
     "dep:zeroize",
+    "dep:zed_credentials_provider",
     "agent_ui/multiplayer-tools",
     "git_ui/multiplayer-tools",
+    "zed_credentials_provider/multiplayer-tools",
 ]
 test-support = [
     "call/test-support",
@@ -57,8 +62,11 @@ futures.workspace = true
 fuzzy.workspace = true
 gpui.workspace = true
 git_ui = { workspace = true, optional = true }
+hex = { workspace = true, optional = true }
 livekit_client.workspace = true
+log = { workspace = true, optional = true }
 menu.workspace = true
+multi_buffer = { workspace = true, optional = true }
 nostr_compat = { workspace = true, optional = true }
 notifications.workspace = true
 picker.workspace = true
@@ -82,6 +90,7 @@ ui.workspace = true
 util.workspace = true
 workspace.workspace = true
 zed_actions.workspace = true
+zed_credentials_provider = { workspace = true, optional = true }
 zeroize = { workspace = true, optional = true }
 
 [dev-dependencies]

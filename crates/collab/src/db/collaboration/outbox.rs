@@ -494,6 +494,7 @@ const fn adapter_name(adapter: CommandAdapter) -> &'static str {
     match adapter {
         CommandAdapter::NostrInProcess => "nostr_in_process",
         CommandAdapter::NostrTemporarySidecar => "nostr_temporary_sidecar",
+        CommandAdapter::ZedRpc => "zed_rpc",
     }
 }
 

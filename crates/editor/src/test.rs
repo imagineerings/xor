@@ -50,7 +50,7 @@ pub fn marked_display_snapshot(
     let (unmarked_text, markers) = marked_text_offsets(text);
 
     let font = Font {
-        family: ".SimMono".into(),
+        family: ".ZedMono".into(),
         features: FontFeatures::default(),
         fallbacks: None,
         weight: FontWeight::default(),

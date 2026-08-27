@@ -10,7 +10,9 @@ use crate::{
     collaborative_focus::CollaborativeFocusRegion,
     collaborative_layout::CollaborativeLayout,
     collaborative_layout_persistence::CollaborativeLayoutState,
-    collaborative_participants::CollaborativeParticipantProviderState,
+    collaborative_participants::{
+        CollaborativeParticipantProvider, CollaborativeParticipantProviderState,
+    },
     collaborative_shell_state::{
         CollaborativeShellPhase, CollaborativeShellState, CollaborativeShellStatus,
     },
@@ -21,7 +23,7 @@ pub(crate) struct CollaborativeWorkspace {
     project: Entity<Project>,
     layout: Entity<CollaborativeLayout>,
     composer: Entity<CollaborativeComposerSurface>,
-    participant_state: CollaborativeParticipantProviderState,
+    participant_provider: Option<CollaborativeParticipantProvider>,
     shell_state: Entity<CollaborativeShellState>,
     focus_handle: FocusHandle,
 }
@@ -43,7 +45,7 @@ impl CollaborativeWorkspace {
             project,
             layout,
             composer,
-            participant_state: CollaborativeParticipantProviderState::Unavailable,
+            participant_provider: None,
             shell_state,
             focus_handle,
         }
@@ -56,6 +58,17 @@ impl CollaborativeWorkspace {
 
     pub(crate) fn layout_state(&self, cx: &App) -> CollaborativeLayoutState {
         self.layout.read(cx).state()
+    }
+
+    pub(crate) fn top_bar(&self, cx: &App) -> CollaborativeTopBar {
+        CollaborativeTopBar::new(
+            self.project.clone(),
+            self.layout.clone(),
+            self.participant_provider
+                .as_ref()
+                .map(|provider| provider.state(cx))
+                .unwrap_or(CollaborativeParticipantProviderState::Unavailable),
+        )
     }
 
     pub(crate) fn rail_width(&self, cx: &App) -> Pixels {
@@ -72,29 +85,62 @@ impl CollaborativeWorkspace {
             .update(cx, CollaborativeLayout::reset_rail_width);
     }
 
-    pub(crate) fn set_review_view(&mut self, review_view: Option<AnyView>, cx: &mut Context<Self>) {
+    pub(crate) fn toggle_review(&mut self, cx: &mut Context<Self>) {
+        self.layout.update(cx, CollaborativeLayout::toggle_review);
+    }
+
+    pub(crate) fn set_review_view(
+        &mut self,
+        review_view: Option<AnyView>,
+        selected_slot: Option<crate::collaborative_review::CollaborativeReviewSlot>,
+        agent_available: bool,
+        project_available: bool,
+        cx: &mut Context<Self>,
+    ) {
+        self.layout.update(cx, |layout, cx| {
+            layout.set_review_view(
+                review_view,
+                selected_slot,
+                agent_available,
+                project_available,
+                cx,
+            )
+        });
+    }
+
+    pub(crate) fn set_timeline_view(
+        &mut self,
+        timeline_view: Option<AnyView>,
+        cx: &mut Context<Self>,
+    ) {
         self.layout
-            .update(cx, |layout, cx| layout.set_review_view(review_view, cx));
+            .update(cx, |layout, cx| layout.set_timeline_view(timeline_view, cx));
     }
 
     pub(crate) fn set_composer_view(
         &mut self,
         composer_view: Option<AnyView>,
+        composer_focus_handle: Option<FocusHandle>,
+        unavailable_message: Option<gpui::SharedString>,
         cx: &mut Context<Self>,
     ) {
-        self.composer
-            .update(cx, |composer, cx| composer.set_view(composer_view, cx));
+        self.composer.update(cx, |composer, cx| {
+            composer.set_view(
+                composer_view,
+                composer_focus_handle,
+                unavailable_message,
+                cx,
+            )
+        });
     }
 
-    pub(crate) fn set_participant_state(
+    pub(crate) fn set_participant_provider(
         &mut self,
-        state: CollaborativeParticipantProviderState,
+        provider: Option<CollaborativeParticipantProvider>,
         cx: &mut Context<Self>,
     ) {
-        if self.participant_state != state {
-            self.participant_state = state;
-            cx.notify();
-        }
+        self.participant_provider = provider;
+        cx.notify();
     }
 
     #[cfg(test)]
@@ -169,11 +215,6 @@ impl Render for CollaborativeWorkspace {
                 }
             })
             .bg(cx.theme().colors().background)
-            .child(CollaborativeTopBar::new(
-                self.project.clone(),
-                self.layout.clone(),
-                self.participant_state.clone(),
-            ))
             .when(!shell_ready, |this| {
                 this.child(CollaborativeShellStatus::new(self.shell_state.clone()))
             })

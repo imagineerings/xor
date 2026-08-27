@@ -22,7 +22,9 @@ pub mod visual_tests;
 #[cfg(target_os = "windows")]
 pub(crate) mod windows_only_instance;
 
+#[cfg(feature = "agentic-tools")]
 use agent_settings::{UserAgentsMdState, init_user_agents_md};
+#[cfg(feature = "agentic-tools")]
 use agent_ui::AgentDiffToolbar;
 #[cfg(feature = "multiplayer-tools")]
 use agent_ui::AgentPanel;
@@ -42,7 +44,6 @@ use editor::{Editor, MultiBuffer};
 use extension_host::ExtensionStore;
 use feature_flags::{FeatureFlagAppExt as _, PanicFeatureFlag};
 use fs::Fs;
-use futures::FutureExt as _;
 use futures::{StreamExt, channel::mpsc, select_biased};
 use git_ui::branch_diff::BranchDiffToolbar;
 use git_ui::commit_view::CommitViewToolbar;
@@ -53,12 +54,14 @@ use git_ui::project_diff::ProjectDiffToolbar;
 use git_ui::solo_diff_view::{SoloDiffGitToolbar, SoloDiffStyleToolbar};
 use git_ui::staged_diff::StagedDiffToolbar;
 use git_ui::unstaged_diff::UnstagedDiffToolbar;
+#[cfg(feature = "agentic-tools")]
+use gpui::AsyncWindowContext;
 use gpui::{
-    Action, App, AppContext as _, AsyncWindowContext, ClipboardItem, Context, DismissEvent,
-    Element, Entity, FocusHandle, Focusable, Image, ImageFormat, KeyBinding, ParentElement,
-    PathPromptOptions, PromptLevel, ReadGlobal, SharedString, Size, Task, TaskExt, TitlebarOptions,
-    UpdateGlobal, WeakEntity, Window, WindowBounds, WindowHandle, WindowKind, WindowOptions,
-    actions, image_cache, img, point, px, retain_all,
+    Action, App, AppContext as _, ClipboardItem, Context, DismissEvent, Element, Entity,
+    FocusHandle, Focusable, Image, ImageFormat, KeyBinding, ParentElement, PathPromptOptions,
+    PromptLevel, ReadGlobal, SharedString, Size, Task, TaskExt, TitlebarOptions, UpdateGlobal,
+    WeakEntity, Window, WindowBounds, WindowHandle, WindowKind, WindowOptions, actions,
+    image_cache, img, point, px, retain_all,
 };
 #[cfg(feature = "multiplayer-tools")]
 use gpui::{EntityId, Subscription};
@@ -93,6 +96,7 @@ use settings::{
     SettingsFile, SettingsStore, VIM_KEYMAP_PATH, initial_local_debug_tasks_content,
     initial_project_settings_content, initial_tasks_content, update_settings_file,
 };
+#[cfg(feature = "agentic-tools")]
 use sidebar::Sidebar;
 #[cfg(debug_assertions)]
 use workspace::workspace_error::{ErrorAction, ErrorSeverity, WorkspaceError};
@@ -116,19 +120,27 @@ use uuid::Uuid;
 use vim_mode_setting::VimModeSetting;
 use workspace::notifications::{NotificationId, dismiss_app_notification, show_app_notification};
 
+#[cfg(feature = "agentic-tools")]
+use workspace::Panel;
 #[cfg(feature = "multiplayer-tools")]
 use workspace::collaborative_composer::CollaborativeComposerRegistration;
 #[cfg(feature = "multiplayer-tools")]
 use workspace::collaborative_participants::{
-    CollaborativeParticipantProvider, CollaborativeParticipantProviderState,
-    CollaborativeParticipantRegistration, CollaborativeParticipantViewData,
+    CollaborativeConnectionState, CollaborativeParticipant, CollaborativeParticipantPresence,
+    CollaborativeParticipantProvider, CollaborativeParticipantRegistration,
+};
+#[cfg(all(test, feature = "multiplayer-tools"))]
+use workspace::collaborative_participants::{
+    CollaborativeParticipantProviderState, CollaborativeParticipantViewData,
 };
 #[cfg(feature = "multiplayer-tools")]
 use workspace::collaborative_review::CollaborativeReviewRegistration;
+#[cfg(feature = "multiplayer-tools")]
+use workspace::collaborative_timeline::CollaborativeTimelineRegistration;
 use workspace::{
-    AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Panel, Toast, Workspace,
-    WorkspaceSettings, create_and_open_local_file,
-    notifications::simple_message_notification::MessageNotification, open_new,
+    AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Toast, Workspace, WorkspaceSettings,
+    create_and_open_local_file, notifications::simple_message_notification::MessageNotification,
+    open_new,
 };
 use workspace::{
     CloseIntent, CloseProject, CloseWindow, RestoreBanner, with_active_or_new_workspace,
@@ -136,7 +148,7 @@ use workspace::{
 use workspace::{Pane, notifications::DetachAndPromptErr};
 use zed_actions::{
     About, GetMerch, OpenAccountSettings, OpenBrowser, OpenDocs, OpenProjectTasks,
-    OpenServerSettings, OpenSettingsFile, OpenSimUrl, OpenStatusPage, Quit,
+    OpenServerSettings, OpenSettingsFile, OpenStatusPage, OpenZedUrl, Quit,
 };
 const DOCS_URL: &str = "https://zed.dev/docs/";
 const STATUS_URL: &str = "https://status.zed.dev";
@@ -155,10 +167,14 @@ struct CollaborativeReviewCompositionState {
     composer_thread_view_id: Option<EntityId>,
     composer_registration: Option<CollaborativeComposerRegistration>,
     participant_thread_view_id: Option<EntityId>,
-    participant_view_data: Option<CollaborativeParticipantViewData>,
     participant_registration: Option<CollaborativeParticipantRegistration>,
     participant_observed_thread_view_id: Option<EntityId>,
     participant_thread_observation: Option<Subscription>,
+    participant_active_call_observation: Option<Subscription>,
+    participant_room_id: Option<EntityId>,
+    participant_room_observation: Option<Subscription>,
+    timeline_thread_view_id: Option<EntityId>,
+    timeline_registration: Option<CollaborativeTimelineRegistration>,
     project_diff_id: Option<EntityId>,
     project_registration: Option<CollaborativeReviewRegistration>,
 }
@@ -166,7 +182,6 @@ struct CollaborativeReviewCompositionState {
 #[cfg(feature = "multiplayer-tools")]
 struct CollaborativeParticipantProjection {
     thread_view_id: EntityId,
-    view_data: CollaborativeParticipantViewData,
     provider: CollaborativeParticipantProvider,
 }
 
@@ -176,11 +191,9 @@ impl CollaborativeParticipantProjection {
         adapter: agent_ui::collaborative_participants::CollaborativeParticipantAdapter,
     ) -> Self {
         let thread_view_id = adapter.thread_view_id();
-        let view_data = adapter.view_data().clone();
         let provider = adapter.into_provider();
         Self {
             thread_view_id,
-            view_data,
             provider,
         }
     }
@@ -238,6 +251,55 @@ fn reconcile_collaborative_composer(
 }
 
 #[cfg(feature = "multiplayer-tools")]
+fn reconcile_collaborative_timeline(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: &Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut App,
+) {
+    let thread_view_id = agent_panel
+        .read(cx)
+        .active_thread_view(cx)
+        .map(|thread_view| thread_view.entity_id());
+    if state.borrow().timeline_thread_view_id == thread_view_id {
+        return;
+    }
+
+    let adapter = agent_ui::collaborative_timeline::CollaborativeTimelineAdapter::from_agent_panel(
+        agent_panel,
+        workspace_handle,
+        cx,
+    );
+    let state = state.clone();
+    workspace_handle.update(cx, |workspace, cx| {
+        if let Some(registration) = state.borrow_mut().timeline_registration.take() {
+            workspace.unregister_collaborative_timeline_provider(registration, cx);
+        }
+        state.borrow_mut().timeline_thread_view_id = None;
+
+        let adapter = match adapter {
+            Ok(adapter) => adapter,
+            Err(
+                agent_ui::collaborative_timeline::CollaborativeTimelineAdapterError::ThreadUnavailable,
+            ) => return,
+            Err(error) => {
+                log::warn!("failed to adapt collaborative timeline: {error}");
+                return;
+            }
+        };
+        let thread_view_id = adapter.thread_view_id();
+        match adapter.register_in_workspace(workspace, cx) {
+            Ok(registration) => {
+                let mut state = state.borrow_mut();
+                state.timeline_thread_view_id = Some(thread_view_id);
+                state.timeline_registration = Some(registration);
+            }
+            Err(error) => log::warn!("failed to register collaborative timeline: {error}"),
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
 fn apply_collaborative_participant_projection(
     workspace_handle: &Entity<Workspace>,
     projection: Option<CollaborativeParticipantProjection>,
@@ -247,55 +309,27 @@ fn apply_collaborative_participant_projection(
     let projection_is_current = projection.as_ref().is_some_and(|projection| {
         let state = state.borrow();
         state.participant_thread_view_id == Some(projection.thread_view_id)
-            && state.participant_view_data.as_ref() == Some(&projection.view_data)
             && state.participant_registration.is_some()
     });
-    if projection_is_current
-        || (projection.is_none() && state.borrow().participant_registration.is_none())
-    {
+    if projection_is_current {
+        workspace_handle.update(cx, |_, cx| cx.notify());
+        return;
+    }
+    if projection.is_none() && state.borrow().participant_registration.is_none() {
         return;
     }
 
     let state = state.clone();
     workspace_handle.update(cx, |workspace, cx| {
         if let Some(projection) = projection {
-            let current_registration = {
-                let state = state.borrow();
-                (state.participant_thread_view_id == Some(projection.thread_view_id))
-                    .then_some(state.participant_registration)
-                    .flatten()
-            };
-            if let Some(registration) = current_registration {
-                match workspace.update_collaborative_participant_provider(
-                    registration,
-                    CollaborativeParticipantProviderState::Ready(projection.view_data.clone()),
-                    cx,
-                ) {
-                    Ok(()) => {
-                        state.borrow_mut().participant_view_data = Some(projection.view_data);
-                        return;
-                    }
-                    Err(error) => {
-                        log::warn!(
-                            "failed to update collaborative participant provider; replacing it: {error}"
-                        );
-                    }
-                }
-            }
-
             if let Some(registration) = state.borrow_mut().participant_registration.take() {
                 workspace.unregister_collaborative_participant_provider(registration, cx);
             }
-            {
-                let mut state = state.borrow_mut();
-                state.participant_thread_view_id = None;
-                state.participant_view_data = None;
-            }
+            state.borrow_mut().participant_thread_view_id = None;
             match workspace.register_collaborative_participant_provider(projection.provider, cx) {
                 Ok(registration) => {
                     let mut state = state.borrow_mut();
                     state.participant_thread_view_id = Some(projection.thread_view_id);
-                    state.participant_view_data = Some(projection.view_data);
                     state.participant_registration = Some(registration);
                 }
                 Err(error) => {
@@ -308,7 +342,6 @@ fn apply_collaborative_participant_projection(
             }
             let mut state = state.borrow_mut();
             state.participant_thread_view_id = None;
-            state.participant_view_data = None;
         }
     });
 }
@@ -325,7 +358,41 @@ fn reconcile_collaborative_participants(
         workspace_handle,
         cx,
     ) {
-        Ok(adapter) => Some(CollaborativeParticipantProjection::from_adapter(adapter)),
+        Ok(adapter) => {
+            let adapter = adapter.with_room_state_reader(|cx| {
+                call::ActiveCall::try_global(cx)
+                    .and_then(|active_call| active_call.read(cx).room().cloned())
+                    .map(|room| {
+                        room.read_with(cx, |room, cx| {
+                            let mut participants = Vec::new();
+                            if let Some(user) = room.local_participant_user(cx) {
+                                participants.push(CollaborativeParticipant::human(
+                                    &user,
+                                    CollaborativeParticipantPresence::Online,
+                                ));
+                            }
+                            participants.extend(
+                                room.remote_participants().values().map(|participant| {
+                                    CollaborativeParticipant::human(
+                                        &participant.user,
+                                        CollaborativeParticipantPresence::Online,
+                                    )
+                                }),
+                            );
+                            let connection = if room.status().is_online() {
+                                CollaborativeConnectionState::Connected
+                            } else if room.status().is_offline() {
+                                CollaborativeConnectionState::Failed
+                            } else {
+                                CollaborativeConnectionState::Connecting
+                            };
+                            (participants, connection)
+                        })
+                    })
+                    .unwrap_or_default()
+            });
+            Some(CollaborativeParticipantProjection::from_adapter(adapter))
+        }
         Err(
             agent_ui::collaborative_participants::CollaborativeParticipantAdapterError::ThreadUnavailable,
         ) => None,
@@ -341,20 +408,25 @@ fn reconcile_collaborative_participants(
 fn reconcile_collaborative_project_review(
     workspace_handle: &Entity<Workspace>,
     state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    window: &mut Window,
     cx: &mut App,
 ) {
     let project_diff_id = workspace_handle
         .read(cx)
         .item_of_type::<ProjectDiff>(cx)
         .map(|project_diff| project_diff.entity_id());
-    if state.borrow().project_diff_id == project_diff_id {
+    if state.borrow().project_diff_id == project_diff_id
+        || (project_diff_id.is_none() && state.borrow().project_registration.is_some())
+    {
         return;
     }
 
-    let adapter = git_ui::collaborative_review::CollaborativeProjectReviewAdapter::from_workspace(
-        workspace_handle,
-        cx,
-    );
+    let adapter =
+        git_ui::collaborative_review::CollaborativeProjectReviewAdapter::from_workspace_or_create(
+            workspace_handle,
+            window,
+            cx,
+        );
     let state = state.clone();
     workspace_handle.update(cx, |workspace, cx| {
         if let Some(registration) = state.borrow_mut().project_registration.take() {
@@ -441,10 +513,16 @@ fn reconcile_collaborative_agent_review(
 fn schedule_collaborative_project_review_reconciliation(
     workspace_handle: Entity<Workspace>,
     state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    window: &Window,
     cx: &mut Context<Workspace>,
 ) {
+    let window_handle = window.window_handle();
     cx.defer(move |cx| {
-        reconcile_collaborative_project_review(&workspace_handle, &state, cx);
+        if let Err(error) = window_handle.update(cx, |_, window, cx| {
+            reconcile_collaborative_project_review(&workspace_handle, &state, window, cx);
+        }) {
+            log::warn!("failed to reconcile collaborative project review: {error}");
+        }
     });
 }
 
@@ -475,6 +553,18 @@ fn schedule_collaborative_composer_reconciliation(
 ) {
     cx.defer(move |cx| {
         reconcile_collaborative_composer(&workspace_handle, &agent_panel, &state, cx);
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn schedule_collaborative_timeline_reconciliation(
+    workspace_handle: Entity<Workspace>,
+    agent_panel: Entity<AgentPanel>,
+    state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    cx.defer(move |cx| {
+        reconcile_collaborative_timeline(&workspace_handle, &agent_panel, &state, cx);
     });
 }
 
@@ -530,6 +620,44 @@ fn observe_collaborative_participant_thread(
 }
 
 #[cfg(feature = "multiplayer-tools")]
+fn observe_collaborative_participant_room(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: &Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    let room = call::ActiveCall::try_global(cx)
+        .and_then(|active_call| active_call.read(cx).room().cloned());
+    let room_id = room.as_ref().map(Entity::entity_id);
+    if state.borrow().participant_room_id == room_id {
+        return;
+    }
+    {
+        let mut state = state.borrow_mut();
+        state.participant_room_id = room_id;
+        state.participant_room_observation = None;
+    }
+    let Some(room) = room else {
+        return;
+    };
+    let workspace_handle = workspace_handle.clone();
+    let agent_panel = agent_panel.clone();
+    let weak_state = Rc::downgrade(state);
+    let observation = cx.observe(&room, move |_, _, cx| {
+        let Some(state) = weak_state.upgrade() else {
+            return;
+        };
+        schedule_collaborative_participant_reconciliation(
+            workspace_handle.clone(),
+            agent_panel.clone(),
+            state,
+            cx,
+        );
+    });
+    state.borrow_mut().participant_room_observation = Some(observation);
+}
+
+#[cfg(feature = "multiplayer-tools")]
 fn subscribe_to_collaborative_review_agent_panel(
     workspace_handle: &Entity<Workspace>,
     agent_panel: Entity<AgentPanel>,
@@ -556,6 +684,12 @@ fn subscribe_to_collaborative_review_agent_panel(
         state.clone(),
         cx,
     );
+    schedule_collaborative_timeline_reconciliation(
+        workspace_handle.clone(),
+        agent_panel.clone(),
+        state.clone(),
+        cx,
+    );
     observe_collaborative_participant_thread(workspace_handle, &agent_panel, state, cx);
     schedule_collaborative_participant_reconciliation(
         workspace_handle.clone(),
@@ -563,6 +697,27 @@ fn subscribe_to_collaborative_review_agent_panel(
         state.clone(),
         cx,
     );
+    observe_collaborative_participant_room(workspace_handle, &agent_panel, state, cx);
+    if state.borrow().participant_active_call_observation.is_none()
+        && let Some(active_call) = call::ActiveCall::try_global(cx)
+    {
+        let workspace_handle = workspace_handle.clone();
+        let agent_panel = agent_panel.clone();
+        let weak_state = Rc::downgrade(state);
+        let observation = cx.observe(&active_call, move |_, _, cx| {
+            let Some(state) = weak_state.upgrade() else {
+                return;
+            };
+            observe_collaborative_participant_room(&workspace_handle, &agent_panel, &state, cx);
+            schedule_collaborative_participant_reconciliation(
+                workspace_handle.clone(),
+                agent_panel.clone(),
+                state,
+                cx,
+            );
+        });
+        state.borrow_mut().participant_active_call_observation = Some(observation);
+    }
 
     let workspace_handle = workspace_handle.clone();
     let state = state.clone();
@@ -579,6 +734,12 @@ fn subscribe_to_collaborative_review_agent_panel(
                     cx,
                 );
                 schedule_collaborative_composer_reconciliation(
+                    workspace_handle.clone(),
+                    agent_panel.clone(),
+                    state.clone(),
+                    cx,
+                );
+                schedule_collaborative_timeline_reconciliation(
                     workspace_handle.clone(),
                     agent_panel.clone(),
                     state.clone(),
@@ -1725,23 +1886,27 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
                 .unwrap_or(true)
         });
 
-        let window_handle = window.window_handle();
-        let multi_workspace_handle = cx.entity();
-        cx.subscribe_in(
-            &multi_workspace_handle,
-            window,
-            |this, _multi_workspace, event: &workspace::MultiWorkspaceEvent, window, cx| {
-                let workspace::MultiWorkspaceEvent::ActiveWorkspaceChanged { source_workspace } =
-                    event
-                else {
-                    return;
-                };
+        #[cfg(feature = "agentic-tools")]
+        {
+            let window_handle = window.window_handle();
+            let multi_workspace_handle = cx.entity();
+            cx.subscribe_in(
+                &multi_workspace_handle,
+                window,
+                |this, _multi_workspace, event: &workspace::MultiWorkspaceEvent, window, cx| {
+                    let workspace::MultiWorkspaceEvent::ActiveWorkspaceChanged {
+                        source_workspace,
+                    } = event
+                    else {
+                        return;
+                    };
 
-                let active_workspace = this.workspace().clone();
-                let source_workspace = source_workspace.clone();
-                active_workspace.update(cx, |workspace, cx| {
-                    if let Some(ref source) = source_workspace {
-                        if let Some(panel) = workspace.panel::<agent_ui::AgentPanel>(cx) {
+                    let active_workspace = this.workspace().clone();
+                    let source_workspace = source_workspace.clone();
+                    active_workspace.update(cx, |workspace, cx| {
+                        if let Some(ref source) = source_workspace
+                            && let Some(panel) = workspace.panel::<agent_ui::AgentPanel>(cx)
+                        {
                             panel.update(cx, |panel, cx| {
                                 panel.initialize_from_source_workspace_if_needed(
                                     source.clone(),
@@ -1750,26 +1915,26 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
                                 );
                             });
                         }
-                    }
 
-                    ensure_agent_panel_for_workspace(workspace, source_workspace, window, cx)
-                        .detach_and_log_err(cx);
-                });
-            },
-        )
-        .detach();
-
-        cx.defer(move |cx| {
-            window_handle
-                .update(cx, |_, window, cx| {
-                    let sidebar =
-                        cx.new(|cx| Sidebar::new(multi_workspace_handle.clone(), window, cx));
-                    multi_workspace_handle.update(cx, |multi_workspace, cx| {
-                        multi_workspace.register_sidebar(sidebar, cx);
+                        ensure_agent_panel_for_workspace(workspace, source_workspace, window, cx)
+                            .detach_and_log_err(cx);
                     });
-                })
-                .ok();
-        });
+                },
+            )
+            .detach();
+
+            cx.defer(move |cx| {
+                window_handle
+                    .update(cx, |_, window, cx| {
+                        let sidebar =
+                            cx.new(|cx| Sidebar::new(multi_workspace_handle.clone(), window, cx));
+                        multi_workspace_handle.update(cx, |multi_workspace, cx| {
+                            multi_workspace.register_sidebar(sidebar, cx);
+                        });
+                    })
+                    .ok();
+            });
+        }
     })
     .detach();
 
@@ -1786,6 +1951,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
         schedule_collaborative_project_review_reconciliation(
             workspace_handle.clone(),
             collaborative_review_state.clone(),
+            window,
             cx,
         );
         #[cfg(feature = "multiplayer-tools")]
@@ -1815,6 +1981,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
                     schedule_collaborative_project_review_reconciliation(
                         workspace_handle.clone(),
                         collaborative_review_state.clone(),
+                        window,
                         cx,
                     );
                 }
@@ -1900,6 +2067,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
         let line_ending_indicator =
             cx.new(|_| line_ending_selector::LineEndingIndicator::default());
         let git_blame_status = cx.new(|_| git_ui::GitBlameStatus::default());
+        #[cfg(feature = "agentic-tools")]
         let merge_conflict_indicator =
             cx.new(|cx| git_ui::MergeConflictIndicator::new(workspace, cx));
         workspace.status_bar().update(cx, |status_bar, cx| {
@@ -1908,6 +2076,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
             status_bar.add_left_item(diagnostic_summary, window, cx);
             status_bar.add_left_item(active_file_name, window, cx);
             status_bar.add_left_item(git_blame_status, window, cx);
+            #[cfg(feature = "agentic-tools")]
             status_bar.add_left_item(merge_conflict_indicator, window, cx);
             status_bar.add_left_item(activity_indicator, window, cx);
             status_bar.add_right_item(edit_prediction_ui, window, cx);
@@ -2115,13 +2284,18 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
             add_panel_when_ready(channels_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(debug_panel, workspace_handle.clone(), cx.clone()),
             comfy_panels,
-            initialize_agent_panel(workspace_handle, cx.clone()).map(|r| r.log_err()),
         );
+
+        #[cfg(feature = "agentic-tools")]
+        initialize_agent_panel(workspace_handle, cx.clone())
+            .await
+            .log_err();
 
         anyhow::Ok(())
     })
 }
 
+#[cfg(feature = "agentic-tools")]
 fn setup_or_teardown_ai_panel<P: Panel>(
     workspace: &mut Workspace,
     window: &mut Window,
@@ -2158,6 +2332,7 @@ fn setup_or_teardown_ai_panel<P: Panel>(
     }
 }
 
+#[cfg(feature = "agentic-tools")]
 fn ensure_agent_panel_for_workspace(
     workspace: &mut Workspace,
     source_workspace: Option<WeakEntity<Workspace>>,
@@ -2182,6 +2357,7 @@ fn ensure_agent_panel_for_workspace(
     })
 }
 
+#[cfg(feature = "agentic-tools")]
 async fn initialize_agent_panel(
     workspace_handle: WeakEntity<Workspace>,
     mut cx: AsyncWindowContext,
@@ -2335,7 +2511,7 @@ fn register_actions(
         .register_action(|_, _: &ToggleFullScreen, window, _| {
             window.toggle_fullscreen();
         })
-        .register_action(|_, action: &OpenSimUrl, _, cx| {
+        .register_action(|_, action: &OpenZedUrl, _, cx| {
             OpenListener::global(cx).open(RawOpenRequest {
                 urls: vec![String::from(&*action.url)],
                 ..Default::default()
@@ -2557,17 +2733,18 @@ fn register_actions(
                 }
             }
         })
-        .register_action(|_, _: &install_cli::RegisterSimScheme, window, cx| {
+        .register_action(|_, _: &install_cli::RegisterZedScheme, window, cx| {
             cx.spawn_in(window, async move |workspace, cx| {
                 install_cli::register_zed_scheme(cx).await?;
                 workspace.update_in(cx, |workspace, _, cx| {
-                    struct RegisterSimScheme;
+                    struct RegisterZedScheme;
 
                     workspace.show_toast(
                         Toast::new(
-                            NotificationId::unique::<RegisterSimScheme>(),
+                            NotificationId::unique::<RegisterZedScheme>(),
                             format!(
-                                "zed:// links will now open in {}.",
+                                "{} links will now open in {}.",
+                                product_flavor::URL_PREFIX,
                                 ReleaseChannel::global(cx).display_name()
                             ),
                         ),
@@ -2577,7 +2754,7 @@ fn register_actions(
                 Ok(())
             })
             .detach_and_prompt_err(
-                "Error registering zed:// scheme",
+                product_flavor::REGISTER_SCHEME_ERROR_TITLE,
                 window,
                 cx,
                 |_, _, _| None,
@@ -2714,6 +2891,7 @@ fn register_actions(
         });
     }
 
+    #[cfg(feature = "agentic-tools")]
     workspace.register_action(sidebar::dump_workspace_info);
 
     #[cfg(debug_assertions)]
@@ -2790,8 +2968,11 @@ fn initialize_pane(
             toolbar.add_item(lsp_log_item, window, cx);
             let dap_log_item = cx.new(|_| debugger_tools::DapLogToolbarItemView::new());
             toolbar.add_item(dap_log_item, window, cx);
-            let acp_tools_item = cx.new(|_| acp_tools::AcpToolsToolbarItemView::new());
-            toolbar.add_item(acp_tools_item, window, cx);
+            #[cfg(feature = "agentic-tools")]
+            {
+                let acp_tools_item = cx.new(|_| acp_tools::AcpToolsToolbarItemView::new());
+                toolbar.add_item(acp_tools_item, window, cx);
+            }
             let telemetry_log_item =
                 cx.new(|cx| telemetry_log::TelemetryLogToolbarItemView::new(window, cx));
             toolbar.add_item(telemetry_log_item, window, cx);
@@ -2815,8 +2996,11 @@ fn initialize_pane(
             toolbar.add_item(solo_diff_git_toolbar, window, cx);
             let commit_view_toolbar = cx.new(|_| CommitViewToolbar::new());
             toolbar.add_item(commit_view_toolbar, window, cx);
-            let agent_diff_toolbar = cx.new(AgentDiffToolbar::new);
-            toolbar.add_item(agent_diff_toolbar, window, cx);
+            #[cfg(feature = "agentic-tools")]
+            {
+                let agent_diff_toolbar = cx.new(AgentDiffToolbar::new);
+                toolbar.add_item(agent_diff_toolbar, window, cx);
+            }
             let basedpyright_banner = cx.new(|cx| BasedPyrightBanner::new(workspace, cx));
             toolbar.add_item(basedpyright_banner, window, cx);
             let image_view_toolbar = cx.new(|_| image_viewer::ImageViewToolbarControls::new());
@@ -3017,7 +3201,7 @@ fn open_about_window(cx: &mut App) {
     cx.open_window(
         WindowOptions {
             titlebar: Some(TitlebarOptions {
-                title: Some("About Zed".into()),
+                title: Some(format!("About {}", product_flavor::DISPLAY_NAME).into()),
                 appears_transparent: true,
                 traffic_light_position: Some(point(px(12.), px(12.))),
             }),
@@ -3457,6 +3641,7 @@ fn init_reduce_motion(cx: &mut App) {
 ///
 /// The file itself is loaded into [`agent_settings::UserAgentsMd`] for inclusion
 /// in prompts.
+#[cfg(feature = "agentic-tools")]
 pub fn watch_user_agents_md(fs: Arc<dyn fs::Fs>, cx: &mut App) {
     struct UserAgentsMdParseError;
     let notification_id = NotificationId::unique::<UserAgentsMdParseError>();
@@ -3713,7 +3898,7 @@ pub fn load_default_keymap(cx: &mut App) {
     let vim_enabled =
         VimModeSetting::get_global(cx).0 || vim_mode_setting::HelixModeSetting::get_global(cx).0;
     for (asset_path, source) in builtin_keymap_assets(base_keymap, vim_enabled) {
-        match KeymapFile::load_asset(asset_path, Some(source), cx) {
+        match load_builtin_keymap_asset(asset_path, source, cx) {
             Ok(key_bindings) => cx.bind_keys(filter_disabled_ai_bindings(key_bindings, cx)),
             Err(error) => {
                 log::error!("Failed to load built-in keymap {asset_path:?}: {error:#}");
@@ -3722,6 +3907,23 @@ pub fn load_default_keymap(cx: &mut App) {
     }
 }
 
+fn load_builtin_keymap_asset(
+    asset_path: &str,
+    source: KeybindSource,
+    cx: &App,
+) -> anyhow::Result<Vec<KeyBinding>> {
+    #[cfg(feature = "agentic-tools")]
+    let key_bindings = KeymapFile::load_asset(asset_path, Some(source), cx)?;
+    #[cfg(not(feature = "agentic-tools"))]
+    let mut key_bindings = KeymapFile::load_asset_allow_partial_failure(asset_path, cx)?;
+    #[cfg(not(feature = "agentic-tools"))]
+    for key_binding in &mut key_bindings {
+        key_binding.set_meta(source.meta());
+    }
+    Ok(key_bindings)
+}
+
+#[cfg(feature = "agentic-tools")]
 const AI_ACTION_NAMESPACES: &[&str] = &[
     "acp::",
     "agent::",
@@ -3731,6 +3933,9 @@ const AI_ACTION_NAMESPACES: &[&str] = &[
     "zeta::",
 ];
 
+#[cfg(not(feature = "agentic-tools"))]
+const AI_ACTION_NAMESPACES: &[&str] = &["acp::", "agent::", "assistant::", "inline_assistant::"];
+
 fn is_ai_keybinding(binding: &KeyBinding) -> bool {
     let name = binding.action().name();
     AI_ACTION_NAMESPACES
@@ -3739,7 +3944,7 @@ fn is_ai_keybinding(binding: &KeyBinding) -> bool {
 }
 
 fn filter_disabled_ai_bindings(bindings: Vec<KeyBinding>, cx: &App) -> Vec<KeyBinding> {
-    if !DisableAiSettings::get_global(cx).disable_ai {
+    if cfg!(feature = "agentic-tools") && !DisableAiSettings::get_global(cx).disable_ai {
         return bindings;
     }
     bindings
@@ -4225,6 +4430,7 @@ mod tests {
     use node_runtime::NodeRuntime;
     use pretty_assertions::{assert_eq, assert_ne};
     use project::{Project, ProjectPath};
+    #[cfg(feature = "agentic-tools")]
     use prompt_store::PromptBuilder;
     use remote::RemoteClient;
     use remote_server::{HeadlessAppState, HeadlessProject};
@@ -4556,9 +4762,9 @@ mod tests {
             apply_collaborative_participant_projection(&workspace, None, &state, cx);
         });
         assert_eq!(
-            workspace.read_with(cx, |workspace, _| workspace
+            workspace.read_with(cx, |workspace, cx| workspace
                 .collaborative_participants()
-                .state()),
+                .state(cx)),
             CollaborativeParticipantProviderState::Unavailable
         );
 
@@ -4580,17 +4786,26 @@ mod tests {
                         workspace::collaborative_participants::CollaborativeExecutionLocation::Unknown,
                 },
             ),
+            task_title: Some("Primary task".into()),
+            connection: CollaborativeConnectionState::Disconnected,
         };
+        let current_view_data = Rc::new(RefCell::new(unknown_view_data.clone()));
         cx.update(|_, cx| {
             apply_collaborative_participant_projection(
                 &workspace,
                 Some(CollaborativeParticipantProjection {
                     thread_view_id: first_thread_view.entity_id(),
-                    view_data: unknown_view_data.clone(),
-                    provider: CollaborativeParticipantProvider::new(
+                    provider: CollaborativeParticipantProvider::from_reader(
                         project.clone(),
                         first_thread_view.entity_id(),
-                        CollaborativeParticipantProviderState::Ready(unknown_view_data.clone()),
+                        {
+                            let current_view_data = current_view_data.clone();
+                            move |_| {
+                                CollaborativeParticipantProviderState::Ready(
+                                    current_view_data.borrow().clone(),
+                                )
+                            }
+                        },
                     ),
                 }),
                 &state,
@@ -4602,9 +4817,9 @@ mod tests {
             .participant_registration
             .expect("active thread should register one participant provider");
         assert_eq!(
-            workspace.read_with(cx, |workspace, _| workspace
+            workspace.read_with(cx, |workspace, cx| workspace
                 .collaborative_participants()
-                .state()),
+                .state(cx)),
             CollaborativeParticipantProviderState::Ready(unknown_view_data.clone())
         );
         let occupied = workspace.update(cx, |workspace, cx| {
@@ -4636,12 +4851,12 @@ mod tests {
             ),
             ..unknown_view_data.clone()
         };
+        *current_view_data.borrow_mut() = updated_view_data.clone();
         cx.update(|_, cx| {
             apply_collaborative_participant_projection(
                 &workspace,
                 Some(CollaborativeParticipantProjection {
                     thread_view_id: first_thread_view.entity_id(),
-                    view_data: updated_view_data.clone(),
                     provider: CollaborativeParticipantProvider::new(
                         project.clone(),
                         first_thread_view.entity_id(),
@@ -4658,9 +4873,9 @@ mod tests {
             "same-thread metadata updates should retain the sole registration"
         );
         assert_eq!(
-            workspace.read_with(cx, |workspace, _| workspace
+            workspace.read_with(cx, |workspace, cx| workspace
                 .collaborative_participants()
-                .state()),
+                .state(cx)),
             CollaborativeParticipantProviderState::Ready(updated_view_data)
         );
 
@@ -4674,13 +4889,14 @@ mod tests {
                 ),
             ],
             execution: None,
+            task_title: Some("Replacement task".into()),
+            connection: CollaborativeConnectionState::Disconnected,
         };
         cx.update(|_, cx| {
             apply_collaborative_participant_projection(
                 &workspace,
                 Some(CollaborativeParticipantProjection {
                     thread_view_id: replacement_thread_view.entity_id(),
-                    view_data: replacement_view_data.clone(),
                     provider: CollaborativeParticipantProvider::new(
                         project,
                         replacement_thread_view.entity_id(),
@@ -4705,9 +4921,9 @@ mod tests {
         });
         assert!(state.borrow().participant_registration.is_none());
         assert_eq!(
-            workspace.read_with(cx, |workspace, _| workspace
+            workspace.read_with(cx, |workspace, cx| workspace
                 .collaborative_participants()
-                .state()),
+                .state(cx)),
             CollaborativeParticipantProviderState::Unavailable
         );
     }
@@ -8265,16 +8481,38 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(actions_without_namespace, Vec::<&str>::new());
 
+            #[cfg(not(feature = "agentic-tools"))]
+            for action_name in [
+                "editor::CancelEditReviewComment",
+                "editor::ConfirmEditReviewComment",
+                "editor::DeleteReviewComment",
+                "editor::EditReviewComment",
+                "editor::SendReviewToAgent",
+                "editor::SubmitDiffReviewComment",
+                "editor::ToggleReviewCommentsExpanded",
+                "zed::AcpRegistry",
+            ] {
+                assert!(
+                    !all_actions.contains(&action_name),
+                    "agentic action registered in disabled build: {action_name}"
+                );
+            }
+
             let expected_namespaces = vec![
                 "action",
                 "activity_indicator",
+                #[cfg(feature = "agentic-tools")]
                 "agent",
+                #[cfg(feature = "agentic-tools")]
                 "agents_sidebar",
                 "app_menu",
+                #[cfg(feature = "agentic-tools")]
                 "assistant",
+                #[cfg(feature = "agentic-tools")]
                 "assistant2",
                 "auto_update",
                 "branch_picker",
+                #[cfg(feature = "agentic-tools")]
                 "bedrock",
                 "branches",
                 "buffer_search",
@@ -8311,6 +8549,7 @@ mod tests {
                 "highlights_tree_view",
                 "icon_theme_selector",
                 "image_viewer",
+                #[cfg(feature = "agentic-tools")]
                 "inline_assistant",
                 "journal",
                 "keymap_editor",
@@ -8341,6 +8580,7 @@ mod tests {
                 "search",
                 "settings_editor",
                 "settings_profile_selector",
+                #[cfg(feature = "agentic-tools")]
                 "skill_creator",
                 "snippets",
                 "stash_picker",
@@ -8562,28 +8802,35 @@ mod tests {
             );
             image_viewer::init(cx);
             language_model::init(cx);
-            client::RefreshLlmTokenListener::register(
-                app_state.client.clone(),
-                app_state.user_store.clone(),
-                cx,
-            );
-            language_models::init(app_state.user_store.clone(), app_state.client.clone(), cx);
-            web_search::init(cx);
-            web_search_providers::init(app_state.client.clone(), app_state.user_store.clone(), cx);
-            let prompt_builder = PromptBuilder::load(app_state.fs.clone(), false, cx);
-            project::AgentRegistryStore::init_global(
-                cx,
-                app_state.fs.clone(),
-                app_state.client.http_client(),
-            );
-            agent_ui::init(
-                app_state.fs.clone(),
-                prompt_builder,
-                app_state.languages.clone(),
-                true,
-                false,
-                cx,
-            );
+            #[cfg(feature = "agentic-tools")]
+            {
+                client::RefreshLlmTokenListener::register(
+                    app_state.client.clone(),
+                    app_state.user_store.clone(),
+                    cx,
+                );
+                language_models::init(app_state.user_store.clone(), app_state.client.clone(), cx);
+                web_search::init(cx);
+                web_search_providers::init(
+                    app_state.client.clone(),
+                    app_state.user_store.clone(),
+                    cx,
+                );
+                let prompt_builder = PromptBuilder::load(app_state.fs.clone(), false, cx);
+                project::AgentRegistryStore::init_global(
+                    cx,
+                    app_state.fs.clone(),
+                    app_state.client.http_client(),
+                );
+                agent_ui::init(
+                    app_state.fs.clone(),
+                    prompt_builder,
+                    app_state.languages.clone(),
+                    true,
+                    false,
+                    cx,
+                );
+            }
 
             repl::init(app_state.fs.clone(), cx);
             repl::notebook::init(cx);
@@ -8850,6 +9097,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "agentic-tools")]
     #[gpui::test]
     async fn test_disable_ai_filters_keybindings(cx: &mut gpui::TestAppContext) {
         let _app_state = init_keymap_test(cx);

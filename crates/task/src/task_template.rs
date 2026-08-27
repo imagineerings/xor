@@ -9,8 +9,8 @@ use util::serde::default_true;
 use util::{ResultExt, truncate_and_remove_front};
 
 use crate::{
-    AttachRequest, ResolvedTask, RevealTarget, Shell, SpawnInTerminal, TaskContext, TaskId,
-    VariableName, ZED_VARIABLE_NAME_PREFIX, serde_helpers::non_empty_string_vec,
+    AttachRequest, ResolvedTask, RevealTarget, Shell, SpawnInTerminal, TaskArtifact, TaskContext,
+    TaskId, VariableName, ZED_VARIABLE_NAME_PREFIX, serde_helpers::non_empty_string_vec,
 };
 
 /// A template definition of a Zed task to run.
@@ -78,6 +78,9 @@ pub struct TaskTemplate {
     /// Hooks that this task runs when emitted.
     #[serde(default)]
     pub hooks: HashSet<TaskHook>,
+    /// A bounded project-visible file produced by a successful task.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact: Option<TaskArtifact>,
 }
 
 #[derive(Deserialize, Eq, PartialEq, Clone, Debug)]
@@ -239,6 +242,17 @@ impl TaskTemplate {
             &variable_names,
             &mut substituted_variables,
         )?;
+        let resolved_artifact = if let Some(artifact) = &self.artifact {
+            let path = substitute_all_template_variables_in_str(
+                &artifact.path,
+                &task_variables,
+                &variable_names,
+                &mut substituted_variables,
+            )?;
+            Some(artifact.with_resolved_path(path).log_err()?)
+        } else {
+            None
+        };
 
         let task_hash = to_hex_hash(self)
             .context("hashing task template")
@@ -272,6 +286,7 @@ impl TaskTemplate {
             id: id.clone(),
             substituted_variables,
             original_task: self.clone(),
+            resolved_artifact,
             resolved_label: full_label.clone(),
             resolved: SpawnInTerminal {
                 id,
@@ -325,6 +340,9 @@ impl TaskTemplate {
 
         if let Some(cwd) = &self.cwd {
             Self::collect_unknown_variables(cwd, &mut variables);
+        }
+        if let Some(artifact) = &self.artifact {
+            Self::collect_unknown_variables(&artifact.path, &mut variables);
         }
 
         variables.into_iter().collect()
@@ -1195,5 +1213,72 @@ mod tests {
             "args that consist entirely of variables resolved to empty strings should be omitted, \
             while literal empty args and partially substituted args should be preserved"
         );
+    }
+
+    #[test]
+    fn task_artifact_paths_are_substituted_and_bounded() {
+        let task = TaskTemplate {
+            label: "profile".to_string(),
+            command: "profiler".to_string(),
+            artifact: Some(TaskArtifact {
+                path: "target/$ZED_STEM.svg".to_string(),
+                kind: crate::TaskArtifactKind::Svg,
+                max_bytes: 1024,
+            }),
+            ..TaskTemplate::default()
+        };
+        let context = TaskContext {
+            task_variables: TaskVariables::from_iter([(VariableName::Stem, "server".to_string())]),
+            ..TaskContext::default()
+        };
+        let resolved = task
+            .resolve_task(TEST_ID_BASE, &context)
+            .expect("safe artifact should resolve");
+        assert_eq!(
+            resolved
+                .resolved_artifact()
+                .map(|artifact| artifact.path.as_str()),
+            Some("target/server.svg")
+        );
+        assert!(
+            resolved
+                .substituted_variables()
+                .contains(&VariableName::Stem)
+        );
+
+        for path in [
+            "../profile.svg",
+            "/tmp/profile.svg",
+            "https://example.com/profile.svg",
+        ] {
+            let invalid = TaskTemplate {
+                artifact: Some(TaskArtifact {
+                    path: path.to_string(),
+                    kind: crate::TaskArtifactKind::Svg,
+                    max_bytes: 1024,
+                }),
+                ..task.clone()
+            };
+            assert!(invalid.resolve_task(TEST_ID_BASE, &context).is_none());
+        }
+
+        let data = TaskTemplate {
+            artifact: Some(TaskArtifact {
+                path: "target/coverage.json".to_string(),
+                kind: crate::TaskArtifactKind::Data,
+                max_bytes: 4096,
+            }),
+            ..task.clone()
+        };
+        assert!(data.resolve_task(TEST_ID_BASE, &context).is_some());
+        let invalid_data = TaskTemplate {
+            artifact: Some(TaskArtifact {
+                path: "target/coverage.txt".to_string(),
+                kind: crate::TaskArtifactKind::Data,
+                max_bytes: 4096,
+            }),
+            ..task
+        };
+        assert!(invalid_data.resolve_task(TEST_ID_BASE, &context).is_none());
     }
 }

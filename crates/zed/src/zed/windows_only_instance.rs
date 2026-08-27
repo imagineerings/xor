@@ -110,13 +110,17 @@ fn retrieve_message_from_pipe_inner(pipe: HANDLE) -> anyhow::Result<String> {
 // This part of code is mostly from crates/cli/src/main.rs
 fn send_args_to_instance(args: &Args) -> anyhow::Result<()> {
     if let Some(dock_menu_action_idx) = args.dock_action {
-        let url = format!("zed-dock-action://{}", dock_menu_action_idx);
+        let url = format!(
+            "{}{}",
+            product_flavor::DOCK_ACTION_URL_PREFIX,
+            dock_menu_action_idx
+        );
         return write_message_to_instance_pipe(url.as_bytes());
     }
 
     let (server, server_name) =
         IpcOneShotServer::<IpcHandshake>::new().context("Handshake before Zed spawn")?;
-    let url = format!("zed-cli://{server_name}");
+    let url = format!("{}{server_name}", product_flavor::CLI_URL_PREFIX);
 
     let request = {
         let mut paths = vec![];
@@ -126,7 +130,8 @@ fn send_args_to_instance(args: &Args) -> anyhow::Result<()> {
             match std::fs::canonicalize(&path) {
                 Ok(path) => paths.push(path.to_string_lossy().into_owned()),
                 Err(error) => {
-                    if path.starts_with("zed://")
+                    if path.starts_with(product_flavor::URL_PREFIX)
+                        || path.starts_with("zed://")
                         || path.starts_with("http://")
                         || path.starts_with("https://")
                         || path.starts_with("file://")

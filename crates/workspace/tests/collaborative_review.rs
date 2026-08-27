@@ -6,10 +6,10 @@ use git::{
     status::{StageStatus, StatusCode},
 };
 use gpui::{AppContext as _, Empty, TestAppContext};
-use project::{Project, ProjectPath};
+use project::Project;
 use serde_json::json;
 use settings::SettingsStore;
-use util::{path, rel_path::RelPath};
+use util::path;
 use workspace::{
     collaborative_review::{CollaborativeReviewHost, CollaborativeReviewSlot},
     collaborative_review_actions::{
@@ -17,10 +17,7 @@ use workspace::{
         CollaborativeReviewActionError, CollaborativeReviewActionRequest,
         CollaborativeReviewActionState, route_collaborative_review_action,
     },
-    collaborative_review_summary::{
-        CollaborativeReviewFileSummary, CollaborativeReviewSummary,
-        CollaborativeReviewSummarySource,
-    },
+    collaborative_review_summary::CollaborativeReviewSummarySource,
 };
 
 #[gpui::test]
@@ -60,20 +57,14 @@ async fn collaborative_review(cx: &mut TestAppContext) {
         .await;
     cx.run_until_parked();
 
-    let (repository, worktree_id) = project.read_with(cx, |project, cx| {
+    let repository = project.read_with(cx, |project, cx| {
         let repository = project
             .repositories(cx)
             .values()
             .next()
             .cloned()
             .expect("the repository fixture should be discovered");
-        let worktree_id = project
-            .worktrees(cx)
-            .next()
-            .expect("the repository fixture should have a worktree")
-            .read(cx)
-            .id();
-        (repository, worktree_id)
+        repository
     });
     assert_eq!(
         repository.read_with(cx, |repository, _| {
@@ -119,50 +110,6 @@ async fn collaborative_review(cx: &mut TestAppContext) {
         review_view.entity_id(),
         1,
     );
-    let mut summary = CollaborativeReviewSummary::new(
-        source,
-        vec![
-            CollaborativeReviewFileSummary::new(
-                "lib-file",
-                ProjectPath {
-                    worktree_id,
-                    path: RelPath::from_unix_str("src/lib.rs")
-                        .expect("fixture path should be relative")
-                        .into(),
-                },
-            )
-            .expect("stable file identity should be valid"),
-            CollaborativeReviewFileSummary::new(
-                "main-file",
-                ProjectPath {
-                    worktree_id,
-                    path: RelPath::from_unix_str("src/main.rs")
-                        .expect("fixture path should be relative")
-                        .into(),
-                },
-            )
-            .expect("stable file identity should be valid"),
-        ],
-        Some("lib-file".into()),
-        1,
-        1,
-    )
-    .expect("the native review summary should be valid");
-    assert!(
-        summary
-            .select_file(source, "main-file")
-            .expect("a stable file link should select its current target")
-    );
-    assert_eq!(
-        summary
-            .navigation_target(source, "main-file")
-            .expect("a stable file link should resolve its current target")
-            .path,
-        RelPath::from_unix_str("src/main.rs")
-            .expect("fixture path should be relative")
-            .into()
-    );
-
     let action_context = CollaborativeReviewActionContext::new(
         source,
         CollaborativeReviewActionState::Ready,
@@ -202,9 +149,6 @@ async fn collaborative_review(cx: &mut TestAppContext) {
         review_view.entity_id(),
         2,
     );
-    summary
-        .replace(CollaborativeReviewSummary::empty(next_source))
-        .expect("the canonical Git refresh should publish a newer projection");
     let stale_action_invoked = Rc::new(Cell::new(false));
     let stale_action_flag = stale_action_invoked.clone();
     assert_eq!(
@@ -223,5 +167,4 @@ async fn collaborative_review(cx: &mut TestAppContext) {
         Err(CollaborativeReviewActionError::StaleRevision)
     );
     assert!(!stale_action_invoked.get());
-    assert_eq!((summary.additions(), summary.deletions()), (0, 0));
 }

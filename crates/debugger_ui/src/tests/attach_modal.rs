@@ -129,7 +129,7 @@ async fn test_show_attach_modal_and_select_process(
                     .into_iter()
                     .collect(),
                     true,
-                    ModalIntent::AttachToProcess(task::SimDebugConfig {
+                    ModalIntent::AttachToProcess(task::ZedDebugConfig {
                         adapter: FakeAdapter::ADAPTER_NAME.into(),
                         request: dap::DebugRequest::Attach(AttachRequest::default()),
                         label: "attach example".into(),

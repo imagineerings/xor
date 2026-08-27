@@ -6,6 +6,8 @@ The authoritative migration inventory is [coverage-catalog.md](coverage-catalog.
 
 The feature packs beneath this directory are implementation plans only. They do not prove implementation. Every task remains unchecked and must be completed only after its dependencies, product decisions, reads/writes, and validation metadata are satisfied.
 
+The cross-cutting [`agentic` feature boundary](feature-boundary.md) applies to every current and future production write in these packs. The application-owned implementation and validation plan is in [`agentic-feature/`](agentic-feature/requirements.md). A migration leaf cannot be completed until its evidence classifies actual production writes as agentic or feature-neutral and records the inherited enabled/disabled validation.
+
 ## Audit rules
 
 1. Observable behavior and failure behavior take precedence over matching names or directories.
@@ -15,3 +17,4 @@ The feature packs beneath this directory are implementation plans only. They do 
 5. Product/security/operations choices remain explicit decisions rather than implicit implementation tasks.
 6. Requirement IDs and acceptance-criterion IDs are stable; design elements and leaf tasks trace back to them.
 7. A checked task is prohibited until implementation and its concrete validation have actually completed.
+8. `crates/zed` owns the default-enabled `agentic` Cargo feature; no Goose migration registration, dependency, service, background task, tool, permission, command, menu, or network initializer may enter the disabled application graph.

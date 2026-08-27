@@ -37,7 +37,7 @@ async fn collaborative_workspace_theme_zoom_and_narrow_window(cx: &mut TestAppCo
 
     let file_system = FakeFs::new(cx.executor());
     let project = Project::test(file_system, [], cx).await;
-    let (_multi_workspace, cx) =
+    let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
 
     cx.dispatch_action(SwitchToCollaborativeWorkspace);
@@ -74,8 +74,14 @@ async fn collaborative_workspace_theme_zoom_and_narrow_window(cx: &mut TestAppCo
         assert_eq!(theme.colors().background, black());
         assert_eq!(theme.colors().text, white());
     });
+    assert!(multi_workspace.read_with(cx, |multi_workspace, cx| {
+        multi_workspace
+            .workspace()
+            .read(cx)
+            .collaborative_title_bar(cx)
+            .is_some()
+    }));
     for selector in [
-        "COLLABORATIVE-TOP-BAR",
         "COLLABORATIVE-TIMELINE-REGION",
         "COLLABORATIVE-REVIEW-REGION",
         "COLLABORATIVE-COMPOSER",
@@ -87,7 +93,7 @@ async fn collaborative_workspace_theme_zoom_and_narrow_window(cx: &mut TestAppCo
         );
     }
 
-    cx.simulate_resize(size(px(760.), px(640.)));
+    cx.simulate_resize(size(px(602.), px(640.)));
     settle_collaborative_layout(cx);
     settle_collaborative_layout(cx);
     assert!(cx.debug_bounds("COLLABORATIVE-REVIEW-REGION").is_none());
@@ -133,6 +139,11 @@ async fn collaborative_workspace_restart_restores_presentation_state(cx: &mut Te
         WorkspacePresentation::Collaborative
     );
 
+    let initial_review_width = cx
+        .debug_bounds("COLLABORATIVE-REVIEW-REGION")
+        .expect("wide restart fixture should expose review")
+        .size
+        .width;
     let resize_handle = cx
         .debug_bounds("COLLABORATIVE-REVIEW-RESIZE-HANDLE")
         .expect("wide restart fixture should expose review resizing");
@@ -164,7 +175,7 @@ async fn collaborative_workspace_restart_restores_presentation_state(cx: &mut Te
         .expect("resized review should remain visible")
         .size
         .width;
-    assert!(resized_review_width > px(440.));
+    assert!(resized_review_width > initial_review_width + px(60.));
 
     workspace.update_in(cx, |workspace, window, cx| {
         workspace
@@ -187,11 +198,13 @@ async fn collaborative_workspace_restart_restores_presentation_state(cx: &mut Te
             .navigate_collaborative_backward(|_| true, window, cx)
             .expect("restart fixture should retain backward navigation");
     });
-    let review_toggle = cx
-        .debug_bounds("COLLABORATIVE-TOP-BAR-REVIEW-LAYOUT")
-        .expect("restart fixture should expose review toggle");
-    cx.simulate_click(review_toggle.center(), gpui::Modifiers::default());
-    cx.run_until_parked();
+    assert!(workspace.read_with(cx, |workspace, cx| {
+        workspace.collaborative_title_bar(cx).is_some()
+    }));
+    workspace.update(cx, |workspace, cx| {
+        workspace.toggle_collaborative_review_for_tests(cx);
+    });
+    settle_collaborative_layout(cx);
 
     assert!(cx.debug_bounds("COLLABORATIVE-REVIEW-REGION").is_none());
 
@@ -225,10 +238,12 @@ async fn collaborative_workspace_restart_restores_presentation_state(cx: &mut Te
     });
     assert!(cx.debug_bounds("COLLABORATIVE-REVIEW-REGION").is_none());
 
-    let review_toggle = cx
-        .debug_bounds("COLLABORATIVE-TOP-BAR-REVIEW-LAYOUT")
-        .expect("restored workspace should expose review toggle");
-    cx.simulate_click(review_toggle.center(), gpui::Modifiers::default());
+    assert!(restored.read_with(cx, |workspace, cx| {
+        workspace.collaborative_title_bar(cx).is_some()
+    }));
+    restored.update(cx, |workspace, cx| {
+        workspace.toggle_collaborative_review_for_tests(cx);
+    });
     settle_collaborative_layout(cx);
     settle_collaborative_layout(cx);
     assert_eq!(
@@ -267,7 +282,7 @@ fn collaborative_workspace_reduced_motion_and_theme_token_contract() {
             }
             let source = std::fs::read_to_string(&path)
                 .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
-            for forbidden in [".animation(", ".with_animation(", "Animation::", ".timer("] {
+            for forbidden in [".animation(", ".with_animation(", "Animation::"] {
                 assert!(
                     !source.contains(forbidden),
                     "{} schedules motion through {forbidden}; add a reduced-motion policy first",

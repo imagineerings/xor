@@ -1938,12 +1938,12 @@ impl ProtoClient for Client {
     }
 }
 
-/// prefix for the zed:// url scheme
-pub const ZED_URL_SCHEME: &str = "zed";
+/// URL scheme registered for the selected product.
+pub const ZED_URL_SCHEME: &str = product_flavor::URL_SCHEME;
 
 /// A parsed Zed link that can be handled internally by the application.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SimLink {
+pub enum ZedLink {
     /// Join a channel: `zed.dev/channel/channel-name-123` or `zed://channel/channel-name-123`
     Channel { channel_id: u64 },
     /// Open channel notes: `zed.dev/channel/channel-name-123/notes` or with heading `notes#heading`
@@ -1958,13 +1958,17 @@ pub enum SimLink {
 /// Returns a [`Some`] containing the parsed link if the link is a recognized Zed link
 /// that should be handled internally by the application.
 /// Returns [`None`] for links that should be opened in the browser.
-pub fn parse_zed_link(link: &str, cx: &App) -> Option<SimLink> {
+pub fn parse_zed_link(link: &str, cx: &App) -> Option<ZedLink> {
     let server_url = &ClientSettings::get_global(cx).server_url;
     let path = link
         .strip_prefix(server_url)
         .and_then(|result| result.strip_prefix('/'))
         .or_else(|| {
             link.strip_prefix(ZED_URL_SCHEME)
+                .and_then(|result| result.strip_prefix("://"))
+        })
+        .or_else(|| {
+            link.strip_prefix("zed")
                 .and_then(|result| result.strip_prefix("://"))
         })?;
 
@@ -1979,18 +1983,18 @@ pub fn parse_zed_link(link: &str, cx: &App) -> Option<SimLink> {
     let channel_id = id_str.parse::<u64>().ok()?;
 
     let Some(next) = parts.next() else {
-        return Some(SimLink::Channel { channel_id });
+        return Some(ZedLink::Channel { channel_id });
     };
 
     if let Some(heading) = next.strip_prefix("notes#") {
-        return Some(SimLink::ChannelNotes {
+        return Some(ZedLink::ChannelNotes {
             channel_id,
             heading: Some(heading.to_string()),
         });
     }
 
     if next == "notes" {
-        return Some(SimLink::ChannelNotes {
+        return Some(ZedLink::ChannelNotes {
             channel_id,
             heading: None,
         });

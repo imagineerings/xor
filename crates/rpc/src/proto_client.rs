@@ -375,6 +375,15 @@ impl AnyProtoClient {
                             Response::GetReferencesResponse(response) => {
                                 to_any_envelope(&envelope, response)
                             }
+                            Response::PrepareCallHierarchyResponse(response) => {
+                                to_any_envelope(&envelope, response)
+                            }
+                            Response::GetIncomingCallsResponse(response) => {
+                                to_any_envelope(&envelope, response)
+                            }
+                            Response::GetOutgoingCallsResponse(response) => {
+                                to_any_envelope(&envelope, response)
+                            }
                             Response::GetDocumentColorResponse(response) => {
                                 to_any_envelope(&envelope, response)
                             }

@@ -169,9 +169,9 @@ impl WorkflowFile {
             .name
             .as_ref()
             .context("Workflow must have a name at this point")?;
-        let Some(workflow_path) = self.active_output_path(workflow_name) else {
+        if self.active_output_path(workflow_name).is_none() {
             return Ok(());
-        };
+        }
 
         let workflow_folder = self.r#type.folder_path();
         fs::create_dir_all(&workflow_folder).with_context(|| {
@@ -297,6 +297,7 @@ pub fn run_workflows(args: GenerateWorkflowArgs) -> Result<()> {
         workflow_file.generate_file(&args)?;
     }
 
+    crate::tasks::products::run(crate::tasks::products::ProductsArgs { check: true })?;
     workflow_checks::validate(Default::default())
 }
 

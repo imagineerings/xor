@@ -12,6 +12,7 @@ type ComposerAction = Rc<dyn Fn(&mut App) -> Result<(), CollaborativeComposerAct
 pub struct CollaborativeComposerProvider {
     project: Entity<Project>,
     view: AnyView,
+    focus_handle: Option<FocusHandle>,
     submit: ComposerAction,
     cancel: ComposerAction,
 }
@@ -26,9 +27,15 @@ impl CollaborativeComposerProvider {
         Self {
             project,
             view,
+            focus_handle: None,
             submit: Rc::new(submit),
             cancel: Rc::new(cancel),
         }
+    }
+
+    pub fn with_focus_handle(mut self, focus_handle: FocusHandle) -> Self {
+        self.focus_handle = Some(focus_handle);
+        self
     }
 
     pub fn project(&self) -> &Entity<Project> {
@@ -37,6 +44,18 @@ impl CollaborativeComposerProvider {
 
     pub fn view(&self) -> &AnyView {
         &self.view
+    }
+
+    pub fn focus_handle(&self) -> Option<FocusHandle> {
+        self.focus_handle.clone()
+    }
+
+    pub fn submit(&self, cx: &mut App) -> Result<(), CollaborativeComposerActionError> {
+        (self.submit)(cx)
+    }
+
+    pub fn cancel(&self, cx: &mut App) -> Result<(), CollaborativeComposerActionError> {
+        (self.cancel)(cx)
     }
 }
 
@@ -149,12 +168,18 @@ impl CollaborativeComposerHost {
         self.provider.as_ref().map(|provider| provider.view.clone())
     }
 
+    pub fn focus_handle(&self) -> Option<FocusHandle> {
+        self.provider
+            .as_ref()
+            .and_then(CollaborativeComposerProvider::focus_handle)
+    }
+
     pub fn submit(&self, cx: &mut App) -> Result<(), CollaborativeComposerActionError> {
         let provider = self
             .provider
             .as_ref()
             .ok_or(CollaborativeComposerActionError::ThreadUnavailable)?;
-        (provider.submit)(cx)
+        provider.submit(cx)
     }
 
     pub fn cancel(&self, cx: &mut App) -> Result<(), CollaborativeComposerActionError> {
@@ -162,34 +187,50 @@ impl CollaborativeComposerHost {
             .provider
             .as_ref()
             .ok_or(CollaborativeComposerActionError::ThreadUnavailable)?;
-        (provider.cancel)(cx)
+        provider.cancel(cx)
     }
 }
 
 pub(crate) struct CollaborativeComposerSurface {
     view: Option<AnyView>,
+    unavailable_message: Option<gpui::SharedString>,
     focus_handle: FocusHandle,
+    provider_focus_handle: Option<FocusHandle>,
 }
 
 impl CollaborativeComposerSurface {
     pub(crate) fn new(cx: &mut Context<Self>) -> Self {
         Self {
             view: None,
+            unavailable_message: None,
             focus_handle: cx.focus_handle(),
+            provider_focus_handle: None,
         }
     }
 
-    pub(crate) fn set_view(&mut self, view: Option<AnyView>, cx: &mut Context<Self>) {
-        let changed =
-            self.view.as_ref().map(AnyView::entity_id) != view.as_ref().map(AnyView::entity_id);
+    pub(crate) fn set_view(
+        &mut self,
+        view: Option<AnyView>,
+        provider_focus_handle: Option<FocusHandle>,
+        unavailable_message: Option<gpui::SharedString>,
+        cx: &mut Context<Self>,
+    ) {
+        let changed = self.view.as_ref().map(AnyView::entity_id)
+            != view.as_ref().map(AnyView::entity_id)
+            || self.provider_focus_handle != provider_focus_handle
+            || self.unavailable_message != unavailable_message;
         if changed {
             self.view = view;
+            self.provider_focus_handle = provider_focus_handle;
+            self.unavailable_message = unavailable_message;
             cx.notify();
         }
     }
 
     pub(crate) fn focus_handle(&self) -> FocusHandle {
-        self.focus_handle.clone()
+        self.provider_focus_handle
+            .clone()
+            .unwrap_or_else(|| self.focus_handle.clone())
     }
 }
 
@@ -208,21 +249,27 @@ impl Render for CollaborativeComposerSurface {
             .border_t_1()
             .border_color(cx.theme().colors().border)
             .bg(cx.theme().colors().background)
-            .p_2()
+            .p_1()
             .when_some(self.view.clone(), |this, view| {
                 this.child(
                     div()
                         .id("collaborative-composer-editor")
                         .debug_selector(|| "COLLABORATIVE-COMPOSER-EDITOR".to_owned())
                         .w_full()
+                        .h_8()
+                        .overflow_hidden()
                         .child(view),
                 )
             })
             .when(!view_available, |this| {
                 this.min_h(px(56.)).items_center().justify_center().child(
-                    Label::new("Select a task to start collaborating")
-                        .size(LabelSize::Small)
-                        .color(Color::Muted),
+                    Label::new(
+                        self.unavailable_message
+                            .clone()
+                            .unwrap_or_else(|| "Select a task to start collaborating".into()),
+                    )
+                    .size(LabelSize::Small)
+                    .color(Color::Muted),
                 )
             })
     }

@@ -1,11 +1,14 @@
 use crate::{BufferDiagnosticsEditor, ProjectDiagnosticsEditor, ToggleDiagnosticsRefresh};
+#[cfg(feature = "agentic")]
 use agent_settings::AgentSettings;
 use gpui::{Context, EventEmitter, ParentElement, Render, Window};
 use language::DiagnosticEntry;
+#[cfg(feature = "agentic")]
 use settings::Settings;
 use text::{Anchor, BufferId};
 use ui::{Tooltip, prelude::*};
 use workspace::{ToolbarItemEvent, ToolbarItemLocation, ToolbarItemView, item::ItemHandle};
+#[cfg(feature = "agentic")]
 use zed_actions::assistant::InlineAssist;
 use zed_actions::buffer_search;
 
@@ -48,40 +51,39 @@ impl Render for ToolbarControls {
             None => {}
         }
 
-        let is_agent_enabled = AgentSettings::get_global(cx).enabled(cx);
-
         let (warning_tooltip, warning_color) = if include_warnings {
             ("Exclude Warnings", Color::Warning)
         } else {
             ("Include Warnings", Color::Disabled)
         };
 
-        h_flex()
-            .gap_1()
-            .child({
-                IconButton::new("toggle_search", IconName::MagnifyingGlass)
+        let toolbar = h_flex().gap_1().child({
+            IconButton::new("toggle_search", IconName::MagnifyingGlass)
+                .icon_size(IconSize::Small)
+                .tooltip(Tooltip::for_action_title(
+                    "Buffer Search",
+                    &buffer_search::Deploy::find(),
+                ))
+                .on_click(|_, window, cx| {
+                    window.dispatch_action(Box::new(buffer_search::Deploy::find()), cx);
+                })
+        });
+        #[cfg(feature = "agentic")]
+        let toolbar = toolbar.when(AgentSettings::get_global(cx).enabled(cx), |this| {
+            this.child(
+                IconButton::new("inline_assist", IconName::ZedAssistant)
                     .icon_size(IconSize::Small)
                     .tooltip(Tooltip::for_action_title(
-                        "Buffer Search",
-                        &buffer_search::Deploy::find(),
+                        "Inline Assist",
+                        &InlineAssist::default(),
                     ))
                     .on_click(|_, window, cx| {
-                        window.dispatch_action(Box::new(buffer_search::Deploy::find()), cx);
-                    })
-            })
-            .when(is_agent_enabled, |this| {
-                this.child(
-                    IconButton::new("inline_assist", IconName::ZedAssistant)
-                        .icon_size(IconSize::Small)
-                        .tooltip(Tooltip::for_action_title(
-                            "Inline Assist",
-                            &InlineAssist::default(),
-                        ))
-                        .on_click(|_, window, cx| {
-                            window.dispatch_action(Box::new(InlineAssist::default()), cx);
-                        }),
-                )
-            })
+                        window.dispatch_action(Box::new(InlineAssist::default()), cx);
+                    }),
+            )
+        });
+
+        toolbar
             .map(|div| {
                 if is_updating {
                     div.child(

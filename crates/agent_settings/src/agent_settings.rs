@@ -757,6 +757,23 @@ pub fn normalize_path(raw: &str) -> String {
 impl Settings for AgentSettings {
     fn from_settings(content: &settings::SettingsContent) -> Self {
         let agent = content.agent.clone().unwrap();
+        let mut profiles = agent
+            .profiles
+            .unwrap()
+            .into_iter()
+            .map(|(key, value)| (AgentProfileId(key), value.into()))
+            .collect::<IndexMap<_, AgentProfileSettings>>();
+        let product_profile_id = AgentProfileId(product_flavor::AGENT_PROFILE.into());
+        if !profiles.contains_key(&product_profile_id)
+            && let Some(mut product_profile) = profiles
+                .get(&AgentProfileId(
+                    agent_profile::builtin_profiles::WRITE.into(),
+                ))
+                .cloned()
+        {
+            product_profile.name = product_flavor::AGENT_PROFILE_NAME.into();
+            profiles.insert(product_profile_id, product_profile);
+        }
         Self {
             enabled: agent.enabled.unwrap(),
             button: agent.button.unwrap(),
@@ -786,12 +803,7 @@ impl Settings for AgentSettings {
             inline_alternatives: agent.inline_alternatives.unwrap_or_default(),
             favorite_models: agent.favorite_models,
             default_profile: AgentProfileId(agent.default_profile.unwrap()),
-            profiles: agent
-                .profiles
-                .unwrap()
-                .into_iter()
-                .map(|(key, val)| (AgentProfileId(key), val.into()))
-                .collect(),
+            profiles,
 
             notify_when_agent_waiting: agent.notify_when_agent_waiting.unwrap(),
             play_sound_when_agent_done: agent.play_sound_when_agent_done.unwrap_or_default(),

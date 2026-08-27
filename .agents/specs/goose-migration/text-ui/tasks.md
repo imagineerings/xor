@@ -1,5 +1,7 @@
 # Implementation Plan: Text UI / Terminal UI
 
+> Cross-cutting contract: every production write in this plan inherits the [`agentic` feature boundary](../feature-boundary.md). Completion evidence must classify actual writes and include the required enabled/disabled validation.
+
 ## Overview
 
 Implement an interactive terminal UI mode for zed's CLI using crossterm/ratatui, with a configuration wizard, extension management, markdown rendering, onboarding, and slash commands. This extends `crates/cli/` with a new `goose interactive` subcommand.

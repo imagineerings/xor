@@ -38,7 +38,7 @@
     <rescap:Capability Name="unvirtualizedResources"/>
   </Capabilities>
   <Applications>
-    <Application Id="SimNightly"
+    <Application Id="ZedNightly"
       Executable="Zed.exe"
       uap10:TrustLevel="mediumIL"
       uap10:RuntimeBehavior="win32App">
@@ -55,13 +55,13 @@
         <desktop4:Extension Category="windows.fileExplorerContextMenus">
           <desktop4:FileExplorerContextMenus>
             <desktop5:ItemType Type="Directory">
-              <desktop5:Verb Id="OpenWithSimNightly" Clsid="266f2cfe-1653-42af-b55c-fe3590c83871" />
+              <desktop5:Verb Id="OpenWithZedNightly" Clsid="266f2cfe-1653-42af-b55c-fe3590c83871" />
             </desktop5:ItemType>
             <desktop5:ItemType Type="Directory\Background">
-              <desktop5:Verb Id="OpenWithSimNightly" Clsid="266f2cfe-1653-42af-b55c-fe3590c83871" />
+              <desktop5:Verb Id="OpenWithZedNightly" Clsid="266f2cfe-1653-42af-b55c-fe3590c83871" />
             </desktop5:ItemType>
             <desktop5:ItemType Type="*">
-              <desktop5:Verb Id="OpenWithSimNightly" Clsid="266f2cfe-1653-42af-b55c-fe3590c83871" />
+              <desktop5:Verb Id="OpenWithZedNightly" Clsid="266f2cfe-1653-42af-b55c-fe3590c83871" />
             </desktop5:ItemType>
           </desktop4:FileExplorerContextMenus>
         </desktop4:Extension>

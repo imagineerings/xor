@@ -1,25 +1,31 @@
-use crate::{
-    ItemHandle, MultiWorkspace, Pane, SidebarSide, ToggleWorkspaceSidebar,
-    sidebar_side_context_menu,
-};
+use crate::{ItemHandle, MultiWorkspace, Pane, SidebarSide};
 #[cfg(feature = "multiplayer-tools")]
 use crate::{
+    SwitchToCollaborativeWorkspace,
     collaborative_participants::{
-        CollaborativeExecutionPhase, CollaborativeParticipantProviderState,
-    },
-    collaborative_status::{
-        CollaborativeStatus, CollaborativeStatusProjection, CollaborativeTaskPhase,
+        CollaborativeExecutionPhase, CollaborativeParticipantProvider,
+        CollaborativeParticipantProviderState,
     },
 };
+#[cfg(feature = "agentic")]
+use crate::{ToggleWorkspaceSidebar, sidebar_side_context_menu};
+#[cfg(feature = "multiplayer-tools")]
+use gpui::Action;
+#[cfg(feature = "agentic")]
+use gpui::Anchor;
 use gpui::{
-    Anchor, AnyView, App, Context, Decorations, Entity, FocusHandle, Focusable, IntoElement,
-    ParentElement, Render, Role, SharedString, Styled, Subscription, WeakEntity, Window,
+    AnyView, App, Context, Decorations, Entity, FocusHandle, Focusable, IntoElement, ParentElement,
+    Render, Role, SharedString, Styled, Subscription, WeakEntity, Window,
 };
 use project::Project;
 use settings::{SettingsContent, update_settings_file};
 use std::{any::TypeId, sync::Arc};
 use theme::CLIENT_SIDE_DECORATION_ROUNDING;
-use ui::{ContextMenu, Divider, IconPosition, Indicator, Tooltip, prelude::*, right_click_menu};
+#[cfg(any(feature = "agentic", feature = "multiplayer-tools"))]
+use ui::Divider;
+use ui::{ContextMenu, IconPosition, prelude::*, right_click_menu};
+#[cfg(feature = "agentic")]
+use ui::{Indicator, Tooltip};
 
 /// Describes how a status-bar item can be hidden by the user.
 ///
@@ -84,7 +90,9 @@ trait StatusItemViewHandle: Send {
 struct SidebarStatus {
     open: bool,
     side: SidebarSide,
+    #[cfg(feature = "agentic")]
     has_notifications: bool,
+    #[cfg(feature = "agentic")]
     show_toggle: bool,
 }
 
@@ -99,7 +107,9 @@ impl SidebarStatus {
                 Self {
                     open: mw.sidebar_open() && enabled,
                     side: mw.sidebar_side(cx),
+                    #[cfg(feature = "agentic")]
                     has_notifications: mw.sidebar_has_notifications(cx),
+                    #[cfg(feature = "agentic")]
                     show_toggle: enabled,
                 }
             })
@@ -111,17 +121,13 @@ pub struct StatusBar {
     left_items: Vec<Box<dyn StatusItemViewHandle>>,
     right_items: Vec<Box<dyn StatusItemViewHandle>>,
     active_pane: Entity<Pane>,
-    #[cfg(feature = "multiplayer-tools")]
-    project: Entity<Project>,
     multi_workspace: Option<WeakEntity<MultiWorkspace>>,
     #[cfg(feature = "multiplayer-tools")]
-    collaborative_participants: Option<CollaborativeParticipantProviderState>,
+    collaborative_participants: Option<CollaborativeParticipantProvider>,
     #[cfg(feature = "multiplayer-tools")]
-    collaborative_status_focus_handle: FocusHandle,
+    collaborative_workspace_active: bool,
     focus_handle: FocusHandle,
     _observe_active_pane: Subscription,
-    #[cfg(feature = "multiplayer-tools")]
-    _observe_project: Subscription,
     _observe_git_store: Subscription,
 }
 
@@ -206,37 +212,35 @@ impl Render for StatusBar {
 }
 
 impl StatusBar {
+    #[cfg_attr(not(feature = "agentic"), allow(unused_variables))]
     fn render_left_tools(
         &self,
         sidebar: &SidebarStatus,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let tools = h_flex().gap_1().min_w_0().overflow_x_hidden().when(
+        let tools = h_flex().gap_1().min_w_0().overflow_x_hidden();
+        #[cfg(feature = "multiplayer-tools")]
+        let tools = tools.when(!self.collaborative_workspace_active, |this| {
+            this.child(
+                div()
+                    .debug_selector(|| "OPEN-COLLABORATIVE-WORKSPACE".to_owned())
+                    .child(
+                        Button::new("open-collaborative-workspace", "Multiplayer Workspace")
+                            .style(ButtonStyle::Subtle)
+                            .on_click(|_, window, cx| {
+                                window.dispatch_action(
+                                    SwitchToCollaborativeWorkspace.boxed_clone(),
+                                    cx,
+                                );
+                            }),
+                    ),
+            )
+        });
+        #[cfg(feature = "agentic")]
+        let tools = tools.when(
             sidebar.show_toggle && !sidebar.open && sidebar.side == SidebarSide::Left,
             |this| this.child(self.render_sidebar_toggle(sidebar, cx)),
         );
-        #[cfg(feature = "multiplayer-tools")]
-        let tools = tools.when(self.collaborative_participants.is_some(), |this| {
-            let task = self.collaborative_participants.as_ref().and_then(|state| {
-                let CollaborativeParticipantProviderState::Ready(view_data) = state else {
-                    return None;
-                };
-                view_data.execution.as_ref().and_then(|execution| {
-                    CollaborativeTaskPhase::from_execution_phase(execution.phase)
-                })
-            });
-            this.child(
-                div()
-                    .id("collaborative-status-landmark")
-                    .track_focus(&self.collaborative_status_focus_handle)
-                    .tab_index(0)
-                    .role(Role::Status)
-                    .aria_label(crate::collaborative_accessibility::STATUS_LABEL)
-                    .child(CollaborativeStatus::new(
-                        CollaborativeStatusProjection::from_project(&self.project, None, task, cx),
-                    )),
-            )
-        });
         tools.children(
             self.left_items.iter().enumerate().map(|(index, item)| {
                 render_hideable_item("status-bar-left", index, item.as_ref(), cx)
@@ -244,6 +248,7 @@ impl StatusBar {
         )
     }
 
+    #[cfg_attr(not(feature = "agentic"), allow(unused_variables))]
     fn render_right_tools(
         &self,
         sidebar: &SidebarStatus,
@@ -263,18 +268,23 @@ impl StatusBar {
                     }),
             );
         #[cfg(feature = "multiplayer-tools")]
-        let tools = tools.when_some(
-            self.collaborative_participants.clone(),
-            |this, participant_state| {
-                this.child(CollaborativeParticipantStatus::new(participant_state))
-            },
-        );
-        tools.when(
+        let tools = tools.when(self.collaborative_workspace_active, |this| {
+            let state = self
+                .collaborative_participants
+                .as_ref()
+                .map(|provider| provider.state(cx))
+                .unwrap_or(CollaborativeParticipantProviderState::Unavailable);
+            this.child(CollaborativeParticipantStatus::new(state))
+        });
+        #[cfg(feature = "agentic")]
+        let tools = tools.when(
             sidebar.show_toggle && !sidebar.open && sidebar.side == SidebarSide::Right,
             |this| this.child(self.render_sidebar_toggle(sidebar, cx)),
-        )
+        );
+        tools
     }
 
+    #[cfg(feature = "agentic")]
     fn render_sidebar_toggle(
         &self,
         sidebar: &SidebarStatus,
@@ -372,7 +382,7 @@ pub fn add_hide_button_entry(menu: ContextMenu, hide: HideStatusItem) -> Context
 impl StatusBar {
     #[cfg(feature = "multiplayer-tools")]
     pub(crate) fn collaborative_focus_handle(&self) -> FocusHandle {
-        self.collaborative_status_focus_handle.clone()
+        self.focus_handle.clone()
     }
 
     pub fn new(
@@ -387,19 +397,15 @@ impl StatusBar {
             left_items: Default::default(),
             right_items: Default::default(),
             active_pane: active_pane.clone(),
-            #[cfg(feature = "multiplayer-tools")]
-            project: project.clone(),
             multi_workspace,
             #[cfg(feature = "multiplayer-tools")]
             collaborative_participants: None,
             #[cfg(feature = "multiplayer-tools")]
-            collaborative_status_focus_handle: cx.focus_handle(),
+            collaborative_workspace_active: false,
             focus_handle: cx.focus_handle(),
             _observe_active_pane: cx.observe_in(active_pane, window, |this, _, window, cx| {
                 this.update_active_pane_item(window, cx)
             }),
-            #[cfg(feature = "multiplayer-tools")]
-            _observe_project: cx.observe(&project, |_, _, cx| cx.notify()),
             _observe_git_store: cx.observe(&git_store, |_, _, cx| cx.notify()),
         };
         this.update_active_pane_item(window, cx);
@@ -418,13 +424,13 @@ impl StatusBar {
     #[cfg(feature = "multiplayer-tools")]
     pub(crate) fn set_collaborative_participants(
         &mut self,
-        state: Option<CollaborativeParticipantProviderState>,
+        collaborative_workspace_active: bool,
+        provider: Option<CollaborativeParticipantProvider>,
         cx: &mut Context<Self>,
     ) {
-        if self.collaborative_participants != state {
-            self.collaborative_participants = state;
-            cx.notify();
-        }
+        self.collaborative_workspace_active = collaborative_workspace_active;
+        self.collaborative_participants = provider;
+        cx.notify();
     }
 
     pub fn add_left_item<T>(&mut self, item: Entity<T>, window: &mut Window, cx: &mut Context<Self>)

@@ -25,7 +25,7 @@ pub struct VsCodeTokenColorSettings {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone, EnumIter)]
-pub enum SimSyntaxToken {
+pub enum ZedSyntaxToken {
     Attribute,
     Boolean,
     Comment,
@@ -67,57 +67,57 @@ pub enum SimSyntaxToken {
     Variant,
 }
 
-impl std::fmt::Display for SimSyntaxToken {
+impl std::fmt::Display for ZedSyntaxToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                SimSyntaxToken::Attribute => "attribute",
-                SimSyntaxToken::Boolean => "boolean",
-                SimSyntaxToken::Comment => "comment",
-                SimSyntaxToken::CommentDoc => "comment.doc",
-                SimSyntaxToken::Constant => "constant",
-                SimSyntaxToken::Constructor => "constructor",
-                SimSyntaxToken::Embedded => "embedded",
-                SimSyntaxToken::Emphasis => "emphasis",
-                SimSyntaxToken::EmphasisStrong => "emphasis.strong",
-                SimSyntaxToken::Enum => "enum",
-                SimSyntaxToken::Function => "function",
-                SimSyntaxToken::Hint => "hint",
-                SimSyntaxToken::Keyword => "keyword",
-                SimSyntaxToken::Label => "label",
-                SimSyntaxToken::LinkText => "link_text",
-                SimSyntaxToken::LinkUri => "link_uri",
-                SimSyntaxToken::Number => "number",
-                SimSyntaxToken::Operator => "operator",
-                SimSyntaxToken::Predictive => "predictive",
-                SimSyntaxToken::Preproc => "preproc",
-                SimSyntaxToken::Primary => "primary",
-                SimSyntaxToken::Property => "property",
-                SimSyntaxToken::Punctuation => "punctuation",
-                SimSyntaxToken::PunctuationBracket => "punctuation.bracket",
-                SimSyntaxToken::PunctuationDelimiter => "punctuation.delimiter",
-                SimSyntaxToken::PunctuationListMarker => "punctuation.list_marker",
-                SimSyntaxToken::PunctuationSpecial => "punctuation.special",
-                SimSyntaxToken::String => "string",
-                SimSyntaxToken::StringEscape => "string.escape",
-                SimSyntaxToken::StringRegex => "string.regex",
-                SimSyntaxToken::StringSpecial => "string.special",
-                SimSyntaxToken::StringSpecialSymbol => "string.special.symbol",
-                SimSyntaxToken::Tag => "tag",
-                SimSyntaxToken::TextLiteral => "text.literal",
-                SimSyntaxToken::Title => "title",
-                SimSyntaxToken::Type => "type",
-                SimSyntaxToken::Variable => "variable",
-                SimSyntaxToken::VariableSpecial => "variable.special",
-                SimSyntaxToken::Variant => "variant",
+                ZedSyntaxToken::Attribute => "attribute",
+                ZedSyntaxToken::Boolean => "boolean",
+                ZedSyntaxToken::Comment => "comment",
+                ZedSyntaxToken::CommentDoc => "comment.doc",
+                ZedSyntaxToken::Constant => "constant",
+                ZedSyntaxToken::Constructor => "constructor",
+                ZedSyntaxToken::Embedded => "embedded",
+                ZedSyntaxToken::Emphasis => "emphasis",
+                ZedSyntaxToken::EmphasisStrong => "emphasis.strong",
+                ZedSyntaxToken::Enum => "enum",
+                ZedSyntaxToken::Function => "function",
+                ZedSyntaxToken::Hint => "hint",
+                ZedSyntaxToken::Keyword => "keyword",
+                ZedSyntaxToken::Label => "label",
+                ZedSyntaxToken::LinkText => "link_text",
+                ZedSyntaxToken::LinkUri => "link_uri",
+                ZedSyntaxToken::Number => "number",
+                ZedSyntaxToken::Operator => "operator",
+                ZedSyntaxToken::Predictive => "predictive",
+                ZedSyntaxToken::Preproc => "preproc",
+                ZedSyntaxToken::Primary => "primary",
+                ZedSyntaxToken::Property => "property",
+                ZedSyntaxToken::Punctuation => "punctuation",
+                ZedSyntaxToken::PunctuationBracket => "punctuation.bracket",
+                ZedSyntaxToken::PunctuationDelimiter => "punctuation.delimiter",
+                ZedSyntaxToken::PunctuationListMarker => "punctuation.list_marker",
+                ZedSyntaxToken::PunctuationSpecial => "punctuation.special",
+                ZedSyntaxToken::String => "string",
+                ZedSyntaxToken::StringEscape => "string.escape",
+                ZedSyntaxToken::StringRegex => "string.regex",
+                ZedSyntaxToken::StringSpecial => "string.special",
+                ZedSyntaxToken::StringSpecialSymbol => "string.special.symbol",
+                ZedSyntaxToken::Tag => "tag",
+                ZedSyntaxToken::TextLiteral => "text.literal",
+                ZedSyntaxToken::Title => "title",
+                ZedSyntaxToken::Type => "type",
+                ZedSyntaxToken::Variable => "variable",
+                ZedSyntaxToken::VariableSpecial => "variable.special",
+                ZedSyntaxToken::Variant => "variant",
             }
         )
     }
 }
 
-impl SimSyntaxToken {
+impl ZedSyntaxToken {
     pub fn find_best_token_color_match<'a>(
         &self,
         token_colors: &'a [VsCodeTokenColor],
@@ -175,49 +175,49 @@ impl SimSyntaxToken {
 
     pub fn fallbacks(&self) -> &[Self] {
         match self {
-            SimSyntaxToken::CommentDoc => &[SimSyntaxToken::Comment],
-            SimSyntaxToken::Number => &[SimSyntaxToken::Constant],
-            SimSyntaxToken::VariableSpecial => &[SimSyntaxToken::Variable],
-            SimSyntaxToken::PunctuationBracket
-            | SimSyntaxToken::PunctuationDelimiter
-            | SimSyntaxToken::PunctuationListMarker
-            | SimSyntaxToken::PunctuationSpecial => &[SimSyntaxToken::Punctuation],
-            SimSyntaxToken::StringEscape
-            | SimSyntaxToken::StringRegex
-            | SimSyntaxToken::StringSpecial
-            | SimSyntaxToken::StringSpecialSymbol => &[SimSyntaxToken::String],
+            ZedSyntaxToken::CommentDoc => &[ZedSyntaxToken::Comment],
+            ZedSyntaxToken::Number => &[ZedSyntaxToken::Constant],
+            ZedSyntaxToken::VariableSpecial => &[ZedSyntaxToken::Variable],
+            ZedSyntaxToken::PunctuationBracket
+            | ZedSyntaxToken::PunctuationDelimiter
+            | ZedSyntaxToken::PunctuationListMarker
+            | ZedSyntaxToken::PunctuationSpecial => &[ZedSyntaxToken::Punctuation],
+            ZedSyntaxToken::StringEscape
+            | ZedSyntaxToken::StringRegex
+            | ZedSyntaxToken::StringSpecial
+            | ZedSyntaxToken::StringSpecialSymbol => &[ZedSyntaxToken::String],
             _ => &[],
         }
     }
 
     fn to_vscode(self) -> Vec<&'static str> {
         match self {
-            SimSyntaxToken::Attribute => vec!["entity.other.attribute-name"],
-            SimSyntaxToken::Boolean => vec!["constant.language"],
-            SimSyntaxToken::Comment => vec!["comment"],
-            SimSyntaxToken::CommentDoc => vec!["comment.block.documentation"],
-            SimSyntaxToken::Constant => vec!["constant", "constant.language", "constant.character"],
-            SimSyntaxToken::Constructor => {
+            ZedSyntaxToken::Attribute => vec!["entity.other.attribute-name"],
+            ZedSyntaxToken::Boolean => vec!["constant.language"],
+            ZedSyntaxToken::Comment => vec!["comment"],
+            ZedSyntaxToken::CommentDoc => vec!["comment.block.documentation"],
+            ZedSyntaxToken::Constant => vec!["constant", "constant.language", "constant.character"],
+            ZedSyntaxToken::Constructor => {
                 vec![
                     "entity.name.tag",
                     "entity.name.function.definition.special.constructor",
                 ]
             }
-            SimSyntaxToken::Embedded => vec!["meta.embedded"],
-            SimSyntaxToken::Emphasis => vec!["markup.italic"],
-            SimSyntaxToken::EmphasisStrong => vec![
+            ZedSyntaxToken::Embedded => vec!["meta.embedded"],
+            ZedSyntaxToken::Emphasis => vec!["markup.italic"],
+            ZedSyntaxToken::EmphasisStrong => vec![
                 "markup.bold",
                 "markup.italic markup.bold",
                 "markup.bold markup.italic",
             ],
-            SimSyntaxToken::Enum => vec!["support.type.enum"],
-            SimSyntaxToken::Function => vec![
+            ZedSyntaxToken::Enum => vec!["support.type.enum"],
+            ZedSyntaxToken::Function => vec![
                 "entity.function",
                 "entity.name.function",
                 "variable.function",
             ],
-            SimSyntaxToken::Hint => vec![],
-            SimSyntaxToken::Keyword => vec![
+            ZedSyntaxToken::Hint => vec![],
+            ZedSyntaxToken::Keyword => vec![
                 "keyword",
                 "keyword.other.fn.rust",
                 "keyword.control",
@@ -226,63 +226,63 @@ impl SimSyntaxToken {
                 "punctuation.accessor",
                 "entity.name.tag",
             ],
-            SimSyntaxToken::Label => vec![
+            ZedSyntaxToken::Label => vec![
                 "label",
                 "entity.name",
                 "entity.name.import",
                 "entity.name.package",
             ],
-            SimSyntaxToken::LinkText => vec!["markup.underline.link", "string.other.link"],
-            SimSyntaxToken::LinkUri => vec!["markup.underline.link", "string.other.link"],
-            SimSyntaxToken::Number => vec!["constant.numeric", "number"],
-            SimSyntaxToken::Operator => vec!["operator", "keyword.operator"],
-            SimSyntaxToken::Predictive => vec![],
-            SimSyntaxToken::Preproc => vec![
+            ZedSyntaxToken::LinkText => vec!["markup.underline.link", "string.other.link"],
+            ZedSyntaxToken::LinkUri => vec!["markup.underline.link", "string.other.link"],
+            ZedSyntaxToken::Number => vec!["constant.numeric", "number"],
+            ZedSyntaxToken::Operator => vec!["operator", "keyword.operator"],
+            ZedSyntaxToken::Predictive => vec![],
+            ZedSyntaxToken::Preproc => vec![
                 "preproc",
                 "meta.preprocessor",
                 "punctuation.definition.preprocessor",
             ],
-            SimSyntaxToken::Primary => vec![],
-            SimSyntaxToken::Property => vec![
+            ZedSyntaxToken::Primary => vec![],
+            ZedSyntaxToken::Property => vec![
                 "variable.member",
                 "support.type.property-name",
                 "variable.object.property",
                 "variable.other.field",
             ],
-            SimSyntaxToken::Punctuation => vec![
+            ZedSyntaxToken::Punctuation => vec![
                 "punctuation",
                 "punctuation.section",
                 "punctuation.accessor",
                 "punctuation.separator",
                 "punctuation.definition.tag",
             ],
-            SimSyntaxToken::PunctuationBracket => vec![
+            ZedSyntaxToken::PunctuationBracket => vec![
                 "punctuation.bracket",
                 "punctuation.definition.tag.begin",
                 "punctuation.definition.tag.end",
             ],
-            SimSyntaxToken::PunctuationDelimiter => vec![
+            ZedSyntaxToken::PunctuationDelimiter => vec![
                 "punctuation.delimiter",
                 "punctuation.separator",
                 "punctuation.terminator",
             ],
-            SimSyntaxToken::PunctuationListMarker => {
+            ZedSyntaxToken::PunctuationListMarker => {
                 vec!["markup.list punctuation.definition.list.begin"]
             }
-            SimSyntaxToken::PunctuationSpecial => vec!["punctuation.special"],
-            SimSyntaxToken::String => vec!["string"],
-            SimSyntaxToken::StringEscape => {
+            ZedSyntaxToken::PunctuationSpecial => vec!["punctuation.special"],
+            ZedSyntaxToken::String => vec!["string"],
+            ZedSyntaxToken::StringEscape => {
                 vec!["string.escape", "constant.character", "constant.other"]
             }
-            SimSyntaxToken::StringRegex => vec!["string.regex"],
-            SimSyntaxToken::StringSpecial => vec!["string.special", "constant.other.symbol"],
-            SimSyntaxToken::StringSpecialSymbol => {
+            ZedSyntaxToken::StringRegex => vec!["string.regex"],
+            ZedSyntaxToken::StringSpecial => vec!["string.special", "constant.other.symbol"],
+            ZedSyntaxToken::StringSpecialSymbol => {
                 vec!["string.special.symbol", "constant.other.symbol"]
             }
-            SimSyntaxToken::Tag => vec!["tag", "entity.name.tag", "meta.tag.sgml"],
-            SimSyntaxToken::TextLiteral => vec!["text.literal", "string"],
-            SimSyntaxToken::Title => vec!["title", "entity.name"],
-            SimSyntaxToken::Type => vec![
+            ZedSyntaxToken::Tag => vec!["tag", "entity.name.tag", "meta.tag.sgml"],
+            ZedSyntaxToken::TextLiteral => vec!["text.literal", "string"],
+            ZedSyntaxToken::Title => vec!["title", "entity.name"],
+            ZedSyntaxToken::Type => vec![
                 "entity.name.type",
                 "entity.name.type.primitive",
                 "entity.name.type.numeric",
@@ -291,20 +291,20 @@ impl SimSyntaxToken {
                 "support.type.primitive",
                 "support.class",
             ],
-            SimSyntaxToken::Variable => vec![
+            ZedSyntaxToken::Variable => vec![
                 "variable",
                 "variable.language",
                 "variable.member",
                 "variable.parameter",
                 "variable.parameter.function-call",
             ],
-            SimSyntaxToken::VariableSpecial => vec![
+            ZedSyntaxToken::VariableSpecial => vec![
                 "variable.special",
                 "variable.member",
                 "variable.annotation",
                 "variable.language",
             ],
-            SimSyntaxToken::Variant => vec!["variant"],
+            ZedSyntaxToken::Variant => vec!["variant"],
         }
     }
 }

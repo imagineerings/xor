@@ -272,6 +272,26 @@ impl EventRepository {
         if tenant.community_id() != record.community_id {
             return Err(EventRepositoryError::TenantBoundaryViolation);
         }
+        let transaction = self.begin().await?;
+        let result = async {
+            set_tenant(&transaction, tenant.community_id()).await?;
+            self.store_in_transaction(&transaction, tenant, record, persistence_decision)
+                .await
+        }
+        .await;
+        finish_transaction(transaction, result).await
+    }
+
+    pub async fn store_in_transaction(
+        &self,
+        transaction: &DatabaseTransaction,
+        tenant: &TenantContext,
+        record: &VerifiedEventRecord,
+        persistence_decision: EventPersistenceDecision,
+    ) -> Result<EventStoreOutcome, EventRepositoryError> {
+        if tenant.community_id() != record.community_id {
+            return Err(EventRepositoryError::TenantBoundaryViolation);
+        }
         let persistence_decision = EventPersistencePolicy::validate_for_event(
             record.signed_event.event.kind,
             persistence_decision,
@@ -279,33 +299,26 @@ impl EventRepository {
         if persistence_decision.durability() == EventDurability::TransientOnly {
             return Ok(EventStoreOutcome::EphemeralNotPersisted);
         }
-        let transaction = self.begin().await?;
-        let result = async {
-            set_tenant(&transaction, tenant.community_id()).await?;
-            if let Some(coordinate) = event_coordinate(&record.signed_event.event)? {
-                let head_result = transaction
-                    .execute(head_statement(tenant.community_id(), record, &coordinate))
-                    .await
-                    .map_err(EventRepositoryError::Unavailable)?;
-                if head_result.rows_affected() == 0
-                    && !same_live_head(&transaction, tenant.community_id(), record, &coordinate)
-                        .await?
-                {
-                    return Ok(EventStoreOutcome::Stale);
-                }
-            }
-            let result = transaction
-                .execute(insert_statement(record)?)
+        if let Some(coordinate) = event_coordinate(&record.signed_event.event)? {
+            let head_result = transaction
+                .execute(head_statement(tenant.community_id(), record, &coordinate))
                 .await
                 .map_err(EventRepositoryError::Unavailable)?;
-            Ok(if result.rows_affected() == 0 {
-                EventStoreOutcome::Duplicate
-            } else {
-                EventStoreOutcome::Inserted
-            })
+            if head_result.rows_affected() == 0
+                && !same_live_head(transaction, tenant.community_id(), record, &coordinate).await?
+            {
+                return Ok(EventStoreOutcome::Stale);
+            }
         }
-        .await;
-        finish_transaction(transaction, result).await
+        let result = transaction
+            .execute(insert_statement(record)?)
+            .await
+            .map_err(EventRepositoryError::Unavailable)?;
+        Ok(if result.rows_affected() == 0 {
+            EventStoreOutcome::Duplicate
+        } else {
+            EventStoreOutcome::Inserted
+        })
     }
 
     pub async fn exact(

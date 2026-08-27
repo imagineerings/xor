@@ -153,6 +153,41 @@ message CargoDependency {
   optional string resolved_version = 11;
   optional ProjectPath resolved_workspace_member = 12;
   optional ProjectPath local_manifest = 13;
+  optional ProjectPath declaration_manifest = 14;
+  CargoDependencyDeclarationOrigin declaration_origin = 15;
+  repeated CargoResolvedDependency resolved_instances = 16;
+  bool resolution_truncated = 17;
+  CargoDependencyFeatureCausality feature_causality = 18;
+  bool cycle_detected = 19;
+}
+
+message CargoResolvedDependency {
+  string name = 1;
+  string version = 2;
+  CargoDependencySourceKind source_kind = 3;
+  repeated string enabled_features = 4;
+  CargoDependencyLockStatus lock_status = 5;
+  optional ProjectPath workspace_member = 6;
+  optional ProjectPath local_manifest = 7;
+}
+
+enum CargoDependencyDeclarationOrigin {
+  CARGO_DEPENDENCY_DECLARATION_ORIGIN_UNKNOWN = 0;
+  CARGO_DEPENDENCY_DECLARATION_ORIGIN_DIRECT = 1;
+  CARGO_DEPENDENCY_DECLARATION_ORIGIN_WORKSPACE_INHERITED = 2;
+}
+
+enum CargoDependencyFeatureCausality {
+  CARGO_DEPENDENCY_FEATURE_CAUSALITY_UNKNOWN = 0;
+  CARGO_DEPENDENCY_FEATURE_CAUSALITY_VALIDATED = 1;
+  CARGO_DEPENDENCY_FEATURE_CAUSALITY_AMBIGUOUS = 2;
+}
+
+enum CargoDependencyLockStatus {
+  CARGO_DEPENDENCY_LOCK_STATUS_UNKNOWN = 0;
+  CARGO_DEPENDENCY_LOCK_STATUS_LOCKED = 1;
+  CARGO_DEPENDENCY_LOCK_STATUS_NOT_LOCKED = 2;
+  CARGO_DEPENDENCY_LOCK_STATUS_MISSING_LOCKFILE = 3;
 }
 
 enum CargoDependencyKind {

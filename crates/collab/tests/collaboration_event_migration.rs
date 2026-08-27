@@ -13,7 +13,7 @@ const DOWN: &str = include_str!(concat!(
     "/migrations/20260820000100_collaboration_events.down.sql"
 ));
 
-fn migration<'a>(migrations: &'a [Migration], migration_type: MigrationType) -> &'a Migration {
+fn migration(migrations: &[Migration], migration_type: MigrationType) -> &Migration {
     migrations
         .iter()
         .find(|migration| {

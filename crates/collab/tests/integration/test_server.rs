@@ -12,7 +12,7 @@ use collab::{
     AppState, Config,
     db::UserId,
     executor::Executor,
-    rpc::{CLEANUP_TIMEOUT, Principal, RECONNECT_TIMEOUT, Server, SimVersion},
+    rpc::{CLEANUP_TIMEOUT, Principal, RECONNECT_TIMEOUT, Server, ZedVersion},
 };
 use collab_ui::channel_view::ChannelView;
 use collections::{HashMap, HashSet};
@@ -87,11 +87,20 @@ pub struct ContactsSummary {
 
 impl TestServer {
     pub async fn start(deterministic: BackgroundExecutor) -> Self {
+        let use_postgres = env::var("USE_POSTGRES")
+            .ok()
+            .is_some_and(|value| value == "true" || value == "1");
+        Self::start_with_database(deterministic, use_postgres).await
+    }
+
+    pub async fn start_postgres(deterministic: BackgroundExecutor) -> Self {
+        Self::start_with_database(deterministic, true).await
+    }
+
+    async fn start_with_database(deterministic: BackgroundExecutor, use_postgres: bool) -> Self {
         static NEXT_LIVEKIT_SERVER_ID: AtomicUsize = AtomicUsize::new(0);
 
-        let use_postgres = env::var("USE_POSTGRES").ok();
-        let use_postgres = use_postgres.as_deref();
-        let test_db = if use_postgres == Some("true") || use_postgres == Some("1") {
+        let test_db = if use_postgres {
             TestDb::postgres(deterministic.clone())
         } else {
             TestDb::sqlite(deterministic.clone())
@@ -113,7 +122,7 @@ impl TestServer {
             .create_server(&app_state.config.zed_environment)
             .await
             .unwrap();
-        let server = Server::new(epoch, app_state.clone());
+        let server = Server::try_new(epoch, app_state.clone()).unwrap();
         server.start().await.unwrap();
         // Advance clock to ensure the server's cleanup task is finished.
         deterministic.advance_clock(CLEANUP_TIMEOUT);
@@ -187,30 +196,42 @@ impl TestServer {
 
         let clock = Arc::new(FakeSystemClock::new());
 
-        let user_id = if let Ok(Some(user)) = self
+        let (user_id, created) = if let Ok(Some(user)) = self
             .app_state
             .user_service
             .get_user_by_github_login(name)
             .await
         {
-            user.id
+            (user.id, false)
         } else {
             let github_user_id = self.next_github_user_id;
             self.next_github_user_id += 1;
-            self.app_state
-                .user_service
-                .as_fake()
-                .create_user(
-                    &format!("{name}@example.com"),
-                    None,
-                    false,
-                    NewUserParams {
-                        github_login: name.into(),
-                        github_user_id,
-                    },
-                )
-                .await
+            (
+                self.app_state
+                    .user_service
+                    .as_fake()
+                    .create_user(
+                        &format!("{name}@example.com"),
+                        None,
+                        false,
+                        NewUserParams {
+                            github_login: name.into(),
+                            github_user_id,
+                        },
+                    )
+                    .await,
+                true,
+            )
         };
+        if created {
+            let persisted_user = self
+                .app_state
+                .db
+                .create_user(false)
+                .await
+                .expect("persist test user");
+            assert_eq!(persisted_user.user_id, user_id);
+        }
 
         let http = FakeHttpClient::create({
             let name = name.to_string();
@@ -307,7 +328,7 @@ impl TestServer {
                             server_conn,
                             client_name,
                             Principal::User(user),
-                            SimVersion(semver::Version::new(1, 0, 0)),
+                            ZedVersion(semver::Version::new(1, 0, 0)),
                             Some("test".to_string()),
                             None,
                             None,
@@ -608,6 +629,7 @@ impl TestServer {
                 kinesis_stream: None,
                 kinesis_access_key: None,
                 kinesis_secret_key: None,
+                collaboration_redis_url: std::env::var("COLLAB_TEST_REDIS_URL").ok(),
             },
         })
     }

@@ -1,6 +1,4 @@
 #[cfg(feature = "multiplayer-tools")]
-pub mod collaborative_awareness;
-#[cfg(feature = "multiplayer-tools")]
 mod collaborative_navigation;
 #[cfg(feature = "multiplayer-tools")]
 mod collaborative_pinned;

@@ -4,7 +4,7 @@ use collections::HashMap;
 use dap::{StartDebuggingRequestArguments, adapters::DebugTaskDefinition};
 use gpui::AsyncApp;
 use std::ffi::OsStr;
-use task::{DebugScenario, SimDebugConfig};
+use task::{DebugScenario, ZedDebugConfig};
 
 use crate::*;
 
@@ -29,7 +29,7 @@ impl DebugAdapter for GdbDebugAdapter {
         DebugAdapterName(Self::ADAPTER_NAME.into())
     }
 
-    async fn config_from_zed_format(&self, zed_scenario: SimDebugConfig) -> Result<DebugScenario> {
+    async fn config_from_zed_format(&self, zed_scenario: ZedDebugConfig) -> Result<DebugScenario> {
         let mut obj = serde_json::Map::default();
 
         match &zed_scenario.request {

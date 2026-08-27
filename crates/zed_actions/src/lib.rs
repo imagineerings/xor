@@ -24,7 +24,7 @@ pub struct OpenBrowser {
 #[derive(Clone, PartialEq, Deserialize, JsonSchema, Action)]
 #[action(namespace = zed)]
 #[serde(deny_unknown_fields)]
-pub struct OpenSimUrl {
+pub struct OpenZedUrl {
     pub url: Arc<str>,
 }
 
@@ -113,6 +113,7 @@ pub struct Extensions {
 }
 
 /// Opens the ACP registry.
+#[cfg(feature = "agentic")]
 #[derive(PartialEq, Clone, Default, Debug, Deserialize, JsonSchema, Action)]
 #[action(namespace = zed)]
 #[serde(deny_unknown_fields)]
@@ -168,10 +169,12 @@ pub struct OpenSettingsPage {
 }
 
 /// `OpenSettingsAt` path of the agent skills page in the settings UI.
+#[cfg(feature = "agentic")]
 pub const AGENT_SKILLS_SETTINGS_PATH: &str = "agent.skills";
 
 /// `OpenSettingsAt` path of the agent sandbox permissions page in the settings
 /// UI.
+#[cfg(feature = "agentic")]
 pub const AGENT_SANDBOX_SETTINGS_PATH: &str = "agent.sandbox_permissions";
 
 #[derive(PartialEq, Clone, Debug, Deserialize, JsonSchema)]
@@ -563,6 +566,7 @@ pub mod settings_profile_selector {
     pub struct Toggle;
 }
 
+#[cfg(feature = "agentic")]
 pub mod agent {
     use gpui::{Action, SharedString, actions};
     use schemars::JsonSchema;
@@ -647,6 +651,7 @@ pub mod agent {
     }
 }
 
+#[cfg(feature = "agentic")]
 pub mod assistant {
     use gpui::{Action, actions};
     use schemars::JsonSchema;
@@ -800,7 +805,7 @@ actions!(
     zed_predict_onboarding,
     [
         /// Opens the Zed Predict onboarding modal.
-        OpenSimPredictOnboarding
+        OpenZedPredictOnboarding
     ]
 );
 actions!(
@@ -909,6 +914,7 @@ pub mod preview {
     }
 }
 
+#[cfg(feature = "agentic")]
 pub mod agents_sidebar {
     use gpui::{Action, actions};
     use schemars::JsonSchema;

@@ -4966,6 +4966,135 @@ async fn test_prettier_formatting_buffer(
     );
 }
 
+#[gpui::test]
+async fn test_call_hierarchy_routes_through_the_authoritative_host(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    server
+        .create_room(&mut [(&client_a, cx_a), (&client_b, cx_b)])
+        .await;
+    let active_call_a = cx_a.read(ActiveCall::global);
+
+    let capabilities = lsp::ServerCapabilities {
+        call_hierarchy_provider: Some(lsp::CallHierarchyServerCapability::Simple(true)),
+        ..lsp::ServerCapabilities::default()
+    };
+    client_a.language_registry().add(rust_lang());
+    let mut fake_language_servers = client_a.language_registry().register_fake_lsp(
+        "Rust",
+        FakeLspAdapter {
+            capabilities: capabilities.clone(),
+            ..FakeLspAdapter::default()
+        },
+    );
+    client_b.language_registry().add(rust_lang());
+    client_b.language_registry().register_fake_lsp_adapter(
+        "Rust",
+        FakeLspAdapter {
+            capabilities,
+            ..FakeLspAdapter::default()
+        },
+    );
+
+    client_a
+        .fs()
+        .insert_tree(
+            path!("/root"),
+            json!({
+                "root.rs": "fn root() {}\n",
+                "caller.rs": "fn caller() { root(); }\n",
+            }),
+        )
+        .await;
+    let (project_a, worktree_id) = client_a.build_local_project(path!("/root"), cx_a).await;
+    let project_id = active_call_a
+        .update(cx_a, |call, cx| call.share_project(project_a.clone(), cx))
+        .await
+        .unwrap();
+    let project_b = client_b.join_remote_project(project_id, cx_b).await;
+    let (buffer_b, _handle) = project_b
+        .update(cx_b, |project, cx| {
+            project.open_buffer_with_lsp((worktree_id, rel_path("root.rs")), cx)
+        })
+        .await
+        .unwrap();
+    let fake_language_server = fake_language_servers.next().await.unwrap();
+    executor.run_until_parked();
+
+    fake_language_server.set_request_handler::<lsp::request::CallHierarchyPrepare, _, _>(
+        |_, _| async move {
+            Ok(Some(vec![lsp::CallHierarchyItem {
+                name: "root".to_string(),
+                kind: lsp::SymbolKind::FUNCTION,
+                tags: None,
+                detail: Some("fn root()".to_string()),
+                uri: lsp::Uri::from_file_path(path!("/root/root.rs")).unwrap(),
+                range: lsp::Range::new(lsp::Position::new(0, 0), lsp::Position::new(0, 12)),
+                selection_range: lsp::Range::new(
+                    lsp::Position::new(0, 3),
+                    lsp::Position::new(0, 7),
+                ),
+                data: Some(json!({"authoritative": true})),
+            }]))
+        },
+    );
+    let prepared = project_b
+        .update(cx_b, |project, cx| {
+            project.prepare_call_hierarchy(&buffer_b, 4, cx)
+        })
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(prepared.items.len(), 1);
+    assert_eq!(prepared.items[0].name.as_ref(), "root");
+    assert_eq!(prepared.items[0].data, Some(json!({"authoritative": true})));
+
+    fake_language_server.set_request_handler::<lsp::request::CallHierarchyIncomingCalls, _, _>(
+        |params, _| async move {
+            assert_eq!(params.item.data, Some(json!({"authoritative": true})));
+            Ok(Some(vec![lsp::CallHierarchyIncomingCall {
+                from: lsp::CallHierarchyItem {
+                    name: "caller".to_string(),
+                    kind: lsp::SymbolKind::FUNCTION,
+                    tags: None,
+                    detail: Some("fn caller()".to_string()),
+                    uri: lsp::Uri::from_file_path(path!("/root/caller.rs")).unwrap(),
+                    range: lsp::Range::new(lsp::Position::new(0, 0), lsp::Position::new(0, 23)),
+                    selection_range: lsp::Range::new(
+                        lsp::Position::new(0, 3),
+                        lsp::Position::new(0, 9),
+                    ),
+                    data: None,
+                },
+                from_ranges: vec![lsp::Range::new(
+                    lsp::Position::new(0, 14),
+                    lsp::Position::new(0, 18),
+                )],
+            }]))
+        },
+    );
+    let incoming = project_b
+        .update(cx_b, |project, cx| {
+            project.incoming_calls(prepared.items[0].clone(), cx)
+        })
+        .await
+        .unwrap();
+    assert_eq!(incoming.calls.len(), 1);
+    assert_eq!(incoming.calls[0].item.name.as_ref(), "caller");
+    assert_eq!(
+        incoming.calls[0]
+            .item
+            .buffer
+            .read_with(cx_b, |buffer, _| buffer.text()),
+        "fn caller() { root(); }\n"
+    );
+}
+
 #[gpui::test(iterations = 10)]
 async fn test_definition(
     executor: BackgroundExecutor,

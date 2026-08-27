@@ -1,5 +1,6 @@
 use crate::multibuffer_hint::MultibufferHint;
 use client::{Client, UserStore, zed_urls};
+#[cfg(feature = "agentic")]
 use cloud_api_types::Plan;
 use db::kvp::KeyValueStore;
 use fs::Fs;
@@ -9,6 +10,7 @@ use gpui::{
     Subscription, Task, WeakEntity, Window, actions,
 };
 use notifications::status_toast::StatusToast;
+#[cfg(feature = "agentic")]
 use project::agent_server_store::AllAgentServersSettings;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -218,41 +220,44 @@ impl Onboarding {
     fn new(workspace: &Workspace, cx: &mut App) -> Entity<Self> {
         let font_family_cache = theme::FontFamilyCache::global(cx);
 
-        let installed_agents = cx
-            .global::<SettingsStore>()
-            .get::<AllAgentServersSettings>(None)
-            .clone();
-        let client = Client::global(cx);
-        let status = *client.status().borrow();
-        let plan = workspace.user_store().read(cx).plan();
-        let zed_agent_state = if status.is_signed_out()
-            || matches!(
-                status,
-                client::Status::AuthenticationError | client::Status::ConnectionError
-            ) {
-            "signed_out"
-        } else if status.is_signing_in() {
-            "signing_in"
-        } else {
-            match plan {
-                Some(Plan::SimPro) => "pro",
-                Some(Plan::SimProTrial) => "trial",
-                Some(Plan::SimBusiness) => "business",
-                Some(Plan::SimVip) => "vip",
-                Some(Plan::SimStudent) => "student",
-                Some(Plan::SimFree) | None => "free",
-            }
-        };
-        let agents_installed = basics_page::FEATURED_AGENT_IDS
-            .iter()
-            .filter(|id| installed_agents.contains_key(**id))
-            .copied()
-            .collect::<Vec<_>>();
-        telemetry::event!(
-            "Welcome Agent Setup Viewed",
-            zed_agent = zed_agent_state,
-            agents_installed = agents_installed,
-        );
+        #[cfg(feature = "agentic")]
+        {
+            let installed_agents = cx
+                .global::<SettingsStore>()
+                .get::<AllAgentServersSettings>(None)
+                .clone();
+            let client = Client::global(cx);
+            let status = *client.status().borrow();
+            let plan = workspace.user_store().read(cx).plan();
+            let zed_agent_state = if status.is_signed_out()
+                || matches!(
+                    status,
+                    client::Status::AuthenticationError | client::Status::ConnectionError
+                ) {
+                "signed_out"
+            } else if status.is_signing_in() {
+                "signing_in"
+            } else {
+                match plan {
+                    Some(Plan::ZedPro) => "pro",
+                    Some(Plan::ZedProTrial) => "trial",
+                    Some(Plan::ZedBusiness) => "business",
+                    Some(Plan::ZedVip) => "vip",
+                    Some(Plan::ZedStudent) => "student",
+                    Some(Plan::ZedFree) | None => "free",
+                }
+            };
+            let agents_installed = basics_page::FEATURED_AGENT_IDS
+                .iter()
+                .filter(|id| installed_agents.contains_key(**id))
+                .copied()
+                .collect::<Vec<_>>();
+            telemetry::event!(
+                "Welcome Agent Setup Viewed",
+                zed_agent = zed_agent_state,
+                agents_installed = agents_installed,
+            );
+        }
 
         cx.new(|cx| {
             cx.spawn(async move |this, cx| {
@@ -352,14 +357,19 @@ impl Render for Onboarding {
                                             .child(
                                                 v_flex()
                                                     .child(
-                                                        Headline::new("Welcome to Zed")
-                                                            .size(HeadlineSize::Small),
+                                                        Headline::new(format!(
+                                                            "Welcome to {}",
+                                                            product_flavor::DISPLAY_NAME
+                                                        ))
+                                                        .size(HeadlineSize::Small),
                                                     )
                                                     .child(
-                                                        Label::new("The editor for what's next")
-                                                            .color(Color::Muted)
-                                                            .size(LabelSize::Small)
-                                                            .italic(),
+                                                        Label::new(
+                                                            "Rust, Cargo, and agentic development",
+                                                        )
+                                                        .color(Color::Muted)
+                                                        .size(LabelSize::Small)
+                                                        .italic(),
                                                     ),
                                             ),
                                     )

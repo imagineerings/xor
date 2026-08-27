@@ -166,7 +166,7 @@ function initShellAlias() {
   }
 }
 
-function isSimRepo() {
+function isZedRepo() {
   try {
     const result = spawnSync("git", ["remote", "-v"], {
       encoding: "utf-8",
@@ -255,7 +255,7 @@ async function main() {
   }
 
   // If not in zed repo, just pass through to cargo
-  if (!isSimRepo()) {
+  if (!isZedRepo()) {
     runCargoPassthrough(args);
     return;
   }
