@@ -164,7 +164,7 @@ pub(super) fn first_valid_grant_reaches_verified_materialization_and_finalizatio
             trust,
             permission_policy,
             ComponentExecutionBoundary::private_worker(executor.clone()),
-            ComponentLimits::default(),
+            provider_component_limits(),
             base_registry,
         )?;
         let router = ComponentHostRouter::new(host.clone());
@@ -571,7 +571,7 @@ impl ProviderBridgeHarness {
             trust_policy()?,
             permission_policy(&manifest.manifest)?,
             ComponentExecutionBoundary::private_worker(executor.clone()),
-            ComponentLimits::default(),
+            provider_component_limits(),
             base_registry,
         )?;
         let router = ComponentHostRouter::new(host.clone());
@@ -699,7 +699,12 @@ impl ProviderBridgeHarness {
             .host
             .execute_provider_v2_worker(&plugin, NODE_ID, provider_inputs()?, context)
             .await;
-        let mut evidence = actuator.await?;
+        let mut evidence = actuator.await.map_err(|error| {
+            format!(
+                "provider actuator failed: execution={execution:?}, snapshot={:?}, error={error}",
+                presentation.snapshot(self.profile_id)
+            )
+        })?;
         if let Ok(materialization) = &execution {
             evidence.materializations += 1;
             evidence.outputs = materialization.ports().len();
@@ -719,7 +724,9 @@ impl ProviderBridgeHarness {
                 None,
             )
             .map_err(|failure| format!("provider attempt cancellation failed: {failure:?}"))?;
-        drop(controller);
+        controller
+            .shutdown()
+            .map_err(|failure| format!("provider controller shutdown failed: {failure:?}"))?;
         Ok(ProviderBridgeRunOutcome {
             execution,
             evidence,
@@ -768,7 +775,7 @@ pub(super) fn provider_plan(
         prompt_id: Some(prompt_id),
         client_id: None,
         number: None,
-        extra_data: BTreeMap::new(),
+        extra_data: BTreeMap::from([("zed_native_delay_millis".to_owned(), json!(10_000))]),
         unknown: BTreeMap::new(),
     })?)
 }
@@ -1527,5 +1534,12 @@ pub(super) fn worker_policy() -> SupervisorPolicy {
         ready_timeout: Duration::from_secs(10),
         maximum_automatic_restarts: 1,
         restart_backoff: Duration::from_millis(1),
+    }
+}
+
+fn provider_component_limits() -> ComponentLimits {
+    ComponentLimits {
+        epoch_deadline_ticks: 300,
+        ..ComponentLimits::default()
     }
 }
