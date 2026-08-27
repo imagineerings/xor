@@ -301,7 +301,7 @@ impl RenderOnce for CollaborativeTopBar {
                     .child(
                         IconButton::new("collaborative-share", IconName::Share)
                             .style(ButtonStyle::Subtle)
-                            .aria_label("Share collaborative workspace")
+                            .aria_label("Share Multiplayer Workspace")
                             .disabled(!action_availability.share)
                             .tooltip(Tooltip::text("Share or unshare the current project"))
                             .on_click(|_, window, cx| {

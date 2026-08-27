@@ -779,7 +779,7 @@ pub(crate) fn render_basics_page(user_store: &Entity<UserStore>, cx: &mut App) -
     let page = v_flex()
         .id("basics-page")
         .gap_6()
-        .child(crate::workspace_choice::render_workspace_choice(
+        .children(crate::workspace_choice::render_workspace_choice(
             &mut tab_index,
             cx,
         ))

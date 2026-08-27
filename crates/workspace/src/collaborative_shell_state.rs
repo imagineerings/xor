@@ -21,7 +21,7 @@ pub(crate) enum CollaborativeShellScope {
 impl CollaborativeShellScope {
     fn label(self) -> &'static str {
         match self {
-            Self::Workspace => "Collaborative Workspace",
+            Self::Workspace => "Multiplayer Workspace",
             Self::Timeline => "timeline",
             Self::Realtime => "realtime synchronization",
         }

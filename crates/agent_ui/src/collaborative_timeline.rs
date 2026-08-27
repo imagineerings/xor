@@ -142,7 +142,7 @@ impl Render for CollaborativeTimeline {
             return div()
                 .id("collaborative-activity-empty")
                 .role(Role::Status)
-                .aria_label("Collaborative activity timeline is empty")
+                .aria_label("Multiplayer Workspace activity timeline is empty")
                 .size_full()
                 .flex()
                 .items_center()

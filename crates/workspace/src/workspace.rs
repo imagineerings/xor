@@ -14874,7 +14874,7 @@ mod tests {
             state.transition(
                 crate::collaborative_shell_state::CollaborativeShellPhase::InitializationFailed {
                     scope: crate::collaborative_shell_state::CollaborativeShellScope::Workspace,
-                    summary: "Collaborative Workspace initialization failed".into(),
+                    summary: "Multiplayer Workspace initialization failed".into(),
                     last_trustworthy_state: Some("Editor project state is intact".into()),
                 },
                 cx,
@@ -14904,7 +14904,7 @@ mod tests {
             state.transition(
                 crate::collaborative_shell_state::CollaborativeShellPhase::InitializationFailed {
                     scope: crate::collaborative_shell_state::CollaborativeShellScope::Workspace,
-                    summary: "Collaborative Workspace initialization failed again".into(),
+                    summary: "Multiplayer Workspace initialization failed again".into(),
                     last_trustworthy_state: Some("Editor project state is intact".into()),
                 },
                 cx,

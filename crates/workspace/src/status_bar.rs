@@ -225,7 +225,7 @@ impl StatusBar {
                 div()
                     .debug_selector(|| "OPEN-COLLABORATIVE-WORKSPACE".to_owned())
                     .child(
-                        Button::new("open-collaborative-workspace", "Collaborative Workspace")
+                        Button::new("open-collaborative-workspace", "Multiplayer Workspace")
                             .style(ButtonStyle::Subtle)
                             .on_click(|_, window, cx| {
                                 window.dispatch_action(

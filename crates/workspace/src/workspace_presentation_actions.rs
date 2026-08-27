@@ -14,7 +14,7 @@ actions!(
 actions!(
     workspace,
     [
-        /// Switches the active workspace to the collaborative presentation.
+        /// Switches the active workspace to the multiplayer presentation.
         SwitchToCollaborativeWorkspace
     ]
 );

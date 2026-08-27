@@ -8,13 +8,13 @@ use crate::{
     collaborative_shell_state::{CollaborativeShellPhase, CollaborativeShellScope},
 };
 
-pub const WORKSPACE_LABEL: &str = "Collaborative Workspace";
-pub const TOP_BAR_LABEL: &str = "Collaborative workspace controls";
-pub const NAVIGATION_LABEL: &str = "Collaborative navigation";
-pub const TIMELINE_LABEL: &str = "Collaborative activity timeline";
+pub const WORKSPACE_LABEL: &str = "Multiplayer Workspace";
+pub const TOP_BAR_LABEL: &str = "Multiplayer Workspace controls";
+pub const NAVIGATION_LABEL: &str = "Multiplayer Workspace navigation";
+pub const TIMELINE_LABEL: &str = "Multiplayer Workspace activity timeline";
 pub const COMPOSER_LABEL: &str = "Message and agent prompt composer";
 pub const REVIEW_LABEL: &str = "Review changes";
-pub const STATUS_LABEL: &str = "Collaborative workspace status";
+pub const STATUS_LABEL: &str = "Multiplayer Workspace status";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CollaborativeAnnouncementRole {
@@ -171,7 +171,7 @@ pub(crate) fn shell_announcement(
 
 fn scope_label(scope: CollaborativeShellScope) -> &'static str {
     match scope {
-        CollaborativeShellScope::Workspace => "Collaborative Workspace",
+        CollaborativeShellScope::Workspace => "Multiplayer Workspace",
         CollaborativeShellScope::Timeline => "timeline",
         CollaborativeShellScope::Realtime => "realtime synchronization",
     }
@@ -260,9 +260,8 @@ mod tests {
             shell_announcement(&shell_failure),
             Some(CollaborativeAnnouncement {
                 role: CollaborativeAnnouncementRole::Alert,
-                label:
-                    "Unable to initialize collaboration. Affected scope: Collaborative Workspace"
-                        .into(),
+                label: "Unable to initialize collaboration. Affected scope: Multiplayer Workspace"
+                    .into(),
             })
         );
     }

@@ -58,14 +58,14 @@ Zed has mature native editor, project, Git, agent, ACP, remote-development and c
 
 ### Requirement 3: Reversible workspace presentation
 
-**User story:** As a Zed user, I want to choose the editor or collaborative presentation without forking my data, so that I can work in the mode appropriate to my task.
+**User story:** As a Zed user, I want to choose the editor or multiplayer presentation without forking my data, so that I can work in the mode appropriate to my task.
 
 #### Acceptance criteria
 
-1. **3.1** WHEN onboarding is shown, THEN Zed SHALL present “Editor Workspace” and “Collaborative Workspace” as clear choices and explain that both use the same underlying projects and data.
+1. **3.1** WHILE `multiplayer-tools` is enabled and onboarding is shown, Zed SHALL present exactly “Editor Workspace” and “Multiplayer Workspace” as clear choices and explain that both use the same underlying projects and data; WHILE `multiplayer-tools` is disabled, onboarding SHALL omit the complete Workspace selector section and use Editor Workspace implicitly.
 2. **3.2** WHEN a choice is made, THEN Zed SHALL persist the presentation preference and open the selected presentation on subsequent launches.
 3. **3.3** WHEN the user switches presentation later, THEN Zed SHALL preserve project, worktree, Git, identity, credentials, agent session and collaboration state without copying or forking it.
-4. **3.4** IF an existing user has not selected Collaborative Workspace, THEN current Editor Workspace behavior SHALL remain unchanged.
+4. **3.4** IF an existing user has not selected Multiplayer Workspace, THEN current Editor Workspace behavior SHALL remain unchanged.
 
 ### Requirement 4: Native collaborative composition and accessibility
 
