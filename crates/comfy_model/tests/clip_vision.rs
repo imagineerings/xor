@@ -844,6 +844,105 @@ fn cancellation_and_workspace_oom_publish_nothing_and_converge() -> Result<(), B
     Ok(())
 }
 
+#[test]
+fn caller_context_construction_reconstruction_and_public_forward_are_identity_stable()
+-> Result<(), Box<dyn Error>> {
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let context = context(&authority, &cancellation, 16 * 1024 * 1024)?;
+    let clip_configuration = configuration(ClipVisionModelType::Clip);
+    let legacy = NativeClipVision::new(
+        clip_configuration.clone(),
+        weights(&backend, ClipVisionModelType::Clip, &context)?,
+    )?;
+    let cancellable = NativeClipVision::new_with_cancellation(
+        clip_configuration,
+        weights(&backend, ClipVisionModelType::Clip, &context)?,
+        &cancellation,
+    )?;
+    assert_eq!(legacy.configuration(), cancellable.configuration());
+    assert_eq!(
+        legacy.semantic_digest_sha256(),
+        cancellable.semantic_digest_sha256()
+    );
+
+    let reconstructed = cancellable.reconstruct(&cancellation)?;
+    assert_eq!(
+        reconstructed.semantic_digest_sha256(),
+        cancellable.semantic_digest_sha256()
+    );
+    assert_eq!(
+        reconstructed.resident_parts()?,
+        cancellable.resident_parts()?
+    );
+    let input = nchw_input(&backend, 4, 4, &context)?;
+    let mut original_execution = cancellable;
+    let original_output = original_execution.forward(
+        &backend,
+        &input,
+        ClipVisionIntermediate::Layer(-1),
+        &context,
+    )?;
+    let mut reconstructed_execution = reconstructed;
+    let reconstructed_output = reconstructed_execution.forward(
+        &backend,
+        &input,
+        ClipVisionIntermediate::Layer(-1),
+        &context,
+    )?;
+    assert_eq!(
+        original_output.semantic_digest_sha256(),
+        reconstructed_output.semantic_digest_sha256()
+    );
+    assert_eq!(
+        original_output.image_embeds.contiguous_bytes()?,
+        reconstructed_output.image_embeds.contiguous_bytes()?
+    );
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    assert!(matches!(
+        NativeClipVision::new_with_cancellation(
+            configuration(ClipVisionModelType::Clip),
+            weights(&backend, ClipVisionModelType::Clip, &context)?,
+            &cancelled,
+        ),
+        Err(ClipVisionError::Cancelled)
+    ));
+    assert!(matches!(
+        original_execution.reconstruct(&cancelled),
+        Err(ClipVisionError::Cancelled)
+    ));
+
+    let source =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/clip_vision.rs"))?;
+    let production = source
+        .split_once("\n#[cfg(test)]\n")
+        .map_or(source.as_str(), |(production, _)| production);
+    assert_eq!(
+        production.matches("pub fn new_with_cancellation(").count(),
+        1
+    );
+    assert_eq!(production.matches("pub fn reconstruct(").count(), 1);
+    assert_eq!(
+        production.matches("pub(crate) fn forward_checked(").count(),
+        1
+    );
+    let checked_forward = production
+        .split_once("pub(crate) fn forward_checked(")
+        .and_then(|(_, tail)| tail.split_once("\n    fn patch_embeddings("))
+        .map(|(checked, _)| checked)
+        .ok_or("checked CLIP vision forward boundary is missing")?;
+    assert_eq!(checked_forward.matches(".post_layer_norm").count(), 2);
+    assert_eq!(
+        checked_forward
+            .matches("self.visual_projection.as_mut()")
+            .count(),
+        1
+    );
+    Ok(())
+}
+
 fn execute_valid_vision_contract(symbol: &str) -> Result<(), Box<dyn Error>> {
     match symbol {
         "clip_preprocess" => {

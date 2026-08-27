@@ -8375,8 +8375,14 @@ fn run_ownership_validation(
     .into_iter()
     .flat_map(|needle| source_occurrences(&sources, needle))
     .collect::<Vec<_>>();
-    let component_lifecycle_adapter_impls =
+    let mut component_lifecycle_adapter_impls =
         production_source_occurrences(&sources, "impl ComponentLifecycleAdapter for ");
+    component_lifecycle_adapter_impls.extend(production_source_occurrences(
+        &sources,
+        "impl extension_host::ComponentLifecycleAdapter for ",
+    ));
+    component_lifecycle_adapter_impls.sort();
+    component_lifecycle_adapter_impls.dedup();
     let subgraph_library_definitions = source_occurrences(
         &sources,
         &["struct ", "SubgraphBlueprintLibrary", " {"].concat(),
@@ -9849,9 +9855,13 @@ fn run_ownership_validation(
         ),
         (
             "plugin_host_is_extension_lifecycle_adapter",
-            component_lifecycle_adapter_impls.len() == 1
-                && component_lifecycle_adapter_impls[0]
-                    .contains("crates/comfy_plugin_host/src/component_host.rs")
+            component_lifecycle_adapter_impls.len() == 2
+                && component_lifecycle_adapter_impls
+                    .iter()
+                    .any(|location| location.contains("crates/comfy_plugin_host/src/component_host.rs"))
+                && component_lifecycle_adapter_impls
+                    .iter()
+                    .any(|location| location.contains("crates/zed/src/zed.rs"))
                 && plugin_component_host
                     .contains("use extension_host::{ComponentLifecycleAdapter, ComponentRuntime")
                 && plugin_component_host
@@ -9860,8 +9870,16 @@ fn run_ownership_validation(
                     .contains("impl ComponentLifecycleAdapter for ComponentHost {")
                 && extension_host.contains("pub trait ComponentLifecycleAdapter: Send + Sync")
                 && zed_bootstrap.contains("ComponentHostRouter::with_initial_generation(")
-                && zed_bootstrap
-                    .contains("extension_host::register_component_lifecycle_adapter(Arc::new(")
+                && zed_bootstrap.contains(
+                    "impl extension_host::ComponentLifecycleAdapter for DesktopComponentLifecycleAdapter",
+                )
+                && zed_bootstrap.contains("let candidate_identity = candidate.identity().clone()")
+                && zed_bootstrap.contains(
+                    "extension_host::ComponentLifecycleAdapter::synchronize(\n                &router,",
+                )
+                && zed_bootstrap.contains(
+                    "extension_host::register_component_lifecycle_adapter(\n        Arc::new(DesktopComponentLifecycleAdapter",
+                )
                 && zed_bootstrap.contains("comfy_plugin_services::private_worker_services(")
                 && zed_plugin_services
                     .contains("PluginCapabilityBroker::new_with_provider_cost_acceptance(")
@@ -9955,7 +9973,16 @@ fn run_ownership_validation(
         ),
         (
             "desktop_api_headless_and_worker_consume_component_registry",
-            zed_bootstrap.contains("component_host.router.active_execution_registry_bundle()?")
+            zed_bootstrap.contains("fn accepted_desktop_component_registry_bundle(")
+                && zed_bootstrap.contains(
+                    "registry_bundle: Arc::new(router.active_execution_registry_bundle()?),",
+                )
+                && zed_bootstrap.contains(
+                    "let deployment = accepted_desktop_component_registry_bundle(",
+                )
+                && zed_bootstrap.contains(
+                    "NativeProviderDeploymentIdentity::from_registry_bundle(\n        &deployment.registry_bundle,\n        &deployment.candidate_identity,",
+                )
                 && zed_bootstrap.contains("worker.with_registry_deployment(")
                 && api_host_production.contains("pub fn with_registry_bundle(")
                 && api_host_production.contains("NativeRuntimeHttpServices::from_registry_bundle(")

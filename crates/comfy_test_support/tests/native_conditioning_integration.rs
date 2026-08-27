@@ -2332,3 +2332,67 @@ fn style_model_resource() -> Result<(), Box<dyn Error>> {
     assert_eq!(workspace.in_use_bytes(), 0);
     Ok(())
 }
+
+#[test]
+fn native_clip_vision_context_construction() -> Result<(), Box<dyn Error>> {
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("workspace root is unavailable")?;
+    let source = fs::read_to_string(workspace.join("crates/comfy_model/src/clip_vision.rs"))?;
+    let production = source
+        .split_once("\n#[cfg(test)]\n")
+        .map_or(source.as_str(), |(production, _)| production);
+    assert_eq!(
+        production.matches("pub struct NativeClipVision {").count(),
+        1
+    );
+    assert_eq!(
+        production.matches("pub fn new_with_cancellation(").count(),
+        1
+    );
+    assert_eq!(production.matches("pub fn reconstruct(").count(), 1);
+    assert_eq!(
+        production.matches("pub(crate) fn forward_checked(").count(),
+        1
+    );
+    assert!(production.contains("pub(crate) pooled_hidden: Tensor"));
+    assert!(production.contains("Self::new_with_cancellation("));
+    assert!(production.contains("ClipVisionCanonicalStateCursor::new"));
+    assert!(production.contains("Self::new_with_cancellation_and_phase_hook("));
+    for phase in [
+        "CanonicalState",
+        "ParameterProjection",
+        "PatchEmbedding",
+        "PreLayerNorm",
+        "LayerNorm1",
+        "AttentionQuery",
+        "AttentionKey",
+        "AttentionValue",
+        "AttentionOutput",
+        "LayerNorm2",
+        "MlpInput",
+        "MlpActivation",
+        "MlpOutput",
+        "PostLayerNorm",
+        "VisualProjection",
+        "LlavaProjection",
+        "SemanticDigest",
+        "ModuleDigest",
+        "Validation",
+        "Return",
+    ] {
+        assert!(
+            production.contains(&format!("ClipVisionConstructionPhase::{phase}")),
+            "missing caller-cancellation phase {phase}"
+        );
+    }
+    assert!(!production.contains("pub struct NativeClipVisionCheckedForward"));
+
+    let payload =
+        fs::read_to_string(workspace.join("crates/comfy_model/src/native_node_payload.rs"))?;
+    assert!(!payload.contains("new_with_cancellation"));
+    assert!(!payload.contains("forward_checked"));
+    assert!(!payload.contains("pooled_hidden"));
+    Ok(())
+}

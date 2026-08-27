@@ -212,6 +212,124 @@ pub struct NativeClipVisionExecutionSession {
     model: NativeClipVision,
 }
 
+#[derive(Debug)]
+pub(crate) struct NativeClipVisionCheckedForward {
+    pub(crate) output: ClipVisionOutput,
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the Task395 PhotoMaker adapter consumes the checked pooled hidden state"
+        )
+    )]
+    pub(crate) pooled_hidden: Tensor,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ClipVisionConstructionPhase {
+    Entry,
+    CanonicalState,
+    ParameterProjection,
+    PatchEmbedding,
+    PreLayerNorm,
+    LayerNorm1(usize),
+    AttentionQuery(usize),
+    AttentionKey(usize),
+    AttentionValue(usize),
+    AttentionOutput(usize),
+    LayerNorm2(usize),
+    MlpInput(usize),
+    MlpActivation(usize),
+    MlpOutput(usize),
+    PostLayerNorm,
+    VisualProjection,
+    LlavaProjection,
+    SemanticDigest,
+    ModuleDigest,
+    Validation,
+    Return,
+}
+
+fn construction_checkpoint(
+    cancellation: &CancellationToken,
+    phase: ClipVisionConstructionPhase,
+    phase_hook: &mut impl FnMut(ClipVisionConstructionPhase, &CancellationToken),
+) -> Result<(), ClipVisionError> {
+    phase_hook(phase, cancellation);
+    cancellation.check()?;
+    Ok(())
+}
+
+struct ClipVisionCanonicalStateCursor<'a> {
+    state: &'a [(String, Tensor)],
+    index: usize,
+}
+
+impl<'a> ClipVisionCanonicalStateCursor<'a> {
+    fn new(state: &'a [(String, Tensor)]) -> Self {
+        Self { state, index: 0 }
+    }
+
+    fn take(
+        &mut self,
+        expected_name: &str,
+        cancellation: &CancellationToken,
+        phase_hook: &mut impl FnMut(ClipVisionConstructionPhase, &CancellationToken),
+    ) -> Result<Tensor, ClipVisionError> {
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::CanonicalState,
+            phase_hook,
+        )?;
+        let (name, tensor) =
+            self.state
+                .get(self.index)
+                .ok_or(ClipVisionError::InvalidConfiguration(
+                    "canonical state is missing a required tensor",
+                ))?;
+        if name != expected_name {
+            return Err(ClipVisionError::InvalidConfiguration(
+                "canonical state tensor order changed",
+            ));
+        }
+        self.index = self
+            .index
+            .checked_add(1)
+            .ok_or(ClipVisionError::Overflow("canonical state cursor"))?;
+        Ok(tensor.clone())
+    }
+
+    fn take_optional(
+        &mut self,
+        expected_name: &str,
+        present: bool,
+        cancellation: &CancellationToken,
+        phase_hook: &mut impl FnMut(ClipVisionConstructionPhase, &CancellationToken),
+    ) -> Result<Option<Tensor>, ClipVisionError> {
+        present
+            .then(|| self.take(expected_name, cancellation, phase_hook))
+            .transpose()
+    }
+
+    fn finish(
+        self,
+        cancellation: &CancellationToken,
+        phase_hook: &mut impl FnMut(ClipVisionConstructionPhase, &CancellationToken),
+    ) -> Result<(), ClipVisionError> {
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::CanonicalState,
+            phase_hook,
+        )?;
+        if self.index != self.state.len() {
+            return Err(ClipVisionError::InvalidConfiguration(
+                "canonical state contains an unexpected tensor",
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ClipVisionTensorResidentAllocation {
     storage_id: StorageId,
@@ -668,7 +786,14 @@ fn clip_vision_architecture_digest(
 
 fn clip_vision_canonical_state(
     weights: &ClipVisionWeights,
+    cancellation: &CancellationToken,
+    phase_hook: &mut impl FnMut(ClipVisionConstructionPhase, &CancellationToken),
 ) -> Result<Vec<(String, Tensor)>, ClipVisionError> {
+    construction_checkpoint(
+        cancellation,
+        ClipVisionConstructionPhase::CanonicalState,
+        phase_hook,
+    )?;
     let mut state = Vec::new();
     state
         .try_reserve_exact(
@@ -683,50 +808,56 @@ fn clip_vision_canonical_state(
                 .ok_or(ClipVisionError::Overflow("canonical state entries"))?,
         )
         .map_err(|_| ClipVisionError::Overflow("canonical state entries"))?;
-    let mut push = |name: &str, tensor: Option<&Tensor>| {
+    let mut push = |name: &str, tensor: Option<&Tensor>| -> Result<(), ClipVisionError> {
         if let Some(tensor) = tensor {
+            construction_checkpoint(
+                cancellation,
+                ClipVisionConstructionPhase::CanonicalState,
+                phase_hook,
+            )?;
             state.push((name.to_owned(), tensor.clone()));
         }
+        Ok(())
     };
     push(
         "patch_embedding.weight",
         Some(&weights.patch_embedding_weight),
-    );
+    )?;
     push(
         "patch_embedding.bias",
         weights.patch_embedding_bias.as_ref(),
-    );
-    push("class_embedding", weights.class_embedding.as_ref());
-    push("position_embedding", Some(&weights.position_embedding));
+    )?;
+    push("class_embedding", weights.class_embedding.as_ref())?;
+    push("position_embedding", Some(&weights.position_embedding))?;
     push(
         "pre_layer_norm.weight",
         weights.pre_layer_norm_weight.as_ref(),
-    );
-    push("pre_layer_norm.bias", weights.pre_layer_norm_bias.as_ref());
+    )?;
+    push("pre_layer_norm.bias", weights.pre_layer_norm_bias.as_ref())?;
     for (index, layer) in weights.layers.iter().enumerate() {
         for (name, tensor) in layer_tensors(layer) {
-            push(&format!("layers.{index}.{name}"), Some(tensor));
+            push(&format!("layers.{index}.{name}"), Some(tensor))?;
         }
     }
     push(
         "post_layer_norm.weight",
         Some(&weights.post_layer_norm_weight),
-    );
-    push("post_layer_norm.bias", Some(&weights.post_layer_norm_bias));
+    )?;
+    push("post_layer_norm.bias", Some(&weights.post_layer_norm_bias))?;
     push(
         "visual_projection.weight",
         weights.visual_projection_weight.as_ref(),
-    );
+    )?;
     push(
         "llava_linear_1.weight",
         weights.llava_linear_1_weight.as_ref(),
-    );
-    push("llava_linear_1.bias", weights.llava_linear_1_bias.as_ref());
+    )?;
+    push("llava_linear_1.bias", weights.llava_linear_1_bias.as_ref())?;
     push(
         "llava_linear_2.weight",
         weights.llava_linear_2_weight.as_ref(),
-    );
-    push("llava_linear_2.bias", weights.llava_linear_2_bias.as_ref());
+    )?;
+    push("llava_linear_2.bias", weights.llava_linear_2_bias.as_ref())?;
     Ok(state)
 }
 
@@ -837,16 +968,48 @@ impl NativeClipVision {
         configuration: ClipVisionConfiguration,
         weights: ClipVisionWeights,
     ) -> Result<Self, ClipVisionError> {
+        Self::new_with_cancellation(configuration, weights, &CancellationToken::default())
+    }
+
+    pub fn new_with_cancellation(
+        configuration: ClipVisionConfiguration,
+        weights: ClipVisionWeights,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, ClipVisionError> {
+        Self::new_with_cancellation_and_phase_hook(
+            configuration,
+            weights,
+            cancellation,
+            &mut |_, _| {},
+        )
+    }
+
+    fn new_with_cancellation_and_phase_hook(
+        configuration: ClipVisionConfiguration,
+        weights: ClipVisionWeights,
+        cancellation: &CancellationToken,
+        phase_hook: &mut impl FnMut(ClipVisionConstructionPhase, &CancellationToken),
+    ) -> Result<Self, ClipVisionError> {
+        construction_checkpoint(cancellation, ClipVisionConstructionPhase::Entry, phase_hook)?;
         configuration.validate()?;
         if weights.layers.len() != configuration.layer_count {
             return Err(ClipVisionError::InvalidConfiguration(
                 "configured layer count does not match the weight graph",
             ));
         }
-        let cancellation = CancellationToken::default();
-        let canonical_state = clip_vision_canonical_state(&weights)?;
+        let canonical_state = clip_vision_canonical_state(&weights, cancellation, phase_hook)?;
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::SemanticDigest,
+            phase_hook,
+        )?;
         let semantic_identity =
-            clip_vision_identity(&configuration, &canonical_state, &cancellation)?;
+            clip_vision_identity(&configuration, &canonical_state, cancellation)?;
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::ParameterProjection,
+            phase_hook,
+        )?;
         let stream = weights.position_embedding.descriptor().stream();
         validate_parameter_target(
             "position embedding",
@@ -891,6 +1054,11 @@ impl NativeClipVision {
             ("Llava linear 2 bias", weights.llava_linear_2_bias.as_ref()),
         ] {
             if let Some(tensor) = tensor {
+                construction_checkpoint(
+                    cancellation,
+                    ClipVisionConstructionPhase::ParameterProjection,
+                    phase_hook,
+                )?;
                 validate_parameter_target(
                     name,
                     tensor,
@@ -901,6 +1069,11 @@ impl NativeClipVision {
             }
         }
 
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::PatchEmbedding,
+            phase_hook,
+        )?;
         let patch_width = configuration
             .num_channels
             .checked_mul(configuration.patch_size)
@@ -984,6 +1157,11 @@ impl NativeClipVision {
             }
         }
 
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::PreLayerNorm,
+            phase_hook,
+        )?;
         let pre_layer_norm = match configuration.model_type {
             ClipVisionModelType::Clip => Some(layer_norm_from_weights(
                 "vision_model.pre_layrnorm",
@@ -1015,13 +1193,30 @@ impl NativeClipVision {
             .try_reserve_exact(configuration.layer_count)
             .map_err(|_| ClipVisionError::Overflow("vision layers"))?;
         for (index, weights) in weights.layers.into_iter().enumerate() {
-            layers.push(build_layer(index, &configuration, weights, stream)?);
+            layers.push(build_layer(
+                index,
+                &configuration,
+                weights,
+                stream,
+                cancellation,
+                phase_hook,
+            )?);
         }
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::PostLayerNorm,
+            phase_hook,
+        )?;
         let post_layer_norm = layer_norm_from_weights(
             "vision_model.post_layernorm",
             configuration.hidden_size,
             weights.post_layer_norm_weight,
             weights.post_layer_norm_bias,
+        )?;
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::VisualProjection,
+            phase_hook,
         )?;
         let visual_projection = optional_linear(
             "visual_projection",
@@ -1030,6 +1225,11 @@ impl NativeClipVision {
             weights.visual_projection_weight,
             None,
         )?;
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::LlavaProjection,
+            phase_hook,
+        )?;
         let llava_linear_1 = optional_linear(
             "multi_modal_projector.linear_1",
             configuration.hidden_size,
@@ -1037,12 +1237,22 @@ impl NativeClipVision {
             weights.llava_linear_1_weight,
             weights.llava_linear_1_bias,
         )?;
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::LlavaProjection,
+            phase_hook,
+        )?;
         let llava_linear_2 = optional_linear(
             "multi_modal_projector.linear_2",
             configuration.llava_projection_dimension.unwrap_or(1),
             configuration.llava_projection_dimension,
             weights.llava_linear_2_weight,
             weights.llava_linear_2_bias,
+        )?;
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::LlavaProjection,
+            phase_hook,
         )?;
         let llava_activation =
             NativeModule::gelu("multi_modal_projector.gelu", GeluApproximation::None)?;
@@ -1065,9 +1275,179 @@ impl NativeClipVision {
             module_state_digest_sha256: String::new(),
             training: false,
         };
-        model.module_state_digest_sha256 = clip_vision_module_state_digest(&model, &cancellation)?;
-        model.validate(&cancellation)?;
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::ModuleDigest,
+            phase_hook,
+        )?;
+        model.module_state_digest_sha256 = clip_vision_module_state_digest(&model, cancellation)?;
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::Validation,
+            phase_hook,
+        )?;
+        model.validate(cancellation)?;
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::Return,
+            phase_hook,
+        )?;
         Ok(model)
+    }
+
+    pub fn reconstruct(&self, cancellation: &CancellationToken) -> Result<Self, ClipVisionError> {
+        self.reconstruct_with_phase_hook(cancellation, &mut |_, _| {})
+    }
+
+    fn reconstruct_with_phase_hook(
+        &self,
+        cancellation: &CancellationToken,
+        phase_hook: &mut impl FnMut(ClipVisionConstructionPhase, &CancellationToken),
+    ) -> Result<Self, ClipVisionError> {
+        construction_checkpoint(cancellation, ClipVisionConstructionPhase::Entry, phase_hook)?;
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::Validation,
+            phase_hook,
+        )?;
+        self.validate(cancellation)?;
+        let mut cursor = ClipVisionCanonicalStateCursor::new(&self.canonical_state);
+        let patch_embedding_weight =
+            cursor.take("patch_embedding.weight", cancellation, phase_hook)?;
+        let patch_embedding_bias = cursor.take_optional(
+            "patch_embedding.bias",
+            self.configuration.model_type != ClipVisionModelType::Clip,
+            cancellation,
+            phase_hook,
+        )?;
+        let class_embedding = cursor.take_optional(
+            "class_embedding",
+            self.configuration.model_type == ClipVisionModelType::Clip,
+            cancellation,
+            phase_hook,
+        )?;
+        let position_embedding = cursor.take("position_embedding", cancellation, phase_hook)?;
+        let pre_layer_norm_weight = cursor.take_optional(
+            "pre_layer_norm.weight",
+            self.configuration.model_type == ClipVisionModelType::Clip,
+            cancellation,
+            phase_hook,
+        )?;
+        let pre_layer_norm_bias = cursor.take_optional(
+            "pre_layer_norm.bias",
+            self.configuration.model_type == ClipVisionModelType::Clip,
+            cancellation,
+            phase_hook,
+        )?;
+        let mut layers = Vec::new();
+        layers
+            .try_reserve_exact(self.configuration.layer_count)
+            .map_err(|_| ClipVisionError::Overflow("reconstructed vision layers"))?;
+        for index in 0..self.configuration.layer_count {
+            let mut take = |suffix: &str| {
+                cursor.take(
+                    &format!("layers.{index}.{suffix}"),
+                    cancellation,
+                    phase_hook,
+                )
+            };
+            layers.push(ClipVisionLayerWeights {
+                layer_norm_1_weight: take("layer norm 1 weight")?,
+                layer_norm_1_bias: take("layer norm 1 bias")?,
+                query_weight: take("query weight")?,
+                query_bias: take("query bias")?,
+                key_weight: take("key weight")?,
+                key_bias: take("key bias")?,
+                value_weight: take("value weight")?,
+                value_bias: take("value bias")?,
+                output_weight: take("output weight")?,
+                output_bias: take("output bias")?,
+                layer_norm_2_weight: take("layer norm 2 weight")?,
+                layer_norm_2_bias: take("layer norm 2 bias")?,
+                feed_forward_1_weight: take("feed forward 1 weight")?,
+                feed_forward_1_bias: take("feed forward 1 bias")?,
+                feed_forward_2_weight: take("feed forward 2 weight")?,
+                feed_forward_2_bias: take("feed forward 2 bias")?,
+            });
+        }
+        let post_layer_norm_weight =
+            cursor.take("post_layer_norm.weight", cancellation, phase_hook)?;
+        let post_layer_norm_bias = cursor.take("post_layer_norm.bias", cancellation, phase_hook)?;
+        let visual_projection_weight = cursor.take_optional(
+            "visual_projection.weight",
+            self.configuration.projection_dimension.is_some(),
+            cancellation,
+            phase_hook,
+        )?;
+        let has_llava = self.configuration.llava_projection_dimension.is_some();
+        let llava_linear_1_weight =
+            cursor.take_optional("llava_linear_1.weight", has_llava, cancellation, phase_hook)?;
+        let llava_linear_1_bias =
+            cursor.take_optional("llava_linear_1.bias", has_llava, cancellation, phase_hook)?;
+        let llava_linear_2_weight =
+            cursor.take_optional("llava_linear_2.weight", has_llava, cancellation, phase_hook)?;
+        let llava_linear_2_bias =
+            cursor.take_optional("llava_linear_2.bias", has_llava, cancellation, phase_hook)?;
+        cursor.finish(cancellation, phase_hook)?;
+        let mut reconstructed = Self::new_with_cancellation_and_phase_hook(
+            self.configuration.clone(),
+            ClipVisionWeights {
+                patch_embedding_weight,
+                patch_embedding_bias,
+                class_embedding,
+                position_embedding,
+                pre_layer_norm_weight,
+                pre_layer_norm_bias,
+                layers,
+                post_layer_norm_weight,
+                post_layer_norm_bias,
+                visual_projection_weight,
+                llava_linear_1_weight,
+                llava_linear_1_bias,
+                llava_linear_2_weight,
+                llava_linear_2_bias,
+            },
+            cancellation,
+            phase_hook,
+        )?;
+        reconstructed.set_training(self.training);
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::Validation,
+            phase_hook,
+        )?;
+        if reconstructed.configuration != self.configuration
+            || reconstructed.semantic_identity != self.semantic_identity
+            || reconstructed.module_state_digest_sha256 != self.module_state_digest_sha256
+            || reconstructed.resident_parts()? != self.resident_parts()?
+            || reconstructed.canonical_state.len() != self.canonical_state.len()
+        {
+            return Err(ClipVisionError::SemanticIdentityChanged);
+        }
+        for ((actual_name, actual), (expected_name, expected)) in reconstructed
+            .canonical_state
+            .iter()
+            .zip(&self.canonical_state)
+        {
+            construction_checkpoint(
+                cancellation,
+                ClipVisionConstructionPhase::Validation,
+                phase_hook,
+            )?;
+            if actual_name != expected_name
+                || actual.descriptor() != expected.descriptor()
+                || actual.storage_id() != expected.storage_id()
+                || actual.contiguous_bytes()? != expected.contiguous_bytes()?
+            {
+                return Err(ClipVisionError::SemanticIdentityChanged);
+            }
+        }
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::Return,
+            phase_hook,
+        )?;
+        Ok(reconstructed)
     }
 
     pub fn configuration(&self) -> &ClipVisionConfiguration {
@@ -1340,6 +1720,18 @@ impl NativeClipVision {
         intermediate: ClipVisionIntermediate,
         context: &ExecutionContext<'_>,
     ) -> Result<ClipVisionOutput, ClipVisionError> {
+        Ok(self
+            .forward_checked(backend, pixel_values, intermediate, context)?
+            .output)
+    }
+
+    pub(crate) fn forward_checked(
+        &mut self,
+        backend: &CpuBackend,
+        pixel_values: &Tensor,
+        intermediate: ClipVisionIntermediate,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeClipVisionCheckedForward, ClipVisionError> {
         self.execution_requirements().admit_backend_target(
             backend,
             self.configuration.device,
@@ -1441,6 +1833,7 @@ impl NativeClipVision {
                 (normalized.clone(), normalized)
             }
         };
+        let pooled_hidden = pooled.clone();
         let image_embeds = match self.visual_projection.as_mut() {
             Some(projection) => projection.forward_with_context(backend, &pooled, context)?,
             None => pooled,
@@ -1472,13 +1865,17 @@ impl NativeClipVision {
                 }
             };
         context.check()?;
-        ClipVisionOutput::checked(
+        let output = ClipVisionOutput::checked(
             last_hidden_state,
             intermediate,
             image_embeds,
             projected_intermediate,
             image_sizes,
-        )
+        )?;
+        Ok(NativeClipVisionCheckedForward {
+            output,
+            pooled_hidden,
+        })
     }
 
     fn patch_embeddings(
@@ -1775,8 +2172,15 @@ fn build_layer(
     configuration: &ClipVisionConfiguration,
     weights: ClipVisionLayerWeights,
     stream: StreamId,
+    cancellation: &CancellationToken,
+    phase_hook: &mut impl FnMut(ClipVisionConstructionPhase, &CancellationToken),
 ) -> Result<ClipVisionLayer, ClipVisionError> {
     for (name, tensor) in layer_tensors(&weights) {
+        construction_checkpoint(
+            cancellation,
+            ClipVisionConstructionPhase::ParameterProjection,
+            phase_hook,
+        )?;
         validate_parameter_target(
             name,
             tensor,
@@ -1786,11 +2190,21 @@ fn build_layer(
         )?;
     }
     let prefix = format!("vision_model.encoder.layers.{index}");
+    construction_checkpoint(
+        cancellation,
+        ClipVisionConstructionPhase::LayerNorm1(index),
+        phase_hook,
+    )?;
     let layer_norm_1 = layer_norm_from_weights(
         format!("{prefix}.layer_norm1"),
         configuration.hidden_size,
         weights.layer_norm_1_weight,
         weights.layer_norm_1_bias,
+    )?;
+    construction_checkpoint(
+        cancellation,
+        ClipVisionConstructionPhase::AttentionQuery(index),
+        phase_hook,
     )?;
     let mut attention = NativeModule::multihead_attention(
         format!("{prefix}.self_attn"),
@@ -1799,12 +2213,33 @@ fn build_layer(
         true,
         false,
     )?;
-    for (name, weight, bias) in [
-        ("q_proj", weights.query_weight, weights.query_bias),
-        ("k_proj", weights.key_weight, weights.key_bias),
-        ("v_proj", weights.value_weight, weights.value_bias),
-        ("out_proj", weights.output_weight, weights.output_bias),
+    for (phase, name, weight, bias) in [
+        (
+            ClipVisionConstructionPhase::AttentionQuery(index),
+            "q_proj",
+            weights.query_weight,
+            weights.query_bias,
+        ),
+        (
+            ClipVisionConstructionPhase::AttentionKey(index),
+            "k_proj",
+            weights.key_weight,
+            weights.key_bias,
+        ),
+        (
+            ClipVisionConstructionPhase::AttentionValue(index),
+            "v_proj",
+            weights.value_weight,
+            weights.value_bias,
+        ),
+        (
+            ClipVisionConstructionPhase::AttentionOutput(index),
+            "out_proj",
+            weights.output_weight,
+            weights.output_bias,
+        ),
     ] {
+        construction_checkpoint(cancellation, phase, phase_hook)?;
         attention
             .child_mut(name)
             .ok_or(ClipVisionError::InvalidConfiguration(
@@ -1812,11 +2247,21 @@ fn build_layer(
             ))?
             .load_dense_parameters(weight, Some(bias))?;
     }
+    construction_checkpoint(
+        cancellation,
+        ClipVisionConstructionPhase::LayerNorm2(index),
+        phase_hook,
+    )?;
     let layer_norm_2 = layer_norm_from_weights(
         format!("{prefix}.layer_norm2"),
         configuration.hidden_size,
         weights.layer_norm_2_weight,
         weights.layer_norm_2_bias,
+    )?;
+    construction_checkpoint(
+        cancellation,
+        ClipVisionConstructionPhase::MlpInput(index),
+        phase_hook,
     )?;
     let mut feed_forward_1 = NativeModule::linear(
         format!("{prefix}.mlp.fc1"),
@@ -1829,6 +2274,22 @@ fn build_layer(
         weights.feed_forward_1_weight,
         Some(weights.feed_forward_1_bias),
     )?;
+    let approximation = match configuration.activation {
+        ClipVisionActivation::Gelu => GeluApproximation::None,
+        ClipVisionActivation::GeluTanh => GeluApproximation::Tanh,
+        ClipVisionActivation::QuickGelu => GeluApproximation::None,
+    };
+    construction_checkpoint(
+        cancellation,
+        ClipVisionConstructionPhase::MlpActivation(index),
+        phase_hook,
+    )?;
+    let activation = NativeModule::gelu(format!("{prefix}.mlp.activation"), approximation)?;
+    construction_checkpoint(
+        cancellation,
+        ClipVisionConstructionPhase::MlpOutput(index),
+        phase_hook,
+    )?;
     let mut feed_forward_2 = NativeModule::linear(
         format!("{prefix}.mlp.fc2"),
         configuration.intermediate_size,
@@ -1840,17 +2301,12 @@ fn build_layer(
         weights.feed_forward_2_weight,
         Some(weights.feed_forward_2_bias),
     )?;
-    let approximation = match configuration.activation {
-        ClipVisionActivation::Gelu => GeluApproximation::None,
-        ClipVisionActivation::GeluTanh => GeluApproximation::Tanh,
-        ClipVisionActivation::QuickGelu => GeluApproximation::None,
-    };
     Ok(ClipVisionLayer {
         layer_norm_1,
         attention,
         layer_norm_2,
         feed_forward_1,
-        activation: NativeModule::gelu(format!("{prefix}.mlp.activation"), approximation)?,
+        activation,
         feed_forward_2,
         quick_gelu: configuration.activation == ClipVisionActivation::QuickGelu,
     })
@@ -2701,10 +3157,29 @@ mod tests {
         )
     }
 
-    fn tiny_clip_vision(
+    fn tiny_clip_configuration() -> ClipVisionConfiguration {
+        ClipVisionConfiguration {
+            model_type: ClipVisionModelType::Clip,
+            dtype: DType::F32,
+            device: DeviceId::CPU,
+            hidden_size: 2,
+            intermediate_size: 2,
+            attention_heads: 1,
+            layer_count: 1,
+            image_size: 2,
+            patch_size: 1,
+            num_channels: 3,
+            max_num_patches: 4,
+            activation: ClipVisionActivation::QuickGelu,
+            projection_dimension: None,
+            llava_projection_dimension: None,
+        }
+    }
+
+    fn tiny_clip_weights(
         backend: &CpuBackend,
         context: &ExecutionContext<'_>,
-    ) -> Result<NativeClipVision, Box<dyn Error>> {
+    ) -> Result<ClipVisionWeights, Box<dyn Error>> {
         let zero_2 = filled_tensor(backend, context, vec![2], 0.0)?;
         let zero_2x2 = filled_tensor(backend, context, vec![2, 2], 0.0)?;
         let layer = ClipVisionLayerWeights {
@@ -2725,40 +3200,169 @@ mod tests {
             feed_forward_2_weight: zero_2x2,
             feed_forward_2_bias: zero_2.clone(),
         };
+        Ok(ClipVisionWeights {
+            patch_embedding_weight: filled_tensor(backend, context, vec![2, 3, 1, 1], 0.0)?,
+            patch_embedding_bias: None,
+            class_embedding: Some(zero_2.clone()),
+            position_embedding: filled_tensor(backend, context, vec![5, 2], 0.0)?,
+            pre_layer_norm_weight: Some(filled_tensor(backend, context, vec![2], 1.0)?),
+            pre_layer_norm_bias: Some(zero_2.clone()),
+            layers: vec![layer],
+            post_layer_norm_weight: filled_tensor(backend, context, vec![2], 1.0)?,
+            post_layer_norm_bias: zero_2,
+            visual_projection_weight: None,
+            llava_linear_1_weight: None,
+            llava_linear_1_bias: None,
+            llava_linear_2_weight: None,
+            llava_linear_2_bias: None,
+        })
+    }
+
+    fn tiny_clip_vision(
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeClipVision, Box<dyn Error>> {
         Ok(NativeClipVision::new(
-            ClipVisionConfiguration {
-                model_type: ClipVisionModelType::Clip,
-                dtype: DType::F32,
-                device: DeviceId::CPU,
-                hidden_size: 2,
-                intermediate_size: 2,
-                attention_heads: 1,
-                layer_count: 1,
-                image_size: 2,
-                patch_size: 1,
-                num_channels: 3,
-                max_num_patches: 4,
-                activation: ClipVisionActivation::QuickGelu,
-                projection_dimension: None,
-                llava_projection_dimension: None,
-            },
-            ClipVisionWeights {
-                patch_embedding_weight: filled_tensor(backend, context, vec![2, 3, 1, 1], 0.0)?,
-                patch_embedding_bias: None,
-                class_embedding: Some(zero_2.clone()),
-                position_embedding: filled_tensor(backend, context, vec![5, 2], 0.0)?,
-                pre_layer_norm_weight: Some(filled_tensor(backend, context, vec![2], 1.0)?),
-                pre_layer_norm_bias: Some(zero_2.clone()),
-                layers: vec![layer],
-                post_layer_norm_weight: filled_tensor(backend, context, vec![2], 1.0)?,
-                post_layer_norm_bias: zero_2,
-                visual_projection_weight: None,
-                llava_linear_1_weight: None,
-                llava_linear_1_bias: None,
-                llava_linear_2_weight: None,
-                llava_linear_2_bias: None,
-            },
+            tiny_clip_configuration(),
+            tiny_clip_weights(backend, context)?,
         )?)
+    }
+
+    #[test]
+    fn caller_cancellation_stops_every_named_clip_vision_construction_phase()
+    -> Result<(), Box<dyn Error>> {
+        let phases = [
+            ClipVisionConstructionPhase::Entry,
+            ClipVisionConstructionPhase::CanonicalState,
+            ClipVisionConstructionPhase::ParameterProjection,
+            ClipVisionConstructionPhase::PatchEmbedding,
+            ClipVisionConstructionPhase::PreLayerNorm,
+            ClipVisionConstructionPhase::LayerNorm1(0),
+            ClipVisionConstructionPhase::AttentionQuery(0),
+            ClipVisionConstructionPhase::AttentionKey(0),
+            ClipVisionConstructionPhase::AttentionValue(0),
+            ClipVisionConstructionPhase::AttentionOutput(0),
+            ClipVisionConstructionPhase::LayerNorm2(0),
+            ClipVisionConstructionPhase::MlpInput(0),
+            ClipVisionConstructionPhase::MlpActivation(0),
+            ClipVisionConstructionPhase::MlpOutput(0),
+            ClipVisionConstructionPhase::PostLayerNorm,
+            ClipVisionConstructionPhase::VisualProjection,
+            ClipVisionConstructionPhase::LlavaProjection,
+            ClipVisionConstructionPhase::SemanticDigest,
+            ClipVisionConstructionPhase::ModuleDigest,
+            ClipVisionConstructionPhase::Validation,
+            ClipVisionConstructionPhase::Return,
+        ];
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(4 * 1024 * 1024)?;
+        let upload_cancellation = CancellationToken::default();
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(2 * 1024 * 1024)?,
+            &upload_cancellation,
+        );
+        let model = tiny_clip_vision(&backend, &context)?;
+        for phase in phases {
+            let cancellation = CancellationToken::default();
+            let error = NativeClipVision::new_with_cancellation_and_phase_hook(
+                tiny_clip_configuration(),
+                tiny_clip_weights(&backend, &context)?,
+                &cancellation,
+                &mut |actual, token| {
+                    if actual == phase {
+                        token.cancel();
+                    }
+                },
+            )
+            .expect_err("the named construction boundary must not publish a model");
+            assert!(
+                matches!(error, ClipVisionError::Cancelled),
+                "{phase:?}: {error}"
+            );
+
+            let reconstruction_cancellation = CancellationToken::default();
+            let error = model
+                .reconstruct_with_phase_hook(&reconstruction_cancellation, &mut |actual, token| {
+                    if actual == phase {
+                        token.cancel();
+                    }
+                })
+                .expect_err("the named reconstruction boundary must not publish a model");
+            assert!(
+                matches!(error, ClipVisionError::Cancelled),
+                "reconstruction {phase:?}: {error}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn reconstruction_reprojects_canonical_state_and_checked_forward_retains_pooled_hidden()
+    -> Result<(), Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(4 * 1024 * 1024)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(2 * 1024 * 1024)?,
+            &cancellation,
+        );
+        let mut configuration = tiny_clip_configuration();
+        configuration.projection_dimension = Some(2);
+        let mut weights = tiny_clip_weights(&backend, &context)?;
+        weights.visual_projection_weight = Some(f32_tensor(
+            &backend,
+            &context,
+            vec![2, 2],
+            &[1.0, 0.0, 0.0, 1.0],
+        )?);
+        let model = NativeClipVision::new_with_cancellation(configuration, weights, &cancellation)?;
+        let reconstructed = model.reconstruct(&cancellation)?;
+        assert_eq!(reconstructed.configuration, model.configuration);
+        assert_eq!(reconstructed.semantic_identity, model.semantic_identity);
+        assert_eq!(
+            reconstructed.module_state_digest_sha256,
+            model.module_state_digest_sha256
+        );
+        assert_eq!(reconstructed.resident_parts()?, model.resident_parts()?);
+        for ((actual_name, actual), (expected_name, expected)) in reconstructed
+            .canonical_state
+            .iter()
+            .zip(&model.canonical_state)
+        {
+            assert_eq!(actual_name, expected_name);
+            assert_eq!(actual.storage_id(), expected.storage_id());
+            assert_eq!(actual.descriptor(), expected.descriptor());
+            assert_eq!(actual.contiguous_bytes()?, expected.contiguous_bytes()?);
+        }
+
+        let input = filled_tensor(&backend, &context, vec![1, 3, 2, 2], 0.25)?;
+        let mut checked_model = reconstructed.clone();
+        let checked = checked_model.forward_checked(
+            &backend,
+            &input,
+            ClipVisionIntermediate::None,
+            &context,
+        )?;
+        assert_eq!(
+            checked.pooled_hidden.contiguous_bytes()?,
+            checked.output.image_embeds.contiguous_bytes()?
+        );
+        let mut public_model = reconstructed;
+        let public =
+            public_model.forward(&backend, &input, ClipVisionIntermediate::None, &context)?;
+        assert_eq!(
+            public.semantic_digest_sha256(),
+            checked.output.semantic_digest_sha256()
+        );
+
+        let mut misordered = model;
+        misordered.canonical_state.swap(0, 1);
+        assert!(matches!(
+            misordered.reconstruct(&cancellation),
+            Err(ClipVisionError::SemanticIdentityChanged)
+                | Err(ClipVisionError::InvalidConfiguration(_))
+        ));
+        Ok(())
     }
 
     #[test]

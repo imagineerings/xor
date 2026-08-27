@@ -20,6 +20,16 @@ CERTIFICATION_WRITES = {
     "crates/comfy_test_support/Cargo.toml",
 }
 AUTHORIZED_INTEGRATION_WRITES = {
+    "comfy-parity-provider-worker-stream-bridge": {
+        "crates/comfy_plugin_host/Cargo.toml",
+        "crates/comfy_test_support/Cargo.toml",
+    },
+    "comfy-parity-provider-deployment-lifecycle": {
+        "Cargo.lock",
+        "crates/comfy_api/Cargo.toml",
+        "crates/extension_host/Cargo.toml",
+        "crates/zed/Cargo.toml",
+    },
     "comfy-parity-native-node-runtime-foundation": {
         "Cargo.lock",
         "crates/comfy_nodes/Cargo.toml",

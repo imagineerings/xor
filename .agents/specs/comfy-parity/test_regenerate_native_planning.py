@@ -2251,35 +2251,160 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-provider-deployment-lifecycle"
         ]
         for deployment_read in (
-            "crates/extension_host/src/extension_host.rs",
             "crates/comfy_runtime/src/settings.rs",
             "crates/comfy_runtime/src/trust.rs",
             "crates/comfy_runtime/src/permissions.rs",
             "crates/paths/src/paths.rs",
-            "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
-            "crates/comfy_test_support/tests/plugin_e2e.rs",
             "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component",
         ):
             self.assertIn(deployment_read, provider_deployment["reads"])
             self.assertNotIn(deployment_read, provider_deployment["writes"])
+        deployment_witness = "crates/comfy_test_support/tests/plugin_e2e.rs"
+        self.assertIn(deployment_witness, provider_deployment["reads"])
+        self.assertIn(deployment_witness, provider_deployment["writes"])
+        self.assertIn(
+            "crates/extension_host/src/extension_host.rs",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/extension_host/src/extension_host.rs",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/extension_host/src/extension_store_test.rs",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/extension_host/src/extension_store_test.rs",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/extension_host/Cargo.toml",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/extension_host/Cargo.toml",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_api/Cargo.toml",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_api/Cargo.toml",
+            provider_deployment["writes"],
+        )
+        self.assertIn("crates/zed/Cargo.toml", provider_deployment["reads"])
+        self.assertIn("crates/zed/Cargo.toml", provider_deployment["writes"])
+        self.assertIn("Cargo.lock", provider_deployment["reads"])
+        self.assertIn("Cargo.lock", provider_deployment["writes"])
+        self.assertIn(
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/support/provider_worker_stream_bridge.rs",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/support/provider_worker_stream_bridge.rs",
+            provider_deployment["writes"],
+        )
         self.assertIn(
             "crates/comfy_test_support/tests/provider_deployment_lifecycle.rs",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/plugin_e2e.rs",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
             provider_deployment["writes"],
         )
         for deployment_gate in (
             "canonical paths::extensions_dir inventory",
             "neither rescans files, substitutes PluginTrustPolicy::default()",
             "commit the whole VerifiedComponentGeneration atomically",
+            "without invoking any component adapter",
+            "invalid inventory is distinct from a legitimate empty deployment",
+            "only a valid empty candidate synchronizes adapters to empty",
+            "one canonical owner-derived SHA-256 candidate digest",
+            "opaque owner-issued ComponentInventoryCandidateIdentity",
+            "exact accepted replay is a generation-idempotent no-op",
             "rejected candidate retains the prior descriptors",
+            "staged replacement runtime before quiescing",
+            "Ready state and controller registration wait for the first accepted canonical inventory candidate",
+            "Each mode independently generates its authorization sealer",
+            "remain mode-local opaque values",
             "starts the replacement with start_with_provider_worker_bridge",
             "publishes Ready/API state only after attachment succeeds",
             "Headless remains fail-closed for provider, network, credential, and cost actuation",
             "focused provider_deployment_lifecycle test reuses Task425's nonconstructible scripted bridge",
+            "must exact-match them to the signed worker deployment before minting or activation",
+            "changed candidate paired with an old otherwise-valid registry bundle is denied",
+            "atomically re-drives the exact previously accepted opaque candidate through the replacement router",
+            "exactly one helper-only owner in tests/support/provider_worker_stream_bridge.rs with no test entrypoints",
+            "provider_worker_stream_bridge.rs retains exactly its three Task425 tests",
+            "provider_deployment_lifecycle.rs retains exactly its one Task433 test",
+            "private production transition is concrete over NativeProviderWorkerBridgeAttachment",
             "exactly one ProviderRuntimeStreamService::new owner",
         ):
             self.assertIn(deployment_gate, provider_deployment["done"])
         self.assertIn(
+            "cargo test --locked -p comfy_test_support --test provider_worker_stream_bridge -- --list",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "cargo test --locked -p comfy_test_support --test provider_worker_stream_bridge -- --nocapture",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "cargo test --locked -p comfy_test_support --test provider_deployment_lifecycle -- --list",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
             "cargo test --locked -p comfy_test_support --test provider_deployment_lifecycle provider_deployment_lifecycle_preserves_cross_mode_generation_and_recovery -- --exact --nocapture",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "cargo test --locked -p extension_host --all-targets",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "cargo test --locked -p zed --features comfy-test-support --all-targets",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/validate_backend_dependencies.py",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "cargo test --locked -p extension_host component_inventory_candidate -- --nocapture",
             planning.task_validation_commands(provider_deployment),
         )
         for deployment_attachment_read in (

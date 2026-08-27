@@ -257,6 +257,9 @@ pub struct NativeHeadlessSnapshot {
     pub restart_count: usize,
     pub transitions: Vec<NativeHeadlessTransition>,
     pub dropped_transitions: usize,
+    pub deployment_identity_sha256: Option<String>,
+    pub provider_deployment: Option<crate::NativeProviderDeploymentIdentity>,
+    pub deployment_diagnostic: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -552,10 +555,117 @@ pub type NativeHeadlessRuntimeFactory = Arc<
         + 'static,
 >;
 
+type NativeHeadlessRuntimeActivation = Box<
+    dyn FnOnce(
+            SharedExecutionPresentationService,
+        ) -> Result<NativeRuntimeApiHost, NativeApiHostError>
+        + Send
+        + 'static,
+>;
+
+type NativeHeadlessDeploymentActivation = Box<
+    dyn FnOnce(
+            SharedExecutionPresentationService,
+            Arc<comfy_runtime::NativeExecutionRegistryBundle>,
+            extension_host::ComponentInventoryCandidateIdentity,
+        ) -> Result<NativeRuntimeApiHost, NativeApiHostError>
+        + Send
+        + 'static,
+>;
+
+pub struct PreparedNativeHeadlessRuntime {
+    provider_deployment: Option<crate::NativeProviderDeploymentIdentity>,
+    registry_bundle: Option<Arc<comfy_runtime::NativeExecutionRegistryBundle>>,
+    candidate_identity: Option<extension_host::ComponentInventoryCandidateIdentity>,
+    activation: Option<NativeHeadlessRuntimeActivation>,
+    deployment_activation: Option<NativeHeadlessDeploymentActivation>,
+}
+
+impl PreparedNativeHeadlessRuntime {
+    pub fn checked<F>(
+        registry_bundle: Arc<comfy_runtime::NativeExecutionRegistryBundle>,
+        candidate_identity: extension_host::ComponentInventoryCandidateIdentity,
+        activation: F,
+    ) -> Result<Self, NativeApiHostError>
+    where
+        F: FnOnce(
+                SharedExecutionPresentationService,
+                Arc<comfy_runtime::NativeExecutionRegistryBundle>,
+                extension_host::ComponentInventoryCandidateIdentity,
+            ) -> Result<NativeRuntimeApiHost, NativeApiHostError>
+            + Send
+            + 'static,
+    {
+        let provider_deployment = crate::NativeProviderDeploymentIdentity::from_registry_bundle(
+            &registry_bundle,
+            &candidate_identity,
+        )?;
+        Ok(Self {
+            provider_deployment: Some(provider_deployment),
+            registry_bundle: Some(registry_bundle),
+            candidate_identity: Some(candidate_identity),
+            activation: None,
+            deployment_activation: Some(Box::new(activation)),
+        })
+    }
+
+    fn immediate(factory: NativeHeadlessRuntimeFactory) -> Self {
+        Self {
+            provider_deployment: None,
+            registry_bundle: None,
+            candidate_identity: None,
+            activation: Some(Box::new(move |presentation| factory(presentation))),
+            deployment_activation: None,
+        }
+    }
+
+    pub fn activate(
+        mut self,
+        presentation: SharedExecutionPresentationService,
+    ) -> Result<NativeRuntimeApiHost, NativeApiHostError> {
+        if let Some(activation) = self.deployment_activation.take() {
+            let bundle = self
+                .registry_bundle
+                .take()
+                .ok_or(NativeApiHostError::StateUnavailable)?;
+            let candidate_identity = self
+                .candidate_identity
+                .take()
+                .ok_or(NativeApiHostError::StateUnavailable)?;
+            let runtime = activation(presentation, bundle, candidate_identity)?;
+            if runtime.provider_deployment() != self.provider_deployment.as_ref() {
+                runtime.shutdown("prepared deployment activation returned a foreign runtime")?;
+                return Err(NativeApiHostError::InvalidConfiguration(
+                    "prepared deployment activation returned a foreign runtime".into(),
+                ));
+            }
+            return Ok(runtime);
+        }
+        self.activation
+            .take()
+            .ok_or(NativeApiHostError::StateUnavailable)?(presentation)
+    }
+}
+
+pub type NativeHeadlessRuntimePreparationFactory = Arc<
+    dyn Fn(
+            SharedExecutionPresentationService,
+        ) -> Result<PreparedNativeHeadlessRuntime, NativeApiHostError>
+        + Send
+        + Sync
+        + 'static,
+>;
+
+enum HeadlessRuntimeFactory {
+    Immediate(NativeHeadlessRuntimeFactory),
+    Prepared(NativeHeadlessRuntimePreparationFactory),
+}
+
 struct ActiveRuntime {
     runtime: NativeRuntimeApiHost,
     server: Option<NativeApiServer<crate::NativeRuntimeHttpServices>>,
     local_address: Option<SocketAddr>,
+    provider_deployment: Option<crate::NativeProviderDeploymentIdentity>,
 }
 
 struct PendingShutdown {
@@ -570,12 +680,13 @@ struct NativeHeadlessInner {
     next_sequence: u64,
     transitions: VecDeque<NativeHeadlessTransition>,
     dropped_transitions: usize,
+    deployment_diagnostic: Option<String>,
 }
 
 pub struct NativeHeadlessService {
     mode: NativeHeadlessMode,
     presentation: SharedExecutionPresentationService,
-    factory: NativeHeadlessRuntimeFactory,
+    factory: HeadlessRuntimeFactory,
     server_config: Option<NativeApiServerConfig>,
     policy: NativeHeadlessPolicy,
     operation: Mutex<()>,
@@ -600,7 +711,30 @@ impl NativeHeadlessService {
         Self::new(
             NativeHeadlessMode::Serve,
             presentation,
-            Arc::new(factory),
+            HeadlessRuntimeFactory::Immediate(Arc::new(factory)),
+            Some(server_config),
+            policy,
+        )
+    }
+
+    pub fn serve_prepared<F>(
+        presentation: SharedExecutionPresentationService,
+        factory: F,
+        server_config: NativeApiServerConfig,
+        policy: NativeHeadlessPolicy,
+    ) -> Result<Self, NativeHeadlessError>
+    where
+        F: Fn(
+                SharedExecutionPresentationService,
+            ) -> Result<PreparedNativeHeadlessRuntime, NativeApiHostError>
+            + Send
+            + Sync
+            + 'static,
+    {
+        Self::new(
+            NativeHeadlessMode::Serve,
+            presentation,
+            HeadlessRuntimeFactory::Prepared(Arc::new(factory)),
             Some(server_config),
             policy,
         )
@@ -622,7 +756,29 @@ impl NativeHeadlessService {
         Self::new(
             NativeHeadlessMode::Offline,
             presentation,
-            Arc::new(factory),
+            HeadlessRuntimeFactory::Immediate(Arc::new(factory)),
+            None,
+            policy,
+        )
+    }
+
+    pub fn offline_prepared<F>(
+        presentation: SharedExecutionPresentationService,
+        factory: F,
+        policy: NativeHeadlessPolicy,
+    ) -> Result<Self, NativeHeadlessError>
+    where
+        F: Fn(
+                SharedExecutionPresentationService,
+            ) -> Result<PreparedNativeHeadlessRuntime, NativeApiHostError>
+            + Send
+            + Sync
+            + 'static,
+    {
+        Self::new(
+            NativeHeadlessMode::Offline,
+            presentation,
+            HeadlessRuntimeFactory::Prepared(Arc::new(factory)),
             None,
             policy,
         )
@@ -631,7 +787,7 @@ impl NativeHeadlessService {
     fn new(
         mode: NativeHeadlessMode,
         presentation: SharedExecutionPresentationService,
-        factory: NativeHeadlessRuntimeFactory,
+        factory: HeadlessRuntimeFactory,
         server_config: Option<NativeApiServerConfig>,
         policy: NativeHeadlessPolicy,
     ) -> Result<Self, NativeHeadlessError> {
@@ -661,6 +817,7 @@ impl NativeHeadlessService {
                 next_sequence: 1,
                 transitions,
                 dropped_transitions: 0,
+                deployment_diagnostic: None,
             }),
         })
     }
@@ -692,6 +849,34 @@ impl NativeHeadlessService {
             if inner.active.is_none() {
                 return Err(NativeHeadlessError::NotRunning);
             }
+        }
+        let prepared = self.prepare_runtime(true)?;
+        if let Some(provider_deployment) = prepared.provider_deployment.as_ref() {
+            let inner = self
+                .inner
+                .lock()
+                .map_err(|_| NativeHeadlessError::StateUnavailable)?;
+            if inner
+                .active
+                .as_ref()
+                .and_then(|active| active.provider_deployment.as_ref())
+                .is_some_and(|active| active.same_signed_deployment(provider_deployment))
+            {
+                drop(inner);
+                drop(prepared);
+                let mut inner = self
+                    .inner
+                    .lock()
+                    .map_err(|_| NativeHeadlessError::StateUnavailable)?;
+                inner.deployment_diagnostic = None;
+                return self.snapshot_from_inner(&inner);
+            }
+        }
+        {
+            let inner = self
+                .inner
+                .lock()
+                .map_err(|_| NativeHeadlessError::StateUnavailable)?;
             if inner.restart_count >= self.policy.maximum_restarts {
                 return Err(NativeHeadlessError::RestartBudgetExhausted {
                     maximum: self.policy.maximum_restarts,
@@ -710,7 +895,7 @@ impl NativeHeadlessService {
                 },
             )?;
         }
-        self.start_locked()?;
+        self.start_prepared_locked(prepared)?;
         self.snapshot_locked()
     }
 
@@ -980,6 +1165,46 @@ impl NativeHeadlessService {
     }
 
     fn start_locked(&self) -> Result<(), NativeHeadlessError> {
+        let prepared = self.prepare_runtime(false)?;
+        self.start_prepared_locked(prepared)
+    }
+
+    fn prepare_runtime(
+        &self,
+        retain_active_on_rejection: bool,
+    ) -> Result<PreparedNativeHeadlessRuntime, NativeHeadlessError> {
+        let prepared = match &self.factory {
+            HeadlessRuntimeFactory::Immediate(factory) => {
+                Ok(PreparedNativeHeadlessRuntime::immediate(factory.clone()))
+            }
+            HeadlessRuntimeFactory::Prepared(factory) => factory(self.presentation.clone()),
+        };
+        match prepared {
+            Ok(prepared) => Ok(prepared),
+            Err(error) if retain_active_on_rejection => {
+                let mut inner = self
+                    .inner
+                    .lock()
+                    .map_err(|_| NativeHeadlessError::StateUnavailable)?;
+                inner.deployment_diagnostic = Some(error.to_string());
+                Err(NativeHeadlessError::DeploymentRejected(error.to_string()))
+            }
+            Err(error) => {
+                self.record_failure(
+                    "runtime_prepare",
+                    "native_runtime_deployment_rejected",
+                    &error.to_string(),
+                    true,
+                )?;
+                Err(NativeHeadlessError::DeploymentRejected(error.to_string()))
+            }
+        }
+    }
+
+    fn start_prepared_locked(
+        &self,
+        prepared: PreparedNativeHeadlessRuntime,
+    ) -> Result<(), NativeHeadlessError> {
         {
             let mut inner = self
                 .inner
@@ -997,7 +1222,8 @@ impl NativeHeadlessService {
                 "building native Rust runtime",
             )?;
         }
-        let runtime = match (self.factory)(self.presentation.clone()) {
+        let prepared_provider_deployment = prepared.provider_deployment.clone();
+        let runtime = match prepared.activate(self.presentation.clone()) {
             Ok(runtime) => runtime,
             Err(error) => {
                 self.record_failure(
@@ -1009,6 +1235,24 @@ impl NativeHeadlessService {
                 return Err(NativeHeadlessError::RuntimeBuild(error.to_string()));
             }
         };
+        if prepared_provider_deployment.is_some()
+            && runtime.provider_deployment() != prepared_provider_deployment.as_ref()
+        {
+            let shutdown_result = runtime.shutdown("prepared deployment identity mismatch");
+            let detail = match shutdown_result {
+                Ok(()) => "prepared runtime returned a foreign deployment identity".to_owned(),
+                Err(error) => format!(
+                    "prepared runtime returned a foreign deployment identity; cleanup failed: {error}"
+                ),
+            };
+            self.record_failure(
+                "runtime_activation",
+                "native_runtime_deployment_identity_mismatch",
+                &detail,
+                true,
+            )?;
+            return Err(NativeHeadlessError::RuntimeBuild(detail));
+        }
         let (server, local_address) = match &self.server_config {
             Some(config) => {
                 let mut effective_config = runtime.server_config(config.bind_address);
@@ -1049,7 +1293,9 @@ impl NativeHeadlessService {
             runtime,
             server,
             local_address,
+            provider_deployment: prepared_provider_deployment,
         });
+        inner.deployment_diagnostic = None;
         let detail = local_address.map_or_else(
             || "native runtime ready without a public socket".to_owned(),
             |address| format!("native API ready at {address}"),
@@ -1219,6 +1465,13 @@ impl NativeHeadlessService {
             .inner
             .lock()
             .map_err(|_| NativeHeadlessError::StateUnavailable)?;
+        self.snapshot_from_inner(&inner)
+    }
+
+    fn snapshot_from_inner(
+        &self,
+        inner: &NativeHeadlessInner,
+    ) -> Result<NativeHeadlessSnapshot, NativeHeadlessError> {
         Ok(NativeHeadlessSnapshot {
             mode: self.mode,
             state: inner.state.clone(),
@@ -1229,6 +1482,16 @@ impl NativeHeadlessService {
             restart_count: inner.restart_count,
             transitions: inner.transitions.iter().cloned().collect(),
             dropped_transitions: inner.dropped_transitions,
+            deployment_identity_sha256: inner
+                .active
+                .as_ref()
+                .and_then(|active| active.provider_deployment.as_ref())
+                .map(|deployment| deployment.execution_bundle_identity_sha256().to_owned()),
+            provider_deployment: inner
+                .active
+                .as_ref()
+                .and_then(|active| active.provider_deployment.clone()),
+            deployment_diagnostic: inner.deployment_diagnostic.clone(),
         })
     }
 }
@@ -1287,6 +1550,8 @@ pub enum NativeHeadlessError {
     RestartBudgetExhausted { maximum: usize },
     #[error("native runtime construction failed: {0}")]
     RuntimeBuild(String),
+    #[error("native provider deployment was rejected: {0}")]
+    DeploymentRejected(String),
     #[error("native API transport failed: {0}")]
     Transport(String),
     #[error("native API host failed: {0}")]
@@ -1321,6 +1586,7 @@ impl NativeHeadlessError {
             Self::LifecycleBusy => "headless_lifecycle_busy",
             Self::RestartBudgetExhausted { .. } => "headless_restart_budget_exhausted",
             Self::RuntimeBuild(_) => "native_runtime_start_failed",
+            Self::DeploymentRejected(_) => "native_provider_deployment_rejected",
             Self::Transport(_) => "native_api_transport_failed",
             Self::Host(_) => "native_api_host_failed",
             Self::ShutdownTimeout { .. } => "native_shutdown_timeout",
@@ -1688,6 +1954,7 @@ mod tests {
             NativeHeadlessError::LifecycleBusy,
             NativeHeadlessError::RestartBudgetExhausted { maximum: 1 },
             NativeHeadlessError::RuntimeBuild("fixture".into()),
+            NativeHeadlessError::DeploymentRejected("fixture".into()),
             NativeHeadlessError::Transport("fixture".into()),
             NativeHeadlessError::Host("fixture".into()),
             NativeHeadlessError::ShutdownTimeout { milliseconds: 1 },
@@ -1716,6 +1983,7 @@ mod tests {
                 "headless_lifecycle_busy",
                 "headless_restart_budget_exhausted",
                 "native_runtime_start_failed",
+                "native_provider_deployment_rejected",
                 "native_api_transport_failed",
                 "native_api_host_failed",
                 "native_shutdown_timeout",

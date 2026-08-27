@@ -1,5 +1,5 @@
 mod app_menus;
-#[cfg(all(feature = "comfy", not(test)))]
+#[cfg(feature = "comfy")]
 #[path = "comfy_plugin_services.rs"]
 pub mod comfy_plugin_services;
 pub mod edit_prediction_registry;
@@ -603,18 +603,88 @@ fn subscribe_to_collaborative_review_agent_panel(
 }
 
 #[cfg(feature = "comfy")]
+#[derive(Clone)]
+struct DesktopComponentLifecycleAdapter {
+    router: comfy_plugin_host::ComponentHostRouter,
+    accepted_candidate_identity:
+        Arc<std::sync::Mutex<Option<extension_host::ComponentInventoryCandidateIdentity>>>,
+}
+
+#[cfg(feature = "comfy")]
+impl extension_host::ComponentLifecycleAdapter for DesktopComponentLifecycleAdapter {
+    fn adapter_id(&self) -> &'static str {
+        "comfy.desktop-component-lifecycle"
+    }
+
+    fn synchronize_candidate(
+        &self,
+        candidate: extension_host::ComponentInventoryCandidate,
+    ) -> futures::future::BoxFuture<'static, Result<(), String>> {
+        let router = self.router.clone();
+        let accepted_candidate_identity = self.accepted_candidate_identity.clone();
+        async move {
+            let candidate_identity = candidate.identity().clone();
+            let previous_identity = accepted_candidate_identity
+                .lock()
+                .map_err(|_| "desktop component candidate identity is unavailable".to_owned())?
+                .replace(candidate_identity);
+            if let Err(error) = extension_host::ComponentLifecycleAdapter::synchronize(
+                &router,
+                candidate.into_components(),
+            )
+            .await
+            {
+                *accepted_candidate_identity.lock().map_err(|_| {
+                    "desktop component candidate identity is unavailable".to_owned()
+                })? = previous_identity;
+                return Err(error);
+            }
+            Ok(())
+        }
+        .boxed()
+    }
+
+    fn synchronize(
+        &self,
+        components: Vec<extension_host::InstalledComponent>,
+    ) -> futures::future::BoxFuture<'static, Result<(), String>> {
+        extension_host::ComponentLifecycleAdapter::synchronize(&self.router, components)
+    }
+}
+
+#[cfg(feature = "comfy")]
 struct ComfyComponentHostGlobal {
     profile_id: String,
     component_generation: u64,
     #[cfg(not(test))]
     plugin_security: comfy_runtime::NativePluginSecurityPolicy,
     router: comfy_plugin_host::ComponentHostRouter,
+    #[cfg(not(test))]
     provider_invocation_authority:
         Option<Arc<dyn comfy_runtime::NativeProviderInvocationAuthority>>,
     #[cfg(not(test))]
     private_worker_executor: Arc<comfy_plugin_host::PrivateWorkerPluginExecutor>,
     #[cfg(not(test))]
     provider_cost_authority: Arc<comfy_runtime::ProviderCostApprovalAuthority>,
+    #[cfg_attr(
+        test,
+        expect(
+            dead_code,
+            reason = "desktop startup consumes accepted inventory state"
+        )
+    )]
+    accepted_inventory: bool,
+    #[cfg_attr(
+        test,
+        expect(
+            dead_code,
+            reason = "desktop startup consumes accepted candidate identity"
+        )
+    )]
+    accepted_candidate_identity:
+        Arc<std::sync::Mutex<Option<extension_host::ComponentInventoryCandidateIdentity>>>,
+    #[cfg(not(test))]
+    active_provider_deployment: Option<comfy_api::NativeProviderDeploymentIdentity>,
 }
 
 #[cfg(all(test, feature = "rust-tools"))]
@@ -850,8 +920,6 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
     );
     #[cfg(not(test))]
     let provider_cost_authority = plugin_services.cost_authority();
-    #[cfg(test)]
-    let provider_invocation_authority = None;
     if let Some(component_host) = cx.try_global::<ComfyComponentHostGlobal>() {
         let router = component_host.router.clone();
         router.replace_with_initial_generation(replacement_host, component_generation)?;
@@ -863,9 +931,10 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
         {
             component_host.plugin_security = plugin_security;
         }
-        component_host.provider_invocation_authority = provider_invocation_authority;
         #[cfg(not(test))]
         {
+            component_host.provider_invocation_authority = provider_invocation_authority;
+            component_host.active_provider_deployment = None;
             component_host.private_worker_executor = private_worker_executor;
             component_host.provider_cost_authority = provider_cost_authority;
         }
@@ -875,7 +944,14 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
         replacement_host,
         component_generation,
     )?;
-    extension_host::register_component_lifecycle_adapter(Arc::new(router.clone()), cx)?;
+    let accepted_candidate_identity = Arc::new(std::sync::Mutex::new(None));
+    extension_host::register_component_lifecycle_adapter(
+        Arc::new(DesktopComponentLifecycleAdapter {
+            router: router.clone(),
+            accepted_candidate_identity: accepted_candidate_identity.clone(),
+        }),
+        cx,
+    )?;
     register_comfy_plugin_contribution_source(router.clone(), cx);
     #[cfg(not(test))]
     let receiver = {
@@ -889,20 +965,28 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
         #[cfg(not(test))]
         plugin_security,
         router,
+        #[cfg(not(test))]
         provider_invocation_authority,
         #[cfg(not(test))]
         private_worker_executor,
         #[cfg(not(test))]
         provider_cost_authority,
+        accepted_inventory: false,
+        accepted_candidate_identity,
+        #[cfg(not(test))]
+        active_provider_deployment: None,
     });
     #[cfg(not(test))]
     {
         cx.spawn(async move |cx| {
             while receiver.recv().await.is_ok() {
                 let profile = profile.clone();
-                if let Err(error) =
-                    cx.update(|cx| register_native_comfy_execution(&profile, false, cx))
-                {
+                let result = cx.update(|cx| {
+                    cx.global_mut::<ComfyComponentHostGlobal>()
+                        .accepted_inventory = true;
+                    register_native_comfy_execution(&profile, false, cx)
+                });
+                if let Err(error) = result {
                     eprintln!("native Comfy component lifecycle rebind failed: {error}");
                 }
             }
@@ -1087,6 +1171,68 @@ fn native_comfy_worker_launch(
     )
 }
 
+#[cfg(feature = "comfy")]
+struct AcceptedDesktopComponentDeployment {
+    registry_bundle: Arc<comfy_runtime::NativeExecutionRegistryBundle>,
+    candidate_identity: extension_host::ComponentInventoryCandidateIdentity,
+}
+
+#[cfg(feature = "comfy")]
+fn accepted_desktop_component_registry_bundle(
+    accepted_inventory: bool,
+    candidate_identity: Option<extension_host::ComponentInventoryCandidateIdentity>,
+    router: &comfy_plugin_host::ComponentHostRouter,
+) -> anyhow::Result<AcceptedDesktopComponentDeployment> {
+    anyhow::ensure!(
+        accepted_inventory,
+        "native Comfy component inventory has not produced an accepted candidate"
+    );
+    let candidate_identity = candidate_identity.ok_or_else(|| {
+        anyhow::anyhow!("native Comfy component inventory candidate identity is unavailable")
+    })?;
+    Ok(AcceptedDesktopComponentDeployment {
+        registry_bundle: Arc::new(router.active_execution_registry_bundle()?),
+        candidate_identity,
+    })
+}
+
+#[cfg(feature = "comfy")]
+#[cfg_attr(
+    test,
+    expect(
+        dead_code,
+        reason = "desktop startup owns the concrete controller attachment transition"
+    )
+)]
+fn activate_desktop_component_deployment<RollbackError>(
+    deployment: AcceptedDesktopComponentDeployment,
+    provider_worker_bridge: comfy_runtime::NativeProviderWorkerBridgeAttachment,
+    private_worker_executor: Arc<comfy_plugin_host::PrivateWorkerPluginExecutor>,
+    cx: &mut App,
+    rollback_controller: impl FnOnce(&mut App) -> Result<(), RollbackError>,
+) -> anyhow::Result<comfy_api::NativeProviderDeploymentIdentity>
+where
+    RollbackError: std::fmt::Display,
+{
+    let provider_deployment = comfy_api::NativeProviderDeploymentIdentity::from_registry_bundle(
+        &deployment.registry_bundle,
+        &deployment.candidate_identity,
+    )?;
+    if let Err(error) =
+        private_worker_executor.attach_provider_worker_bridge(provider_worker_bridge)
+    {
+        if let Err(rollback_error) = rollback_controller(cx) {
+            return Err(anyhow::anyhow!(
+                "native provider bridge attachment failed: {error}; controller rollback failed: {rollback_error}"
+            ));
+        }
+        return Err(anyhow::anyhow!(
+            "native provider bridge attachment failed: {error}"
+        ));
+    }
+    Ok(provider_deployment)
+}
+
 #[cfg(all(feature = "comfy", not(test)))]
 fn register_native_comfy_execution(
     profile: &comfy_runtime::NativeRuntimeProfile,
@@ -1116,17 +1262,28 @@ fn register_native_comfy_execution(
         }
     };
     let mut worker = native_comfy_worker_launch(profile, WorkerId(Uuid::new_v4()))?;
-    let (registry_bundle, provider_invocation_authority, private_worker_executor) = {
+    let (deployment, provider_invocation_authority, private_worker_executor) = {
         let component_host = cx
             .try_global::<ComfyComponentHostGlobal>()
             .filter(|component_host| component_host.profile_id == profile_id.0.to_string())
             .ok_or_else(|| anyhow::anyhow!("native Comfy component host is unavailable"))?;
+        let candidate_identity = component_host
+            .accepted_candidate_identity
+            .lock()
+            .map_err(|_| anyhow::anyhow!("desktop component candidate identity is unavailable"))?
+            .clone();
+        let deployment = accepted_desktop_component_registry_bundle(
+            component_host.accepted_inventory,
+            candidate_identity,
+            &component_host.router,
+        )?;
         (
-            Arc::new(component_host.router.active_execution_registry_bundle()?),
+            deployment,
             component_host.provider_invocation_authority.clone(),
             component_host.private_worker_executor.clone(),
         )
     };
+    let registry_bundle = deployment.registry_bundle.clone();
     worker = worker.with_registry_deployment(registry_bundle.worker_deployment().clone());
     let presentation = comfy_ui::execution_ui_model(cx)
         .ok_or_else(|| anyhow::anyhow!("native execution UI model is not initialized"))?
@@ -1141,20 +1298,28 @@ fn register_native_comfy_execution(
                 || anyhow::anyhow!("native provider invocation authority is unavailable"),
             )?);
     }
+    let provider_deployment = comfy_api::NativeProviderDeploymentIdentity::from_registry_bundle(
+        &deployment.registry_bundle,
+        &deployment.candidate_identity,
+    )?;
+    if cx
+        .try_global::<ComfyComponentHostGlobal>()
+        .and_then(|component_host| component_host.active_provider_deployment.as_ref())
+        == Some(&provider_deployment)
+    {
+        return Ok(());
+    }
     let provider_worker_bridge =
         comfy_ui::register_native_execution_services(config, registry_bundle, cx)?;
-    if let Err(error) =
-        private_worker_executor.attach_provider_worker_bridge(provider_worker_bridge)
-    {
-        if let Err(clear_error) = comfy_ui::clear_native_execution_services(cx) {
-            return Err(anyhow::anyhow!(
-                "native provider bridge attachment failed: {error}; controller rollback failed: {clear_error}"
-            ));
-        }
-        return Err(anyhow::anyhow!(
-            "native provider bridge attachment failed: {error}"
-        ));
-    }
+    let provider_deployment = activate_desktop_component_deployment(
+        deployment,
+        provider_worker_bridge,
+        private_worker_executor,
+        cx,
+        comfy_ui::clear_native_execution_services,
+    )?;
+    cx.global_mut::<ComfyComponentHostGlobal>()
+        .active_provider_deployment = Some(provider_deployment);
     Ok(())
 }
 
@@ -1242,15 +1407,7 @@ pub fn init(cx: &mut App) {
             }
             #[cfg(not(test))]
             Ok(()) => {
-                if let Ok(profile) = active_native_comfy_profile(cx)
-                    && let Err(error) = register_native_comfy_execution(&profile, false, cx)
-                {
-                    let message =
-                        format!("native Comfy worker registry initialization failed: {error}");
-                    log::error!("{message}");
-                    comfy_ui::set_initialization_error(message, cx);
-                } else if let Ok((profile, plugin_security)) = active_native_comfy_configuration(cx)
-                {
+                if let Ok((profile, plugin_security)) = active_native_comfy_configuration(cx) {
                     cx.set_global(NativeComfyRuntimeBinding::new(&profile, &plugin_security));
                 }
             }
@@ -4109,15 +4266,157 @@ mod tests {
         let register = desktop
             .find("comfy_ui::register_native_execution_services(config, registry_bundle, cx)")
             .expect("native controller registration");
-        let attach = desktop[register..]
-            .find("private_worker_executor.attach_provider_worker_bridge(provider_worker_bridge)")
+        let transition = desktop[register..]
+            .find("activate_desktop_component_deployment(")
             .map(|offset| register + offset)
+            .expect("exact desktop deployment transition");
+        let attach = desktop
+            .find("private_worker_executor.attach_provider_worker_bridge(provider_worker_bridge)")
             .expect("exact retained executor attachment");
-        assert!(register < attach);
+        assert!(attach < register && register < transition);
 
-        assert!(headless.contains("ComponentExecutionBoundary::conformance_in_process"));
-        assert!(!headless.contains("attach_provider_worker_bridge"));
-        assert!(!headless.contains("NativeProviderWorkerBridgeAttachment"));
+        assert!(headless.contains("deny_only_private_worker_services("));
+        assert!(headless.contains("start_with_provider_worker_bridge("));
+        assert!(headless.contains("attach_provider_worker_bridge(provider_worker_bridge)"));
+    }
+
+    #[cfg(feature = "comfy")]
+    #[gpui::test]
+    async fn desktop_component_registry_waits_for_an_accepted_inventory_bundle(
+        cx: &mut TestAppContext,
+    ) {
+        cx.executor().allow_parking();
+        desktop_component_registry_waits_for_an_accepted_inventory_bundle_result(cx)
+            .await
+            .expect("desktop component registry lifecycle should converge");
+    }
+
+    #[cfg(feature = "comfy")]
+    async fn desktop_component_registry_waits_for_an_accepted_inventory_bundle_result(
+        cx: &mut TestAppContext,
+    ) -> anyhow::Result<()> {
+        let profile_id = comfy_ui::LOCAL_EXECUTION_PROFILE_ID.0.to_string();
+        let host = comfy_plugin_host::ComponentHost::new(
+            extension_host::ComponentRuntime::no_wasi()?,
+            comfy_runtime::PluginTrustPolicy::default(),
+            comfy_runtime::PermissionPolicy::new(profile_id, std::iter::empty())?,
+            comfy_plugin_host::ComponentExecutionBoundary::conformance_in_process(Arc::new(
+                comfy_plugin_host::UnavailablePluginCapabilityServices,
+            )),
+            comfy_plugin_host::ComponentLimits::default(),
+            comfy_runtime::generated_native_node_registry_projection(None)?,
+        )?;
+        let router = comfy_plugin_host::ComponentHostRouter::with_initial_generation(
+            host,
+            comfy_runtime::DEFAULT_COMPONENT_REGISTRY_GENERATION,
+        )?;
+        assert!(accepted_desktop_component_registry_bundle(false, None, &router).is_err());
+
+        let filesystem = FakeFs::new(cx.executor());
+        let extensions_dir = Path::new("/task433-desktop-inventory");
+        filesystem
+            .insert_tree(extensions_dir.join("installed"), json!({}))
+            .await;
+        filesystem
+            .insert_file(
+                extensions_dir.join("index.json"),
+                serde_json::to_vec(&extension_host::ExtensionIndex::default())?,
+            )
+            .await;
+        let candidate = extension_host::ExtensionStore::canonical_component_inventory_candidate(
+            filesystem,
+            extensions_dir,
+        )
+        .await?;
+        let accepted_candidate_identity = Arc::new(std::sync::Mutex::new(None));
+        let adapter = DesktopComponentLifecycleAdapter {
+            router: router.clone(),
+            accepted_candidate_identity: accepted_candidate_identity.clone(),
+        };
+        extension_host::ComponentLifecycleAdapter::synchronize_candidate(&adapter, candidate)
+            .await
+            .map_err(anyhow::Error::msg)?;
+        let identity = accepted_candidate_identity
+            .lock()
+            .map_err(|_| anyhow::anyhow!("desktop candidate identity is unavailable"))?
+            .clone();
+        let accepted = accepted_desktop_component_registry_bundle(true, identity.clone(), &router)?;
+        assert_eq!(
+            accepted
+                .registry_bundle
+                .worker_deployment()
+                .begin()
+                .generation()
+                .get(),
+            comfy_runtime::DEFAULT_COMPONENT_REGISTRY_GENERATION
+        );
+        let replay = accepted_desktop_component_registry_bundle(true, identity.clone(), &router)?;
+        assert_eq!(
+            replay.registry_bundle.identity_sha256(),
+            accepted.registry_bundle.identity_sha256()
+        );
+        assert_eq!(replay.candidate_identity, accepted.candidate_identity);
+        assert_eq!(
+            replay
+                .registry_bundle
+                .provider_registry()
+                .map(comfy_runtime::NativeProviderRegistryPin::identity_sha256),
+            accepted
+                .registry_bundle
+                .provider_registry()
+                .map(comfy_runtime::NativeProviderRegistryPin::identity_sha256)
+        );
+        let replacement_generation = comfy_runtime::DEFAULT_COMPONENT_REGISTRY_GENERATION
+            .checked_add(1)
+            .ok_or_else(|| anyhow::anyhow!("component generation overflowed"))?;
+        let replacement_host = comfy_plugin_host::ComponentHost::new(
+            extension_host::ComponentRuntime::no_wasi()?,
+            comfy_runtime::PluginTrustPolicy::default(),
+            comfy_runtime::PermissionPolicy::new(
+                comfy_ui::LOCAL_EXECUTION_PROFILE_ID.0.to_string(),
+                std::iter::empty(),
+            )?,
+            comfy_plugin_host::ComponentExecutionBoundary::conformance_in_process(Arc::new(
+                comfy_plugin_host::UnavailablePluginCapabilityServices,
+            )),
+            comfy_plugin_host::ComponentLimits::default(),
+            comfy_runtime::generated_native_node_registry_projection(None)?,
+        )?;
+        router.replace_with_initial_generation(replacement_host, replacement_generation)?;
+        let active = accepted_desktop_component_registry_bundle(true, identity, &router)?;
+        assert_eq!(
+            active.candidate_identity.as_sha256(),
+            accepted.candidate_identity.as_sha256()
+        );
+        assert_eq!(
+            active
+                .registry_bundle
+                .worker_deployment()
+                .begin()
+                .generation()
+                .get(),
+            replacement_generation
+        );
+        let source = include_str!("zed.rs");
+        let register = source
+            .find("comfy_ui::register_native_execution_services(config, registry_bundle, cx)")
+            .ok_or_else(|| anyhow::anyhow!("desktop controller registration is absent"))?;
+        let transition = source[register..]
+            .find("activate_desktop_component_deployment(")
+            .map(|offset| register + offset)
+            .ok_or_else(|| anyhow::anyhow!("desktop deployment transition is absent"))?;
+        let attach = source
+            .find("private_worker_executor.attach_provider_worker_bridge(provider_worker_bridge)")
+            .ok_or_else(|| anyhow::anyhow!("concrete private executor attachment is absent"))?;
+        assert!(register < transition);
+        assert!(attach < register);
+        assert!(source.contains(
+            "provider_worker_bridge: comfy_runtime::NativeProviderWorkerBridgeAttachment"
+        ));
+        assert!(source.contains(
+            "private_worker_executor: Arc<comfy_plugin_host::PrivateWorkerPluginExecutor>"
+        ));
+        Ok(())
     }
     use theme::ThemeRegistry;
     use util::{

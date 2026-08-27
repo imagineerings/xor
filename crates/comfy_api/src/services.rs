@@ -18,7 +18,7 @@ use comfy_runtime::{
     generated_native_node_registry_projection, native_image_catalog_bindings,
 };
 use comfy_types::{HttpMethod, PromptSubmission};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -30,6 +30,142 @@ use std::{
 const MAXIMUM_JOB_PAGE_SIZE: usize = 1_000;
 const MAXIMUM_HISTORY_PAGE_SIZE: usize = 4_096;
 const MAXIMUM_ASSET_SCAN_RESULTS: usize = 100_000;
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeProviderDeploymentIdentity {
+    profile_id: String,
+    component_inventory_candidate_sha256: String,
+    component_generation: u64,
+    signed_component_snapshot_sha256: String,
+    provider_binding_set_sha256: Option<String>,
+    registry_digest_sha256: String,
+    provider_registry_identity_sha256: Option<String>,
+    execution_bundle_identity_sha256: String,
+}
+
+impl NativeProviderDeploymentIdentity {
+    pub fn from_registry_bundle(
+        bundle: &NativeExecutionRegistryBundle,
+        candidate_identity: &extension_host::ComponentInventoryCandidateIdentity,
+    ) -> Result<Self, crate::NativeApiHostError> {
+        let components = bundle.worker_deployment().begin().components();
+        let candidate_descriptors = candidate_identity.descriptors();
+        if components.len() != candidate_descriptors.len()
+            || components
+                .iter()
+                .zip(candidate_descriptors)
+                .any(|(component, candidate)| {
+                    component.extension_id() != candidate.extension_id()
+                        || component.extension_version() != candidate.extension_version()
+                        || component.manifest_digest_sha256().as_str()
+                            != candidate.manifest_sha256()
+                        || component.component_digest_sha256().as_str()
+                            != candidate.component_sha256()
+                })
+        {
+            return Err(crate::NativeApiHostError::InvalidConfiguration(
+                "component inventory candidate does not match the signed registry deployment"
+                    .into(),
+            ));
+        }
+        let mut snapshot = Sha256::new();
+        snapshot.update(b"zed.native-provider-signed-component-snapshot.v1\0");
+        snapshot.update(bundle.profile_id().0.as_bytes());
+        snapshot.update(
+            bundle
+                .worker_deployment()
+                .begin()
+                .generation()
+                .get()
+                .to_le_bytes(),
+        );
+        for component in bundle.worker_deployment().begin().components() {
+            for field in [
+                component.extension_id().as_bytes(),
+                component.extension_version().as_bytes(),
+                component.plugin_identifier().as_bytes(),
+                component.plugin_version().as_bytes(),
+                component.manifest_digest_sha256().as_str().as_bytes(),
+                component.component_digest_sha256().as_str().as_bytes(),
+            ] {
+                snapshot.update(u64::try_from(field.len()).unwrap_or(u64::MAX).to_le_bytes());
+                snapshot.update(field);
+            }
+        }
+        let provider_binding_set_sha256 = bundle.provider_registry().map(|registry| {
+            let mut digest = Sha256::new();
+            digest.update(b"zed.native-provider-binding-set.v1\0");
+            for binding in registry.binding_digests_sha256() {
+                digest.update(
+                    u64::try_from(binding.len())
+                        .unwrap_or(u64::MAX)
+                        .to_le_bytes(),
+                );
+                digest.update(binding.as_bytes());
+            }
+            format!("{:x}", digest.finalize())
+        });
+        Ok(Self {
+            profile_id: bundle.profile_id().0.to_string(),
+            component_inventory_candidate_sha256: candidate_identity.as_sha256().to_owned(),
+            component_generation: bundle.worker_deployment().begin().generation().get(),
+            signed_component_snapshot_sha256: format!("{:x}", snapshot.finalize()),
+            provider_binding_set_sha256,
+            registry_digest_sha256: bundle
+                .worker_deployment()
+                .begin()
+                .registry_digest_sha256()
+                .as_str()
+                .to_owned(),
+            provider_registry_identity_sha256: bundle
+                .provider_registry()
+                .map(NativeProviderRegistryPin::identity_sha256),
+            execution_bundle_identity_sha256: bundle.identity_sha256().to_owned(),
+        })
+    }
+
+    pub fn profile_id(&self) -> &str {
+        &self.profile_id
+    }
+
+    pub fn component_generation(&self) -> u64 {
+        self.component_generation
+    }
+
+    pub fn component_inventory_candidate_sha256(&self) -> &str {
+        &self.component_inventory_candidate_sha256
+    }
+
+    pub fn signed_component_snapshot_sha256(&self) -> &str {
+        &self.signed_component_snapshot_sha256
+    }
+
+    pub fn provider_binding_set_sha256(&self) -> Option<&str> {
+        self.provider_binding_set_sha256.as_deref()
+    }
+
+    pub fn same_signed_deployment(&self, other: &Self) -> bool {
+        self.profile_id == other.profile_id
+            && self.component_inventory_candidate_sha256
+                == other.component_inventory_candidate_sha256
+            && self.component_generation == other.component_generation
+            && self.signed_component_snapshot_sha256 == other.signed_component_snapshot_sha256
+            && self.provider_binding_set_sha256 == other.provider_binding_set_sha256
+    }
+
+    pub fn registry_digest_sha256(&self) -> &str {
+        &self.registry_digest_sha256
+    }
+
+    pub fn provider_registry_identity_sha256(&self) -> Option<&str> {
+        self.provider_registry_identity_sha256.as_deref()
+    }
+
+    pub fn execution_bundle_identity_sha256(&self) -> &str {
+        &self.execution_bundle_identity_sha256
+    }
+}
 
 enum CommandSequenceReconciliation {
     Completed,

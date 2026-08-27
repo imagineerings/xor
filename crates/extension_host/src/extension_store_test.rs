@@ -133,6 +133,30 @@ impl ComponentLifecycleAdapter for RecordingComponentAdapter {
     }
 }
 
+async fn assert_component_candidate_rejected_without_adapter_call(
+    fs: Arc<dyn Fs>,
+    installed_dir: &Path,
+    entries: &[ExtensionIndexEntry],
+    adapter: Arc<RecordingComponentAdapter>,
+    diagnostic: &str,
+) {
+    let accepted_snapshots = adapter.snapshots();
+    let adapters: Vec<Arc<dyn ComponentLifecycleAdapter>> = vec![adapter.clone()];
+    let errors =
+        ExtensionStore::synchronize_component_adapters(fs, installed_dir, entries, &adapters).await;
+    assert!(
+        errors
+            .get(adapter.adapter_id())
+            .is_some_and(|error| error.contains(diagnostic)),
+        "missing canonical {diagnostic:?} rejection in {errors:?}"
+    );
+    assert_eq!(
+        adapter.snapshots(),
+        accepted_snapshots,
+        "rejected candidate {diagnostic:?} must not invoke the adapter"
+    );
+}
+
 fn remote_sync_language_entry(extension: &str, path: &str) -> ExtensionIndexLanguageEntry {
     ExtensionIndexLanguageEntry {
         extension: extension.into(),
@@ -558,7 +582,11 @@ async fn component_adapter_failures_converge_without_partial_verification(cx: &m
             .get(adapter.adapter_id())
             .is_some_and(|error| error.contains("must provide both"))
     );
-    assert_eq!(adapter.snapshots().last(), Some(&Vec::new()));
+    assert_eq!(
+        adapter.snapshots().last().map(Vec::len),
+        Some(1),
+        "rejected inventory must preserve the last accepted adapter state"
+    );
 
     let errors = ExtensionStore::synchronize_component_adapters(
         fs.clone(),
@@ -615,6 +643,270 @@ async fn component_adapter_failures_converge_without_partial_verification(cx: &m
 }
 
 #[gpui::test]
+async fn component_inventory_candidate_rejection_never_invokes_adapters(cx: &mut TestAppContext) {
+    let fs = FakeFs::new(cx.executor());
+    let installed_dir = Path::new("/component-candidate/installed");
+    fs.insert_tree(
+        installed_dir.join("alpha"),
+        json!({
+            "comfy-plugin.json": "manifest-v1",
+            "comfy-plugin.wasm": "component-v1",
+        }),
+    )
+    .await;
+    let adapter = Arc::new(RecordingComponentAdapter::new());
+    let adapters: Vec<Arc<dyn ComponentLifecycleAdapter>> = vec![adapter.clone()];
+    let accepted = [remote_sync_entry_with_version("alpha", "1.0.0", "")];
+
+    let errors = ExtensionStore::synchronize_component_adapters(
+        fs.clone(),
+        installed_dir,
+        &accepted,
+        &adapters,
+    )
+    .await;
+    assert!(errors.is_empty());
+    let accepted_snapshots = adapter.snapshots();
+    assert_eq!(accepted_snapshots.len(), 1);
+
+    fs.remove_file(
+        installed_dir.join("alpha/comfy-plugin.wasm").as_path(),
+        Default::default(),
+    )
+    .await
+    .expect("remove component half");
+    assert_component_candidate_rejected_without_adapter_call(
+        fs.clone(),
+        installed_dir,
+        &accepted,
+        adapter.clone(),
+        "must provide both",
+    )
+    .await;
+
+    let traversal = [remote_sync_entry("../escape", "")];
+    assert_component_candidate_rejected_without_adapter_call(
+        fs.clone(),
+        installed_dir,
+        &traversal,
+        adapter.clone(),
+        "one normal path component",
+    )
+    .await;
+
+    fs.insert_tree(
+        "/component-candidate/outside/symlinked",
+        json!({
+            "comfy-plugin.json": "manifest",
+            "comfy-plugin.wasm": "component",
+        }),
+    )
+    .await;
+    fs.insert_symlink(
+        "/component-candidate/installed/symlinked",
+        PathBuf::from("/component-candidate/outside/symlinked"),
+    )
+    .await;
+    let symlinked = [remote_sync_entry("symlinked", "")];
+    assert_component_candidate_rejected_without_adapter_call(
+        fs.clone(),
+        installed_dir,
+        &symlinked,
+        adapter.clone(),
+        "not a direct real directory",
+    )
+    .await;
+
+    let excessive_entries = (0..=crate::MAXIMUM_COMFY_COMPONENT_COUNT)
+        .map(|_| remote_sync_entry("alpha", ""))
+        .collect::<Vec<_>>();
+    assert_component_candidate_rejected_without_adapter_call(
+        fs.clone(),
+        installed_dir,
+        &excessive_entries,
+        adapter.clone(),
+        "maximum",
+    )
+    .await;
+    assert_eq!(adapter.snapshots(), accepted_snapshots);
+
+    let valid_empty =
+        ExtensionStore::component_inventory_candidate_from_entries(fs.clone(), installed_dir, &[])
+            .await
+            .expect("valid empty candidate");
+    assert!(valid_empty.components().is_empty());
+    assert_eq!(valid_empty.payload_bytes(), 0);
+    let errors =
+        ExtensionStore::synchronize_component_adapters(fs, installed_dir, &[], &adapters).await;
+    assert!(errors.is_empty());
+    assert_eq!(adapter.snapshots().last(), Some(&Vec::new()));
+}
+
+#[gpui::test]
+async fn component_inventory_candidate_is_canonical_fresh_and_digest_stable(
+    cx: &mut TestAppContext,
+) {
+    let fs = FakeFs::new(cx.executor());
+    let extensions_dir = Path::new("/canonical-component-candidate");
+    fs.insert_tree(
+        extensions_dir.join("installed/beta"),
+        json!({
+            "comfy-plugin.json": "beta-manifest",
+            "comfy-plugin.wasm": "beta-component",
+        }),
+    )
+    .await;
+    fs.insert_tree(
+        extensions_dir.join("installed/alpha"),
+        json!({
+            "comfy-plugin.json": "alpha-manifest",
+            "comfy-plugin.wasm": "alpha-component",
+        }),
+    )
+    .await;
+    let mut index = ExtensionIndex::default();
+    index.extensions.insert(
+        Arc::from("beta"),
+        remote_sync_entry_with_version("beta", "2.0.0", ""),
+    );
+    index.extensions.insert(
+        Arc::from("alpha"),
+        remote_sync_entry_with_version("alpha", "1.0.0", ""),
+    );
+    fs.insert_file(
+        extensions_dir.join("index.json"),
+        serde_json::to_vec(&index).expect("encode extension index"),
+    )
+    .await;
+
+    let desktop =
+        ExtensionStore::canonical_component_inventory_candidate(fs.clone(), extensions_dir)
+            .await
+            .expect("desktop canonical candidate");
+    let headless =
+        ExtensionStore::canonical_component_inventory_candidate(fs.clone(), extensions_dir)
+            .await
+            .expect("headless canonical candidate");
+    assert_eq!(desktop, headless);
+    assert_eq!(
+        desktop
+            .components()
+            .iter()
+            .map(InstalledComponent::extension_id)
+            .collect::<Vec<_>>(),
+        ["alpha", "beta"]
+    );
+    assert_eq!(desktop.identity_sha256().len(), 64);
+    assert_eq!(
+        desktop.identity_sha256(),
+        "30e61cda7db99496dd3f5e68099583b3008629259de236c768df6b60ab83de38"
+    );
+    assert!(
+        desktop
+            .identity_sha256()
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    );
+
+    fs.insert_file(
+        extensions_dir.join("installed/alpha/extension-update"),
+        b"newer-than-index".to_vec(),
+    )
+    .await;
+    fs.touch_path(extensions_dir.join("installed")).await;
+    let stale = ExtensionStore::canonical_component_inventory_candidate(fs, extensions_dir)
+        .await
+        .expect_err("stale index must not mint a candidate");
+    assert!(stale.diagnostic().contains("stale"));
+}
+
+#[gpui::test]
+async fn component_inventory_candidate_exact_replay_is_adapter_idempotent(cx: &mut TestAppContext) {
+    init_test(cx);
+    let fs = FakeFs::new(cx.executor());
+    let extensions_dir = PathBuf::from("/component-replay");
+    fs.insert_tree(
+        extensions_dir.join("installed/alpha"),
+        json!({
+            "extension.json": r#"{
+                "id": "alpha",
+                "name": "Alpha",
+                "version": "1.0.0"
+            }"#,
+            "comfy-plugin.json": "manifest",
+            "comfy-plugin.wasm": "component",
+        }),
+    )
+    .await;
+
+    let proxy = Arc::new(ExtensionHostProxy::new());
+    let theme_registry = Arc::new(ThemeRegistry::new(Box::new(())));
+    theme_extension::init(proxy.clone(), theme_registry, cx.executor());
+    let language_registry = Arc::new(LanguageRegistry::test(cx.executor()));
+    language_extension::init(LspAccess::Noop, proxy.clone(), language_registry);
+    let http_client = FakeHttpClient::with_200_response();
+    let adapter = Arc::new(RecordingComponentAdapter::new());
+    let store = cx.new(|cx| {
+        ExtensionStore::new(
+            extensions_dir,
+            None,
+            proxy,
+            fs,
+            http_client.clone(),
+            http_client,
+            None,
+            NodeRuntime::unavailable(),
+            vec![adapter.clone()],
+            cx,
+        )
+    });
+
+    cx.executor().advance_clock(RELOAD_DEBOUNCE_DURATION);
+    cx.executor().run_until_parked();
+    let accepted_nonempty = adapter.snapshots();
+    assert_eq!(accepted_nonempty.len(), 1);
+    for expected_calls in [1, 1] {
+        let reload = store.update(cx, |store, cx| store.reload(None, cx));
+        cx.executor().advance_clock(RELOAD_DEBOUNCE_DURATION);
+        reload.await.expect("reload canonical component inventory");
+        assert_eq!(
+            adapter.snapshots().len(),
+            expected_calls,
+            "an exact accepted replay must not advance the adapter generation"
+        );
+    }
+    let rejected_empty = store.update(cx, |store, cx| {
+        store.extensions_updated(ExtensionIndex::default(), false, cx)
+    });
+    rejected_empty.await;
+    assert_eq!(
+        adapter.snapshots().len(),
+        1,
+        "failure-synthesized empty inventory must not invoke the adapter"
+    );
+    store.read_with(cx, |store, _| {
+        assert!(
+            store
+                .component_adapter_errors()
+                .get(adapter.adapter_id())
+                .is_some_and(|error| error.contains("unavailable or stale"))
+        );
+    });
+
+    let accepted_empty = store.update(cx, |store, cx| {
+        store.extensions_updated(ExtensionIndex::default(), true, cx)
+    });
+    accepted_empty.await;
+    let mut expected_snapshots = accepted_nonempty;
+    expected_snapshots.push(Vec::new());
+    assert_eq!(adapter.snapshots(), expected_snapshots);
+    store.read_with(cx, |store, _| {
+        assert!(store.accepted_component_candidate.is_some());
+        assert!(store.component_adapter_errors().is_empty());
+    });
+}
+
+#[gpui::test]
 async fn component_adapter_failure_is_returned_by_reload(cx: &mut TestAppContext) {
     init_test(cx);
     let fs = FakeFs::new(cx.executor());
@@ -643,7 +935,7 @@ async fn component_adapter_failure_is_returned_by_reload(cx: &mut TestAppContext
         b"rejected-manifest".to_vec(),
     ));
     let store = cx.new(|cx| {
-        let mut store = ExtensionStore::new(
+        ExtensionStore::new(
             extensions_dir,
             None,
             proxy,
@@ -652,10 +944,9 @@ async fn component_adapter_failure_is_returned_by_reload(cx: &mut TestAppContext
             http_client,
             None,
             NodeRuntime::unavailable(),
+            vec![adapter],
             cx,
-        );
-        store.component_lifecycle_adapters = vec![adapter];
-        store
+        )
     });
 
     cx.executor().advance_clock(RELOAD_DEBOUNCE_DURATION);
@@ -1073,6 +1364,7 @@ async fn test_extension_store(cx: &mut TestAppContext) {
             http_client.clone(),
             None,
             node_runtime.clone(),
+            Vec::new(),
             cx,
         )
     });
@@ -1223,6 +1515,7 @@ async fn test_extension_store(cx: &mut TestAppContext) {
             http_client.clone(),
             None,
             node_runtime.clone(),
+            Vec::new(),
             cx,
         )
     });
@@ -1275,7 +1568,7 @@ async fn test_extension_store(cx: &mut TestAppContext) {
         // The on-disk manifest limits the number of FS calls that need to be made
         // on startup.
         assert_eq!(fs.read_dir_call_count(), prev_fs_read_dir_call_count);
-        assert_eq!(fs.metadata_call_count(), prev_fs_metadata_call_count + 2);
+        assert_eq!(fs.metadata_call_count(), prev_fs_metadata_call_count + 11);
     });
 
     store.update(cx, |store, cx| {
@@ -1484,6 +1777,7 @@ async fn test_extension_store_with_test_extension(cx: &mut TestAppContext) {
             builder_client,
             None,
             node_runtime,
+            Vec::new(),
             cx,
         )
     });

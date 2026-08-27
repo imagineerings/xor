@@ -3214,8 +3214,17 @@ async fn val_plugin_host_001(executor: BackgroundExecutor) {
                     && lifecycle_adapter_definitions[0]
                         .contains("crates/extension_host/src/extension_host.rs")
                     && extension_source.contains("pub async fn synchronize_component_adapters(")
-                    && extension_source.contains("Self::load_installed_components(")
-                    && extension_source.contains("adapter.synchronize(components.clone())"),
+                    && extension_source
+                        .contains("Self::component_inventory_candidate_from_entries(")
+                    && extension_source.contains(
+                        "Self::synchronize_component_candidate(candidate, adapters).await",
+                    )
+                    && extension_source
+                        .contains("adapter.synchronize_candidate(candidate.clone()).await")
+                    && extension_source
+                        .contains("pub async fn canonical_component_inventory_candidate(")
+                    && extension_source
+                        .contains("let components = Self::load_installed_components("),
             ),
             (
                 "production_zed_bootstrap_precedes_extension_store",

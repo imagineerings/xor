@@ -15,6 +15,7 @@ bytes.workspace = true
 comfy_model.workspace = true
 comfy_runtime.workspace = true
 comfy_types.workspace = true
+extension_host.workspace = true
 httparse.workspace = true
 rustls.workspace = true
 serde.workspace = true
