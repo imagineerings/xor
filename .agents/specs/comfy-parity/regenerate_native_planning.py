@@ -9842,7 +9842,7 @@ def native_model_resource_precursor_tasks(
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "One sealed NativeStyleModelResource owns an internal exact architecture enum with StyleAdapter width 1024, context width 768, eight heads, three transformer layers, and eight output tokens, or Flux Redux projections 1152 to 12288 to 4096. StyleAdapter strictly admits its exact 42-entry source schema, checked-splits each fused attn.in_proj_weight and attn.in_proj_bias into internal Q, K, and V projections, reconstructs the exact fused source keys, and delegates all scaled-dot-product attention exclusively to canonical comfy_model::attention without owning a second attention equation or policy. Each variant has a strict complete ordered schema for every source checkpoint entry, deterministic checkpoint reconstruction, F32/F16/BF16 storage-to-F32 projection under the pinned manual-cast disposition, semantic digest, distinct-StorageId residency, conservative construction and invocation phase-memory admission, and cancellation between layers and before publication. It exposes only get_cond(last_hidden_state) from the canonical ClipVisionOutput last_hidden_state and preserves the source loader's StyleAdapter-before-FluxRedux detection precedence without impersonating GLIGEN or PHOTOMAKER. A tracked pure-standard-library reduced source-equation fixture covers both variants, asserts the exact source key sets, and clearly distinguishes reduced executable dimensions from the source-exact production profiles. Unsupported or ambiguous architecture, cross-role use, malformed weights or inputs, uncertified non-CPU/F32 execution, OOM, cancellation, and failed reconstruction publish no resource or conditioning state. The STYLE_MODEL-specific ownership concern, required mappings, and exact ownership test certify one authoritative retained resource and invocation owner without pre-claiming GLIGEN or PHOTOMAKER closure. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-service-foundation.",
+        "One sealed NativeStyleModelResource owns an internal exact architecture enum with StyleAdapter width 1024, context width 768, eight heads, three transformer layers, and eight output tokens, or Flux Redux projections 1152 to 12288 to 4096. StyleAdapter strictly admits its exact 42-entry source schema, checked-splits each fused attn.in_proj_weight and attn.in_proj_bias into internal Q, K, and V projections, reconstructs the exact fused source keys, and delegates all scaled-dot-product attention exclusively to canonical comfy_model::attention without owning a second attention equation or policy. Each variant has a strict complete ordered schema for every source checkpoint entry, deterministic checkpoint reconstruction, F32/F16/BF16 storage-to-F32 projection under the pinned manual-cast disposition, semantic digest, distinct-StorageId residency, conservative construction and invocation phase-memory admission, and cancellation between layers and before publication. It exposes only get_cond(last_hidden_state) from the canonical ClipVisionOutput last_hidden_state and preserves the source loader's StyleAdapter-before-FluxRedux detection precedence without impersonating GLIGEN or PHOTOMAKER. A tracked pure-standard-library reduced source-equation fixture covers both variants, asserts the exact source key sets, and clearly distinguishes reduced executable dimensions from the source-exact production profiles. Unsupported or ambiguous architecture, cross-role use, malformed weights or inputs, uncertified non-CPU/F32 execution, OOM, cancellation, and failed reconstruction publish no resource or conditioning state. The STYLE_MODEL-specific ownership concern, required mappings, and exact ownership test certify one authoritative retained resource and invocation owner without pre-claiming GLIGEN or PHOTOMAKER closure. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
     append(
         "comfy-parity-native-clip-vision-context-construction",
@@ -9904,7 +9904,7 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_test_support/tests/native_conditioning_integration.rs",
             "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
         ],
-        "One sealed NativePhotoMakerResource accepts either the flat source checkpoint or one optional top-level id_encoder mapping, rejects a non-mapping or any outer or inner extra entry, and strictly admits the exact 407-entry ordered source schema: 392 delegated NativeClipVision keys plus 15 PhotoMaker-owned keys comprising visual_projection_2.weight, two six-key MLPs, and the final two-key layer normalization. It delegates the fixed 1024/4096/16-head/24-layer/224/14 CLIP image graph, checkpoint reconstruction, semantic digest, and exact post-layernorm pre-projection pooled hidden exclusively to NativeClipVision with the caller CancellationToken and owns no second CLIP state, equation, layer normalization, projection, or digest. The extra projection is exactly 1024 to 1280 without bias; it concatenates the canonical 768 and 1280 projections to width 2048. MLP1 applies LayerNorm 4096, Linear 4096-to-2048, exact GELU, and Linear 2048-to-2048 with no internal residual before adding the prompt. MLP2 applies LayerNorm 2048, Linear 2048-to-2048, exact GELU, and Linear 2048-to-2048 before its residual addition, followed by the final LayerNorm. Invocation admits only CPU/F32 image input [1, N, 3, 224, 224], prompt [1, S, 2048], and Bool mask [1, S], with N greater than zero and count_true(mask) equal to N and no greater than S; source row-major true positions pair with images in order, output is [1, S, 2048], unmasked rows remain bit-identical, and inputs remain immutable. Batch greater than one rejects rather than inventing semantics for the source global mask sum. Reshape, concatenation, sum, nonzero gather, scatter, normalization, and GELU mechanics delegate to canonical tensor owners. Resource identity binds the whole artifact bytes, wrapper disposition, architecture, ordered state, storage dtype, semantic digest, and alias-aware distinct-StorageId residency; reconstruction calls NativeClipVision::reconstruct(token). Construction and invocation use conservative checked phase memory and cancellation before publication. A separately named tracked pure-standard-library reduced PhotoMaker case pins nodes_photomaker.py and inherited CLIP hashes, cross-links pooled and projected CLIP oracles, and discriminates flat and nested wrappers, all 407 keys, both projections, both MLP residual dispositions, a noncontiguous multi-identity mask and scatter, F32/F16/BF16 storage projection, alias residency, reconstruction, max-plus-one OOM, and every cancellation phase without changing the StyleAdapter or Flux Redux fixture hashes. Node-level text editing, strength, attention-mask concatenation, and conditioning metadata mutation remain assigned to later node leaves. Cross-role use, malformed state or inputs, uncertified execution, OOM, cancellation, or failed reconstruction publishes no PHOTOMAKER resource or conditioning state. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-service-foundation.",
+        "One sealed NativePhotoMakerResource accepts either the flat source checkpoint or one optional top-level id_encoder mapping, rejects a non-mapping or any outer or inner extra entry, and strictly admits the exact 407-entry ordered source schema: 392 delegated NativeClipVision keys plus 15 PhotoMaker-owned keys comprising visual_projection_2.weight, two six-key MLPs, and the final two-key layer normalization. It delegates the fixed 1024/4096/16-head/24-layer/224/14 CLIP image graph, checkpoint reconstruction, semantic digest, and exact post-layernorm pre-projection pooled hidden exclusively to NativeClipVision with the caller CancellationToken and owns no second CLIP state, equation, layer normalization, projection, or digest. The extra projection is exactly 1024 to 1280 without bias; it concatenates the canonical 768 and 1280 projections to width 2048. MLP1 applies LayerNorm 4096, Linear 4096-to-2048, exact GELU, and Linear 2048-to-2048 with no internal residual before adding the prompt. MLP2 applies LayerNorm 2048, Linear 2048-to-2048, exact GELU, and Linear 2048-to-2048 before its residual addition, followed by the final LayerNorm. Invocation admits only CPU/F32 image input [1, N, 3, 224, 224], prompt [1, S, 2048], and Bool mask [1, S], with N greater than zero and count_true(mask) equal to N and no greater than S; source row-major true positions pair with images in order, output is [1, S, 2048], unmasked rows remain bit-identical, and inputs remain immutable. Batch greater than one rejects rather than inventing semantics for the source global mask sum. Reshape, concatenation, sum, nonzero gather, scatter, normalization, and GELU mechanics delegate to canonical tensor owners. Resource identity binds the whole artifact bytes, wrapper disposition, architecture, ordered state, storage dtype, semantic digest, and alias-aware distinct-StorageId residency; reconstruction calls NativeClipVision::reconstruct(token). Construction and invocation use conservative checked phase memory and cancellation before publication. A separately named tracked pure-standard-library reduced PhotoMaker case pins nodes_photomaker.py and inherited CLIP hashes, cross-links pooled and projected CLIP oracles, and discriminates flat and nested wrappers, all 407 keys, both projections, both MLP residual dispositions, a noncontiguous multi-identity mask and scatter, F32/F16/BF16 storage projection, alias residency, reconstruction, max-plus-one OOM, and every cancellation phase without changing the StyleAdapter or Flux Redux fixture hashes. Node-level text editing, strength, attention-mask concatenation, and conditioning metadata mutation remain assigned to later node leaves. Cross-role use, malformed state or inputs, uncertified execution, OOM, cancellation, or failed reconstruction publishes no PHOTOMAKER resource or conditioning state. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
     append(
         "comfy-parity-native-gligen-resource-foundation",
@@ -9945,7 +9945,7 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_test_support/tests/native_conditioning_integration.rs",
             "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
         ],
-        "One sealed NativeGligenResource scans source structural locations in exact input_blocks 0 through 19, middle_block 0 through 19, then output_blocks 0 through 19 order, skips absent locations, and compacts present modules into sequential transformer_index values. Sparse structural locations are source-valid and never treated as gaps. It requires at least one fuser and exactly one anchored .fuser. namespace at each present location; each has the exact 17-key suffix set, while partial sets, multiple paths or collisions at one location, duplicate suffixes, unknown regions, indices outside 0 through 19, and unrelated state reject. The structural-to-compact order is retained and reconstructed exactly, and out-of-range apply rejects typed. PositionNet owns exactly eight keys: null_positive_feature, null_position_feature[64], and three biased linears from input-plus-64 to 512 to 512 to output. Fourier embedding uses eight frequencies, temperature 100, positive 100 ** (arange(8)/8), sin then cos per frequency over xyxy, concatenated in source order, with SiLU after the first two linears. Each fuser owns a biased context linear; biasless q, k, and v; biased attention output; GEGLU projection and output linear; two affine layer normalizations; and scalar alpha_attn and alpha_dense. All fusers and PositionNet require a consistent key dimension. Query/head geometry is key_dim 768 to eight heads, otherwise d_head 64 with exact divisibility. Apply implements only source-reachable GatedSelfAttentionDense: project objects, concatenate visual plus objects, layer-normalize, delegate self-attention exclusively to canonical comfy_model::attention, slice the visual prefix, and add tanh(alpha_attn) times attention; then layer-normalize visual, GEGLU as split(linear(x), 2) into value times exact_gelu(gate), apply output linear, and add tanh(alpha_dense) times feed-forward, with fixed scale one. Linear, normalization, activation, reshape, concatenate, and residual mechanics delegate to canonical owners. Defined-but-loader-unreachable GatedCrossAttentionDense and GatedSelfAttentionDense2, mutable scale, bicubic grounding-token paths, and sampler patch installation are excluded. Position preparation receives latent-grid embedding, height, width, y, and x after node-level division of image coordinates by eight; it does not accept image xyxy. For latent shape [B,C,H,W], it computes exact f32 x/W, y/H, (x+width)/W, and (y+height)/H without clamping, accepts zero through 30 entries, requires every embedding [1,key_dim], repeats positions and embeddings across B, and pads to 30 with learned null features. Zero entries matches source set_empty and 31 rejects. It returns one opaque non-Clone prepared-position object bound to resource identity, batch, and device. Apply admits visual [B,V,query_dim(index)], checks prepared identity and batch, returns a fresh same-shape tensor, and never mutates inputs. Strict ordered state is 8 plus 17 times fuser_count. F32, F16, and BF16 retained storage projects checked to CPU/F32 execution; identity binds whole artifact bytes, architecture, structural-to-compact order, state, dtype, digest, and alias-deduplicated StorageIds. Reconstruction rebuilds from retained state rather than cloning and preserves identity, residency, and output. Conservative phase memory and cancellation cover construction, Fourier/null/MLP, context projection, concatenate/layer-normalization/QKV/SDP/output, both gated residuals, digest, and pre-publication; attention includes quadratic (V+30)^2 workspace. Every error publishes no resource, prepared position, or fuser output. A separately named pure-standard-library reduced GLIGEN fixture pins gligen.py, attention.py, samplers.py, and openaimodel.py source hashes without changing StyleAdapter, Flux Redux, or PhotoMaker hashes. It discriminates sparse multi-region order and compact indices, all 8+17F keys, both head-rule branches, zero/30/31 positions, unclamped coordinates, Fourier order, learned-null padding, attention/GEGLU/gates/residual order, wrong prepared-resource/index/batch, F32/F16/BF16 projection, alias residency, reconstruction, max-plus-one OOM, and every cancellation phase. Node-level conditioning metadata mutation remains assigned to the later GLIGEN node leaf. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-service-foundation.",
+        "One sealed NativeGligenResource scans source structural locations in exact input_blocks 0 through 19, middle_block 0 through 19, then output_blocks 0 through 19 order, skips absent locations, and compacts present modules into sequential transformer_index values. Sparse structural locations are source-valid and never treated as gaps. It requires at least one fuser and exactly one anchored .fuser. namespace at each present location; each has the exact 17-key suffix set, while partial sets, multiple paths or collisions at one location, duplicate suffixes, unknown regions, indices outside 0 through 19, and unrelated state reject. The structural-to-compact order is retained and reconstructed exactly, and out-of-range apply rejects typed. PositionNet owns exactly eight keys: null_positive_feature, null_position_feature[64], and three biased linears from input-plus-64 to 512 to 512 to output. Fourier embedding uses eight frequencies, temperature 100, positive 100 ** (arange(8)/8), sin then cos per frequency over xyxy, concatenated in source order, with SiLU after the first two linears. Each fuser owns a biased context linear; biasless q, k, and v; biased attention output; GEGLU projection and output linear; two affine layer normalizations; and scalar alpha_attn and alpha_dense. All fusers and PositionNet require a consistent key dimension. Query/head geometry is key_dim 768 to eight heads, otherwise d_head 64 with exact divisibility. Apply implements only source-reachable GatedSelfAttentionDense: project objects, concatenate visual plus objects, layer-normalize, delegate self-attention exclusively to canonical comfy_model::attention, slice the visual prefix, and add tanh(alpha_attn) times attention; then layer-normalize visual, GEGLU as split(linear(x), 2) into value times exact_gelu(gate), apply output linear, and add tanh(alpha_dense) times feed-forward, with fixed scale one. Linear, normalization, activation, reshape, concatenate, and residual mechanics delegate to canonical owners. Defined-but-loader-unreachable GatedCrossAttentionDense and GatedSelfAttentionDense2, mutable scale, bicubic grounding-token paths, and sampler patch installation are excluded. Position preparation receives latent-grid embedding, height, width, y, and x after node-level division of image coordinates by eight; it does not accept image xyxy. For latent shape [B,C,H,W], it computes exact f32 x/W, y/H, (x+width)/W, and (y+height)/H without clamping, accepts zero through 30 entries, requires every embedding [1,key_dim], repeats positions and embeddings across B, and pads to 30 with learned null features. Zero entries matches source set_empty and 31 rejects. It returns one opaque non-Clone prepared-position object bound to resource identity, batch, and device. Apply admits visual [B,V,query_dim(index)], checks prepared identity and batch, returns a fresh same-shape tensor, and never mutates inputs. Strict ordered state is 8 plus 17 times fuser_count. F32, F16, and BF16 retained storage projects checked to CPU/F32 execution; identity binds whole artifact bytes, architecture, structural-to-compact order, state, dtype, digest, and alias-deduplicated StorageIds. Reconstruction rebuilds from retained state rather than cloning and preserves identity, residency, and output. Conservative phase memory and cancellation cover construction, Fourier/null/MLP, context projection, concatenate/layer-normalization/QKV/SDP/output, both gated residuals, digest, and pre-publication; attention includes quadratic (V+30)^2 workspace. Every error publishes no resource, prepared position, or fuser output. A separately named pure-standard-library reduced GLIGEN fixture pins gligen.py, attention.py, samplers.py, and openaimodel.py source hashes without changing StyleAdapter, Flux Redux, or PhotoMaker hashes. It discriminates sparse multi-region order and compact indices, all 8+17F keys, both head-rule branches, zero/30/31 positions, unclamped coordinates, Fourier order, learned-null padding, attention/GEGLU/gates/residual order, wrong prepared-resource/index/batch, F32/F16/BF16 projection, alias residency, reconstruction, max-plus-one OOM, and every cancellation phase. Node-level conditioning metadata mutation remains assigned to the later GLIGEN node leaf. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation.",
     )
     append(
         "comfy-parity-native-conditioning-auxiliary-resource-foundation",
@@ -9980,7 +9980,7 @@ def native_model_resource_precursor_tasks(
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "The prerequisite implementations already provide three concrete non-Clone resource structs: NativeGligenResource, NativePhotoMakerResource, and NativeStyleModelResource. NativeModelPayload and its private NativeModelResource backing remain intentionally Clone through Arc. Typed constructors cannot accept another resource type; generic payload accessors are borrowed selector-free Option<&Arc<T>> views that return None on the wrong role, and dynamic admission and validation return exact ResourceMismatch without reinterpretation. STYLE_MODEL alone owns the internal StyleAdapter versus FluxRedux architecture enum. This closure changes no resource equation, checkpoint, reconstruction, identity, memory, cancellation, or execution behavior. It preserves the existing native_style_model_resource ownership concern byte-for-byte and adds two separate non-overlapping native_photomaker_model_resource and native_gligen_model_resource concerns owned by comfy_model::conditioning_resources::{NativePhotoMakerResource, NativeGligenResource}; no aggregate or generic conditioning-resource concern is introduced. Each concern pins the exact concrete resource definition and callsites plus payload role, format, variant, typed constructor, and borrowed accessor mappings. Allowed adapters are only canonical tensor and NativeModule operations, NativeClipVision's exact pooled-hidden adapter for PhotoMaker, canonical comfy_model::attention for GLIGEN and inherited StyleAdapter attention, and the tracked fixture as a development oracle. Ownership scans forbid a second checkpoint or reconstruction owner, second CLIP transformer, post-layernorm, or projection owner, second scaled-dot-product attention owner, generic coefficient, trait-object, or string-role facade, as_any or raw selector, and lifecycle, cache, or persistence authority. The final prerequisite-owned fixture is consumed read-only and frozen as exactly four cases: GLIGEN, PhotoMaker, StyleAdapter, and Flux Redux. Manifest, provenance, oracle, generator, and pinned source hashes cross-link exactly; reduced dimensions remain distinct from production profiles; inherited case hashes and mutation coverage do not change; generate_oracle.py --check produces no diff. Closure tests build each prerequisite resource through its existing owner, wrap and reconstruct it only through its existing typed payload API, prove exact identity, residency, and output preservation, and prove the full three-by-three wrong-role matrix returns None or exact ResourceMismatch. This task owns only role registration and ownership, cross-role, and frozen-fixture evidence. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain exclusively assigned to comfy-parity-native-model-resource-service-foundation.",
+        "The prerequisite implementations already provide three concrete non-Clone resource structs: NativeGligenResource, NativePhotoMakerResource, and NativeStyleModelResource. NativeModelPayload and its private NativeModelResource backing remain intentionally Clone through Arc. Typed constructors cannot accept another resource type; generic payload accessors are borrowed selector-free Option<&Arc<T>> views that return None on the wrong role, and dynamic admission and validation return exact ResourceMismatch without reinterpretation. STYLE_MODEL alone owns the internal StyleAdapter versus FluxRedux architecture enum. This closure changes no resource equation, checkpoint, reconstruction, identity, memory, cancellation, or execution behavior. It preserves the existing native_style_model_resource ownership concern byte-for-byte and adds two separate non-overlapping native_photomaker_model_resource and native_gligen_model_resource concerns owned by comfy_model::conditioning_resources::{NativePhotoMakerResource, NativeGligenResource}; no aggregate or generic conditioning-resource concern is introduced. Each concern pins the exact concrete resource definition and callsites plus payload role, format, variant, typed constructor, and borrowed accessor mappings. Allowed adapters are only canonical tensor and NativeModule operations, NativeClipVision's exact pooled-hidden adapter for PhotoMaker, canonical comfy_model::attention for GLIGEN and inherited StyleAdapter attention, and the tracked fixture as a development oracle. Ownership scans forbid a second checkpoint or reconstruction owner, second CLIP transformer, post-layernorm, or projection owner, second scaled-dot-product attention owner, generic coefficient, trait-object, or string-role facade, as_any or raw selector, and lifecycle, cache, or persistence authority. The final prerequisite-owned fixture is consumed read-only and frozen as exactly four cases: GLIGEN, PhotoMaker, StyleAdapter, and Flux Redux. Manifest, provenance, oracle, generator, and pinned source hashes cross-link exactly; reduced dimensions remain distinct from production profiles; inherited case hashes and mutation coverage do not change; generate_oracle.py --check produces no diff. Closure tests build each prerequisite resource through its existing owner, wrap and reconstruct it only through its existing typed payload API, prove exact identity, residency, and output preservation, and prove the full three-by-three wrong-role matrix returns None or exact ResourceMismatch. This task owns only role registration and ownership, cross-role, and frozen-fixture evidence. Handle publication, cache, durable persistence, restart, and stale-generation behavior remain exclusively assigned to comfy-parity-native-model-resource-execution-foundation.",
         include_model_payload=False,
     )
     append(
@@ -10013,6 +10013,7 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_types/src/worker_protocol.rs",
             "crates/comfy_types/src/comfy_types.rs",
             "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_worker/src/supervisor.rs",
             "crates/comfy_worker/tests/ipc_framing.rs",
             "crates/comfy_runtime/src/runtime_supervisor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
@@ -10020,6 +10021,7 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_model/src/model_store.rs",
             "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
             "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
@@ -10028,16 +10030,18 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_types/src/worker_protocol.rs",
             "crates/comfy_types/src/comfy_types.rs",
             "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_worker/src/supervisor.rs",
             "crates/comfy_worker/tests/ipc_framing.rs",
             "crates/comfy_runtime/src/runtime_supervisor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_runtime/src/assets.rs",
             "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "A distinct worker-to-app model-source open, read, and close protocol reuses the Task425 capacity-one backpressure pattern but never overloads provider streaming. Every request binds exact attempt, node, and service generations, a one-use source-session ID, checked call ordinal, ordered source-selection identity, tensor ordinal and bounded byte range; every response binds a fixed chunk ceiling below the worker frame maximum and an exact response digest. The app alone resolves names and authorization through NativeAssetResolverRegistry and AssetService, opens the canonical ModelStore verified manifest, and serves revalidated chunks. The worker receives no path, file handle, authorization grant, ArtifactIndex, ModelStore, raw service, or authority getter. Wrong direction, duplicate, replayed, late, or out-of-order calls, foreign or stale identity or generation, replacement, crash, cancellation between chunks, changed source bytes, oversized aggregate or chunk, digest mismatch, and post-close traffic cancel and close the exact session; a fresh attempt restarts at ordinal one with no duplicated publication. Legacy WorkerMessage bytes remain frozen. A hermetic multi-chunk source larger than the 12 MiB native execution frame crosses the bridge without being embedded in ExecuteNativeImagePlan, and worker loss, shutdown, and controller replacement revoke all session capacity and permit a clean retry.",
+        "A distinct worker-to-app model-source open, read, and close protocol reuses the Task425 capacity-one backpressure pattern but never overloads provider streaming. Every request binds exact attempt, node, and service generations, a one-use source-session ID, checked call ordinal, ordered source-selection identity, tensor ordinal and bounded byte range; every response binds a fixed chunk ceiling below the worker frame maximum and an exact response digest. The app alone resolves names and authorization through NativeAssetResolverRegistry and AssetService, opens the canonical ModelStore verified manifest, and serves revalidated chunks. The worker receives no path, file handle, authorization grant, ArtifactIndex, ModelStore, raw service, or authority getter. WorkerMessage direction and lifecycle matches remain exhaustive in comfy_worker, supervisor, ipc_framing, and comfy_test_worker_fixture; the new variants have exact wrong-direction rejection and frozen legacy bytes with no wildcard acceptance. Wrong direction, duplicate, replayed, late, or out-of-order calls, foreign or stale identity or generation, replacement, crash, cancellation between chunks, changed source bytes, oversized aggregate or chunk, digest mismatch, and post-close traffic cancel and close the exact session; a fresh attempt restarts at ordinal one with no duplicated publication. Legacy WorkerMessage bytes remain frozen. A hermetic multi-chunk source larger than the 12 MiB native execution frame crosses the bridge without being embedded in ExecuteNativeImagePlan, and worker loss, shutdown, and controller replacement revoke all session capacity and permit a clean retry.",
         include_model_payload=False,
     )
     append(
@@ -10048,6 +10052,8 @@ def native_model_resource_precursor_tasks(
             "projects/comfy/ComfyUI/nodes.py",
             "projects/comfy/ComfyUI/folder_paths.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_hidream.py",
             "crates/comfy_model/src/model_store.rs",
             "crates/comfy_model/src/artifact_index.rs",
             "crates/comfy_model/src/conditioning_resources.rs",
@@ -10078,7 +10084,62 @@ def native_model_resource_precursor_tasks(
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
-        "comfy_nodes defines one object-safe Send+Sync NativeModelResourceService port. Its checked request contains only a typed role, exact folder category, ordered source names, and no raw bytes, path, grant, parser, store, cache key, or memory ceiling; its result is Arc<NativeModelPayload> only, never NativeStoredModelPayload, handle, execution output, or effect. Runtime owns one non-Clone opaque implementation with the paired worker-source session and a private exact role dispatch. NativeNodeServices and NodeContext validate the same NativeNodeServiceIdentity attempt and node before and after every call; cancellation and source identity are revalidated immediately before return. Initial success is exactly STYLE_MODEL from style_models, PHOTOMAKER from photomaker, and GLIGEN from gligen, each with exactly one source and one delegation to its prerequisite typed owner. The request representation may preserve ordered one-through-three multiplicity for later recipes, but paired and triple CLIP success remains exclusively assigned to the following resource execution task. This service loads only; invocation remains in each typed resource owner. Old service, attempt, node, or generation requests fail; already returned local Arcs are not retroactively revoked. Wrong category or count, changed bytes, partial selection, unsupported architecture, malformed weights, denied authorization, OOM, cancellation, service replacement, worker loss, and restart publish no resource, NativeStoredModelPayload, handle, execution-cache entry, effect, or durable success. Canonical verified ModelStore parse-cache retention remains governed solely by ModelStore and is explicitly allowed after a later resource-construction rejection. Ownership registers one native_model_resource_service concern with the runtime implementation as canonical owner, NativeModelResourceService as the boundary port, and AssetService, ArtifactIndex, ModelStore, the three typed resource owners, the model-source worker bridge, and ExecutionEngine as allowed adapters. It forbids a second parser, store, index, path, grant, cache, handle/publication, or resource-constructor owner and any public raw bridge or service getter.",
+        "comfy_nodes defines one object-safe Send+Sync NativeModelResourceService port. Its checked request contains only a typed role, exact folder category, one through four ordered source names, and no raw bytes, path, grant, parser, store, cache key, or memory ceiling; its result is Arc<NativeModelPayload> only, never NativeStoredModelPayload, handle, execution output, or effect. Runtime owns one non-Clone opaque implementation with the paired worker-source session and a private exact role dispatch. NativeNodeServices and NodeContext validate the same NativeNodeServiceIdentity attempt and node before and after every call; cancellation and source identity are revalidated immediately before return. Initial success is exactly STYLE_MODEL from style_models, PHOTOMAKER from photomaker, and GLIGEN from gligen, each with exactly one source and one delegation to its prerequisite typed owner. The request representation preserves ordered one-through-four multiplicity for the following recipe-closure task, including SD3's three-source and HiDream's four-source CLIP loaders, but every other recipe remains typed unavailable here. This service loads only; invocation, handle publication, cache, durable persistence, restart reconstruction, and stale-generation behavior remain assigned to comfy-parity-native-model-resource-execution-foundation. Old service, attempt, node, or generation requests fail; already returned local Arcs are not retroactively revoked. Wrong category or count, changed bytes, partial selection, unsupported architecture, malformed weights, denied authorization, OOM, cancellation, service replacement, worker loss, and restart publish no resource, NativeStoredModelPayload, handle, execution-cache entry, effect, or durable success. Canonical verified ModelStore parse-cache retention remains governed solely by ModelStore and is explicitly allowed after a later resource-construction rejection. Ownership registers one native_model_resource_service concern with the runtime implementation as canonical owner, NativeModelResourceService as the boundary port, and AssetService, ArtifactIndex, ModelStore, the three typed resource owners, the model-source worker bridge, and ExecutionEngine as allowed adapters. It forbids a second parser, store, index, path, grant, cache, handle/publication, lifecycle, persistence, or resource-constructor owner and any public raw bridge or service getter.",
+        include_model_payload=False,
+    )
+    append(
+        "comfy-parity-native-model-resource-service-recipe-closure",
+        "Close native model resource service recipes",
+        "Extend the existing loader service's private role dispatch with the complete source-valid one-, two-, three-, and four-source recipe matrix for every concrete NativeModelPayload loader role, without publishing handles or moving invocation or lifecycle authority into the service.",
+        [
+            "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/folder_paths.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_audio_encoder.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_bg_removal.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_depth_anything_3.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_hidream.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_hunyuan.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_moge.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_void.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py",
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/audio_encoder.rs",
+            "crates/comfy_model/src/background_removal.rs",
+            "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/src/depth_anything_3.rs",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/latent_upscale_model.rs",
+            "crates/comfy_model/src/moge.rs",
+            "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/src/vision_models.rs",
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_model/src/vae_structured.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "The existing NativeModelResourceService request and opaque runtime implementation remain the sole loader-service port and owner. Exact source/category recipes are: one checkpoints source selected as MODEL, CLIP, or VAE; one diffusion_models source as MODEL; one through four ordered text_encoders sources as CLIP, preserving single, dual, SD3 triple, and HiDream quadruple order; one vae source as VAE; one audio_encoders source as AUDIO_ENCODER; one clip_vision source as CLIP_VISION; one style_models source as STYLE_MODEL; one photomaker source as PHOTOMAKER; one gligen source as GLIGEN; one latent_upscale_models source as LATENT_UPSCALE_MODEL; one background_removal source as BACKGROUND_REMOVAL; one frame_interpolation source as INTERP_MODEL; one geometry_estimation source selected as DA3_MODEL or MOGE_MODEL; and one optical_flow source as OPTICAL_FLOW. Each admitted recipe delegates exactly once to its canonical typed resource owner and returns Arc<NativeModelPayload>. Ordered-source count, category, role, source identity, and detected architecture are checked as one matrix; zero, five, swapped, duplicate, partial, wrong-category, wrong-role, ambiguous, unsupported, changed-source, OOM, cancellation, worker-loss, and replacement cases return typed unavailable or the exact owner error before any stored payload, handle, cache record, effect, or durable success. CONTROL_NET remains NativeControlPayload-owned, UPSCALE_MODEL remains typed unavailable while its resource is uninhabited, FACE_DETECTION remains unavailable until a concrete owner exists, and HOOKS, HOOK_KEYFRAMES, LATENT_OPERATION, LORA_MODEL, and MODEL_PATCH remain assigned to transform leaves. This closure adds no parser, store, bridge, path, grant, invocation, handle, cache, persistence, restart, or stale-generation authority. native_model_resource_service remains the sole service concern, while native_node_registry remains the sole handle lifecycle, lease, cache, and generation owner; publication and restart reconstruction remain assigned to comfy-parity-native-model-resource-execution-foundation.",
         include_model_payload=False,
     )
     ordered_ids = [
@@ -10108,6 +10169,7 @@ def native_model_resource_precursor_tasks(
         "comfy-parity-native-model-store-stream-source-foundation",
         "comfy-parity-native-model-source-worker-bridge-foundation",
         "comfy-parity-native-model-resource-service-foundation",
+        "comfy-parity-native-model-resource-service-recipe-closure",
     ]
     tasks_by_id = {str(item["id"]): item for item in tasks}
     ordered = [tasks_by_id[identifier] for identifier in ordered_ids]
@@ -10123,18 +10185,25 @@ def native_model_resource_precursor_tasks(
         )
     tasks_by_id["comfy-parity-native-model-store-stream-source-foundation"][
         "dependencies"
-    ] = [asset_dependency]
+    ] = [
+        "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+        asset_dependency,
+    ]
     tasks_by_id["comfy-parity-native-model-source-worker-bridge-foundation"][
         "dependencies"
     ] = [
         "comfy-parity-native-model-store-stream-source-foundation",
-        "comfy-parity-native-conditioning-auxiliary-resource-foundation",
     ]
     tasks_by_id["comfy-parity-native-model-resource-service-foundation"][
         "dependencies"
     ] = [
-        "comfy-parity-native-conditioning-auxiliary-resource-foundation",
         "comfy-parity-native-model-source-worker-bridge-foundation",
+    ]
+    tasks_by_id["comfy-parity-native-model-resource-service-recipe-closure"][
+        "dependencies"
+    ] = [
+        "comfy-parity-native-model-resource-service-foundation",
+        "comfy-parity-model-detection-any-of-key-selector-consolidation",
     ]
     return ordered
 
@@ -10148,7 +10217,7 @@ def native_model_resource_execution_foundation_task(
         [4, 6, 7, 18, 26, 28, 31, 34, 35, 37, 38, 41, 44],
         [8, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
         ["VAL-MODEL-FAMILY-001", "VAL-NODE-001", "VAL-MEMORY-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
-        "Integrate the typed resource prerequisites through the single native handle-store boundary. MODEL, CLIP, and VAE retain their canonical NativeDiffusionPayload transport; AUDIO_ENCODER, LATENT_UPSCALE_MODEL, and other auxiliary model roles use checked concrete NativeStoredModelPayload admission; the runtime loader service returns complete typed resources and the node boundary alone stages and publishes handles. Existing ControlNet, optical-flow, CLIP-vision, frame-interpolation, and face-detection owners remain canonical, while LoRA and executable model-patch resources remain assigned to the model-transform foundation.",
+        "Integrate the recipe-closed loader service through the single native handle-store boundary with an exact payload and typed-unavailable matrix. NativeDiffusionPayload remains the only transport for diffusion MODEL, SD1 CLIP, and VAE. Direct concrete NativeModelPayload resources use checked NativeStoredModelPayload admission. NativeControlPayload remains the sole CONTROL_NET transport; uninhabited, ownerless, and transform roles remain typed unavailable. Restart reconstructs resources from canonical persisted source selections into fresh-generation handles without serializing process-local handles, payloads, tensors, stores, or caches.",
         [
             ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
             "projects/comfy/ComfyUI/nodes.py",
@@ -10156,27 +10225,51 @@ def native_model_resource_execution_foundation_task(
             "projects/comfy/ComfyUI/comfy_extras/nodes_upscale_model.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_bg_removal.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_depth_anything_3.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_moge.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_void.py",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/model_family.rs",
             "crates/comfy_model/src/audio_encoder.rs",
+            "crates/comfy_model/src/background_removal.rs",
+            "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/src/depth_anything_3.rs",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/latent_upscale_model.rs",
+            "crates/comfy_model/src/moge.rs",
+            "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/src/upscale_model.rs",
+            "crates/comfy_model/src/vision_models.rs",
             "crates/comfy_model/src/vae.rs",
             "crates/comfy_model/src/vae_structured.rs",
             "crates/comfy_nodes/src/stored_payload.rs",
             "crates/comfy_nodes/src/execution.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/persistence.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [
             "crates/comfy_nodes/src/stored_payload.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_runtime/src/cache.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
         ],
-        "All prerequisite resources plus the already canonical ControlNet, optical-flow, CLIP-vision, frame-interpolation, and face-detection resources can be published, resolved, leased, cached, persisted, reconstructed after restart, and consumed through exactly one role-correct handle boundary without a crate cycle. MODEL, CLIP, and VAE use only NativeDiffusionPayload transport; AUDIO_ENCODER, LATENT_UPSCALE_MODEL, and other auxiliary roles use only explicit concrete stored admission. Old-generation handles reject after restart while fresh handles resolve the same semantic identity. Wrong-role or non-concrete backing, unsupported architecture, malformed weights, source or profile drift, partial multi-file loads, OOM, cancellation, stale handles, service replacement, failed reconstruction, and invocation failures publish no handle, cache record, effect, or durable success, and repository scans find no family-local loader, fake resource, second store, or duplicate execution owner.",
+        "The exact publication matrix is closed. NativeDiffusionPayload transports only diffusion MODEL backed by Sd15Model or NativeFamilyModel, SD1 CLIP, and VAE backed by NativeVae or NativeStructuredVae. NativeStoredModelPayload::model_resource directly admits only concrete NativeModelPayload resources: MODEL backed by NativeSdPoseModel; CLIP backed by NativeDecoderTextEncoder, NativeQwenMultimodal, NativeGemmaMultimodal, or NativeClipResource; AUDIO_ENCODER, BACKGROUND_REMOVAL, CLIP_VISION, DA3_MODEL, INTERP_MODEL, GLIGEN, LATENT_UPSCALE_MODEL, MOGE_MODEL, OPTICAL_FLOW, PHOTOMAKER, and STYLE_MODEL backed by their exact canonical owners. CONTROL_NET remains exclusively NativeStoredPayload::Control and NativeControlPayload. UPSCALE_MODEL returns typed unavailable while NativeUpscaleModelResource is uninhabited; FACE_DETECTION returns typed unavailable until a concrete resource owner exists; HOOKS, HOOK_KEYFRAMES, LATENT_OPERATION, LORA_MODEL, and MODEL_PATCH remain typed unavailable here and assigned to model-transform leaves. No generic role facade, string dispatch, raw selector, or reinterpretation can admit another backing. The node boundary alone stages and publishes each admitted resource through the existing native_node_registry concern, which remains the sole NativeHandleStoreGeneration, NativeOpaqueHandle, NativeHandleLease, cache-lease, eviction, and generation owner; this task adds no second lifecycle owner. Durable state persists only canonical node inputs, ordered source selection, semantic reconstruction identity, and attempt evidence. NativeOpaqueHandle, NativeStoredPayload, NativeModelPayload, tensor bytes, Arc state, ModelStore manifests or sessions, and NativeCache are never serialized. Restart replays the persisted source-name recipe through a fresh loader-service and ModelStore session, reconstructs the same semantic resource, and stages a fresh handle in a new NativeHandleStoreGeneration. The old handle rejects exact WrongGeneration; the fresh handle has the same semantic digest. Changed source bytes, order, category, role, detected profile, or reconstruction identity fails before publishing a fresh handle, cache record, output, effect, or durable success. Wrong-role or non-concrete backing, unsupported or unavailable role, malformed weights, partial multi-file loads, OOM, cancellation, stale handle, service replacement, worker loss, failed reconstruction, and invocation failure are atomic. Focused tests cover every admitted backing, every unavailable role, role/backing cross-products, one-through-four source recipes, cache hit and eviction, cancellation and OOM before publication, worker replacement, stale-generation rejection, same-identity restart, changed-source restart failure, and repository scans proving no family-local loader, fake resource, second store, second registry, or duplicate execution owner.",
         dependency,
         locked=True,
         feature_scoped=True,
@@ -21783,7 +21876,6 @@ def task_validation_commands(item: dict[str, object]) -> str:
         ])
         if identifier == "comfy-parity-native-style-model-resource-foundation":
             commands.extend([
-                "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
                 "cargo test --locked -p comfy_test_support --test native_conditioning_integration style_model_resource -- --exact --nocapture",
                 "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task393_style_model_resource_001 -- --exact --nocapture",
             ])
@@ -21848,6 +21940,8 @@ def task_validation_commands(item: dict[str, object]) -> str:
     if identifier == "comfy-parity-native-model-source-worker-bridge-foundation":
         commands.extend([
             "cargo fmt --all -- --check",
+            "cargo check --locked -p comfy_types -p comfy_worker -p comfy_runtime -p comfy_test_support",
+            "cargo test --locked -p comfy_worker model_source_worker_message_consumers_are_exhaustive -- --nocapture",
             "cargo test --locked -p comfy_worker --test ipc_framing model_source_worker_bridge -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test native_worker_resilience model_source_worker_bridge_restarts_without_duplicate_publication -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task399_model_source_worker_bridge_001 -- --exact --nocapture",
@@ -21866,6 +21960,36 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "cargo test --locked -p comfy_test_support --test native_node_family_e2e native_model_resource_service_loads_style_photomaker_and_gligen -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test native_worker_resilience val_recovery_005 -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task400_native_model_resource_service_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-model-resource-service-recipe-closure":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p comfy_nodes native_model_resource_service_recipes -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_model_resource_service_recipes -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_node_family_e2e native_model_resource_service_recipe_matrix -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_worker_resilience model_resource_recipe_restart_is_atomic -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/generate_ownership_catalog.py",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task401_native_model_resource_service_recipes_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-model-resource-execution-foundation":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo test --locked -p comfy_nodes native_model_resource_execution -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_model_resource_execution -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_node_family_e2e native_model_resource_execution_matrix -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_worker_resilience model_resource_execution_restarts_with_fresh_generation -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/generate_ownership_catalog.py",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_native_model_resource_execution_001 -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",

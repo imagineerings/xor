@@ -1,0 +1,37 @@
+{
+  "arithmetic_contract": "Pure Python standard-library source equations with explicit IEEE-754 binary32 rounding, exact-rational fused multiply-add with ties-to-even binary32 rounding, source-order f32 attention accumulation, f64 layer-normalization statistics, and f64 final matmul accumulation.",
+  "command": "PYTHONDONTWRITEBYTECODE=1 python3 crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation/generate_oracle.py --check",
+  "format": "conditioning-auxiliary-resource-foundation-provenance-v1",
+  "generator_sha256": "a5bd373083f4e7e15eb24d0c0890e096d9a0038422a435df6d237a02cfae51b1",
+  "mutations": [
+    "redux_down",
+    "redux_up",
+    "style_embedding",
+    "style_projection",
+    "style_quick_gelu",
+    "style_value_projection"
+  ],
+  "oracle_domain": "conditioning-auxiliary-resource-foundation-v1",
+  "oracle_sha256": "dea7383e960b5b1e3b556b2eccc933263295736fa154426e81622249aed5a8fa",
+  "pinned_sources": {
+    "projects/comfy/ComfyUI/comfy/ldm/flux/redux.py": "3b7abf43e15fc7b9613a64e701635f943351fa47f5036d87427ea672f93c7952",
+    "projects/comfy/ComfyUI/comfy/ops.py": "9d8a4ec8357a9bfcd98dddbf06fcc2a0244643a392aacbe0970d945462c86a42",
+    "projects/comfy/ComfyUI/comfy/sd.py": "9c378edbcaab01d00397cc0ef1cab7d37d25fca49c707a87cde451030ac6bf42",
+    "projects/comfy/ComfyUI/comfy/t2i_adapter/adapter.py": "efc52cc85f941e11b509c0339e8950a6680d031b09bec36736d8834b9ccfa1af",
+    "projects/comfy/ComfyUI/nodes.py": "b8dfdde1de8975be762b085048143cc2dda8fc9202695e460ecc2c8dfe44bc4b"
+  },
+  "profiles": [
+    "style",
+    "redux"
+  ],
+  "reduced_profiles_are_source_exact": false,
+  "redux_state_count": 4,
+  "runtime_boundary": "The fixture executes reduced dimensions only and never labels them source-exact production profiles. It does not import torch, numpy, a model runtime, a codec, or a native library and uses no subprocess, network, host credential, or generated product output. Q/K baseline projections are exactly zero, making the source softmax an exact uniform four-token disposition; V, output projection, MLP, QuickGELU, final projection, and both Redux linears remain live. A separate batch-two case activates asymmetric Q and K projections in both heads of every layer to discriminate fused splitting, scale, softmax, head grouping, and batch/sequence order.",
+  "source_graph_sha256": "79a3d30c383cf348aa075ff3273866d56419d8a4b7fe031b7be35d0176bb4c32",
+  "storage_dtypes": [
+    "float32",
+    "float16",
+    "bfloat16"
+  ],
+  "style_state_count": 42
+}

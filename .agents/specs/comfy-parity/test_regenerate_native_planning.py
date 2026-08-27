@@ -195,7 +195,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 731)
+        self.assertEqual(len(tasks), 732)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -338,6 +338,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-native-model-store-stream-source-foundation",
             "comfy-parity-native-model-source-worker-bridge-foundation",
             "comfy-parity-native-model-resource-service-foundation",
+            "comfy-parity-native-model-resource-service-recipe-closure",
         ]
         self.assertEqual(
             tasks_by_id[model_resource_phases[0]]["dependencies"],
@@ -356,22 +357,33 @@ class ValidationGenerationTests(unittest.TestCase):
         model_resource_service_task = tasks_by_id[
             "comfy-parity-native-model-resource-service-foundation"
         ]
+        model_resource_recipe_task = tasks_by_id[
+            "comfy-parity-native-model-resource-service-recipe-closure"
+        ]
         self.assertEqual(
             model_store_stream_task["dependencies"],
-            ["comfy-parity-native-asset-name-resolution-foundation"],
+            [
+                "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+                "comfy-parity-native-asset-name-resolution-foundation",
+            ],
         )
         self.assertEqual(
             model_source_bridge_task["dependencies"],
             [
                 "comfy-parity-native-model-store-stream-source-foundation",
-                "comfy-parity-native-conditioning-auxiliary-resource-foundation",
             ],
         )
         self.assertEqual(
             model_resource_service_task["dependencies"],
             [
-                "comfy-parity-native-conditioning-auxiliary-resource-foundation",
                 "comfy-parity-native-model-source-worker-bridge-foundation",
+            ],
+        )
+        self.assertEqual(
+            model_resource_recipe_task["dependencies"],
+            [
+                "comfy-parity-native-model-resource-service-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
             ],
         )
         clip_task = tasks_by_id["comfy-parity-native-clip-resource-foundation"]
@@ -735,11 +747,14 @@ class ValidationGenerationTests(unittest.TestCase):
             self.assertIn(style_gate, style_task["done"])
         style_validation = planning.task_validation_commands(style_task)
         for command in (
-            "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
             "cargo test --locked -p comfy_test_support --test native_conditioning_integration style_model_resource -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task393_style_model_resource_001 -- --exact --nocapture",
         ):
             self.assertIn(command, style_validation)
+        self.assertNotIn(
+            "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+            style_validation,
+        )
         for clip_vision_read in (
             "crates/comfy_model/tests/clip_vision.rs",
             "crates/comfy_model/src/native_node_payload.rs",
@@ -946,9 +961,11 @@ class ValidationGenerationTests(unittest.TestCase):
         for bridge_write in (
             "crates/comfy_types/src/worker_protocol.rs",
             "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_worker/src/supervisor.rs",
             "crates/comfy_runtime/src/runtime_supervisor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
             "crates/comfy_test_support/tests/native_worker_resilience.rs",
         ):
             self.assertIn(bridge_write, model_source_bridge_task["writes"])
@@ -959,6 +976,8 @@ class ValidationGenerationTests(unittest.TestCase):
             "worker receives no path, file handle, authorization grant, ArtifactIndex, ModelStore",
             "fresh attempt restarts at ordinal one",
             "Legacy WorkerMessage bytes remain frozen",
+            "WorkerMessage direction and lifecycle matches remain exhaustive",
+            "no wildcard acceptance",
             "larger than the 12 MiB native execution frame",
         ):
             self.assertIn(phrase, model_source_bridge_task["done"])
@@ -973,6 +992,11 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_model/src/native_node_payload.rs",
             model_resource_service_task["writes"],
         )
+        for source_loader_read in (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_hidream.py",
+        ):
+            self.assertIn(source_loader_read, model_resource_service_task["reads"])
         for service_write in (
             "crates/comfy_nodes/src/execution.rs",
             "crates/comfy_runtime/src/executor.rs",
@@ -985,13 +1009,16 @@ class ValidationGenerationTests(unittest.TestCase):
         for phrase in (
             "object-safe Send+Sync NativeModelResourceService port",
             "Arc<NativeModelPayload> only",
+            "one through four ordered source names",
             "same NativeNodeServiceIdentity attempt and node before and after every call",
             "STYLE_MODEL from style_models, PHOTOMAKER from photomaker, and GLIGEN from gligen",
-            "paired and triple CLIP success remains exclusively assigned",
+            "SD3's three-source and HiDream's four-source CLIP loaders",
+            "every other recipe remains typed unavailable here",
+            "remain assigned to comfy-parity-native-model-resource-execution-foundation",
             "already returned local Arcs are not retroactively revoked",
             "Canonical verified ModelStore parse-cache retention",
             "native_model_resource_service concern",
-            "forbids a second parser, store, index, path, grant, cache, handle/publication, or resource-constructor owner",
+            "forbids a second parser, store, index, path, grant, cache, handle/publication, lifecycle, persistence, or resource-constructor owner",
         ):
             self.assertIn(phrase, model_resource_service_task["done"])
         service_validation = planning.task_validation_commands(
@@ -1005,6 +1032,43 @@ class ValidationGenerationTests(unittest.TestCase):
             "val_ownership_task400_native_model_resource_service_001",
         ):
             self.assertIn(command, service_validation)
+        for recipe_read in (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_audio_encoder.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_hidream.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_void.py",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_runtime/src/executor.rs",
+        ):
+            self.assertIn(recipe_read, model_resource_recipe_task["reads"])
+        self.assertIn(
+            "complete source-valid one-, two-, three-, and four-source recipe matrix",
+            model_resource_recipe_task["outcome"],
+        )
+        for recipe_gate in (
+            "one checkpoints source selected as MODEL, CLIP, or VAE",
+            "one through four ordered text_encoders sources as CLIP",
+            "SD3 triple, and HiDream quadruple order",
+            "one geometry_estimation source selected as DA3_MODEL or MOGE_MODEL",
+            "CONTROL_NET remains NativeControlPayload-owned",
+            "UPSCALE_MODEL remains typed unavailable",
+            "FACE_DETECTION remains unavailable",
+            "native_node_registry remains the sole handle lifecycle, lease, cache, and generation owner",
+            "remain assigned to comfy-parity-native-model-resource-execution-foundation",
+        ):
+            self.assertIn(recipe_gate, model_resource_recipe_task["done"])
+        recipe_validation = planning.task_validation_commands(
+            model_resource_recipe_task
+        )
+        for command in (
+            "cargo test --locked -p comfy_nodes native_model_resource_service_recipes -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_model_resource_service_recipes -- --nocapture",
+            "native_model_resource_service_recipe_matrix",
+            "model_resource_recipe_restart_is_atomic",
+            "val_ownership_task401_native_model_resource_service_recipes_001",
+        ):
+            self.assertIn(command, recipe_validation)
         for item in (
             style_task,
             clip_vision_context_task,
@@ -1298,14 +1362,68 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(writers, [execution_id])
         self.assertIn(execution_id, tasks_by_id[audio_id]["done"])
         self.assertIn(execution_id, tasks_by_id[latent_upscale_id]["done"])
+        for lifecycle_delegate in (
+            style_task,
+            photomaker_task,
+            gligen_task,
+            conditioning_auxiliary,
+        ):
+            self.assertIn(execution_id, lifecycle_delegate["done"])
+            self.assertNotIn(
+                "remain assigned to comfy-parity-native-model-resource-service-foundation",
+                lifecycle_delegate["done"],
+            )
+        for required_read in (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_void.py",
+            "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/src/background_removal.rs",
+            "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/src/depth_anything_3.rs",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/latent_upscale_model.rs",
+            "crates/comfy_model/src/moge.rs",
+            "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/src/upscale_model.rs",
+            "crates/comfy_model/src/vision_models.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/persistence.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+        ):
+            self.assertIn(required_read, tasks_by_id[execution_id]["reads"])
+        self.assertIn(
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            tasks_by_id[execution_id]["writes"],
+        )
         for required in [
             "AUDIO_ENCODER",
             "LATENT_UPSCALE_MODEL",
-            "persisted",
-            "restart",
-            "stale",
+            "NativeDiffusionPayload transports only diffusion MODEL",
+            "NativeStoredModelPayload::model_resource directly admits only concrete NativeModelPayload resources",
+            "CONTROL_NET remains exclusively NativeStoredPayload::Control",
+            "UPSCALE_MODEL returns typed unavailable",
+            "FACE_DETECTION returns typed unavailable",
+            "HOOKS, HOOK_KEYFRAMES, LATENT_OPERATION, LORA_MODEL, and MODEL_PATCH remain typed unavailable",
+            "native_node_registry concern",
+            "NativeOpaqueHandle, NativeStoredPayload, NativeModelPayload, tensor bytes, Arc state, ModelStore manifests or sessions, and NativeCache are never serialized",
+            "fresh handle in a new NativeHandleStoreGeneration",
+            "old handle rejects exact WrongGeneration",
+            "fresh handle has the same semantic digest",
         ]:
             self.assertIn(required, tasks_by_id[execution_id]["done"])
+        execution_validation = planning.task_validation_commands(
+            tasks_by_id[execution_id]
+        )
+        for command in (
+            "cargo test --locked -p comfy_nodes native_model_resource_execution -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_model_resource_execution -- --nocapture",
+            "native_model_resource_execution_matrix",
+            "model_resource_execution_restarts_with_fresh_generation",
+            "val_ownership_native_model_resource_execution_001",
+        ):
+            self.assertIn(command, execution_validation)
         video_phases = [
             "comfy-parity-native-video-codec-general-abi-foundation",
             "comfy-parity-native-video-codec-package-bootstrap-foundation",

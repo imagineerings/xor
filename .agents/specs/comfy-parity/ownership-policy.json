@@ -14510,6 +14510,124 @@
       "decision_reason": "NativeSgd alone owns SGD hyperparameter validation and momentum-buffer transitions. It stages every updated parameter and buffer before publishing either collection, delegates allocation and tensor identity to CpuBackend and Tensor, and does not introduce a generic optimizer registry, autograd tape, queue, persistence layer, or cancellation token."
     },
     {
+      "concern": "native_style_model_resource",
+      "canonical_owner": "comfy_model::conditioning_resources::NativeStyleModelResource",
+      "owner_files": [
+        "crates/comfy_model/src/conditioning_resources.rs",
+        "crates/comfy_model/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeStyleModelResource"
+      ],
+      "allowed_adapters": [
+        "canonical comfy_model::attention retains the sole scaled-dot-product attention equation and policy while NativeStyleModelResource owns only StyleAdapter source choreography and checked fused-QKV projection views",
+        "canonical comfy_model native_ops and comfy_tensor operators retain linear, layer-normalization, activation, reshape, concatenation, storage, allocation, cancellation, and workspace authority",
+        "comfy_model::clip_vision::ClipVisionOutput retains the canonical CLIP-vision output identity and validation boundary; NativeStyleModelResource consumes only its checked last_hidden_state tensor and owns no CLIP transformer, post-layer-normalization, or projection equation",
+        "NativeModelPayload seals STYLE_MODEL role, identity, alias-aware residency, reconstruction, and the borrowed selector-free style_model_resource view without creating handle, cache, persistence, restart, or stale-generation authority",
+        "the pure-standard-library reduced StyleAdapter and Flux Redux fixture is an independent development-reference equation oracle and confers no production model, tensor, attention, or publication authority",
+        "GLIGEN and PHOTOMAKER checkpoint, reconstruction, invocation, and payload ownership remain assigned to their separate native resource tasks"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "qualified": "comfy_model::conditioning_resources::NativeStyleModelResource",
+          "role": "canonical",
+          "symbol": "NativeStyleModelResource",
+          "pattern": "^pub struct NativeStyleModelResource \\{"
+        }
+      ],
+      "call_symbols": [
+        "NativeStyleModelResource::from_checkpoint",
+        "NativeStyleModelResource::reconstruct_checkpoint",
+        "NativeStyleModelResource::get_cond",
+        "NativeModelPayload::style_model",
+        "style_model_resource"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "style-model-admission-detects-strict-state-and-binds-execution",
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "pattern": "pub fn from_checkpoint\\([\\s\\S]*fn checked\\([\\s\\S]*raw_checkpoint_preflight[\\s\\S]*detect_configuration[\\s\\S]*state_manifest[\\s\\S]*validate_ordered_keys[\\s\\S]*build_style_attention[\\s\\S]*semantic_digest"
+        },
+        {
+          "name": "style-model-reconstructs-complete-ordered-source-state",
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "pattern": "pub fn reconstruct_checkpoint\\([\\s\\S]*state_manifest[\\s\\S]*self\\.source_state[\\s\\S]*NativeStyleModelCheckpoint"
+        },
+        {
+          "name": "style-model-validates-canonical-clip-output-and-publishes-bounded-conditioning",
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "pattern": "pub fn get_cond\\([\\s\\S]*input\\.validate\\(\\)\\?[\\s\\S]*last_hidden_state[\\s\\S]*preflight_invocation_memory[\\s\\S]*execute_style_adapter[\\s\\S]*execute_flux_redux[\\s\\S]*context\\.check\\(\\)\\?[\\s\\S]*Ok\\(output\\)"
+        },
+        {
+          "name": "style-adapter-fused-qkv-reconstruction-delegates-canonical-attention",
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "pattern": "scaled_dot_product_attention_tensor_with_context[\\s\\S]*build_style_attention[\\s\\S]*split_three[\\s\\S]*require_exact_fused_reconstruction"
+        },
+        {
+          "name": "style-model-payload-seals-role-identity-and-residency",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "pub fn style_model\\([\\s\\S]*NativeModelResourceRole::StyleModel[\\s\\S]*zed-native-style-model-v1[\\s\\S]*NativeModelResource::StyleModel[\\s\\S]*NativeModelBackingKind::NativeStyleModelResource[\\s\\S]*pub fn style_model_resource"
+        },
+        {
+          "name": "style-model-fixture-is-source-pinned-independent-and-bounded",
+          "path": "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation/provenance.json",
+          "pattern": "Pure Python standard-library source equations[\\s\\S]*reduced_profiles_are_source_exact[\\s\\S]*style_state_count"
+        },
+        {
+          "name": "style-model-integration-covers-source-oracle-and-atomic-failure",
+          "path": "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+          "pattern": "fn style_model_resource\\([\\s\\S]*NativeStyleModelResource[\\s\\S]*get_cond[\\s\\S]*NativeModelPayload::style_model_test_fixture"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-style-model-resource-foundation"
+      ],
+      "production_consumers": [
+        "native STYLE_MODEL payload admission and typed StyleAdapter or Flux Redux conditioning invocation"
+      ],
+      "requirements": [
+        "Requirement 6.3",
+        "Requirement 7.2",
+        "Requirement 18.1",
+        "Requirement 26.2",
+        "Requirement 28.2",
+        "Requirement 31.5",
+        "Requirement 34.2",
+        "Requirement 34.6",
+        "Requirement 35.2",
+        "Requirement 37.5",
+        "Requirement 38.3",
+        "Requirement 41.2",
+        "Requirement 44.1",
+        "Requirement 44.3"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeStyleModelResource is the sole retained owner of strict StyleAdapter and Flux Redux checkpoint identity, source-ordered reconstruction, checked F32 execution projection, bounded get_cond invocation, and conditioning publication. It delegates shared tensor equations and scaled-dot-product attention to their canonical owners, consumes only canonical ClipVisionOutput last_hidden_state, and exposes the sealed STYLE_MODEL payload projection without claiming GLIGEN, PHOTOMAKER, handle, cache, persistence, restart, or stale-generation authority."
+    },
+    {
       "concern": "native_tensor_transform_composition",
       "canonical_owner": "comfy_tensor::generated_external_tensor_kernel_03::compose_with_context_exact_native",
       "owner_files": [
@@ -20677,7 +20795,7 @@
         {
           "name": "private-worker-transfers-canonical-invocation-session",
           "path": "crates/comfy_plugin_host/src/private_worker.rs",
-          "pattern": "PluginCapabilityBroker[\\s\\S]*RuntimeSupervisor::start[\\s\\S]*execute_plugin_retaining_capabilities\\("
+          "pattern": "PluginCapabilityBroker[\\s\\S]*begin_invocation\\(service_context\\)[\\s\\S]*PrivateWorkerCommand::Legacy[\\s\\S]*capability_invocation[\\s\\S]*execute_private_worker_command[\\s\\S]*execute_plugin_retaining_capabilities\\("
         },
         {
           "name": "zed-production-composes-existing-service-owners",
@@ -21601,7 +21719,7 @@
         {
           "name": "task412-controller-shares-service-and-delegates-v1-cleanup",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "provider_streams: ProviderRuntimeStreamService[\\s\\S]*provider_bridge_live: Arc<AtomicBool>[\\s\\S]*pub struct NativeProviderWorkerBridgeAttachment[\\s\\S]*Weak<NativeExecutionController>[\\s\\S]*provider_bridge_live\\.load\\(Ordering::Acquire\\)[\\s\\S]*pub fn start_with_provider_worker_bridge\\([\\s\\S]*ProviderRuntimeStreamService::new\\(\\)[\\s\\S]*runner_provider_bridge_live[\\s\\S]*invalidate_provider_worker_bridge\\([\\s\\S]*fn revoke_provider_worker_bridge\\([\\s\\S]*fn invalidate_provider_worker_bridge\\([\\s\\S]*live\\.swap\\(false, Ordering::AcqRel\\)[\\s\\S]*\\.begin_legacy\\([\\s\\S]*\\.call_legacy\\([\\s\\S]*\\.resolve_legacy\\([\\s\\S]*\\.finish_legacy\\([\\s\\S]*abort_legacy\\([\\s\\S]*fn abort_provider_sessions\\([\\s\\S]*provider_streams\\.revoke_all\\("
+          "pattern": "provider_streams: ProviderRuntimeStreamService[\\s\\S]*provider_bridge_live: Arc<AtomicBool>[\\s\\S]*provider_bridge_attempt: Arc<Mutex<Option<NativeProviderWorkerBridgeActiveAttempt>>>[\\s\\S]*pub struct NativeProviderWorkerBridgeAttachment[\\s\\S]*Weak<NativeExecutionController>[\\s\\S]*provider_bridge_live\\.load\\(Ordering::Acquire\\)[\\s\\S]*pub fn start_with_provider_worker_bridge\\([\\s\\S]*ProviderRuntimeStreamService::new\\(\\)[\\s\\S]*runner_provider_bridge_live[\\s\\S]*runner_provider_bridge_attempt[\\s\\S]*invalidate_provider_worker_bridge\\([\\s\\S]*fn revoke_provider_worker_bridge\\([\\s\\S]*fn invalidate_provider_worker_bridge\\([\\s\\S]*live\\.store\\(false, Ordering::Release\\)[\\s\\S]*abort_native_provider_worker_sessions[\\s\\S]*fn retire_native_provider_worker_sessions\\([\\s\\S]*provider_bridge_attempt\\.lock\\(\\)\\.take\\(\\)[\\s\\S]*provider_streams\\.revoke_all\\(\\)[\\s\\S]*fn abort_native_provider_worker_sessions\\([\\s\\S]*active\\.cancellation\\.cancel\\(\\)[\\s\\S]*provider_streams\\.revoke_all\\(\\)[\\s\\S]*\\.begin_legacy\\([\\s\\S]*\\.call_legacy\\([\\s\\S]*\\.resolve_legacy\\([\\s\\S]*\\.finish_legacy\\([\\s\\S]*abort_legacy\\([\\s\\S]*fn abort_provider_sessions\\([\\s\\S]*abort_native_provider_worker_sessions[\\s\\S]*fn retire_provider_sessions\\([\\s\\S]*retire_native_provider_worker_sessions"
         },
         {
           "name": "task423-private-executor-retains-only-one-live-weak-controller-attachment",

@@ -47,7 +47,7 @@ const TOKENIZER_IMPLEMENTATION_CLOSURE: [(&str, &str); 7] = [
     ),
     (
         "crates/comfy_runtime/src/native_execution_controller.rs",
-        "a533e8070c9587467b147399ce8c46c06f2a0368c38eeab31ec030311a956fd9",
+        "2e80d3c1de589e52d73996563cf3c1de6924d1e06d52ef294585e0af5ee2ea88",
     ),
     (
         "crates/comfy_test_support/src/native_diffusion_fixture.rs",

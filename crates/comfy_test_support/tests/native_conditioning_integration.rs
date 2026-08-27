@@ -1,5 +1,8 @@
 use comfy_model::{
-    MappedModelWeights, PatchGraph, PatchPayload, PatchTensor, PatchValueTransform,
+    ClipVisionOutput, FLUX_REDUX_SOURCE_SHA256, MappedModelWeights, NativeModelPayload,
+    NativeStyleModelCheckpoint, NativeStyleModelError, NativeStyleModelResource, PatchGraph,
+    PatchPayload, PatchTensor, PatchValueTransform, STYLE_ADAPTER_SOURCE_SHA256,
+    STYLE_MODEL_NODES_SOURCE_SHA256, STYLE_MODEL_OPS_SOURCE_SHA256, STYLE_MODEL_SD_SOURCE_SHA256,
     SemanticPatchOperation,
     conditioning::{
         ConditioningConstant, ConditioningControlReference, ConditioningEntry,
@@ -28,11 +31,16 @@ use comfy_sampler::{
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
-    ResizeMode, StreamId, Tensor, TensorError,
+    ResizeMode, StreamId, Tensor, TensorBackend, TensorDescriptor, TensorError,
+    generated_elementwise_or_runtime_operation_03::{
+        real_add_with_context_exact_native, sigmoid_with_context_exact_native,
+    },
+    generated_elementwise_or_runtime_operation_09::full_like_with_context_exact_native,
     generated_native_diffusion::{tensor_from_f32, tensor_to_f32},
 };
 use comfy_test_support::NativeDiffusionFixture;
 use comfy_types::{AttemptId, ProfileId};
+use serde::Deserialize;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::{
@@ -51,6 +59,18 @@ use uuid::Uuid;
 
 const WORKFLOW: &[u8] = include_bytes!("../fixtures/native_diffusion/workflow.json");
 const MEMORY_LIMIT: u64 = 2 * 1024 * 1024 * 1024;
+const STYLE_MODEL_FIXTURE_MEMORY: u64 = 64 * 1024 * 1024;
+const STYLE_MODEL_ORACLE: &[u8] =
+    include_bytes!("../fixtures/models/conditioning-auxiliary-resource-foundation/oracle.json");
+const STYLE_MODEL_MANIFEST: &[u8] =
+    include_bytes!("../fixtures/models/conditioning-auxiliary-resource-foundation/manifest.json");
+const STYLE_MODEL_PROVENANCE: &[u8] =
+    include_bytes!("../fixtures/models/conditioning-auxiliary-resource-foundation/provenance.json");
+const STYLE_MODEL_SOURCE_GRAPH: &[u8] =
+    include_bytes!("../fixtures/models/conditioning-auxiliary-resource-foundation/source_graph.py");
+const STYLE_MODEL_GENERATOR: &[u8] = include_bytes!(
+    "../fixtures/models/conditioning-auxiliary-resource-foundation/generate_oracle.py"
+);
 const CONDITIONING_TASK: &str = "comfy-parity-conditioning-value-foundation";
 const GUIDANCE_TASK: &str = "comfy-parity-conditioning-guidance-adapter";
 const FIXTURE_CONTROL_EXECUTOR_DIGEST: &str =
@@ -1478,5 +1498,837 @@ fn write_artifact(executed_case_ids: &BTreeSet<&str>) -> Result<(), Box<dyn Erro
         directory.join("val-conditioning-001.json"),
         serde_json::to_vec_pretty(&artifact)?,
     )?;
+    Ok(())
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StyleStateFixture {
+    key: String,
+    shape: Vec<u64>,
+    storage_bits: Vec<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StyleDtypeFixture {
+    state: Vec<StyleStateFixture>,
+    source_identity_sha256: String,
+    projected_identity_sha256: String,
+    output_shape: Vec<u64>,
+    output_bits: Vec<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StyleProfileFixture {
+    input_shape: Vec<u64>,
+    input_bits: Vec<u32>,
+    dtypes: BTreeMap<String, StyleDtypeFixture>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StyleMutationFixture {
+    profile: String,
+    key: String,
+    index: usize,
+    delta_bits: u32,
+    source_identity_sha256: String,
+    output_bits: Vec<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StyleStateModificationFixture {
+    key: String,
+    index: usize,
+    value_bits: u32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StyleAttentionDiscriminatorFixture {
+    state_modifications: Vec<StyleStateModificationFixture>,
+    source_identity_sha256: String,
+    input_shape: Vec<u64>,
+    input_bits: Vec<u32>,
+    output_shape: Vec<u64>,
+    output_bits: Vec<u32>,
+    batch_outputs_differ: bool,
+    query_key_are_asymmetric: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct QuickGeluFixture {
+    coefficient_bits: u32,
+    input_bits: u32,
+    scaled_bits: u32,
+    sigmoid_bits: u32,
+    output_bits: u32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StyleDiscriminators {
+    signed_zero_input_bits: u32,
+    signed_zero_after_add_bits: u32,
+    quick_gelu: QuickGeluFixture,
+    detection_precedence: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StyleModelOracle {
+    format: String,
+    reduced_profiles_are_source_exact: bool,
+    source_dimensions: serde_json::Value,
+    reduced_dimensions: serde_json::Value,
+    style: StyleProfileFixture,
+    redux: StyleProfileFixture,
+    attention_discriminator: StyleAttentionDiscriminatorFixture,
+    mutations: BTreeMap<String, StyleMutationFixture>,
+    discriminators: StyleDiscriminators,
+    pinned_sources: BTreeMap<String, String>,
+    generator_sha256: String,
+    source_graph_sha256: String,
+    generator_command: String,
+}
+
+fn style_model_oracle() -> Result<StyleModelOracle, Box<dyn Error>> {
+    Ok(serde_json::from_slice(STYLE_MODEL_ORACLE)?)
+}
+
+fn fixture_dtype(name: &str) -> Result<DType, Box<dyn Error>> {
+    match name {
+        "float32" => Ok(DType::F32),
+        "float16" => Ok(DType::F16),
+        "bfloat16" => Ok(DType::Bf16),
+        value => Err(format!("unsupported fixture dtype {value}").into()),
+    }
+}
+
+fn storage_bytes(entry: &StyleStateFixture, dtype: DType) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut bytes = Vec::new();
+    let byte_width = usize::try_from(dtype.byte_width())?;
+    bytes.try_reserve_exact(
+        entry
+            .storage_bits
+            .len()
+            .checked_mul(byte_width)
+            .ok_or("fixture storage byte count overflowed")?,
+    )?;
+    for value in &entry.storage_bits {
+        match dtype {
+            DType::F32 => bytes.extend_from_slice(&value.to_le_bytes()),
+            DType::F16 | DType::Bf16 => {
+                bytes.extend_from_slice(&u16::try_from(*value)?.to_le_bytes())
+            }
+            _ => return Err("fixture storage dtype is not floating point".into()),
+        }
+    }
+    Ok(bytes)
+}
+
+fn projected_f32_bits(value: u32, dtype: DType) -> Result<u32, Box<dyn Error>> {
+    Ok(match dtype {
+        DType::F32 => value,
+        DType::Bf16 => value << 16,
+        DType::F16 => {
+            let decoded = DType::F16.decode_scalar(&u16::try_from(value)?.to_le_bytes())?;
+            match decoded {
+                comfy_tensor::DecodedScalar::Real(value) => (value as f32).to_bits(),
+                _ => return Err("F16 fixture decoded to a non-real scalar".into()),
+            }
+        }
+        _ => return Err("fixture storage dtype is not floating point".into()),
+    })
+}
+
+fn fixture_state_identity(
+    state: &[StyleStateFixture],
+    dtype_name: &str,
+    projected: bool,
+) -> Result<String, Box<dyn Error>> {
+    let dtype = fixture_dtype(dtype_name)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"conditioning-auxiliary-state-v1\0");
+    hasher.update(if projected {
+        b"float32".as_slice()
+    } else {
+        dtype_name.as_bytes()
+    });
+    for entry in state {
+        hasher.update(u64::try_from(entry.key.len())?.to_le_bytes());
+        hasher.update(entry.key.as_bytes());
+        for dimension in &entry.shape {
+            hasher.update(dimension.to_le_bytes());
+        }
+        for value in &entry.storage_bits {
+            if projected {
+                hasher.update(projected_f32_bits(*value, dtype)?.to_le_bytes());
+            } else if dtype == DType::F32 {
+                hasher.update(value.to_le_bytes());
+            } else {
+                hasher.update(u16::try_from(*value)?.to_le_bytes());
+            }
+        }
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn upload_style_state(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    fixture: &StyleDtypeFixture,
+    dtype_name: &str,
+) -> Result<Vec<(String, Tensor)>, Box<dyn Error>> {
+    let dtype = fixture_dtype(dtype_name)?;
+    let mut state = Vec::new();
+    state.try_reserve_exact(fixture.state.len())?;
+    for entry in &fixture.state {
+        let descriptor = TensorDescriptor::contiguous(
+            entry.shape.clone(),
+            dtype,
+            DeviceId::CPU,
+            context.stream,
+        )?;
+        let (tensor, event) =
+            backend.upload_bytes(descriptor, &storage_bytes(entry, dtype)?, context)?;
+        backend.wait_event(event, context)?;
+        state.push((entry.key.clone(), tensor));
+    }
+    Ok(state)
+}
+
+fn style_artifact_sha256(profile: &str) -> String {
+    format!(
+        "{:x}",
+        Sha256::digest(format!("task393:{profile}:reduced-v1"))
+    )
+}
+
+fn style_checkpoint(
+    profile: &str,
+    state: Vec<(String, Tensor)>,
+    memory_budget_bytes: u64,
+) -> NativeStyleModelCheckpoint {
+    NativeStyleModelCheckpoint {
+        artifact_sha256: style_artifact_sha256(profile),
+        ordered_state: state,
+        memory_budget_bytes,
+    }
+}
+
+fn fixture_clip_output(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    profile: &StyleProfileFixture,
+) -> Result<ClipVisionOutput, Box<dyn Error>> {
+    fixture_clip_output_values(backend, context, &profile.input_shape, &profile.input_bits)
+}
+
+fn fixture_clip_output_values(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    shape: &[u64],
+    input_bits: &[u32],
+) -> Result<ClipVisionOutput, Box<dyn Error>> {
+    let values = input_bits
+        .iter()
+        .map(|value| f32::from_bits(*value))
+        .collect::<Vec<_>>();
+    let hidden = tensor_from_f32(backend, shape, &values, context)?;
+    let embeds = tensor_from_f32(
+        backend,
+        &[shape[0], shape[2]],
+        &vec![0.0; usize::try_from(shape[0] * shape[2])?],
+        context,
+    )?;
+    Ok(ClipVisionOutput::checked(
+        hidden,
+        None,
+        embeds,
+        None,
+        vec![[3, 16, 16]; usize::try_from(shape[0])?],
+    )?)
+}
+
+fn assert_fixture_output(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    output: &Tensor,
+    fixture: &StyleDtypeFixture,
+) -> Result<(), Box<dyn Error>> {
+    assert_eq!(output.descriptor().shape(), fixture.output_shape);
+    let bits = tensor_to_f32(backend, output, context)?
+        .iter()
+        .map(|value| value.to_bits())
+        .collect::<Vec<_>>();
+    assert_eq!(bits, fixture.output_bits);
+    Ok(())
+}
+
+fn assert_reconstruction(
+    reconstructed: &NativeStyleModelCheckpoint,
+    original: &[(String, Tensor)],
+) -> Result<(), Box<dyn Error>> {
+    assert_eq!(reconstructed.ordered_state.len(), original.len());
+    for ((actual_key, actual), (expected_key, expected)) in
+        reconstructed.ordered_state.iter().zip(original)
+    {
+        assert_eq!(actual_key, expected_key);
+        assert_eq!(actual.descriptor(), expected.descriptor());
+        assert_eq!(actual.storage_id(), expected.storage_id());
+        assert_eq!(actual.contiguous_bytes()?, expected.contiguous_bytes()?);
+    }
+    Ok(())
+}
+
+fn assert_style_payload_cross_role_denial(payload: &NativeModelPayload) {
+    assert!(payload.model().is_none());
+    assert!(payload.native_family_model_resource().is_none());
+    assert!(payload.clip().is_none());
+    assert!(payload.vae().is_none());
+    assert!(payload.structured_vae().is_none());
+    assert!(payload.audio_encoder_resource().is_none());
+    assert!(payload.optical_flow_resource().is_none());
+    assert!(payload.clip_vision_resource().is_none());
+    assert!(payload.decoder_clip_resource().is_none());
+    assert!(payload.qwen_multimodal_resource().is_none());
+    assert!(payload.gemma_multimodal_resource().is_none());
+    assert!(payload.native_clip_resource().is_none());
+    assert!(payload.sdpose_model_resource().is_none());
+    assert!(payload.frame_interpolation_resource().is_none());
+    assert!(payload.latent_upscale_model_resource().is_none());
+    assert!(payload.background_removal_resource().is_none());
+    assert!(payload.depth_anything_3_resource().is_none());
+    assert!(payload.moge_resource().is_none());
+}
+
+#[test]
+fn conditioning_auxiliary_fixture_integrity() -> Result<(), Box<dyn Error>> {
+    let oracle = style_model_oracle()?;
+    assert_eq!(
+        oracle.format,
+        "conditioning-auxiliary-resource-foundation-v1"
+    );
+    assert!(!oracle.reduced_profiles_are_source_exact);
+    assert_eq!(oracle.style.dtypes["float32"].state.len(), 42);
+    assert_eq!(oracle.redux.dtypes["float32"].state.len(), 4);
+    assert_eq!(
+        oracle.style.dtypes["float32"].state[0].key,
+        "style_embedding"
+    );
+    assert_eq!(oracle.style.dtypes["float32"].state[1].key, "proj");
+    assert_eq!(oracle.style.dtypes["float32"].state[41].key, "ln_pre.bias");
+    assert_eq!(
+        oracle.redux.dtypes["float32"].state[0].key,
+        "redux_up.weight"
+    );
+    assert_eq!(
+        oracle.redux.dtypes["float32"].state[3].key,
+        "redux_down.bias"
+    );
+    assert_eq!(
+        oracle.discriminators.detection_precedence,
+        ["style_embedding", "redux_down.weight"]
+    );
+    assert_eq!(oracle.discriminators.signed_zero_input_bits, 0x8000_0000);
+    assert_eq!(oracle.discriminators.signed_zero_after_add_bits, 0);
+    assert_eq!(oracle.source_dimensions["style"]["width"], 1024);
+    assert_eq!(oracle.source_dimensions["redux"]["hidden"], 12288);
+    assert_eq!(oracle.reduced_dimensions["style"]["width"], 8);
+    assert_eq!(oracle.reduced_dimensions["redux"]["hidden"], 12);
+    assert_eq!(oracle.attention_discriminator.input_shape, [2, 2, 8]);
+    assert_eq!(oracle.attention_discriminator.output_shape, [2, 2, 6]);
+    assert_eq!(oracle.attention_discriminator.state_modifications.len(), 36);
+    assert!(oracle.attention_discriminator.batch_outputs_differ);
+    assert!(oracle.attention_discriminator.query_key_are_asymmetric);
+    assert_eq!(
+        oracle.generator_command,
+        "PYTHONDONTWRITEBYTECODE=1 python3 crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation/generate_oracle.py --check"
+    );
+
+    let manifest: serde_json::Value = serde_json::from_slice(STYLE_MODEL_MANIFEST)?;
+    let provenance: serde_json::Value = serde_json::from_slice(STYLE_MODEL_PROVENANCE)?;
+    assert_eq!(
+        manifest["oracle_sha256"],
+        format!("{:x}", Sha256::digest(STYLE_MODEL_ORACLE))
+    );
+    assert_eq!(
+        manifest["generator_sha256"],
+        format!("{:x}", Sha256::digest(STYLE_MODEL_GENERATOR))
+    );
+    assert_eq!(
+        manifest["source_graph_sha256"],
+        format!("{:x}", Sha256::digest(STYLE_MODEL_SOURCE_GRAPH))
+    );
+    assert_eq!(provenance["reduced_profiles_are_source_exact"], false);
+    let source_graph = std::str::from_utf8(STYLE_MODEL_SOURCE_GRAPH)?;
+    for forbidden in [
+        "import torch",
+        "import numpy",
+        "import ctypes",
+        "import subprocess",
+    ] {
+        assert!(!source_graph.contains(forbidden));
+    }
+    assert_eq!(
+        oracle.generator_sha256,
+        format!("{:x}", Sha256::digest(STYLE_MODEL_GENERATOR))
+    );
+    assert_eq!(
+        oracle.source_graph_sha256,
+        format!("{:x}", Sha256::digest(STYLE_MODEL_SOURCE_GRAPH))
+    );
+    assert_eq!(
+        oracle.pinned_sources["projects/comfy/ComfyUI/nodes.py"],
+        STYLE_MODEL_NODES_SOURCE_SHA256
+    );
+    assert_eq!(
+        oracle.pinned_sources["projects/comfy/ComfyUI/comfy/sd.py"],
+        STYLE_MODEL_SD_SOURCE_SHA256
+    );
+    assert_eq!(
+        oracle.pinned_sources["projects/comfy/ComfyUI/comfy/ops.py"],
+        STYLE_MODEL_OPS_SOURCE_SHA256
+    );
+    assert_eq!(
+        oracle.pinned_sources["projects/comfy/ComfyUI/comfy/t2i_adapter/adapter.py"],
+        STYLE_ADAPTER_SOURCE_SHA256
+    );
+    assert_eq!(
+        oracle.pinned_sources["projects/comfy/ComfyUI/comfy/ldm/flux/redux.py"],
+        FLUX_REDUX_SOURCE_SHA256
+    );
+    Ok(())
+}
+
+#[test]
+fn style_model_resource() -> Result<(), Box<dyn Error>> {
+    let oracle = style_model_oracle()?;
+    let cancellation = CancellationToken::default();
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(MEMORY_LIMIT)?;
+    let workspace = authority.authorize_workspace(MEMORY_LIMIT)?;
+    let context = backend.execution_context(StreamId::DEFAULT, workspace.clone(), &cancellation);
+
+    for (profile_name, profile) in [("style", &oracle.style), ("redux", &oracle.redux)] {
+        let baseline = &profile.dtypes["float32"].output_bits;
+        for dtype_name in ["float32", "float16", "bfloat16"] {
+            let fixture = &profile.dtypes[dtype_name];
+            assert_eq!(
+                fixture.source_identity_sha256,
+                fixture_state_identity(&fixture.state, dtype_name, false)?
+            );
+            assert_eq!(
+                fixture.projected_identity_sha256,
+                fixture_state_identity(&fixture.state, dtype_name, true)?
+            );
+            let original = upload_style_state(&backend, &context, fixture, dtype_name)?;
+            let resource = Arc::new(NativeStyleModelResource::from_reduced_fixture(
+                &backend,
+                style_checkpoint(profile_name, original.clone(), STYLE_MODEL_FIXTURE_MEMORY),
+                &context,
+            )?);
+            assert!(!resource.is_source_exact_profile());
+            assert_eq!(resource.source_dtype(), fixture_dtype(dtype_name)?);
+            resource.validate(&cancellation)?;
+            let reconstructed = resource.reconstruct_checkpoint(&cancellation)?;
+            assert_reconstruction(&reconstructed, &original)?;
+            let clip_output = fixture_clip_output(&backend, &context, profile)?;
+            let output = resource.get_cond(&backend, &clip_output, &context)?;
+            assert_fixture_output(&backend, &context, &output, fixture)?;
+            let payload =
+                NativeModelPayload::style_model_test_fixture(resource.clone(), &cancellation)?;
+            assert!(Arc::ptr_eq(
+                payload
+                    .style_model_resource()
+                    .ok_or("STYLE_MODEL payload accessor is missing")?,
+                &resource
+            ));
+            assert_style_payload_cross_role_denial(&payload);
+            payload.validate()?;
+            assert!(NativeModelPayload::style_model(resource, &cancellation).is_err());
+        }
+        assert!(!baseline.is_empty());
+    }
+
+    let attention = &oracle.attention_discriminator;
+    let mut fixture = oracle.style.dtypes["float32"].clone();
+    for modification in &attention.state_modifications {
+        let entry = fixture
+            .state
+            .iter_mut()
+            .find(|entry| entry.key == modification.key)
+            .ok_or("attention discriminator key is missing")?;
+        *entry
+            .storage_bits
+            .get_mut(modification.index)
+            .ok_or("attention discriminator index is missing")? = modification.value_bits;
+    }
+    assert_eq!(
+        attention.source_identity_sha256,
+        fixture_state_identity(&fixture.state, "float32", false)?
+    );
+    let state = upload_style_state(&backend, &context, &fixture, "float32")?;
+    let resource = NativeStyleModelResource::from_reduced_fixture(
+        &backend,
+        style_checkpoint("style", state, STYLE_MODEL_FIXTURE_MEMORY),
+        &context,
+    )?;
+    let output = resource.get_cond(
+        &backend,
+        &fixture_clip_output_values(
+            &backend,
+            &context,
+            &attention.input_shape,
+            &attention.input_bits,
+        )?,
+        &context,
+    )?;
+    assert_eq!(output.descriptor().shape(), attention.output_shape);
+    assert_eq!(
+        tensor_to_f32(&backend, &output, &context)?
+            .iter()
+            .map(|value| value.to_bits())
+            .collect::<Vec<_>>(),
+        attention.output_bits
+    );
+
+    for mutation in oracle.mutations.values() {
+        let profile = if mutation.profile == "style" {
+            &oracle.style
+        } else {
+            &oracle.redux
+        };
+        let mut fixture = profile.dtypes["float32"].clone();
+        let entry = fixture
+            .state
+            .iter_mut()
+            .find(|entry| entry.key == mutation.key)
+            .ok_or("mutation key is missing")?;
+        let value = entry
+            .storage_bits
+            .get_mut(mutation.index)
+            .ok_or("mutation index is missing")?;
+        *value = (f32::from_bits(*value) + f32::from_bits(mutation.delta_bits)).to_bits();
+        assert_eq!(
+            mutation.source_identity_sha256,
+            fixture_state_identity(&fixture.state, "float32", false)?
+        );
+        let state = upload_style_state(&backend, &context, &fixture, "float32")?;
+        let resource = NativeStyleModelResource::from_reduced_fixture(
+            &backend,
+            style_checkpoint(&mutation.profile, state, STYLE_MODEL_FIXTURE_MEMORY),
+            &context,
+        )?;
+        let output = resource.get_cond(
+            &backend,
+            &fixture_clip_output(&backend, &context, profile)?,
+            &context,
+        )?;
+        let actual = tensor_to_f32(&backend, &output, &context)?
+            .iter()
+            .map(|value| value.to_bits())
+            .collect::<Vec<_>>();
+        assert_eq!(actual, mutation.output_bits);
+        assert_ne!(actual, profile.dtypes["float32"].output_bits);
+    }
+
+    let signed_zero = tensor_from_f32(
+        &backend,
+        &[1],
+        &[f32::from_bits(oracle.discriminators.signed_zero_input_bits)],
+        &context,
+    )?;
+    let zero = full_like_with_context_exact_native(
+        &backend,
+        &signed_zero,
+        comfy_tensor::Scalar::Float(0.0),
+        Some(DType::F32),
+        &context,
+    )?;
+    let added = real_add_with_context_exact_native(&backend, &signed_zero, &zero, &context)?;
+    assert_eq!(
+        tensor_to_f32(&backend, &added, &context)?[0].to_bits(),
+        oracle.discriminators.signed_zero_after_add_bits
+    );
+    let quick = &oracle.discriminators.quick_gelu;
+    assert_eq!(1.702_f32.to_bits(), quick.coefficient_bits);
+    let quick_input = f32::from_bits(quick.input_bits);
+    let quick_scaled = 1.702_f32 * quick_input;
+    assert_eq!(quick_scaled.to_bits(), quick.scaled_bits);
+    let quick_tensor = tensor_from_f32(&backend, &[1], &[quick_scaled], &context)?;
+    let quick_sigmoid = sigmoid_with_context_exact_native(&backend, &quick_tensor, &context)?;
+    let quick_sigmoid = tensor_to_f32(&backend, &quick_sigmoid, &context)?[0];
+    assert_eq!(quick_sigmoid.to_bits(), quick.sigmoid_bits);
+    assert_eq!((quick_input * quick_sigmoid).to_bits(), quick.output_bits);
+    let implementation = include_str!("../../comfy_model/src/conditioning_resources.rs");
+    assert!(implementation.contains("scaled.push(QUICK_GELU_SCALE * value);"));
+    assert!(implementation.contains("output.push(*value * sigmoid);"));
+
+    let style_fixture = &oracle.style.dtypes["float32"];
+    let style_state = upload_style_state(&backend, &context, style_fixture, "float32")?;
+    let mut no_marker = upload_style_state(
+        &backend,
+        &context,
+        &oracle.redux.dtypes["float32"],
+        "float32",
+    )?;
+    let marker = no_marker
+        .iter_mut()
+        .find(|(key, _)| key == "redux_down.weight")
+        .ok_or("Redux marker is missing")?;
+    marker.0 = "not_a_style_model_marker".to_owned();
+    assert!(matches!(
+        NativeStyleModelResource::from_reduced_fixture(
+            &backend,
+            style_checkpoint("redux", no_marker, STYLE_MODEL_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativeStyleModelError::UnsupportedArchitecture)
+    ));
+    let mut ambiguous = style_state.clone();
+    ambiguous[2].0 = "redux_down.weight".to_owned();
+    assert!(matches!(
+        NativeStyleModelResource::from_reduced_fixture(
+            &backend,
+            style_checkpoint("style", ambiguous, STYLE_MODEL_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativeStyleModelError::UnexpectedState(_))
+    ));
+    let mut aliased = style_state.clone();
+    let weight = aliased
+        .iter()
+        .position(|(key, _)| key == "ln_post.weight")
+        .ok_or("weight key is missing")?;
+    let bias = aliased
+        .iter()
+        .position(|(key, _)| key == "ln_post.bias")
+        .ok_or("bias key is missing")?;
+    aliased[bias].1 = aliased[weight].1.clone();
+    assert!(matches!(
+        NativeStyleModelResource::from_reduced_fixture(
+            &backend,
+            style_checkpoint("style", aliased, STYLE_MODEL_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativeStyleModelError::InvalidCheckpoint(error)) if error.contains("aliases")
+    ));
+    let mut malformed_shape = style_state.clone();
+    let malformed_descriptor =
+        TensorDescriptor::contiguous(vec![1, 4, 4], DType::F32, DeviceId::CPU, context.stream)?;
+    let (malformed_tensor, event) = backend.upload_bytes(
+        malformed_descriptor,
+        style_state[0].1.contiguous_bytes()?,
+        &context,
+    )?;
+    backend.wait_event(event, &context)?;
+    malformed_shape[0].1 = malformed_tensor;
+    assert!(matches!(
+        NativeStyleModelResource::from_reduced_fixture(
+            &backend,
+            style_checkpoint("style", malformed_shape, STYLE_MODEL_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativeStyleModelError::StateShape { .. })
+    ));
+    let mut malformed_dtype = style_state.clone();
+    let bool_descriptor =
+        TensorDescriptor::contiguous(vec![1, 2, 8], DType::Bool, DeviceId::CPU, context.stream)?;
+    let (bool_tensor, event) = backend.upload_bytes(bool_descriptor, &[0; 16], &context)?;
+    backend.wait_event(event, &context)?;
+    malformed_dtype[0].1 = bool_tensor;
+    assert!(matches!(
+        NativeStyleModelResource::from_reduced_fixture(
+            &backend,
+            style_checkpoint("style", malformed_dtype, STYLE_MODEL_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativeStyleModelError::StateShape { .. })
+    ));
+    let noncanonical_artifact = NativeStyleModelCheckpoint {
+        artifact_sha256: "A".repeat(64),
+        ordered_state: style_state.clone(),
+        memory_budget_bytes: STYLE_MODEL_FIXTURE_MEMORY,
+    };
+    assert!(matches!(
+        NativeStyleModelResource::from_reduced_fixture(
+            &backend,
+            noncanonical_artifact,
+            &context,
+        ),
+        Err(NativeStyleModelError::InvalidCheckpoint(error)) if error.contains("lowercase")
+    ));
+    let out_of_memory = NativeStyleModelResource::from_reduced_fixture(
+        &backend,
+        style_checkpoint("style", style_state.clone(), 1),
+        &context,
+    );
+    let raw_required = match out_of_memory {
+        Err(NativeStyleModelError::OutOfMemory {
+            required,
+            budget: 1,
+        }) => required,
+        result => return Err(format!("expected raw checkpoint OOM, got {result:?}").into()),
+    };
+    assert!(raw_required > 1);
+    assert!(matches!(
+        NativeStyleModelResource::from_reduced_fixture(
+            &backend,
+            style_checkpoint("style", style_state.clone(), raw_required - 1),
+            &context,
+        ),
+        Err(NativeStyleModelError::OutOfMemory { required, budget })
+            if required == raw_required && budget == raw_required - 1
+    ));
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_workspace = authority.authorize_workspace(MEMORY_LIMIT)?;
+    let cancelled_context =
+        backend.execution_context(StreamId::DEFAULT, cancelled_workspace.clone(), &cancelled);
+    assert!(matches!(
+        NativeStyleModelResource::from_reduced_fixture(
+            &backend,
+            style_checkpoint("style", style_state.clone(), STYLE_MODEL_FIXTURE_MEMORY),
+            &cancelled_context,
+        ),
+        Err(NativeStyleModelError::Cancelled)
+    ));
+    assert_eq!(cancelled_workspace.in_use_bytes(), 0);
+
+    let resource = NativeStyleModelResource::from_reduced_fixture(
+        &backend,
+        style_checkpoint("style", style_state.clone(), STYLE_MODEL_FIXTURE_MEMORY),
+        &context,
+    )?;
+    let valid_clip = fixture_clip_output(&backend, &context, &oracle.style)?;
+    assert!(matches!(
+        resource.reconstruct_checkpoint(&cancelled),
+        Err(NativeStyleModelError::Cancelled)
+    ));
+    let cancelled_invocation_workspace = authority.authorize_workspace(MEMORY_LIMIT)?;
+    let cancelled_invocation_context = backend.execution_context(
+        StreamId::DEFAULT,
+        cancelled_invocation_workspace.clone(),
+        &cancelled,
+    );
+    assert!(matches!(
+        resource.get_cond(&backend, &valid_clip, &cancelled_invocation_context),
+        Err(NativeStyleModelError::Cancelled)
+    ));
+    assert_eq!(cancelled_invocation_workspace.in_use_bytes(), 0);
+
+    let mut f16_bytes = Vec::new();
+    for value in &oracle.style.input_bits {
+        f16_bytes.extend_from_slice(&DType::F16.encode_scalar(
+            comfy_tensor::Scalar::Float(f64::from(f32::from_bits(*value))),
+            "task393-style-input-dtype-negative",
+            DeviceId::CPU,
+        )?);
+    }
+    let f16_descriptor = TensorDescriptor::contiguous(
+        oracle.style.input_shape.clone(),
+        DType::F16,
+        DeviceId::CPU,
+        context.stream,
+    )?;
+    let (f16_hidden, event) = backend.upload_bytes(f16_descriptor, &f16_bytes, &context)?;
+    backend.wait_event(event, &context)?;
+    let f16_embeds_descriptor = TensorDescriptor::contiguous(
+        vec![oracle.style.input_shape[0], oracle.style.input_shape[2]],
+        DType::F16,
+        DeviceId::CPU,
+        context.stream,
+    )?;
+    let f16_embeds_bytes = vec![
+        0_u8;
+        usize::try_from(
+            oracle.style.input_shape[0] * oracle.style.input_shape[2] * DType::F16.byte_width(),
+        )?
+    ];
+    let (f16_embeds, event) =
+        backend.upload_bytes(f16_embeds_descriptor, &f16_embeds_bytes, &context)?;
+    backend.wait_event(event, &context)?;
+    let f16_clip = ClipVisionOutput::checked(
+        f16_hidden,
+        None,
+        f16_embeds,
+        None,
+        valid_clip.image_sizes().to_vec(),
+    )?;
+    assert!(matches!(
+        resource.get_cond(&backend, &f16_clip, &context),
+        Err(NativeStyleModelError::InvalidInput(error)) if error.contains("contiguous F32 CPU")
+    ));
+
+    let mut admitted_budget = raw_required;
+    let constrained_resource = loop {
+        match NativeStyleModelResource::from_reduced_fixture(
+            &backend,
+            style_checkpoint("style", style_state.clone(), admitted_budget),
+            &context,
+        ) {
+            Ok(resource) => break resource,
+            Err(NativeStyleModelError::OutOfMemory { required, budget })
+                if budget == admitted_budget && required > admitted_budget =>
+            {
+                admitted_budget = required;
+            }
+            result => {
+                return Err(
+                    format!("expected bounded construction admission, got {result:?}").into(),
+                );
+            }
+        }
+    };
+    let oom_shape = [1, 256, 8];
+    let oom_input_bits = oracle
+        .style
+        .input_bits
+        .iter()
+        .copied()
+        .cycle()
+        .take(usize::try_from(oom_shape.iter().product::<u64>())?)
+        .collect::<Vec<_>>();
+    let oom_clip = fixture_clip_output_values(&backend, &context, &oom_shape, &oom_input_bits)?;
+    assert!(matches!(
+        constrained_resource.get_cond(&backend, &oom_clip, &context),
+        Err(NativeStyleModelError::OutOfMemory { required, budget })
+            if budget == admitted_budget && required > budget
+    ));
+
+    let mut stale_clip = valid_clip;
+    let mut changed = oracle
+        .style
+        .input_bits
+        .iter()
+        .map(|value| f32::from_bits(*value))
+        .collect::<Vec<_>>();
+    changed[0] += 0.25;
+    stale_clip.last_hidden_state =
+        tensor_from_f32(&backend, &oracle.style.input_shape, &changed, &context)?;
+    assert!(matches!(
+        resource.get_cond(&backend, &stale_clip, &context),
+        Err(NativeStyleModelError::ClipVision(_))
+    ));
+    let foreign_workspace = authority.authorize_workspace(MEMORY_LIMIT)?;
+    let foreign_context =
+        backend.execution_context(StreamId::new(7), foreign_workspace.clone(), &cancellation);
+    let foreign_clip = fixture_clip_output(&backend, &foreign_context, &oracle.style)?;
+    assert!(matches!(
+        resource.get_cond(&backend, &foreign_clip, &context),
+        Err(NativeStyleModelError::InvalidInput(_))
+    ));
+    let foreign_state = upload_style_state(
+        &backend,
+        &foreign_context,
+        &oracle.style.dtypes["float32"],
+        "float32",
+    )?;
+    assert!(matches!(
+        NativeStyleModelResource::from_reduced_fixture(
+            &backend,
+            style_checkpoint("style", foreign_state, STYLE_MODEL_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativeStyleModelError::InvalidCheckpoint(error)) if error.contains("construction stream")
+    ));
+    assert_eq!(foreign_workspace.in_use_bytes(), 0);
+    assert_eq!(workspace.in_use_bytes(), 0);
     Ok(())
 }

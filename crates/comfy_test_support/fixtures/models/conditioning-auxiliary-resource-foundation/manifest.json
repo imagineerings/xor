@@ -1,0 +1,27 @@
+{
+  "format": "conditioning-auxiliary-resource-foundation-manifest-v1",
+  "generator_sha256": "a5bd373083f4e7e15eb24d0c0890e096d9a0038422a435df6d237a02cfae51b1",
+  "mutations": [
+    "redux_down",
+    "redux_up",
+    "style_embedding",
+    "style_projection",
+    "style_quick_gelu",
+    "style_value_projection"
+  ],
+  "oracle_domain": "conditioning-auxiliary-resource-foundation-v1",
+  "oracle_sha256": "dea7383e960b5b1e3b556b2eccc933263295736fa154426e81622249aed5a8fa",
+  "profiles": [
+    "style",
+    "redux"
+  ],
+  "reduced_profiles_are_source_exact": false,
+  "redux_state_count": 4,
+  "source_graph_sha256": "79a3d30c383cf348aa075ff3273866d56419d8a4b7fe031b7be35d0176bb4c32",
+  "storage_dtypes": [
+    "float32",
+    "float16",
+    "bfloat16"
+  ],
+  "style_state_count": 42
+}
