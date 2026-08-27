@@ -810,6 +810,9 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ):
             self.assertIn(photomaker_read, photomaker_task["reads"])
+        self.assertIn(
+            "crates/comfy_model/src/clip_vision.rs", photomaker_task["writes"]
+        )
         for photomaker_gate in (
             "exact 407-entry ordered source schema",
             "392 delegated NativeClipVision keys plus 15 PhotoMaker-owned keys",

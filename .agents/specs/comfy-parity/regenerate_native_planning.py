@@ -9899,6 +9899,7 @@ def native_model_resource_precursor_tasks(
         ],
         [
             "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/src/clip_vision.rs",
             "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_test_support/tests/native_conditioning_integration.rs",
