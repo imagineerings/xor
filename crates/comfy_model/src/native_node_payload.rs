@@ -14,9 +14,10 @@ use crate::{
     GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256, GEMMA3_MULTIMODAL_SOURCE_SHA256,
     GEMMA4_MULTIMODAL_SOURCE_SHA256, LLAMA_SOURCE_SHA256, NativeAudioEncoder,
     NativeBackgroundRemovalResource, NativeDecoderTextEncoder, NativeDepthAnything3Resource,
-    NativeFrameInterpolationModel, NativeGemmaMultimodal, NativeLatentUpscaleModelResource,
-    NativeMogeResource, NativePhotoMakerResource, NativePromptTokenizer, NativeQwenMultimodal,
-    NativeRaftLarge, NativeSdPoseModel, NativeStructuredVae, NativeStyleModelResource, NativeVae,
+    NativeFrameInterpolationModel, NativeGemmaMultimodal, NativeGligenResource,
+    NativeLatentUpscaleModelResource, NativeMogeResource, NativePhotoMakerResource,
+    NativePromptTokenizer, NativeQwenMultimodal, NativeRaftLarge, NativeSdPoseModel,
+    NativeStructuredVae, NativeStyleModelResource, NativeVae,
     QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256,
     QWEN35_SOURCE_SHA256,
     clip::{LoadedSd1Clip, NativeClipResidentOwnerKind, NativeClipResource, NativeTokenizer},
@@ -315,6 +316,9 @@ enum NativeModelResource {
     Moge {
         resource: Arc<NativeMogeResource>,
     },
+    Gligen {
+        resource: Arc<NativeGligenResource>,
+    },
     PhotoMaker {
         resource: Arc<NativePhotoMakerResource>,
     },
@@ -356,6 +360,7 @@ pub enum NativeModelBackingKind {
     NativeBackgroundRemovalResource,
     NativeDepthAnything3Resource,
     NativeMogeResource,
+    NativeGligenResource,
     NativePhotoMakerResource,
     NativeStyleModelResource,
 }
@@ -1158,6 +1163,61 @@ impl NativeModelPayload {
         })
     }
 
+    pub fn gligen(
+        resource: Arc<NativeGligenResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if !resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "GLIGEN production source-exact profile",
+            ));
+        }
+        Self::gligen_checked(resource, cancellation)
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn gligen_test_fixture(
+        resource: Arc<NativeGligenResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "GLIGEN reduced test fixture profile",
+            ));
+        }
+        Self::gligen_checked(resource, cancellation)
+    }
+
+    fn gligen_checked(
+        resource: Arc<NativeGligenResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        resource
+            .validate(cancellation)
+            .map_err(|error| match error {
+                crate::conditioning_resources::NativeGligenError::Cancelled => {
+                    NativeModelPayloadError::Tensor(TensorError::Cancelled)
+                }
+                crate::conditioning_resources::NativeGligenError::Tensor(error) => {
+                    NativeModelPayloadError::Tensor(error)
+                }
+                error => NativeModelPayloadError::ResourceAccounting(error.to_string()),
+            })?;
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::Gligen,
+            resource.identifier(),
+            "zed-native-gligen-v1",
+            resource.artifact_sha256(),
+            resource.semantic_digest_sha256(),
+        )?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, resource.resident_bytes())?,
+            identity,
+            resource: NativeModelResource::Gligen { resource },
+        })
+    }
+
     pub fn photomaker(
         resource: Arc<NativePhotoMakerResource>,
         cancellation: &CancellationToken,
@@ -1735,6 +1795,29 @@ impl NativeModelPayload {
                     })?,
                 }]
             }
+            NativeModelResource::Gligen { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::NativeGligenResource,
+                    address: Arc::as_ptr(resource) as usize,
+                    resident_bytes: resource.resident_owned_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                }]
+            }
             NativeModelResource::PhotoMaker { resource } => {
                 tensor_allocations.extend(
                     resource
@@ -1819,6 +1902,7 @@ impl NativeModelPayload {
             | NativeModelResource::BackgroundRemoval { .. }
             | NativeModelResource::DepthAnything3 { .. }
             | NativeModelResource::Moge { .. }
+            | NativeModelResource::Gligen { .. }
             | NativeModelResource::PhotoMaker { .. }
             | NativeModelResource::StyleModel { .. } => None,
         }
@@ -1853,6 +1937,7 @@ impl NativeModelPayload {
             | NativeModelResource::BackgroundRemoval { .. }
             | NativeModelResource::DepthAnything3 { .. }
             | NativeModelResource::Moge { .. }
+            | NativeModelResource::Gligen { .. }
             | NativeModelResource::PhotoMaker { .. }
             | NativeModelResource::StyleModel { .. } => None,
         }
@@ -1878,6 +1963,7 @@ impl NativeModelPayload {
             | NativeModelResource::BackgroundRemoval { .. }
             | NativeModelResource::DepthAnything3 { .. }
             | NativeModelResource::Moge { .. }
+            | NativeModelResource::Gligen { .. }
             | NativeModelResource::PhotoMaker { .. }
             | NativeModelResource::StyleModel { .. } => None,
         }
@@ -1917,6 +2003,7 @@ impl NativeModelPayload {
             | NativeModelResource::BackgroundRemoval { .. }
             | NativeModelResource::DepthAnything3 { .. }
             | NativeModelResource::Moge { .. }
+            | NativeModelResource::Gligen { .. }
             | NativeModelResource::PhotoMaker { .. }
             | NativeModelResource::StyleModel { .. } => None,
         }
@@ -1942,6 +2029,7 @@ impl NativeModelPayload {
             | NativeModelResource::BackgroundRemoval { .. }
             | NativeModelResource::DepthAnything3 { .. }
             | NativeModelResource::Moge { .. }
+            | NativeModelResource::Gligen { .. }
             | NativeModelResource::PhotoMaker { .. }
             | NativeModelResource::StyleModel { .. } => None,
         }
@@ -2015,6 +2103,13 @@ impl NativeModelPayload {
     pub fn moge_resource(&self) -> Option<&Arc<NativeMogeResource>> {
         match &self.resource {
             NativeModelResource::Moge { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
+    pub fn gligen_resource(&self) -> Option<&Arc<NativeGligenResource>> {
+        match &self.resource {
+            NativeModelResource::Gligen { resource } => Some(resource),
             _ => None,
         }
     }
@@ -2135,6 +2230,22 @@ impl NativeModelPayload {
                     {
                         return Err(NativeModelPayloadError::ResourceMismatch(
                             "MoGe reduced test fixture profile",
+                        ));
+                    }
+                }
+            }
+            NativeModelResource::Gligen { resource } => {
+                if resource.is_source_exact_profile() {
+                    Self::gligen(resource.clone(), &CancellationToken::default())?
+                } else {
+                    #[cfg(feature = "test-support")]
+                    {
+                        Self::gligen_test_fixture(resource.clone(), &CancellationToken::default())?
+                    }
+                    #[cfg(not(feature = "test-support"))]
+                    {
+                        return Err(NativeModelPayloadError::ResourceMismatch(
+                            "GLIGEN reduced test fixture profile",
                         ));
                     }
                 }

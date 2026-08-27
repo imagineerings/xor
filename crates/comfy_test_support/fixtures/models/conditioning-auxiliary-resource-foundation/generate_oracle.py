@@ -19,6 +19,10 @@ SOURCES = {
     "projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py": "c7e86d4684d2884eda20250bd7122e31a8aaf7bfa003245ad0e0431a9ef1957e",
     "projects/comfy/ComfyUI/comfy/clip_model.py": "08be993d86c3b494b58305fb868638b4b525bbe40abead89e9c94da021716845",
     "projects/comfy/ComfyUI/comfy/clip_vision.py": "8e3cc5d5d257b52d120885ba7427ff3fdf56129a485fdadac3b6215ae2c67b20",
+    "projects/comfy/ComfyUI/comfy/gligen.py": "87c4297809a1a0a7727e3623cef0930463080dfedc068eb97c5e19bc6e155d0c",
+    "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py": "436e1d91f8d5d84c5667e051cdf3ab2f91d8db25b66d88a084c89a202de0579e",
+    "projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py": "9d27fb036cab8a262ef3d866a643f7fdc40994022616f1b8be14b7d919f57f96",
+    "projects/comfy/ComfyUI/comfy/samplers.py": "d882256ae9baa1d23f1367ab2ec3b021fdc15fe39ce4cb49ea2c1ee10026a649",
 }
 
 
@@ -56,11 +60,12 @@ def documents():
         "oracle_sha256": oracle_sha256,
         "generator_sha256": generator_sha256,
         "source_graph_sha256": source_graph_sha256,
-        "profiles": ["style", "redux", "photomaker"],
+        "profiles": ["style", "redux", "photomaker", "gligen"],
         "storage_dtypes": ["float32", "float16", "bfloat16"],
         "style_state_count": 42,
         "redux_state_count": 4,
         "photomaker_state_count": 407,
+        "gligen_state_count": 42,
         "mutations": sorted([*oracle["mutations"], *oracle["photomaker_mutations"]]),
         "reduced_profiles_are_source_exact": False,
     }
@@ -89,7 +94,11 @@ def documents():
             "final normalization, and row-major scatter. Source torch GELU is evaluated with the "
             "standard-library erf equation; the fixture separately evaluates the canonical Rust "
             "f32 erf approximation over every admitted reduced value and records the exact maximum "
-            "downstream output ULP distance plus a max-plus-one rejection discriminator."
+            "downstream output ULP distance plus a max-plus-one rejection discriminator. The "
+            "GLIGEN case independently projects the exact PositionNet Fourier/null/MLP equations, "
+            "sparse structural-to-compact fuser order, canonical self-attention, GEGLU, gates, and "
+            "residuals for every admitted storage dtype; a second schema case locks the 768-key "
+            "eight-head rule without importing product code."
         ),
         "pinned_sources": SOURCES,
     }

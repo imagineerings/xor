@@ -1,6 +1,7 @@
 {
   "format": "conditioning-auxiliary-resource-foundation-manifest-v1",
-  "generator_sha256": "b6b7760132197e66e1badf1f0145c5bf65229a26f8bdd5829fb1262fbc784924",
+  "generator_sha256": "c7622869a2d8abf441dc45a8f147a9d7d73548dfcd652343405eb8f757aa249c",
+  "gligen_state_count": 42,
   "mutations": [
     "photomaker_extra_projection",
     "photomaker_mlp1",
@@ -13,16 +14,17 @@
     "style_value_projection"
   ],
   "oracle_domain": "conditioning-auxiliary-resource-foundation-v1",
-  "oracle_sha256": "c4192d774cb6eec3fe47cfabda5ef1a4fbde7c7b4da131ecb35b0c8565b5e9f4",
+  "oracle_sha256": "c4d20e79b630efea4917ba7416831596cd9756e6ce9d72e0ac51fdf064a0eb6e",
   "photomaker_state_count": 407,
   "profiles": [
     "style",
     "redux",
-    "photomaker"
+    "photomaker",
+    "gligen"
   ],
   "reduced_profiles_are_source_exact": false,
   "redux_state_count": 4,
-  "source_graph_sha256": "0be83ef5781e06fc70552c92272a50c937784a322c346b9cef7f1fa41f69c9be",
+  "source_graph_sha256": "9663b57984f7fc64e8c4b5f6edf3a165894bf591c6eb7d56dea5ee1c6d6f364f",
   "storage_dtypes": [
     "float32",
     "float16",

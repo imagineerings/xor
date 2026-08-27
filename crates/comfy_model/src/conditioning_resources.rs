@@ -9,9 +9,10 @@ use comfy_tensor::{
         OperatorIndirectionError, cast_to_with_context_exact_native,
         tensor_from_f32_with_context_exact_native, tensor_to_f32_with_context_exact_native,
     },
+    generated_elementwise_or_runtime_operation_02::tanh_with_context_exact_native,
     generated_elementwise_or_runtime_operation_03::{
-        ElementwiseRuntimePartThreeError, real_add_with_context_exact_native,
-        sigmoid_with_context_exact_native,
+        ElementwiseOperand, ElementwiseRuntimePartThreeError, real_add_with_context_exact_native,
+        real_multiply_with_context_exact_native, sigmoid_with_context_exact_native,
     },
     generated_elementwise_or_runtime_operation_09::{
         ElementwiseRuntimePartNineError, full_like_with_context_exact_native,
@@ -67,6 +68,14 @@ pub const PHOTOMAKER_SOURCE_SHA256: &str =
     "c7e86d4684d2884eda20250bd7122e31a8aaf7bfa003245ad0e0431a9ef1957e";
 pub const PHOTOMAKER_CLIP_VISION_SOURCE_SHA256: &str =
     "8e3cc5d5d257b52d120885ba7427ff3fdf56129a485fdadac3b6215ae2c67b20";
+pub const GLIGEN_SOURCE_SHA256: &str =
+    "87c4297809a1a0a7727e3623cef0930463080dfedc068eb97c5e19bc6e155d0c";
+pub const GLIGEN_ATTENTION_SOURCE_SHA256: &str =
+    "436e1d91f8d5d84c5667e051cdf3ab2f91d8db25b66d88a084c89a202de0579e";
+pub const GLIGEN_SAMPLERS_SOURCE_SHA256: &str =
+    "d882256ae9baa1d23f1367ab2ec3b021fdc15fe39ce4cb49ea2c1ee10026a649";
+pub const GLIGEN_OPENAIMODEL_SOURCE_SHA256: &str =
+    "9d27fb036cab8a262ef3d866a643f7fdc40994022616f1b8be14b7d919f57f96";
 
 const MAX_STATE_KEY_BYTES: usize = 1_024;
 const DIGEST_CHUNK_BYTES: usize = 64 * 1_024;
@@ -97,6 +106,13 @@ const PHOTOMAKER_SOURCE_IMAGE: usize = 224;
 const PHOTOMAKER_SOURCE_PATCH: usize = 14;
 const PHOTOMAKER_SOURCE_PROJECTION: usize = 768;
 const PHOTOMAKER_SOURCE_EXTRA_PROJECTION: usize = 1_280;
+const GLIGEN_POSITION_STATE_COUNT: usize = 8;
+const GLIGEN_FUSER_STATE_COUNT: usize = 17;
+const GLIGEN_MAX_OBJECTS: usize = 30;
+const GLIGEN_POSITION_WIDTH: usize = 64;
+const GLIGEN_POSITION_HIDDEN: usize = 512;
+const GLIGEN_FOURIER_FREQUENCIES: usize = 8;
+const GLIGEN_FOURIER_TEMPERATURE: f32 = 100.0;
 #[cfg(any(test, feature = "test-support"))]
 const PHOTOMAKER_REDUCED_HIDDEN: usize = 4;
 #[cfg(any(test, feature = "test-support"))]
@@ -4048,6 +4064,2162 @@ fn pm_i64(value: impl TryInto<i64>) -> Result<i64, NativePhotoMakerError> {
         .map_err(|_| NativePhotoMakerError::ShapeOverflow)
 }
 
+#[derive(Clone, Debug)]
+pub struct NativeGligenCheckpoint {
+    pub artifact_sha256: String,
+    pub ordered_state: Vec<(String, Tensor)>,
+    pub memory_budget_bytes: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum NativeGligenRegion {
+    InputBlock,
+    MiddleBlock,
+    OutputBlock,
+}
+
+impl NativeGligenRegion {
+    const fn source_name(self) -> &'static str {
+        match self {
+            Self::InputBlock => "input_blocks",
+            Self::MiddleBlock => "middle_block",
+            Self::OutputBlock => "output_blocks",
+        }
+    }
+
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "input_blocks" => Some(Self::InputBlock),
+            "middle_block" => Some(Self::MiddleBlock),
+            "output_blocks" => Some(Self::OutputBlock),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeGligenFuserLocation {
+    region: NativeGligenRegion,
+    block_index: u8,
+    namespace: String,
+    transformer_index: usize,
+    query_dimension: usize,
+    key_dimension: usize,
+    heads: usize,
+    head_dimension: usize,
+}
+
+impl NativeGligenFuserLocation {
+    pub const fn region(&self) -> NativeGligenRegion {
+        self.region
+    }
+
+    pub const fn block_index(&self) -> u8 {
+        self.block_index
+    }
+
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    pub const fn transformer_index(&self) -> usize {
+        self.transformer_index
+    }
+
+    pub const fn query_dimension(&self) -> usize {
+        self.query_dimension
+    }
+
+    pub const fn key_dimension(&self) -> usize {
+        self.key_dimension
+    }
+
+    pub const fn heads(&self) -> usize {
+        self.heads
+    }
+
+    pub const fn head_dimension(&self) -> usize {
+        self.head_dimension
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeGligenPositionParameter {
+    pub embedding: Tensor,
+    pub height: f32,
+    pub width: f32,
+    pub y: f32,
+    pub x: f32,
+}
+
+#[derive(Debug)]
+pub struct NativeGligenPreparedPositions {
+    resource_semantic_digest_sha256: String,
+    batch: usize,
+    device: DeviceId,
+    stream: StreamId,
+    objects: Tensor,
+}
+
+impl NativeGligenPreparedPositions {
+    pub const fn batch(&self) -> usize {
+        self.batch
+    }
+
+    pub const fn device(&self) -> DeviceId {
+        self.device
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn objects(&self) -> &Tensor {
+        &self.objects
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NativeGligenPhase {
+    Entry,
+    Discovery,
+    Schema,
+    SourceValidation,
+    Projection,
+    SemanticDigest,
+    Validation,
+    Return,
+    PositionAdmission,
+    Fourier,
+    NullProjection,
+    PositionLinearOne,
+    PositionSiluOne,
+    PositionLinearTwo,
+    PositionSiluTwo,
+    PositionLinearThree,
+    PositionReturn,
+    ApplyAdmission,
+    ContextProjection,
+    Concatenate,
+    AttentionLayerNorm,
+    AttentionQuery,
+    AttentionKey,
+    AttentionValue,
+    AttentionSdp,
+    AttentionOutput,
+    AttentionResidual,
+    DenseLayerNorm,
+    GegluProjection,
+    GegluActivation,
+    DenseOutput,
+    DenseResidual,
+    ApplyReturn,
+}
+
+#[derive(Debug)]
+pub struct NativeGligenResource {
+    artifact_sha256: String,
+    source_state: BTreeMap<String, Tensor>,
+    execution_state: BTreeMap<String, Tensor>,
+    fusers: Box<[NativeGligenFuserLocation]>,
+    key_dimension: usize,
+    source_dtype: DType,
+    stream: StreamId,
+    memory_budget_bytes: u64,
+    resident_bytes: u64,
+    semantic_digest_sha256: String,
+    source_exact: bool,
+}
+
+#[derive(Debug, Error)]
+pub enum NativeGligenError {
+    #[error("GLIGEN execution was cancelled")]
+    Cancelled,
+    #[error("GLIGEN checkpoint is invalid: {0}")]
+    InvalidCheckpoint(String),
+    #[error("GLIGEN state is missing key {0}")]
+    MissingState(String),
+    #[error("GLIGEN state is unexpected: {0}")]
+    UnexpectedState(String),
+    #[error("GLIGEN state {key} expected {expected:?}, got {actual:?} {actual_dtype:?}")]
+    StateShape {
+        key: String,
+        expected: Vec<u64>,
+        actual: Vec<u64>,
+        actual_dtype: DType,
+    },
+    #[error("GLIGEN input is invalid: {0}")]
+    InvalidInput(String),
+    #[error("GLIGEN retained semantic state changed")]
+    SemanticStateChanged,
+    #[error("GLIGEN shape arithmetic overflowed")]
+    ShapeOverflow,
+    #[error("GLIGEN allocation failed")]
+    Allocation,
+    #[error("GLIGEN memory requirement {required} exceeds budget {budget}")]
+    OutOfMemory { required: u64, budget: u64 },
+    #[error("GLIGEN canonical owner failed: {0}")]
+    Canonical(String),
+    #[error(transparent)]
+    Tensor(TensorError),
+}
+
+impl From<comfy_types::CancellationError> for NativeGligenError {
+    fn from(_: comfy_types::CancellationError) -> Self {
+        Self::Cancelled
+    }
+}
+
+impl From<TensorError> for NativeGligenError {
+    fn from(error: TensorError) -> Self {
+        match error {
+            TensorError::Cancelled => Self::Cancelled,
+            error => Self::Tensor(error),
+        }
+    }
+}
+
+impl NativeGligenResource {
+    pub fn from_checkpoint(
+        backend: &CpuBackend,
+        checkpoint: NativeGligenCheckpoint,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, NativeGligenError> {
+        Self::checked(backend, checkpoint, true, context, &mut |_, _| {})
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    #[doc(hidden)]
+    pub fn from_reduced_fixture(
+        backend: &CpuBackend,
+        checkpoint: NativeGligenCheckpoint,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, NativeGligenError> {
+        Self::checked(backend, checkpoint, false, context, &mut |_, _| {})
+    }
+
+    fn checked(
+        backend: &CpuBackend,
+        checkpoint: NativeGligenCheckpoint,
+        source_exact: bool,
+        context: &ExecutionContext<'_>,
+        phase_hook: &mut impl FnMut(NativeGligenPhase, &CancellationToken),
+    ) -> Result<Self, NativeGligenError> {
+        gligen_checkpoint(context.cancellation, NativeGligenPhase::Entry, phase_hook)?;
+        gligen_validate_sha256(&checkpoint.artifact_sha256)?;
+        if checkpoint.memory_budget_bytes == 0 {
+            return Err(NativeGligenError::InvalidCheckpoint(
+                "memory budget must be nonzero".to_owned(),
+            ));
+        }
+        gligen_raw_checkpoint_preflight(&checkpoint)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::Discovery,
+            phase_hook,
+        )?;
+        let (fusers, key_dimension, specifications) =
+            gligen_discover_state(&checkpoint.ordered_state)?;
+        gligen_checkpoint(context.cancellation, NativeGligenPhase::Schema, phase_hook)?;
+        gligen_validate_ordered_keys(&checkpoint.ordered_state, &specifications)?;
+        let source_dtype = gligen_validate_source_state(
+            &checkpoint.ordered_state,
+            &specifications,
+            context.stream,
+            context.cancellation,
+        )?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::SourceValidation,
+            phase_hook,
+        )?;
+        let construction_peak = gligen_construction_peak(
+            &checkpoint.artifact_sha256,
+            checkpoint.artifact_sha256.capacity(),
+            &checkpoint.ordered_state,
+            &specifications,
+            &fusers,
+        )?;
+        if construction_peak > checkpoint.memory_budget_bytes {
+            return Err(NativeGligenError::OutOfMemory {
+                required: construction_peak,
+                budget: checkpoint.memory_budget_bytes,
+            });
+        }
+        let source_state = checkpoint
+            .ordered_state
+            .into_iter()
+            .collect::<BTreeMap<_, _>>();
+        let mut execution_state = BTreeMap::new();
+        for (index, specification) in specifications.iter().enumerate() {
+            if index.is_multiple_of(8) {
+                gligen_checkpoint(
+                    context.cancellation,
+                    NativeGligenPhase::Projection,
+                    phase_hook,
+                )?;
+            }
+            let source = source_state
+                .get(&specification.key)
+                .ok_or_else(|| NativeGligenError::MissingState(specification.key.clone()))?;
+            let projected = cast_to_with_context_exact_native(
+                backend,
+                source,
+                DType::F32,
+                DeviceId::CPU,
+                false,
+                true,
+                context,
+            )
+            .map_err(gligen_canonical)?;
+            gligen_validate_finite_tensor(&specification.key, &projected, context.cancellation)?;
+            execution_state.insert(specification.key.clone(), projected);
+        }
+        gligen_validate_distinct_storage(&source_state, &execution_state)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::SemanticDigest,
+            phase_hook,
+        )?;
+        let semantic_digest_sha256 = gligen_semantic_digest(
+            source_exact,
+            &checkpoint.artifact_sha256,
+            source_dtype,
+            key_dimension,
+            &fusers,
+            &source_state,
+            &execution_state,
+            &specifications,
+            context.cancellation,
+        )?;
+        let owned_bytes = gligen_resident_owned_bytes(
+            &checkpoint.artifact_sha256,
+            checkpoint.artifact_sha256.capacity(),
+            &semantic_digest_sha256,
+            semantic_digest_sha256.capacity(),
+            &source_state,
+            &execution_state,
+            &fusers,
+        )?;
+        let resident_bytes = gligen_resident_tensor_allocations(
+            [&source_state, &execution_state],
+            context.cancellation,
+        )?
+        .into_iter()
+        .try_fold(owned_bytes, |total, (_, bytes)| {
+            total
+                .checked_add(bytes)
+                .ok_or(NativeGligenError::ShapeOverflow)
+        })?;
+        if resident_bytes > checkpoint.memory_budget_bytes {
+            return Err(NativeGligenError::OutOfMemory {
+                required: resident_bytes,
+                budget: checkpoint.memory_budget_bytes,
+            });
+        }
+        let resource = Self {
+            artifact_sha256: checkpoint.artifact_sha256,
+            source_state,
+            execution_state,
+            fusers: fusers.into_boxed_slice(),
+            key_dimension,
+            source_dtype,
+            stream: context.stream,
+            memory_budget_bytes: checkpoint.memory_budget_bytes,
+            resident_bytes,
+            semantic_digest_sha256,
+            source_exact,
+        };
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::Validation,
+            phase_hook,
+        )?;
+        resource.validate(context.cancellation)?;
+        gligen_checkpoint(context.cancellation, NativeGligenPhase::Return, phase_hook)?;
+        Ok(resource)
+    }
+
+    pub const fn identifier(&self) -> &'static str {
+        "gligen"
+    }
+
+    pub fn artifact_sha256(&self) -> &str {
+        &self.artifact_sha256
+    }
+
+    pub fn semantic_digest_sha256(&self) -> &str {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn source_dtype(&self) -> DType {
+        self.source_dtype
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub const fn is_source_exact_profile(&self) -> bool {
+        self.source_exact
+    }
+
+    pub const fn key_dimension(&self) -> usize {
+        self.key_dimension
+    }
+
+    pub fn fuser_locations(&self) -> &[NativeGligenFuserLocation] {
+        &self.fusers
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, NativeGligenError> {
+        gligen_resident_owned_bytes(
+            &self.artifact_sha256,
+            self.artifact_sha256.capacity(),
+            &self.semantic_digest_sha256,
+            self.semantic_digest_sha256.capacity(),
+            &self.source_state,
+            &self.execution_state,
+            &self.fusers,
+        )
+    }
+
+    pub fn resident_tensor_allocations(&self) -> Result<Vec<(StorageId, u64)>, NativeGligenError> {
+        gligen_resident_tensor_allocations(
+            [&self.source_state, &self.execution_state],
+            &CancellationToken::default(),
+        )
+    }
+
+    pub fn reconstruct_checkpoint(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeGligenCheckpoint, NativeGligenError> {
+        self.validate(cancellation)?;
+        let specifications = gligen_state_manifest(&self.fusers, self.key_dimension)?;
+        let mut ordered_state = Vec::new();
+        ordered_state
+            .try_reserve_exact(specifications.len())
+            .map_err(|_| NativeGligenError::Allocation)?;
+        for (index, specification) in specifications.iter().enumerate() {
+            if index.is_multiple_of(8) {
+                cancellation.check()?;
+            }
+            ordered_state.push((
+                specification.key.clone(),
+                self.source_state
+                    .get(&specification.key)
+                    .ok_or_else(|| NativeGligenError::MissingState(specification.key.clone()))?
+                    .clone(),
+            ));
+        }
+        cancellation.check()?;
+        Ok(NativeGligenCheckpoint {
+            artifact_sha256: self.artifact_sha256.clone(),
+            ordered_state,
+            memory_budget_bytes: self.memory_budget_bytes,
+        })
+    }
+
+    pub fn validate(&self, cancellation: &CancellationToken) -> Result<(), NativeGligenError> {
+        cancellation.check()?;
+        if self.fusers.is_empty() {
+            return Err(NativeGligenError::SemanticStateChanged);
+        }
+        let specifications = gligen_state_manifest(&self.fusers, self.key_dimension)?;
+        let ordered_source = specifications
+            .iter()
+            .map(|specification| {
+                self.source_state
+                    .get(&specification.key)
+                    .cloned()
+                    .map(|tensor| (specification.key.clone(), tensor))
+                    .ok_or_else(|| NativeGligenError::MissingState(specification.key.clone()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let dtype = gligen_validate_source_state(
+            &ordered_source,
+            &specifications,
+            self.stream,
+            cancellation,
+        )?;
+        if dtype != self.source_dtype || self.execution_state.len() != specifications.len() {
+            return Err(NativeGligenError::SemanticStateChanged);
+        }
+        for specification in &specifications {
+            let tensor = self
+                .execution_state
+                .get(&specification.key)
+                .ok_or_else(|| NativeGligenError::MissingState(specification.key.clone()))?;
+            if tensor.descriptor().shape() != specification.shape
+                || tensor.descriptor().dtype() != DType::F32
+                || tensor.descriptor().device() != DeviceId::CPU
+                || tensor.descriptor().stream() != self.stream
+                || !tensor.descriptor().is_contiguous()?
+            {
+                return Err(NativeGligenError::SemanticStateChanged);
+            }
+            gligen_validate_finite_tensor(&specification.key, tensor, cancellation)?;
+        }
+        gligen_validate_distinct_storage(&self.source_state, &self.execution_state)?;
+        let digest = gligen_semantic_digest(
+            self.source_exact,
+            &self.artifact_sha256,
+            self.source_dtype,
+            self.key_dimension,
+            &self.fusers,
+            &self.source_state,
+            &self.execution_state,
+            &specifications,
+            cancellation,
+        )?;
+        if digest != self.semantic_digest_sha256 {
+            return Err(NativeGligenError::SemanticStateChanged);
+        }
+        let resident = gligen_resident_tensor_allocations(
+            [&self.source_state, &self.execution_state],
+            cancellation,
+        )?
+        .into_iter()
+        .try_fold(self.resident_owned_bytes()?, |total, (_, bytes)| {
+            total
+                .checked_add(bytes)
+                .ok_or(NativeGligenError::ShapeOverflow)
+        })?;
+        if resident != self.resident_bytes || resident > self.memory_budget_bytes {
+            return Err(NativeGligenError::SemanticStateChanged);
+        }
+        cancellation.check()?;
+        Ok(())
+    }
+
+    fn tensor(&self, key: &str) -> Result<&Tensor, NativeGligenError> {
+        self.execution_state
+            .get(key)
+            .ok_or_else(|| NativeGligenError::MissingState(key.to_owned()))
+    }
+}
+
+const GLIGEN_POSITION_KEYS: [&str; GLIGEN_POSITION_STATE_COUNT] = [
+    "position_net.null_positive_feature",
+    "position_net.null_position_feature",
+    "position_net.linears.0.weight",
+    "position_net.linears.0.bias",
+    "position_net.linears.2.weight",
+    "position_net.linears.2.bias",
+    "position_net.linears.4.weight",
+    "position_net.linears.4.bias",
+];
+
+const GLIGEN_FUSER_SUFFIXES: [&str; GLIGEN_FUSER_STATE_COUNT] = [
+    "alpha_attn",
+    "alpha_dense",
+    "linear.weight",
+    "linear.bias",
+    "attn.to_q.weight",
+    "attn.to_k.weight",
+    "attn.to_v.weight",
+    "attn.to_out.0.weight",
+    "attn.to_out.0.bias",
+    "ff.net.0.proj.weight",
+    "ff.net.0.proj.bias",
+    "ff.net.2.weight",
+    "ff.net.2.bias",
+    "norm1.weight",
+    "norm1.bias",
+    "norm2.weight",
+    "norm2.bias",
+];
+
+fn gligen_checkpoint(
+    cancellation: &CancellationToken,
+    phase: NativeGligenPhase,
+    phase_hook: &mut impl FnMut(NativeGligenPhase, &CancellationToken),
+) -> Result<(), NativeGligenError> {
+    phase_hook(phase, cancellation);
+    cancellation.check()?;
+    Ok(())
+}
+
+fn gligen_raw_checkpoint_preflight(
+    checkpoint: &NativeGligenCheckpoint,
+) -> Result<(), NativeGligenError> {
+    let count = checkpoint.ordered_state.len();
+    if count < GLIGEN_POSITION_STATE_COUNT + GLIGEN_FUSER_STATE_COUNT
+        || count > GLIGEN_POSITION_STATE_COUNT + 60 * GLIGEN_FUSER_STATE_COUNT
+        || !(count - GLIGEN_POSITION_STATE_COUNT).is_multiple_of(GLIGEN_FUSER_STATE_COUNT)
+    {
+        return Err(NativeGligenError::UnexpectedState(format!(
+            "state count {count} is not 8 + 17*fuser_count for 1..=60 fusers"
+        )));
+    }
+    let mut source_bytes = 0_u64;
+    let mut projected_bytes = 0_u64;
+    let mut maximum_scratch = 0_u64;
+    let mut key_bytes = 0_u64;
+    for (key, tensor) in &checkpoint.ordered_state {
+        if key.is_empty() || key.len() > MAX_STATE_KEY_BYTES {
+            return Err(NativeGligenError::InvalidCheckpoint(
+                "state key length is invalid".to_owned(),
+            ));
+        }
+        let source = tensor.storage_byte_len();
+        let projected = tensor
+            .descriptor()
+            .element_count()?
+            .checked_mul(DType::F32.byte_width())
+            .ok_or(NativeGligenError::ShapeOverflow)?;
+        source_bytes = source_bytes
+            .checked_add(source)
+            .ok_or(NativeGligenError::ShapeOverflow)?;
+        projected_bytes = projected_bytes
+            .checked_add(projected)
+            .ok_or(NativeGligenError::ShapeOverflow)?;
+        maximum_scratch = maximum_scratch.max(source.max(projected));
+        key_bytes = key_bytes
+            .checked_add(gligen_u64(key.capacity())?)
+            .ok_or(NativeGligenError::ShapeOverflow)?;
+    }
+    let container_bytes = gligen_u64(count)?
+        .checked_mul(
+            u64::try_from(mem::size_of::<(String, Tensor)>())
+                .map_err(|_| NativeGligenError::ShapeOverflow)?,
+        )
+        .and_then(|bytes| bytes.checked_mul(3))
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let required = source_bytes
+        .checked_add(projected_bytes)
+        .and_then(|bytes| bytes.checked_add(maximum_scratch.checked_mul(2)?))
+        .and_then(|bytes| bytes.checked_add(key_bytes.checked_mul(3)?))
+        .and_then(|bytes| bytes.checked_add(container_bytes))
+        .and_then(|bytes| {
+            bytes.checked_add(u64::try_from(mem::size_of::<NativeGligenResource>()).ok()?)
+        })
+        .and_then(|bytes| {
+            bytes.checked_add(gligen_u64(checkpoint.artifact_sha256.capacity()).ok()?)
+        })
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    if required > checkpoint.memory_budget_bytes {
+        return Err(NativeGligenError::OutOfMemory {
+            required,
+            budget: checkpoint.memory_budget_bytes,
+        });
+    }
+    Ok(())
+}
+
+fn gligen_discover_state(
+    state: &[(String, Tensor)],
+) -> Result<
+    (
+        Vec<NativeGligenFuserLocation>,
+        usize,
+        Vec<StateSpecification>,
+    ),
+    NativeGligenError,
+> {
+    for (index, expected) in GLIGEN_POSITION_KEYS.iter().enumerate() {
+        let Some((actual, _)) = state.get(index) else {
+            return Err(NativeGligenError::MissingState((*expected).to_owned()));
+        };
+        if actual != expected {
+            return Err(NativeGligenError::UnexpectedState(format!(
+                "expected {expected}, got {actual}"
+            )));
+        }
+    }
+    let key_dimension = state
+        .first()
+        .and_then(|(_, tensor)| tensor.descriptor().shape().first().copied())
+        .ok_or_else(|| {
+            NativeGligenError::InvalidCheckpoint(
+                "position_net.null_positive_feature must be rank one".to_owned(),
+            )
+        })
+        .and_then(gligen_usize)?;
+    if key_dimension == 0 {
+        return Err(NativeGligenError::InvalidCheckpoint(
+            "GLIGEN key dimension must be nonzero".to_owned(),
+        ));
+    }
+
+    let mut discovered = BTreeMap::<(NativeGligenRegion, u8), (String, HashSet<String>)>::new();
+    for (key, _) in state.iter().skip(GLIGEN_POSITION_STATE_COUNT) {
+        let Some((namespace, suffix)) = key.split_once(".fuser.") else {
+            return Err(NativeGligenError::UnexpectedState(format!(
+                "unrelated GLIGEN state {key}"
+            )));
+        };
+        if suffix.is_empty() || suffix.contains(".fuser.") {
+            return Err(NativeGligenError::UnexpectedState(format!(
+                "invalid fuser key {key}"
+            )));
+        }
+        let mut components = namespace.split('.');
+        let region_name = components.next().unwrap_or_default();
+        let index_name = components.next().unwrap_or_default();
+        if components.next().is_none() {
+            return Err(NativeGligenError::UnexpectedState(format!(
+                "fuser namespace {namespace} is not structurally anchored"
+            )));
+        }
+        let region = NativeGligenRegion::parse(region_name).ok_or_else(|| {
+            NativeGligenError::UnexpectedState(format!("unknown GLIGEN region {region_name}"))
+        })?;
+        let block_index = index_name.parse::<u8>().map_err(|_| {
+            NativeGligenError::UnexpectedState(format!("invalid GLIGEN block index {index_name}"))
+        })?;
+        if block_index >= 20 {
+            return Err(NativeGligenError::UnexpectedState(format!(
+                "GLIGEN block index {block_index} is outside 0..19"
+            )));
+        }
+        let (existing_namespace, suffixes) = discovered
+            .entry((region, block_index))
+            .or_insert_with(|| (namespace.to_owned(), HashSet::new()));
+        if existing_namespace != namespace {
+            return Err(NativeGligenError::UnexpectedState(format!(
+                "multiple fuser namespaces occupy {}.{block_index}",
+                region.source_name()
+            )));
+        }
+        if !GLIGEN_FUSER_SUFFIXES.contains(&suffix) {
+            return Err(NativeGligenError::UnexpectedState(format!(
+                "unknown fuser suffix {suffix}"
+            )));
+        }
+        if !suffixes.insert(suffix.to_owned()) {
+            return Err(NativeGligenError::UnexpectedState(format!(
+                "duplicate fuser suffix {suffix} at {namespace}"
+            )));
+        }
+    }
+    if discovered.is_empty() {
+        return Err(NativeGligenError::InvalidCheckpoint(
+            "GLIGEN requires at least one fuser".to_owned(),
+        ));
+    }
+    for ((region, block_index), (_, suffixes)) in &discovered {
+        if suffixes.len() != GLIGEN_FUSER_STATE_COUNT
+            || GLIGEN_FUSER_SUFFIXES
+                .iter()
+                .any(|suffix| !suffixes.contains(*suffix))
+        {
+            return Err(NativeGligenError::UnexpectedState(format!(
+                "partial fuser state at {}.{block_index}",
+                region.source_name()
+            )));
+        }
+    }
+
+    let state_by_key = state
+        .iter()
+        .map(|(key, tensor)| (key.as_str(), tensor))
+        .collect::<BTreeMap<_, _>>();
+    let mut fusers = Vec::new();
+    fusers
+        .try_reserve_exact(discovered.len())
+        .map_err(|_| NativeGligenError::Allocation)?;
+    for region in [
+        NativeGligenRegion::InputBlock,
+        NativeGligenRegion::MiddleBlock,
+        NativeGligenRegion::OutputBlock,
+    ] {
+        for block_index in 0_u8..20 {
+            let Some((namespace, _)) = discovered.get(&(region, block_index)) else {
+                continue;
+            };
+            let linear_key = format!("{namespace}.fuser.linear.weight");
+            let shape = state_by_key
+                .get(linear_key.as_str())
+                .ok_or_else(|| NativeGligenError::MissingState(linear_key.clone()))?
+                .descriptor()
+                .shape();
+            let [query_dimension, observed_key_dimension] = shape else {
+                return Err(NativeGligenError::InvalidCheckpoint(format!(
+                    "state {linear_key} must be rank two"
+                )));
+            };
+            let query_dimension = gligen_usize(*query_dimension)?;
+            let observed_key_dimension = gligen_usize(*observed_key_dimension)?;
+            if query_dimension == 0 || observed_key_dimension != key_dimension {
+                return Err(NativeGligenError::InvalidCheckpoint(format!(
+                    "state {linear_key} has inconsistent key/query dimensions"
+                )));
+            }
+            let (heads, head_dimension) = if key_dimension == 768 {
+                if !query_dimension.is_multiple_of(8) {
+                    return Err(NativeGligenError::InvalidCheckpoint(format!(
+                        "query dimension {query_dimension} is not divisible by 8"
+                    )));
+                }
+                (8, query_dimension / 8)
+            } else {
+                if !query_dimension.is_multiple_of(64) {
+                    return Err(NativeGligenError::InvalidCheckpoint(format!(
+                        "query dimension {query_dimension} is not divisible by d_head 64"
+                    )));
+                }
+                (query_dimension / 64, 64)
+            };
+            fusers.push(NativeGligenFuserLocation {
+                region,
+                block_index,
+                namespace: namespace.clone(),
+                transformer_index: fusers.len(),
+                query_dimension,
+                key_dimension,
+                heads,
+                head_dimension,
+            });
+        }
+    }
+    let specifications = gligen_state_manifest(&fusers, key_dimension)?;
+    Ok((fusers, key_dimension, specifications))
+}
+
+fn gligen_state_manifest(
+    fusers: &[NativeGligenFuserLocation],
+    key_dimension: usize,
+) -> Result<Vec<StateSpecification>, NativeGligenError> {
+    let key = gligen_u64(key_dimension)?;
+    let input = key
+        .checked_add(gligen_u64(GLIGEN_POSITION_WIDTH)?)
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let hidden = gligen_u64(GLIGEN_POSITION_HIDDEN)?;
+    let mut specifications = Vec::new();
+    specifications
+        .try_reserve_exact(
+            GLIGEN_POSITION_STATE_COUNT
+                .checked_add(
+                    fusers
+                        .len()
+                        .checked_mul(GLIGEN_FUSER_STATE_COUNT)
+                        .ok_or(NativeGligenError::ShapeOverflow)?,
+                )
+                .ok_or(NativeGligenError::ShapeOverflow)?,
+        )
+        .map_err(|_| NativeGligenError::Allocation)?;
+    for (key_name, shape) in [
+        (GLIGEN_POSITION_KEYS[0], vec![key]),
+        (
+            GLIGEN_POSITION_KEYS[1],
+            vec![gligen_u64(GLIGEN_POSITION_WIDTH)?],
+        ),
+        (GLIGEN_POSITION_KEYS[2], vec![hidden, input]),
+        (GLIGEN_POSITION_KEYS[3], vec![hidden]),
+        (GLIGEN_POSITION_KEYS[4], vec![hidden, hidden]),
+        (GLIGEN_POSITION_KEYS[5], vec![hidden]),
+        (GLIGEN_POSITION_KEYS[6], vec![key, hidden]),
+        (GLIGEN_POSITION_KEYS[7], vec![key]),
+    ] {
+        specifications.push(StateSpecification {
+            key: key_name.to_owned(),
+            shape,
+        });
+    }
+    for fuser in fusers {
+        if fuser.key_dimension != key_dimension {
+            return Err(NativeGligenError::SemanticStateChanged);
+        }
+        let query = gligen_u64(fuser.query_dimension)?;
+        let doubled_query = query
+            .checked_mul(2)
+            .ok_or(NativeGligenError::ShapeOverflow)?;
+        let prefix = format!("{}.fuser", fuser.namespace);
+        for (suffix, shape) in [
+            ("alpha_attn", vec![]),
+            ("alpha_dense", vec![]),
+            ("linear.weight", vec![query, key]),
+            ("linear.bias", vec![query]),
+            ("attn.to_q.weight", vec![query, query]),
+            ("attn.to_k.weight", vec![query, query]),
+            ("attn.to_v.weight", vec![query, query]),
+            ("attn.to_out.0.weight", vec![query, query]),
+            ("attn.to_out.0.bias", vec![query]),
+            ("ff.net.0.proj.weight", vec![doubled_query, query]),
+            ("ff.net.0.proj.bias", vec![doubled_query]),
+            ("ff.net.2.weight", vec![query, query]),
+            ("ff.net.2.bias", vec![query]),
+            ("norm1.weight", vec![query]),
+            ("norm1.bias", vec![query]),
+            ("norm2.weight", vec![query]),
+            ("norm2.bias", vec![query]),
+        ] {
+            specifications.push(StateSpecification {
+                key: format!("{prefix}.{suffix}"),
+                shape,
+            });
+        }
+    }
+    Ok(specifications)
+}
+
+fn gligen_validate_ordered_keys(
+    state: &[(String, Tensor)],
+    specifications: &[StateSpecification],
+) -> Result<(), NativeGligenError> {
+    if state.len() != specifications.len() {
+        return Err(NativeGligenError::UnexpectedState(format!(
+            "expected {} entries, got {}",
+            specifications.len(),
+            state.len()
+        )));
+    }
+    let mut seen = HashSet::new();
+    for ((actual, _), expected) in state.iter().zip(specifications) {
+        if !seen.insert(actual) {
+            return Err(NativeGligenError::UnexpectedState(format!(
+                "duplicate state key {actual}"
+            )));
+        }
+        if actual != &expected.key {
+            return Err(NativeGligenError::UnexpectedState(format!(
+                "expected {}, got {actual}",
+                expected.key
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn gligen_validate_source_state(
+    state: &[(String, Tensor)],
+    specifications: &[StateSpecification],
+    stream: StreamId,
+    cancellation: &CancellationToken,
+) -> Result<DType, NativeGligenError> {
+    gligen_validate_ordered_keys(state, specifications)?;
+    let mut dtype = None;
+    let mut storages = HashSet::new();
+    for (index, ((key, tensor), specification)) in state.iter().zip(specifications).enumerate() {
+        if index.is_multiple_of(8) {
+            cancellation.check()?;
+        }
+        let descriptor = tensor.descriptor();
+        if descriptor.shape() != specification.shape
+            || !matches!(descriptor.dtype(), DType::F32 | DType::F16 | DType::Bf16)
+        {
+            return Err(NativeGligenError::StateShape {
+                key: key.clone(),
+                expected: specification.shape.clone(),
+                actual: descriptor.shape().to_vec(),
+                actual_dtype: descriptor.dtype(),
+            });
+        }
+        if descriptor.device() != DeviceId::CPU
+            || descriptor.stream() != stream
+            || !descriptor.is_contiguous()?
+        {
+            return Err(NativeGligenError::InvalidCheckpoint(format!(
+                "state {key} must be contiguous CPU storage on the construction stream"
+            )));
+        }
+        if dtype
+            .replace(descriptor.dtype())
+            .is_some_and(|previous| previous != descriptor.dtype())
+        {
+            return Err(NativeGligenError::InvalidCheckpoint(
+                "all source tensors must use one storage dtype".to_owned(),
+            ));
+        }
+        if !storages.insert(tensor.storage_id()) {
+            return Err(NativeGligenError::InvalidCheckpoint(format!(
+                "state {key} aliases another source tensor"
+            )));
+        }
+        gligen_validate_finite_source_tensor(key, tensor, cancellation)?;
+    }
+    dtype.ok_or_else(|| NativeGligenError::InvalidCheckpoint("state is empty".to_owned()))
+}
+
+fn gligen_validate_finite_source_tensor(
+    key: &str,
+    tensor: &Tensor,
+    cancellation: &CancellationToken,
+) -> Result<(), NativeGligenError> {
+    let count = gligen_usize(tensor.descriptor().element_count()?)?;
+    for index in 0..count {
+        if index.is_multiple_of(16_384) {
+            cancellation.check()?;
+        }
+        match tensor
+            .descriptor()
+            .dtype()
+            .decode_scalar(tensor.linear_element_bytes(gligen_u64(index)?)?)?
+        {
+            DecodedScalar::Real(value) if value.is_finite() => {}
+            _ => {
+                return Err(NativeGligenError::InvalidCheckpoint(format!(
+                    "state {key} contains a non-finite or non-real value"
+                )));
+            }
+        }
+    }
+    cancellation.check()?;
+    Ok(())
+}
+
+fn gligen_validate_finite_tensor(
+    name: &str,
+    tensor: &Tensor,
+    cancellation: &CancellationToken,
+) -> Result<(), NativeGligenError> {
+    if tensor.descriptor().dtype() != DType::F32 {
+        return Err(NativeGligenError::InvalidInput(format!(
+            "{name} must use F32 execution storage"
+        )));
+    }
+    for (index, chunk) in tensor.contiguous_bytes()?.chunks_exact(4).enumerate() {
+        if index.is_multiple_of(16_384) {
+            cancellation.check()?;
+        }
+        let raw: [u8; 4] = chunk
+            .try_into()
+            .map_err(|_| NativeGligenError::SemanticStateChanged)?;
+        if !f32::from_ne_bytes(raw).is_finite() {
+            return Err(NativeGligenError::InvalidInput(format!(
+                "{name} contains a non-finite value"
+            )));
+        }
+    }
+    cancellation.check()?;
+    Ok(())
+}
+
+fn gligen_validate_distinct_storage(
+    source: &BTreeMap<String, Tensor>,
+    execution: &BTreeMap<String, Tensor>,
+) -> Result<(), NativeGligenError> {
+    let source_ids = source
+        .values()
+        .map(Tensor::storage_id)
+        .collect::<HashSet<_>>();
+    let mut execution_ids = HashSet::new();
+    for tensor in execution.values() {
+        if source_ids.contains(&tensor.storage_id()) || !execution_ids.insert(tensor.storage_id()) {
+            return Err(NativeGligenError::SemanticStateChanged);
+        }
+    }
+    Ok(())
+}
+
+fn gligen_tensor_values(
+    backend: &CpuBackend,
+    tensor: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, NativeGligenError> {
+    tensor_to_f32_with_context_exact_native(backend, tensor, context).map_err(gligen_canonical)
+}
+
+fn gligen_linear_values(
+    backend: &CpuBackend,
+    input: &[f32],
+    input_shape: &[usize],
+    weight: &Tensor,
+    bias: Option<&Tensor>,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, NativeGligenError> {
+    let weight_values = gligen_tensor_values(backend, weight, context)?;
+    let bias_values = bias
+        .map(|bias| gligen_tensor_values(backend, bias, context))
+        .transpose()?;
+    let weight_shape = weight
+        .descriptor()
+        .shape()
+        .iter()
+        .map(|dimension| gligen_usize(*dimension))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(linear_with_context_exact_native(
+        backend,
+        input,
+        input_shape,
+        &weight_values,
+        &weight_shape,
+        bias_values.as_deref(),
+        DeviceId::CPU,
+        context,
+    )
+    .map_err(gligen_canonical)?
+    .values)
+}
+
+fn gligen_linear_tensor(
+    backend: &CpuBackend,
+    input: &Tensor,
+    weight: &Tensor,
+    bias: Option<&Tensor>,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, NativeGligenError> {
+    let input_shape = input
+        .descriptor()
+        .shape()
+        .iter()
+        .map(|dimension| gligen_usize(*dimension))
+        .collect::<Result<Vec<_>, _>>()?;
+    let input_values = gligen_tensor_values(backend, input, context)?;
+    let output_values =
+        gligen_linear_values(backend, &input_values, &input_shape, weight, bias, context)?;
+    let output_width = weight
+        .descriptor()
+        .shape()
+        .first()
+        .copied()
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let mut output_shape = input.descriptor().shape().to_vec();
+    let Some(last) = output_shape.last_mut() else {
+        return Err(NativeGligenError::ShapeOverflow);
+    };
+    *last = output_width;
+    tensor_from_f32_with_context_exact_native(
+        backend,
+        &output_shape,
+        &output_values,
+        DType::F32,
+        DeviceId::CPU,
+        context,
+    )
+    .map_err(gligen_canonical)
+}
+
+fn gligen_layer_norm_tensor(
+    backend: &CpuBackend,
+    input: &Tensor,
+    weight: &Tensor,
+    bias: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, NativeGligenError> {
+    let shape = input
+        .descriptor()
+        .shape()
+        .iter()
+        .map(|dimension| gligen_usize(*dimension))
+        .collect::<Result<Vec<_>, _>>()?;
+    let width = *shape.last().ok_or(NativeGligenError::ShapeOverflow)?;
+    let input_values = gligen_tensor_values(backend, input, context)?;
+    let weight_values = gligen_tensor_values(backend, weight, context)?;
+    let bias_values = gligen_tensor_values(backend, bias, context)?;
+    let output = layer_norm_with_context_exact_native(
+        backend,
+        &input_values,
+        &shape,
+        &[width],
+        Some(&weight_values),
+        Some(&bias_values),
+        LAYER_NORM_EPSILON,
+        DeviceId::CPU,
+        context,
+    )
+    .map_err(gligen_canonical)?;
+    tensor_from_f32_with_context_exact_native(
+        backend,
+        input.descriptor().shape(),
+        &output,
+        DType::F32,
+        DeviceId::CPU,
+        context,
+    )
+    .map_err(gligen_canonical)
+}
+
+fn gligen_tanh_scalar(
+    backend: &CpuBackend,
+    input: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<f32, NativeGligenError> {
+    if !input.descriptor().shape().is_empty() {
+        return Err(NativeGligenError::SemanticStateChanged);
+    }
+    let value =
+        tanh_with_context_exact_native(backend, input, context).map_err(gligen_canonical)?;
+    let bytes = value.linear_element_bytes(0)?;
+    match value.descriptor().dtype().decode_scalar(bytes)? {
+        DecodedScalar::Real(value) if value.is_finite() => Ok(value as f32),
+        _ => Err(NativeGligenError::SemanticStateChanged),
+    }
+}
+
+fn gligen_attention_workspace_bytes(
+    batch: usize,
+    heads: usize,
+    tokens: usize,
+) -> Result<usize, NativeGligenError> {
+    batch
+        .checked_mul(heads)
+        .and_then(|value| value.checked_mul(tokens))
+        .and_then(|value| value.checked_mul(tokens))
+        .and_then(|value| value.checked_mul(8))
+        .ok_or(NativeGligenError::ShapeOverflow)
+}
+
+fn gligen_construction_peak(
+    artifact: &str,
+    artifact_capacity: usize,
+    ordered_state: &[(String, Tensor)],
+    specifications: &[StateSpecification],
+    fusers: &[NativeGligenFuserLocation],
+) -> Result<u64, NativeGligenError> {
+    let source_bytes = ordered_state.iter().try_fold(0_u64, |total, (_, tensor)| {
+        total
+            .checked_add(tensor.storage_byte_len())
+            .ok_or(NativeGligenError::ShapeOverflow)
+    })?;
+    let projected_bytes = specifications
+        .iter()
+        .try_fold(0_u64, |total, specification| {
+            total
+                .checked_add(gligen_tensor_bytes(&specification.shape, DType::F32)?)
+                .ok_or(NativeGligenError::ShapeOverflow)
+        })?;
+    let maximum_scratch = specifications
+        .iter()
+        .map(|specification| gligen_tensor_bytes(&specification.shape, DType::F32))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .max()
+        .unwrap_or(0)
+        .checked_mul(2)
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let key_bytes = ordered_state.iter().try_fold(0_u64, |total, (key, _)| {
+        total
+            .checked_add(gligen_u64(key.capacity())?)
+            .ok_or(NativeGligenError::ShapeOverflow)
+    })?;
+    let fuser_owned = fusers.iter().try_fold(0_u64, |total, fuser| {
+        total
+            .checked_add(gligen_u64(fuser.namespace.capacity())?)
+            .and_then(|bytes| {
+                bytes.checked_add(u64::try_from(mem::size_of::<NativeGligenFuserLocation>()).ok()?)
+            })
+            .ok_or(NativeGligenError::ShapeOverflow)
+    })?;
+    let container_bytes = gligen_u64(ordered_state.len())?
+        .checked_mul(
+            u64::try_from(mem::size_of::<(String, Tensor)>())
+                .map_err(|_| NativeGligenError::ShapeOverflow)?,
+        )
+        .and_then(|bytes| bytes.checked_mul(3))
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    source_bytes
+        .checked_add(projected_bytes)
+        .and_then(|bytes| bytes.checked_add(maximum_scratch))
+        .and_then(|bytes| bytes.checked_add(key_bytes.checked_mul(3)?))
+        .and_then(|bytes| bytes.checked_add(fuser_owned))
+        .and_then(|bytes| bytes.checked_add(container_bytes))
+        .and_then(|bytes| {
+            bytes.checked_add(u64::try_from(mem::size_of::<NativeGligenResource>()).ok()?)
+        })
+        .and_then(|bytes| {
+            bytes.checked_add(gligen_u64(artifact_capacity.max(artifact.len())).ok()?)
+        })
+        .ok_or(NativeGligenError::ShapeOverflow)
+}
+
+fn gligen_prepare_peak(
+    resource: &NativeGligenResource,
+    batch: usize,
+    position_count: usize,
+) -> Result<(), NativeGligenError> {
+    let rows = batch
+        .checked_mul(GLIGEN_MAX_OBJECTS)
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let input_width = resource
+        .key_dimension
+        .checked_add(GLIGEN_POSITION_WIDTH)
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let scalar_bytes = 4_u64;
+    let positions = gligen_u64(rows)?
+        .checked_mul(gligen_u64(input_width)?)
+        .and_then(|value| value.checked_mul(scalar_bytes))
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let hidden = gligen_u64(rows)?
+        .checked_mul(gligen_u64(GLIGEN_POSITION_HIDDEN)?)
+        .and_then(|value| value.checked_mul(scalar_bytes))
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let objects = gligen_u64(rows)?
+        .checked_mul(gligen_u64(resource.key_dimension)?)
+        .and_then(|value| value.checked_mul(scalar_bytes))
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let decoded_embedding = gligen_u64(position_count)?
+        .checked_mul(gligen_u64(resource.key_dimension)?)
+        .and_then(|value| value.checked_mul(scalar_bytes))
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let decoded_weight = resource
+        .execution_state
+        .values()
+        .map(Tensor::storage_byte_len)
+        .max()
+        .unwrap_or(0)
+        .checked_mul(2)
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let phase = positions
+        .checked_mul(3)
+        .and_then(|value| value.checked_add(hidden.checked_mul(4)?))
+        .and_then(|value| value.checked_add(objects.checked_mul(2)?))
+        .and_then(|value| value.checked_add(decoded_embedding))
+        .and_then(|value| value.checked_add(decoded_weight))
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    gligen_require_budget(resource, phase)
+}
+
+fn gligen_apply_peak(
+    resource: &NativeGligenResource,
+    fuser: &NativeGligenFuserLocation,
+    batch: usize,
+    visual_tokens: usize,
+) -> Result<(), NativeGligenError> {
+    let total_tokens = visual_tokens
+        .checked_add(GLIGEN_MAX_OBJECTS)
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let scalar_bytes = 4_u64;
+    let visual = gligen_u64(batch)?
+        .checked_mul(gligen_u64(visual_tokens)?)
+        .and_then(|value| value.checked_mul(gligen_u64(fuser.query_dimension).ok()?))
+        .and_then(|value| value.checked_mul(scalar_bytes))
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let combined = gligen_u64(batch)?
+        .checked_mul(gligen_u64(total_tokens)?)
+        .and_then(|value| value.checked_mul(gligen_u64(fuser.query_dimension).ok()?))
+        .and_then(|value| value.checked_mul(scalar_bytes))
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let attention = gligen_u64(batch)?
+        .checked_mul(gligen_u64(fuser.heads)?)
+        .and_then(|value| value.checked_mul(gligen_u64(total_tokens).ok()?))
+        .and_then(|value| value.checked_mul(gligen_u64(total_tokens).ok()?))
+        .and_then(|value| value.checked_mul(8))
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let geglu = visual
+        .checked_mul(2)
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let decoded_weight = resource
+        .execution_state
+        .values()
+        .map(Tensor::storage_byte_len)
+        .max()
+        .unwrap_or(0)
+        .checked_mul(2)
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let phase = combined
+        .checked_mul(12)
+        .and_then(|value| value.checked_add(attention.checked_mul(2)?))
+        .and_then(|value| value.checked_add(visual.checked_mul(8)?))
+        .and_then(|value| value.checked_add(geglu.checked_mul(2)?))
+        .and_then(|value| value.checked_add(decoded_weight))
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    gligen_require_budget(resource, phase)
+}
+
+fn gligen_require_budget(
+    resource: &NativeGligenResource,
+    phase_bytes: u64,
+) -> Result<(), NativeGligenError> {
+    let required = resource
+        .resident_bytes
+        .checked_add(phase_bytes)
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    if required > resource.memory_budget_bytes {
+        return Err(NativeGligenError::OutOfMemory {
+            required,
+            budget: resource.memory_budget_bytes,
+        });
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn gligen_semantic_digest(
+    source_exact: bool,
+    artifact: &str,
+    source_dtype: DType,
+    key_dimension: usize,
+    fusers: &[NativeGligenFuserLocation],
+    source_state: &BTreeMap<String, Tensor>,
+    execution_state: &BTreeMap<String, Tensor>,
+    specifications: &[StateSpecification],
+    cancellation: &CancellationToken,
+) -> Result<String, NativeGligenError> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"zed.comfy.gligen-resource.v1\0");
+    hasher.update([u8::from(source_exact)]);
+    hasher.update(artifact.as_bytes());
+    hasher.update(source_dtype.catalog_name().as_bytes());
+    hasher.update(gligen_u64(key_dimension)?.to_le_bytes());
+    hasher.update(gligen_u64(fusers.len())?.to_le_bytes());
+    for fuser in fusers {
+        cancellation.check()?;
+        hasher.update([match fuser.region {
+            NativeGligenRegion::InputBlock => 1,
+            NativeGligenRegion::MiddleBlock => 2,
+            NativeGligenRegion::OutputBlock => 3,
+        }]);
+        hasher.update([fuser.block_index]);
+        hasher.update(gligen_u64(fuser.transformer_index)?.to_le_bytes());
+        hasher.update(gligen_u64(fuser.namespace.len())?.to_le_bytes());
+        hasher.update(fuser.namespace.as_bytes());
+        for value in [
+            fuser.query_dimension,
+            fuser.key_dimension,
+            fuser.heads,
+            fuser.head_dimension,
+        ] {
+            hasher.update(gligen_u64(value)?.to_le_bytes());
+        }
+    }
+    for (index, specification) in specifications.iter().enumerate() {
+        if index.is_multiple_of(8) {
+            cancellation.check()?;
+        }
+        gligen_hash_tensor(
+            &mut hasher,
+            &specification.key,
+            source_state
+                .get(&specification.key)
+                .ok_or_else(|| NativeGligenError::MissingState(specification.key.clone()))?,
+            cancellation,
+        )?;
+        gligen_hash_tensor(
+            &mut hasher,
+            &specification.key,
+            execution_state
+                .get(&specification.key)
+                .ok_or_else(|| NativeGligenError::MissingState(specification.key.clone()))?,
+            cancellation,
+        )?;
+    }
+    cancellation.check()?;
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn gligen_hash_tensor(
+    hasher: &mut Sha256,
+    key: &str,
+    tensor: &Tensor,
+    cancellation: &CancellationToken,
+) -> Result<(), NativeGligenError> {
+    hasher.update(gligen_u64(key.len())?.to_le_bytes());
+    hasher.update(key.as_bytes());
+    hasher.update(tensor.descriptor().dtype().catalog_name().as_bytes());
+    for dimension in tensor.descriptor().shape() {
+        hasher.update(dimension.to_le_bytes());
+    }
+    for chunk in tensor.contiguous_bytes()?.chunks(DIGEST_CHUNK_BYTES) {
+        cancellation.check()?;
+        hasher.update(chunk);
+    }
+    Ok(())
+}
+
+fn gligen_resident_owned_bytes(
+    artifact: &str,
+    artifact_capacity: usize,
+    digest: &str,
+    digest_capacity: usize,
+    source_state: &BTreeMap<String, Tensor>,
+    execution_state: &BTreeMap<String, Tensor>,
+    fusers: &[NativeGligenFuserLocation],
+) -> Result<u64, NativeGligenError> {
+    let base = u64::try_from(mem::size_of::<NativeGligenResource>())
+        .map_err(|_| NativeGligenError::ShapeOverflow)?;
+    let keys =
+        source_state
+            .keys()
+            .chain(execution_state.keys())
+            .try_fold(0_u64, |total, key| {
+                total
+                    .checked_add(gligen_u64(key.capacity())?)
+                    .ok_or(NativeGligenError::ShapeOverflow)
+            })?;
+    let map_nodes = gligen_u64(source_state.len())?
+        .checked_mul(
+            u64::try_from(mem::size_of::<(String, Tensor)>())
+                .map_err(|_| NativeGligenError::ShapeOverflow)?
+                .checked_add(64)
+                .ok_or(NativeGligenError::ShapeOverflow)?,
+        )
+        .and_then(|bytes| bytes.checked_mul(2))
+        .ok_or(NativeGligenError::ShapeOverflow)?;
+    let fuser_owned = fusers.iter().try_fold(0_u64, |total, fuser| {
+        total
+            .checked_add(gligen_u64(fuser.namespace.capacity())?)
+            .and_then(|bytes| {
+                bytes.checked_add(u64::try_from(mem::size_of::<NativeGligenFuserLocation>()).ok()?)
+            })
+            .ok_or(NativeGligenError::ShapeOverflow)
+    })?;
+    base.checked_add(gligen_u64(artifact_capacity.max(artifact.len()))?)
+        .and_then(|bytes| bytes.checked_add(gligen_u64(digest_capacity.max(digest.len())).ok()?))
+        .and_then(|bytes| bytes.checked_add(keys))
+        .and_then(|bytes| bytes.checked_add(map_nodes))
+        .and_then(|bytes| bytes.checked_add(fuser_owned))
+        .ok_or(NativeGligenError::ShapeOverflow)
+}
+
+fn gligen_resident_tensor_allocations<'a>(
+    maps: impl IntoIterator<Item = &'a BTreeMap<String, Tensor>>,
+    cancellation: &CancellationToken,
+) -> Result<Vec<(StorageId, u64)>, NativeGligenError> {
+    let mut allocations = Vec::new();
+    for map in maps {
+        for (index, tensor) in map.values().enumerate() {
+            if index.is_multiple_of(16) {
+                cancellation.check()?;
+            }
+            let storage_id = tensor.storage_id();
+            let bytes = tensor.storage_byte_len();
+            if let Some((_, existing)) = allocations
+                .iter()
+                .find(|(existing_id, _)| *existing_id == storage_id)
+            {
+                if *existing != bytes {
+                    return Err(NativeGligenError::SemanticStateChanged);
+                }
+            } else {
+                allocations.push((storage_id, bytes));
+            }
+        }
+    }
+    cancellation.check()?;
+    Ok(allocations)
+}
+
+fn gligen_tensor_bytes(shape: &[u64], dtype: DType) -> Result<u64, NativeGligenError> {
+    shape
+        .iter()
+        .try_fold(1_u64, |count, dimension| {
+            count
+                .checked_mul(*dimension)
+                .ok_or(NativeGligenError::ShapeOverflow)
+        })?
+        .checked_mul(dtype.byte_width())
+        .ok_or(NativeGligenError::ShapeOverflow)
+}
+
+fn gligen_validate_sha256(value: &str) -> Result<(), NativeGligenError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(NativeGligenError::InvalidCheckpoint(
+            "artifact identity must be canonical lowercase SHA-256".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn gligen_canonical(error: impl std::error::Error + 'static) -> NativeGligenError {
+    let mut source: &(dyn std::error::Error + 'static) = &error;
+    loop {
+        if is_cancellation_error(source) {
+            return NativeGligenError::Cancelled;
+        }
+        let Some(next) = source.source() else {
+            break;
+        };
+        source = next;
+    }
+    NativeGligenError::Canonical(error.to_string())
+}
+
+fn gligen_u64(value: usize) -> Result<u64, NativeGligenError> {
+    u64::try_from(value).map_err(|_| NativeGligenError::ShapeOverflow)
+}
+
+fn gligen_usize(value: u64) -> Result<usize, NativeGligenError> {
+    usize::try_from(value).map_err(|_| NativeGligenError::ShapeOverflow)
+}
+
+fn gligen_i64(value: impl TryInto<i64>) -> Result<i64, NativeGligenError> {
+    value
+        .try_into()
+        .map_err(|_| NativeGligenError::ShapeOverflow)
+}
+
+impl NativeGligenResource {
+    pub fn prepare_positions(
+        &self,
+        backend: &CpuBackend,
+        latent_shape: [u64; 4],
+        positions: &[NativeGligenPositionParameter],
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeGligenPreparedPositions, NativeGligenError> {
+        self.prepare_positions_checked(backend, latent_shape, positions, context, &mut |_, _| {})
+    }
+
+    fn prepare_positions_checked(
+        &self,
+        backend: &CpuBackend,
+        latent_shape: [u64; 4],
+        positions: &[NativeGligenPositionParameter],
+        context: &ExecutionContext<'_>,
+        phase_hook: &mut impl FnMut(NativeGligenPhase, &CancellationToken),
+    ) -> Result<NativeGligenPreparedPositions, NativeGligenError> {
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::PositionAdmission,
+            phase_hook,
+        )?;
+        self.validate(context.cancellation)?;
+        let [batch, channels, latent_height, latent_width] = latent_shape;
+        if batch == 0 || channels == 0 || latent_height == 0 || latent_width == 0 {
+            return Err(NativeGligenError::InvalidInput(
+                "latent shape must be nonzero [B,C,H,W]".to_owned(),
+            ));
+        }
+        if positions.len() > GLIGEN_MAX_OBJECTS {
+            return Err(NativeGligenError::InvalidInput(format!(
+                "GLIGEN accepts at most {GLIGEN_MAX_OBJECTS} position entries"
+            )));
+        }
+        let batch = gligen_usize(batch)?;
+        gligen_prepare_peak(self, batch, positions.len())?;
+        for position in positions {
+            let descriptor = position.embedding.descriptor();
+            if descriptor.shape() != [1, gligen_u64(self.key_dimension)?]
+                || descriptor.dtype() != DType::F32
+                || descriptor.device() != DeviceId::CPU
+                || descriptor.stream() != context.stream
+                || !descriptor.is_contiguous()?
+            {
+                return Err(NativeGligenError::InvalidInput(format!(
+                    "position embedding must be contiguous CPU F32 [1, {}] state on the execution stream",
+                    self.key_dimension
+                )));
+            }
+            if ![position.height, position.width, position.y, position.x]
+                .into_iter()
+                .all(f32::is_finite)
+            {
+                return Err(NativeGligenError::InvalidInput(
+                    "position coordinates must be finite".to_owned(),
+                ));
+            }
+            gligen_validate_finite_tensor(
+                "position embedding",
+                &position.embedding,
+                context.cancellation,
+            )?;
+        }
+
+        gligen_checkpoint(context.cancellation, NativeGligenPhase::Fourier, phase_hook)?;
+        let mut boxes = vec![[0.0_f32; 4]; GLIGEN_MAX_OBJECTS];
+        let mut embedding_rows = vec![vec![0.0_f32; self.key_dimension]; GLIGEN_MAX_OBJECTS];
+        for (index, position) in positions.iter().enumerate() {
+            context.check()?;
+            boxes[index] = [
+                position.x / latent_width as f32,
+                position.y / latent_height as f32,
+                (position.x + position.width) / latent_width as f32,
+                (position.y + position.height) / latent_height as f32,
+            ];
+            embedding_rows[index] =
+                tensor_to_f32_with_context_exact_native(backend, &position.embedding, context)
+                    .map_err(gligen_canonical)?;
+        }
+        let mut fourier_rows = Vec::new();
+        fourier_rows
+            .try_reserve_exact(GLIGEN_MAX_OBJECTS)
+            .map_err(|_| NativeGligenError::Allocation)?;
+        for (index, box_values) in boxes.iter().enumerate() {
+            if index.is_multiple_of(8) {
+                context.check()?;
+            }
+            let mut row = Vec::new();
+            row.try_reserve_exact(GLIGEN_POSITION_WIDTH)
+                .map_err(|_| NativeGligenError::Allocation)?;
+            for frequency_index in 0..GLIGEN_FOURIER_FREQUENCIES {
+                let frequency = GLIGEN_FOURIER_TEMPERATURE
+                    .powf(frequency_index as f32 / GLIGEN_FOURIER_FREQUENCIES as f32);
+                for value in box_values {
+                    row.push((frequency * value).sin());
+                }
+                for value in box_values {
+                    row.push((frequency * value).cos());
+                }
+            }
+            fourier_rows.push(row);
+        }
+
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::NullProjection,
+            phase_hook,
+        )?;
+        let null_positive = gligen_tensor_values(
+            backend,
+            self.tensor("position_net.null_positive_feature")?,
+            context,
+        )?;
+        let null_position = gligen_tensor_values(
+            backend,
+            self.tensor("position_net.null_position_feature")?,
+            context,
+        )?;
+        let input_width = self
+            .key_dimension
+            .checked_add(GLIGEN_POSITION_WIDTH)
+            .ok_or(NativeGligenError::ShapeOverflow)?;
+        let row_count = batch
+            .checked_mul(GLIGEN_MAX_OBJECTS)
+            .ok_or(NativeGligenError::ShapeOverflow)?;
+        let mut input = Vec::new();
+        input
+            .try_reserve_exact(
+                row_count
+                    .checked_mul(input_width)
+                    .ok_or(NativeGligenError::ShapeOverflow)?,
+            )
+            .map_err(|_| NativeGligenError::Allocation)?;
+        for batch_index in 0..batch {
+            for object_index in 0..GLIGEN_MAX_OBJECTS {
+                if (batch_index * GLIGEN_MAX_OBJECTS + object_index).is_multiple_of(8) {
+                    context.check()?;
+                }
+                if object_index < positions.len() {
+                    input.extend_from_slice(&embedding_rows[object_index]);
+                    input.extend_from_slice(&fourier_rows[object_index]);
+                } else {
+                    input.extend_from_slice(&null_positive);
+                    input.extend_from_slice(&null_position);
+                }
+            }
+        }
+
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::PositionLinearOne,
+            phase_hook,
+        )?;
+        let hidden = gligen_linear_values(
+            backend,
+            &input,
+            &[row_count, input_width],
+            self.tensor("position_net.linears.0.weight")?,
+            Some(self.tensor("position_net.linears.0.bias")?),
+            context,
+        )?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::PositionSiluOne,
+            phase_hook,
+        )?;
+        let hidden = silu_with_context_exact_native(backend, &hidden, DeviceId::CPU, context)
+            .map_err(gligen_canonical)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::PositionLinearTwo,
+            phase_hook,
+        )?;
+        let hidden = gligen_linear_values(
+            backend,
+            &hidden,
+            &[row_count, GLIGEN_POSITION_HIDDEN],
+            self.tensor("position_net.linears.2.weight")?,
+            Some(self.tensor("position_net.linears.2.bias")?),
+            context,
+        )?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::PositionSiluTwo,
+            phase_hook,
+        )?;
+        let hidden = silu_with_context_exact_native(backend, &hidden, DeviceId::CPU, context)
+            .map_err(gligen_canonical)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::PositionLinearThree,
+            phase_hook,
+        )?;
+        let objects = gligen_linear_values(
+            backend,
+            &hidden,
+            &[row_count, GLIGEN_POSITION_HIDDEN],
+            self.tensor("position_net.linears.4.weight")?,
+            Some(self.tensor("position_net.linears.4.bias")?),
+            context,
+        )?;
+        let objects = tensor_from_f32_with_context_exact_native(
+            backend,
+            &[
+                gligen_u64(batch)?,
+                gligen_u64(GLIGEN_MAX_OBJECTS)?,
+                gligen_u64(self.key_dimension)?,
+            ],
+            &objects,
+            DType::F32,
+            DeviceId::CPU,
+            context,
+        )
+        .map_err(gligen_canonical)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::PositionReturn,
+            phase_hook,
+        )?;
+        Ok(NativeGligenPreparedPositions {
+            resource_semantic_digest_sha256: self.semantic_digest_sha256.clone(),
+            batch,
+            device: DeviceId::CPU,
+            stream: context.stream,
+            objects,
+        })
+    }
+
+    pub fn apply_fuser(
+        &self,
+        backend: &CpuBackend,
+        transformer_index: usize,
+        visual: &Tensor,
+        prepared: &NativeGligenPreparedPositions,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, NativeGligenError> {
+        self.apply_fuser_checked(
+            backend,
+            transformer_index,
+            visual,
+            prepared,
+            context,
+            &mut |_, _| {},
+        )
+    }
+
+    fn apply_fuser_checked(
+        &self,
+        backend: &CpuBackend,
+        transformer_index: usize,
+        visual: &Tensor,
+        prepared: &NativeGligenPreparedPositions,
+        context: &ExecutionContext<'_>,
+        phase_hook: &mut impl FnMut(NativeGligenPhase, &CancellationToken),
+    ) -> Result<Tensor, NativeGligenError> {
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::ApplyAdmission,
+            phase_hook,
+        )?;
+        self.validate(context.cancellation)?;
+        let fuser = self.fusers.get(transformer_index).ok_or_else(|| {
+            NativeGligenError::InvalidInput(format!(
+                "transformer_index {transformer_index} is out of range"
+            ))
+        })?;
+        let [batch, visual_tokens, width] = visual.descriptor().shape() else {
+            return Err(NativeGligenError::InvalidInput(
+                "visual input must have [B,V,query_dim] shape".to_owned(),
+            ));
+        };
+        if *batch == 0
+            || *visual_tokens == 0
+            || *width != gligen_u64(fuser.query_dimension)?
+            || visual.descriptor().dtype() != DType::F32
+            || visual.descriptor().device() != DeviceId::CPU
+            || visual.descriptor().stream() != context.stream
+            || !visual.descriptor().is_contiguous()?
+        {
+            return Err(NativeGligenError::InvalidInput(format!(
+                "visual input must be contiguous CPU F32 [B,V,{}] state on the execution stream",
+                fuser.query_dimension
+            )));
+        }
+        let batch = gligen_usize(*batch)?;
+        let visual_tokens = gligen_usize(*visual_tokens)?;
+        if prepared.resource_semantic_digest_sha256 != self.semantic_digest_sha256
+            || prepared.batch != batch
+            || prepared.device != DeviceId::CPU
+            || prepared.stream != context.stream
+            || prepared.objects.descriptor().shape()
+                != [
+                    gligen_u64(batch)?,
+                    gligen_u64(GLIGEN_MAX_OBJECTS)?,
+                    gligen_u64(self.key_dimension)?,
+                ]
+            || prepared.objects.descriptor().dtype() != DType::F32
+            || prepared.objects.descriptor().device() != DeviceId::CPU
+            || prepared.objects.descriptor().stream() != context.stream
+            || !prepared.objects.descriptor().is_contiguous()?
+        {
+            return Err(NativeGligenError::InvalidInput(
+                "prepared positions do not belong to this resource, batch, device, and stream"
+                    .to_owned(),
+            ));
+        }
+        gligen_validate_finite_tensor("visual input", visual, context.cancellation)?;
+        gligen_apply_peak(self, fuser, batch, visual_tokens)?;
+        let prefix = format!("{}.fuser", fuser.namespace);
+
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::ContextProjection,
+            phase_hook,
+        )?;
+        let objects = gligen_linear_tensor(
+            backend,
+            &prepared.objects,
+            self.tensor(&format!("{prefix}.linear.weight"))?,
+            Some(self.tensor(&format!("{prefix}.linear.bias"))?),
+            context,
+        )?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::Concatenate,
+            phase_hook,
+        )?;
+        let combined =
+            torch_cat_with_context_exact_native(backend, &[visual.clone(), objects], 1, context)
+                .map_err(gligen_canonical)?;
+        let total_tokens = visual_tokens
+            .checked_add(GLIGEN_MAX_OBJECTS)
+            .ok_or(NativeGligenError::ShapeOverflow)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::AttentionLayerNorm,
+            phase_hook,
+        )?;
+        let normalized = gligen_layer_norm_tensor(
+            backend,
+            &combined,
+            self.tensor(&format!("{prefix}.norm1.weight"))?,
+            self.tensor(&format!("{prefix}.norm1.bias"))?,
+            context,
+        )?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::AttentionQuery,
+            phase_hook,
+        )?;
+        let query = gligen_linear_tensor(
+            backend,
+            &normalized,
+            self.tensor(&format!("{prefix}.attn.to_q.weight"))?,
+            None,
+            context,
+        )?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::AttentionKey,
+            phase_hook,
+        )?;
+        let key = gligen_linear_tensor(
+            backend,
+            &normalized,
+            self.tensor(&format!("{prefix}.attn.to_k.weight"))?,
+            None,
+            context,
+        )?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::AttentionValue,
+            phase_hook,
+        )?;
+        let value = gligen_linear_tensor(
+            backend,
+            &normalized,
+            self.tensor(&format!("{prefix}.attn.to_v.weight"))?,
+            None,
+            context,
+        )?;
+        let attention_shape = [
+            gligen_i64(batch)?,
+            gligen_i64(total_tokens)?,
+            gligen_i64(fuser.heads)?,
+            gligen_i64(fuser.head_dimension)?,
+        ];
+        let query =
+            torch_reshape_with_context_exact_native(backend, &query, &attention_shape, context)
+                .map_err(gligen_canonical)?;
+        let key = torch_reshape_with_context_exact_native(backend, &key, &attention_shape, context)
+            .map_err(gligen_canonical)?;
+        let value =
+            torch_reshape_with_context_exact_native(backend, &value, &attention_shape, context)
+                .map_err(gligen_canonical)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::AttentionSdp,
+            phase_hook,
+        )?;
+        let workspace_limit_bytes =
+            gligen_attention_workspace_bytes(batch, fuser.heads, total_tokens)?;
+        let attention = scaled_dot_product_attention_tensor_with_context(
+            backend,
+            AttentionRequest {
+                backend: AttentionBackend::PytorchSdp,
+                fallback: AttentionFallbackPolicy::AllowExactNative,
+                batch,
+                query_tokens: total_tokens,
+                key_tokens: total_tokens,
+                heads: fuser.heads,
+                head_dimension: fuser.head_dimension,
+                value_dimension: fuser.head_dimension,
+                scale: None,
+                workspace_limit_bytes,
+            },
+            &query,
+            &key,
+            &value,
+            None,
+            context,
+        )
+        .map_err(gligen_canonical)?;
+        let attention = torch_reshape_with_context_exact_native(
+            backend,
+            &attention,
+            &[
+                gligen_i64(batch)?,
+                gligen_i64(total_tokens)?,
+                gligen_i64(fuser.query_dimension)?,
+            ],
+            context,
+        )
+        .map_err(gligen_canonical)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::AttentionOutput,
+            phase_hook,
+        )?;
+        let attention = gligen_linear_tensor(
+            backend,
+            &attention,
+            self.tensor(&format!("{prefix}.attn.to_out.0.weight"))?,
+            Some(self.tensor(&format!("{prefix}.attn.to_out.0.bias"))?),
+            context,
+        )?;
+        let attention = narrow_method_exact_native(
+            &attention,
+            1,
+            0,
+            gligen_u64(visual_tokens)?,
+            context.cancellation,
+        )
+        .map_err(gligen_canonical)?;
+        let alpha_attention = gligen_tanh_scalar(
+            backend,
+            self.tensor(&format!("{prefix}.alpha_attn"))?,
+            context,
+        )?;
+        let attention = real_multiply_with_context_exact_native(
+            backend,
+            &attention,
+            ElementwiseOperand::Scalar(Scalar::Float(f64::from(alpha_attention))),
+            context,
+        )
+        .map_err(gligen_canonical)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::AttentionResidual,
+            phase_hook,
+        )?;
+        let mut output = real_add_with_context_exact_native(backend, visual, &attention, context)
+            .map_err(gligen_canonical)?;
+
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::DenseLayerNorm,
+            phase_hook,
+        )?;
+        let normalized = gligen_layer_norm_tensor(
+            backend,
+            &output,
+            self.tensor(&format!("{prefix}.norm2.weight"))?,
+            self.tensor(&format!("{prefix}.norm2.bias"))?,
+            context,
+        )?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::GegluProjection,
+            phase_hook,
+        )?;
+        let projected = gligen_linear_tensor(
+            backend,
+            &normalized,
+            self.tensor(&format!("{prefix}.ff.net.0.proj.weight"))?,
+            Some(self.tensor(&format!("{prefix}.ff.net.0.proj.bias"))?),
+            context,
+        )?;
+        let value = narrow_method_exact_native(
+            &projected,
+            2,
+            0,
+            gligen_u64(fuser.query_dimension)?,
+            context.cancellation,
+        )
+        .map_err(gligen_canonical)?;
+        let gate = narrow_method_exact_native(
+            &projected,
+            2,
+            gligen_i64(fuser.query_dimension)?,
+            gligen_u64(fuser.query_dimension)?,
+            context.cancellation,
+        )
+        .map_err(gligen_canonical)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::GegluActivation,
+            phase_hook,
+        )?;
+        let gate_values = gligen_tensor_values(backend, &gate, context)?;
+        let gate_values = gelu_with_context_exact_native(
+            backend,
+            &gate_values,
+            GeluApproximation::None,
+            DeviceId::CPU,
+            context,
+        )
+        .map_err(gligen_canonical)?;
+        let gate = tensor_from_f32_with_context_exact_native(
+            backend,
+            value.descriptor().shape(),
+            &gate_values,
+            DType::F32,
+            DeviceId::CPU,
+            context,
+        )
+        .map_err(gligen_canonical)?;
+        let dense = comfy_tensor::generated_elementwise_or_runtime_operation_09::mul_with_context_exact_native(
+            backend,
+            &value,
+            &gate,
+            context,
+        )
+        .map_err(gligen_canonical)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::DenseOutput,
+            phase_hook,
+        )?;
+        let dense = gligen_linear_tensor(
+            backend,
+            &dense,
+            self.tensor(&format!("{prefix}.ff.net.2.weight"))?,
+            Some(self.tensor(&format!("{prefix}.ff.net.2.bias"))?),
+            context,
+        )?;
+        let alpha_dense = gligen_tanh_scalar(
+            backend,
+            self.tensor(&format!("{prefix}.alpha_dense"))?,
+            context,
+        )?;
+        let dense = real_multiply_with_context_exact_native(
+            backend,
+            &dense,
+            ElementwiseOperand::Scalar(Scalar::Float(f64::from(alpha_dense))),
+            context,
+        )
+        .map_err(gligen_canonical)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::DenseResidual,
+            phase_hook,
+        )?;
+        output = real_add_with_context_exact_native(backend, &output, &dense, context)
+            .map_err(gligen_canonical)?;
+        gligen_checkpoint(
+            context.cancellation,
+            NativeGligenPhase::ApplyReturn,
+            phase_hook,
+        )?;
+        gligen_validate_finite_tensor("fuser output", &output, context.cancellation)?;
+        Ok(output)
+    }
+}
+
 #[cfg(test)]
 mod photomaker_tests {
     use super::*;
@@ -4217,6 +6389,194 @@ mod photomaker_tests {
             );
             assert!(matches!(result, Err(NativePhotoMakerError::Cancelled)));
         }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod gligen_tests {
+    use super::*;
+    use comfy_tensor::{CpuWorkspaceAuthority, TensorDescriptor};
+
+    const TEST_MEMORY: u64 = 64 * 1024 * 1024;
+
+    fn fixture_checkpoint(
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeGligenCheckpoint, NativeGligenError> {
+        let fuser = NativeGligenFuserLocation {
+            region: NativeGligenRegion::InputBlock,
+            block_index: 2,
+            namespace: "input_blocks.2.transformer_blocks.0".to_owned(),
+            transformer_index: 0,
+            query_dimension: 64,
+            key_dimension: 4,
+            heads: 1,
+            head_dimension: 64,
+        };
+        let specifications = gligen_state_manifest(&[fuser], 4)?;
+        let mut ordered_state = Vec::new();
+        for specification in specifications {
+            let descriptor = TensorDescriptor::contiguous(
+                specification.shape,
+                DType::F32,
+                DeviceId::CPU,
+                context.stream,
+            )?;
+            let count = usize::try_from(descriptor.element_count()?)
+                .map_err(|_| NativeGligenError::ShapeOverflow)?;
+            let byte_count = count
+                .checked_mul(4)
+                .ok_or(NativeGligenError::ShapeOverflow)?;
+            let bytes = vec![0_u8; byte_count];
+            let (tensor, event) = backend.upload_bytes(descriptor, &bytes, context)?;
+            backend.wait_event(event, context)?;
+            ordered_state.push((specification.key, tensor));
+        }
+        Ok(NativeGligenCheckpoint {
+            artifact_sha256: format!("{:x}", Sha256::digest("task396:phase-fixture")),
+            ordered_state,
+            memory_budget_bytes: TEST_MEMORY,
+        })
+    }
+
+    #[test]
+    fn gligen_resource_cancellation_phases_do_not_publish() -> Result<(), NativeGligenError> {
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(TEST_MEMORY)?;
+        let setup_cancellation = CancellationToken::default();
+        let setup_workspace = authority.authorize_workspace(TEST_MEMORY)?;
+        let setup_context = backend.execution_context(
+            StreamId::DEFAULT,
+            setup_workspace.clone(),
+            &setup_cancellation,
+        );
+        let checkpoint = fixture_checkpoint(&backend, &setup_context)?;
+        for target in [
+            NativeGligenPhase::Entry,
+            NativeGligenPhase::Discovery,
+            NativeGligenPhase::Schema,
+            NativeGligenPhase::SourceValidation,
+            NativeGligenPhase::Projection,
+            NativeGligenPhase::SemanticDigest,
+            NativeGligenPhase::Validation,
+            NativeGligenPhase::Return,
+        ] {
+            let cancellation = CancellationToken::default();
+            let workspace = authority.authorize_workspace(TEST_MEMORY)?;
+            let context = backend.execution_context(StreamId::DEFAULT, workspace, &cancellation);
+            let result = NativeGligenResource::checked(
+                &backend,
+                checkpoint.clone(),
+                false,
+                &context,
+                &mut |phase, cancellation| {
+                    if phase == target {
+                        cancellation.cancel();
+                    }
+                },
+            );
+            assert!(matches!(result, Err(NativeGligenError::Cancelled)));
+        }
+
+        let resource =
+            NativeGligenResource::from_reduced_fixture(&backend, checkpoint, &setup_context)?;
+        let embedding = tensor_from_f32_with_context_exact_native(
+            &backend,
+            &[1, 4],
+            &[0.0; 4],
+            DType::F32,
+            DeviceId::CPU,
+            &setup_context,
+        )
+        .map_err(gligen_canonical)?;
+        let positions = [NativeGligenPositionParameter {
+            embedding,
+            height: 1.0,
+            width: 1.0,
+            y: 0.0,
+            x: 0.0,
+        }];
+        for target in [
+            NativeGligenPhase::PositionAdmission,
+            NativeGligenPhase::Fourier,
+            NativeGligenPhase::NullProjection,
+            NativeGligenPhase::PositionLinearOne,
+            NativeGligenPhase::PositionSiluOne,
+            NativeGligenPhase::PositionLinearTwo,
+            NativeGligenPhase::PositionSiluTwo,
+            NativeGligenPhase::PositionLinearThree,
+            NativeGligenPhase::PositionReturn,
+        ] {
+            let cancellation = CancellationToken::default();
+            let workspace = authority.authorize_workspace(TEST_MEMORY)?;
+            let context = backend.execution_context(StreamId::DEFAULT, workspace, &cancellation);
+            let result = resource.prepare_positions_checked(
+                &backend,
+                [1, 4, 8, 8],
+                &positions,
+                &context,
+                &mut |phase, cancellation| {
+                    if phase == target {
+                        cancellation.cancel();
+                    }
+                },
+            );
+            assert!(matches!(result, Err(NativeGligenError::Cancelled)));
+        }
+
+        let prepared =
+            resource.prepare_positions(&backend, [1, 4, 8, 8], &positions, &setup_context)?;
+        let visual = tensor_from_f32_with_context_exact_native(
+            &backend,
+            &[1, 2, 64],
+            &[0.0; 128],
+            DType::F32,
+            DeviceId::CPU,
+            &setup_context,
+        )
+        .map_err(gligen_canonical)?;
+        for target in [
+            NativeGligenPhase::ApplyAdmission,
+            NativeGligenPhase::ContextProjection,
+            NativeGligenPhase::Concatenate,
+            NativeGligenPhase::AttentionLayerNorm,
+            NativeGligenPhase::AttentionQuery,
+            NativeGligenPhase::AttentionKey,
+            NativeGligenPhase::AttentionValue,
+            NativeGligenPhase::AttentionSdp,
+            NativeGligenPhase::AttentionOutput,
+            NativeGligenPhase::AttentionResidual,
+            NativeGligenPhase::DenseLayerNorm,
+            NativeGligenPhase::GegluProjection,
+            NativeGligenPhase::GegluActivation,
+            NativeGligenPhase::DenseOutput,
+            NativeGligenPhase::DenseResidual,
+            NativeGligenPhase::ApplyReturn,
+        ] {
+            let cancellation = CancellationToken::default();
+            let workspace = authority.authorize_workspace(TEST_MEMORY)?;
+            let context = backend.execution_context(StreamId::DEFAULT, workspace, &cancellation);
+            let result = resource.apply_fuser_checked(
+                &backend,
+                0,
+                &visual,
+                &prepared,
+                &context,
+                &mut |phase, cancellation| {
+                    if phase == target {
+                        cancellation.cancel();
+                    }
+                },
+            );
+            assert!(matches!(result, Err(NativeGligenError::Cancelled)));
+        }
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        assert!(matches!(
+            resource.reconstruct_checkpoint(&cancelled),
+            Err(NativeGligenError::Cancelled)
+        ));
+        assert_eq!(setup_workspace.in_use_bytes(), 0);
         Ok(())
     }
 }

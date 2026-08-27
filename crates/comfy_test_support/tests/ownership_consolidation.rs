@@ -774,7 +774,6 @@ fn val_ownership_task393_style_model_resource_001() -> Result<(), Box<dyn std::e
         );
     }
     for forbidden in [
-        "pub struct NativeGligenResource",
         "fn scaled_dot_product_attention(",
         "fn clip_vision_transformer(",
         "fn post_layernorm(",

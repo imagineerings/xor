@@ -24,6 +24,16 @@ PHOTO_EXTRA_PROJECTION = 5
 PHOTO_PROMPT = PHOTO_PROJECTION + PHOTO_EXTRA_PROJECTION
 PHOTO_SEQUENCE = 4
 PHOTO_IMAGES = 2
+GLIGEN_KEY = 4
+GLIGEN_QUERY = 64
+GLIGEN_VISUAL_TOKENS = 2
+GLIGEN_MAX_OBJECTS = 30
+GLIGEN_POSITION_WIDTH = 64
+GLIGEN_POSITION_HIDDEN = 512
+GLIGEN_FUSERS = [
+    "input_blocks.2.transformer_blocks.0",
+    "output_blocks.7.transformer_blocks.0",
+]
 
 
 def f32(value):
@@ -226,6 +236,277 @@ def photomaker_manifest():
     ])
     assert len(definitions) == 407
     return definitions
+
+
+def gligen_manifest(key_dimension=GLIGEN_KEY, query_dimension=GLIGEN_QUERY, fusers=GLIGEN_FUSERS):
+    position_input = key_dimension + GLIGEN_POSITION_WIDTH
+    definitions = [
+        ("position_net.null_positive_feature", [key_dimension]),
+        ("position_net.null_position_feature", [GLIGEN_POSITION_WIDTH]),
+        ("position_net.linears.0.weight", [GLIGEN_POSITION_HIDDEN, position_input]),
+        ("position_net.linears.0.bias", [GLIGEN_POSITION_HIDDEN]),
+        ("position_net.linears.2.weight", [GLIGEN_POSITION_HIDDEN, GLIGEN_POSITION_HIDDEN]),
+        ("position_net.linears.2.bias", [GLIGEN_POSITION_HIDDEN]),
+        ("position_net.linears.4.weight", [key_dimension, GLIGEN_POSITION_HIDDEN]),
+        ("position_net.linears.4.bias", [key_dimension]),
+    ]
+    for namespace in fusers:
+        prefix = f"{namespace}.fuser"
+        definitions.extend([
+            (f"{prefix}.alpha_attn", []),
+            (f"{prefix}.alpha_dense", []),
+            (f"{prefix}.linear.weight", [query_dimension, key_dimension]),
+            (f"{prefix}.linear.bias", [query_dimension]),
+            (f"{prefix}.attn.to_q.weight", [query_dimension, query_dimension]),
+            (f"{prefix}.attn.to_k.weight", [query_dimension, query_dimension]),
+            (f"{prefix}.attn.to_v.weight", [query_dimension, query_dimension]),
+            (f"{prefix}.attn.to_out.0.weight", [query_dimension, query_dimension]),
+            (f"{prefix}.attn.to_out.0.bias", [query_dimension]),
+            (f"{prefix}.ff.net.0.proj.weight", [query_dimension * 2, query_dimension]),
+            (f"{prefix}.ff.net.0.proj.bias", [query_dimension * 2]),
+            (f"{prefix}.ff.net.2.weight", [query_dimension, query_dimension]),
+            (f"{prefix}.ff.net.2.bias", [query_dimension]),
+            (f"{prefix}.norm1.weight", [query_dimension]),
+            (f"{prefix}.norm1.bias", [query_dimension]),
+            (f"{prefix}.norm2.weight", [query_dimension]),
+            (f"{prefix}.norm2.bias", [query_dimension]),
+        ])
+    return definitions
+
+
+def gligen_value(key, index, shape):
+    output = index // shape[-1] if len(shape) == 2 else index
+    component = index % shape[-1] if len(shape) == 2 else index
+    variant = 1 if "output_blocks" in key else 0
+    if key == "position_net.null_positive_feature":
+        return f32((index + 1) * 0.03125)
+    if key == "position_net.null_position_feature":
+        return f32(((index % 9) - 4) * 0.0078125)
+    if key == "position_net.linears.0.weight":
+        return f32(0.125 + (output % 3) * 0.015625) if component == output % shape[1] else 0.0
+    if key == "position_net.linears.0.bias":
+        return f32(((index % 7) - 3) * 0.00390625)
+    if key == "position_net.linears.2.weight":
+        return f32(0.5) if component == output else 0.0
+    if key == "position_net.linears.2.bias":
+        return f32(((index % 5) - 2) * 0.001953125)
+    if key == "position_net.linears.4.weight":
+        return f32(0.25 + output * 0.03125) if component == (output * 17 + 3) % shape[1] else 0.0
+    if key == "position_net.linears.4.bias":
+        return f32((index - 1) * 0.015625)
+    suffix = key.split(".fuser.", 1)[1]
+    if suffix == "alpha_attn":
+        return f32(0.375 + variant * 0.0625)
+    if suffix == "alpha_dense":
+        return f32(-0.3125 + variant * 0.03125)
+    if suffix == "linear.weight":
+        return f32(0.1875 + (output % 4) * 0.015625) if component == output % shape[1] else 0.0
+    if suffix == "linear.bias":
+        return f32(((index % 5) - 2) * 0.0078125)
+    if suffix == "attn.to_q.weight":
+        return f32(0.125 + variant * 0.015625) if component == output else 0.0
+    if suffix == "attn.to_k.weight":
+        return f32(0.09375) if component == (output + 1) % shape[1] else 0.0
+    if suffix == "attn.to_v.weight":
+        return f32(0.25) if component == output else 0.0
+    if suffix == "attn.to_out.0.weight":
+        return f32(0.3125) if component == output else 0.0
+    if suffix == "attn.to_out.0.bias":
+        return f32(((index % 3) - 1) * 0.00390625)
+    if suffix == "ff.net.0.proj.weight":
+        return f32(0.21875 if output < shape[1] else 0.15625) if component == output % shape[1] else 0.0
+    if suffix == "ff.net.0.proj.bias":
+        return f32(((index % 7) - 3) * 0.002)
+    if suffix == "ff.net.2.weight":
+        return f32(0.28125) if component == output else 0.0
+    if suffix == "ff.net.2.bias":
+        return f32(((index % 4) - 1) * 0.0025)
+    if suffix in ["norm1.weight", "norm2.weight"]:
+        return f32(1.0 + (index % 4) * 0.015625)
+    if suffix in ["norm1.bias", "norm2.bias"]:
+        return f32(((index % 5) - 2) * 0.001)
+    raise RuntimeError(f"unknown GLIGEN key {key}")
+
+
+def gligen_projected_value(key, index, shape, dtype):
+    raw = storage_bits(gligen_value(key, index, shape), dtype)
+    return project_storage(raw, dtype)
+
+
+def gligen_linear(rows, input_width, output_width, values, key, dtype):
+    shape = [output_width, input_width]
+    output = []
+    bias_key = key[:-6] + "bias" if key.endswith("weight") else None
+    if ".attn.to_q." in key or ".attn.to_k." in key or ".attn.to_v." in key:
+        bias_key = None
+    def live_component(output_channel):
+        if key == "position_net.linears.0.weight":
+            return output_channel % input_width
+        if key == "position_net.linears.2.weight":
+            return output_channel
+        if key == "position_net.linears.4.weight":
+            return (output_channel * 17 + 3) % input_width
+        suffix = key.split(".fuser.", 1)[1]
+        if suffix == "linear.weight":
+            return output_channel % input_width
+        if suffix == "attn.to_k.weight":
+            return (output_channel + 1) % input_width
+        return output_channel % input_width
+    for row in range(rows):
+        for output_channel in range(output_width):
+            total = gligen_projected_value(bias_key, output_channel, [output_width], dtype) if bias_key else 0.0
+            input_channel = live_component(output_channel)
+            total = fmadd(
+                values[row * input_width + input_channel],
+                gligen_projected_value(key, output_channel * input_width + input_channel, shape, dtype),
+                total,
+            )
+            output.append(total)
+    return output
+
+
+def gligen_layer_norm(values, rows, width, prefix, dtype):
+    output = []
+    for row in range(rows):
+        source = values[row * width:(row + 1) * width]
+        mean_total = 0.0
+        for value in source:
+            mean_total += float(value)
+        mean = f32(mean_total / width)
+        variance_total = 0.0
+        for value in source:
+            difference = float(value) - float(mean)
+            variance_total += difference * difference
+        variance = variance_total / width
+        inverse = f32(1.0 / math.sqrt(variance + float(f32(1.0e-5))))
+        for component, value in enumerate(source):
+            normalized = fmul(fadd(value, -mean), inverse)
+            scale = gligen_projected_value(f"{prefix}.weight", component, [width], dtype)
+            bias = gligen_projected_value(f"{prefix}.bias", component, [width], dtype)
+            output.append(fadd(fmul(normalized, scale), bias))
+    return output
+
+
+def canonical_erf(value):
+    sign = -1.0 if value < 0.0 else 1.0
+    absolute = f32(abs(value))
+    t = fdiv(1.0, fadd(1.0, fmul(0.3275911, absolute)))
+    polynomial = fmul(fadd(fmul(fadd(fmul(fadd(fmul(fadd(fmul(1.0614054, t), -1.4531521), t), 1.4214138), t), -0.28449672), t), 0.2548296), t)
+    return fmul(sign, fadd(1.0, -fmul(polynomial, f32(math.exp(fmul(-absolute, absolute))))))
+
+
+def canonical_gelu(value):
+    scaled = fmul(value, from_bits(0x3f3504f3))
+    return fmul(fmul(0.5, value), fadd(1.0, canonical_erf(scaled)))
+
+
+def gligen_attention(query, key, value, tokens, width):
+    scale = f32(1.0 / math.sqrt(width))
+    output = [0.0] * (tokens * width)
+    for query_token in range(tokens):
+        scores = []
+        for key_token in range(tokens):
+            score = 0.0
+            for component in range(width):
+                score = fadd(score, fmul(query[query_token * width + component], key[key_token * width + component]))
+            scores.append(fmul(score, scale))
+        maximum = max(scores)
+        probabilities = [f32(math.exp(fadd(score, -maximum))) for score in scores]
+        denominator = 0.0
+        for probability in probabilities:
+            denominator = fadd(denominator, probability)
+        probabilities = [fdiv(probability, denominator) for probability in probabilities]
+        for component in range(width):
+            total = 0.0
+            for key_token, probability in enumerate(probabilities):
+                total = fadd(total, fmul(probability, value[key_token * width + component]))
+            output[query_token * width + component] = total
+    return output
+
+
+def gligen_prepare(dtype):
+    positions = [
+        ([0.125, -0.25, 0.375, -0.5], 3.0, 5.0, 1.0, 2.0),
+        ([-0.2, 0.15, 0.4, 0.05], 2.0, 4.0, -1.0, 6.0),
+    ]
+    rows = []
+    for object_index in range(GLIGEN_MAX_OBJECTS):
+        if object_index < len(positions):
+            embedding, height, width, y, x = positions[object_index]
+            box_values = [x / 8.0, y / 6.0, (x + width) / 8.0, (y + height) / 6.0]
+            fourier = []
+            for frequency_index in range(8):
+                frequency = f32(100.0 ** (frequency_index / 8.0))
+                fourier.extend(f32(math.sin(fmul(frequency, value))) for value in box_values)
+                fourier.extend(f32(math.cos(fmul(frequency, value))) for value in box_values)
+            rows.extend(f32(value) for value in embedding)
+            rows.extend(fourier)
+        else:
+            rows.extend(gligen_projected_value("position_net.null_positive_feature", index, [GLIGEN_KEY], dtype) for index in range(GLIGEN_KEY))
+            rows.extend(gligen_projected_value("position_net.null_position_feature", index, [GLIGEN_POSITION_WIDTH], dtype) for index in range(GLIGEN_POSITION_WIDTH))
+    hidden = gligen_linear(GLIGEN_MAX_OBJECTS, GLIGEN_KEY + GLIGEN_POSITION_WIDTH, GLIGEN_POSITION_HIDDEN, rows, "position_net.linears.0.weight", dtype)
+    hidden = [silu(value) for value in hidden]
+    hidden = gligen_linear(GLIGEN_MAX_OBJECTS, GLIGEN_POSITION_HIDDEN, GLIGEN_POSITION_HIDDEN, hidden, "position_net.linears.2.weight", dtype)
+    hidden = [silu(value) for value in hidden]
+    return gligen_linear(GLIGEN_MAX_OBJECTS, GLIGEN_POSITION_HIDDEN, GLIGEN_KEY, hidden, "position_net.linears.4.weight", dtype)
+
+
+def gligen_apply(dtype, namespace, objects):
+    visual = [f32(((index % 11) - 5) * 0.03125) for index in range(GLIGEN_VISUAL_TOKENS * GLIGEN_QUERY)]
+    projected = gligen_linear(GLIGEN_MAX_OBJECTS, GLIGEN_KEY, GLIGEN_QUERY, objects, f"{namespace}.fuser.linear.weight", dtype)
+    combined = visual + projected
+    tokens = GLIGEN_VISUAL_TOKENS + GLIGEN_MAX_OBJECTS
+    normalized = gligen_layer_norm(combined, tokens, GLIGEN_QUERY, f"{namespace}.fuser.norm1", dtype)
+    query = gligen_linear(tokens, GLIGEN_QUERY, GLIGEN_QUERY, normalized, f"{namespace}.fuser.attn.to_q.weight", dtype)
+    key = gligen_linear(tokens, GLIGEN_QUERY, GLIGEN_QUERY, normalized, f"{namespace}.fuser.attn.to_k.weight", dtype)
+    value = gligen_linear(tokens, GLIGEN_QUERY, GLIGEN_QUERY, normalized, f"{namespace}.fuser.attn.to_v.weight", dtype)
+    attention = gligen_attention(query, key, value, tokens, GLIGEN_QUERY)
+    attention = gligen_linear(tokens, GLIGEN_QUERY, GLIGEN_QUERY, attention, f"{namespace}.fuser.attn.to_out.0.weight", dtype)[:GLIGEN_VISUAL_TOKENS * GLIGEN_QUERY]
+    alpha_attention = f32(math.tanh(gligen_projected_value(f"{namespace}.fuser.alpha_attn", 0, [], dtype)))
+    output = [fadd(left, fmul(alpha_attention, right)) for left, right in zip(visual, attention)]
+    normalized = gligen_layer_norm(output, GLIGEN_VISUAL_TOKENS, GLIGEN_QUERY, f"{namespace}.fuser.norm2", dtype)
+    projected = gligen_linear(GLIGEN_VISUAL_TOKENS, GLIGEN_QUERY, GLIGEN_QUERY * 2, normalized, f"{namespace}.fuser.ff.net.0.proj.weight", dtype)
+    dense = []
+    for row in range(GLIGEN_VISUAL_TOKENS):
+        start = row * GLIGEN_QUERY * 2
+        for component in range(GLIGEN_QUERY):
+            dense.append(fmul(projected[start + component], canonical_gelu(projected[start + GLIGEN_QUERY + component])))
+    dense = gligen_linear(GLIGEN_VISUAL_TOKENS, GLIGEN_QUERY, GLIGEN_QUERY, dense, f"{namespace}.fuser.ff.net.2.weight", dtype)
+    alpha_dense = f32(math.tanh(gligen_projected_value(f"{namespace}.fuser.alpha_dense", 0, [], dtype)))
+    return visual, [fadd(left, fmul(alpha_dense, right)) for left, right in zip(output, dense)]
+
+
+def gligen_oracle():
+    cases = {}
+    for dtype in ["float32", "float16", "bfloat16"]:
+        objects = gligen_prepare(dtype)
+        visual, output = gligen_apply(dtype, GLIGEN_FUSERS[0], objects)
+        cases[dtype] = {
+            "prepared_shape": [1, GLIGEN_MAX_OBJECTS, GLIGEN_KEY],
+            "prepared_bits": [bits(value) for value in objects],
+            "visual_shape": [1, GLIGEN_VISUAL_TOKENS, GLIGEN_QUERY],
+            "visual_bits": [bits(value) for value in visual],
+            "output_bits": [bits(value) for value in output],
+        }
+    return {
+        "key_dimension": GLIGEN_KEY,
+        "query_dimension": GLIGEN_QUERY,
+        "state": [{"key": key, "shape": shape} for key, shape in gligen_manifest()],
+        "fusers": [
+            {"namespace": GLIGEN_FUSERS[0], "region": "input_blocks", "block_index": 2, "transformer_index": 0},
+            {"namespace": GLIGEN_FUSERS[1], "region": "output_blocks", "block_index": 7, "transformer_index": 1},
+        ],
+        "positions": [
+            {"embedding_bits": [bits(value) for value in [0.125, -0.25, 0.375, -0.5]], "height": 3.0, "width": 5.0, "y": 1.0, "x": 2.0},
+            {"embedding_bits": [bits(value) for value in [-0.2, 0.15, 0.4, 0.05]], "height": 2.0, "width": 4.0, "y": -1.0, "x": 6.0},
+        ],
+        "latent_shape": [1, 4, 6, 8],
+        "dtypes": cases,
+        "head_rule_cases": [
+            {"key_dimension": 4, "query_dimension": 64, "heads": 1, "head_dimension": 64},
+            {"key_dimension": 768, "query_dimension": 8, "heads": 8, "head_dimension": 1},
+        ],
+    }
 
 
 def photomaker_value(state_index, value_index, key, shape):
@@ -817,6 +1098,7 @@ def build_oracle():
         "style": profile_oracle("style"),
         "redux": profile_oracle("redux"),
         "photomaker": photomaker_profile_oracle(),
+        "gligen": gligen_oracle(),
         "attention_discriminator": attention_discriminator_oracle(),
         "mutations": mutations,
         "photomaker_mutations": photomaker_mutations,

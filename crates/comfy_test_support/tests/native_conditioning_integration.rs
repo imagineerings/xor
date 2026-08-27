@@ -1,11 +1,14 @@
 use comfy_model::{
-    CLIP_VISION_SOURCE_SHA256, ClipVisionOutput, FLUX_REDUX_SOURCE_SHA256, MappedModelWeights,
-    NativeModelPayload, NativePhotoMakerCheckpoint, NativePhotoMakerCheckpointEntry,
-    NativePhotoMakerError, NativePhotoMakerResource, NativeStyleModelCheckpoint,
-    NativeStyleModelError, NativeStyleModelResource, PHOTOMAKER_CLIP_VISION_SOURCE_SHA256,
-    PHOTOMAKER_SOURCE_SHA256, PatchGraph, PatchPayload, PatchTensor, PatchValueTransform,
-    STYLE_ADAPTER_SOURCE_SHA256, STYLE_MODEL_NODES_SOURCE_SHA256, STYLE_MODEL_OPS_SOURCE_SHA256,
-    STYLE_MODEL_SD_SOURCE_SHA256, SemanticPatchOperation,
+    CLIP_VISION_SOURCE_SHA256, ClipVisionOutput, FLUX_REDUX_SOURCE_SHA256,
+    GLIGEN_ATTENTION_SOURCE_SHA256, GLIGEN_OPENAIMODEL_SOURCE_SHA256,
+    GLIGEN_SAMPLERS_SOURCE_SHA256, GLIGEN_SOURCE_SHA256, MappedModelWeights,
+    NativeGligenCheckpoint, NativeGligenError, NativeGligenPositionParameter, NativeGligenRegion,
+    NativeGligenResource, NativeModelPayload, NativePhotoMakerCheckpoint,
+    NativePhotoMakerCheckpointEntry, NativePhotoMakerError, NativePhotoMakerResource,
+    NativeStyleModelCheckpoint, NativeStyleModelError, NativeStyleModelResource,
+    PHOTOMAKER_CLIP_VISION_SOURCE_SHA256, PHOTOMAKER_SOURCE_SHA256, PatchGraph, PatchPayload,
+    PatchTensor, PatchValueTransform, STYLE_ADAPTER_SOURCE_SHA256, STYLE_MODEL_NODES_SOURCE_SHA256,
+    STYLE_MODEL_OPS_SOURCE_SHA256, STYLE_MODEL_SD_SOURCE_SHA256, SemanticPatchOperation,
     conditioning::{
         ConditioningConstant, ConditioningControlReference, ConditioningEntry,
         ConditioningEntryOptions, ConditioningHookReference, ConditioningIdentity,
@@ -62,6 +65,7 @@ use uuid::Uuid;
 const WORKFLOW: &[u8] = include_bytes!("../fixtures/native_diffusion/workflow.json");
 const MEMORY_LIMIT: u64 = 2 * 1024 * 1024 * 1024;
 const STYLE_MODEL_FIXTURE_MEMORY: u64 = 64 * 1024 * 1024;
+const GLIGEN_FIXTURE_MEMORY: u64 = 128 * 1024 * 1024;
 const STYLE_MODEL_ORACLE: &[u8] =
     include_bytes!("../fixtures/models/conditioning-auxiliary-resource-foundation/oracle.json");
 const STYLE_MODEL_MANIFEST: &[u8] =
@@ -1555,6 +1559,58 @@ struct PhotoMakerProfileFixture {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+struct GligenStateFixture {
+    key: String,
+    shape: Vec<u64>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct GligenDtypeFixture {
+    prepared_shape: Vec<u64>,
+    prepared_bits: Vec<u32>,
+    visual_shape: Vec<u64>,
+    visual_bits: Vec<u32>,
+    output_bits: Vec<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct GligenFuserFixture {
+    namespace: String,
+    region: String,
+    block_index: u8,
+    transformer_index: usize,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct GligenPositionFixture {
+    embedding_bits: Vec<u32>,
+    height: f32,
+    width: f32,
+    y: f32,
+    x: f32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct GligenHeadRuleFixture {
+    key_dimension: usize,
+    query_dimension: usize,
+    heads: usize,
+    head_dimension: usize,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct GligenProfileFixture {
+    key_dimension: usize,
+    query_dimension: usize,
+    state: Vec<GligenStateFixture>,
+    fusers: Vec<GligenFuserFixture>,
+    positions: Vec<GligenPositionFixture>,
+    latent_shape: [u64; 4],
+    dtypes: BTreeMap<String, GligenDtypeFixture>,
+    head_rule_cases: Vec<GligenHeadRuleFixture>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 struct StyleMutationFixture {
     profile: String,
     key: String,
@@ -1621,6 +1677,7 @@ struct StyleModelOracle {
     style: StyleProfileFixture,
     redux: StyleProfileFixture,
     photomaker: PhotoMakerProfileFixture,
+    gligen: GligenProfileFixture,
     attention_discriminator: StyleAttentionDiscriminatorFixture,
     mutations: BTreeMap<String, StyleMutationFixture>,
     photomaker_mutations: BTreeMap<String, PhotoMakerMutationFixture>,
@@ -1864,6 +1921,7 @@ fn assert_style_payload_cross_role_denial(payload: &NativeModelPayload) {
     assert!(payload.background_removal_resource().is_none());
     assert!(payload.depth_anything_3_resource().is_none());
     assert!(payload.moge_resource().is_none());
+    assert!(payload.gligen_resource().is_none());
     assert!(payload.photomaker_resource().is_none());
 }
 
@@ -1886,6 +1944,30 @@ fn assert_photomaker_payload_cross_role_denial(payload: &NativeModelPayload) {
     assert!(payload.background_removal_resource().is_none());
     assert!(payload.depth_anything_3_resource().is_none());
     assert!(payload.moge_resource().is_none());
+    assert!(payload.gligen_resource().is_none());
+    assert!(payload.style_model_resource().is_none());
+}
+
+fn assert_gligen_payload_cross_role_denial(payload: &NativeModelPayload) {
+    assert!(payload.model().is_none());
+    assert!(payload.native_family_model_resource().is_none());
+    assert!(payload.clip().is_none());
+    assert!(payload.vae().is_none());
+    assert!(payload.structured_vae().is_none());
+    assert!(payload.audio_encoder_resource().is_none());
+    assert!(payload.optical_flow_resource().is_none());
+    assert!(payload.clip_vision_resource().is_none());
+    assert!(payload.decoder_clip_resource().is_none());
+    assert!(payload.qwen_multimodal_resource().is_none());
+    assert!(payload.gemma_multimodal_resource().is_none());
+    assert!(payload.native_clip_resource().is_none());
+    assert!(payload.sdpose_model_resource().is_none());
+    assert!(payload.frame_interpolation_resource().is_none());
+    assert!(payload.latent_upscale_model_resource().is_none());
+    assert!(payload.background_removal_resource().is_none());
+    assert!(payload.depth_anything_3_resource().is_none());
+    assert!(payload.moge_resource().is_none());
+    assert!(payload.photomaker_resource().is_none());
     assert!(payload.style_model_resource().is_none());
 }
 
@@ -1914,6 +1996,262 @@ fn photomaker_checkpoint(
         ordered_entries,
         memory_budget_bytes,
     }
+}
+
+fn gligen_fixture_value(key: &str, index: usize, shape: &[u64]) -> Result<f32, Box<dyn Error>> {
+    let width = shape.last().copied().unwrap_or(1);
+    let width = usize::try_from(width)?;
+    let output = index / width;
+    let component = index % width;
+    let variant = usize::from(key.contains("output_blocks"));
+    let value = match key {
+        "position_net.null_positive_feature" => (index + 1) as f32 * 0.03125,
+        "position_net.null_position_feature" => (index % 9) as f32 * 0.0078125 - 0.03125,
+        "position_net.linears.0.weight" => {
+            if component == output % width {
+                0.125 + (output % 3) as f32 * 0.015625
+            } else {
+                0.0
+            }
+        }
+        "position_net.linears.0.bias" => (index % 7) as f32 * 0.00390625 - 0.01171875,
+        "position_net.linears.2.weight" => {
+            if component == output {
+                0.5
+            } else {
+                0.0
+            }
+        }
+        "position_net.linears.2.bias" => (index % 5) as f32 * 0.001953125 - 0.00390625,
+        "position_net.linears.4.weight" => {
+            if component == (output * 17 + 3) % width {
+                0.25 + output as f32 * 0.03125
+            } else {
+                0.0
+            }
+        }
+        "position_net.linears.4.bias" => index as f32 * 0.015625 - 0.015625,
+        _ => {
+            let suffix = key
+                .split_once(".fuser.")
+                .ok_or("GLIGEN fixture key has no fuser anchor")?
+                .1;
+            match suffix {
+                "alpha_attn" => 0.375 + variant as f32 * 0.0625,
+                "alpha_dense" => -0.3125 + variant as f32 * 0.03125,
+                "linear.weight" => {
+                    if component == output % width {
+                        0.1875 + (output % 4) as f32 * 0.015625
+                    } else {
+                        0.0
+                    }
+                }
+                "linear.bias" => (index % 5) as f32 * 0.0078125 - 0.015625,
+                "attn.to_q.weight" => {
+                    if component == output {
+                        0.125 + variant as f32 * 0.015625
+                    } else {
+                        0.0
+                    }
+                }
+                "attn.to_k.weight" => {
+                    if component == (output + 1) % width {
+                        0.09375
+                    } else {
+                        0.0
+                    }
+                }
+                "attn.to_v.weight" => {
+                    if component == output {
+                        0.25
+                    } else {
+                        0.0
+                    }
+                }
+                "attn.to_out.0.weight" => {
+                    if component == output {
+                        0.3125
+                    } else {
+                        0.0
+                    }
+                }
+                "attn.to_out.0.bias" => (index % 3) as f32 * 0.00390625 - 0.00390625,
+                "ff.net.0.proj.weight" => {
+                    if component == output % width {
+                        if output < width { 0.21875 } else { 0.15625 }
+                    } else {
+                        0.0
+                    }
+                }
+                "ff.net.0.proj.bias" => (index % 7) as f32 * 0.002 - 0.006,
+                "ff.net.2.weight" => {
+                    if component == output {
+                        0.28125
+                    } else {
+                        0.0
+                    }
+                }
+                "ff.net.2.bias" => (index % 4) as f32 * 0.0025 - 0.0025,
+                "norm1.weight" | "norm2.weight" => 1.0 + (index % 4) as f32 * 0.015625,
+                "norm1.bias" | "norm2.bias" => (index % 5) as f32 * 0.001 - 0.002,
+                _ => return Err(format!("unknown GLIGEN fixture suffix {suffix}").into()),
+            }
+        }
+    };
+    Ok(value)
+}
+
+fn upload_gligen_state(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    state_fixture: &[GligenStateFixture],
+    dtype_name: &str,
+) -> Result<Vec<(String, Tensor)>, Box<dyn Error>> {
+    let dtype = fixture_dtype(dtype_name)?;
+    let mut state = Vec::new();
+    state.try_reserve_exact(state_fixture.len())?;
+    for entry in state_fixture {
+        let descriptor = TensorDescriptor::contiguous(
+            entry.shape.clone(),
+            dtype,
+            DeviceId::CPU,
+            context.stream,
+        )?;
+        let count = usize::try_from(descriptor.element_count()?)?;
+        let mut bytes = Vec::new();
+        bytes.try_reserve_exact(
+            count
+                .checked_mul(usize::try_from(dtype.byte_width())?)
+                .ok_or("GLIGEN fixture byte count overflowed")?,
+        )?;
+        for index in 0..count {
+            bytes.extend_from_slice(&dtype.encode_scalar(
+                comfy_tensor::Scalar::Float(f64::from(gligen_fixture_value(
+                    &entry.key,
+                    index,
+                    &entry.shape,
+                )?)),
+                "task396.gligen-fixture",
+                DeviceId::CPU,
+            )?);
+        }
+        let (tensor, event) = backend.upload_bytes(descriptor, &bytes, context)?;
+        backend.wait_event(event, context)?;
+        state.push((entry.key.clone(), tensor));
+    }
+    Ok(state)
+}
+
+fn gligen_fixture_schema(
+    key_dimension: usize,
+    query_dimension: usize,
+    namespaces: &[&str],
+) -> Result<Vec<GligenStateFixture>, Box<dyn Error>> {
+    let key = u64::try_from(key_dimension)?;
+    let query = u64::try_from(query_dimension)?;
+    let mut state = vec![
+        GligenStateFixture {
+            key: "position_net.null_positive_feature".to_owned(),
+            shape: vec![key],
+        },
+        GligenStateFixture {
+            key: "position_net.null_position_feature".to_owned(),
+            shape: vec![64],
+        },
+        GligenStateFixture {
+            key: "position_net.linears.0.weight".to_owned(),
+            shape: vec![512, key + 64],
+        },
+        GligenStateFixture {
+            key: "position_net.linears.0.bias".to_owned(),
+            shape: vec![512],
+        },
+        GligenStateFixture {
+            key: "position_net.linears.2.weight".to_owned(),
+            shape: vec![512, 512],
+        },
+        GligenStateFixture {
+            key: "position_net.linears.2.bias".to_owned(),
+            shape: vec![512],
+        },
+        GligenStateFixture {
+            key: "position_net.linears.4.weight".to_owned(),
+            shape: vec![key, 512],
+        },
+        GligenStateFixture {
+            key: "position_net.linears.4.bias".to_owned(),
+            shape: vec![key],
+        },
+    ];
+    for namespace in namespaces {
+        let prefix = format!("{namespace}.fuser");
+        for (suffix, shape) in [
+            ("alpha_attn", vec![]),
+            ("alpha_dense", vec![]),
+            ("linear.weight", vec![query, key]),
+            ("linear.bias", vec![query]),
+            ("attn.to_q.weight", vec![query, query]),
+            ("attn.to_k.weight", vec![query, query]),
+            ("attn.to_v.weight", vec![query, query]),
+            ("attn.to_out.0.weight", vec![query, query]),
+            ("attn.to_out.0.bias", vec![query]),
+            ("ff.net.0.proj.weight", vec![query * 2, query]),
+            ("ff.net.0.proj.bias", vec![query * 2]),
+            ("ff.net.2.weight", vec![query, query]),
+            ("ff.net.2.bias", vec![query]),
+            ("norm1.weight", vec![query]),
+            ("norm1.bias", vec![query]),
+            ("norm2.weight", vec![query]),
+            ("norm2.bias", vec![query]),
+        ] {
+            state.push(GligenStateFixture {
+                key: format!("{prefix}.{suffix}"),
+                shape,
+            });
+        }
+    }
+    Ok(state)
+}
+
+fn gligen_checkpoint(
+    state: Vec<(String, Tensor)>,
+    memory_budget_bytes: u64,
+) -> NativeGligenCheckpoint {
+    NativeGligenCheckpoint {
+        artifact_sha256: format!("{:x}", Sha256::digest("task396:gligen:reduced-v1")),
+        ordered_state: state,
+        memory_budget_bytes,
+    }
+}
+
+fn gligen_positions(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    fixture: &GligenProfileFixture,
+) -> Result<Vec<NativeGligenPositionParameter>, Box<dyn Error>> {
+    fixture
+        .positions
+        .iter()
+        .map(|position| {
+            let values = position
+                .embedding_bits
+                .iter()
+                .map(|value| f32::from_bits(*value))
+                .collect::<Vec<_>>();
+            Ok(NativeGligenPositionParameter {
+                embedding: tensor_from_f32(
+                    backend,
+                    &[1, u64::try_from(values.len())?],
+                    &values,
+                    context,
+                )?,
+                height: position.height,
+                width: position.width,
+                y: position.y,
+                x: position.x,
+            })
+        })
+        .collect()
 }
 
 fn photomaker_inputs(
@@ -2040,6 +2378,16 @@ fn conditioning_auxiliary_fixture_integrity() -> Result<(), Box<dyn Error>> {
     assert_eq!(oracle.style.dtypes["float32"].state.len(), 42);
     assert_eq!(oracle.redux.dtypes["float32"].state.len(), 4);
     assert_eq!(oracle.photomaker.dtypes["float32"].state.len(), 407);
+    assert_eq!(oracle.gligen.state.len(), 42);
+    assert_eq!(oracle.gligen.fusers.len(), 2);
+    assert_eq!(oracle.gligen.fusers[0].transformer_index, 0);
+    assert_eq!(oracle.gligen.fusers[1].transformer_index, 1);
+    assert_eq!(oracle.gligen.head_rule_cases[0].heads, 1);
+    assert_eq!(oracle.gligen.head_rule_cases[0].head_dimension, 64);
+    assert_eq!(oracle.gligen.head_rule_cases[1].key_dimension, 768);
+    assert_eq!(oracle.gligen.head_rule_cases[1].query_dimension, 8);
+    assert_eq!(oracle.gligen.head_rule_cases[1].heads, 8);
+    assert_eq!(oracle.gligen.head_rule_cases[1].head_dimension, 1);
     assert_eq!(
         oracle.style.dtypes["float32"].state[0].key,
         "style_embedding"
@@ -2151,6 +2499,22 @@ fn conditioning_auxiliary_fixture_integrity() -> Result<(), Box<dyn Error>> {
     assert_eq!(
         oracle.pinned_sources["projects/comfy/ComfyUI/comfy/clip_vision.py"],
         PHOTOMAKER_CLIP_VISION_SOURCE_SHA256
+    );
+    assert_eq!(
+        oracle.pinned_sources["projects/comfy/ComfyUI/comfy/gligen.py"],
+        GLIGEN_SOURCE_SHA256
+    );
+    assert_eq!(
+        oracle.pinned_sources["projects/comfy/ComfyUI/comfy/ldm/modules/attention.py"],
+        GLIGEN_ATTENTION_SOURCE_SHA256
+    );
+    assert_eq!(
+        oracle.pinned_sources["projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py"],
+        GLIGEN_OPENAIMODEL_SOURCE_SHA256
+    );
+    assert_eq!(
+        oracle.pinned_sources["projects/comfy/ComfyUI/comfy/samplers.py"],
+        GLIGEN_SAMPLERS_SOURCE_SHA256
     );
     Ok(())
 }
@@ -2587,6 +2951,343 @@ fn style_model_resource() -> Result<(), Box<dyn Error>> {
         Err(NativeStyleModelError::InvalidCheckpoint(error)) if error.contains("construction stream")
     ));
     assert_eq!(foreign_workspace.in_use_bytes(), 0);
+    assert_eq!(workspace.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn gligen_resource() -> Result<(), Box<dyn Error>> {
+    let oracle = style_model_oracle()?;
+    let fixture = &oracle.gligen;
+    let cancellation = CancellationToken::default();
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(MEMORY_LIMIT)?;
+    let workspace = authority.authorize_workspace(MEMORY_LIMIT)?;
+    let context = backend.execution_context(StreamId::DEFAULT, workspace.clone(), &cancellation);
+    let positions = gligen_positions(&backend, &context, fixture)?;
+
+    for dtype_name in ["float32", "float16", "bfloat16"] {
+        let expected = &fixture.dtypes[dtype_name];
+        let original = upload_gligen_state(&backend, &context, &fixture.state, dtype_name)?;
+        let resource = Arc::new(NativeGligenResource::from_reduced_fixture(
+            &backend,
+            gligen_checkpoint(original.clone(), GLIGEN_FIXTURE_MEMORY),
+            &context,
+        )?);
+        assert!(!resource.is_source_exact_profile());
+        assert_eq!(resource.source_dtype(), fixture_dtype(dtype_name)?);
+        assert_eq!(resource.key_dimension(), fixture.key_dimension);
+        assert_eq!(resource.fuser_locations().len(), fixture.fusers.len());
+        for (actual, expected_location) in resource.fuser_locations().iter().zip(&fixture.fusers) {
+            assert_eq!(actual.namespace(), expected_location.namespace);
+            assert_eq!(actual.block_index(), expected_location.block_index);
+            assert_eq!(
+                actual.transformer_index(),
+                expected_location.transformer_index
+            );
+            assert_eq!(actual.query_dimension(), fixture.query_dimension);
+            assert_eq!(
+                actual.region(),
+                match expected_location.region.as_str() {
+                    "input_blocks" => NativeGligenRegion::InputBlock,
+                    "middle_block" => NativeGligenRegion::MiddleBlock,
+                    "output_blocks" => NativeGligenRegion::OutputBlock,
+                    value => return Err(format!("unknown GLIGEN fixture region {value}").into()),
+                }
+            );
+        }
+        resource.validate(&cancellation)?;
+        let reconstructed = resource.reconstruct_checkpoint(&cancellation)?;
+        assert_eq!(reconstructed.ordered_state.len(), original.len());
+        for ((actual_key, actual), (expected_key, expected_tensor)) in
+            reconstructed.ordered_state.iter().zip(&original)
+        {
+            assert_eq!(actual_key, expected_key);
+            assert_eq!(actual.descriptor(), expected_tensor.descriptor());
+            assert_eq!(actual.storage_id(), expected_tensor.storage_id());
+            assert_eq!(
+                actual.contiguous_bytes()?,
+                expected_tensor.contiguous_bytes()?
+            );
+        }
+        let prepared =
+            resource.prepare_positions(&backend, fixture.latent_shape, &positions, &context)?;
+        assert_eq!(
+            prepared.objects().descriptor().shape(),
+            expected.prepared_shape
+        );
+        let prepared_bits = tensor_to_f32(&backend, prepared.objects(), &context)?
+            .iter()
+            .map(|value| value.to_bits())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            prepared_bits, expected.prepared_bits,
+            "GLIGEN {dtype_name} PositionNet"
+        );
+        let visual = tensor_from_f32(
+            &backend,
+            &expected.visual_shape,
+            &expected
+                .visual_bits
+                .iter()
+                .map(|value| f32::from_bits(*value))
+                .collect::<Vec<_>>(),
+            &context,
+        )?;
+        let visual_before = visual.contiguous_bytes()?.to_vec();
+        let output = resource.apply_fuser(&backend, 0, &visual, &prepared, &context)?;
+        let output_bits = tensor_to_f32(&backend, &output, &context)?
+            .iter()
+            .map(|value| value.to_bits())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            output_bits, expected.output_bits,
+            "GLIGEN {dtype_name} fuser"
+        );
+        assert_eq!(visual.contiguous_bytes()?, visual_before);
+        assert_ne!(output.storage_id(), visual.storage_id());
+
+        let payload = NativeModelPayload::gligen_test_fixture(resource.clone(), &cancellation)?;
+        assert!(Arc::ptr_eq(
+            payload
+                .gligen_resource()
+                .ok_or("GLIGEN payload accessor is missing")?,
+            &resource,
+        ));
+        assert_gligen_payload_cross_role_denial(&payload);
+        payload.validate()?;
+        assert!(NativeModelPayload::gligen(resource, &cancellation).is_err());
+    }
+
+    let primary_state = upload_gligen_state(&backend, &context, &fixture.state, "float32")?;
+    let primary = NativeGligenResource::from_reduced_fixture(
+        &backend,
+        gligen_checkpoint(primary_state.clone(), GLIGEN_FIXTURE_MEMORY),
+        &context,
+    )?;
+    let empty = primary.prepare_positions(&backend, fixture.latent_shape, &[], &context)?;
+    assert_eq!(empty.objects().descriptor().shape(), [1, 30, 4]);
+    let thirty = (0..30).map(|_| positions[0].clone()).collect::<Vec<_>>();
+    primary.prepare_positions(&backend, fixture.latent_shape, &thirty, &context)?;
+    let thirty_one = (0..31).map(|_| positions[0].clone()).collect::<Vec<_>>();
+    assert!(matches!(
+        primary.prepare_positions(&backend, fixture.latent_shape, &thirty_one, &context),
+        Err(NativeGligenError::InvalidInput(message)) if message.contains("at most 30")
+    ));
+
+    let alternate_state = gligen_fixture_schema(768, 8, &["middle_block.3.transformer_blocks.0"])?;
+    let alternate = NativeGligenResource::from_reduced_fixture(
+        &backend,
+        gligen_checkpoint(
+            upload_gligen_state(&backend, &context, &alternate_state, "float32")?,
+            GLIGEN_FIXTURE_MEMORY,
+        ),
+        &context,
+    )?;
+    let alternate_location = &alternate.fuser_locations()[0];
+    assert_eq!(alternate_location.heads(), fixture.head_rule_cases[1].heads);
+    assert_eq!(
+        alternate_location.head_dimension(),
+        fixture.head_rule_cases[1].head_dimension
+    );
+
+    let prepared =
+        primary.prepare_positions(&backend, fixture.latent_shape, &positions, &context)?;
+    let visual_fixture = &fixture.dtypes["float32"];
+    let visual = tensor_from_f32(
+        &backend,
+        &visual_fixture.visual_shape,
+        &visual_fixture
+            .visual_bits
+            .iter()
+            .map(|value| f32::from_bits(*value))
+            .collect::<Vec<_>>(),
+        &context,
+    )?;
+    let alternate_visual = tensor_from_f32(&backend, &[1, 2, 8], &[0.0; 16], &context)?;
+    assert!(matches!(
+        alternate.apply_fuser(&backend, 0, &alternate_visual, &prepared, &context),
+        Err(NativeGligenError::InvalidInput(message)) if message.contains("do not belong")
+    ));
+    assert!(matches!(
+        primary.apply_fuser(&backend, 2, &visual, &prepared, &context),
+        Err(NativeGligenError::InvalidInput(message)) if message.contains("out of range")
+    ));
+    let batch_two_visual = tensor_from_f32(&backend, &[2, 2, 64], &[0.0; 256], &context)?;
+    assert!(matches!(
+        primary.apply_fuser(&backend, 0, &batch_two_visual, &prepared, &context),
+        Err(NativeGligenError::InvalidInput(message)) if message.contains("do not belong")
+    ));
+    let f16_descriptor = TensorDescriptor::contiguous(
+        visual_fixture.visual_shape.clone(),
+        DType::F16,
+        DeviceId::CPU,
+        context.stream,
+    )?;
+    let mut f16_bytes = Vec::new();
+    for value in &visual_fixture.visual_bits {
+        f16_bytes.extend_from_slice(&DType::F16.encode_scalar(
+            comfy_tensor::Scalar::Float(f64::from(f32::from_bits(*value))),
+            "task396.gligen-visual-f16",
+            DeviceId::CPU,
+        )?);
+    }
+    let (f16_visual, f16_event) = backend.upload_bytes(f16_descriptor, &f16_bytes, &context)?;
+    backend.wait_event(f16_event, &context)?;
+    assert!(matches!(
+        primary.apply_fuser(&backend, 0, &f16_visual, &prepared, &context),
+        Err(NativeGligenError::InvalidInput(message)) if message.contains("CPU F32")
+    ));
+
+    let mut partial = primary_state.clone();
+    partial.pop();
+    assert!(matches!(
+        NativeGligenResource::from_reduced_fixture(
+            &backend,
+            gligen_checkpoint(partial, GLIGEN_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativeGligenError::UnexpectedState(_))
+    ));
+    let mut out_of_range = primary_state.clone();
+    for (key, _) in &mut out_of_range {
+        if key.starts_with("output_blocks.7.") {
+            *key = key.replacen("output_blocks.7.", "output_blocks.20.", 1);
+        }
+    }
+    assert!(matches!(
+        NativeGligenResource::from_reduced_fixture(
+            &backend,
+            gligen_checkpoint(out_of_range, GLIGEN_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativeGligenError::UnexpectedState(message)) if message.contains("outside 0..19")
+    ));
+    let mut collision = primary_state.clone();
+    for (key, _) in &mut collision {
+        if key.starts_with("output_blocks.7.") {
+            *key = key.replacen(
+                "output_blocks.7.transformer_blocks.0",
+                "input_blocks.2.transformer_blocks.1",
+                1,
+            );
+        }
+    }
+    assert!(matches!(
+        NativeGligenResource::from_reduced_fixture(
+            &backend,
+            gligen_checkpoint(collision, GLIGEN_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativeGligenError::UnexpectedState(message)) if message.contains("multiple fuser namespaces")
+    ));
+    let mut aliases = primary_state.clone();
+    let source = aliases
+        .iter()
+        .find(|(key, _)| key.ends_with("norm1.weight"))
+        .ok_or("GLIGEN alias source is missing")?
+        .1
+        .clone();
+    let target = aliases
+        .iter_mut()
+        .find(|(key, _)| key.ends_with("norm1.bias"))
+        .ok_or("GLIGEN alias target is missing")?;
+    assert_eq!(source.descriptor(), target.1.descriptor());
+    target.1 = source;
+    assert!(matches!(
+        NativeGligenResource::from_reduced_fixture(
+            &backend,
+            gligen_checkpoint(aliases, GLIGEN_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativeGligenError::InvalidCheckpoint(message)) if message.contains("aliases")
+    ));
+
+    let raw_out_of_memory = NativeGligenResource::from_reduced_fixture(
+        &backend,
+        gligen_checkpoint(primary_state.clone(), 1),
+        &context,
+    );
+    let required = match raw_out_of_memory {
+        Err(NativeGligenError::OutOfMemory {
+            required,
+            budget: 1,
+        }) => required,
+        result => return Err(format!("expected GLIGEN construction OOM, got {result:?}").into()),
+    };
+    assert!(matches!(
+        NativeGligenResource::from_reduced_fixture(
+            &backend,
+            gligen_checkpoint(primary_state.clone(), required - 1),
+            &context,
+        ),
+        Err(NativeGligenError::OutOfMemory { required: actual, budget })
+            if actual == required && budget == required - 1
+    ));
+    let mut admitted_budget = required;
+    loop {
+        match NativeGligenResource::from_reduced_fixture(
+            &backend,
+            gligen_checkpoint(primary_state.clone(), admitted_budget),
+            &context,
+        ) {
+            Ok(_) => break,
+            Err(NativeGligenError::OutOfMemory {
+                required: next_required,
+                budget,
+            }) if budget == admitted_budget && next_required > admitted_budget => {
+                admitted_budget = next_required;
+            }
+            result => {
+                return Err(format!(
+                    "GLIGEN monotonic construction admission failed at {admitted_budget}: {result:?}"
+                )
+                .into());
+            }
+        }
+    }
+    let (constrained, constrained_prepared) = loop {
+        let candidate = NativeGligenResource::from_reduced_fixture(
+            &backend,
+            gligen_checkpoint(primary_state.clone(), admitted_budget),
+            &context,
+        )?;
+        match candidate.prepare_positions(&backend, fixture.latent_shape, &positions, &context) {
+            Ok(prepared) => break (candidate, prepared),
+            Err(NativeGligenError::OutOfMemory {
+                required: next_required,
+                budget,
+            }) if budget == admitted_budget && next_required > admitted_budget => {
+                admitted_budget = next_required;
+            }
+            result => {
+                return Err(format!(
+                    "GLIGEN position admission failed at {admitted_budget}: {result:?}"
+                )
+                .into());
+            }
+        }
+    };
+    let large_visual = tensor_from_f32(&backend, &[1, 256, 64], &[0.0; 256 * 64], &context)?;
+    match constrained.apply_fuser(&backend, 0, &large_visual, &constrained_prepared, &context) {
+        Err(NativeGligenError::OutOfMemory {
+            required: apply_required,
+            budget,
+        }) if budget == admitted_budget && apply_required > admitted_budget => {}
+        result => {
+            return Err(format!(
+                "expected GLIGEN invocation OOM above construction/position budget {admitted_budget}, got {result:?}"
+            )
+            .into());
+        }
+    }
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context =
+        backend.execution_context(StreamId::DEFAULT, workspace.clone(), &cancelled);
+    assert!(matches!(
+        alternate.prepare_positions(&backend, fixture.latent_shape, &[], &cancelled_context),
+        Err(NativeGligenError::Cancelled)
+    ));
     assert_eq!(workspace.in_use_bytes(), 0);
     Ok(())
 }

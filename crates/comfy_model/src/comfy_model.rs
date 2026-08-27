@@ -224,11 +224,14 @@ pub use cogvideox_family::{
     configuration_for_probe as cogvideox_configuration_for_probe,
 };
 pub use conditioning_resources::{
-    FLUX_REDUX_SOURCE_SHA256, NativePhotoMakerCheckpoint, NativePhotoMakerCheckpointEntry,
-    NativePhotoMakerError, NativePhotoMakerResource, NativeStyleModelCheckpoint,
-    NativeStyleModelError, NativeStyleModelResource, PHOTOMAKER_CLIP_VISION_SOURCE_SHA256,
-    PHOTOMAKER_SOURCE_SHA256, STYLE_ADAPTER_SOURCE_SHA256, STYLE_MODEL_NODES_SOURCE_SHA256,
-    STYLE_MODEL_OPS_SOURCE_SHA256, STYLE_MODEL_SD_SOURCE_SHA256,
+    FLUX_REDUX_SOURCE_SHA256, GLIGEN_ATTENTION_SOURCE_SHA256, GLIGEN_OPENAIMODEL_SOURCE_SHA256,
+    GLIGEN_SAMPLERS_SOURCE_SHA256, GLIGEN_SOURCE_SHA256, NativeGligenCheckpoint, NativeGligenError,
+    NativeGligenFuserLocation, NativeGligenPositionParameter, NativeGligenPreparedPositions,
+    NativeGligenRegion, NativeGligenResource, NativePhotoMakerCheckpoint,
+    NativePhotoMakerCheckpointEntry, NativePhotoMakerError, NativePhotoMakerResource,
+    NativeStyleModelCheckpoint, NativeStyleModelError, NativeStyleModelResource,
+    PHOTOMAKER_CLIP_VISION_SOURCE_SHA256, PHOTOMAKER_SOURCE_SHA256, STYLE_ADAPTER_SOURCE_SHA256,
+    STYLE_MODEL_NODES_SOURCE_SHA256, STYLE_MODEL_OPS_SOURCE_SHA256, STYLE_MODEL_SD_SOURCE_SHA256,
 };
 pub use cosmos_family::{
     COSMOS_ANIMA_DETECTION_MARKER_KEYS, COSMOS_CLIP_CANDIDATES, COSMOS_CLIP_CONFIGURATION,
