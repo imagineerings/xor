@@ -113,7 +113,7 @@ OpenCode can update terminal titles automatically. For Zed notifications, add an
 Create `.opencode/plugins/zed-bell.js` in your project, or `~/.config/opencode/plugins/zed-bell.js` to use it globally:
 
 ```js
-export const SimBell = async () => {
+export const ZedBell = async () => {
   return {
     event: async ({ event }) => {
       if (process.env.OPENCODE_CLIENT === "acp") return;

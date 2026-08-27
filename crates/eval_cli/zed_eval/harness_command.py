@@ -115,9 +115,9 @@ def build_harness_command(run_request: dict[str, Any], jobs_dir: str) -> list[st
         # its own thin agent shell (the sanctioned cross-framework exception).
         "--agent-import-path",
         (
-            "zed_eval.pier_agent:SimPierAgent"
+            "zed_eval.pier_agent:ZedPierAgent"
             if harness_binary(benchmark) == benchmarks.HARNESS_PIER
-            else "zed_eval.agent:SimAgent"
+            else "zed_eval.agent:ZedAgent"
         ),
         "--ae",
         f"EVAL_CLI_CONTAINER_PATH=/data/builds/{build_id}/eval-cli",

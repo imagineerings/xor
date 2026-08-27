@@ -5,7 +5,7 @@ use cloud_api_types::Plan;
 use gpui::{Entity, IntoElement, ParentElement};
 use ui::prelude::*;
 
-use crate::SimAiOnboarding;
+use crate::ZedAiOnboarding;
 
 pub struct EditPredictionOnboarding {
     user_store: Entity<UserStore>,
@@ -40,7 +40,7 @@ impl Render for EditPredictionOnboarding {
             .user_store
             .read(cx)
             .plan()
-            .is_some_and(|plan| plan == Plan::SimFree);
+            .is_some_and(|plan| plan == Plan::ZedFree);
 
         let github_copilot = v_flex()
             .gap_1()
@@ -68,7 +68,7 @@ impl Render for EditPredictionOnboarding {
 
         v_flex()
             .gap_2()
-            .child(SimAiOnboarding::new(
+            .child(ZedAiOnboarding::new(
                 self.client.clone(),
                 &self.user_store,
                 self.continue_with_zed_ai.clone(),

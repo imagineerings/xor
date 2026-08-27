@@ -20,15 +20,15 @@ struct ConnectedPrincipal {
 }
 
 #[derive(Clone, Debug, Serialize, PartialOrd, PartialEq, Eq, Ord)]
-pub struct SimVersion(pub Version);
+pub struct ZedVersion(pub Version);
 
-impl fmt::Display for SimVersion {
+impl fmt::Display for ZedVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl SimVersion {
+impl ZedVersion {
     pub fn can_collaborate(&self) -> bool {
         // v0.204.1 was the first version after the auto-update bug.
         // We reject any clients older than that to hope we can persuade them to upgrade.
@@ -44,7 +44,7 @@ impl SimVersion {
 pub struct Connection {
     pub user_id: UserId,
     pub admin: bool,
-    pub zed_version: SimVersion,
+    pub zed_version: ZedVersion,
 }
 
 impl ConnectionPool {
@@ -64,7 +64,7 @@ impl ConnectionPool {
         connection_id: ConnectionId,
         user_id: UserId,
         admin: bool,
-        zed_version: SimVersion,
+        zed_version: ZedVersion,
     ) {
         self.connections.insert(
             connection_id,

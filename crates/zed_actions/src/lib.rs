@@ -24,7 +24,7 @@ pub struct OpenBrowser {
 #[derive(Clone, PartialEq, Deserialize, JsonSchema, Action)]
 #[action(namespace = zed)]
 #[serde(deny_unknown_fields)]
-pub struct OpenSimUrl {
+pub struct OpenZedUrl {
     pub url: Arc<str>,
 }
 
@@ -805,7 +805,7 @@ actions!(
     zed_predict_onboarding,
     [
         /// Opens the Zed Predict onboarding modal.
-        OpenSimPredictOnboarding
+        OpenZedPredictOnboarding
     ]
 );
 actions!(

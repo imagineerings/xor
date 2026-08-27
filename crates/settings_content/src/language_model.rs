@@ -27,7 +27,7 @@ pub struct AllLanguageModelSettingsContent {
     pub vercel_ai_gateway: Option<VercelAiGatewaySettingsContent>,
     pub x_ai: Option<XAiSettingsContent>,
     #[serde(rename = "zed.dev")]
-    pub zed_dot_dev: Option<SimDotDevSettingsContent>,
+    pub zed_dot_dev: Option<ZedDotDevSettingsContent>,
 }
 
 #[with_fallible_options]
@@ -530,15 +530,15 @@ pub struct XaiAvailableModel {
 
 #[with_fallible_options]
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema, MergeFrom)]
-pub struct SimDotDevSettingsContent {
-    pub available_models: Option<Vec<SimDotDevAvailableModel>>,
+pub struct ZedDotDevSettingsContent {
+    pub available_models: Option<Vec<ZedDotDevAvailableModel>>,
 }
 
 #[with_fallible_options]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
-pub struct SimDotDevAvailableModel {
+pub struct ZedDotDevAvailableModel {
     /// The provider of the language model.
-    pub provider: SimDotDevAvailableProvider,
+    pub provider: ZedDotDevAvailableProvider,
     /// The model's name in the provider's API. e.g. claude-3-5-sonnet-20240620
     pub name: String,
     /// The name displayed in the UI, such as in the agent panel model dropdown menu.
@@ -565,7 +565,7 @@ pub struct SimDotDevAvailableModel {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
 #[serde(rename_all = "lowercase")]
-pub enum SimDotDevAvailableProvider {
+pub enum ZedDotDevAvailableProvider {
     Anthropic,
     OpenAi,
     Google,

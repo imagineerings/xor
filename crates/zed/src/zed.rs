@@ -22,9 +22,9 @@ pub mod visual_tests;
 #[cfg(target_os = "windows")]
 pub(crate) mod windows_only_instance;
 
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 use agent_settings::{UserAgentsMdState, init_user_agents_md};
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 use agent_ui::AgentDiffToolbar;
 #[cfg(feature = "multiplayer-tools")]
 use agent_ui::AgentPanel;
@@ -54,7 +54,7 @@ use git_ui::project_diff::ProjectDiffToolbar;
 use git_ui::solo_diff_view::{SoloDiffGitToolbar, SoloDiffStyleToolbar};
 use git_ui::staged_diff::StagedDiffToolbar;
 use git_ui::unstaged_diff::UnstagedDiffToolbar;
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 use gpui::AsyncWindowContext;
 use gpui::{
     Action, App, AppContext as _, ClipboardItem, Context, DismissEvent, Element, Entity,
@@ -96,7 +96,7 @@ use settings::{
     SettingsFile, SettingsStore, VIM_KEYMAP_PATH, initial_local_debug_tasks_content,
     initial_project_settings_content, initial_tasks_content, update_settings_file,
 };
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 use sidebar::Sidebar;
 #[cfg(debug_assertions)]
 use workspace::workspace_error::{ErrorAction, ErrorSeverity, WorkspaceError};
@@ -120,7 +120,7 @@ use uuid::Uuid;
 use vim_mode_setting::VimModeSetting;
 use workspace::notifications::{NotificationId, dismiss_app_notification, show_app_notification};
 
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 use workspace::Panel;
 #[cfg(feature = "multiplayer-tools")]
 use workspace::collaborative_composer::CollaborativeComposerRegistration;
@@ -148,7 +148,7 @@ use workspace::{
 use workspace::{Pane, notifications::DetachAndPromptErr};
 use zed_actions::{
     About, GetMerch, OpenAccountSettings, OpenBrowser, OpenDocs, OpenProjectTasks,
-    OpenServerSettings, OpenSettingsFile, OpenSimUrl, OpenStatusPage, Quit,
+    OpenServerSettings, OpenSettingsFile, OpenStatusPage, OpenZedUrl, Quit,
 };
 const DOCS_URL: &str = "https://zed.dev/docs/";
 const STATUS_URL: &str = "https://status.zed.dev";
@@ -1729,7 +1729,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
                 .unwrap_or(true)
         });
 
-        #[cfg(feature = "agentic")]
+        #[cfg(feature = "agentic-tools")]
         {
             let window_handle = window.window_handle();
             let multi_workspace_handle = cx.entity();
@@ -1910,7 +1910,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
         let line_ending_indicator =
             cx.new(|_| line_ending_selector::LineEndingIndicator::default());
         let git_blame_status = cx.new(|_| git_ui::GitBlameStatus::default());
-        #[cfg(feature = "agentic")]
+        #[cfg(feature = "agentic-tools")]
         let merge_conflict_indicator =
             cx.new(|cx| git_ui::MergeConflictIndicator::new(workspace, cx));
         workspace.status_bar().update(cx, |status_bar, cx| {
@@ -1919,7 +1919,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
             status_bar.add_left_item(diagnostic_summary, window, cx);
             status_bar.add_left_item(active_file_name, window, cx);
             status_bar.add_left_item(git_blame_status, window, cx);
-            #[cfg(feature = "agentic")]
+            #[cfg(feature = "agentic-tools")]
             status_bar.add_left_item(merge_conflict_indicator, window, cx);
             status_bar.add_left_item(activity_indicator, window, cx);
             status_bar.add_right_item(edit_prediction_ui, window, cx);
@@ -2129,7 +2129,7 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
             comfy_panels,
         );
 
-        #[cfg(feature = "agentic")]
+        #[cfg(feature = "agentic-tools")]
         initialize_agent_panel(workspace_handle, cx.clone())
             .await
             .log_err();
@@ -2138,7 +2138,7 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
     })
 }
 
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 fn setup_or_teardown_ai_panel<P: Panel>(
     workspace: &mut Workspace,
     window: &mut Window,
@@ -2175,7 +2175,7 @@ fn setup_or_teardown_ai_panel<P: Panel>(
     }
 }
 
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 fn ensure_agent_panel_for_workspace(
     workspace: &mut Workspace,
     source_workspace: Option<WeakEntity<Workspace>>,
@@ -2200,7 +2200,7 @@ fn ensure_agent_panel_for_workspace(
     })
 }
 
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 async fn initialize_agent_panel(
     workspace_handle: WeakEntity<Workspace>,
     mut cx: AsyncWindowContext,
@@ -2354,7 +2354,7 @@ fn register_actions(
         .register_action(|_, _: &ToggleFullScreen, window, _| {
             window.toggle_fullscreen();
         })
-        .register_action(|_, action: &OpenSimUrl, _, cx| {
+        .register_action(|_, action: &OpenZedUrl, _, cx| {
             OpenListener::global(cx).open(RawOpenRequest {
                 urls: vec![String::from(&*action.url)],
                 ..Default::default()
@@ -2576,15 +2576,15 @@ fn register_actions(
                 }
             }
         })
-        .register_action(|_, _: &install_cli::RegisterSimScheme, window, cx| {
+        .register_action(|_, _: &install_cli::RegisterZedScheme, window, cx| {
             cx.spawn_in(window, async move |workspace, cx| {
                 install_cli::register_zed_scheme(cx).await?;
                 workspace.update_in(cx, |workspace, _, cx| {
-                    struct RegisterSimScheme;
+                    struct RegisterZedScheme;
 
                     workspace.show_toast(
                         Toast::new(
-                            NotificationId::unique::<RegisterSimScheme>(),
+                            NotificationId::unique::<RegisterZedScheme>(),
                             format!(
                                 "{} links will now open in {}.",
                                 product_flavor::URL_PREFIX,
@@ -2734,7 +2734,7 @@ fn register_actions(
         });
     }
 
-    #[cfg(feature = "agentic")]
+    #[cfg(feature = "agentic-tools")]
     workspace.register_action(sidebar::dump_workspace_info);
 
     #[cfg(debug_assertions)]
@@ -2811,7 +2811,7 @@ fn initialize_pane(
             toolbar.add_item(lsp_log_item, window, cx);
             let dap_log_item = cx.new(|_| debugger_tools::DapLogToolbarItemView::new());
             toolbar.add_item(dap_log_item, window, cx);
-            #[cfg(feature = "agentic")]
+            #[cfg(feature = "agentic-tools")]
             {
                 let acp_tools_item = cx.new(|_| acp_tools::AcpToolsToolbarItemView::new());
                 toolbar.add_item(acp_tools_item, window, cx);
@@ -2839,7 +2839,7 @@ fn initialize_pane(
             toolbar.add_item(solo_diff_git_toolbar, window, cx);
             let commit_view_toolbar = cx.new(|_| CommitViewToolbar::new());
             toolbar.add_item(commit_view_toolbar, window, cx);
-            #[cfg(feature = "agentic")]
+            #[cfg(feature = "agentic-tools")]
             {
                 let agent_diff_toolbar = cx.new(AgentDiffToolbar::new);
                 toolbar.add_item(agent_diff_toolbar, window, cx);
@@ -3484,7 +3484,7 @@ fn init_reduce_motion(cx: &mut App) {
 ///
 /// The file itself is loaded into [`agent_settings::UserAgentsMd`] for inclusion
 /// in prompts.
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 pub fn watch_user_agents_md(fs: Arc<dyn fs::Fs>, cx: &mut App) {
     struct UserAgentsMdParseError;
     let notification_id = NotificationId::unique::<UserAgentsMdParseError>();
@@ -3755,18 +3755,18 @@ fn load_builtin_keymap_asset(
     source: KeybindSource,
     cx: &App,
 ) -> anyhow::Result<Vec<KeyBinding>> {
-    #[cfg(feature = "agentic")]
+    #[cfg(feature = "agentic-tools")]
     let key_bindings = KeymapFile::load_asset(asset_path, Some(source), cx)?;
-    #[cfg(not(feature = "agentic"))]
+    #[cfg(not(feature = "agentic-tools"))]
     let mut key_bindings = KeymapFile::load_asset_allow_partial_failure(asset_path, cx)?;
-    #[cfg(not(feature = "agentic"))]
+    #[cfg(not(feature = "agentic-tools"))]
     for key_binding in &mut key_bindings {
         key_binding.set_meta(source.meta());
     }
     Ok(key_bindings)
 }
 
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 const AI_ACTION_NAMESPACES: &[&str] = &[
     "acp::",
     "agent::",
@@ -3776,7 +3776,7 @@ const AI_ACTION_NAMESPACES: &[&str] = &[
     "zeta::",
 ];
 
-#[cfg(not(feature = "agentic"))]
+#[cfg(not(feature = "agentic-tools"))]
 const AI_ACTION_NAMESPACES: &[&str] = &["acp::", "agent::", "assistant::", "inline_assistant::"];
 
 fn is_ai_keybinding(binding: &KeyBinding) -> bool {
@@ -3787,7 +3787,7 @@ fn is_ai_keybinding(binding: &KeyBinding) -> bool {
 }
 
 fn filter_disabled_ai_bindings(bindings: Vec<KeyBinding>, cx: &App) -> Vec<KeyBinding> {
-    if cfg!(feature = "agentic") && !DisableAiSettings::get_global(cx).disable_ai {
+    if cfg!(feature = "agentic-tools") && !DisableAiSettings::get_global(cx).disable_ai {
         return bindings;
     }
     bindings
@@ -4273,7 +4273,7 @@ mod tests {
     use node_runtime::NodeRuntime;
     use pretty_assertions::{assert_eq, assert_ne};
     use project::{Project, ProjectPath};
-    #[cfg(feature = "agentic")]
+    #[cfg(feature = "agentic-tools")]
     use prompt_store::PromptBuilder;
     use remote::RemoteClient;
     use remote_server::{HeadlessAppState, HeadlessProject};
@@ -8182,7 +8182,7 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(actions_without_namespace, Vec::<&str>::new());
 
-            #[cfg(not(feature = "agentic"))]
+            #[cfg(not(feature = "agentic-tools"))]
             for action_name in [
                 "editor::CancelEditReviewComment",
                 "editor::ConfirmEditReviewComment",
@@ -8202,18 +8202,18 @@ mod tests {
             let expected_namespaces = vec![
                 "action",
                 "activity_indicator",
-                #[cfg(feature = "agentic")]
+                #[cfg(feature = "agentic-tools")]
                 "agent",
-                #[cfg(feature = "agentic")]
+                #[cfg(feature = "agentic-tools")]
                 "agents_sidebar",
                 "app_menu",
-                #[cfg(feature = "agentic")]
+                #[cfg(feature = "agentic-tools")]
                 "assistant",
-                #[cfg(feature = "agentic")]
+                #[cfg(feature = "agentic-tools")]
                 "assistant2",
                 "auto_update",
                 "branch_picker",
-                #[cfg(feature = "agentic")]
+                #[cfg(feature = "agentic-tools")]
                 "bedrock",
                 "branches",
                 "buffer_search",
@@ -8250,7 +8250,7 @@ mod tests {
                 "highlights_tree_view",
                 "icon_theme_selector",
                 "image_viewer",
-                #[cfg(feature = "agentic")]
+                #[cfg(feature = "agentic-tools")]
                 "inline_assistant",
                 "journal",
                 "keymap_editor",
@@ -8281,7 +8281,7 @@ mod tests {
                 "search",
                 "settings_editor",
                 "settings_profile_selector",
-                #[cfg(feature = "agentic")]
+                #[cfg(feature = "agentic-tools")]
                 "skill_creator",
                 "snippets",
                 "stash_picker",
@@ -8503,7 +8503,7 @@ mod tests {
             );
             image_viewer::init(cx);
             language_model::init(cx);
-            #[cfg(feature = "agentic")]
+            #[cfg(feature = "agentic-tools")]
             {
                 client::RefreshLlmTokenListener::register(
                     app_state.client.clone(),
@@ -8798,7 +8798,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "agentic")]
+    #[cfg(feature = "agentic-tools")]
     #[gpui::test]
     async fn test_disable_ai_filters_keybindings(cx: &mut gpui::TestAppContext) {
         let _app_state = init_keymap_test(cx);

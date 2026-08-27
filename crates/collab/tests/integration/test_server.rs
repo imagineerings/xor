@@ -12,7 +12,7 @@ use collab::{
     AppState, Config,
     db::UserId,
     executor::Executor,
-    rpc::{CLEANUP_TIMEOUT, Principal, RECONNECT_TIMEOUT, Server, SimVersion},
+    rpc::{CLEANUP_TIMEOUT, Principal, RECONNECT_TIMEOUT, Server, ZedVersion},
 };
 use collab_ui::channel_view::ChannelView;
 use collections::{HashMap, HashSet};
@@ -328,7 +328,7 @@ impl TestServer {
                             server_conn,
                             client_name,
                             Principal::User(user),
-                            SimVersion(semver::Version::new(1, 0, 0)),
+                            ZedVersion(semver::Version::new(1, 0, 0)),
                             Some("test".to_string()),
                             None,
                             None,

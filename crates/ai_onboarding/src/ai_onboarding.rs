@@ -48,7 +48,7 @@ impl From<client::Status> for SignInStatus {
 
 #[cfg_attr(feature = "agentic", derive(RegisterComponent))]
 #[derive(IntoElement)]
-pub struct SimAiOnboarding {
+pub struct ZedAiOnboarding {
     pub sign_in_status: SignInStatus,
     pub plan: Option<Plan>,
     pub account_too_young: bool,
@@ -57,7 +57,7 @@ pub struct SimAiOnboarding {
     pub dismiss_onboarding: Option<Arc<dyn Fn(&mut Window, &mut App)>>,
 }
 
-impl SimAiOnboarding {
+impl ZedAiOnboarding {
     pub fn new(
         client: Arc<Client>,
         user_store: &Entity<UserStore>,
@@ -387,17 +387,17 @@ impl SimAiOnboarding {
     }
 }
 
-impl RenderOnce for SimAiOnboarding {
+impl RenderOnce for ZedAiOnboarding {
     fn render(self, _window: &mut ui::Window, cx: &mut App) -> impl IntoElement {
         if matches!(self.sign_in_status, SignInStatus::SignedIn) {
             match self.plan {
                 None => self.render_free_plan_state(cx),
-                Some(Plan::SimFree) => self.render_free_plan_state(cx),
-                Some(Plan::SimProTrial) => self.render_trial_state(cx),
-                Some(Plan::SimPro) => self.render_pro_plan_state(cx),
-                Some(Plan::SimBusiness) => self.render_business_plan_state(cx),
-                Some(Plan::SimVip) => self.render_vip_plan_state(cx),
-                Some(Plan::SimStudent) => self.render_student_plan_state(cx),
+                Some(Plan::ZedFree) => self.render_free_plan_state(cx),
+                Some(Plan::ZedProTrial) => self.render_trial_state(cx),
+                Some(Plan::ZedPro) => self.render_pro_plan_state(cx),
+                Some(Plan::ZedBusiness) => self.render_business_plan_state(cx),
+                Some(Plan::ZedVip) => self.render_vip_plan_state(cx),
+                Some(Plan::ZedStudent) => self.render_student_plan_state(cx),
             }
         } else {
             self.render_sign_in_disclaimer(cx)
@@ -406,7 +406,7 @@ impl RenderOnce for SimAiOnboarding {
 }
 
 #[cfg(feature = "agentic")]
-impl Component for SimAiOnboarding {
+impl Component for ZedAiOnboarding {
     fn scope() -> ComponentScope {
         ComponentScope::Onboarding
     }
@@ -433,7 +433,7 @@ impl Component for SimAiOnboarding {
                 .max_w(px(1100.))
                 .child(
                     AgentPanelOnboardingCard::new().child(
-                        SimAiOnboarding {
+                        ZedAiOnboarding {
                             sign_in_status,
                             plan,
                             account_too_young,
@@ -461,27 +461,27 @@ impl Component for SimAiOnboarding {
                 ),
                 single_example(
                     "Free Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::SimFree), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::ZedFree), false),
                 ),
                 single_example(
                     "Pro Trial",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::SimProTrial), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::ZedProTrial), false),
                 ),
                 single_example(
                     "Pro Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::SimPro), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::ZedPro), false),
                 ),
                 single_example(
                     "Business Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::SimBusiness), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::ZedBusiness), false),
                 ),
                 single_example(
                     "VIP Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::SimVip), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::ZedVip), false),
                 ),
                 single_example(
                     "Student Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::SimStudent), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::ZedStudent), false),
                 ),
             ])
             .into_any_element()

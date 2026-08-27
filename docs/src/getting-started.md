@@ -93,4 +93,4 @@ Zed is open source. Join us on GitHub or in Discord to contribute code, report b
 
 - [Discord](https://discord.com/invite/zedindustries)
 - [GitHub Discussions](https://github.com/simtropolis/zed/discussions)
-- [Zed Reddit](https://www.reddit.com/r/SimEditor)
+- [Zed Reddit](https://www.reddit.com/r/ZedEditor)

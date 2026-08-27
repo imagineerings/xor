@@ -85,6 +85,16 @@ fn render_rust_toolchain_section() -> impl IntoElement {
 
 const LIGHT_THEMES: [&str; 3] = ["One Light", "Ayu Light", "Gruvbox Light"];
 const DARK_THEMES: [&str; 3] = ["One Dark", "Ayu Dark", "Gruvbox Dark"];
+const BASE_KEYMAP_OPTION_LABELS: [&str; 8] = [
+    "Zed",
+    "VS Code",
+    "JetBrains",
+    "Sublime Text",
+    "Atom",
+    "Emacs",
+    "Cursor",
+    "TextMate",
+];
 const FAMILY_NAMES: [SharedString; 3] = [
     SharedString::new_static("One"),
     SharedString::new_static("Ayu"),
@@ -387,6 +397,16 @@ fn render_telemetry_section(tab_index: &mut isize, cx: &App) -> impl IntoElement
 }
 
 fn render_base_keymap_section(tab_index: &mut isize, cx: &mut App) -> impl IntoElement {
+    let [
+        zed,
+        vscode,
+        jetbrains,
+        sublime_text,
+        atom,
+        emacs,
+        cursor,
+        textmate,
+    ] = BASE_KEYMAP_OPTION_LABELS;
     let base_keymap = match BaseKeymap::get_global(cx) {
         BaseKeymap::Zed => Some(0),
         BaseKeymap::VSCode => Some(1),
@@ -403,30 +423,30 @@ fn render_base_keymap_section(tab_index: &mut isize, cx: &mut App) -> impl IntoE
         ToggleButtonGroup::two_rows(
             "base_keymap_selection",
             [
-                ToggleButtonWithIcon::new("Sim", IconName::AiZed, |_, _, cx| {
+                ToggleButtonWithIcon::new(zed, IconName::AiZed, |_, _, cx| {
                     write_keymap_base(BaseKeymap::Zed, cx);
                 }),
-                ToggleButtonWithIcon::new("VS Code", IconName::EditorVsCode, |_, _, cx| {
+                ToggleButtonWithIcon::new(vscode, IconName::EditorVsCode, |_, _, cx| {
                     write_keymap_base(BaseKeymap::VSCode, cx);
                 }),
-                ToggleButtonWithIcon::new("JetBrains", IconName::EditorJetBrains, |_, _, cx| {
+                ToggleButtonWithIcon::new(jetbrains, IconName::EditorJetBrains, |_, _, cx| {
                     write_keymap_base(BaseKeymap::JetBrains, cx);
                 }),
-                ToggleButtonWithIcon::new("Sublime Text", IconName::EditorSublime, |_, _, cx| {
+                ToggleButtonWithIcon::new(sublime_text, IconName::EditorSublime, |_, _, cx| {
                     write_keymap_base(BaseKeymap::SublimeText, cx);
                 }),
             ],
             [
-                ToggleButtonWithIcon::new("Atom", IconName::EditorAtom, |_, _, cx| {
+                ToggleButtonWithIcon::new(atom, IconName::EditorAtom, |_, _, cx| {
                     write_keymap_base(BaseKeymap::Atom, cx);
                 }),
-                ToggleButtonWithIcon::new("Emacs", IconName::EditorEmacs, |_, _, cx| {
+                ToggleButtonWithIcon::new(emacs, IconName::EditorEmacs, |_, _, cx| {
                     write_keymap_base(BaseKeymap::Emacs, cx);
                 }),
-                ToggleButtonWithIcon::new("Cursor", IconName::EditorCursor, |_, _, cx| {
+                ToggleButtonWithIcon::new(cursor, IconName::EditorCursor, |_, _, cx| {
                     write_keymap_base(BaseKeymap::Cursor, cx);
                 }),
-                ToggleButtonWithIcon::new("TextMate", IconName::Keyboard, |_, _, cx| {
+                ToggleButtonWithIcon::new(textmate, IconName::Keyboard, |_, _, cx| {
                     write_keymap_base(BaseKeymap::TextMate, cx);
                 }),
             ],
@@ -663,9 +683,9 @@ fn render_zed_agent_button(user_store: &Entity<UserStore>, cx: &mut App) -> impl
     let status = *client.status().borrow();
 
     let plan = user_store.read(cx).plan();
-    let is_free = matches!(plan, Some(Plan::SimFree) | None);
-    let is_pro = matches!(plan, Some(Plan::SimPro));
-    let is_trial = matches!(plan, Some(Plan::SimProTrial));
+    let is_free = matches!(plan, Some(Plan::ZedFree) | None);
+    let is_pro = matches!(plan, Some(Plan::ZedPro));
+    let is_trial = matches!(plan, Some(Plan::ZedProTrial));
 
     let is_signed_out = status.is_signed_out()
         || matches!(
@@ -795,4 +815,15 @@ pub(crate) fn render_basics_page(user_store: &Entity<UserStore>, cx: &mut App) -
         .child(render_worktree_auto_trust_switch(&mut tab_index, cx))
         .child(Divider::horizontal().color(ui::DividerColor::BorderVariant))
         .child(render_telemetry_section(&mut tab_index, cx))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BASE_KEYMAP_OPTION_LABELS;
+
+    #[test]
+    fn base_keymap_options_use_upstream_zed_name() {
+        assert!(BASE_KEYMAP_OPTION_LABELS.contains(&"Zed"));
+        assert!(!BASE_KEYMAP_OPTION_LABELS.contains(&"Sim"));
+    }
 }

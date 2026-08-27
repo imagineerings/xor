@@ -2,7 +2,7 @@
 
 ## Overview
 
-`crates/zed` owns `agentic` because it is the smallest crate that selects the complete desktop product. The feature is enabled by default to preserve the current application. It activates optional agent-only dependencies and forwards `agentic` into shared participating crates. Those crates expose no default `agentic` feature, preventing a transitive default from re-enabling the subsystem in `zed --no-default-features`.
+`crates/zed` owns `agentic-tools` because it is the smallest crate that selects the complete desktop product. The feature is enabled by default to preserve the current application. It activates optional agent-only dependencies and forwards the existing crate-local `agentic` feature into shared participating crates. Those crates expose no default `agentic` feature, preventing a transitive default from re-enabling the subsystem in `zed --no-default-features`.
 
 The implementation gates complete modules where agent code already has a module boundary and gates narrow startup, menu, toolbar, URL-dispatch, and persistence registration blocks where agent and editor behavior share a file. Runtime `disable_ai` remains an enabled-build product preference; it is not used to implement the compile-time boundary.
 
@@ -21,10 +21,10 @@ The implementation gates complete modules where agent code already has a module 
 
 ### D-FEATURE-OWNER: `zed` owns product selection
 
-<!-- impl: crates/zed/Cargo.toml#agentic -->
+<!-- impl: crates/zed/Cargo.toml#agentic-tools -->
 
-- Responsibility: Define `default = ["agentic"]`, activate every optional agent dependency, and forward `agentic` to participating shared crates.
-- Integration: Existing opt-in features such as `comfy`, `rust-tools`, and `multiplayer-tools` remain orthogonal. Any feature that requires agent code includes `agentic` explicitly.
+- Responsibility: Define `default = ["agentic-tools"]`, activate every optional agent dependency, and forward each participating shared crate's `agentic` feature.
+- Integration: Existing opt-in features such as `comfy`, `rust-tools`, and `multiplayer-tools` remain orthogonal. Any `zed` feature that requires agent code includes `agentic-tools` explicitly.
 - Rationale: A virtual workspace cannot own package features, while lower-level crates cannot select the application product.
 
 ### D-PARTICIPANTS: Shared crates expose non-default forwarded features
@@ -40,8 +40,8 @@ The implementation gates complete modules where agent code already has a module 
 <!-- impl: crates/zed/src/main.rs#main -->
 <!-- impl: crates/zed/src/zed.rs#initialize_panels -->
 
-- Responsibility: Compile agent startup, panel construction, actions, menus, toolbars, services, registries, background tasks, permissions, provider/web tooling, and agent-specific network listeners only with `agentic`.
-- Integration: Use `#[cfg(feature = "agentic")]` on cohesive functions, modules, imports, match arms, and startup blocks. Non-agentic initialization ordering is otherwise unchanged. Feature-neutral multi-workspace project grouping remains enabled in the disabled product; only its agent sidebar adapter and action registrations are gated.
+- Responsibility: Compile agent startup, panel construction, actions, menus, toolbars, services, registries, background tasks, permissions, provider/web tooling, and agent-specific network listeners only with `agentic-tools` in `zed`.
+- Integration: Use `#[cfg(feature = "agentic-tools")]` inside `zed` and retain `#[cfg(feature = "agentic")]` inside participating downstream crates. Non-agentic initialization ordering is otherwise unchanged. Feature-neutral multi-workspace project grouping remains enabled in the disabled product; only its agent sidebar adapter and action registrations are gated.
 - Rationale: Registration points are the observable boundary and give stronger absence guarantees than hiding rendered controls.
 
 ### D-PERSISTENCE: Preserve and explicitly reject unavailable references
@@ -58,7 +58,7 @@ The implementation gates complete modules where agent code already has a module 
 <!-- impl: .agents/specs/goose-migration/feature-boundary.md#Future-task-rule -->
 
 - Responsibility: `feature-boundary.md` is the canonical cross-pack policy and classifies each migration pack's production write families. Every pack's task plan links to it.
-- Integration: Agent-only paths are compiled only through `agentic`; shared/feature-neutral paths may compile normally but their agent adapters, registration, and consumers are gated. External services and SDK artifacts are not linked into the desktop graph and cannot be launched or registered by a disabled application.
+- Integration: Agent-only application paths are compiled only through `zed/agentic-tools`; shared/feature-neutral paths may compile normally but their crate-local `agentic` adapters, registration, and consumers are gated. External services and SDK artifacts are not linked into the desktop graph and cannot be launched or registered by a disabled application.
 - Rationale: Central classification avoids duplicating a volatile path table in 18 plans while making future task review mechanical.
 
 ### D-VALIDATION: Resolve and inspect both Cargo products
@@ -82,9 +82,9 @@ cargo run -p zed
 Explicit agentic product without unrelated defaults:
 
 ```bash
-cargo build -p zed --no-default-features --features agentic
-cargo test -p zed --no-default-features --features agentic
-cargo run -p zed --no-default-features --features agentic
+cargo build -p zed --no-default-features --features agentic-tools
+cargo test -p zed --no-default-features --features agentic-tools
+cargo run -p zed --no-default-features --features agentic-tools
 ```
 
 Non-agentic product:
@@ -99,7 +99,7 @@ Resolved-graph checks:
 
 ```bash
 cargo tree -p zed --no-default-features -e features
-cargo tree -p zed --no-default-features --features agentic -e features
+cargo tree -p zed --no-default-features --features agentic-tools -e features
 cargo metadata --format-version 1 --no-deps
 ```
 
@@ -133,7 +133,7 @@ cargo metadata --format-version 1 --no-deps
 ## Testing strategy
 
 - Run manifest/source boundary tests first so feature leaks fail quickly.
-- Compile and test `zed` with defaults, explicit `agentic`, and no default features.
+- Compile and test `zed` with defaults, explicit `agentic-tools`, and no default features.
 - Inspect the disabled resolved tree for agent, agent UI/settings/skills/servers, ACP agent tooling, prompt store, and agent-only provider/web dependencies.
 - Exercise generic workspace/session restoration, settings/keymap compatibility, action absence, and agent URL rejection in a disabled build.
 - Launch the disabled binary as a bounded smoke check where the environment supports a GUI; otherwise record the environment limitation separately from compile/test success.

@@ -21,7 +21,7 @@ use std::sync::Arc;
 pub use adapter_schema::{AdapterSchema, AdapterSchemas};
 pub use debug_format::{
     AttachRequest, BuildTaskDefinition, DebugRequest, DebugScenario, DebugTaskFile, LaunchRequest,
-    Request, SimDebugConfig, TcpArgumentsTemplate,
+    Request, TcpArgumentsTemplate, ZedDebugConfig,
 };
 pub use task_template::{
     DebugArgsRequest, HideStrategy, RevealStrategy, SaveStrategy, TaskHook, TaskTemplate,
@@ -750,15 +750,15 @@ pub fn shell_to_proto(shell: Shell) -> proto::Shell {
 
 type VsCodeEnvVariable = String;
 type VsCodeCommand = String;
-type SimEnvVariable = String;
+type ZedEnvVariable = String;
 
 struct EnvVariableReplacer {
-    variables: HashMap<VsCodeEnvVariable, SimEnvVariable>,
-    commands: HashMap<VsCodeCommand, SimEnvVariable>,
+    variables: HashMap<VsCodeEnvVariable, ZedEnvVariable>,
+    commands: HashMap<VsCodeCommand, ZedEnvVariable>,
 }
 
 impl EnvVariableReplacer {
-    fn new(variables: HashMap<VsCodeEnvVariable, SimEnvVariable>) -> Self {
+    fn new(variables: HashMap<VsCodeEnvVariable, ZedEnvVariable>) -> Self {
         Self {
             variables,
             commands: HashMap::default(),
@@ -767,7 +767,7 @@ impl EnvVariableReplacer {
 
     fn with_commands(
         mut self,
-        commands: impl IntoIterator<Item = (VsCodeCommand, SimEnvVariable)>,
+        commands: impl IntoIterator<Item = (VsCodeCommand, ZedEnvVariable)>,
     ) -> Self {
         self.commands = commands.into_iter().collect();
         self

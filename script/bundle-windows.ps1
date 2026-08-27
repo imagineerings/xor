@@ -219,7 +219,7 @@ function ZipProductDebugSymbols {
 }
 
 
-function SignSimAndItsFriends {
+function SignZedAndItsFriends {
     if (-not $canCodeSign) {
         return
     }
@@ -341,7 +341,7 @@ function BuildInstaller {
     }
 }
 
-ParseSimWorkspace
+ParseZedWorkspace
 $innoDir = "$env:ZED_WORKSPACE\inno\$Architecture"
 $debugArchive = "$CargoOutDir\$env:ZED_PRODUCT_ID-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip"
 
@@ -350,7 +350,7 @@ PrepareForBundle
 GenerateLicenses
 BuildProductBinaries
 BuildRemoteServer
-SignSimAndItsFriends
+SignZedAndItsFriends
 ZipProductDebugSymbols
 DownloadAMDGpuServices
 DownloadConpty

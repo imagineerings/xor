@@ -72,7 +72,7 @@ jobs:
       matrix:
         include:
         - product: rust
-          application_features: multiplayer-tools,rust-tools
+          application_features: agentic-tools,rust-tools
           remote_features: rust-tools
       fail-fast: false
     steps:

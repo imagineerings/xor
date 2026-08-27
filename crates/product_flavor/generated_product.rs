@@ -74,7 +74,7 @@ pub const AGENT_PROFILE_NAME: &str = "Rust Engineer";
 /// The selected product's Rust-focused agent instructions.
 pub const AGENT_INSTRUCTIONS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/product_flavors/rust/agent-instructions.md"));
 /// Product Cargo features for the application package.
-pub const CARGO_FEATURES: &[&str] = &["multiplayer-tools", "rust-tools"];
+pub const CARGO_FEATURES: &[&str] = &["agentic-tools", "rust-tools"];
 /// Product Cargo features for the remote server package.
 pub const REMOTE_SERVER_FEATURES: &[&str] = &["rust-tools"];
 /// Product language-server defaults.

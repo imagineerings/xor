@@ -239,12 +239,12 @@ impl Onboarding {
                 "signing_in"
             } else {
                 match plan {
-                    Some(Plan::SimPro) => "pro",
-                    Some(Plan::SimProTrial) => "trial",
-                    Some(Plan::SimBusiness) => "business",
-                    Some(Plan::SimVip) => "vip",
-                    Some(Plan::SimStudent) => "student",
-                    Some(Plan::SimFree) | None => "free",
+                    Some(Plan::ZedPro) => "pro",
+                    Some(Plan::ZedProTrial) => "trial",
+                    Some(Plan::ZedBusiness) => "business",
+                    Some(Plan::ZedVip) => "vip",
+                    Some(Plan::ZedStudent) => "student",
+                    Some(Plan::ZedFree) | None => "free",
                 }
             };
             let agents_installed = basics_page::FEATURED_AGENT_IDS

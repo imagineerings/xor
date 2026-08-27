@@ -38,7 +38,7 @@
     <rescap:Capability Name="unvirtualizedResources"/>
   </Capabilities>
   <Applications>
-    <Application Id="SimPreview"
+    <Application Id="ZedPreview"
       Executable="Zed.exe"
       uap10:TrustLevel="mediumIL"
       uap10:RuntimeBehavior="win32App">
@@ -55,13 +55,13 @@
         <desktop4:Extension Category="windows.fileExplorerContextMenus">
           <desktop4:FileExplorerContextMenus>
             <desktop5:ItemType Type="Directory">
-              <desktop5:Verb Id="OpenWithSimPreview" Clsid="af8e85ea-fb20-4db2-93cf-56513c1ec697" />
+              <desktop5:Verb Id="OpenWithZedPreview" Clsid="af8e85ea-fb20-4db2-93cf-56513c1ec697" />
             </desktop5:ItemType>
             <desktop5:ItemType Type="Directory\Background">
-              <desktop5:Verb Id="OpenWithSimPreview" Clsid="af8e85ea-fb20-4db2-93cf-56513c1ec697" />
+              <desktop5:Verb Id="OpenWithZedPreview" Clsid="af8e85ea-fb20-4db2-93cf-56513c1ec697" />
             </desktop5:ItemType>
             <desktop5:ItemType Type="*">
-              <desktop5:Verb Id="OpenWithSimPreview" Clsid="af8e85ea-fb20-4db2-93cf-56513c1ec697" />
+              <desktop5:Verb Id="OpenWithZedPreview" Clsid="af8e85ea-fb20-4db2-93cf-56513c1ec697" />
             </desktop5:ItemType>
           </desktop4:FileExplorerContextMenus>
         </desktop4:Extension>

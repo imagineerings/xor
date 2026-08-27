@@ -12,8 +12,8 @@ default-run = "zed"
 workspace = true
 
 [features]
-default = ["agentic"]
-agentic = [
+default = ["agentic-tools"]
+agentic-tools = [
     "dep:acp_thread",
     "dep:acp_tools",
     "dep:agent",
@@ -38,7 +38,7 @@ agentic = [
     "zed_actions/agentic",
 ]
 multiplayer-tools = [
-    "agentic",
+    "agentic-tools",
     "agent/multiplayer-tools",
     "dep:nostr_compat",
     "agent_ui/multiplayer-tools",
@@ -75,7 +75,7 @@ runtime-shaders = ["gpui_platform/runtime_shaders"]
 # LEAK_BACKTRACE=1 cargo run --features zed/track-project-leak --profile release-fast
 track-project-leak = ["gpui/leak-detection"]
 test-support = [
-    "agentic",
+    "agentic-tools",
     "agent/test-support",
     "dep:tempfile",
     "gpui/test-support",
@@ -91,7 +91,7 @@ test-support = [
     "title_bar/test-support",
 ]
 visual-tests = [
-    "agentic",
+    "agentic-tools",
     "gpui/test-support",
     "gpui_platform/screen-capture",
     "gpui_platform/test-support",

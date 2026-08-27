@@ -35,7 +35,7 @@ participating_crates=(
 )
 
 disabled_normal_tree=$(cargo tree -p zed --no-default-features -e normal --prefix none)
-enabled_normal_tree=$(cargo tree -p zed --no-default-features --features agentic -e normal --prefix none)
+enabled_normal_tree=$(cargo tree -p zed --no-default-features --features agentic-tools -e normal --prefix none)
 
 for package in "${agent_packages[@]}"; do
   if grep -Eq "^${package//-/\\-} v" <<<"$disabled_normal_tree"; then
@@ -59,7 +59,7 @@ for package in "${participating_crates[@]}"; do
   fi
 
   enabled_features=$(
-    cargo tree -p zed --no-default-features --features agentic -e features -i "$package" --prefix none
+    cargo tree -p zed --no-default-features --features agentic-tools -e features -i "$package" --prefix none
   )
   if ! grep -Fq "$package feature \"agentic\"" <<<"$enabled_features"; then
     echo "$package/agentic is not forwarded by the enabled application graph" >&2

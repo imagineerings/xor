@@ -2,7 +2,7 @@ use crate::{
     CloudRequestTimeoutError, CurrentEditPrediction, DebugEvent, EditPredictionFinishedDebugEvent,
     EditPredictionId, EditPredictionInputs, EditPredictionModelInput,
     EditPredictionStartedDebugEvent, EditPredictionStore, PromptHistoryBoundary,
-    SimUpdateRequiredError, buffer_path_with_id_fallback,
+    ZedUpdateRequiredError, buffer_path_with_id_fallback,
     cursor_excerpt::{self, compute_cursor_excerpt, compute_syntax_ranges},
     data_collection::CapturedPredictionContext,
     prediction::EditPredictionResult,
@@ -652,7 +652,7 @@ fn handle_api_response<T>(
                     .ok();
             }
 
-            if err.is::<SimUpdateRequiredError>() {
+            if err.is::<ZedUpdateRequiredError>() {
                 cx.update(|cx| {
                     this.update(cx, |this, _cx| {
                         this.update_required = true;
@@ -677,7 +677,7 @@ fn handle_api_response<T>(
                     }
 
                     show_app_notification(
-                        NotificationId::unique::<SimUpdateRequiredError>(),
+                        NotificationId::unique::<ZedUpdateRequiredError>(),
                         cx,
                         move |cx| {
                             cx.new({

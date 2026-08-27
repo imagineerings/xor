@@ -131,11 +131,11 @@ pub fn install_cli_binary(window: &mut Window, cx: &mut Context<Workspace>) {
         };
 
         workspace.update_in(cx, |workspace, _, cx| {
-            struct InstalledSimCli;
+            struct InstalledZedCli;
 
             workspace.show_toast(
                 Toast::new(
-                    NotificationId::unique::<InstalledSimCli>(),
+                    NotificationId::unique::<InstalledZedCli>(),
                     format!(
                         "Installed `{}` to {}. You can launch {} from your terminal.",
                         product_flavor::EXECUTABLE_NAME,

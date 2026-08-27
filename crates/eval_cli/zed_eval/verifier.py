@@ -7,7 +7,7 @@ from harbor.verifier.verifier import Verifier
 from .judge_proxy import JUDGE_PROXY_ENSURE_SCRIPT, JUDGE_PROXY_SCRIPT
 
 
-class SimJudgeProxyVerifier(Verifier):
+class ZedJudgeProxyVerifier(Verifier):
     async def verify(self) -> VerifierResult:
         await self._ensure_judge_proxy()
         return await super().verify()

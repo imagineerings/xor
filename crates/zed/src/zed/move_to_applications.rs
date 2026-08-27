@@ -90,13 +90,13 @@ impl MoveToApplicationsRequest {
                 workspace
                     .update_in(cx, |workspace, window, cx| {
                         workspace
-                            .toggle_modal(window, cx, |_window, cx| InstallingSimModal::new(cx));
+                            .toggle_modal(window, cx, |_window, cx| InstallingZedModal::new(cx));
                     })
                     .ok();
                 if let Err(error) = move_to_applications(&self.app_path, cx).await {
                     workspace
                         .update_in(cx, |workspace, _window, cx| {
-                            if let Some(modal) = workspace.active_modal::<InstallingSimModal>(cx) {
+                            if let Some(modal) = workspace.active_modal::<InstallingZedModal>(cx) {
                                 modal.update(cx, |modal, cx| modal.finished(cx));
                             }
                         })
@@ -123,12 +123,12 @@ impl MoveToApplicationsRequest {
     }
 }
 
-pub struct InstallingSimModal {
+pub struct InstallingZedModal {
     focus_handle: FocusHandle,
     finished: bool,
 }
 
-impl InstallingSimModal {
+impl InstallingZedModal {
     fn new(cx: &mut Context<Self>) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
@@ -142,9 +142,9 @@ impl InstallingSimModal {
     }
 }
 
-impl EventEmitter<DismissEvent> for InstallingSimModal {}
+impl EventEmitter<DismissEvent> for InstallingZedModal {}
 
-impl ModalView for InstallingSimModal {
+impl ModalView for InstallingZedModal {
     fn on_before_dismiss(
         &mut self,
         _window: &mut Window,
@@ -158,13 +158,13 @@ impl ModalView for InstallingSimModal {
     }
 }
 
-impl Focusable for InstallingSimModal {
+impl Focusable for InstallingZedModal {
     fn focus_handle(&self, _cx: &App) -> FocusHandle {
         self.focus_handle.clone()
     }
 }
 
-impl Render for InstallingSimModal {
+impl Render for InstallingZedModal {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
 

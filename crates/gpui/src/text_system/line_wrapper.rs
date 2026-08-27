@@ -688,7 +688,7 @@ mod tests {
     fn build_wrapper() -> LineWrapper {
         let dispatcher = TestDispatcher::new(0);
         let cx = TestAppContext::build(dispatcher, None);
-        let id = cx.text_system().resolve_font(&font(".SimMono"));
+        let id = cx.text_system().resolve_font(&font(".ZedMono"));
         LineWrapper::new(id, px(16.), cx.text_system().clone())
     }
 
@@ -1257,7 +1257,7 @@ mod tests {
     fn test_multiline_truncation_fits_within_wrapped_lines() {
         let mut wrapper = build_wrapper();
 
-        // With .SimMono at 16px, each char is 9.6px wide.
+        // With .ZedMono at 16px, each char is 9.6px wide.
         // wrap_width = 72px fits ~7 chars per line.
         //
         // "aa bbbbbb cccccc dddddd eeee ffff" with wrap_width=72px wraps as:

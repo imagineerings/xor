@@ -7,8 +7,8 @@ use serde_json::json;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use task::{
-    DebugRequest, DebugScenario, LaunchRequest, SharedTaskContext, SimDebugConfig, TaskContext,
-    VariableName,
+    DebugRequest, DebugScenario, LaunchRequest, SharedTaskContext, TaskContext, VariableName,
+    ZedDebugConfig,
 };
 use text::Point;
 use util::path;
@@ -375,7 +375,7 @@ async fn test_dap_adapter_config_conversion_and_validation(cx: &mut TestAppConte
         registry.enumerate_adapters::<Vec<_>>()
     });
 
-    let zed_config = SimDebugConfig {
+    let zed_config = ZedDebugConfig {
         label: "test_debug_session".into(),
         adapter: "test_adapter".into(),
         request: DebugRequest::Launch(LaunchRequest {

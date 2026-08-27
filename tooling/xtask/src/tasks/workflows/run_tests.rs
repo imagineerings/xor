@@ -379,7 +379,7 @@ mod tests {
         assert!(workflow.contains("--bench cargo_workspace -- --noplot"));
         assert!(workflow.contains("--bench structured_execution -- --noplot"));
         assert!(workflow.contains("test-rust-tools-environments --matrix --offline"));
-        assert!(workflow.contains("application_features: multiplayer-tools,rust-tools"));
+        assert!(workflow.contains("application_features: agentic-tools,rust-tools"));
         assert!(workflow.contains("remote_features: rust-tools"));
         assert!(workflow.contains("cargo xtask bundle --product"));
         assert!(workflow.contains("needs:\n    - shared_validation"));

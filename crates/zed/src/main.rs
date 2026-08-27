@@ -6,12 +6,12 @@ mod comfy_cli;
 mod reliability;
 mod zed;
 
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 use agent_ui::AgentPanel;
 use anyhow::{Context as _, Result};
 use clap::Parser;
 use cli::FORCE_CLI_MODE_ENV_VAR_NAME;
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 use client::RefreshLlmTokenListener;
 use client::{Client, ProxySettings, UserStore, parse_zed_link};
 use collab_ui::channel_view::ChannelView;
@@ -33,7 +33,7 @@ use gpui_tokio::Tokio;
 use language::LanguageRegistry;
 use onboarding::{FIRST_OPEN, show_onboarding_view};
 use project_panel::ProjectPanel;
-#[cfg(feature = "agentic")]
+#[cfg(feature = "agentic-tools")]
 use prompt_store::PromptBuilder;
 use remote::RemoteConnectionOptions;
 use reqwest_client::ReqwestClient;
@@ -629,7 +629,7 @@ fn main() {
         })
         .detach();
 
-        #[cfg(feature = "agentic")]
+        #[cfg(feature = "agentic-tools")]
         let is_new_install = matches!(&installation_id, Some(IdType::New(_)));
 
         // We should rename these in the future to `first app open`, `first app open for release channel`, and `app open`
@@ -698,7 +698,7 @@ fn main() {
 
         copilot_ui::init(&app_state, cx);
         language_model::init(cx);
-        #[cfg(feature = "agentic")]
+        #[cfg(feature = "agentic-tools")]
         {
             RefreshLlmTokenListener::register(
                 app_state.client.clone(),
@@ -711,14 +711,14 @@ fn main() {
         zed::telemetry_log::init(cx);
         zed::remote_debug::init(cx);
         edit_prediction_ui::init(cx);
-        #[cfg(feature = "agentic")]
+        #[cfg(feature = "agentic-tools")]
         {
             web_search::init(cx);
             web_search_providers::init(app_state.client.clone(), app_state.user_store.clone(), cx);
         }
         snippet_provider::init(cx);
         edit_prediction_registry::init(app_state.client.clone(), app_state.user_store.clone(), cx);
-        #[cfg(feature = "agentic")]
+        #[cfg(feature = "agentic-tools")]
         {
             let prompt_builder = PromptBuilder::load(app_state.fs.clone(), stdout_is_a_pty(), cx);
             project::AgentRegistryStore::init_global(
@@ -1050,7 +1050,7 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
                 })
                 .detach_and_log_err(cx);
             }
-            #[cfg(feature = "agentic")]
+            #[cfg(feature = "agentic-tools")]
             OpenRequestKind::AgentPanel {
                 external_source_prompt,
             } => {
@@ -1088,7 +1088,7 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
                 })
                 .detach_and_log_err(cx);
             }
-            #[cfg(feature = "agentic")]
+            #[cfg(feature = "agentic-tools")]
             OpenRequestKind::InstallSkill { content } => {
                 cx.spawn(async move |cx| {
                     let multi_workspace =

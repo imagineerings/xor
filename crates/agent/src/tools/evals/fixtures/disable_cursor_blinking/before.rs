@@ -7966,7 +7966,7 @@ impl Editor {
                         cx.stop_propagation();
                         this.report_editor_event("Edit Prediction Provider ToS Clicked", None, cx);
                         window.dispatch_action(
-                            zed_actions::OpenSimPredictOnboarding.boxed_clone(),
+                            zed_actions::OpenZedPredictOnboarding.boxed_clone(),
                             cx,
                         );
                     }))

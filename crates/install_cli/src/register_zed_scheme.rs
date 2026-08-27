@@ -5,7 +5,7 @@ actions!(
     cli,
     [
         /// Registers the selected product URL scheme handler.
-        RegisterSimScheme
+        RegisterZedScheme
     ]
 );
 
