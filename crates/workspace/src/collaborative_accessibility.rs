@@ -6,7 +6,6 @@ use crate::{
         CollaborativeParticipantProviderState,
     },
     collaborative_shell_state::{CollaborativeShellPhase, CollaborativeShellScope},
-    collaborative_status::{CollaborativeStatusProjection, CollaborativeTaskPhase},
 };
 
 pub const WORKSPACE_LABEL: &str = "Collaborative Workspace";
@@ -170,29 +169,6 @@ pub(crate) fn shell_announcement(
     })
 }
 
-pub(crate) fn project_status_label(projection: &CollaborativeStatusProjection) -> SharedString {
-    let task = projection.task.map_or("No active task", task_label);
-    format!(
-        "{STATUS_LABEL}: project {}, repository {}, branch {}, {} changed files, {} additions, {} deletions, {task}",
-        projection.project,
-        projection.repository_label(),
-        projection.branch_label(),
-        projection.changed_files,
-        projection.additions,
-        projection.deletions,
-    )
-    .into()
-}
-
-fn task_label(task: CollaborativeTaskPhase) -> &'static str {
-    match task {
-        CollaborativeTaskPhase::Running => "task running",
-        CollaborativeTaskPhase::WaitingForUser => "task waiting for user",
-        CollaborativeTaskPhase::Failed => "task failed",
-        CollaborativeTaskPhase::Completed => "task completed",
-    }
-}
-
 fn scope_label(scope: CollaborativeShellScope) -> &'static str {
     match scope {
         CollaborativeShellScope::Workspace => "Collaborative Workspace",
@@ -252,6 +228,8 @@ mod tests {
                     runtime: None,
                     location: CollaborativeExecutionLocation::Local,
                 }),
+                task_title: Some("Run checks".into()),
+                connection: Default::default(),
             });
         assert_eq!(
             participant_label(&running).as_ref(),

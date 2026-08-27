@@ -1,21 +1,23 @@
 use std::{cmp::Reverse, collections::HashMap};
 
 use agent_ui::thread_metadata_store::{ThreadMetadata, ThreadMetadataStore};
+use channel::{Channel, ChannelStore};
 use chrono::{DateTime, Utc};
-use gpui::{Context, InteractiveElement, Render, SharedString, Task, WeakEntity};
-use ui::{Window, prelude::*};
+use gpui::{
+    Action, Context, InteractiveElement, KeyDownEvent, Render, Role, SharedString, Task, WeakEntity,
+};
+use ui::{Tooltip, Window, prelude::*};
 use workspace::{
     MultiWorkspace, RecentWorkspace, WorkspaceDb,
     collaborative_navigation::CollaborativeNavigationTarget,
 };
 
 use crate::collaborative_navigation::{
-    CollaborativeNavigationProjection, CollaborativeNavigationRow, CollaborativeNavigationSourceId,
+    CollaborativeNavigationBadge, CollaborativeNavigationProjection, CollaborativeNavigationRow,
+    CollaborativeNavigationSourceId, render_collaborative_navigation_badges,
 };
 use crate::{
-    collaborative_awareness::{observe_collaborative_awareness, render_collaborative_awareness},
-    collaborative_projects::activate_project_target,
-    collaborative_tasks::activate_thread_target,
+    collaborative_projects::activate_project_target, collaborative_tasks::activate_thread_target,
 };
 
 const MAX_RECENT_WORK_ROWS: usize = 8;
@@ -36,14 +38,16 @@ struct RecentNavigationCandidate {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct CollaborativePinnedProjection {
     navigation: CollaborativeNavigationProjection,
-    missing_targets: Vec<CollaborativeNavigationSourceId>,
+    missing_targets: Vec<CollaborativeNavigationTarget>,
+    pinned_sources: std::collections::HashSet<CollaborativeNavigationSourceId>,
 }
 
 impl CollaborativePinnedProjection {
     fn from_sources(
-        pinned_targets: &[CollaborativeNavigationSourceId],
+        pinned_targets: &[CollaborativeNavigationTarget],
         recent_projects: &[RecentWorkspace],
         recent_threads: impl IntoIterator<Item = ThreadMetadata>,
+        channels: impl IntoIterator<Item = (Channel, bool)>,
     ) -> Result<Self, SharedString> {
         let mut recent_candidates = Vec::new();
         for workspace in recent_projects {
@@ -77,18 +81,38 @@ impl CollaborativePinnedProjection {
                 return Err(format!("duplicate recent source: {source_id:?}").into());
             }
         }
+        for (channel, unread) in channels {
+            let badges = unread
+                .then_some(CollaborativeNavigationBadge::Unread(1))
+                .into_iter()
+                .collect();
+            let row = CollaborativeNavigationRow::from_channel(&channel, badges);
+            let source_id = row.source_id().clone();
+            if candidates_by_source
+                .insert(source_id.clone(), row)
+                .is_some()
+            {
+                return Err(format!("duplicate channel source: {source_id:?}").into());
+            }
+        }
         let mut rows = Vec::new();
         let mut missing_targets = Vec::new();
         let mut included_sources = std::collections::HashSet::new();
+        let mut pinned_sources = std::collections::HashSet::new();
         for target in pinned_targets {
-            if !included_sources.insert(target.clone()) {
+            let candidate = candidates_by_source
+                .values()
+                .find(|row| CollaborativePinned::target(row).as_ref() == Some(target));
+            let Some(candidate) = candidate else {
+                missing_targets.push(target.clone());
+                continue;
+            };
+            let source_id = candidate.source_id().clone();
+            if !included_sources.insert(source_id) {
                 return Err(format!("duplicate pinned target: {target:?}").into());
             }
-            if let Some(row) = candidates_by_source.get(target) {
-                rows.push(CollaborativeNavigationRow::pinned(row, Vec::new()));
-            } else {
-                missing_targets.push(target.clone());
-            }
+            pinned_sources.insert(candidate.source_id().clone());
+            rows.push(CollaborativeNavigationRow::pinned(candidate, Vec::new()));
         }
 
         let mut recent_row_count = 0;
@@ -111,6 +135,7 @@ impl CollaborativePinnedProjection {
         Ok(Self {
             navigation,
             missing_targets,
+            pinned_sources,
         })
     }
 }
@@ -120,15 +145,16 @@ pub(crate) struct CollaborativePinned {
     state: CollaborativePinnedState,
     activation_error: Option<SharedString>,
     recent_projects: Vec<RecentWorkspace>,
-    pinned_targets: Vec<CollaborativeNavigationSourceId>,
     _load_task: Task<()>,
 }
 
 impl CollaborativePinned {
     pub(crate) fn new(multi_workspace: WeakEntity<MultiWorkspace>, cx: &mut Context<Self>) -> Self {
-        observe_collaborative_awareness(cx);
         if let Some(thread_store) = ThreadMetadataStore::try_global(cx) {
             cx.observe(&thread_store, |_, _, cx| cx.notify()).detach();
+        }
+        if let Some(channel_store) = ChannelStore::try_global(cx) {
+            cx.observe(&channel_store, |_, _, cx| cx.notify()).detach();
         }
 
         let multi_workspace = multi_workspace.upgrade();
@@ -178,7 +204,6 @@ impl CollaborativePinned {
             },
             activation_error: None,
             recent_projects: Vec::new(),
-            pinned_targets: Vec::new(),
             _load_task: load_task,
         }
     }
@@ -187,10 +212,43 @@ impl CollaborativePinned {
         let recent_threads = ThreadMetadataStore::try_global(cx)
             .map(|store| store.read(cx).entries().cloned().collect::<Vec<_>>())
             .unwrap_or_default();
+        let channels = ChannelStore::try_global(cx)
+            .map(|store| {
+                let store = store.read(cx);
+                store
+                    .channels()
+                    .map(|channel| {
+                        (
+                            channel.as_ref().clone(),
+                            store.has_channel_buffer_changed(channel.id),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let mut pinned_targets = self
+            .multi_workspace
+            .as_ref()
+            .and_then(WeakEntity::upgrade)
+            .map(|multi_workspace| {
+                let workspace = multi_workspace.read(cx).workspace().clone();
+                workspace
+                    .read(cx)
+                    .collaborative_navigation()
+                    .pinned()
+                    .to_vec()
+            })
+            .unwrap_or_default();
+        if let Some(channel_store) = ChannelStore::try_global(cx) {
+            pinned_targets.extend(channel_store.read(cx).favorite_channel_ids().iter().map(
+                |channel_id| CollaborativeNavigationTarget::channel(channel_id.0.to_string()),
+            ));
+        }
         CollaborativePinnedProjection::from_sources(
-            &self.pinned_targets,
+            &pinned_targets,
             &self.recent_projects,
             recent_threads,
+            channels,
         )
     }
 
@@ -202,8 +260,70 @@ impl CollaborativePinned {
             CollaborativeNavigationSourceId::Thread(thread_id) => Some(
                 CollaborativeNavigationTarget::thread(thread_id.to_key_string()),
             ),
+            CollaborativeNavigationSourceId::Channel(channel_id) => Some(
+                CollaborativeNavigationTarget::channel(channel_id.to_string()),
+            ),
             _ => None,
         }
+    }
+
+    fn selected_target(&self, cx: &gpui::App) -> Option<CollaborativeNavigationTarget> {
+        let multi_workspace = self.multi_workspace.as_ref()?.upgrade()?;
+        let workspace = multi_workspace.read(cx).workspace().clone();
+        workspace
+            .read(cx)
+            .collaborative_navigation()
+            .current()
+            .cloned()
+    }
+
+    fn unpin(
+        &mut self,
+        target: CollaborativeNavigationTarget,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(multi_workspace) = self.multi_workspace.as_ref().and_then(WeakEntity::upgrade)
+        else {
+            self.activation_error = Some("Pinning is unavailable".into());
+            cx.notify();
+            return;
+        };
+        match &target {
+            CollaborativeNavigationTarget::Channel { channel_id } => {
+                let result = channel_id
+                    .parse::<u64>()
+                    .map_err(|_| SharedString::from("The pinned channel is invalid"))
+                    .and_then(|channel_id| {
+                        let channel_store = ChannelStore::try_global(cx).ok_or_else(|| {
+                            SharedString::from("Channel favorites are unavailable")
+                        })?;
+                        channel_store.update(cx, |store, cx| {
+                            let channel_id = {
+                                store
+                                    .channels()
+                                    .find(|channel| channel.id.0 == channel_id)
+                                    .map(|channel| channel.id)
+                            };
+                            if let Some(channel_id) = channel_id {
+                                store.toggle_favorite_channel(channel_id, cx);
+                            }
+                        });
+                        Ok(())
+                    });
+                self.activation_error = result.err();
+            }
+            _ => {
+                let workspace = multi_workspace.read(cx).workspace().clone();
+                self.activation_error = workspace
+                    .update(cx, |workspace, cx| {
+                        workspace.toggle_collaborative_pin(target, window, cx)
+                    })
+                    .err()
+                    .map(|error| error.to_string().into());
+            }
+        }
+        cx.notify();
     }
 
     fn activate(
@@ -241,6 +361,38 @@ impl CollaborativePinned {
                     |metadata| activate_thread_target(&multi_workspace, metadata, window, cx),
                 )
             }
+            CollaborativeNavigationTarget::Channel { channel_id } => channel_id
+                .parse::<u64>()
+                .map_err(|_| SharedString::from("The selected channel is invalid"))
+                .and_then(|channel_id| {
+                    let available = ChannelStore::try_global(cx).is_some_and(|store| {
+                        store
+                            .read(cx)
+                            .channels()
+                            .any(|channel| channel.id.0 == channel_id)
+                    });
+                    if !available {
+                        return Err(SharedString::from(
+                            "The selected channel is no longer available",
+                        ));
+                    }
+                    let workspace = multi_workspace.read(cx).workspace().clone();
+                    workspace
+                        .update(cx, |workspace, cx| {
+                            workspace.navigate_collaborative_to(
+                                CollaborativeNavigationTarget::channel(channel_id.to_string()),
+                                |_| true,
+                                window,
+                                cx,
+                            )
+                        })
+                        .map_err(|error| SharedString::from(error.to_string()))?;
+                    window.dispatch_action(
+                        workspace::OpenChannelNotesById { channel_id }.boxed_clone(),
+                        cx,
+                    );
+                    Ok(())
+                }),
             _ => Err("The selected item is unsupported".into()),
         };
         self.activation_error = result.err();
@@ -250,6 +402,7 @@ impl CollaborativePinned {
 
 impl Render for CollaborativePinned {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let selected_target = self.selected_target(cx);
         let contents = match &self.state {
             CollaborativePinnedState::Loading => v_flex()
                 .debug_selector(|| "COLLABORATIVE-PINNED-LOADING".to_owned())
@@ -302,12 +455,27 @@ impl Render for CollaborativePinned {
                             )
                         })
                         .children(projection.navigation.rows().iter().map(|row| {
-                            let awareness = render_collaborative_awareness(row, cx);
+                            let badges = render_collaborative_navigation_badges(row);
                             let Some(target) = Self::target(row) else {
                                 return Label::new("Pinned target is unavailable")
                                     .size(LabelSize::Small)
                                     .color(Color::Error)
                                     .into_any_element();
+                            };
+                            let keyboard_target = target.clone();
+                            let unpin_target = target.clone();
+                            let is_pinned = projection.pinned_sources.contains(row.source_id());
+                            let selected = selected_target.as_ref() == Some(&target);
+                            let icon = match row.source_id() {
+                                CollaborativeNavigationSourceId::Project(_) => IconName::Folder,
+                                CollaborativeNavigationSourceId::Thread(_) => IconName::Circle,
+                                CollaborativeNavigationSourceId::Channel(_) => IconName::Hash,
+                                CollaborativeNavigationSourceId::Worktree { .. } => {
+                                    IconName::Folder
+                                }
+                                CollaborativeNavigationSourceId::Repository { .. } => {
+                                    IconName::GitBranch
+                                }
                             };
                             h_flex()
                                 .id(SharedString::from(format!(
@@ -315,15 +483,50 @@ impl Render for CollaborativePinned {
                                 )))
                                 .h_6()
                                 .min_w_0()
+                                .tab_index(0)
+                                .role(Role::Link)
+                                .aria_label(format!("Open pinned item {}", row.label()))
+                                .when(selected, |this| {
+                                    this.bg(cx.theme().colors().element_selected)
+                                })
+                                .gap_1()
+                                .child(Icon::new(icon).size(IconSize::XSmall).color(Color::Muted))
                                 .child(
                                     Label::new(row.label().clone())
                                         .size(LabelSize::Small)
                                         .truncate(),
                                 )
-                                .when_some(awareness, |this, awareness| this.child(awareness))
+                                .when_some(badges, |this, badges| this.child(badges))
+                                .when(is_pinned, |this| {
+                                    this.child(
+                                        IconButton::new(
+                                            SharedString::from(format!(
+                                                "unpin-collaborative-target-{unpin_target:?}"
+                                            )),
+                                            IconName::Unpin,
+                                        )
+                                        .icon_size(IconSize::XSmall)
+                                        .tooltip(Tooltip::text("Unpin"))
+                                        .on_click(
+                                            cx.listener(move |this, _, window, cx| {
+                                                cx.stop_propagation();
+                                                this.unpin(unpin_target.clone(), window, cx);
+                                            }),
+                                        ),
+                                    )
+                                })
                                 .on_click(cx.listener(move |this, _, window, cx| {
                                     this.activate(target.clone(), window, cx);
                                 }))
+                                .on_key_down(cx.listener(
+                                    move |this, event: &KeyDownEvent, window, cx| {
+                                        if matches!(event.keystroke.key.as_str(), "enter" | "space")
+                                        {
+                                            cx.stop_propagation();
+                                            this.activate(keyboard_target.clone(), window, cx);
+                                        }
+                                    },
+                                ))
                                 .into_any_element()
                         }))
                         .into_any_element()
@@ -391,11 +594,16 @@ mod tests {
             None,
             project.identity_paths.clone(),
         ));
+        let project_target = CollaborativeNavigationTarget::project(match &project_source {
+            CollaborativeNavigationSourceId::Project(project) => project,
+            _ => unreachable!(),
+        });
 
         let projection = CollaborativePinnedProjection::from_sources(
-            std::slice::from_ref(&project_source),
+            std::slice::from_ref(&project_target),
             std::slice::from_ref(&project),
             [thread],
+            [],
         )
         .expect("valid recent work should project");
         assert_eq!(projection.navigation.rows().len(), 2);
@@ -414,24 +622,30 @@ mod tests {
             None,
             project.identity_paths.clone(),
         ));
+        let project_target = CollaborativeNavigationTarget::project(match &project_source {
+            CollaborativeNavigationSourceId::Project(project) => project,
+            _ => unreachable!(),
+        });
         let archived = recent_thread("archived", timestamp, true);
 
         let present = CollaborativePinnedProjection::from_sources(
-            std::slice::from_ref(&project_source),
+            std::slice::from_ref(&project_target),
             std::slice::from_ref(&project),
             [archived.clone()],
+            [],
         )
         .expect("present target should project");
         assert_eq!(present.navigation.rows().len(), 1);
 
         let removed = CollaborativePinnedProjection::from_sources(
-            std::slice::from_ref(&project_source),
+            std::slice::from_ref(&project_target),
             &[],
             [archived],
+            [],
         )
         .expect("missing targets should remain observable");
         assert!(removed.navigation.rows().is_empty());
-        assert_eq!(removed.missing_targets, vec![project_source]);
+        assert_eq!(removed.missing_targets, vec![project_target]);
     }
 
     #[test]
@@ -442,16 +656,21 @@ mod tests {
             None,
             project.identity_paths.clone(),
         ));
+        let target = CollaborativeNavigationTarget::project(match &source {
+            CollaborativeNavigationSourceId::Project(project) => project,
+            _ => unreachable!(),
+        });
         let error = CollaborativePinnedProjection::from_sources(
-            &[source.clone(), source],
+            &[target.clone(), target],
             std::slice::from_ref(&project),
+            [],
             [],
         )
         .expect_err("duplicate target records should not silently collapse");
         assert!(error.contains("duplicate pinned target"));
 
         let duplicate_recent =
-            CollaborativePinnedProjection::from_sources(&[], &[project.clone(), project], [])
+            CollaborativePinnedProjection::from_sources(&[], &[project.clone(), project], [], [])
                 .expect_err("duplicate recent records should not silently overwrite one another");
         assert!(duplicate_recent.contains("duplicate recent source"));
     }
@@ -496,7 +715,6 @@ mod tests {
             state: CollaborativePinnedState::Ready,
             activation_error: None,
             recent_projects: Vec::new(),
-            pinned_targets: Vec::new(),
             _load_task: Task::ready(()),
         });
         cx.run_until_parked();

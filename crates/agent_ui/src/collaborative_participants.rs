@@ -1,24 +1,29 @@
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, rc::Rc};
 
 use acp_thread::ThreadStatus;
-use gpui::{App, Entity, EntityId, SharedString, SharedUri};
+use gpui::{App, Entity, EntityId, SharedString, SharedUri, WeakEntity};
 use project::Project;
 use workspace::{
     Workspace,
     collaborative_participants::{
-        CollaborativeExecutionLocation, CollaborativeExecutionPhase, CollaborativeExecutionStatus,
-        CollaborativeParticipant, CollaborativeParticipantPresence,
-        CollaborativeParticipantProvider, CollaborativeParticipantProviderState,
-        CollaborativeParticipantViewData,
+        CollaborativeConnectionState, CollaborativeExecutionLocation, CollaborativeExecutionPhase,
+        CollaborativeExecutionStatus, CollaborativeParticipant, CollaborativeParticipantProvider,
+        CollaborativeParticipantProviderState, CollaborativeParticipantViewData,
     },
 };
 
-use crate::{Agent, AgentPanel, thread_metadata_store::ThreadMetadataStore};
+use crate::{
+    Agent, AgentPanel, conversation_view::ThreadView, thread_metadata_store::ThreadMetadataStore,
+};
+
+type RoomStateReader =
+    Rc<dyn Fn(&App) -> (Vec<CollaborativeParticipant>, CollaborativeConnectionState)>;
 
 pub struct CollaborativeParticipantAdapter {
     project: Entity<Project>,
+    thread_view: WeakEntity<ThreadView>,
     thread_view_id: EntityId,
-    view_data: CollaborativeParticipantViewData,
+    room_state_reader: Option<RoomStateReader>,
 }
 
 impl CollaborativeParticipantAdapter {
@@ -27,14 +32,10 @@ impl CollaborativeParticipantAdapter {
         workspace: &Entity<Workspace>,
         cx: &App,
     ) -> Result<Self, CollaborativeParticipantAdapterError> {
-        let (thread_view, active_thread_id) = agent_panel.read_with(cx, |agent_panel, cx| {
-            (
-                agent_panel.active_thread_view(cx),
-                agent_panel.active_thread_id(cx),
-            )
-        });
-        let thread_view =
-            thread_view.ok_or(CollaborativeParticipantAdapterError::ThreadUnavailable)?;
+        let thread_view = agent_panel
+            .read(cx)
+            .active_thread_view(cx)
+            .ok_or(CollaborativeParticipantAdapterError::ThreadUnavailable)?;
         let project = thread_view
             .read(cx)
             .project
@@ -44,6 +45,60 @@ impl CollaborativeParticipantAdapter {
             return Err(CollaborativeParticipantAdapterError::ProjectMismatch);
         }
 
+        Ok(Self {
+            project,
+            thread_view: thread_view.downgrade(),
+            thread_view_id: thread_view.entity_id(),
+            room_state_reader: None,
+        })
+    }
+
+    pub fn with_room_state_reader(
+        mut self,
+        reader: impl Fn(&App) -> (Vec<CollaborativeParticipant>, CollaborativeConnectionState) + 'static,
+    ) -> Self {
+        self.room_state_reader = Some(Rc::new(reader));
+        self
+    }
+
+    pub fn thread_view_id(&self) -> EntityId {
+        self.thread_view_id
+    }
+
+    pub fn state(&self, cx: &App) -> CollaborativeParticipantProviderState {
+        match self.view_data(cx) {
+            Ok(view_data) => CollaborativeParticipantProviderState::Ready(view_data),
+            Err(CollaborativeParticipantAdapterError::ThreadUnavailable) => {
+                CollaborativeParticipantProviderState::Unavailable
+            }
+            Err(error) => CollaborativeParticipantProviderState::failed(error.to_string()),
+        }
+    }
+
+    pub fn into_provider(self) -> CollaborativeParticipantProvider {
+        let project = self.project.clone();
+        let source_id = self.thread_view_id;
+        CollaborativeParticipantProvider::from_reader(project, source_id, move |cx| self.state(cx))
+    }
+
+    fn view_data(
+        &self,
+        cx: &App,
+    ) -> Result<CollaborativeParticipantViewData, CollaborativeParticipantAdapterError> {
+        let thread_view = self
+            .thread_view
+            .upgrade()
+            .ok_or(CollaborativeParticipantAdapterError::ThreadUnavailable)?;
+        let project = thread_view
+            .read(cx)
+            .project
+            .upgrade()
+            .ok_or(CollaborativeParticipantAdapterError::ProjectUnavailable)?;
+        if project.entity_id() != self.project.entity_id() {
+            return Err(CollaborativeParticipantAdapterError::ProjectMismatch);
+        }
+
+        let active_thread_id = Some(thread_view.read(cx).root_thread_id);
         let location = active_thread_id
             .and_then(|thread_id| {
                 ThreadMetadataStore::try_global(cx).and_then(|store| {
@@ -60,8 +115,18 @@ impl CollaborativeParticipantAdapter {
                 None => CollaborativeExecutionLocation::Local,
             })
             .unwrap_or(CollaborativeExecutionLocation::Unknown);
+        let task_title = active_thread_id
+            .and_then(|thread_id| {
+                ThreadMetadataStore::try_global(cx).and_then(|store| {
+                    store
+                        .read(cx)
+                        .entry(thread_id)
+                        .and_then(|metadata| metadata.title())
+                })
+            })
+            .or_else(|| thread_view.read(cx).thread.read(cx).title());
 
-        let snapshot = thread_view.read_with(cx, |thread_view, cx| {
+        let mut view_data = thread_view.read_with(cx, |thread_view, cx| {
             let agent_id = thread_view.agent_id.clone();
             let agent_server_store = project.read(cx).agent_server_store().clone();
             let display_name = agent_server_store
@@ -90,72 +155,32 @@ impl CollaborativeParticipantAdapter {
             } else {
                 CollaborativeExecutionPhase::Idle
             };
-            CollaborativeParticipantSnapshot {
-                agent_id: agent_id.0,
-                display_name,
-                avatar_uri,
-                model,
-                runtime,
-                location,
-                phase,
+            CollaborativeParticipantViewData {
+                participants: vec![CollaborativeParticipant::agent(
+                    agent_id.0,
+                    display_name,
+                    avatar_uri,
+                    workspace::collaborative_participants::CollaborativeParticipantPresence::Online,
+                )],
+                execution: Some(CollaborativeExecutionStatus {
+                    phase,
+                    model,
+                    runtime: Some(runtime),
+                    location,
+                }),
+                task_title,
+                connection: CollaborativeConnectionState::Disconnected,
             }
         });
-        Self::from_snapshot(project, thread_view.entity_id(), Some(snapshot))
-    }
 
-    fn from_snapshot(
-        project: Entity<Project>,
-        thread_view_id: EntityId,
-        snapshot: Option<CollaborativeParticipantSnapshot>,
-    ) -> Result<Self, CollaborativeParticipantAdapterError> {
-        let snapshot = snapshot.ok_or(CollaborativeParticipantAdapterError::ThreadUnavailable)?;
-        let participant = CollaborativeParticipant::agent(
-            snapshot.agent_id,
-            snapshot.display_name,
-            snapshot.avatar_uri,
-            CollaborativeParticipantPresence::Online,
-        );
-        let execution = CollaborativeExecutionStatus {
-            phase: snapshot.phase,
-            model: snapshot.model,
-            runtime: Some(snapshot.runtime),
-            location: snapshot.location,
-        };
-        Ok(Self {
-            project,
-            thread_view_id,
-            view_data: CollaborativeParticipantViewData {
-                participants: vec![participant],
-                execution: Some(execution),
-            },
-        })
+        if let Some(room_state_reader) = &self.room_state_reader {
+            let (mut participants, connection) = room_state_reader(cx);
+            participants.append(&mut view_data.participants);
+            view_data.participants = participants;
+            view_data.connection = connection;
+        }
+        Ok(view_data)
     }
-
-    pub fn thread_view_id(&self) -> EntityId {
-        self.thread_view_id
-    }
-
-    pub fn view_data(&self) -> &CollaborativeParticipantViewData {
-        &self.view_data
-    }
-
-    pub fn into_provider(self) -> CollaborativeParticipantProvider {
-        CollaborativeParticipantProvider::new(
-            self.project,
-            self.thread_view_id,
-            CollaborativeParticipantProviderState::Ready(self.view_data),
-        )
-    }
-}
-
-struct CollaborativeParticipantSnapshot {
-    agent_id: SharedString,
-    display_name: SharedString,
-    avatar_uri: Option<SharedUri>,
-    model: Option<SharedString>,
-    runtime: SharedString,
-    location: CollaborativeExecutionLocation,
-    phase: CollaborativeExecutionPhase,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -181,110 +206,97 @@ impl Error for CollaborativeParticipantAdapterError {}
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
+    use acp_thread::StubAgentConnection;
     use fs::FakeFs;
-    use gpui::{AppContext as _, Empty, TestAppContext};
-    use settings::SettingsStore;
-    use workspace::collaborative_participants::CollaborativeParticipantIdentity;
+    use gpui::{AppContext as _, TestAppContext, VisualTestContext, px, size};
+    use project::Project;
+    use workspace::MultiWorkspace;
+
+    use crate::thread_metadata_store::ThreadMetadataStore;
 
     use super::*;
 
-    fn snapshot(
-        agent_id: &str,
-        model: Option<&str>,
-        location: CollaborativeExecutionLocation,
-    ) -> CollaborativeParticipantSnapshot {
-        CollaborativeParticipantSnapshot {
-            agent_id: agent_id.to_owned().into(),
-            display_name: "Review Agent".into(),
-            avatar_uri: Some("https://example.test/agent.png".into()),
-            model: model.map(SharedString::from),
-            runtime: "ACP".into(),
-            location,
-            phase: CollaborativeExecutionPhase::Running,
-        }
-    }
-
     #[gpui::test]
-    async fn collaborative_participant_adapter(cx: &mut TestAppContext) {
+    async fn collaborative_participants_read_the_active_native_thread(cx: &mut TestAppContext) {
+        crate::test_support::init_test(cx);
         cx.update(|cx| {
-            let settings_store = SettingsStore::test(cx);
-            cx.set_global(settings_store);
-            cx.set_global(db::AppDatabase::test_new());
-            theme_settings::init(theme::LoadThemes::JustBase, cx);
+            agent::ThreadStore::init_global(cx);
+            language_model::LanguageModelRegistry::test(cx);
+            ThreadMetadataStore::init_global(cx);
         });
-        let file_system = FakeFs::new(cx.executor());
-        let project = Project::test(file_system, [Path::new("/project")], cx).await;
-        let first_thread = cx.new(|_| Empty);
-        let changed_thread = cx.new(|_| Empty);
 
-        assert!(matches!(
-            CollaborativeParticipantAdapter::from_snapshot(
-                project.clone(),
-                first_thread.entity_id(),
-                None
-            ),
-            Err(CollaborativeParticipantAdapterError::ThreadUnavailable)
-        ));
+        let project = Project::test(FakeFs::new(cx.executor()), [], cx).await;
+        let multi_workspace =
+            cx.add_window(|window, cx| MultiWorkspace::test_new(project, window, cx));
+        let workspace = multi_workspace
+            .read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone())
+            .expect("test workspace should exist");
+        let cx = &mut VisualTestContext::from_window(multi_workspace.into(), cx);
+        cx.simulate_resize(size(px(900.), px(700.)));
 
-        let local = CollaborativeParticipantAdapter::from_snapshot(
-            project.clone(),
-            first_thread.entity_id(),
-            Some(snapshot(
-                "agent:reviewer",
-                None,
-                CollaborativeExecutionLocation::Local,
-            )),
-        )
-        .expect("active local thread should adapt");
-        let changed = CollaborativeParticipantAdapter::from_snapshot(
-            project,
-            changed_thread.entity_id(),
-            Some(snapshot(
-                "agent:reviewer",
-                Some("claude-sonnet"),
-                CollaborativeExecutionLocation::Remote(Some("build-host".into())),
-            )),
-        )
-        .expect("changed remote thread should adapt");
+        let panel = workspace.update_in(cx, |workspace, window, cx| {
+            let panel = cx.new(|cx| AgentPanel::new(workspace, window, cx));
+            workspace.add_panel(panel.clone(), window, cx);
+            panel
+        });
+        crate::test_support::open_thread_with_connection(&panel, StubAgentConnection::new(), cx);
+        let thread_view = panel.read_with(cx, |panel, cx| {
+            panel
+                .active_thread_view(cx)
+                .expect("active thread view should exist")
+        });
 
-        assert_eq!(local.thread_view_id(), first_thread.entity_id());
-        assert_eq!(changed.thread_view_id(), changed_thread.entity_id());
-        assert_ne!(local.thread_view_id(), changed.thread_view_id());
-        let local_participant = local
-            .view_data()
-            .participants
-            .first()
-            .expect("local agent participant should exist");
-        let changed_participant = changed
-            .view_data()
-            .participants
-            .first()
-            .expect("changed agent participant should exist");
+        let adapter = cx
+            .update(|_, cx| {
+                CollaborativeParticipantAdapter::from_agent_panel(&panel, &workspace, cx)
+            })
+            .expect("active native thread should adapt");
+        assert_eq!(adapter.thread_view_id(), thread_view.entity_id());
+        let registration = workspace
+            .update(cx, |workspace, cx| {
+                workspace.register_collaborative_participant_provider(adapter.into_provider(), cx)
+            })
+            .expect("native participant reader should register");
+
+        workspace.read_with(cx, |workspace, cx| {
+            let CollaborativeParticipantProviderState::Ready(view_data) =
+                workspace.collaborative_participants().state(cx)
+            else {
+                panic!("active native thread should provide participant state")
+            };
+            assert_eq!(
+                view_data
+                    .execution
+                    .as_ref()
+                    .map(|execution| execution.phase),
+                Some(CollaborativeExecutionPhase::Idle)
+            );
+        });
+
+        crate::test_support::send_message(&panel, cx);
+        workspace.read_with(cx, |workspace, cx| {
+            let CollaborativeParticipantProviderState::Ready(view_data) =
+                workspace.collaborative_participants().state(cx)
+            else {
+                panic!("active native thread should remain registered")
+            };
+            assert_eq!(
+                view_data
+                    .execution
+                    .as_ref()
+                    .map(|execution| execution.phase),
+                Some(CollaborativeExecutionPhase::Running)
+            );
+        });
+
+        workspace.update(cx, |workspace, cx| {
+            assert!(workspace.unregister_collaborative_participant_provider(registration, cx));
+        });
         assert_eq!(
-            local_participant.identity,
-            CollaborativeParticipantIdentity::Agent("agent:reviewer".into())
-        );
-        assert_eq!(local_participant.avatar_uri, changed_participant.avatar_uri);
-
-        let local_execution = local
-            .view_data()
-            .execution
-            .as_ref()
-            .expect("local execution should exist");
-        assert_eq!(local_execution.model_label().as_ref(), "Unknown model");
-        assert_eq!(local_execution.runtime_label().as_ref(), "ACP");
-        assert_eq!(local_execution.location_label().as_ref(), "Local");
-        let changed_execution = changed
-            .view_data()
-            .execution
-            .as_ref()
-            .expect("changed execution should exist");
-        assert_eq!(changed_execution.model_label().as_ref(), "claude-sonnet");
-        assert_eq!(
-            changed_execution.location_label().as_ref(),
-            "Remote · build-host"
+            workspace.read_with(cx, |workspace, cx| {
+                workspace.collaborative_participants().state(cx)
+            }),
+            CollaborativeParticipantProviderState::Unavailable
         );
     }
 }

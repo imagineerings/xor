@@ -1,7 +1,16 @@
 use std::{error::Error, fmt};
 
-use gpui::{AnyView, Entity, EntityId};
+use gpui::{AnyView, Entity, EntityId, actions};
 use project::Project;
+
+actions!(
+    collaborative_workspace,
+    [
+        SelectAgentReview,
+        SelectProjectReview,
+        ToggleCollaborativeReview
+    ]
+);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CollaborativeReviewSlot {
@@ -138,6 +147,10 @@ impl CollaborativeReviewHost {
         self.resolved_slot()
             .and_then(|slot| self.provider(slot))
             .cloned()
+    }
+
+    pub fn provider_available(&self, slot: CollaborativeReviewSlot) -> bool {
+        self.provider(slot).is_some()
     }
 
     pub fn visible_view(&self, review_requested: bool) -> Option<AnyView> {

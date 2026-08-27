@@ -245,6 +245,35 @@ impl Render for TitleBar {
 
         let show_menus = show_menus(cx);
 
+        if let Some(collaborative_title_bar) = self
+            .workspace
+            .upgrade()
+            .and_then(|workspace| workspace.read(cx).collaborative_title_bar(cx))
+        {
+            if show_menus {
+                self.platform_titlebar.update(cx, |this, _| {
+                    this.set_button_layout(button_layout);
+                    this.set_children(
+                        self.application_menu
+                            .clone()
+                            .map(|menu| menu.into_any_element()),
+                    );
+                });
+
+                return v_flex()
+                    .w_full()
+                    .child(self.platform_titlebar.clone().into_any_element())
+                    .child(collaborative_title_bar)
+                    .into_any_element();
+            }
+
+            self.platform_titlebar.update(cx, |this, _| {
+                this.set_button_layout(button_layout);
+                this.set_children(Some(collaborative_title_bar));
+            });
+            return self.platform_titlebar.clone().into_any_element();
+        }
+
         let mut children = <ArrayVec<_, 5>>::new();
 
         let mut project_name = None;

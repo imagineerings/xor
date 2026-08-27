@@ -3766,9 +3766,12 @@ dependencies = [
  "fuzzy",
  "git_ui",
  "gpui",
+ "hex",
  "iroh-base",
  "livekit_client",
+ "log",
  "menu",
+ "multi_buffer",
  "nostr_compat",
  "notifications",
  "picker",
@@ -3793,6 +3796,7 @@ dependencies = [
  "uuid",
  "workspace",
  "zed_actions",
+ "zed_credentials_provider",
  "zeroize",
 ]
 

@@ -193,6 +193,7 @@ impl Render for PlatformTitleBar {
         let sidebar = self.sidebar_render_state(cx);
 
         let title_bar = h_flex()
+            .debug_selector(|| "PLATFORM-TITLE-BAR".to_owned())
             .window_control_area(WindowControlArea::Drag)
             .w_full()
             .h(height)

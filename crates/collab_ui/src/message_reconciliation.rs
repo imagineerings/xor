@@ -114,17 +114,23 @@ where
             .operations
             .get_mut(operation_id)
             .ok_or(MessageReconciliationError::UnknownOperation)?;
-        let MessageDeliveryState::Pending { attempt } = state else {
-            return Ok(MessageReconciliationAction::Unchanged {
-                operation_id: operation_id.clone(),
-            });
+        let next_attempt = match state {
+            MessageDeliveryState::Pending { attempt } => attempt
+                .checked_add(1)
+                .ok_or(MessageReconciliationError::AttemptExhausted)?,
+            MessageDeliveryState::Rejected { .. } => 2,
+            MessageDeliveryState::Accepted { .. } | MessageDeliveryState::Reconciled { .. } => {
+                return Ok(MessageReconciliationAction::Unchanged {
+                    operation_id: operation_id.clone(),
+                });
+            }
         };
-        *attempt = attempt
-            .checked_add(1)
-            .ok_or(MessageReconciliationError::AttemptExhausted)?;
+        *state = MessageDeliveryState::Pending {
+            attempt: next_attempt,
+        };
         Ok(MessageReconciliationAction::RetryOptimistic {
             operation_id: operation_id.clone(),
-            attempt: *attempt,
+            attempt: next_attempt,
         })
     }
 
@@ -332,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn rejection_is_terminal_until_authority_proves_acceptance() {
+    fn rejection_can_retry_with_the_same_operation_identity() {
         let mut reconciler = MessageReconciler::<u128, u8, &'static str>::new();
         reconciler.begin(20).expect("optimistic message");
         assert_eq!(
@@ -345,7 +351,14 @@ mod tests {
         );
         assert_eq!(
             reconciler.retry(&20),
-            Ok(MessageReconciliationAction::Unchanged { operation_id: 20 })
+            Ok(MessageReconciliationAction::RetryOptimistic {
+                operation_id: 20,
+                attempt: 2,
+            })
+        );
+        assert_eq!(
+            reconciler.state(&20),
+            Some(&MessageDeliveryState::Pending { attempt: 2 })
         );
 
         assert_eq!(

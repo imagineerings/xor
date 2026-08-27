@@ -49,6 +49,14 @@ messages!(
     (CancelLanguageServerWork, Foreground),
     (ChannelMessageSent, Foreground),
     (ChannelMessageUpdate, Foreground),
+    (CollaborativeMessageStreamUpdate, Foreground),
+    (OpenCollaborativeChannel, Foreground),
+    (OpenCollaborativeChannelResponse, Foreground),
+    (CloseCollaborativeChannel, Foreground),
+    (GetCollaborativeMessageWindow, Background),
+    (GetCollaborativeMessageWindowResponse, Background),
+    (ApplyCollaborativeMessageOperation, Foreground),
+    (ApplyCollaborativeMessageOperationResponse, Foreground),
     (CloseBuffer, Foreground),
     (Commit, Background),
     (RunGitHook, Background),
@@ -502,6 +510,16 @@ request_messages!(
     (JoinChannel, JoinRoomResponse),
     (JoinChannelBuffer, JoinChannelBufferResponse),
     (JoinChannelChat, JoinChannelChatResponse),
+    (OpenCollaborativeChannel, OpenCollaborativeChannelResponse),
+    (CloseCollaborativeChannel, Ack),
+    (
+        GetCollaborativeMessageWindow,
+        GetCollaborativeMessageWindowResponse
+    ),
+    (
+        ApplyCollaborativeMessageOperation,
+        ApplyCollaborativeMessageOperationResponse
+    ),
     (JoinProject, JoinProjectResponse),
     (JoinRoom, JoinRoomResponse),
     (LeaveChannelBuffer, Ack),

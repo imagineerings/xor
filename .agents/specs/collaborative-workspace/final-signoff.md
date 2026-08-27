@@ -2,7 +2,17 @@
 
 Date: 2026-08-26
 
-Status: **SIGNED — IMPLEMENTATION PARITY COMPLETE; PRODUCTION ACTIONS REMAIN SEPARATELY GATED**
+Status: **REVOKED BY 2026-08-26 NATIVE INTERFACE AUDIT — PARITY INCOMPLETE**
+
+This sign-off is retained as historical evidence, but its parity decision is no
+longer current. A production audit found unsupported PASS claims for the native
+Collaborative Workspace composition and visual evidence. Corrective Epics 50
+and 51 in `tasks.md` must complete before a new product or operational sign-off
+can be recorded. Epic 51 specifically requires production Collab RPC,
+PostgreSQL replay, desktop composition and local two-client evidence for
+channel messaging. The named approval and checklist below describe the
+superseded repository-only decision and must not be interpreted as current
+acceptance.
 
 This record closes the repository implementation and evidence scope. It does
 not approve production deployment, live routing or authority cutover, schema
@@ -64,3 +74,59 @@ Ahmad Vegah approves the operational decision recorded above: the security and
 migration evidence is accepted for repository completion; no rollback window
 applies because this sign-off authorizes no production action; and every future
 production action requires a separate rollback decision and authorization.
+
+## 2026-08-27 visual correction addendum
+
+No new sign-off is granted. The two current exact-size application captures,
+their side-by-side images, amplified diffs and region metrics demonstrate a
+material visual improvement and correct expanded/collapsed review behavior.
+They do not overturn the revoked status at the top of this record.
+
+The remaining visible differences include a simpler native ACP timeline than
+the reference (notably missing inline code/diff-card composition and varied
+avatar imagery), a slightly shifted expanded review boundary, and host-owned
+macOS window controls that raw GPUI raster capture cannot contain. Epic 51 also
+retains its production hosted-channel and two-client proof gaps. CAP-036,
+Requirements 4.1–4.5 and the current product-parity decision remain
+**INCOMPLETE** until those corrective tasks and production evidence pass.
+
+## 2026-08-27 rich native renderer addendum
+
+No new sign-off is granted. Fresh production-level content rasters supersede
+the preceding addendum's missing inline-code/diff and shifted-split findings:
+Collaborative Workspace now hosts the canonical `ThreadView` entry list, shows
+the native Markdown Rust code block, inline ACP diff, tool/terminal output and
+failed state, and places the expanded review boundary at physical x=1221.0.
+The collapsed capture contains no review pane and releases the timeline through
+physical x=1928.0.
+
+The remaining gates are explicit:
+
+- the deterministic GPUI raster proves `PlatformTitleBar` ownership but not
+  host-owned macOS traffic lights; a permission-granted native-window capture
+  has not been supplied;
+- authoritative human avatar rendering passes, but complete actor metadata for
+  every service/system event and active ACP profile remains unproved;
+- Epic 51 still lacks the complete local-Compose, two authenticated desktop
+  clients, send/edit/react/delete/ack, PostgreSQL replay without duplicates,
+  restart, authorization-before-observation and server-backed GPUI evidence.
+
+CAP-036, Requirements 4.1–4.5 and overall Collaborative Workspace parity remain
+**INCOMPLETE**. The historical sign-off remains revoked.
+
+## 2026-08-27 native ownership reuse audit addendum
+
+No new product-parity sign-off is granted. The code-backed matrix and enforced
+source audit now show one canonical owner for each audited user, presence,
+project, Git/diff, ACP thread/composer, message and status capability. The
+unregistered awareness store and parallel status reducer were deleted; review
+and participant bridges now retain native entity/readers instead of copied
+rows. Layout, visual selection, focus, disclosure, scroll, resize and
+registration tokens remain valid Collaborative Workspace state.
+
+The audit itself has no unexplained duplicate-owner finding in its approved
+paths. Overall sign-off remains revoked because Epic 51 still lacks the live
+two-client hosted-channel proof, complete actor metadata remains unproved, and
+permission-granted macOS host-window chrome evidence is not present. Those
+gates are not ownership adapters and are not closed by architecture tests or
+deterministic visual fixtures.

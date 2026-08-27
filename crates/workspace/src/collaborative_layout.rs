@@ -1,16 +1,17 @@
 use gpui::{
-    AnyView, Bounds, Context, DragMoveEvent, FocusHandle, Hsla, MouseButton, Point, Render, Role,
-    canvas, px,
+    Action, AnyView, Bounds, Context, DragMoveEvent, FocusHandle, Hsla, MouseButton, Point, Render,
+    Role, canvas, px,
 };
 use ui::{Window, prelude::*};
 
 use crate::{
     collaborative_accessibility::{REVIEW_LABEL, TIMELINE_LABEL},
     collaborative_layout_persistence::{CollaborativeLayoutState, MIN_REVIEW_WIDTH},
+    collaborative_review::{CollaborativeReviewSlot, SelectAgentReview, SelectProjectReview},
 };
 
-const MIN_TIMELINE_WIDTH: Pixels = px(480.);
-const RESIZE_HANDLE_WIDTH: Pixels = px(6.);
+const MIN_TIMELINE_WIDTH: Pixels = px(320.);
+const RESIZE_HANDLE_WIDTH: Pixels = px(3.);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct CollaborativeLayoutGeometry {
@@ -31,7 +32,11 @@ impl Render for DraggedCollaborativeReview {
 pub(crate) struct CollaborativeLayout {
     bounds: Bounds<Pixels>,
     state: CollaborativeLayoutState,
+    timeline_view: Option<AnyView>,
     review_view: Option<AnyView>,
+    selected_review_slot: Option<CollaborativeReviewSlot>,
+    agent_review_available: bool,
+    project_review_available: bool,
     timeline_focus_handle: FocusHandle,
     review_focus_handle: FocusHandle,
 }
@@ -41,17 +46,47 @@ impl CollaborativeLayout {
         Self {
             bounds: Bounds::default(),
             state,
+            timeline_view: None,
             review_view: None,
+            selected_review_slot: None,
+            agent_review_available: false,
+            project_review_available: false,
             timeline_focus_handle: cx.focus_handle(),
             review_focus_handle: cx.focus_handle(),
         }
     }
 
-    pub(crate) fn set_review_view(&mut self, review_view: Option<AnyView>, cx: &mut Context<Self>) {
+    pub(crate) fn set_timeline_view(
+        &mut self,
+        timeline_view: Option<AnyView>,
+        cx: &mut Context<Self>,
+    ) {
+        let changed = self.timeline_view.as_ref().map(AnyView::entity_id)
+            != timeline_view.as_ref().map(AnyView::entity_id);
+        if changed {
+            self.timeline_view = timeline_view;
+            cx.notify();
+        }
+    }
+
+    pub(crate) fn set_review_view(
+        &mut self,
+        review_view: Option<AnyView>,
+        selected_slot: Option<CollaborativeReviewSlot>,
+        agent_available: bool,
+        project_available: bool,
+        cx: &mut Context<Self>,
+    ) {
         let changed = self.review_view.as_ref().map(AnyView::entity_id)
-            != review_view.as_ref().map(AnyView::entity_id);
+            != review_view.as_ref().map(AnyView::entity_id)
+            || self.selected_review_slot != selected_slot
+            || self.agent_review_available != agent_available
+            || self.project_review_available != project_available;
         if changed {
             self.review_view = review_view;
+            self.selected_review_slot = selected_slot;
+            self.agent_review_available = agent_available;
+            self.project_review_available = project_available;
             cx.notify();
         }
     }
@@ -168,8 +203,10 @@ impl CollaborativeLayout {
     fn render_timeline(
         geometry: CollaborativeLayoutGeometry,
         background: Hsla,
+        timeline_view: Option<AnyView>,
         focus_handle: &FocusHandle,
     ) -> impl IntoElement {
+        let timeline_available = timeline_view.is_some();
         v_flex()
             .id("collaborative-timeline-region")
             .debug_selector(|| "COLLABORATIVE-TIMELINE-REGION".to_owned())
@@ -182,19 +219,45 @@ impl CollaborativeLayout {
             .aria_label(TIMELINE_LABEL)
             .overflow_hidden()
             .bg(background)
-            .child(
-                v_flex().size_full().items_center().justify_center().child(
-                    Label::new("Timeline")
-                        .size(LabelSize::Small)
-                        .color(Color::Muted),
-                ),
-            )
+            .when_some(timeline_view, |this, timeline_view| {
+                this.child(
+                    div()
+                        .id("collaborative-timeline-content")
+                        .debug_selector(|| "COLLABORATIVE-TIMELINE-CONTENT".to_owned())
+                        .size_full()
+                        .overflow_hidden()
+                        .child(timeline_view),
+                )
+            })
+            .when(!timeline_available, |this| {
+                this.child(
+                    v_flex()
+                        .size_full()
+                        .items_center()
+                        .justify_center()
+                        .gap_1()
+                        .child(
+                            Label::new("Select an agent task to view its activity")
+                                .size(LabelSize::Small)
+                                .color(Color::Muted),
+                        )
+                        .child(
+                            Label::new("Channel activity requires an authorized collaboration service connection")
+                                .size(LabelSize::XSmall)
+                                .color(Color::Muted),
+                        ),
+                )
+            })
     }
 
     fn render_review(
         geometry: CollaborativeLayoutGeometry,
         background: Hsla,
+        border: Hsla,
         review_view: Option<AnyView>,
+        selected_slot: Option<CollaborativeReviewSlot>,
+        agent_available: bool,
+        project_available: bool,
         focus_handle: &FocusHandle,
     ) -> impl IntoElement {
         let review_available = review_view.is_some();
@@ -211,12 +274,47 @@ impl CollaborativeLayout {
             .aria_label(REVIEW_LABEL)
             .overflow_hidden()
             .bg(background)
+            .child(
+                h_flex()
+                    .h_9()
+                    .flex_none()
+                    .px_2()
+                    .gap_1()
+                    .border_b_1()
+                    .border_color(border)
+                    .child(Label::new("Review Changes").size(LabelSize::Small))
+                    .child(div().flex_1())
+                    .child(
+                        Button::new("collaborative-agent-review", "Agent")
+                            .style(ButtonStyle::Subtle)
+                            .toggle_state(
+                                selected_slot == Some(CollaborativeReviewSlot::AgentChanges),
+                            )
+                            .disabled(!agent_available)
+                            .on_click(|_, window, cx| {
+                                window.dispatch_action(SelectAgentReview.boxed_clone(), cx);
+                            }),
+                    )
+                    .child(
+                        Button::new("collaborative-project-review", "Project")
+                            .style(ButtonStyle::Subtle)
+                            .toggle_state(
+                                selected_slot == Some(CollaborativeReviewSlot::ProjectChanges),
+                            )
+                            .disabled(!project_available)
+                            .on_click(|_, window, cx| {
+                                window.dispatch_action(SelectProjectReview.boxed_clone(), cx);
+                            }),
+                    ),
+            )
             .when_some(review_view, |this, review_view| {
                 this.child(
                     div()
                         .id("collaborative-review-content")
                         .debug_selector(|| "COLLABORATIVE-REVIEW-CONTENT".to_owned())
-                        .size_full()
+                        .flex_1()
+                        .min_h_0()
+                        .w_full()
                         .overflow_hidden()
                         .child(review_view),
                 )
@@ -257,6 +355,46 @@ impl CollaborativeLayout {
     }
 }
 
+#[cfg(test)]
+mod geometry_tests {
+    use super::*;
+    use crate::collaborative_layout_persistence::{DEFAULT_RAIL_WIDTH, DEFAULT_REVIEW_WIDTH};
+
+    #[test]
+    fn collaborative_reference_and_responsive_geometry() {
+        let expanded = CollaborativeLayout::geometry_for(
+            px(1930. / 2. - DEFAULT_RAIL_WIDTH),
+            true,
+            px(DEFAULT_REVIEW_WIDTH),
+        );
+        assert!(expanded.review_visible);
+        assert_eq!(expanded.review_width, px(354.5));
+        assert_eq!(expanded.timeline_width, px(381.5));
+        assert_eq!(
+            (px(DEFAULT_RAIL_WIDTH) + expanded.timeline_width + RESIZE_HANDLE_WIDTH) * 2.,
+            px(1221.)
+        );
+
+        let collapsed = CollaborativeLayout::geometry_for(
+            px(1928. / 2. - DEFAULT_RAIL_WIDTH),
+            false,
+            px(DEFAULT_REVIEW_WIDTH),
+        );
+        assert!(!collapsed.review_visible);
+        assert_eq!(collapsed.timeline_width, px(738.));
+        assert_eq!(collapsed.review_width, px(0.));
+
+        let narrow = CollaborativeLayout::geometry_for(px(602.), true, px(DEFAULT_REVIEW_WIDTH));
+        assert!(!narrow.review_visible);
+        assert_eq!(narrow.timeline_width, px(602.));
+
+        let wider = CollaborativeLayout::geometry_for(px(900.), true, px(DEFAULT_REVIEW_WIDTH));
+        assert!(wider.review_visible);
+        assert_eq!(wider.review_width, px(DEFAULT_REVIEW_WIDTH));
+        assert_eq!(wider.timeline_width, px(542.5));
+    }
+}
+
 impl Render for CollaborativeLayout {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let geometry = Self::geometry_for(
@@ -269,6 +407,7 @@ impl Render for CollaborativeLayout {
         let review_background = colors.panel_background;
         let border = colors.border;
         let layout = cx.entity();
+        let timeline_view = self.timeline_view.clone();
         let review_view = self.review_view.clone();
 
         h_flex()
@@ -300,6 +439,7 @@ impl Render for CollaborativeLayout {
             .child(Self::render_timeline(
                 geometry,
                 timeline_background,
+                timeline_view,
                 &self.timeline_focus_handle,
             ))
             .when(geometry.review_visible, |this| {
@@ -307,7 +447,11 @@ impl Render for CollaborativeLayout {
                     .child(Self::render_review(
                         geometry,
                         review_background,
+                        border,
                         review_view,
+                        self.selected_review_slot,
+                        self.agent_review_available,
+                        self.project_review_available,
                         &self.review_focus_handle,
                     ))
             })

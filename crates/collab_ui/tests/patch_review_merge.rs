@@ -20,14 +20,7 @@ use collaboration_domain::{
     ReviewCommentInput, ReviewDecision, ReviewDecisionInput, ReviewDiffSide, ReviewError,
     ReviewFilePath, ReviewHunkId, ReviewIdentity,
 };
-use git_ui::collaborative_review::{
-    CollaborativeReviewDiffResolution, CollaborativeReviewDiffTarget, CollaborativeReviewHunkState,
-    CollaborativeReviewStaleReason,
-};
 use gpui::{AppContext as _, TestAppContext};
-use project::ProjectPath;
-use settings::WorktreeId;
-use util::rel_path::RelPath;
 use uuid::Uuid;
 use workspace::{
     collaborative_review::CollaborativeReviewSlot,
@@ -75,28 +68,6 @@ fn projection_context(
         visibility: ActivityVisibility::Project,
         projected_at: DateTime::from_timestamp_millis(1_900_000_100_000).expect("valid timestamp"),
     }
-}
-
-fn project_path(path: &str) -> ProjectPath {
-    ProjectPath {
-        worktree_id: WorktreeId::from_usize(1),
-        path: RelPath::from_unix_str(path)
-            .expect("valid project path")
-            .into(),
-    }
-}
-
-fn review_target(state: CollaborativeReviewHunkState) -> CollaborativeReviewDiffTarget {
-    CollaborativeReviewDiffTarget::new(
-        "stable-file-src-lib",
-        ReviewHunkId::parse("a".repeat(64)).expect("valid hunk"),
-        ReviewDiffSide::Head,
-        ReviewFilePath::new("src/lib.rs").expect("valid review path"),
-        project_path("src/lib.rs"),
-        Default::default()..Default::default(),
-        state,
-    )
-    .expect("valid native review target")
 }
 
 fn action_context(
@@ -173,7 +144,7 @@ fn patch_review_merge_converges_and_blocks_unsafe_variants(cx: &mut TestAppConte
         .clone();
     let comment_item = project_code_activity(
         &projection_context(ActivityActorKind::Human, "Reviewer"),
-        &CollaborationCodeActivity::ReviewCommented(comment.clone()),
+        &CollaborationCodeActivity::ReviewCommented(comment),
     )
     .expect("project comment activity");
     let review_link = comment_item
@@ -194,20 +165,12 @@ fn patch_review_merge_converges_and_blocks_unsafe_variants(cx: &mut TestAppConte
             1,
         )
     });
-    let native_target = review_target(CollaborativeReviewHunkState::Available);
-    assert_eq!(native_target.hunk_id(), &comment.anchor.hunk_id);
-    assert_eq!(native_target.project_path(), &project_path("src/lib.rs"));
     let ready_card = GitActivityCard::new(comment_item.clone())
         .expect("valid comment card")
-        .with_review(
-            CollaborativeReviewDiffResolution::Exact {
-                target: native_target,
-            },
-            Some(action_context(
-                source,
-                CollaborativeReviewActionState::Ready,
-            )),
-        )
+        .with_review(action_context(
+            source,
+            CollaborativeReviewActionState::Ready,
+        ))
         .expect("exact native review card");
     assert_eq!(
         ready_card.available_actions(),
@@ -389,18 +352,10 @@ fn patch_review_merge_converges_and_blocks_unsafe_variants(cx: &mut TestAppConte
     ));
     let stale_card = GitActivityCard::new(comment_item.clone())
         .expect("valid stale comment card")
-        .with_review(
-            CollaborativeReviewDiffResolution::Stale {
-                reason: CollaborativeReviewStaleReason::Revision {
-                    requested: PatchRevisionNumber::FIRST,
-                    current: PatchRevisionNumber::new(2).expect("revision two"),
-                },
-            },
-            Some(action_context(
-                source,
-                CollaborativeReviewActionState::Stale,
-            )),
-        )
+        .with_review(action_context(
+            source,
+            CollaborativeReviewActionState::Stale,
+        ))
         .expect("stale review card");
     assert_eq!(stale_card.status(), GitActivityCardStatus::Stale);
     assert!(stale_card.available_actions().is_empty());
@@ -412,15 +367,10 @@ fn patch_review_merge_converges_and_blocks_unsafe_variants(cx: &mut TestAppConte
 
     let conflict_card = GitActivityCard::new(comment_item)
         .expect("valid conflicting comment card")
-        .with_review(
-            CollaborativeReviewDiffResolution::Conflicting {
-                target: review_target(CollaborativeReviewHunkState::Conflicting),
-            },
-            Some(action_context(
-                source,
-                CollaborativeReviewActionState::Conflict,
-            )),
-        )
+        .with_review(action_context(
+            source,
+            CollaborativeReviewActionState::Conflict,
+        ))
         .expect("conflicting review card");
     assert_eq!(conflict_card.status(), GitActivityCardStatus::Conflict);
     assert!(conflict_card.available_actions().is_empty());

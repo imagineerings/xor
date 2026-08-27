@@ -126,11 +126,17 @@ use workspace::Panel;
 use workspace::collaborative_composer::CollaborativeComposerRegistration;
 #[cfg(feature = "multiplayer-tools")]
 use workspace::collaborative_participants::{
-    CollaborativeParticipantProvider, CollaborativeParticipantProviderState,
-    CollaborativeParticipantRegistration, CollaborativeParticipantViewData,
+    CollaborativeConnectionState, CollaborativeParticipant, CollaborativeParticipantPresence,
+    CollaborativeParticipantProvider, CollaborativeParticipantRegistration,
+};
+#[cfg(all(test, feature = "multiplayer-tools"))]
+use workspace::collaborative_participants::{
+    CollaborativeParticipantProviderState, CollaborativeParticipantViewData,
 };
 #[cfg(feature = "multiplayer-tools")]
 use workspace::collaborative_review::CollaborativeReviewRegistration;
+#[cfg(feature = "multiplayer-tools")]
+use workspace::collaborative_timeline::CollaborativeTimelineRegistration;
 use workspace::{
     AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Toast, Workspace, WorkspaceSettings,
     create_and_open_local_file, notifications::simple_message_notification::MessageNotification,
@@ -161,10 +167,14 @@ struct CollaborativeReviewCompositionState {
     composer_thread_view_id: Option<EntityId>,
     composer_registration: Option<CollaborativeComposerRegistration>,
     participant_thread_view_id: Option<EntityId>,
-    participant_view_data: Option<CollaborativeParticipantViewData>,
     participant_registration: Option<CollaborativeParticipantRegistration>,
     participant_observed_thread_view_id: Option<EntityId>,
     participant_thread_observation: Option<Subscription>,
+    participant_active_call_observation: Option<Subscription>,
+    participant_room_id: Option<EntityId>,
+    participant_room_observation: Option<Subscription>,
+    timeline_thread_view_id: Option<EntityId>,
+    timeline_registration: Option<CollaborativeTimelineRegistration>,
     project_diff_id: Option<EntityId>,
     project_registration: Option<CollaborativeReviewRegistration>,
 }
@@ -172,7 +182,6 @@ struct CollaborativeReviewCompositionState {
 #[cfg(feature = "multiplayer-tools")]
 struct CollaborativeParticipantProjection {
     thread_view_id: EntityId,
-    view_data: CollaborativeParticipantViewData,
     provider: CollaborativeParticipantProvider,
 }
 
@@ -182,11 +191,9 @@ impl CollaborativeParticipantProjection {
         adapter: agent_ui::collaborative_participants::CollaborativeParticipantAdapter,
     ) -> Self {
         let thread_view_id = adapter.thread_view_id();
-        let view_data = adapter.view_data().clone();
         let provider = adapter.into_provider();
         Self {
             thread_view_id,
-            view_data,
             provider,
         }
     }
@@ -244,6 +251,55 @@ fn reconcile_collaborative_composer(
 }
 
 #[cfg(feature = "multiplayer-tools")]
+fn reconcile_collaborative_timeline(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: &Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut App,
+) {
+    let thread_view_id = agent_panel
+        .read(cx)
+        .active_thread_view(cx)
+        .map(|thread_view| thread_view.entity_id());
+    if state.borrow().timeline_thread_view_id == thread_view_id {
+        return;
+    }
+
+    let adapter = agent_ui::collaborative_timeline::CollaborativeTimelineAdapter::from_agent_panel(
+        agent_panel,
+        workspace_handle,
+        cx,
+    );
+    let state = state.clone();
+    workspace_handle.update(cx, |workspace, cx| {
+        if let Some(registration) = state.borrow_mut().timeline_registration.take() {
+            workspace.unregister_collaborative_timeline_provider(registration, cx);
+        }
+        state.borrow_mut().timeline_thread_view_id = None;
+
+        let adapter = match adapter {
+            Ok(adapter) => adapter,
+            Err(
+                agent_ui::collaborative_timeline::CollaborativeTimelineAdapterError::ThreadUnavailable,
+            ) => return,
+            Err(error) => {
+                log::warn!("failed to adapt collaborative timeline: {error}");
+                return;
+            }
+        };
+        let thread_view_id = adapter.thread_view_id();
+        match adapter.register_in_workspace(workspace, cx) {
+            Ok(registration) => {
+                let mut state = state.borrow_mut();
+                state.timeline_thread_view_id = Some(thread_view_id);
+                state.timeline_registration = Some(registration);
+            }
+            Err(error) => log::warn!("failed to register collaborative timeline: {error}"),
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
 fn apply_collaborative_participant_projection(
     workspace_handle: &Entity<Workspace>,
     projection: Option<CollaborativeParticipantProjection>,
@@ -253,55 +309,27 @@ fn apply_collaborative_participant_projection(
     let projection_is_current = projection.as_ref().is_some_and(|projection| {
         let state = state.borrow();
         state.participant_thread_view_id == Some(projection.thread_view_id)
-            && state.participant_view_data.as_ref() == Some(&projection.view_data)
             && state.participant_registration.is_some()
     });
-    if projection_is_current
-        || (projection.is_none() && state.borrow().participant_registration.is_none())
-    {
+    if projection_is_current {
+        workspace_handle.update(cx, |_, cx| cx.notify());
+        return;
+    }
+    if projection.is_none() && state.borrow().participant_registration.is_none() {
         return;
     }
 
     let state = state.clone();
     workspace_handle.update(cx, |workspace, cx| {
         if let Some(projection) = projection {
-            let current_registration = {
-                let state = state.borrow();
-                (state.participant_thread_view_id == Some(projection.thread_view_id))
-                    .then_some(state.participant_registration)
-                    .flatten()
-            };
-            if let Some(registration) = current_registration {
-                match workspace.update_collaborative_participant_provider(
-                    registration,
-                    CollaborativeParticipantProviderState::Ready(projection.view_data.clone()),
-                    cx,
-                ) {
-                    Ok(()) => {
-                        state.borrow_mut().participant_view_data = Some(projection.view_data);
-                        return;
-                    }
-                    Err(error) => {
-                        log::warn!(
-                            "failed to update collaborative participant provider; replacing it: {error}"
-                        );
-                    }
-                }
-            }
-
             if let Some(registration) = state.borrow_mut().participant_registration.take() {
                 workspace.unregister_collaborative_participant_provider(registration, cx);
             }
-            {
-                let mut state = state.borrow_mut();
-                state.participant_thread_view_id = None;
-                state.participant_view_data = None;
-            }
+            state.borrow_mut().participant_thread_view_id = None;
             match workspace.register_collaborative_participant_provider(projection.provider, cx) {
                 Ok(registration) => {
                     let mut state = state.borrow_mut();
                     state.participant_thread_view_id = Some(projection.thread_view_id);
-                    state.participant_view_data = Some(projection.view_data);
                     state.participant_registration = Some(registration);
                 }
                 Err(error) => {
@@ -314,7 +342,6 @@ fn apply_collaborative_participant_projection(
             }
             let mut state = state.borrow_mut();
             state.participant_thread_view_id = None;
-            state.participant_view_data = None;
         }
     });
 }
@@ -331,7 +358,41 @@ fn reconcile_collaborative_participants(
         workspace_handle,
         cx,
     ) {
-        Ok(adapter) => Some(CollaborativeParticipantProjection::from_adapter(adapter)),
+        Ok(adapter) => {
+            let adapter = adapter.with_room_state_reader(|cx| {
+                call::ActiveCall::try_global(cx)
+                    .and_then(|active_call| active_call.read(cx).room().cloned())
+                    .map(|room| {
+                        room.read_with(cx, |room, cx| {
+                            let mut participants = Vec::new();
+                            if let Some(user) = room.local_participant_user(cx) {
+                                participants.push(CollaborativeParticipant::human(
+                                    &user,
+                                    CollaborativeParticipantPresence::Online,
+                                ));
+                            }
+                            participants.extend(
+                                room.remote_participants().values().map(|participant| {
+                                    CollaborativeParticipant::human(
+                                        &participant.user,
+                                        CollaborativeParticipantPresence::Online,
+                                    )
+                                }),
+                            );
+                            let connection = if room.status().is_online() {
+                                CollaborativeConnectionState::Connected
+                            } else if room.status().is_offline() {
+                                CollaborativeConnectionState::Failed
+                            } else {
+                                CollaborativeConnectionState::Connecting
+                            };
+                            (participants, connection)
+                        })
+                    })
+                    .unwrap_or_default()
+            });
+            Some(CollaborativeParticipantProjection::from_adapter(adapter))
+        }
         Err(
             agent_ui::collaborative_participants::CollaborativeParticipantAdapterError::ThreadUnavailable,
         ) => None,
@@ -347,20 +408,25 @@ fn reconcile_collaborative_participants(
 fn reconcile_collaborative_project_review(
     workspace_handle: &Entity<Workspace>,
     state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    window: &mut Window,
     cx: &mut App,
 ) {
     let project_diff_id = workspace_handle
         .read(cx)
         .item_of_type::<ProjectDiff>(cx)
         .map(|project_diff| project_diff.entity_id());
-    if state.borrow().project_diff_id == project_diff_id {
+    if state.borrow().project_diff_id == project_diff_id
+        || (project_diff_id.is_none() && state.borrow().project_registration.is_some())
+    {
         return;
     }
 
-    let adapter = git_ui::collaborative_review::CollaborativeProjectReviewAdapter::from_workspace(
-        workspace_handle,
-        cx,
-    );
+    let adapter =
+        git_ui::collaborative_review::CollaborativeProjectReviewAdapter::from_workspace_or_create(
+            workspace_handle,
+            window,
+            cx,
+        );
     let state = state.clone();
     workspace_handle.update(cx, |workspace, cx| {
         if let Some(registration) = state.borrow_mut().project_registration.take() {
@@ -447,10 +513,16 @@ fn reconcile_collaborative_agent_review(
 fn schedule_collaborative_project_review_reconciliation(
     workspace_handle: Entity<Workspace>,
     state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    window: &Window,
     cx: &mut Context<Workspace>,
 ) {
+    let window_handle = window.window_handle();
     cx.defer(move |cx| {
-        reconcile_collaborative_project_review(&workspace_handle, &state, cx);
+        if let Err(error) = window_handle.update(cx, |_, window, cx| {
+            reconcile_collaborative_project_review(&workspace_handle, &state, window, cx);
+        }) {
+            log::warn!("failed to reconcile collaborative project review: {error}");
+        }
     });
 }
 
@@ -481,6 +553,18 @@ fn schedule_collaborative_composer_reconciliation(
 ) {
     cx.defer(move |cx| {
         reconcile_collaborative_composer(&workspace_handle, &agent_panel, &state, cx);
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn schedule_collaborative_timeline_reconciliation(
+    workspace_handle: Entity<Workspace>,
+    agent_panel: Entity<AgentPanel>,
+    state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    cx.defer(move |cx| {
+        reconcile_collaborative_timeline(&workspace_handle, &agent_panel, &state, cx);
     });
 }
 
@@ -536,6 +620,44 @@ fn observe_collaborative_participant_thread(
 }
 
 #[cfg(feature = "multiplayer-tools")]
+fn observe_collaborative_participant_room(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: &Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    let room = call::ActiveCall::try_global(cx)
+        .and_then(|active_call| active_call.read(cx).room().cloned());
+    let room_id = room.as_ref().map(Entity::entity_id);
+    if state.borrow().participant_room_id == room_id {
+        return;
+    }
+    {
+        let mut state = state.borrow_mut();
+        state.participant_room_id = room_id;
+        state.participant_room_observation = None;
+    }
+    let Some(room) = room else {
+        return;
+    };
+    let workspace_handle = workspace_handle.clone();
+    let agent_panel = agent_panel.clone();
+    let weak_state = Rc::downgrade(state);
+    let observation = cx.observe(&room, move |_, _, cx| {
+        let Some(state) = weak_state.upgrade() else {
+            return;
+        };
+        schedule_collaborative_participant_reconciliation(
+            workspace_handle.clone(),
+            agent_panel.clone(),
+            state,
+            cx,
+        );
+    });
+    state.borrow_mut().participant_room_observation = Some(observation);
+}
+
+#[cfg(feature = "multiplayer-tools")]
 fn subscribe_to_collaborative_review_agent_panel(
     workspace_handle: &Entity<Workspace>,
     agent_panel: Entity<AgentPanel>,
@@ -562,6 +684,12 @@ fn subscribe_to_collaborative_review_agent_panel(
         state.clone(),
         cx,
     );
+    schedule_collaborative_timeline_reconciliation(
+        workspace_handle.clone(),
+        agent_panel.clone(),
+        state.clone(),
+        cx,
+    );
     observe_collaborative_participant_thread(workspace_handle, &agent_panel, state, cx);
     schedule_collaborative_participant_reconciliation(
         workspace_handle.clone(),
@@ -569,6 +697,27 @@ fn subscribe_to_collaborative_review_agent_panel(
         state.clone(),
         cx,
     );
+    observe_collaborative_participant_room(workspace_handle, &agent_panel, state, cx);
+    if state.borrow().participant_active_call_observation.is_none()
+        && let Some(active_call) = call::ActiveCall::try_global(cx)
+    {
+        let workspace_handle = workspace_handle.clone();
+        let agent_panel = agent_panel.clone();
+        let weak_state = Rc::downgrade(state);
+        let observation = cx.observe(&active_call, move |_, _, cx| {
+            let Some(state) = weak_state.upgrade() else {
+                return;
+            };
+            observe_collaborative_participant_room(&workspace_handle, &agent_panel, &state, cx);
+            schedule_collaborative_participant_reconciliation(
+                workspace_handle.clone(),
+                agent_panel.clone(),
+                state,
+                cx,
+            );
+        });
+        state.borrow_mut().participant_active_call_observation = Some(observation);
+    }
 
     let workspace_handle = workspace_handle.clone();
     let state = state.clone();
@@ -585,6 +734,12 @@ fn subscribe_to_collaborative_review_agent_panel(
                     cx,
                 );
                 schedule_collaborative_composer_reconciliation(
+                    workspace_handle.clone(),
+                    agent_panel.clone(),
+                    state.clone(),
+                    cx,
+                );
+                schedule_collaborative_timeline_reconciliation(
                     workspace_handle.clone(),
                     agent_panel.clone(),
                     state.clone(),
@@ -1639,6 +1794,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
         schedule_collaborative_project_review_reconciliation(
             workspace_handle.clone(),
             collaborative_review_state.clone(),
+            window,
             cx,
         );
         #[cfg(feature = "multiplayer-tools")]
@@ -1668,6 +1824,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
                     schedule_collaborative_project_review_reconciliation(
                         workspace_handle.clone(),
                         collaborative_review_state.clone(),
+                        window,
                         cx,
                     );
                 }
@@ -4306,9 +4463,9 @@ mod tests {
             apply_collaborative_participant_projection(&workspace, None, &state, cx);
         });
         assert_eq!(
-            workspace.read_with(cx, |workspace, _| workspace
+            workspace.read_with(cx, |workspace, cx| workspace
                 .collaborative_participants()
-                .state()),
+                .state(cx)),
             CollaborativeParticipantProviderState::Unavailable
         );
 
@@ -4330,17 +4487,26 @@ mod tests {
                         workspace::collaborative_participants::CollaborativeExecutionLocation::Unknown,
                 },
             ),
+            task_title: Some("Primary task".into()),
+            connection: CollaborativeConnectionState::Disconnected,
         };
+        let current_view_data = Rc::new(RefCell::new(unknown_view_data.clone()));
         cx.update(|_, cx| {
             apply_collaborative_participant_projection(
                 &workspace,
                 Some(CollaborativeParticipantProjection {
                     thread_view_id: first_thread_view.entity_id(),
-                    view_data: unknown_view_data.clone(),
-                    provider: CollaborativeParticipantProvider::new(
+                    provider: CollaborativeParticipantProvider::from_reader(
                         project.clone(),
                         first_thread_view.entity_id(),
-                        CollaborativeParticipantProviderState::Ready(unknown_view_data.clone()),
+                        {
+                            let current_view_data = current_view_data.clone();
+                            move |_| {
+                                CollaborativeParticipantProviderState::Ready(
+                                    current_view_data.borrow().clone(),
+                                )
+                            }
+                        },
                     ),
                 }),
                 &state,
@@ -4352,9 +4518,9 @@ mod tests {
             .participant_registration
             .expect("active thread should register one participant provider");
         assert_eq!(
-            workspace.read_with(cx, |workspace, _| workspace
+            workspace.read_with(cx, |workspace, cx| workspace
                 .collaborative_participants()
-                .state()),
+                .state(cx)),
             CollaborativeParticipantProviderState::Ready(unknown_view_data.clone())
         );
         let occupied = workspace.update(cx, |workspace, cx| {
@@ -4386,12 +4552,12 @@ mod tests {
             ),
             ..unknown_view_data.clone()
         };
+        *current_view_data.borrow_mut() = updated_view_data.clone();
         cx.update(|_, cx| {
             apply_collaborative_participant_projection(
                 &workspace,
                 Some(CollaborativeParticipantProjection {
                     thread_view_id: first_thread_view.entity_id(),
-                    view_data: updated_view_data.clone(),
                     provider: CollaborativeParticipantProvider::new(
                         project.clone(),
                         first_thread_view.entity_id(),
@@ -4408,9 +4574,9 @@ mod tests {
             "same-thread metadata updates should retain the sole registration"
         );
         assert_eq!(
-            workspace.read_with(cx, |workspace, _| workspace
+            workspace.read_with(cx, |workspace, cx| workspace
                 .collaborative_participants()
-                .state()),
+                .state(cx)),
             CollaborativeParticipantProviderState::Ready(updated_view_data)
         );
 
@@ -4424,13 +4590,14 @@ mod tests {
                 ),
             ],
             execution: None,
+            task_title: Some("Replacement task".into()),
+            connection: CollaborativeConnectionState::Disconnected,
         };
         cx.update(|_, cx| {
             apply_collaborative_participant_projection(
                 &workspace,
                 Some(CollaborativeParticipantProjection {
                     thread_view_id: replacement_thread_view.entity_id(),
-                    view_data: replacement_view_data.clone(),
                     provider: CollaborativeParticipantProvider::new(
                         project,
                         replacement_thread_view.entity_id(),
@@ -4455,9 +4622,9 @@ mod tests {
         });
         assert!(state.borrow().participant_registration.is_none());
         assert_eq!(
-            workspace.read_with(cx, |workspace, _| workspace
+            workspace.read_with(cx, |workspace, cx| workspace
                 .collaborative_participants()
-                .state()),
+                .state(cx)),
             CollaborativeParticipantProviderState::Unavailable
         );
     }

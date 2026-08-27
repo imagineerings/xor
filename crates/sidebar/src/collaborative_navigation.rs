@@ -10,8 +10,9 @@ use std::{collections::HashSet, fmt, path::PathBuf};
 
 use agent_ui::{ThreadId, thread_metadata_store::ThreadMetadata};
 use channel::Channel;
-use gpui::{App, SharedString};
+use gpui::{AnyElement, App, Role, SharedString};
 use project::{Project, ProjectGroupKey, WorktreeId};
+use ui::{Color, Label, LabelSize, prelude::*};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum CollaborativeNavigationGroup {
@@ -226,6 +227,57 @@ impl CollaborativeNavigationProjection {
     pub(crate) fn rows(&self) -> &[CollaborativeNavigationRow] {
         &self.rows
     }
+}
+
+pub(crate) fn render_collaborative_navigation_badges(
+    row: &CollaborativeNavigationRow,
+) -> Option<AnyElement> {
+    if row.badges().is_empty() {
+        return None;
+    }
+
+    let accessibility_label = row
+        .badges()
+        .iter()
+        .map(|badge| match badge {
+            CollaborativeNavigationBadge::Unread(count) => format!("{count} unread"),
+            CollaborativeNavigationBadge::Running => "Running".to_owned(),
+            CollaborativeNavigationBadge::WaitingForUser => "Waiting for user".to_owned(),
+            CollaborativeNavigationBadge::Failed => "Failed".to_owned(),
+            CollaborativeNavigationBadge::Archived => "Archived".to_owned(),
+            CollaborativeNavigationBadge::Completed => "Completed".to_owned(),
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    Some(
+        h_flex()
+            .id(SharedString::from(format!(
+                "collaborative-navigation-badges-{:?}",
+                row.id()
+            )))
+            .gap_1()
+            .role(Role::Status)
+            .aria_label(accessibility_label)
+            .children(row.badges().iter().map(|badge| {
+                let (label, color) = match badge {
+                    CollaborativeNavigationBadge::Unread(count) => {
+                        (count.to_string(), Color::Accent)
+                    }
+                    CollaborativeNavigationBadge::Running => ("Running".to_owned(), Color::Info),
+                    CollaborativeNavigationBadge::WaitingForUser => {
+                        ("Waiting".to_owned(), Color::Warning)
+                    }
+                    CollaborativeNavigationBadge::Failed => ("Failed".to_owned(), Color::Error),
+                    CollaborativeNavigationBadge::Archived => ("Archived".to_owned(), Color::Muted),
+                    CollaborativeNavigationBadge::Completed => {
+                        ("Completed".to_owned(), Color::Muted)
+                    }
+                };
+                Label::new(label).size(LabelSize::XSmall).color(color)
+            }))
+            .into_any_element(),
+    )
 }
 
 #[cfg(test)]

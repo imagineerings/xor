@@ -531,6 +531,14 @@ message Envelope {
     GetSourceCoverage get_source_coverage = 497;
     SourceCoverageResponse source_coverage_response = 498;
     InterpretRustCoverageArtifact interpret_rust_coverage_artifact = 499; // current max
+    OpenCollaborativeChannel open_collaborative_channel = 500;
+    OpenCollaborativeChannelResponse open_collaborative_channel_response = 501;
+    CloseCollaborativeChannel close_collaborative_channel = 502;
+    GetCollaborativeMessageWindow get_collaborative_message_window = 503;
+    GetCollaborativeMessageWindowResponse get_collaborative_message_window_response = 504;
+    ApplyCollaborativeMessageOperation apply_collaborative_message_operation = 505;
+    ApplyCollaborativeMessageOperationResponse apply_collaborative_message_operation_response = 506;
+    CollaborativeMessageStreamUpdate collaborative_message_stream_update = 507;
   }
 
   reserved 87 to 88;

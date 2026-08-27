@@ -6,14 +6,14 @@ use util::ResultExt;
 use crate::WorkspaceId;
 
 const COLLABORATIVE_LAYOUT_NAMESPACE: &str = "collaborative_workspace_layout";
-const COLLABORATIVE_LAYOUT_VERSION: u32 = 1;
+const COLLABORATIVE_LAYOUT_VERSION: u32 = 4;
 
-pub(crate) const DEFAULT_RAIL_WIDTH: f32 = 300.;
-pub(crate) const DEFAULT_REVIEW_WIDTH: f32 = 440.;
-pub(crate) const MIN_RAIL_WIDTH: f32 = 200.;
-pub(crate) const MAX_RAIL_WIDTH: f32 = 800.;
-pub(crate) const MIN_REVIEW_WIDTH: f32 = 320.;
-pub(crate) const MAX_REVIEW_WIDTH: f32 = 1600.;
+pub(crate) const DEFAULT_RAIL_WIDTH: f32 = 226.;
+pub(crate) const DEFAULT_REVIEW_WIDTH: f32 = 354.5;
+pub(crate) const MIN_RAIL_WIDTH: f32 = 180.;
+pub(crate) const MAX_RAIL_WIDTH: f32 = 400.;
+pub(crate) const MIN_REVIEW_WIDTH: f32 = 280.;
+pub(crate) const MAX_REVIEW_WIDTH: f32 = 800.;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub(crate) struct CollaborativeLayoutState {

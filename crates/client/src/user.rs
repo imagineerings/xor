@@ -687,6 +687,13 @@ impl UserStore {
         self.current_user.borrow().clone()
     }
 
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_current_user_for_tests(&mut self, user: Arc<User>, cx: &mut Context<Self>) {
+        self.users.insert(user.legacy_id, user.clone());
+        self.current_user = watch::channel_with(Some(user)).1;
+        cx.notify();
+    }
+
     pub fn current_organization(&self) -> Option<Arc<Organization>> {
         self.current_organization.clone()
     }

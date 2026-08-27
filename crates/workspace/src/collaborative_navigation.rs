@@ -13,6 +13,7 @@ use crate::WorkspaceId;
 const COLLABORATIVE_NAVIGATION_NAMESPACE: &str = "collaborative_workspace_navigation";
 const COLLABORATIVE_NAVIGATION_VERSION: u32 = 1;
 const MAX_HISTORY_ENTRIES: usize = 100;
+const MAX_PINNED_ENTRIES: usize = 100;
 const MAX_ENTITY_LINK_LENGTH: usize = 4096;
 const MAX_OPAQUE_ID_LENGTH: usize = 256;
 
@@ -283,6 +284,8 @@ struct PersistedCollaborativeNavigation {
     current: Option<CollaborativeNavigationTarget>,
     backward: Vec<CollaborativeNavigationTarget>,
     forward: Vec<CollaborativeNavigationTarget>,
+    #[serde(default)]
+    pinned: Vec<CollaborativeNavigationTarget>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -290,6 +293,7 @@ pub struct CollaborativeNavigation {
     current: Option<CollaborativeNavigationTarget>,
     backward: Vec<CollaborativeNavigationTarget>,
     forward: Vec<CollaborativeNavigationTarget>,
+    pinned: Vec<CollaborativeNavigationTarget>,
 }
 
 impl CollaborativeNavigation {
@@ -303,6 +307,32 @@ impl CollaborativeNavigation {
 
     pub fn can_go_forward(&self) -> bool {
         !self.forward.is_empty()
+    }
+
+    pub fn pinned(&self) -> &[CollaborativeNavigationTarget] {
+        &self.pinned
+    }
+
+    pub fn is_pinned(&self, target: &CollaborativeNavigationTarget) -> bool {
+        self.pinned.contains(target)
+    }
+
+    pub fn toggle_pin(
+        &mut self,
+        target: CollaborativeNavigationTarget,
+    ) -> std::result::Result<bool, CollaborativeNavigationError> {
+        if !target.validate() {
+            return Err(CollaborativeNavigationError::InvalidTarget);
+        }
+        if let Some(index) = self.pinned.iter().position(|pinned| pinned == &target) {
+            self.pinned.remove(index);
+            return Ok(false);
+        }
+        if self.pinned.len() == MAX_PINNED_ENTRIES {
+            self.pinned.remove(0);
+        }
+        self.pinned.push(target);
+        Ok(true)
     }
 
     pub fn navigate_to(
@@ -380,6 +410,7 @@ impl CollaborativeNavigation {
             current: self.current.clone(),
             backward: self.backward.clone(),
             forward: self.forward.clone(),
+            pinned: self.pinned.clone(),
         }
     }
 
@@ -389,12 +420,19 @@ impl CollaborativeNavigation {
         if persisted.version != COLLABORATIVE_NAVIGATION_VERSION
             || persisted.backward.len() > MAX_HISTORY_ENTRIES
             || persisted.forward.len() > MAX_HISTORY_ENTRIES
+            || persisted.pinned.len() > MAX_PINNED_ENTRIES
             || persisted
                 .current
                 .as_ref()
                 .is_some_and(|target| !target.validate())
             || persisted.backward.iter().any(|target| !target.validate())
             || persisted.forward.iter().any(|target| !target.validate())
+            || persisted.pinned.iter().any(|target| !target.validate())
+            || persisted
+                .pinned
+                .iter()
+                .enumerate()
+                .any(|(index, target)| persisted.pinned[index + 1..].contains(target))
         {
             return Err(CollaborativeNavigationError::InvalidTarget);
         }
@@ -402,6 +440,7 @@ impl CollaborativeNavigation {
             current: persisted.current,
             backward: persisted.backward,
             forward: persisted.forward,
+            pinned: persisted.pinned,
         })
     }
 }
@@ -629,6 +668,12 @@ mod tests {
         navigation
             .go_backward(|_| true)
             .expect("back target should resolve");
+        let pinned_thread = thread_target("pinned-thread");
+        assert!(
+            navigation
+                .toggle_pin(pinned_thread.clone())
+                .expect("valid target should pin")
+        );
 
         write_collaborative_navigation(&key_value_store, workspace_id, &navigation)
             .await
@@ -637,6 +682,7 @@ mod tests {
         assert_eq!(restored, navigation);
         assert_eq!(restored.current(), Some(&thread_target("one")));
         assert!(restored.can_go_forward());
+        assert_eq!(restored.pinned(), &[pinned_thread]);
 
         key_value_store
             .scoped(COLLABORATIVE_NAVIGATION_NAMESPACE)
@@ -662,6 +708,33 @@ mod tests {
             read_collaborative_navigation(&key_value_store, workspace_id),
             CollaborativeNavigation::default()
         );
+    }
+
+    #[test]
+    fn collaborative_navigation_toggles_and_bounds_pins() {
+        let mut navigation = CollaborativeNavigation::default();
+        let target = thread_target("thread-1");
+        assert!(
+            navigation
+                .toggle_pin(target.clone())
+                .expect("valid target should pin")
+        );
+        assert!(navigation.is_pinned(&target));
+        assert!(
+            !navigation
+                .toggle_pin(target.clone())
+                .expect("pinned target should unpin")
+        );
+        assert!(!navigation.is_pinned(&target));
+
+        for index in 0..=MAX_PINNED_ENTRIES {
+            navigation
+                .toggle_pin(thread_target(&format!("thread-{index}")))
+                .expect("bounded target should pin");
+        }
+        assert_eq!(navigation.pinned().len(), MAX_PINNED_ENTRIES);
+        assert!(!navigation.is_pinned(&thread_target("thread-0")));
+        assert!(navigation.is_pinned(&thread_target(&format!("thread-{MAX_PINNED_ENTRIES}"))));
     }
 
     #[test]

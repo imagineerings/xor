@@ -1,0 +1,7 @@
+  screenshot-1 region metrics (actual/reference):
+    rail: contrast 0.151/0.140, edges 0.080/0.075, coverage 0.127/0.126
+    top-bar: contrast 0.139/0.124, edges 0.072/0.058, coverage 0.307/0.080
+    timeline: contrast 0.145/0.150, edges 0.062/0.078, coverage 0.657/0.130
+    review: contrast 0.155/0.095, edges 0.056/0.048, coverage 0.618/0.236
+    composer-status: contrast 0.098/0.068, edges 0.048/0.029, coverage 0.480/0.046
+    geometry: expanded review boundary 1221.0px (reference 1221px, tolerance ±2px)

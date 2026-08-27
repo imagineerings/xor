@@ -6157,6 +6157,47 @@ impl ThreadView {
         .flex_grow_1()
     }
 
+    #[cfg(feature = "multiplayer-tools")]
+    pub(crate) fn render_collaborative_entries(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let has_messages = self.list_state.item_count() > 0;
+        let list_state = self.list_state.clone();
+
+        v_flex()
+            .id("collaborative-acp-thread")
+            .debug_selector(|| "COLLABORATIVE-ACP-THREAD".to_owned())
+            .key_context("AcpThread")
+            .track_focus(&self.focus_handle)
+            .size_full()
+            .when(self.resumed_without_history, |this| {
+                this.child(Self::render_resume_notice(cx))
+            })
+            .when(has_messages, |this| {
+                this.child(self.render_entries(cx))
+                    .vertical_scrollbar_for(&list_state, window, cx)
+            })
+            .when(!has_messages, |this| {
+                this.items_center()
+                    .justify_center()
+                    .text_sm()
+                    .text_color(cx.theme().colors().text_muted)
+                    .child("No agent activity yet")
+            })
+            .into_any_element()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn scroll_to_entry_for_tests(&mut self, entry_index: usize, cx: &mut Context<Self>) {
+        self.list_state.scroll_to(ListOffset {
+            item_ix: entry_index,
+            offset_in_item: px(0.),
+        });
+        cx.notify();
+    }
+
     fn render_entry(
         &self,
         entry_ix: usize,
@@ -6369,6 +6410,7 @@ impl ThreadView {
 
                 let style = MarkdownStyle::themed(MarkdownFont::Agent, window, cx);
                 let message_body = v_flex()
+                    .debug_selector(|| "AGENT-THREAD-ASSISTANT-MARKDOWN".to_owned())
                     .w_full()
                     .gap_3()
                     .children(chunks.iter().enumerate().filter_map(
@@ -6382,7 +6424,17 @@ impl ThreadView {
                                     }
 
                                     Some(
-                                        self.render_markdown(md.clone(), style.clone(), cx)
+                                        div()
+                                            .when(md.read(cx).source().contains("```"), |this| {
+                                                this.debug_selector(|| {
+                                                    "AGENT-THREAD-MARKDOWN-CODE-BLOCK".to_owned()
+                                                })
+                                            })
+                                            .child(self.render_markdown(
+                                                md.clone(),
+                                                style.clone(),
+                                                cx,
+                                            ))
                                             .into_any_element(),
                                     )
                                 })
@@ -8154,47 +8206,59 @@ impl ThreadView {
             layout.id_str()
         )));
 
-        div().w_full().id(container_id).map(|this| {
-            if tool_call.is_subagent() {
-                this.child(
-                    self.render_subagent_tool_call(
+        div()
+            .w_full()
+            .id(container_id)
+            .when(
+                matches!(
+                    tool_call.status,
+                    ToolCallStatus::Failed | ToolCallStatus::Rejected
+                ),
+                |this| this.debug_selector(|| "AGENT-THREAD-TOOL-FAILED".to_owned()),
+            )
+            .map(|this| {
+                if tool_call.is_subagent() {
+                    this.child(
+                        self.render_subagent_tool_call(
+                            active_session_id,
+                            entry_ix,
+                            tool_call,
+                            tool_call
+                                .subagent_session_info
+                                .as_ref()
+                                .map(|i| i.session_id.clone()),
+                            focus_handle,
+                            window,
+                            cx,
+                        ),
+                    )
+                } else if has_terminals {
+                    this.children(tool_call.terminals().map(|terminal| {
+                        div()
+                            .debug_selector(|| "AGENT-THREAD-TOOL-TERMINAL".to_owned())
+                            .child(self.render_terminal_tool_call(
+                                active_session_id,
+                                entry_ix,
+                                terminal,
+                                tool_call,
+                                focus_handle,
+                                layout,
+                                window,
+                                cx,
+                            ))
+                    }))
+                } else {
+                    this.child(self.render_tool_call(
                         active_session_id,
                         entry_ix,
-                        tool_call,
-                        tool_call
-                            .subagent_session_info
-                            .as_ref()
-                            .map(|i| i.session_id.clone()),
-                        focus_handle,
-                        window,
-                        cx,
-                    ),
-                )
-            } else if has_terminals {
-                this.children(tool_call.terminals().map(|terminal| {
-                    self.render_terminal_tool_call(
-                        active_session_id,
-                        entry_ix,
-                        terminal,
                         tool_call,
                         focus_handle,
                         layout,
                         window,
                         cx,
-                    )
-                }))
-            } else {
-                this.child(self.render_tool_call(
-                    active_session_id,
-                    entry_ix,
-                    tool_call,
-                    focus_handle,
-                    layout,
-                    window,
-                    cx,
-                ))
-            }
-        })
+                    ))
+                }
+            })
     }
 
     fn render_tool_call(
@@ -10232,7 +10296,7 @@ impl ThreadView {
     ) -> AnyElement {
         match content {
             ToolCallContent::ContentBlock(content) => {
-                if let Some((resource, markdown)) = content.embedded_resource() {
+                let rendered = if let Some((resource, markdown)) = content.embedded_resource() {
                     self.render_embedded_resource_output(
                         resource,
                         markdown.cloned(),
@@ -10260,21 +10324,29 @@ impl ThreadView {
                     self.render_image_output(entry_ix, image.clone(), location, card_layout, cx)
                 } else {
                     Empty.into_any_element()
-                }
+                };
+                div()
+                    .debug_selector(|| "AGENT-THREAD-TOOL-CONTENT".to_owned())
+                    .child(rendered)
+                    .into_any_element()
             }
-            ToolCallContent::Diff(diff) => {
-                self.render_diff_editor(entry_ix, diff, tool_call, has_failed, cx)
-            }
-            ToolCallContent::Terminal(terminal) => self.render_terminal_tool_call(
-                session_id,
-                entry_ix,
-                terminal,
-                tool_call,
-                focus_handle,
-                ToolCallLayout::Standalone,
-                window,
-                cx,
-            ),
+            ToolCallContent::Diff(diff) => div()
+                .debug_selector(|| "AGENT-THREAD-TOOL-DIFF".to_owned())
+                .child(self.render_diff_editor(entry_ix, diff, tool_call, has_failed, cx))
+                .into_any_element(),
+            ToolCallContent::Terminal(terminal) => div()
+                .debug_selector(|| "AGENT-THREAD-TOOL-TERMINAL".to_owned())
+                .child(self.render_terminal_tool_call(
+                    session_id,
+                    entry_ix,
+                    terminal,
+                    tool_call,
+                    focus_handle,
+                    ToolCallLayout::Standalone,
+                    window,
+                    cx,
+                ))
+                .into_any_element(),
         }
     }
 

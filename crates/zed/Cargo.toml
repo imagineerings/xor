@@ -108,6 +108,7 @@ visual-tests = [
     "acp_thread/test-support",
     "action_log/test-support",
     "agent_ui/test-support",
+    "channel/test-support",
     "db/test-support",
     "agent/test-support",
     "language_model/test-support",

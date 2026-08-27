@@ -40,6 +40,7 @@ pub mod review;
 pub mod scheduled_message;
 pub mod tenant;
 pub mod thread;
+pub mod zed_channel_binding;
 
 pub use account_binding::{
     AccountBinding, AccountBindingError, AccountBindingFields, BindingId, BindingStatus,
@@ -259,4 +260,8 @@ pub use thread::{
     AuxiliaryClosure, AuxiliaryEvent, AuxiliaryEventKind, MAX_AUXILIARY_EVENTS_PER_HOP,
     MAX_THREAD_DEPTH, MAX_THREAD_PAGE_ROWS, MAX_THREAD_SUMMARY_PARTICIPANTS, ThreadCursor,
     ThreadError, ThreadEvent, ThreadGraph, ThreadNode, ThreadPage, ThreadReference, ThreadSummary,
+};
+pub use zed_channel_binding::{
+    channel_id_for_legacy_channel, community_id_for_legacy_root_channel,
+    principal_id_for_legacy_user,
 };

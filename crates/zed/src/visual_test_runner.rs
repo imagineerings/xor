@@ -72,6 +72,10 @@ fn main() {
 
     // Create test files in the real filesystem
     create_test_files(&project_path);
+    if std::env::var("COLLABORATIVE_VISUAL_ONLY").is_ok() {
+        prepare_collaborative_visual_git_repository(&project_path)
+            .expect("Failed to prepare collaborative visual Git repository");
+    }
 
     let test_result = std::panic::catch_unwind(|| run_visual_tests(project_path, update_baseline));
 
@@ -103,10 +107,10 @@ use {
     feature_flags::FeatureFlagAppExt as _,
     git_ui::project_diff::ProjectDiff,
     gpui::{
-        App, AppContext as _, Bounds, Entity, KeyBinding, Modifiers, VisualTestAppContext,
-        WindowBounds, WindowHandle, WindowOptions, point, px, size,
+        App, AppContext as _, BorrowAppContext as _, Bounds, Entity, KeyBinding, Modifiers,
+        VisualTestAppContext, WindowBounds, WindowHandle, WindowOptions, point, px, size,
     },
-    image::RgbaImage,
+    image::{GenericImage as _, RgbaImage},
     project::{AgentId, Project},
     project_panel::ProjectPanel,
     settings::{NotifyWhenAgentWaiting, PlaySoundWhenAgentDone, Settings as _},
@@ -176,7 +180,53 @@ fn run_visual_tests(project_path: PathBuf, update_baseline: bool) -> Result<()> 
     // Initialize all Zed subsystems
     cx.update(|cx| {
         gpui_tokio::init(cx);
-        theme_settings::init(theme::LoadThemes::JustBase, cx);
+        let themes = if std::env::var("COLLABORATIVE_VISUAL_ONLY").is_ok() {
+            theme::LoadThemes::All(Box::new(Assets))
+        } else {
+            theme::LoadThemes::JustBase
+        };
+        theme_settings::init(themes, cx);
+        if std::env::var("COLLABORATIVE_VISUAL_ONLY").is_ok() {
+            cx.update_global::<settings::SettingsStore, _>(|store, cx| {
+                store
+                    .set_user_settings(
+                        r#"{
+                            "ui_font_family": ".SystemUIFont",
+                            "ui_font_size": 14,
+                            "agent_ui_font_family": ".SystemUIFont",
+                            "agent_ui_font_size": 14,
+                            "agent_buffer_font_family": ".SystemUIFont",
+                            "agent_buffer_font_size": 14,
+                            "theme": "One Light"
+                        }"#,
+                        cx,
+                    )
+                    .expect("collaborative visual settings should parse");
+            });
+            app_state.user_store.update(cx, |user_store, cx| {
+                user_store.set_current_user_for_tests(
+                    Arc::new(client::User {
+                        legacy_id: 1,
+                        username: "local-developer".into(),
+                        avatar_uri: "https://visual-test.invalid/avatar.png".into(),
+                        name: Some("Local Developer".to_owned()),
+                    }),
+                    cx,
+                );
+            });
+            cx.http_client()
+                .as_fake()
+                .replace_handler(|old_handler, request| async move {
+                    if request.uri().to_string() == "https://visual-test.invalid/avatar.png" {
+                        return Ok(http_client::Response::builder()
+                            .status(200)
+                            .body(http_client::AsyncBody::from(EMBEDDED_TEST_IMAGE.to_vec()))
+                            .expect("visual avatar response should build"));
+                    }
+                    old_handler(request).await
+                });
+            channel::init(&app_state.client, app_state.user_store.clone(), cx);
+        }
         client::init(&app_state.client, cx);
         audio::init(cx);
         workspace::init(app_state.clone(), cx);
@@ -246,6 +296,33 @@ fn run_visual_tests(project_path: PathBuf, update_baseline: bool) -> Result<()> 
 
     // Run until all initialization tasks complete
     cx.run_until_parked();
+
+    if std::env::var("COLLABORATIVE_VISUAL_ONLY").is_ok() {
+        cx.update(|cx| {
+            let theme = theme::ThemeRegistry::global(cx)
+                .get("One Light")
+                .expect("One Light should be available to visual tests");
+            theme::GlobalTheme::update_theme(cx, theme);
+        });
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    if std::env::var("COLLABORATIVE_VISUAL_ONLY").is_ok() {
+        run_collaborative_workspace_visual_tests(
+            project_path.clone(),
+            app_state.clone(),
+            &mut cx,
+            update_baseline,
+            CollaborativeVisualVariant::Expanded,
+        )?;
+        return run_collaborative_workspace_visual_tests(
+            project_path,
+            app_state,
+            &mut cx,
+            update_baseline,
+            CollaborativeVisualVariant::Collapsed,
+        );
+    }
 
     // Open workspace window
     let window_size = size(px(1280.0), px(800.0));
@@ -675,6 +752,989 @@ fn run_visual_tests(project_path: PathBuf, update_baseline: bool) -> Result<()> 
 }
 
 #[cfg(target_os = "macos")]
+fn prepare_collaborative_visual_git_repository(project_path: &Path) -> Result<()> {
+    fn run_git(project_path: &Path, arguments: &[&str]) -> Result<()> {
+        let status = std::process::Command::new("git")
+            .args(arguments)
+            .current_dir(project_path)
+            .status()?;
+        anyhow::ensure!(status.success(), "git {} failed", arguments.join(" "));
+        Ok(())
+    }
+
+    std::fs::write(project_path.join(".gitignore"), "/target\n/Cargo.lock\n")?;
+    std::fs::write(
+        project_path.join("src/main.rs"),
+        r#"struct WorkspaceSession {
+    participants: usize,
+    pending_reviews: usize,
+}
+
+impl WorkspaceSession {
+    fn is_ready(&self) -> bool {
+        self.participants > 1
+    }
+}
+
+fn main() {
+    let session = WorkspaceSession {
+        participants: 2,
+        pending_reviews: 0,
+    };
+    println!("workspace ready: {}", session.is_ready());
+}
+"#,
+    )?;
+    run_git(project_path, &["init"])?;
+    run_git(project_path, &["config", "user.name", "Visual Test"])?;
+    run_git(
+        project_path,
+        &["config", "user.email", "visual-test@example.invalid"],
+    )?;
+    run_git(project_path, &["add", "."])?;
+    run_git(project_path, &["commit", "-m", "Initial visual fixture"])?;
+    std::fs::write(
+        project_path.join("src/main.rs"),
+        r#"struct WorkspaceSession {
+    participants: usize,
+    pending_reviews: usize,
+}
+
+impl WorkspaceSession {
+    fn is_ready(&self) -> bool {
+        self.participants > 1 && self.pending_reviews == 0
+    }
+
+    fn review_summary(&self) -> String {
+        format!("{} reviews pending", self.pending_reviews)
+    }
+}
+
+fn main() {
+    let session = WorkspaceSession {
+        participants: 2,
+        pending_reviews: 1,
+    };
+    println!("{}", session.review_summary());
+}
+"#,
+    )?;
+    Ok(())
+}
+
+#[cfg(all(target_os = "macos", feature = "multiplayer-tools"))]
+#[derive(Clone, Copy)]
+enum CollaborativeVisualVariant {
+    Expanded,
+    Collapsed,
+}
+
+#[cfg(all(target_os = "macos", feature = "multiplayer-tools"))]
+fn run_collaborative_workspace_visual_tests(
+    project_path: PathBuf,
+    app_state: Arc<AppState>,
+    cx: &mut VisualTestAppContext,
+    _update_baseline: bool,
+    variant: CollaborativeVisualVariant,
+) -> Result<()> {
+    use agent_ui::AgentPanel;
+
+    let project = cx.update(|cx| {
+        Project::local(
+            app_state.client.clone(),
+            app_state.node_runtime.clone(),
+            app_state.user_store.clone(),
+            app_state.languages.clone(),
+            app_state.fs.clone(),
+            None,
+            project::LocalProjectFlags {
+                init_worktree_trust: false,
+                ..Default::default()
+            },
+            cx,
+        )
+    });
+    let add_worktree = project.update(cx, |project, cx| {
+        project.find_or_create_worktree(&project_path, true, cx)
+    });
+    cx.background_executor.allow_parking();
+    cx.foreground_executor.block_test(add_worktree)?;
+    cx.background_executor.forbid_parking();
+    cx.run_until_parked();
+
+    cx.update(|cx| {
+        let channel_store = channel::ChannelStore::global(cx);
+        channel_store.update(cx, |channel_store, cx| {
+            channel_store.set_channels_for_tests(
+                [
+                    (client::ChannelId(10), "Rust workspace".into(), None),
+                    (
+                        client::ChannelId(11),
+                        "Compiler diagnostics".into(),
+                        Some(client::ChannelId(10)),
+                    ),
+                    (
+                        client::ChannelId(12),
+                        "Release engineering".into(),
+                        Some(client::ChannelId(10)),
+                    ),
+                    (client::ChannelId(20), "Developer tools".into(), None),
+                ],
+                cx,
+            );
+            channel_store
+                .set_favorite_channel_ids(vec![client::ChannelId(11), client::ChannelId(20)], cx);
+        });
+    });
+
+    let bounds = Bounds {
+        origin: point(px(0.), px(0.)),
+        size: match variant {
+            CollaborativeVisualVariant::Expanded => size(px(965.), px(631.)),
+            CollaborativeVisualVariant::Collapsed => size(px(964.), px(649.)),
+        },
+    };
+    let window: WindowHandle<MultiWorkspace> = cx.update(|cx| {
+        cx.open_window(
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                focus: false,
+                show: false,
+                ..Default::default()
+            },
+            |window, cx| {
+                let workspace = cx
+                    .new(|cx| Workspace::new(None, project.clone(), app_state.clone(), window, cx));
+                cx.new(|cx| MultiWorkspace::new(workspace, window, cx))
+            },
+        )
+    })?;
+    cx.run_until_parked();
+
+    let sidebar = cx.update_window(window.into(), |root, window, cx| {
+        let multi_workspace: Entity<MultiWorkspace> = root
+            .downcast()
+            .map_err(|_| anyhow::anyhow!("collaborative root is not a MultiWorkspace"))?;
+        Ok::<_, anyhow::Error>(cx.new(|cx| sidebar::Sidebar::new(multi_workspace, window, cx)))
+    })??;
+    window.update(cx, |multi_workspace, _, cx| {
+        multi_workspace.register_sidebar(sidebar.clone(), cx);
+    })?;
+
+    let (workspace, weak_workspace, async_window_context) =
+        window.update(cx, |multi_workspace, window, cx| {
+            window.set_rem_size(px(16.));
+            let workspace = multi_workspace.workspace().clone();
+            multi_workspace.add(workspace.clone(), window, cx);
+            (
+                workspace.clone(),
+                workspace.downgrade(),
+                window.to_async(cx),
+            )
+        })?;
+    cx.background_executor.allow_parking();
+    let agent_panel = cx
+        .foreground_executor
+        .block_test(AgentPanel::load(weak_workspace, async_window_context))?;
+    cx.background_executor.forbid_parking();
+    window.update(cx, |_, window, cx| {
+        workspace.update(cx, |workspace, cx| {
+            workspace.add_panel(agent_panel.clone(), window, cx);
+        });
+    })?;
+
+    let connection = StubAgentConnection::new();
+    let diff_path = project_path.join("src/main.rs");
+    let initial_updates = vec![
+        acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk::new(
+            r#"I inspected the Rust workspace and kept the state transition explicit:
+
+```rust
+fn review_ready(participants: usize, pending_reviews: usize) -> bool {
+    participants > 1 && pending_reviews == 0
+}
+```
+
+The function is rendered by the native agent Markdown and code-block pipeline."#
+                .into(),
+        )),
+        acp::SessionUpdate::ToolCall(
+            acp::ToolCall::new("workspace-diff", "Updated the workspace session model")
+                .kind(acp::ToolKind::Edit)
+                .status(acp::ToolCallStatus::Completed)
+                .content(vec![acp::ToolCallContent::Diff(
+                    acp::Diff::new(
+                        diff_path,
+                        r#"struct WorkspaceSession {
+    participants: usize,
+    pending_reviews: usize,
+}
+
+impl WorkspaceSession {
+    fn is_ready(&self) -> bool {
+        self.participants > 1 && self.pending_reviews == 0
+    }
+}
+"#,
+                    )
+                    .old_text(
+                        r#"struct WorkspaceSession {
+    participants: usize,
+    pending_reviews: usize,
+}
+
+impl WorkspaceSession {
+    fn is_ready(&self) -> bool {
+        self.participants > 1
+    }
+}
+"#,
+                    ),
+                )]),
+        ),
+        acp::SessionUpdate::ToolCall(
+            acp::ToolCall::new("validation-output", "Ran focused Rust validation")
+                .kind(acp::ToolKind::Execute)
+                .status(acp::ToolCallStatus::Completed)
+                .content(vec![acp::ToolCallContent::Content(acp::Content::new(
+                    acp::ContentBlock::Text(acp::TextContent::new(
+                        "cargo test -p workspace\n4 focused tests passed in 2.1s".to_owned(),
+                    )),
+                ))]),
+        ),
+        acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk::new(
+            "The native project diff is ready for review.".into(),
+        )),
+    ];
+    let agent_server: Rc<dyn AgentServer> = Rc::new(StubAgentServer::new(connection.clone()));
+    let previous_thread_id = cx.read(|cx| agent_panel.read(cx).active_thread_id(cx));
+    window.update(cx, |_, window, cx| {
+        agent_panel.update(cx, |panel, cx| {
+            panel.open_external_thread_with_server(agent_server, window, cx);
+        });
+    })?;
+    for _ in 0..10 {
+        cx.advance_clock(Duration::from_millis(100));
+        cx.run_until_parked();
+    }
+    let active_thread_id = cx.read(|cx| agent_panel.read(cx).active_thread_id(cx));
+    anyhow::ensure!(
+        active_thread_id.is_some() && active_thread_id != previous_thread_id,
+        "collaborative timeline did not activate a distinct native ACP thread"
+    );
+
+    let thread_view = cx
+        .read(|cx| agent_panel.read(cx).active_thread_view_for_tests().cloned())
+        .context("collaborative visual agent thread view is unavailable")?;
+    let thread = cx
+        .read(|cx| {
+            thread_view
+                .read(cx)
+                .active_thread()
+                .map(|active| active.read(cx).thread.clone())
+        })
+        .context("collaborative visual ACP thread is unavailable")?;
+    let visual_prompt = "Review the Rust project and summarize the change";
+    connection.set_next_prompt_updates(initial_updates);
+    let send = thread.update(cx, |thread, cx| {
+        thread.set_provisional_title(visual_prompt.into(), cx);
+        thread.send(vec![visual_prompt.into()], cx)
+    });
+    cx.background_executor.allow_parking();
+    cx.foreground_executor.block_test(send)?;
+    cx.background_executor.forbid_parking();
+    cx.run_until_parked();
+
+    let terminal_tool_call_id = acp::ToolCallId::new("terminal-output");
+    let terminal_id = acp::TerminalId::new("collaborative-visual-terminal");
+    thread.update(cx, |thread, cx| {
+        thread.register_test_terminal(
+            terminal_id.clone(),
+            "cargo test -p workspace".to_owned(),
+            Some(project_path.clone()),
+            b"running 4 tests\ntest collaborative_layout ... ok\ntest result: ok\n".to_vec(),
+            cx,
+        );
+        thread
+            .handle_session_update(
+                acp::SessionUpdate::ToolCall(
+                    acp::ToolCall::new(terminal_tool_call_id.clone(), "cargo test -p workspace")
+                        .kind(acp::ToolKind::Execute)
+                        .status(acp::ToolCallStatus::Completed)
+                        .content(vec![acp::ToolCallContent::Terminal(acp::Terminal::new(
+                            terminal_id,
+                        ))]),
+                ),
+                cx,
+            )
+            .expect("visual terminal tool call should be accepted");
+    });
+    cx.run_until_parked();
+    thread.update(cx, |thread, cx| {
+        thread
+            .handle_session_update(
+                acp::SessionUpdate::ToolCall(
+                    acp::ToolCall::new("failed-check", "Checked hosted collaboration health")
+                        .kind(acp::ToolKind::Fetch)
+                        .status(acp::ToolCallStatus::Failed)
+                        .content(vec![acp::ToolCallContent::Content(acp::Content::new(
+                            acp::ContentBlock::Text(acp::TextContent::new(
+                                "Local hosted collaboration service is not running; retry after starting Compose."
+                                    .to_owned(),
+                            )),
+                        ))]),
+                ),
+                cx,
+            )
+            .expect("visual failed tool call should be accepted");
+    });
+    cx.run_until_parked();
+    thread_view.update(cx, |conversation, cx| {
+        conversation.expand_tool_call(acp::ToolCallId::new("workspace-diff"), cx);
+        conversation.expand_tool_call(acp::ToolCallId::new("validation-output"), cx);
+        conversation.expand_tool_call(terminal_tool_call_id, cx);
+        conversation.expand_tool_call(acp::ToolCallId::new("failed-check"), cx);
+    });
+    cx.run_until_parked();
+
+    for (prompt, updates) in [
+        (
+            "Show the data flow before changing the implementation",
+            vec![
+                acp::SessionUpdate::AgentThoughtChunk(acp::ContentChunk::new(
+                    "Following project state through the native workspace adapters.".into(),
+                )),
+                acp::SessionUpdate::ToolCall(
+                    acp::ToolCall::new("read-source", "Read the workspace composition")
+                        .kind(acp::ToolKind::Read)
+                        .status(acp::ToolCallStatus::Completed),
+                ),
+                acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk::new(
+                    "Project, thread, review, and participant state converge through the native collaborative workspace owner. The selected task updates the timeline, composer destination, review context, and presence controls without introducing a presentation-only copy of authoritative state."
+                        .into(),
+                )),
+            ],
+        ),
+        (
+            "Run the focused Rust validation",
+            vec![
+                acp::SessionUpdate::ToolCall(
+                    acp::ToolCall::new("cargo-test", "Ran focused Rust validation")
+                        .kind(acp::ToolKind::Execute)
+                        .status(acp::ToolCallStatus::Completed),
+                ),
+                acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk::new(
+                    "Formatting, compilation, and the focused workspace tests completed successfully. The validation covered the multiplayer feature boundary, Rust tooling integration, persisted layout restoration, and the native project review adapter."
+                        .into(),
+                )),
+            ],
+        ),
+        (
+            "Prepare the native change for review",
+            vec![
+                acp::SessionUpdate::ToolCall(
+                    acp::ToolCall::new("edit-workspace", "Updated the workspace session model")
+                        .kind(acp::ToolKind::Edit)
+                        .status(acp::ToolCallStatus::Completed),
+                ),
+                acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk::new(
+                    "The focused structural change is visible in the native review pane and ready for review. It keeps project data in the Git owner, activity in the ACP thread, and selection in the workspace navigation model while the responsive layout presents those sources coherently."
+                        .into(),
+                )),
+            ],
+        ),
+    ] {
+        println!("  Extending collaborative timeline: {prompt}");
+        connection.set_next_prompt_updates(updates);
+        let send = thread.update(cx, |thread, cx| thread.send(vec![prompt.into()], cx));
+        cx.background_executor.allow_parking();
+        cx.foreground_executor.block_test(send)?;
+        cx.background_executor.forbid_parking();
+        cx.run_until_parked();
+        println!("  Extended collaborative timeline: {prompt}");
+    }
+
+    let worktree_paths = project::WorktreePaths::from_folder_paths(&workspace::PathList::new(&[
+        project_path.clone(),
+    ]));
+    let metadata = [
+        "Trace workspace synchronization",
+        "Audit Rust toolchain onboarding",
+        "Check multiplayer reconnect behavior",
+        "Review release packaging metadata",
+        "Improve collaboration accessibility",
+        "Verify native review restoration",
+    ]
+    .into_iter()
+    .enumerate()
+    .map(
+        |(index, title)| agent_ui::thread_metadata_store::ThreadMetadata {
+            thread_id: agent_ui::ThreadId::new(),
+            session_id: None,
+            agent_id: project::AgentId("stub".into()),
+            title: Some(title.into()),
+            title_override: None,
+            updated_at: chrono::DateTime::from_timestamp(1_800_000_000 - index as i64 * 60, 0)
+                .expect("collaborative visual timestamp should be valid"),
+            created_at: None,
+            interacted_at: None,
+            worktree_paths: worktree_paths.clone(),
+            remote_connection: None,
+            archived: false,
+        },
+    )
+    .collect::<Vec<_>>();
+    cx.update(|cx| {
+        agent_ui::thread_metadata_store::ThreadMetadataStore::global(cx).update(cx, |store, cx| {
+            if store.entries().count() < metadata.len() {
+                store.save_all(metadata, cx);
+            }
+        });
+    });
+    cx.run_until_parked();
+
+    let (
+        composer_registration,
+        timeline_registration,
+        participant_registration,
+        project_review_registration,
+        agent_review_registration,
+    ) = window.update(cx, |_, window, cx| {
+        let composer = agent_ui::collaborative_composer::CollaborativeComposerAdapter::from_agent_panel(
+            &agent_panel,
+            &workspace,
+            cx,
+        )?;
+        let timeline = agent_ui::collaborative_timeline::CollaborativeTimelineAdapter::from_agent_panel(
+            &agent_panel,
+            &workspace,
+            cx,
+        )?;
+        let participants = agent_ui::collaborative_participants::CollaborativeParticipantAdapter::from_agent_panel(
+            &agent_panel,
+            &workspace,
+            cx,
+        )?;
+        let user_store = app_state.user_store.clone();
+        let participants = participants.with_room_state_reader(move |cx| {
+            let room_participants = user_store
+                .read(cx)
+                .current_user()
+                .map(|user| {
+                    workspace::collaborative_participants::CollaborativeParticipant::human(
+                        &user,
+                        workspace::collaborative_participants::CollaborativeParticipantPresence::Online,
+                    )
+                })
+                .into_iter()
+                .collect();
+            (
+                room_participants,
+                workspace::collaborative_participants::CollaborativeConnectionState::Connected,
+            )
+        });
+        let project_review = git_ui::collaborative_review::CollaborativeProjectReviewAdapter::from_workspace_or_create(
+            &workspace,
+            window,
+            cx,
+        )?;
+        let agent_review = agent_ui::collaborative_review::CollaborativeAgentReviewAdapter::new(
+            Some(thread.clone()),
+            &workspace,
+            window,
+            cx,
+        )?;
+        let registrations = workspace.update(cx, |workspace, cx| -> Result<_> {
+            let composer_registration = composer.register_in_workspace(workspace, cx)?;
+            let timeline_registration = timeline.register_in_workspace(workspace, cx)?;
+            let participant_registration = workspace.register_collaborative_participant_provider(
+                participants.into_provider(),
+                cx,
+            )?;
+            let project_review_registration =
+                project_review.register_in_workspace(workspace, cx)?;
+            let agent_review_registration = agent_review.register_in_workspace(workspace, cx)?;
+            Ok((
+                composer_registration,
+                timeline_registration,
+                participant_registration,
+                project_review_registration,
+                agent_review_registration,
+            ))
+        })?;
+        window.dispatch_action(Box::new(workspace::SwitchToCollaborativeWorkspace), cx);
+        Ok::<_, anyhow::Error>(registrations)
+    })??;
+    for _ in 0..10 {
+        cx.advance_clock(Duration::from_millis(100));
+        cx.run_until_parked();
+    }
+
+    let visual_thread_id = window.update(cx, |_, window, cx| {
+        let thread_id = agent_panel.read(cx).active_thread_id(cx);
+        if let Some(thread_id) = thread_id {
+            workspace.update(cx, |workspace, cx| {
+                workspace.navigate_collaborative_to(
+                    workspace::collaborative_navigation::CollaborativeNavigationTarget::thread(
+                        thread_id.to_key_string(),
+                    ),
+                    |_| true,
+                    window,
+                    cx,
+                )
+            })?;
+        }
+        window.dispatch_action(
+            Box::new(workspace::collaborative_review::SelectProjectReview),
+            cx,
+        );
+        if matches!(variant, CollaborativeVisualVariant::Collapsed) {
+            window.dispatch_action(
+                Box::new(workspace::collaborative_review::ToggleCollaborativeReview),
+                cx,
+            );
+        }
+        Ok::<_, anyhow::Error>(thread_id)
+    })??;
+    for _ in 0..20 {
+        cx.advance_clock(Duration::from_millis(100));
+        cx.run_until_parked();
+    }
+
+    for _ in 0..20 {
+        std::thread::sleep(Duration::from_millis(50));
+        cx.advance_clock(Duration::from_millis(50));
+        cx.run_until_parked();
+    }
+    let review_requested = cx.read(|cx| workspace.read(cx).collaborative_review_view(cx).is_some());
+    anyhow::ensure!(
+        review_requested == matches!(variant, CollaborativeVisualVariant::Expanded),
+        "collaborative review state does not match the requested visual variant"
+    );
+    for (entry_index, selector) in [
+        (1, "AGENT-THREAD-MARKDOWN-CODE-BLOCK"),
+        (2, "AGENT-THREAD-TOOL-DIFF"),
+        (3, "AGENT-THREAD-TOOL-CONTENT"),
+        (5, "AGENT-THREAD-TOOL-TERMINAL"),
+        (6, "AGENT-THREAD-TOOL-FAILED"),
+    ] {
+        thread_view.update(cx, |conversation, cx| {
+            conversation.scroll_thread_to_entry_for_tests(entry_index, cx);
+        });
+        cx.update_window(window.into(), |_, window, _| window.refresh())?;
+        cx.run_until_parked();
+        anyhow::ensure!(
+            cx.debug_bounds(window.into(), selector)?.is_some(),
+            "collaborative visual scenario did not render {selector} at ACP entry {entry_index}"
+        );
+    }
+    thread_view.update(cx, |conversation, cx| {
+        conversation.scroll_thread_to_entry_for_tests(1, cx);
+    });
+    cx.update_window(window.into(), |_, window, _| window.refresh())?;
+    cx.run_until_parked();
+    let capture_result = capture_collaborative_reference_comparison(
+        match variant {
+            CollaborativeVisualVariant::Expanded => "screenshot-1",
+            CollaborativeVisualVariant::Collapsed => "screenshot-2",
+        },
+        window.into(),
+        cx,
+    );
+
+    workspace.update(cx, |workspace, cx| -> Result<()> {
+        anyhow::ensure!(
+            workspace.unregister_collaborative_composer_provider(composer_registration, cx),
+            "collaborative visual composer registration was replaced before cleanup"
+        );
+        anyhow::ensure!(
+            workspace.unregister_collaborative_timeline_provider(timeline_registration, cx),
+            "collaborative visual timeline registration was replaced before cleanup"
+        );
+        anyhow::ensure!(
+            workspace.unregister_collaborative_participant_provider(participant_registration, cx),
+            "collaborative visual participant registration was replaced before cleanup"
+        );
+        anyhow::ensure!(
+            workspace.unregister_collaborative_review_provider(project_review_registration, cx),
+            "collaborative visual project review registration was replaced before cleanup"
+        );
+        anyhow::ensure!(
+            workspace.unregister_collaborative_review_provider(agent_review_registration, cx),
+            "collaborative visual agent review registration was replaced before cleanup"
+        );
+        Ok(())
+    })?;
+
+    if let Some(thread_id) = visual_thread_id {
+        window.update(cx, |_, window, cx| {
+            agent_panel.update(cx, |panel, cx| {
+                panel.remove_thread_without_activating_draft(thread_id, window, cx);
+            });
+        })?;
+    }
+    cx.run_until_parked();
+
+    workspace.update(cx, |workspace, cx| {
+        let project = workspace.project().clone();
+        project.update(cx, |project, cx| {
+            let worktree_ids = project
+                .worktrees(cx)
+                .map(|worktree| worktree.read(cx).id())
+                .collect::<Vec<_>>();
+            for worktree_id in worktree_ids {
+                project.remove_worktree(worktree_id, cx);
+            }
+        });
+    });
+    cx.run_until_parked();
+
+    cx.update_window(window.into(), |_, window, _| window.remove_window())?;
+    cx.run_until_parked();
+
+    drop(thread);
+    drop(thread_view);
+    drop(agent_panel);
+    drop(workspace);
+    drop(sidebar);
+    drop(project);
+    for _ in 0..15 {
+        cx.advance_clock(Duration::from_millis(100));
+        cx.run_until_parked();
+    }
+
+    capture_result
+}
+
+#[cfg(all(target_os = "macos", feature = "multiplayer-tools"))]
+fn capture_collaborative_reference_comparison(
+    name: &str,
+    window: gpui::AnyWindowHandle,
+    cx: &mut VisualTestAppContext,
+) -> Result<()> {
+    cx.update_window(window, |_, window, _| window.refresh())?;
+    cx.run_until_parked();
+    for selector in [
+        "PLATFORM-TITLE-BAR",
+        "COLLABORATIVE-NATIVE-ACP-TIMELINE",
+        "COLLABORATIVE-PARTICIPANT-AVATAR",
+    ] {
+        anyhow::ensure!(
+            cx.debug_bounds(window, selector)?.is_some(),
+            "{name} did not render required native semantic surface {selector}"
+        );
+    }
+    let timeline_bounds = cx
+        .debug_bounds(window, "COLLABORATIVE-TIMELINE-REGION")?
+        .context("collaborative timeline bounds are unavailable")?;
+    let geometry_report = if name == "screenshot-1" {
+        let review_bounds = cx
+            .debug_bounds(window, "COLLABORATIVE-REVIEW-REGION")?
+            .context("expanded collaborative review bounds are unavailable")?;
+        let physical_review_boundary = f32::from(review_bounds.origin.x) * 2.;
+        anyhow::ensure!(
+            (physical_review_boundary - 1221.).abs() <= 2.,
+            "expanded review boundary {physical_review_boundary:.1}px is outside 1221±2px"
+        );
+        format!(
+            "    geometry: expanded review boundary {physical_review_boundary:.1}px (reference 1221px, tolerance ±2px)\n"
+        )
+    } else {
+        anyhow::ensure!(
+            cx.debug_bounds(window, "COLLABORATIVE-REVIEW-REGION")?
+                .is_none(),
+            "collapsed visual variant still renders the review region"
+        );
+        let physical_timeline_right = f32::from(timeline_bounds.right()) * 2.;
+        anyhow::ensure!(
+            (physical_timeline_right - 1928.).abs() <= 2.,
+            "collapsed timeline right edge {physical_timeline_right:.1}px does not consume the released width"
+        );
+        format!(
+            "    geometry: review absent; timeline right edge {physical_timeline_right:.1}px (viewport 1928px, tolerance ±2px)\n"
+        )
+    };
+    let native_actual = cx.capture_screenshot(window)?;
+    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .context("zed crate should live below the workspace root")?;
+    let evidence_directory = workspace_root.join("test-results/collaborative-workspace");
+    std::fs::create_dir_all(&evidence_directory)?;
+    record_collaborative_host_window_evidence(name, &evidence_directory)?;
+    let reference_path = workspace_root
+        .join(".agents/specs/collaborative-workspace/screenshots")
+        .join(format!("{name}.png"));
+    let reference = image::open(&reference_path)?.to_rgba8();
+    native_actual.save(evidence_directory.join(format!("native-{name}.png")))?;
+    let actual = if native_actual.dimensions() == reference.dimensions() {
+        native_actual
+    } else {
+        image::imageops::resize(
+            &native_actual,
+            reference.width(),
+            reference.height(),
+            image::imageops::FilterType::Lanczos3,
+        )
+    };
+    actual.save(evidence_directory.join(format!("actual-{name}.png")))?;
+    let comparison = compare_images(&actual, &reference);
+    let structural_similarity = collaborative_structural_similarity(&actual, &reference);
+    comparison
+        .diff_image
+        .save(evidence_directory.join(format!("diff-{name}.png")))?;
+    let amplified_diff = RgbaImage::from_fn(reference.width(), reference.height(), |x, y| {
+        let actual_pixel = actual.get_pixel(x, y);
+        let reference_pixel = reference.get_pixel(x, y);
+        image::Rgba([
+            actual_pixel[0]
+                .abs_diff(reference_pixel[0])
+                .saturating_mul(4),
+            actual_pixel[1]
+                .abs_diff(reference_pixel[1])
+                .saturating_mul(4),
+            actual_pixel[2]
+                .abs_diff(reference_pixel[2])
+                .saturating_mul(4),
+            255,
+        ])
+    });
+    amplified_diff.save(evidence_directory.join(format!("amplified-diff-{name}.png")))?;
+    let mut side_by_side = RgbaImage::new(reference.width() * 2, reference.height());
+    side_by_side.copy_from(&reference, 0, 0)?;
+    side_by_side.copy_from(&actual, reference.width(), 0)?;
+    side_by_side.save(evidence_directory.join(format!("side-by-side-{name}.png")))?;
+    let mut region_report = validate_collaborative_regions(name, &actual, &reference)?;
+    region_report.push_str(&geometry_report);
+    std::fs::write(
+        evidence_directory.join(format!("region-metrics-{name}.txt")),
+        &region_report,
+    )?;
+    print!("{region_report}");
+    println!(
+        "  Collaborative {name}: {:.2}% structural similarity, {:.2}% exact-pixel match ({} differing pixels)",
+        structural_similarity * 100.,
+        comparison.match_percentage * 100.,
+        comparison.diff_pixel_count
+    );
+    anyhow::ensure!(
+        structural_similarity >= 0.78,
+        "{name} structural similarity {:.2}% is below the approved 78% threshold",
+        structural_similarity * 100.
+    );
+    Ok(())
+}
+
+#[cfg(all(target_os = "macos", feature = "multiplayer-tools"))]
+fn record_collaborative_host_window_evidence(name: &str, evidence_directory: &Path) -> Result<()> {
+    const CAPTURE_VARIABLE: &str = "COLLABORATIVE_NATIVE_WINDOW_CAPTURE";
+    if let Some(path) = std::env::var_os(CAPTURE_VARIABLE) {
+        let capture = image::open(&path)?.to_rgba8();
+        anyhow::ensure!(
+            capture.width() > 0 && capture.height() > 0,
+            "native host-window evidence is empty"
+        );
+        capture.save(evidence_directory.join(format!("host-window-{name}.png")))?;
+        return Ok(());
+    }
+
+    std::fs::write(
+        evidence_directory.join("host-window-chrome-evidence.md"),
+        format!(
+            "# Collaborative Workspace host-window evidence\n\n\
+The deterministic `actual-{name}.png` capture is GPUI content raster output. It deliberately \
+does not contain the macOS-owned traffic-light controls. The visual runner separately asserts \
+that `PlatformTitleBar` owns the title-bar surface.\n\n\
+For full-window evidence, grant the terminal Screen Recording permission, capture the visible \
+Rust-product window through the macOS screenshot UI, and rerun with \
+`{CAPTURE_VARIABLE}=/absolute/path/to/capture.png`. The runner validates and copies that native \
+capture to `host-window-{name}.png`; it never synthesizes window controls.\n"
+        ),
+    )?;
+    Ok(())
+}
+
+#[cfg(all(target_os = "macos", feature = "multiplayer-tools"))]
+#[derive(Clone, Copy)]
+struct CollaborativeRasterMetrics {
+    contrast: f64,
+    edge_density: f64,
+    foreground_coverage: f64,
+}
+
+#[cfg(all(target_os = "macos", feature = "multiplayer-tools"))]
+fn collaborative_raster_metrics(
+    image: &RgbaImage,
+    left: u32,
+    top: u32,
+    right: u32,
+    bottom: u32,
+) -> CollaborativeRasterMetrics {
+    let left = left.min(image.width());
+    let right = right.clamp(left + 1, image.width());
+    let top = top.min(image.height());
+    let bottom = bottom.clamp(top + 1, image.height());
+    let mut luminance_sum = 0.;
+    let mut luminance_squared_sum = 0.;
+    let mut edge_count = 0u64;
+    let mut buckets = std::collections::HashMap::<u16, u64>::new();
+    let mut count = 0u64;
+    for y in top..bottom {
+        for x in left..right {
+            let pixel = image.get_pixel(x, y);
+            let luminance = 0.2126 * f64::from(pixel[0])
+                + 0.7152 * f64::from(pixel[1])
+                + 0.0722 * f64::from(pixel[2]);
+            luminance_sum += luminance;
+            luminance_squared_sum += luminance * luminance;
+            let bucket = (u16::from(pixel[0] / 16) << 8)
+                | (u16::from(pixel[1] / 16) << 4)
+                | u16::from(pixel[2] / 16);
+            *buckets.entry(bucket).or_default() += 1;
+            if x > left {
+                let previous = image.get_pixel(x - 1, y);
+                let difference = u16::from(pixel[0].abs_diff(previous[0]))
+                    + u16::from(pixel[1].abs_diff(previous[1]))
+                    + u16::from(pixel[2].abs_diff(previous[2]));
+                edge_count += u64::from(difference > 36);
+            }
+            if y > top {
+                let previous = image.get_pixel(x, y - 1);
+                let difference = u16::from(pixel[0].abs_diff(previous[0]))
+                    + u16::from(pixel[1].abs_diff(previous[1]))
+                    + u16::from(pixel[2].abs_diff(previous[2]));
+                edge_count += u64::from(difference > 36);
+            }
+            count += 1;
+        }
+    }
+    let count = count.max(1) as f64;
+    let mean = luminance_sum / count;
+    let contrast = (luminance_squared_sum / count - mean * mean).max(0.).sqrt() / 255.;
+    let dominant_pixels = buckets.values().copied().max().unwrap_or_default() as f64;
+    CollaborativeRasterMetrics {
+        contrast,
+        edge_density: edge_count as f64 / (count * 2.),
+        foreground_coverage: 1. - dominant_pixels / count,
+    }
+}
+
+#[cfg(all(target_os = "macos", feature = "multiplayer-tools"))]
+fn validate_collaborative_regions(
+    name: &str,
+    actual: &RgbaImage,
+    reference: &RgbaImage,
+) -> Result<String> {
+    let width = reference.width();
+    let height = reference.height();
+    let regions = if name == "screenshot-1" {
+        vec![
+            ("rail", 0, 0, 452, height),
+            ("top-bar", 452, 0, width, 126),
+            ("timeline", 452, 126, 1220, height.saturating_sub(96)),
+            ("review", 1220, 126, width, height.saturating_sub(96)),
+            (
+                "composer-status",
+                452,
+                height.saturating_sub(112),
+                width,
+                height,
+            ),
+        ]
+    } else {
+        vec![
+            ("rail", 0, 0, 450, height),
+            ("top-bar", 450, 0, width, 60),
+            ("timeline", 450, 60, width, height.saturating_sub(58)),
+            ("timeline-right", 1220, 60, width, height.saturating_sub(58)),
+            (
+                "composer-status",
+                450,
+                height.saturating_sub(96),
+                width,
+                height,
+            ),
+        ]
+    };
+    let mut report = format!("  {name} region metrics (actual/reference):\n");
+    for (label, left, top, right, bottom) in regions {
+        let actual_metrics = collaborative_raster_metrics(actual, left, top, right, bottom);
+        let reference_metrics = collaborative_raster_metrics(reference, left, top, right, bottom);
+        report.push_str(&format!(
+            "    {label}: contrast {:.3}/{:.3}, edges {:.3}/{:.3}, coverage {:.3}/{:.3}\n",
+            actual_metrics.contrast,
+            reference_metrics.contrast,
+            actual_metrics.edge_density,
+            reference_metrics.edge_density,
+            actual_metrics.foreground_coverage,
+            reference_metrics.foreground_coverage,
+        ));
+        anyhow::ensure!(
+            actual_metrics.contrast >= (reference_metrics.contrast * 0.35).max(0.01),
+            "{name} {label} is washed out or lacks native contrast"
+        );
+        anyhow::ensure!(
+            actual_metrics.edge_density >= (reference_metrics.edge_density * 0.30).max(0.002),
+            "{name} {label} is empty or too sparsely populated"
+        );
+        anyhow::ensure!(
+            actual_metrics.foreground_coverage
+                >= (reference_metrics.foreground_coverage * 0.30).max(0.02),
+            "{name} {label} lacks the required populated native surface"
+        );
+    }
+    Ok(report)
+}
+
+#[cfg(all(target_os = "macos", feature = "multiplayer-tools"))]
+fn collaborative_structural_similarity(actual: &RgbaImage, reference: &RgbaImage) -> f64 {
+    const COLUMNS: u32 = 32;
+    const ROWS: u32 = 24;
+
+    fn luminance(pixel: &image::Rgba<u8>) -> f64 {
+        (0.2126 * f64::from(pixel[0]) + 0.7152 * f64::from(pixel[1]) + 0.0722 * f64::from(pixel[2]))
+            / 255.
+    }
+
+    fn cell_features(image: &RgbaImage, column: u32, row: u32) -> (f64, f64) {
+        let left = column * image.width() / COLUMNS;
+        let right = ((column + 1) * image.width() / COLUMNS).max(left + 1);
+        let top = row * image.height() / ROWS;
+        let bottom = ((row + 1) * image.height() / ROWS).max(top + 1);
+        let mut luminance_sum = 0.;
+        let mut edge_sum = 0.;
+        let mut count = 0u64;
+        for y in top..bottom.min(image.height()) {
+            for x in left..right.min(image.width()) {
+                let value = luminance(image.get_pixel(x, y));
+                luminance_sum += value;
+                if x > left {
+                    edge_sum += (value - luminance(image.get_pixel(x - 1, y))).abs();
+                }
+                if y > top {
+                    edge_sum += (value - luminance(image.get_pixel(x, y - 1))).abs();
+                }
+                count += 1;
+            }
+        }
+        let count = count.max(1) as f64;
+        (luminance_sum / count, (edge_sum / (count * 2.)).min(1.))
+    }
+
+    let mut score = 0.;
+    for row in 0..ROWS {
+        for column in 0..COLUMNS {
+            let (actual_luminance, actual_edges) = cell_features(actual, column, row);
+            let (reference_luminance, reference_edges) = cell_features(reference, column, row);
+            let luminance_similarity = 1. - (actual_luminance - reference_luminance).abs();
+            let edge_similarity = 1. - (actual_edges - reference_edges).abs();
+            score += 0.35 * luminance_similarity + 0.65 * edge_similarity;
+        }
+    }
+    score / f64::from(COLUMNS * ROWS)
+}
+
+#[cfg(target_os = "macos")]
 enum TestResult {
     Passed,
     BaselineUpdated(PathBuf),
@@ -987,9 +2047,11 @@ fn init_app_state(cx: &mut App) -> Arc<AppState> {
     let session = cx.new(|cx| session::AppSession::new(Session::test(), cx));
     let user_store = cx.new(|cx| client::UserStore::new(client.clone(), cx));
     let workspace_store = cx.new(|cx| workspace::WorkspaceStore::new(client.clone(), cx));
+    let node_runtime = NodeRuntime::unavailable();
 
     theme_settings::init(theme::LoadThemes::JustBase, cx);
     client::init(&client, cx);
+    languages::init(languages.clone(), fs.clone(), node_runtime.clone(), cx);
 
     let app_state = Arc::new(AppState {
         client,
@@ -997,7 +2059,7 @@ fn init_app_state(cx: &mut App) -> Arc<AppState> {
         languages,
         user_store,
         workspace_store,
-        node_runtime: NodeRuntime::unavailable(),
+        node_runtime,
         build_window_options: |_, _| Default::default(),
         session,
     });

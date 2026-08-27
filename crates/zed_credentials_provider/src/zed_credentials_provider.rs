@@ -11,6 +11,8 @@ use gpui::{App, AsyncApp, Global};
 use release_channel::ReleaseChannel;
 
 #[cfg(feature = "multiplayer-tools")]
+pub mod channel_signing;
+#[cfg(feature = "multiplayer-tools")]
 pub mod nostr_backup;
 #[cfg(feature = "multiplayer-tools")]
 pub mod nostr_import;

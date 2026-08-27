@@ -14,7 +14,7 @@ use rand::prelude::*;
 use sea_orm::ConnectionTrait;
 use sqlx::migrate::MigrateDatabase;
 
-use self::migrations::run_database_migrations;
+pub use self::migrations::run_database_migrations;
 
 use collab::db::*;
 
@@ -68,10 +68,15 @@ impl TestDb {
 
         let _guard = LOCK.lock();
         let mut rng = StdRng::from_os_rng();
-        let url = format!(
-            "postgres://postgres@localhost/zed-test-{}",
-            rng.random::<u128>()
-        );
+        let database_name = format!("zed-test-{}", rng.random::<u128>());
+        let url = std::env::var("COLLAB_TEST_DATABASE_URL")
+            .ok()
+            .and_then(|base| {
+                let mut base = url::Url::parse(&base).ok()?;
+                base.set_path(&database_name);
+                Some(base.to_string())
+            })
+            .unwrap_or_else(|| format!("postgres://postgres@localhost/{database_name}"));
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_io()
             .enable_time()

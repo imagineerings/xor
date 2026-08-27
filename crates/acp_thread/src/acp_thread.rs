@@ -4767,6 +4767,46 @@ impl AcpThread {
             }
         }
     }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn register_test_terminal(
+        &mut self,
+        terminal_id: acp::TerminalId,
+        label: String,
+        cwd: Option<PathBuf>,
+        output: Vec<u8>,
+        cx: &mut Context<Self>,
+    ) {
+        let background_executor = cx.background_executor().clone();
+        let terminal = cx.new(|cx| {
+            ::terminal::TerminalBuilder::new_display_only(
+                ::terminal::terminal_settings::CursorShape::default(),
+                ::terminal::terminal_settings::AlternateScroll::On,
+                None,
+                0,
+                &background_executor,
+                PathStyle::local(),
+            )
+            .subscribe(cx)
+        });
+        self.on_terminal_provider_event(
+            TerminalProviderEvent::Created {
+                terminal_id: terminal_id.clone(),
+                label,
+                cwd,
+                output_byte_limit: None,
+                terminal,
+            },
+            cx,
+        );
+        self.on_terminal_provider_event(
+            TerminalProviderEvent::Output {
+                terminal_id,
+                data: output,
+            },
+            cx,
+        );
+    }
 }
 
 fn markdown_for_raw_output(

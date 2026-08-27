@@ -3,15 +3,18 @@ use project::Project;
 use ui::{Avatar, ButtonStyle, Tooltip, Window, prelude::*};
 
 use crate::{
-    SwitchToEditorWorkspace,
+    CopyRoomId, OpenCollaborators, ShareProject, SwitchToEditorWorkspace,
     collaborative_accessibility::{
         TOP_BAR_LABEL, participant_label as accessibility_participant_label,
     },
     collaborative_layout::CollaborativeLayout,
-    collaborative_participants::CollaborativeParticipantProviderState,
+    collaborative_participants::{
+        CollaborativeConnectionState, CollaborativeParticipantProviderState,
+    },
+    collaborative_review::ToggleCollaborativeReview,
 };
 
-const NO_ACTIVE_TASK_LABEL: &str = "No active task";
+const NO_ACTIVE_TASK_LABEL: &str = "Select a task or thread";
 const PARTICIPANTS_UNAVAILABLE_LABEL: &str = "Participants unavailable";
 const CONNECTION_UNAVAILABLE_LABEL: &str = "Connection unavailable";
 
@@ -60,15 +63,21 @@ impl CollaborativeTopBar {
     }
 
     fn action_availability(&self) -> CollaborativeTopBarActionAvailability {
+        let room_actions = matches!(
+            &self.participant_state,
+            CollaborativeParticipantProviderState::Ready(view_data)
+                if view_data.connection.supports_room_actions()
+        );
         CollaborativeTopBarActionAvailability {
-            share: false,
-            invite: false,
-            connection_details: false,
+            share: room_actions,
+            invite: true,
+            connection_details: room_actions,
             review_layout: true,
             editor_layout: true,
         }
     }
 
+    #[cfg(test)]
     fn participant_label(&self) -> SharedString {
         match &self.participant_state {
             CollaborativeParticipantProviderState::Ready(view_data)
@@ -89,14 +98,50 @@ impl CollaborativeTopBar {
         }
     }
 
+    fn task_title(&self) -> SharedString {
+        match &self.participant_state {
+            CollaborativeParticipantProviderState::Ready(view_data) => view_data
+                .task_title
+                .as_ref()
+                .filter(|title| !title.trim().is_empty())
+                .cloned()
+                .unwrap_or_else(|| NO_ACTIVE_TASK_LABEL.into()),
+            CollaborativeParticipantProviderState::Failed(_)
+            | CollaborativeParticipantProviderState::Unavailable => NO_ACTIVE_TASK_LABEL.into(),
+        }
+    }
+
+    fn connection_label(&self) -> SharedString {
+        match &self.participant_state {
+            CollaborativeParticipantProviderState::Ready(view_data) => {
+                let connection = view_data.connection.label();
+                view_data.execution.as_ref().map_or_else(
+                    || connection.into(),
+                    |execution| {
+                        format!(
+                            "{connection} · {} · {}",
+                            execution.runtime_label(),
+                            execution.location_label()
+                        )
+                        .into()
+                    },
+                )
+            }
+            CollaborativeParticipantProviderState::Failed(message) => message.clone(),
+            CollaborativeParticipantProviderState::Unavailable => {
+                CONNECTION_UNAVAILABLE_LABEL.into()
+            }
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn test_snapshot(&self, cx: &App) -> CollaborativeTopBarTestSnapshot {
         let action_availability = self.action_availability();
         CollaborativeTopBarTestSnapshot {
             project_title: self.project_title(cx),
-            task_title: NO_ACTIVE_TASK_LABEL,
+            task_title: self.task_title(),
             participants: self.participant_label(),
-            connection: CONNECTION_UNAVAILABLE_LABEL,
+            connection: self.connection_label(),
             share_enabled: action_availability.share,
             invite_enabled: action_availability.invite,
             connection_details_enabled: action_availability.connection_details,
@@ -109,9 +154,9 @@ impl CollaborativeTopBar {
 #[cfg(test)]
 pub(crate) struct CollaborativeTopBarTestSnapshot {
     pub(crate) project_title: SharedString,
-    pub(crate) task_title: &'static str,
+    pub(crate) task_title: SharedString,
     pub(crate) participants: SharedString,
-    pub(crate) connection: &'static str,
+    pub(crate) connection: SharedString,
     pub(crate) share_enabled: bool,
     pub(crate) invite_enabled: bool,
     pub(crate) connection_details_enabled: bool,
@@ -124,7 +169,18 @@ impl RenderOnce for CollaborativeTopBar {
         let project_title = self.project_title(cx);
         let action_availability = self.action_availability();
         let review_requested = self.layout.read(cx).review_requested();
-        let participant_label = self.participant_label();
+        let task_title = self.task_title();
+        let connection_label = self.connection_label();
+        let connection_icon = match &self.participant_state {
+            CollaborativeParticipantProviderState::Ready(view_data) => match view_data.connection {
+                CollaborativeConnectionState::Connected => IconName::UserGroup,
+                CollaborativeConnectionState::Connecting => IconName::ArrowCircle,
+                CollaborativeConnectionState::Disconnected
+                | CollaborativeConnectionState::Failed => IconName::Disconnected,
+            },
+            CollaborativeParticipantProviderState::Failed(_)
+            | CollaborativeParticipantProviderState::Unavailable => IconName::Disconnected,
+        };
         let participant_state = self.participant_state;
         let participant_accessibility_label = accessibility_participant_label(&participant_state);
         let participant_role = if matches!(
@@ -135,16 +191,14 @@ impl RenderOnce for CollaborativeTopBar {
         } else {
             Role::Group
         };
-        let layout = self.layout;
-
         h_flex()
             .id("collaborative-top-bar")
             .debug_selector(|| "COLLABORATIVE-TOP-BAR".to_owned())
-            .h_10()
+            .h_8()
             .w_full()
             .flex_none()
-            .px_2()
-            .gap_2()
+            .px_1()
+            .gap_1()
             .border_b_1()
             .border_color(cx.theme().colors().border)
             .bg(cx.theme().colors().title_bar_background)
@@ -154,18 +208,18 @@ impl RenderOnce for CollaborativeTopBar {
                 h_flex()
                     .id("collaborative-top-bar-title")
                     .debug_selector(|| "COLLABORATIVE-TOP-BAR-TITLE".to_owned())
+                    .flex_1()
                     .min_w_0()
                     .gap_1()
                     .child(Label::new(project_title).size(LabelSize::Small).truncate())
                     .child(Label::new("/").size(LabelSize::Small).color(Color::Muted))
                     .child(
-                        Label::new(NO_ACTIVE_TASK_LABEL)
+                        Label::new(task_title)
                             .size(LabelSize::Small)
                             .color(Color::Muted)
                             .truncate(),
                     ),
             )
-            .child(div().flex_1())
             .child(
                 h_flex()
                     .id("collaborative-top-bar-participants")
@@ -182,11 +236,21 @@ impl RenderOnce for CollaborativeTopBar {
                                 .children(view_data.participants.iter().take(3).map(
                                     |participant| {
                                         if let Some(avatar_uri) = &participant.avatar_uri {
-                                            Avatar::new(avatar_uri.clone())
-                                                .size(rems(1.25))
+                                            div()
+                                                .debug_selector(|| {
+                                                    "COLLABORATIVE-PARTICIPANT-AVATAR".to_owned()
+                                                })
+                                                .child(
+                                                    Avatar::new(avatar_uri.clone())
+                                                        .size(rems(1.25)),
+                                                )
                                                 .into_any_element()
                                         } else {
                                             h_flex()
+                                                .debug_selector(|| {
+                                                    "COLLABORATIVE-PARTICIPANT-AVATAR-FALLBACK"
+                                                        .to_owned()
+                                                })
                                                 .size(rems(1.25))
                                                 .justify_center()
                                                 .rounded_full()
@@ -199,12 +263,7 @@ impl RenderOnce for CollaborativeTopBar {
                                                 .into_any_element()
                                         }
                                     },
-                                ))
-                                .child(
-                                    Label::new(participant_label)
-                                        .size(LabelSize::XSmall)
-                                        .color(Color::Muted),
-                                ),
+                                )),
                             CollaborativeParticipantProviderState::Failed(message) => this
                                 .debug_selector(|| {
                                     "COLLABORATIVE-TOP-BAR-PARTICIPANTS-FAILED".to_owned()
@@ -244,9 +303,10 @@ impl RenderOnce for CollaborativeTopBar {
                             .style(ButtonStyle::Subtle)
                             .aria_label("Share collaborative workspace")
                             .disabled(!action_availability.share)
-                            .tooltip(Tooltip::text(
-                                "Share is unavailable until collaboration is connected",
-                            )),
+                            .tooltip(Tooltip::text("Share or unshare the current project"))
+                            .on_click(|_, window, cx| {
+                                window.dispatch_action(ShareProject.boxed_clone(), cx);
+                            }),
                     ),
             )
             .child(
@@ -257,20 +317,24 @@ impl RenderOnce for CollaborativeTopBar {
                             .style(ButtonStyle::Subtle)
                             .aria_label("Invite participants")
                             .disabled(!action_availability.invite)
-                            .tooltip(Tooltip::text(
-                                "Invites are unavailable until a community is selected",
-                            )),
+                            .tooltip(Tooltip::text("Open collaborators and invitations"))
+                            .on_click(|_, window, cx| {
+                                window.dispatch_action(OpenCollaborators.boxed_clone(), cx);
+                            }),
                     ),
             )
             .child(
                 div()
                     .debug_selector(|| "COLLABORATIVE-TOP-BAR-CONNECTION".to_owned())
                     .child(
-                        IconButton::new("collaborative-connection", IconName::Disconnected)
+                        IconButton::new("collaborative-connection", connection_icon)
                             .style(ButtonStyle::Subtle)
-                            .aria_label(CONNECTION_UNAVAILABLE_LABEL)
+                            .aria_label(connection_label.clone())
                             .disabled(!action_availability.connection_details)
-                            .tooltip(Tooltip::text(CONNECTION_UNAVAILABLE_LABEL)),
+                            .tooltip(Tooltip::text(connection_label))
+                            .on_click(|_, window, cx| {
+                                window.dispatch_action(CopyRoomId.boxed_clone(), cx);
+                            }),
                     ),
             )
             .child(
@@ -293,8 +357,8 @@ impl RenderOnce for CollaborativeTopBar {
                         } else {
                             "Show Review Changes"
                         }))
-                        .on_click(move |_, _, cx| {
-                            layout.update(cx, |layout, cx| layout.toggle_review(cx));
+                        .on_click(move |_, window, cx| {
+                            window.dispatch_action(ToggleCollaborativeReview.boxed_clone(), cx);
                         }),
                     ),
             )

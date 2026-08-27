@@ -4002,6 +4002,373 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Validation: feature-spec validator passes, dual-configuration harness passes, task audit has no unclassified Buzz-derived write path or perpetual deferred bucket_
     - _Evidence: 2026-08-20 — added a semantic-ownership ledger covering every descendant leaf of all 49 epics with explicit shared, gated, disabled-build compatibility and deployment classifications. Mixed epics preserve canonical Zed owners while gating only Collaborative Workspace-exclusive adapters, registrations and service artifacts; future leaves must split independently reviewable owners and update dependency/payload denial in the introducing change. The developer guide now publishes exact quick, full, profile-specific and captured-tree commands plus the same classification rule. Standard warning-denied Clippy identified three multiplayer-test imports left unconditional; the cleanup now admits those imports only with their owning tests. Specification validation, the task-ledger coverage audit and both supported build-profile verification gates passed._
 
+## Milestone corrective parity work discovered by the 2026-08-26 running-interface audit
+
+- [~] 50. Replace geometry-only Collaborative Workspace evidence with complete production composition
+
+  - [x] 50.1. Audit the running composition and reopen unsupported PASS claims
+    - Inspect every primary region, registration path, provider, interaction and visual test against both approved reference images.
+    - Preserve historical evidence while marking unsupported native desktop claims incomplete.
+    - _Requirements: 1.3, 4.1, 4.2, 4.3, 4.4, 4.5, 20.4_
+    - _Capability IDs: CAP-036, CAP-037, CAP-044_
+    - _Depends on: 49.15_
+    - _Reads: crates/{workspace,sidebar,agent_ui,collab_ui,git_ui,zed}/**, .agents/specs/collaborative-workspace/{requirements,design,tasks,parity-report,validation-results,final-signoff}.md, .agents/specs/collaborative-workspace/screenshots/*.png_
+    - _Writes: .agents/specs/collaborative-workspace/{tasks,parity-report,validation-results,final-signoff}.md_
+    - _Validation: every placeholder, disabled action, test-only provider and geometry-only claim has a corrective leaf and no current native parity PASS remains_
+    - _Evidence: 2026-08-26 — found a literal center `"Timeline"` label, no production timeline registration, permanently disabled share/invite/connection actions, no production pinned/community source, and a visual test limited to reference hashes plus selector geometry. Reopened CAP-036 and criteria 4.1–4.5; prior evidence remains present as superseded history._
+
+  - [x] 50.2. Mount a live native ACP activity timeline
+    - Add a dependency-correct workspace provider host and an `agent_ui` adapter over the active authoritative `AcpThread`.
+    - Project human, assistant, tool, structural and lifecycle entries and replace the stream after truncation or thread changes.
+    - _Requirements: 4.1, 4.2, 11.1, 12.1, 12.2_
+    - _Capability IDs: CAP-021, CAP-025, CAP-036_
+    - _Depends on: 50.1_
+    - _Reads: crates/{workspace,agent_ui,acp_thread,zed}/**_
+    - _Writes: crates/workspace/src/{workspace,collaborative_layout,collaborative_workspace,collaborative_timeline}.rs, crates/agent_ui/src/collaborative_timeline.rs, crates/zed/src/zed.rs_
+    - _Validation: production reconciliation and GPUI tests prove native entries, updates, removals, thread switches, empty/error state and no literal timeline placeholder_
+    - _Evidence: 2026-08-26 — added the project- and generation-fenced workspace timeline provider host and a production `agent_ui` adapter over the active authoritative `AcpThread`. Human, assistant, tool, structural and lifecycle entries project through the existing collaboration activity reducer/cards, replace after truncation, and expose truthful unavailable/error state. Production Zed reconciliation and focused GPUI tests passed; the literal `"Timeline"` placeholder no longer exists._
+
+  - [~] 50.3. Bind rail communities, pins, selection and unread state to canonical production owners
+    - Replace empty local pin state and project-only community labeling with authorized channel/community, project, task and thread projections.
+    - Persist selection and pins and prove every selection updates timeline, composer, review and top-bar context.
+    - _Requirements: 4.1, 4.2, 9.1, 9.3, 10.1_
+    - _Capability IDs: CAP-010, CAP-013, CAP-018, CAP-036_
+    - _Depends on: 50.2_
+    - _Reads: crates/{sidebar,channel,collab_ui,workspace,agent_ui,project}/**_
+    - _Writes: crates/sidebar/src/collaborative_*.rs, crates/workspace/src/collaborative_*.rs, upper production registration owners_
+    - _Validation: integration tests use authorized native stores with no hard-coded records and cover selection, unread, scrolling, pinning, restart and denied/offline states_
+    - _Current evidence and gap: ChannelStore communities/favorites/unread state, project/worktree/repository rows and ThreadMetadataStore/AgentPanel tasks now drive the scrollable rail; selection persists and channel selection mounts the canonical `ChannelView`. Project/thread pins use the existing versioned collaborative-navigation record, channel pins use canonical ChannelStore favorites, and visible pin/unpin controls plus restart/bounds/projection tests pass. Hosted authorization/offline integration coverage remains incomplete._
+
+  - [~] 50.4. Make task context, participants, connection and sharing controls truthful and functional
+    - Source humans and agents from native room/thread state, expose selected task context, and connect share, invite and connection-detail actions to their canonical owners.
+    - Render an explicit unavailable dependency only when the current project cannot support an operation; never leave an enabled no-op or permanently disabled production action.
+    - _Requirements: 4.1, 4.2, 6.2, 9.2, 11.1_
+    - _Capability IDs: CAP-008, CAP-014, CAP-021, CAP-036_
+    - _Depends on: 50.3_
+    - _Reads: crates/{workspace,call,collab_ui,client,agent_ui}/**_
+    - _Writes: crates/workspace/src/{collaborative_top_bar,collaborative_participants,collaborative_workspace}.rs and upper provider adapters_
+    - _Validation: populated, signed-out, offline, authorization-denied and partial participant states exercise every visible action and accessibility label_
+    - _Current evidence and gap: the top bar now uses active thread metadata, ACP state and `ActiveCall` room users; share, collaborators/invite and connection details dispatch native owners and signed-out state is explicit. A real hosted room is required to prove remote participant, authorization-denied and partial connection lifecycles end to end._
+
+  - [~] 50.5. Compose authorized channel, message, activity, workflow and review events
+    - Register `collab_ui::MessageTimeline` and native collaboration/activity adapters only from real authorized client projections.
+    - Reconcile live/history/optimistic events without presentation-owned copies and link native Git, CI, workflow and review actions to their owning views.
+    - _Requirements: 4.1, 9.1, 9.3, 10.4, 12.1, 13.1_
+    - _Capability IDs: CAP-011, CAP-013, CAP-020, CAP-025, CAP-027, CAP-036_
+    - _Depends on: 50.3, 50.4_
+    - _Reads: crates/{collab_ui,collab,agent_ui,git_ui,channel,workspace}/**_
+    - _Writes: lower-owner adapters and upper production registrations only_
+    - _Validation: authorized history/live/retry tests prove human, agent, message, activity, tool, workflow, CI and review events render once with stable identity_
+    - _Current evidence and gap: authoritative ACP human/assistant/tool/lifecycle events and native project/agent review views compose without duplicate stores. Channel selection mounts native shared notes, but no production authorized `MessageTimeline` store registration or canonical hosted workflow/CI event source is available locally; this leaf remains incomplete._
+
+  - [~] 50.6. Complete composer routing and failure lifecycle
+    - Route drafts, submit and cancel to the selected ACP thread or supported authorized channel/thread owner.
+    - Show optimistic, rejected, retry, cancellation and offline states without discarding errors.
+    - _Requirements: 4.1, 9.1, 9.3, 11.1_
+    - _Capability IDs: CAP-011, CAP-013, CAP-021, CAP-036_
+    - _Depends on: 50.3, 50.5_
+    - _Reads: crates/{workspace,agent_ui,collab_ui,channel}/**_
+    - _Writes: crates/workspace/src/collaborative_composer.rs and canonical composer adapters_
+    - _Validation: GPUI tests cover draft restoration, submit, optimistic acknowledgement, rejection, retry, cancel, thread switch and visible errors_
+    - _Current evidence and gap: non-channel selection delegates directly to the active native ACP `MessageEditor`, preserving its draft, submit, cancel, optimistic and error lifecycle and exporting that native editor's focus handle through the dependency-correct workspace host. A production-level GPUI integration test now opens a real ACP thread through `AgentPanel`, reaches the real `MessageEditor` through Collaborative landmark keyboard traversal, rejects empty input, submits through the registered workspace composer into the authoritative `AcpThread`, observes its generating state and new entry, cancels through the same production route, and observes the thread return to idle. Channel selection truthfully disables unsupported message submission while leaving native shared notes editable. A canonical authorized channel composer owner plus hosted rejection/retry/offline lifecycle coverage remain incomplete._
+
+  - [~] 50.7. Complete native review and status composition
+    - Make `ProjectDiff` available for a real open project without requiring a pre-opened hidden item, retain `AgentDiffPane`, and expose comments, CI and applicable review actions.
+    - Bind bottom presence, synchronization, task, branch, execution and failure state to native owners.
+    - _Requirements: 4.1, 4.2, 10.3, 10.4, 12.2_
+    - _Capability IDs: CAP-020, CAP-025, CAP-036_
+    - _Depends on: 50.4, 50.5_
+    - _Reads: crates/{git_ui,agent_ui,workspace,status_bar,project}/**_
+    - _Writes: native review adapters, workspace review/status composition and upper registrations_
+    - _Validation: project/agent changes, comments, CI states, resize/collapse, action routing and partial Git failures pass with real stores_
+    - _Current evidence and gap: real projects now create a detached canonical `ProjectDiff` without a hidden editor item, retain `AgentDiffPane`, expose source selection/collapse/resize actions and project/branch/task/execution status. Native comments remain owned by `ProjectDiff`; hosted CI/review authorization state has no local provider and is not claimed._
+
+  - [~] 50.8. Prove complete keyboard, accessibility, responsive and persisted behavior
+    - Exercise focus order, activation, scroll regions, screen-reader semantics, theme, zoom, reduced motion and expanded/collapsed restart restoration across every interactive region.
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 4.3, 4.4_
+    - _Capability IDs: CAP-036, CAP-037, CAP-044_
+    - _Depends on: 50.3, 50.4, 50.6, 50.7_
+    - _Reads: crates/{workspace,sidebar,agent_ui,collab_ui,git_ui}/**_
+    - _Writes: production interaction code and GPUI integration tests_
+    - _Validation: keyboard-only and accessibility tests cover both reference viewports plus narrow windows, restart and failure states_
+    - _Current evidence and gap: visible editor/collaborative switches, rail keyboard activation, roles/labels, theme tokens, zoom, reduced-motion source checks, responsive expanded/collapsed geometry and review/selection restart restoration pass focused GPUI tests. The composer landmark now focuses the canonical ACP `MessageEditor` rather than a presentation wrapper, with a production-level keyboard-focus test. Complete keyboard-only traversal of every top-bar/timeline/review control and hosted failure-state coverage remain incomplete._
+
+  - [~] 50.9. Replace geometry fixtures with populated raster comparison
+    - Render meaningful native state, capture actual application output at 1930×1262 and 1928×1298, and compare it with the checked-in references using approved tolerances and reviewed diff images.
+    - _Requirements: 4.5, 20.1, 20.4_
+    - _Capability IDs: CAP-036, CAP-044_
+    - _Depends on: 50.8_
+    - _Reads: .agents/specs/collaborative-workspace/screenshots/*.png, crates/**/tests/visual/**_
+    - _Writes: visual harness, actual/baseline/diff evidence and validation results_
+    - _Validation: raster comparison fails when populated content or primary-region styling is removed; selector bounds alone cannot pass_
+    - _Current evidence and gap: the Rust-product visual runner now renders a real temporary Git project, active authoritative ACP thread, native composer, task/rail state and canonical `ProjectDiff`; it captures 1930×1262 and 1928×1298 actual/native/diff PNGs and enforces coarse raster structure. Final results are 97.07% and 96.79% structural similarity but only 10.90% and 21.52% exact-pixel match. Dense hosted participants/messages/CI state from the references cannot be reproduced while signed out, so visual parity remains incomplete._
+
+  - [~] 50.10. Run the dual-profile, crate, application and specification sign-off gates
+    - Launch the Rust product, enter through visible UI, exercise real project/thread/composer/review/restart flows and capture final screenshots.
+    - Run changed-crate tests and warning-denied all-target Clippy with and without multiplayer, full Clippy, product packaging, and the complete specification validator.
+    - _Requirements: 20.1, 20.2, 20.3, 20.4, 21.1, 21.2, 21.9_
+    - _Capability IDs: CAP-036, CAP-037, CAP-043, CAP-044_
+    - _Depends on: 50.9_
+    - _Reads: complete implementation and specification evidence_
+    - _Writes: .agents/specs/collaborative-workspace/{tasks,parity-report,validation-results,final-signoff}.md, test-results/collaborative-workspace/**_
+    - _Validation: every criterion has current production evidence, no primary placeholder/unreachable control/mock-only registration remains, and any external dependency is explicitly documented_
+    - _Current evidence and blockers: the exact Rust product command launched; the populated visual runner passed twice after deterministic native-owner cleanup; the unified focused suite passed 84 tests, followed by seven workspace navigation and five sidebar pinning tests for the corrective persistent-pin work. The production-level ACP composer integration test also passes real submit/generating/entry/cancel/idle routing. Standard/no-feature clippy passed all five changed crates and the post-pinning workspace/sidebar/agent_ui reruns; all-feature/all-target clippy passed workspace/sidebar/agent_ui/git_ui and the collab_ui production library. Full workspace clippy stopped in unchanged `language_models` and `onboarding` tests; collab_ui all-target clippy stops at an unchanged redundant clone. The canonical spec and inventory validate. The dual-profile tree gate stops before profile execution because existing shared audio/project/remote paths include `collaboration_domain`; the direct Standard application check passed. Hosted collaboration/CI dependencies and the open leaves above prohibit sign-off._
+
+- [~] 51. Restore canonical production channel messaging
+
+  - [~] 51.1. Define a deliberately versioned collaborative-message RPC contract
+    - Preserve the retired numeric channel-chat messages unchanged and add tenant-scoped UUID identities, operation IDs, aggregate versions, snapshot/keyset cursors, ordered outbox cursors and closed typed outcomes.
+    - Encode signed-event fields as bounded typed binary/string fields without exposing database rows or making Nostr JSON the desktop RPC contract.
+    - _Requirements: 7.1, 7.2, 8.1, 9.1, 16.1, 17.1_
+    - _Capability IDs: CAP-010, CAP-011, CAP-012, CAP-013, CAP-036_
+    - _Depends on: 50.1_
+    - _Reads: crates/proto/proto/{channel,zed}.proto, crates/proto/src/proto.rs, canonical identity/message/cursor contracts_
+    - _Writes: crates/proto/proto/{channel,zed}.proto, crates/proto/src/proto.rs_
+    - _Validation: protocol round trips reject unknown versions, malformed identities, unbounded pages and ambiguous outcomes while legacy field numbers remain unchanged_
+    - _Current evidence and gap: Version-one open/close/window/apply/stream messages carry canonical IDs, operation/version/cursor fields and typed errors; retired messages and field numbers remain unchanged and return an explicit versioned-protocol migration error. Focused malformed/unknown-version codec coverage remains to be added before this leaf can complete._
+
+  - [~] 51.2. Bind authenticated Zed sessions to canonical tenant and principal admission
+    - Add a deployment-scoped adapter binding between existing authenticated local users/channels and canonical community, channel and principal IDs.
+    - Resolve the trusted tenant route and current memberships before issuing the once-owned common authorization token; denied or revoked requests must perform no message/history/count/subscription work.
+    - _Requirements: 2.1, 2.2, 2.3, 7.1, 8.1, 16.1_
+    - _Capability IDs: CAP-001, CAP-002, CAP-010, CAP-011_
+    - _Depends on: 51.1_
+    - _Reads: crates/collab/src/{auth,rpc,tenant_admission}.rs, crates/collab/src/db/queries/channels.rs, canonical channel/membership migrations_
+    - _Writes: crates/collab/src/messages/**, crates/collab/migrations/**, server composition_
+    - _Validation: cross-tenant, nonmember, removed-member and revoked-session tests prove authorization precedes every canonical observable operation_
+    - _Current evidence and gap: Trusted deployment admission maps authenticated local users and accepted channel membership to canonical tenants/principals, revalidates live subscriptions and closes delivery after member removal. Live tests cover cross-tenant, nonmember and removed-member denial; explicit revoked-authentication-session observability coverage remains open._
+
+  - [~] 51.3. Implement atomic canonical message commands and hydration
+    - Load channels/messages through canonical projections, apply `collaboration_domain::Message` and reaction/read-state rules, verify signed events and atomically persist event, projection, stable receipt and command outbox.
+    - Hydrate visible content, author presentation, reply links, edits, deletions and reactions without a legacy chat table.
+    - _Requirements: 8.1, 8.2, 9.1, 9.3, 14.1, 16.1_
+    - _Capability IDs: CAP-011, CAP-012, CAP-013, CAP-017_
+    - _Depends on: 51.2_
+    - _Reads: crates/collaboration_domain/src/{message,reaction,read_state}.rs, crates/collab/src/db/collaboration/{event_repository,outbox}.rs, crates/collab/src/messages/window_repository.rs_
+    - _Writes: crates/collab/src/messages/**, focused canonical persistence migrations only when required_
+    - _Validation: live PostgreSQL tests cover dense history, create/edit/delete/reaction/read persistence, stale versions, exact idempotency and transaction rollback with no partial event/projection/outbox state_
+    - _Current evidence and gap: Live PostgreSQL tests now cover same-timestamp dense keyset pages, create and exact-operation retry, edit, stale rejection, reaction, acknowledgement, deletion and authoritative history reload. The mutation uses the canonical domain authorization shape and one transactional event/projection/receipt/outbox commit; an injected rollback/no-partial-row assertion remains open._
+
+  - [~] 51.4. Add PostgreSQL replay and Redis notification adapters
+    - Replay ordered committed message outbox records from PostgreSQL and publish only bounded content-free notification envelopes through configured Redis.
+    - Bind join/leave/disconnect cleanup to authenticated tenant/channel subscriptions and deliver all canonical mutations through one bounded ordered stream.
+    - _Requirements: 7.2, 9.1, 16.1, 16.2, 20.2_
+    - _Capability IDs: CAP-003, CAP-004, CAP-011, CAP-013_
+    - _Depends on: 51.3_
+    - _Reads: crates/collab/src/pubsub/**, crates/collab/src/db/collaboration/outbox.rs, collaboration configuration_
+    - _Writes: crates/collab/src/pubsub/**, crates/collab/src/rpc.rs, AppState/runtime lifecycle_
+    - _Validation: two-pod delivery, queue overflow, cancellation and Redis-loss tests prove PostgreSQL replay restores exact order without duplicates_
+    - _Current evidence and gap: PostgreSQL replay and configured Redis RESP publish/subscribe execute in production code; a live test proves Redis notification delivery, forced Redis failure and exact PostgreSQL envelope/payload recovery. Connection cleanup and bounded queues are wired. Two-process delivery and overflow/cancellation fault coverage remain open._
+
+  - [~] 51.5. Implement the multiplayer-gated desktop transport adapter
+    - Load head/continuation pages, maintain one live subscription, submit versioned signed operations, reconnect from the authoritative outbox cursor and feed accepted/rejected/replaced outcomes into the existing reconciler.
+    - Scope and drop the adapter with the active authorized channel/thread; expose denied, offline, retrying, stale-version and unavailable states without becoming another message store.
+    - _Requirements: 3.1, 7.2, 9.1, 9.3, 16.1, 16.2_
+    - _Capability IDs: CAP-011, CAP-013, CAP-036, CAP-037_
+    - _Depends on: 51.1, 51.4_
+    - _Reads: crates/{client,channel,collab_ui}/**, existing message timeline/reconciler/draft owners_
+    - _Writes: multiplayer-gated client/channel/collab_ui transport and composition modules_
+    - _Validation: two-client websocket tests cover send/receive, optimistic replacement, edit/delete/react/ack, disconnect/reconnect, restart history and exact deduplication_
+    - _Current evidence and gap: The Multiplayer adapter loads and paginates server windows, signs protected operations, subscribes, reconnects from the authoritative cursor, reconciles optimistic outcomes and closes scope on channel/workspace exit. The live two-client RPC test covers delivery, disconnect activity, reconnect reload, exact deduplication and mutations over the real Peer protocol with PostgreSQL authority; a network-WebSocket client test and adapter-level optimistic replacement test remain open._
+
+  - [~] 51.6. Compose server-backed messages and composer in Collaborative Workspace
+    - Register `MessageTimeline` for authorized rail channel/thread selection and route submit, cancel, edit, delete, react, paginate and retry through the production adapter.
+    - Keep ACP routing intact and remove placeholder or disabled channel timeline/composer states for populated authorized channels.
+    - _Requirements: 4.1, 4.2, 4.3, 9.1, 9.3, 11.1, 20.4_
+    - _Capability IDs: CAP-011, CAP-013, CAP-021, CAP-036, CAP-044_
+    - _Depends on: 51.5_
+    - _Reads: crates/{workspace,sidebar,channel,collab_ui,agent_ui}/**_
+    - _Writes: lower-owner provider registration and upper Collaborative Workspace selection/composer composition_
+    - _Validation: GPUI integration against a real local server proves populated rows, composer lifecycle, pagination, selection changes, restart restoration and visible typed failures_
+    - _Current evidence and gap: Authorized rail channel selection registers the real `MessageTimeline` and channel composer, and native controls route send/cancel/retry/page/edit/delete/reaction/reply through the production adapter while ACP routing remains intact. Compilation passes for the Rust product and `collab_ui/multiplayer-tools`; a GPUI test against the live Collab service, canonical message-thread rail selection and populated application capture remain open._
+
+  - [~] 51.7. Make local Compose and the two-client launcher exercise the production path
+    - Run the checked-in canonical migrations before Collab readiness, connect configured Redis, preserve the existing local authentication/seed flow and document a two-client Rust-product launcher.
+    - Keep forge projections optional and distinguish an unconfigured forge from channel-message health.
+    - _Requirements: 16.1, 18.1, 19.1, 20.1, 20.2_
+    - _Capability IDs: CAP-011, CAP-027, CAP-040, CAP-043_
+    - _Depends on: 51.4, 51.6_
+    - _Reads: deploy/collaboration/compose/**, crates/collab/{README.md,seed*.json}, script/zed-local, Dockerfile-collab_
+    - _Writes: Collab startup/migration composition, Compose contract, launcher and development documentation_
+    - _Validation: fresh Compose health plus an authenticated two-client smoke demonstrates bidirectional mutation, Redis-loss replay, client/server restart restoration and denied outsider access_
+    - _Current evidence and gap: Collab startup runs embedded migrations; the checked Compose contract and shell syntax pass, PostgreSQL/Redis/object storage start healthy, and the documented launcher builds two Rust-product clients with `multiplayer-tools,rust-tools` through the existing auth flow. The Collab container plus two GUI clients have not yet completed the manual smoke/capture, so this leaf remains incomplete._
+
+  - [~] 51.8. Reconcile parity evidence only after end-to-end proof
+    - Preserve historical evidence, retain incomplete status for every unproved behavior and attach production integration, denial, restart, GPUI and populated screenshot evidence.
+    - _Requirements: 20.1, 20.2, 20.3, 20.4, 21.1, 21.2, 21.9_
+    - _Capability IDs: CAP-036, CAP-037, CAP-043, CAP-044_
+    - _Depends on: 51.7_
+    - _Reads: complete implementation, specification and test evidence_
+    - _Writes: .agents/specs/collaborative-workspace/{tasks,parity-report,validation-results,final-signoff}.md, test-results/collaborative-workspace/**_
+    - _Validation: canonical validator, dual build profiles, warning-denied focused Clippy, full Clippy, live Compose demonstration and populated visual evidence all agree with the current criterion states_
+    - _Current evidence and gap: Historical PASS text remains preserved and current CAP-011/requirements remain incomplete. Live PostgreSQL, Redis-loss and Rust-product compile evidence is recorded in the current snapshot. Warning-denied focused Clippy passes `client`, `channel`, `workspace` and the `collab` production library; unchanged all-target test blockers remain in `collab_ui` and `collab`, the pre-existing Rust-tools action-count test blocks `zed`, and full workspace Clippy exhausted the local volume while compiling dependencies. Live Compose GUI demonstration, server-backed GPUI coverage and populated screenshot evidence still gate completion._
+
+- [~] 52. Correct native Collaborative Workspace visual parity
+
+  - [~] 52.1. Capture reference viewports at native display scale
+    - Convert required physical-pixel dimensions to logical GPUI window bounds using the active display scale and reject captures that require post-layout resampling.
+    - Preserve platform-owned title-bar and window-control composition.
+    - _Requirements: 4.1, 4.4, 4.5_
+    - _Capability IDs: CAP-036, CAP-044_
+    - _Depends on: 50.9_
+    - _Reads: crates/zed/src/visual_test_runner.rs, approved reference PNG metadata_
+    - _Writes: crates/zed/src/visual_test_runner.rs_
+    - _Validation: native captures are exactly 1930×1262 and 1928×1298 without resizing and retain readable native Zed typography_
+    - _Current evidence and gap: The visual runner creates separate logical GPUI windows whose Retina backing surfaces are exactly 1930×1262 and 1928×1298, retains the unscaled native captures, applies the light Zed theme and native system typography, and fails if a requested expanded/collapsed review state is not active. Raw GPUI raster capture cannot include macOS traffic-light controls because those remain owned by the host window chrome; the running application retains the platform owner, so this leaf remains incomplete rather than synthesizing those pixels._
+
+  - [x] 52.2. Reconcile rail and top-bar density with canonical providers
+    - Render Pinned, Projects, Tasks and Threads with native icons, hierarchy, truncation, unread/activity state, scrolling and the expanded account/product surface.
+    - Seed deterministic authenticated visual-test state only through existing user, channel, project and ACP owners; production signed-out behavior remains truthful.
+    - _Requirements: 4.1, 4.4, 4.5, 9.3_
+    - _Capability IDs: CAP-010, CAP-013, CAP-036_
+    - _Depends on: 52.1_
+    - _Reads: crates/{sidebar,workspace,channel,client,zed}/**_
+    - _Writes: native rail/top-bar adapters and visual scenario setup_
+    - _Validation: region assertions reject missing sections, signed-out primary content, incorrect row density, missing participant/share/connection controls and absent expanded account surface_
+    - _Evidence: The production rail projects ChannelStore, Project and ThreadMetadataStore state and renders the authenticated UserStore account through native actions. The visual-test setup seeds deterministic authenticated state through those same owners; both exact captures contain Pinned, Projects, Tasks and Threads, the expanded account/product surface, current task context, participant controls, share and connected state without a signed-out placeholder._
+
+  - [~] 52.3. Reconcile timeline, composer and bottom-surface density
+    - Populate the canonical ACP/message projections with grouped human, agent, tool, activity and code/diff semantics and use compact native disclosure treatment.
+    - Keep the real composer lifecycle, focus owner, branch/model/connection state and visible failure state while matching the reference vertical rhythm.
+    - _Requirements: 4.1, 4.4, 4.5, 12.1, 12.2, 12.3, 12.4_
+    - _Capability IDs: CAP-011, CAP-021, CAP-025, CAP-036_
+    - _Depends on: 52.1_
+    - _Reads: crates/{agent_ui,collab_ui,workspace,zed}/**_
+    - _Writes: native timeline/activity/composer/status presentation and canonical visual scenario setup_
+    - _Validation: raster and GPUI tests reject sparse timelines, repetitive text disclosure, oversized composer, missing status state and presentation-only message fixtures_
+    - _Current evidence and gap: The capture uses the production CollaborativeTimelineAdapter over a real native ACP thread, the native composer and project/status owners. Multiple prompt cycles populate human, agent and tool/activity rows; compact icon disclosure replaces repeated “Show details” text and the composer is height-bounded. The result is materially denser, but it still lacks the reference's richer inline ACP code/diff-card composition and avatar variety, so this leaf remains incomplete._
+
+  - [x] 52.4. Reconcile native review and responsive expanded/collapsed geometry
+    - Use a focused structural Git change so `ProjectDiff` renders representative hunks, native syntax colors, headers, gutters and scroll state.
+    - Exercise visible collapse and restoration while preserving resizable review state and full-width collapsed timeline composition.
+    - _Requirements: 4.1, 4.2, 4.3, 4.5, 10.3, 10.4_
+    - _Capability IDs: CAP-020, CAP-036_
+    - _Depends on: 52.1_
+    - _Reads: crates/{git_ui,workspace,zed}/**, native project/Git owners_
+    - _Writes: native review composition, visual Git scenario and responsive assertions_
+    - _Validation: expanded capture matches bounded review geometry and meaningful hunks; collapsed capture has no review pixels and timeline consumes the released width_
+    - _Evidence: The expanded capture uses native ProjectDiff/AgentDiffPane adapters over a real Git project with one focused +7/−3 Rust source change. The review begins at physical x=1230 versus reference x=1221, remains resizable, and exposes native headers, gutters and hunk styling. The second capture asserts the review is fully collapsed and scores the released right-side timeline region independently._
+
+  - [x] 52.5. Enforce region-aware raster parity and reconcile evidence
+    - Generate actual, side-by-side and amplified diff images for both exact viewports and score title bar, rail, timeline, composer/status and review independently.
+    - Fail for sparse/placeholder/signed-out primary regions, wrong review state, washed-out contrast, incorrect font scale or misleading blank-area similarity.
+    - Preserve historical evidence and keep every unsupported parity criterion incomplete.
+    - _Requirements: 4.5, 20.1, 20.2, 20.3, 20.4_
+    - _Capability IDs: CAP-036, CAP-044_
+    - _Depends on: 52.2, 52.3, 52.4_
+    - _Reads: approved references, native captures, complete visual implementation and historical evidence_
+    - _Writes: crates/zed/src/visual_test_runner.rs, test-results/collaborative-workspace/**, .agents/specs/collaborative-workspace/{tasks,parity-report,validation-results,final-signoff}.md_
+    - _Validation: both exact captures and every required primary-region threshold pass alongside GPUI visual tests, dual-feature Clippy/build checks and the canonical specification validator_
+    - _Evidence: The runner writes native actual, side-by-side, amplified diff and per-region metric artifacts for both viewports. Rail, top bar, timeline, timeline-right, review and composer/status gates compare contrast, edge density and foreground coverage to each reference; exact dimensions and expanded/collapsed state are asserted separately. The evidence documents remaining mismatches and does not promote CAP-036 or Requirement 4 to complete._
+
+  - [x] 52.6. Share the canonical ACP thread-entry renderer with Collaborative Workspace
+    - Host the active `ThreadView` entry list without mounting its panel shell or composer, retaining native agent Markdown, code blocks, tool content, terminal output, inline diffs, permissions and actions.
+    - Keep channel selection on the authorized `collab_ui::MessageTimeline` and keep `AcpThread` as the only transcript owner.
+    - _Requirements: 2.1, 2.4, 4.1, 11.1, 12.1, 12.2, 12.4_
+    - _Capability IDs: CAP-011, CAP-021, CAP-025, CAP-036_
+    - _Depends on: 52.1_
+    - _Reads: crates/agent_ui/src/{conversation_view/thread_view,entry_view_state,conversation_view,message_editor,agent_diff}.rs, crates/workspace/src/collaborative_timeline.rs_
+    - _Writes: crates/agent_ui/src/{conversation_view/thread_view,collaborative_timeline}.rs, production GPUI/visual tests_
+    - _Validation: a populated native thread renders a user message, assistant fenced Rust block, completed inline diff, terminal/tool output and failed or permission state through canonical debug/raster surfaces with functional disclosure/actions_
+    - _Evidence: The production adapter hosts the active `ThreadView` list and no longer projects ACP entries into generic activity cards. The exact-size GPUI runner renders and independently observes the user entry, assistant Markdown, fenced Rust code block, native inline diff, content output, terminal output and failed tool state through the shared native renderer. Focused `agent_ui` tests and both changed-crate Clippy matrices pass._
+
+  - [~] 52.7. Resolve collaborative actor presentation through native identity owners
+    - Use `UserStore`, participant-provider and active ACP metadata at the UI adapter boundary; render `ui::Avatar` when an authoritative URI exists and a native identity icon when it does not.
+    - Remove literal actor badges without introducing a second identity store or changing domain serialization for visual metadata.
+    - _Requirements: 2.1, 4.1, 4.4, 11.2_
+    - _Capability IDs: CAP-007, CAP-021, CAP-023, CAP-036_
+    - _Depends on: 52.2, 52.6_
+    - _Reads: crates/{client,title_bar,workspace,agent_ui}/src/**_
+    - _Writes: crates/workspace/src/collaborative_top_bar.rs, crates/agent_ui/src/{collaborative_participants,collaborative_activity_cards}.rs, visual test support_
+    - _Validation: deterministic UserStore/ACP metadata renders the authoritative avatar branch; missing metadata renders truthful native icons; no `AI`/`You`/`Svc`/`Sys` presentation badges remain_
+    - _Current evidence and gap: Top-bar participants consume provider-owned avatar URIs, the exact-size raster asserts that the authoritative `ui::Avatar` branch rendered, and generic activity fallbacks use native identity icons instead of literal actor badges. Complete actor-ID resolution for every non-ACP system/service event and active-agent avatar metadata remains unproved, so this leaf remains incomplete._
+
+  - [x] 52.8. Reconcile the expanded review split from semantic logical geometry
+    - Derive the default split from rail, timeline, divider and review widths so the 1930×1262 review boundary lands within two physical pixels of the approved reference while preserving resizes and persisted custom widths.
+    - Keep the 1928×1298 explicit collapsed state full-width and cover narrow and wider windows without fixed-coordinate layout code.
+    - _Requirements: 4.2, 4.3, 4.5, 10.4_
+    - _Capability IDs: CAP-020, CAP-036, CAP-044_
+    - _Depends on: 52.4_
+    - _Reads: crates/workspace/src/{collaborative_layout,collaborative_layout_persistence}.rs, rendered debug bounds_
+    - _Writes: crates/workspace/src/{collaborative_layout,collaborative_layout_persistence}.rs, crates/zed/src/visual_test_runner.rs_
+    - _Validation: geometry tests cover both reference viewports plus narrow/wide layouts; raster capture measures 1221±2 physical pixels expanded and no review/full released width collapsed_
+    - _Evidence: The semantic default review width is 354.5 logical pixels and leaves persisted custom values untouched. Focused tests cover the two reference sizes plus narrow and wide layouts. Fresh debug bounds measure the expanded split at physical x=1221.0 (reference 1221, tolerance ±2) and the collapsed timeline at physical x=1928.0 with no review pane._
+
+  - [~] 52.9. Separate deterministic content raster from host-owned macOS chrome evidence
+    - Assert that `title_bar::TitleBar` composes the collaborative surface through `PlatformTitleBar`; never draw traffic-light controls in GPUI.
+    - Accept an explicit macOS native-window capture when Screen Recording permission is available, otherwise emit a truthful manual evidence procedure alongside deterministic content capture.
+    - _Requirements: 4.1, 4.4, 4.5, 20.4_
+    - _Capability IDs: CAP-036, CAP-044_
+    - _Depends on: 52.1_
+    - _Reads: crates/{title_bar,platform_title_bar,gpui,zed}/src/**_
+    - _Writes: crates/platform_title_bar/src/platform_title_bar.rs, crates/gpui/src/app/visual_test_context.rs, crates/zed/src/visual_test_runner.rs, native evidence artifacts_
+    - _Validation: content capture asserts the real PlatformTitleBar surface; supplied native capture is validated/copied; absent permission records a manual step and never synthesizes chrome_
+    - _Current evidence and gap: The visual context now exposes rendered debug bounds, the runner asserts `PlatformTitleBar`, and the evidence path distinguishes GPUI raster from optional host-window capture. A permission-granted native-window image has not been supplied, so the leaf remains incomplete._
+
+  - [~] 52.10. Gate rich native semantics and reconcile current visual evidence
+    - Capture both exact viewports with canonical rich ACP state and generate actual, side-by-side, amplified diff and per-region metrics.
+    - Fail independently for absent fenced code, native diff, terminal/tool content, authoritative avatar selection, split tolerance, collapsed width or sparse primary regions.
+    - Preserve Epic 51 as a separate production gate and do not infer hosted-channel parity from the deterministic visual scenario.
+    - _Requirements: 4.5, 9.1, 20.1, 20.4, 21.3_
+    - _Capability IDs: CAP-011, CAP-036, CAP-044_
+    - _Depends on: 52.6, 52.7, 52.8, 52.9_
+    - _Reads: approved references, production native owners, Epic 51 evidence_
+    - _Writes: crates/zed/src/visual_test_runner.rs, test-results/collaborative-workspace/**, .agents/specs/collaborative-workspace/{parity-report,validation-results,final-signoff}.md_
+    - _Validation: both exact captures pass semantic, geometry and region gates; all remaining mismatches and Epic 51 production gaps remain explicitly incomplete_
+    - _Current evidence and gap: Fresh 1930×1262 expanded and 1928×1298 collapsed captures pass rich-entry, authoritative-avatar, sparse-content, split, collapsed-width and per-region gates. The runner generated actual, side-by-side, raw diff, amplified diff and region-metric artifacts. The leaf remains incomplete because its actor-metadata and native host-window evidence dependencies remain open; Epic 51 is a separate incomplete production gate and no overall parity completion is claimed._
+
+- [~] 53. Audit and enforce native ownership reuse
+  - [x] 53.1. Inventory every Collaborative Workspace type and record its ownership disposition
+    - Map capability, canonical owner, reused native component, classification, registration path and canonical-owner test without treating a `Collaborative` prefix as justification.
+    - Preserve explicit reasons for thin dependency-cycle, selection, layout, focus and reconciliation adapters.
+    - _Requirements: 2.1, 2.2, 2.4, 2.5, 20.1_
+    - _Depends on: 52.6_
+    - _Reads: crates/{workspace,sidebar,agent_ui,git_ui,collab_ui,zed}/src/**_
+    - _Writes: .agents/specs/collaborative-workspace/reuse-ownership-matrix.md_
+    - _Validation: every Collaborative implementation type in the approved audit paths appears in the matrix with all required ownership columns_
+    - _Evidence: `reuse-ownership-matrix.md` records every production `Collaborative*` declaration in the approved paths, its canonical owner, native implementation, disposition, registration path and observing test. The inventory test also scans those paths and fails when a declared type is absent from the matrix._
+
+  - [x] 53.2. Remove duplicated awareness, diff-summary and status owners
+    - Delete the unregistered sidebar awareness store and read rail state from `ChannelStore`, `ThreadMetadataStore`, live ACP status and project entities.
+    - Remove the unused parallel `ProjectDiff` hunk/file/revision index and reduce review summaries to a stale native-action token.
+    - Remove the custom project/Git status reducer and let native `StatusBar` items retain project, branch and Git ownership.
+    - _Requirements: 2.1, 2.2, 2.4, 2.5, 4.1, 9.3, 10.4_
+    - _Depends on: 53.1_
+    - _Reads: crates/{sidebar,git_ui,workspace}/src/collaborative_*.rs, crates/workspace/src/status_bar.rs_
+    - _Writes: crates/{sidebar,git_ui,workspace}/src/collaborative_*.rs, crates/workspace/src/{workspace,status_bar}.rs_
+    - _Validation: focused rail/review/status tests and warning-denied Clippy pass with no removed type or module reference_
+    - _Evidence: deleted `CollaborativeAwarenessStore` and `CollaborativeStatusProjection`; reduced the Git review bridge to an exact `Entity<ProjectDiff>` adapter and review summary to a native-action source token. Workspace review/status tests and all-feature/no-default-feature warning-denied Clippy for Workspace, Agent UI, Sidebar and Git UI pass._
+
+  - [x] 53.3. Replace participant snapshot synchronization with a canonical live reader
+    - Register one active-thread reader over `ThreadView`, `ThreadMetadataStore`, `ActiveCall` and native users; top bar and status bar query it rather than receiving copied `view_data` updates.
+    - Preserve selection generations and stale-registration cleanup without retaining a second presence or identity owner.
+    - _Requirements: 2.1, 2.2, 2.4, 2.5, 4.1, 9.3, 11.1_
+    - _Depends on: 53.1_
+    - _Reads: crates/{agent_ui,workspace,zed}/src/**_
+    - _Writes: crates/agent_ui/src/collaborative_participants.rs, crates/workspace/src/{collaborative_participants,collaborative_workspace,status_bar,workspace}.rs, crates/zed/src/zed.rs_
+    - _Validation: a canonical-source mutation changes both Collaborative surfaces without provider replacement; switching/unregistering removes the old reader_
+    - _Evidence: the provider is now an `Rc` reader over the exact active `ThreadView`, `ThreadMetadataStore` and optional `ActiveCall`; Zed registers it without copying participant rows. A production-level GPUI test observes the same ThreadView identity, an Idle-to-Running owner update without provider replacement and an unavailable state after unregistering._
+
+  - [x] 53.4. Enforce Collaborative ownership invariants in architecture tests
+    - Reject new Collaborative `Store`, `Repository`, `Database` or persistence-owner declarations and pin the native `ThreadView`, `MessageEditor`, `ProjectDiff` and `AgentDiffPane` entity paths.
+    - Prove all production composition roots remain behind `multiplayer-tools`.
+    - _Requirements: 2.4, 2.5, 3.4, 11.1, 20.1_
+    - _Depends on: 53.2, 53.3_
+    - _Reads: retained Collaborative implementation sources_
+    - _Writes: crates/workspace/tests/collaborative_ownership_invariants.rs, crates/workspace/src/workspace.rs_
+    - _Validation: focused ownership-invariant tests fail on a synthetic forbidden owner or loss of any native entity path_
+    - _Evidence: five architecture tests pass. They scan the approved source paths, reject synthetic and production `Collaborative*Store/Repository/Database/Persistence` declarations, pin the native ACP composer/thread and project/agent diff paths, check feature gates and require matrix coverage._
+
+  - [~] 53.5. Validate the refactored production composition and reconcile parity evidence
+    - Run focused GPUI tests, Standard and Multiplayer build/Clippy matrices, the exact Rust-product launch, exact-size captures, full workspace Clippy and canonical specification validation.
+    - Preserve Epic 51 and host-window/visible-parity gaps independently; do not infer their completion from the reuse audit.
+    - _Requirements: 2.5, 3.4, 4.5, 20.1, 20.4, 21.1, 21.3_
+    - _Depends on: 53.4_
+    - _Reads: refactored production sources and existing parity evidence_
+    - _Writes: .agents/specs/collaborative-workspace/{tasks,parity-report,validation-results,final-signoff}.md, test-results/collaborative-workspace/**_
+    - _Validation: required focused checks pass; unrelated full-workspace blockers and external evidence gaps remain explicitly separate_
+    - _Current evidence and gap: focused ownership, Workspace, Agent UI and native ProjectDiff tests; both feature Clippy matrices; Standard and Multiplayer Rust-product checks; the exact Rust-product launch; and both exact-size semantic raster captures pass. The expanded boundary is x=1221 and the collapsed timeline reaches x=1928. Full `./script/clippy` is blocked by the unrelated duplicate Bedrock test module and three obsolete onboarding `clear()` calls. Epic 51, complete actor metadata and permission-granted macOS host-window evidence remain incomplete and are not converted into reuse-audit success._
+
 ## Decomposition audit notes
 
 - No approved requirement, architecture decision, capability ownership, migration phase or milestone scope was changed.

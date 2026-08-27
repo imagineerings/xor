@@ -13,6 +13,7 @@ Zed has mature native editor, project, Git, agent, ACP, remote-development and c
 - Complete protocol, service, data, client, operational and source-retirement migration.
 - Compatibility with existing signed events, identities, deployments, CLI scripts, mobile/web clients and stored data unless an approval gate explicitly authorizes a break.
 - Completing documented Buzz stubs or defects before declaring parity.
+- Collaborative ACP presentation reuses the canonical `AgentThread`/`ThreadView` entry renderer; channel presentation remains the authorized `collab_ui::MessageTimeline`. Visual evidence distinguishes deterministic GPUI content raster from host-owned macOS window chrome and never synthesizes traffic-light controls.
 
 ### Out of scope
 
@@ -53,6 +54,7 @@ Zed has mature native editor, project, Git, agent, ACP, remote-development and c
 2. **2.2** IF a compatibility representation or derived projection exists, THEN THE system SHALL identify its canonical source, version, rebuild/reconciliation rule and drift signal.
 3. **2.3** WHERE temporary dual reads or writes are required, THE migration SHALL bound them by phase, reconcile deterministically, expose divergence, support rollback and include removal criteria.
 4. **2.4** THE final system SHALL run no hidden Buzz desktop, parallel agent runtime or second authoritative project, Git, message, transcript, identity, presence, workflow or session store.
+5. **2.5** WHEN Collaborative Workspace composes native capability, THEN its retained adapter SHALL carry canonical entity handles, subscriptions, actions or view-local state only; source validation SHALL reject new Collaborative `Store`, `Repository`, `Database` or persistence owners unless an approved requirement identifies genuinely new canonical functionality.
 
 ### Requirement 3: Reversible workspace presentation
 
@@ -132,6 +134,8 @@ Zed has mature native editor, project, Git, agent, ACP, remote-development and c
 3. **9.3** THE system SHALL synchronize read/unread/manual-unread state, drafts, reminders, presence and typing with documented privacy, expiry, cross-device and offline behavior.
 4. **9.4** WHEN search or discovery runs, THEN authorization and privacy exclusions SHALL be applied before limit/ranking, and results MAY compose with existing Zed file/project search without exposing private event content.
 5. **9.5** WHEN a native or push notification is emitted, THEN it SHALL be deduplicated, permission-aware and privacy-preserving; push payloads SHALL be wake-only and authoritative data SHALL be fetched after reconnect.
+
+The Rust-product channel subset currently uses the versioned collaborative-message RPC, canonical signed-event/message projections, PostgreSQL outbox replay and Redis notification transport. Channel history, create/edit/delete/reaction/read operations, dense keyset pagination, idempotent retry and reconnect replay have live PostgreSQL coverage; the remaining requirement qualification still depends on production GPUI server-backed composition, channel-thread selection, a full local Compose/two-client demonstration and the broader communication capabilities named by 9.1–9.5. <!-- impl: crates/collab/src/messages/channel_service.rs#CanonicalMessageService --> <!-- impl: crates/collab/src/messages/channel_runtime.rs#CanonicalMessageRuntime --> <!-- impl: crates/collab_ui/src/channel_messaging.rs#ChannelMessagingTransport -->
 
 ### Requirement 10: Projects, Git forge and review parity
 
