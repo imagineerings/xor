@@ -357,12 +357,12 @@ fn provider_streaming_manifest(
     let registry = TypeRegistry::built_in()?;
     let mut binding = ProviderBindingSet {
         schema_version: 1,
-        implementation_namespace: "zed.comfy.provider.fixture".to_owned(),
+        implementation_namespace: "zed.comfy.provider.openrouter".to_owned(),
         bindings_sha256: "0".repeat(64),
         bindings: vec![ProviderBindingClaim {
-            feature_id: "COMFY-NODE-TEST-STREAM".to_owned(),
-            node_id: "FixtureStreamingProvider".to_owned(),
-            contract_sha256: "79cf351160d022e2705307243f2c359736199070c8f147caf050a343a050e36b"
+            feature_id: "COMFY-NODE-0466".to_owned(),
+            node_id: "OpenRouterLLMNode".to_owned(),
+            contract_sha256: "9f9e252f2dc4b6827fe12c30f29979d8aafc956ed76ddda414b3d65e9d21f0c9"
                 .to_owned(),
             transport_schema: "zed:comfy-provider-transport@1".parse()?,
             materializer_schema: "zed:comfy-provider-materializer@1".parse()?,
@@ -371,37 +371,37 @@ fn provider_streaming_manifest(
     binding.bindings_sha256 = binding.canonical_bindings_sha256()?;
     assert_eq!(
         binding.bindings_sha256,
-        "dd2046e20056584b2d9c0977a9228be1cefacf4dcf994fb5dc1fdf82284ff96d"
+        "ca1e5cb11d6d456dd26c354a5f4cf00188414854587002e8137694758270d00f"
     );
-    let input = PluginPort {
-        id: "prompt".to_owned(),
-        name: "prompt".to_owned(),
-        direction: PortDirection::Input,
-        type_id: registry.resolve("STRING")?.clone(),
-        cardinality: PortCardinality::Singular,
-        presence: PortPresence::Required,
-        hidden: false,
-        lazy: false,
-        default: None,
-        serialization: PortSerialization::Inline,
-        accepted_legacy_names: Vec::new(),
-    };
-    let output = PluginPort {
-        id: "output".to_owned(),
-        name: "output".to_owned(),
-        direction: PortDirection::Output,
-        type_id: registry.resolve("STRING")?.clone(),
-        cardinality: PortCardinality::Singular,
-        presence: PortPresence::Required,
-        hidden: false,
-        lazy: false,
-        default: None,
-        serialization: PortSerialization::Inline,
-        accepted_legacy_names: Vec::new(),
-    };
+    let input_ports = [
+        ("prompt", "String", PortPresence::Required),
+        ("model", "COMFY_DYNAMICCOMBO_V3", PortPresence::Required),
+        ("seed", "Int", PortPresence::Required),
+        ("system_prompt", "String", PortPresence::Optional),
+    ]
+    .into_iter()
+    .map(|(id, source_type, presence)| {
+        port(
+            &registry,
+            id,
+            PortDirection::Input,
+            source_type,
+            PortCardinality::Singular,
+            presence,
+        )
+    })
+    .collect::<Result<Vec<_>, _>>()?;
+    let output = port(
+        &registry,
+        "output_0",
+        PortDirection::Output,
+        "String",
+        PortCardinality::Singular,
+        PortPresence::Required,
+    )?;
     let mut manifest = PluginManifest {
         schema_version: 1,
-        identifier: "zed.comfy.provider.fixture".to_owned(),
+        identifier: "zed.comfy.provider.openrouter".to_owned(),
         plugin_version: ApiVersion::new(1, 0, 0),
         api: ApiRequirement {
             major: 1,
@@ -425,19 +425,43 @@ fn provider_streaming_manifest(
         },
         provider_binding: Some(binding),
         nodes: vec![PluginNode {
-            id: "FixtureStreamingProvider".to_owned(),
+            id: "OpenRouterLLMNode".to_owned(),
             version: ApiVersion::new(1, 0, 0),
-            display_name: "Fixture Streaming Provider".to_owned(),
-            category: "partner/test".to_owned(),
-            ports: vec![input, output],
+            display_name: "OpenRouter LLM".to_owned(),
+            category: "partner/text/OpenRouter".to_owned(),
+            ports: input_ports.into_iter().chain([output]).collect(),
             determinism: DeterminismPolicy::External,
             cache: CachePolicy::Never,
             effects: EffectPolicy::Provider,
         }],
         capabilities: vec![
             CapabilityRequest {
+                kind: CapabilityKind::NetworkProvider,
+                scope: "zed.comfy.provider.openrouter|https://fixture.invalid/v2/stream".to_owned(),
+                quota: CapabilityQuota {
+                    maximum_operations: 1,
+                    maximum_request_bytes: 16_384,
+                    maximum_response_bytes: 65_536,
+                    maximum_total_bytes: 81_920,
+                    maximum_handles: 1,
+                    timeout_milliseconds: 1_000,
+                },
+            },
+            CapabilityRequest {
+                kind: CapabilityKind::Secret,
+                scope: "fixture-secret".to_owned(),
+                quota: CapabilityQuota {
+                    maximum_operations: 1,
+                    maximum_request_bytes: 1,
+                    maximum_response_bytes: 1,
+                    maximum_total_bytes: 2,
+                    maximum_handles: 1,
+                    timeout_milliseconds: 1_000,
+                },
+            },
+            CapabilityRequest {
                 kind: CapabilityKind::ProviderUpload,
-                scope: "fixture|https://fixture.invalid/v2/stream".to_owned(),
+                scope: "zed.comfy.provider.openrouter|https://fixture.invalid/v2/stream".to_owned(),
                 quota: CapabilityQuota {
                     maximum_operations: 1,
                     maximum_request_bytes: 4_096,
@@ -449,7 +473,7 @@ fn provider_streaming_manifest(
             },
             CapabilityRequest {
                 kind: CapabilityKind::ProviderCost,
-                scope: "fixture|https://fixture.invalid/v2/stream".to_owned(),
+                scope: "zed.comfy.provider.openrouter|https://fixture.invalid/v2/stream".to_owned(),
                 quota: CapabilityQuota {
                     maximum_operations: 1,
                     maximum_request_bytes: MAX_PROVIDER_COST_REQUEST_BYTES,
@@ -1254,6 +1278,29 @@ fn provider_v2_missing_certified_grant_is_denied_before_guest_or_input_exposure(
     let component = provider_streaming_component_fixture()?;
     let digest = format!("{:x}", Sha256::digest(&component));
     let manifest = provider_streaming_manifest(digest)?;
+    assert_eq!(
+        manifest
+            .manifest
+            .capabilities
+            .iter()
+            .map(|capability| (capability.kind, capability.scope.as_str()))
+            .collect::<Vec<_>>(),
+        [
+            (
+                CapabilityKind::NetworkProvider,
+                "zed.comfy.provider.openrouter|https://fixture.invalid/v2/stream",
+            ),
+            (CapabilityKind::Secret, "fixture-secret"),
+            (
+                CapabilityKind::ProviderUpload,
+                "zed.comfy.provider.openrouter|https://fixture.invalid/v2/stream",
+            ),
+            (
+                CapabilityKind::ProviderCost,
+                "zed.comfy.provider.openrouter|https://fixture.invalid/v2/stream",
+            ),
+        ]
+    );
     let trust = trust_policy()?;
     let authorization =
         trust.authorize_provider_manifest_v2(&manifest, &permission_policy(&manifest.manifest)?)?;
@@ -1266,10 +1313,20 @@ fn provider_v2_missing_certified_grant_is_denied_before_guest_or_input_exposure(
     let compiled = host.compile_provider_component_v2(&component, &manifest, &authorization)?;
     let mut inputs = InvocationInputs::default();
     inputs.set_present("prompt", vec![scalar_value("fixture")?]);
+    let registry = TypeRegistry::built_in()?;
+    inputs.set_present(
+        "model",
+        vec![PluginValue::scalar(
+            registry.resolve("COMFY_DYNAMICCOMBO_V3")?.clone(),
+            ScalarValue::String("fixture-model".to_owned()),
+            &registry,
+        )?],
+    );
+    inputs.set_present("seed", vec![integer_value(425)?]);
     let invocation = host.begin_invocation(
         &manifest.manifest,
         authorization.authorization(),
-        "FixtureStreamingProvider",
+        "OpenRouterLLMNode",
         inputs,
         empty_services(),
         CancellationToken::default(),

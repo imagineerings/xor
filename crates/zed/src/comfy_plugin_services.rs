@@ -11,14 +11,16 @@ use comfy_runtime::{
     SharedAssetService, WorkerLaunchConfig,
 };
 use comfy_tensor::{RngAlgorithm, RngProfileVersion};
+#[cfg(not(test))]
 use futures::AsyncReadExt as _;
+#[cfg(not(test))]
 use gpui::{App, BackgroundExecutor};
+#[cfg(not(test))]
 use http_client::{AsyncBody, HttpClient, Request, http};
+#[cfg(not(test))]
+use std::future::Future;
 use std::sync::Arc;
-use std::{
-    future::Future,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 pub struct SimComfyPluginServices {
     pub boundary: ComponentExecutionBoundary,
@@ -48,6 +50,7 @@ impl SimComfyPluginServices {
         ))
     }
 
+    #[cfg(not(test))]
     pub fn cost_authority(&self) -> Arc<ProviderCostApprovalAuthority> {
         self.cost_authority.clone()
     }
@@ -57,6 +60,7 @@ impl SimComfyPluginServices {
     }
 }
 
+#[cfg(not(test))]
 pub fn private_worker_services(
     launch: WorkerLaunchConfig,
     assets: SharedAssetService,
@@ -118,16 +122,111 @@ pub fn private_worker_services(
     })
 }
 
+pub fn deny_only_private_worker_services(
+    launch: WorkerLaunchConfig,
+    assets: SharedAssetService,
+    provider_policy: ProviderPolicy,
+    profile_seed: u64,
+) -> Result<SimComfyPluginServices, ComponentHostError> {
+    let clock: Arc<dyn clock::SystemClock> = Arc::new(clock::RealSystemClock);
+    let cost_issuer = Arc::new(
+        ProviderCostAcceptanceIssuer::generate(clock.utc_now())
+            .map_err(component_boundary_error)?,
+    );
+    let cost_authority = Arc::new(ProviderCostApprovalAuthority::new(
+        cost_issuer,
+        clock.clone(),
+    ));
+    let broker = PluginCapabilityBroker::new_with_provider_cost_acceptance(
+        assets,
+        ModelStore::new(ParserLimits::default()).map_err(component_boundary_error)?,
+        provider_policy,
+        cost_authority
+            .verifier()
+            .map_err(component_boundary_error)?,
+        Arc::new(DenyOnlyProviderActuator),
+        Arc::new(DenyOnlyCredentialActuator),
+        clock,
+        PluginRngPolicy::new(
+            RngProfileVersion::V2,
+            RngAlgorithm::Philox4x32_10,
+            profile_seed,
+        ),
+    );
+    let receipt_issuer = Arc::new(
+        ProviderResultReceiptIssuer::generate(Instant::now()).map_err(component_boundary_error)?,
+    );
+    let receipt_lifetime = Duration::from_secs(5 * 60);
+    let principal_id = launch.profile_id.0.to_string();
+    let private_worker_executor = PrivateWorkerPluginExecutor::new_with_provider_authorities(
+        launch,
+        broker.clone(),
+        principal_id.clone(),
+        receipt_issuer.clone(),
+        receipt_lifetime,
+        cost_authority.clone(),
+    )?;
+    let boundary = ComponentExecutionBoundary::private_worker(private_worker_executor.clone());
+    Ok(SimComfyPluginServices {
+        boundary,
+        private_worker_executor,
+        broker,
+        principal_id,
+        receipt_issuer,
+        receipt_lifetime,
+        cost_authority,
+    })
+}
+
+struct DenyOnlyProviderActuator;
+
+impl ProviderRequestActuator for DenyOnlyProviderActuator {
+    fn execute(
+        &self,
+        _request: &AuthorizedProviderRequest,
+        _secret: Option<&SecretValue>,
+        _body: &[u8],
+        _context: &PluginServiceOperationContext<'_>,
+    ) -> Result<Vec<u8>, PluginServiceActuatorError> {
+        Err(PluginServiceActuatorError::new(
+            "headless provider actuation is unavailable without a separately owned actuator",
+        ))
+    }
+}
+
+struct DenyOnlyCredentialActuator;
+
+impl CredentialPresenceActuator for DenyOnlyCredentialActuator {
+    fn is_present(
+        &self,
+        _request: &AuthorizedCredentialPresenceRequest,
+        _context: &PluginServiceOperationContext<'_>,
+    ) -> Result<bool, PluginServiceActuatorError> {
+        Ok(false)
+    }
+
+    fn read_for_provider(
+        &self,
+        _request: &AuthorizedCredentialPresenceRequest,
+        _context: &PluginServiceOperationContext<'_>,
+    ) -> Result<Option<SecretValue>, PluginServiceActuatorError> {
+        Ok(None)
+    }
+}
+
+#[cfg(not(test))]
 struct CredentialCommand {
     secret_id: String,
     response: async_channel::Sender<Result<Option<Vec<u8>>, String>>,
 }
 
+#[cfg(not(test))]
 #[derive(Clone)]
 struct CredentialBridge {
     commands: async_channel::Sender<CredentialCommand>,
 }
 
+#[cfg(not(test))]
 impl CredentialBridge {
     fn read(&self, secret_id: &str) -> Result<Option<Vec<u8>>, PluginServiceActuatorError> {
         let (response, result) = async_channel::bounded(1);
@@ -144,6 +243,7 @@ impl CredentialBridge {
     }
 }
 
+#[cfg(not(test))]
 fn credential_bridge(cx: &mut App) -> CredentialBridge {
     let credentials = zed_credentials_provider::global(cx);
     let (commands, receiver) = async_channel::bounded::<CredentialCommand>(64);
@@ -163,10 +263,12 @@ fn credential_bridge(cx: &mut App) -> CredentialBridge {
     CredentialBridge { commands }
 }
 
+#[cfg(not(test))]
 struct SimCredentialActuator {
     credentials: CredentialBridge,
 }
 
+#[cfg(not(test))]
 impl CredentialPresenceActuator for SimCredentialActuator {
     fn is_present(
         &self,
@@ -197,11 +299,13 @@ impl CredentialPresenceActuator for SimCredentialActuator {
     }
 }
 
+#[cfg(not(test))]
 struct SimProviderActuator {
     client: Arc<dyn HttpClient>,
     executor: BackgroundExecutor,
 }
 
+#[cfg(not(test))]
 impl ProviderRequestActuator for SimProviderActuator {
     fn execute(
         &self,
@@ -271,6 +375,7 @@ impl ProviderRequestActuator for SimProviderActuator {
     }
 }
 
+#[cfg(not(test))]
 fn block_on_provider_operation<T, E>(
     operation: impl Future<Output = Result<T, E>>,
     context: &PluginServiceOperationContext<'_>,
@@ -290,6 +395,7 @@ where
     ))
 }
 
+#[cfg(not(test))]
 fn check_context(
     context: &PluginServiceOperationContext<'_>,
 ) -> Result<(), PluginServiceActuatorError> {
@@ -302,6 +408,7 @@ fn component_boundary_error(error: impl std::fmt::Display) -> ComponentHostError
     ComponentHostError::ExecutionBoundary(error.to_string())
 }
 
+#[cfg(not(test))]
 fn component_actuator_error(error: impl std::fmt::Display) -> PluginServiceActuatorError {
     PluginServiceActuatorError::new(error.to_string())
 }

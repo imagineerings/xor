@@ -2,7 +2,8 @@ use clap::Args;
 use comfy_api::{
     HttpLimits, HttpRequest, NativeApiHostError, NativeApiServerConfig, NativeAutomationBody,
     NativeAutomationResult, NativeCliInvocation, NativeCliOperation, NativeHeadlessPolicy,
-    NativeHeadlessService, NativeRuntimeApiHost, NativeTlsAcceptor, WebSocketLimits,
+    NativeHeadlessService, NativeRuntimeApiHost, NativeTlsAcceptor, PreparedNativeHeadlessRuntime,
+    WebSocketLimits,
     security::{ApiSecurityConfig, ArtifactIdempotencySnapshotStore, BearerCredential, TlsPolicy},
 };
 #[cfg(test)]
@@ -10,12 +11,14 @@ use comfy_runtime::{
     AssetNamespace, AssetRoots, AssetService, authorize_native_plugin_asset_broker,
 };
 use comfy_runtime::{
-    ComfyRuntimeDb, ExecutionDataSource, ExecutionEventBus, ExecutionPresentationOwner,
-    ExecutionPresentationService, ExecutionSnapshotStatus, NATIVE_IMAGE_REGISTRY_VERSION,
-    NativeExecutionController, NativeExecutionControllerConfig, NativeRuntimeProfile,
-    SharedExecutionPresentationService, WorkerLaunchConfig, open_native_profile_asset_service,
+    ComfyRuntimeDb, ExecutionController as _, ExecutionDataSource, ExecutionEventBus,
+    ExecutionPresentationOwner, ExecutionPresentationService, ExecutionSnapshotStatus,
+    NATIVE_IMAGE_REGISTRY_VERSION, NativeExecutionController, NativeExecutionControllerConfig,
+    NativeRuntimeProfile, SharedExecutionPresentationService, WorkerLaunchConfig,
+    open_native_profile_asset_service,
 };
 use comfy_types::{HttpMethod, ProfileId, WorkerId};
+use extension_host::ComponentLifecycleAdapter as _;
 use serde::Serialize;
 use serde_json::{Value, json};
 use settings::RootUserSettings as _;
@@ -321,9 +324,15 @@ fn execute_native(invocation: ParsedInvocation) -> i32 {
             return UNAVAILABLE_EXIT;
         }
     };
-    let service = match NativeHeadlessService::offline(
+    let service = match NativeHeadlessService::offline_prepared(
         presentation,
-        build_native_runtime,
+        |presentation| {
+            prepare_native_runtime_for_profile(
+                presentation,
+                Uuid::from_u128(0x2101),
+                ApiSecurityConfig::loopback(),
+            )
+        },
         NativeHeadlessPolicy::default(),
     ) {
         Ok(service) => service,
@@ -524,10 +533,10 @@ fn execute_serve(invocation: ParsedInvocation) -> i32 {
             return UNAVAILABLE_EXIT;
         }
     };
-    let service = match NativeHeadlessService::serve(
+    let service = match NativeHeadlessService::serve_prepared(
         presentation,
         move |presentation| {
-            build_native_runtime_for_profile(presentation, profile_id, security.clone())
+            prepare_native_runtime_for_profile(presentation, profile_id, security.clone())
         },
         config,
         NativeHeadlessPolicy::default(),
@@ -1032,20 +1041,12 @@ fn native_presentation(
     Ok(presentation)
 }
 
-fn build_native_runtime(
-    presentation: SharedExecutionPresentationService,
-) -> Result<NativeRuntimeApiHost, NativeApiHostError> {
-    let profile_uuid = Uuid::parse_str("00000000-0000-0000-0000-000000002101")
-        .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
-    build_native_runtime_for_profile(presentation, profile_uuid, ApiSecurityConfig::loopback())
-}
-
-fn build_native_runtime_for_profile(
-    presentation: SharedExecutionPresentationService,
+fn prepare_native_runtime_for_profile(
+    _presentation: SharedExecutionPresentationService,
     profile_uuid: Uuid,
     security: ApiSecurityConfig,
-) -> Result<NativeRuntimeApiHost, NativeApiHostError> {
-    let profile = headless_native_profile(profile_uuid)
+) -> Result<PreparedNativeHeadlessRuntime, NativeApiHostError> {
+    let (profile, plugin_security) = headless_native_configuration(profile_uuid)
         .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
     let root = paths::data_dir()
         .join("comfy")
@@ -1077,68 +1078,133 @@ fn build_native_runtime_for_profile(
     )
     .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
     let permission_policy = Arc::new(
-        comfy_runtime::PermissionPolicy::native_runtime_services(profile_uuid.to_string())
-            .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?
+        plugin_security
+            .permission_policy()
+            .clone()
             .with_additional_grants(
                 comfy_api::security::plugin_route_permission_grants(&security.plugin_route_grants)
                     .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?,
             )
             .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?,
     );
+    let profile_bits = profile.id.as_u128();
+    let profile_seed = (profile_bits as u64) ^ ((profile_bits >> 64) as u64);
+    let plugin_services = crate::zed::comfy_plugin_services::deny_only_private_worker_services(
+        worker.clone(),
+        assets.clone(),
+        plugin_security.provider_policy().clone(),
+        profile_seed,
+    )
+    .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
     let component_host = comfy_plugin_host::ComponentHost::new(
         extension_host::ComponentRuntime::no_wasi()
             .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?,
-        comfy_runtime::PluginTrustPolicy::default(),
+        plugin_security.trust_policy().clone(),
         permission_policy.as_ref().clone(),
-        comfy_plugin_host::ComponentExecutionBoundary::conformance_in_process(Arc::new(
-            comfy_plugin_host::UnavailablePluginCapabilityServices,
-        )),
+        plugin_services.boundary.clone(),
         comfy_plugin_host::ComponentLimits::default(),
         comfy_runtime::generated_native_node_registry_projection(None)
             .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?,
     )
     .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
     let component_router = comfy_plugin_host::ComponentHostRouter::with_initial_generation(
-        component_host,
-        comfy_runtime::DEFAULT_COMPONENT_REGISTRY_GENERATION,
+        component_host.clone(),
+        plugin_security.component_registry_generation(),
     )
     .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
+    let extension_fs: Arc<dyn ::fs::Fs> = Arc::new(::fs::RealFs::new(
+        None,
+        gpui_platform::background_executor(),
+    ));
+    let candidate = smol::block_on(
+        extension_host::ExtensionStore::canonical_component_inventory_candidate(
+            extension_fs,
+            paths::extensions_dir(),
+        ),
+    )
+    .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
+    let (components, candidate_identity) = candidate.into_parts();
+    smol::block_on(component_router.synchronize(components))
+        .map_err(NativeApiHostError::Runtime)?;
     let registry_bundle = Arc::new(
         component_router
             .active_execution_registry_bundle()
             .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?,
     );
-    let worker = worker.with_registry_deployment(registry_bundle.worker_deployment().clone());
-    let events = ExecutionEventBus::new(1_024)
+    let provider_invocation_authority = plugin_services
+        .invocation_authority(component_host)
         .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
-    let controller = NativeExecutionController::start(
-        NativeExecutionControllerConfig::new(assets.clone(), presentation.clone(), worker, true)
-            .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?
-            .with_memory_policy(profile.memory_policy),
-        events.clone(),
-    )
-    .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
-    NativeRuntimeApiHost::with_registry_bundle(
+    let private_worker_executor = plugin_services.private_worker_executor();
+    PreparedNativeHeadlessRuntime::checked(
         registry_bundle,
-        presentation,
-        controller,
-        &events,
-        Some(assets),
-        HttpLimits::default(),
-        WebSocketLimits::default(),
-        security,
-        permission_policy,
-        Arc::new(idempotency_store),
+        candidate_identity,
+        move |presentation, registry_bundle, candidate_identity| {
+            let worker =
+                worker.with_registry_deployment(registry_bundle.worker_deployment().clone());
+            let events = ExecutionEventBus::new(1_024)
+                .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
+            let mut controller_config = NativeExecutionControllerConfig::new(
+                assets.clone(),
+                presentation.clone(),
+                worker,
+                true,
+            )
+            .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?
+            .with_memory_policy(profile.memory_policy);
+            if let Some(provider_registry) = registry_bundle.provider_registry() {
+                controller_config = controller_config
+                    .with_provider_registry(provider_registry.clone())
+                    .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?
+                    .with_provider_invocation_authority(provider_invocation_authority);
+            }
+            let registration = NativeExecutionController::start_with_provider_worker_bridge(
+                controller_config,
+                events.clone(),
+            )
+            .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
+            let (controller, provider_worker_bridge) = registration.into_parts();
+            if let Err(error) =
+                private_worker_executor.attach_provider_worker_bridge(provider_worker_bridge)
+            {
+                if let Err(shutdown_error) = controller.shutdown() {
+                    return Err(NativeApiHostError::Runtime(format!(
+                        "headless provider bridge attachment failed: {error}; controller rollback failed: {}",
+                        shutdown_error.message
+                    )));
+                }
+                return Err(NativeApiHostError::Runtime(format!(
+                    "headless provider bridge attachment failed: {error}"
+                )));
+            }
+            NativeRuntimeApiHost::with_registry_bundle(
+                registry_bundle,
+                &candidate_identity,
+                presentation,
+                controller,
+                &events,
+                Some(assets),
+                HttpLimits::default(),
+                WebSocketLimits::default(),
+                security,
+                permission_policy,
+                Arc::new(idempotency_store),
+            )
+        },
     )
 }
 
-fn headless_native_profile(profile_id: Uuid) -> anyhow::Result<NativeRuntimeProfile> {
+fn headless_native_configuration(
+    profile_id: Uuid,
+) -> anyhow::Result<(
+    NativeRuntimeProfile,
+    comfy_runtime::NativePluginSecurityPolicy,
+)> {
     let settings_text = match fs::read_to_string(paths::settings_file()) {
         Ok(settings) => Some(settings),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) => return Err(error.into()),
     };
-    headless_native_profile_from_settings_text(profile_id, settings_text.as_deref())
+    headless_native_configuration_from_settings_text(profile_id, settings_text.as_deref())
 }
 
 fn headless_native_profile_from_settings_text(
@@ -1170,6 +1236,35 @@ fn headless_native_profile_from_settings_text(
     Err(anyhow::anyhow!(
         "headless native profile {profile_id} is not present in canonical settings"
     ))
+}
+
+fn headless_native_configuration_from_settings_text(
+    profile_id: Uuid,
+    settings_text: Option<&str>,
+) -> anyhow::Result<(
+    NativeRuntimeProfile,
+    comfy_runtime::NativePluginSecurityPolicy,
+)> {
+    if let Some(settings_text) = settings_text {
+        let settings = settings::SettingsContent::parse_json_with_comments(&settings_text)?;
+        let profile_id_text = profile_id.to_string();
+        if let Some(runtime) = settings.comfy_runtime.as_ref()
+            && let Some(profile_content) = runtime
+                .profiles
+                .as_deref()
+                .unwrap_or_default()
+                .iter()
+                .find(|profile| profile.id.as_deref() == Some(profile_id_text.as_str()))
+        {
+            let profile = NativeRuntimeProfile::try_from(profile_content)?;
+            let plugin_security =
+                profile.project_plugin_security_policy(profile_content.plugin_security.as_ref())?;
+            return Ok((profile, plugin_security));
+        }
+    }
+    let profile = headless_native_profile_from_settings_text(profile_id, None)?;
+    let plugin_security = profile.project_plugin_security_policy(None)?;
+    Ok((profile, plugin_security))
 }
 
 struct ServeConfiguration {
@@ -2962,7 +3057,7 @@ mod tests {
         }
         assert_eq!(
             sha256(PARAMETER_CATALOG.as_bytes()),
-            "4ea9fe50b4073493020b74f16d9fea84ede63d8f438bf2d39a8be8b6415e7e32"
+            "f4919448071b0d42077296f6b7e5d11477bdc254f4ff2cc13542800b161b2186"
         );
         let registry = contract_registry()?;
         assert_eq!(registry["schema"], "zed.comfy.contract-registry/1");

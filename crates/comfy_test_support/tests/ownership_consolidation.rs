@@ -581,7 +581,7 @@ fn task391_dinov2_has_one_crate_private_backbone_owner() -> Result<(), Box<dyn s
     );
     assert_eq!(
         concern["production_consumers"].as_array().map(Vec::len),
-        Some(1)
+        Some(2)
     );
 
     let catalog = fs::read_to_string(
@@ -603,6 +603,259 @@ fn task391_dinov2_has_one_crate_private_backbone_owner() -> Result<(), Box<dyn s
         row.iter()
             .any(|field| field.contains("canonical@crates/comfy_model/src/dino2.rs"))
     );
+    Ok(())
+}
+
+#[test]
+fn task392_moge_has_one_native_resource_and_dino_adapter_owner()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let crate_root = fs::read_to_string(root.join("crates/comfy_model/src/comfy_model.rs"))?;
+    let moge = fs::read_to_string(root.join("crates/comfy_model/src/moge.rs"))?;
+    let payload = fs::read_to_string(root.join("crates/comfy_model/src/native_node_payload.rs"))?;
+    assert_eq!(crate_root.matches("pub mod moge;").count(), 1);
+    assert_eq!(moge.matches("pub struct NativeMogeResource").count(), 1);
+    assert_eq!(moge.matches("pub struct NativeMogeGeometry").count(), 1);
+    for required in [
+        "pub fn from_checkpoint(",
+        "pub fn from_nested_checkpoint(",
+        "fn normalize_state(",
+        "fn detect_configuration(",
+        "fn state_manifest(",
+        "bind_parent_preflighted",
+        "execution.get_intermediate_layers",
+        "fn execute_moge_head(",
+        "fn recover_focal_shift(",
+        "fn publish_geometry(",
+    ] {
+        assert!(moge.contains(required), "MoGe owner lacks {required}");
+    }
+    for forbidden in [
+        "fn interpolated_position_embeddings(",
+        "fn transformer_block(",
+        "fn apply_da3_rotary(",
+        "fn select_reference_indices(",
+    ] {
+        assert!(
+            !moge.contains(forbidden),
+            "MoGe duplicates DINO equation {forbidden}"
+        );
+    }
+    assert!(payload.contains("NativeModelResourceRole::MogeModel"));
+    assert!(payload.contains("\"zed-native-moge-v1\""));
+    assert!(payload.contains("NativeModelResource::Moge"));
+    assert!(payload.contains("NativeModelBackingKind::NativeMogeResource"));
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concerns = policy["concerns"]
+        .as_array()
+        .ok_or("ownership policy has no concerns")?;
+    let moge_concern = concerns
+        .iter()
+        .find(|concern| concern["concern"].as_str() == Some("native_moge_model_resource"))
+        .ok_or("MoGe ownership concern is missing")?;
+    assert_eq!(
+        moge_concern["canonical_owner"].as_str(),
+        Some("comfy_model::moge::NativeMogeResource")
+    );
+    assert_eq!(
+        moge_concern["definitions"].as_array().map(Vec::len),
+        Some(2)
+    );
+    assert_eq!(
+        moge_concern["required_mappings"].as_array().map(Vec::len),
+        Some(6)
+    );
+    assert_eq!(
+        moge_concern["production_consumers"]
+            .as_array()
+            .map(Vec::len),
+        Some(1)
+    );
+    assert!(
+        moge_concern["known_open_reasons"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+    );
+    let dino_concern = concerns
+        .iter()
+        .find(|concern| concern["concern"].as_str() == Some("native_dinov2_backbone_execution"))
+        .ok_or("DINOv2 ownership concern is missing")?;
+    assert_eq!(
+        dino_concern["production_consumers"]
+            .as_array()
+            .map(Vec::len),
+        Some(2)
+    );
+    assert!(
+        dino_concern["definitions"]
+            .as_array()
+            .is_some_and(|definitions| definitions.iter().any(|definition| {
+                definition["path"].as_str() == Some("crates/comfy_model/src/moge.rs")
+                    && definition["symbol"].as_str() == Some("NativeMogeResource")
+                    && definition["role"].as_str() == Some("adapter")
+            }))
+    );
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let mut records = parse_csv_records(&catalog)?.into_iter();
+    let header = records.next().ok_or("ownership catalog has no header")?;
+    let column = |name: &str| {
+        header
+            .iter()
+            .position(|candidate| candidate == name)
+            .ok_or_else(|| format!("ownership catalog has no {name} column"))
+    };
+    let concern_column = column("concern")?;
+    let status_column = column("current_status")?;
+    let competing_column = column("competing_symbols")?;
+    let definitions_column = column("definition_hits")?;
+    let consumers_column = column("production_consumers")?;
+    let rows = records
+        .map(|row| (row[concern_column].clone(), row))
+        .collect::<BTreeMap<_, _>>();
+    let moge_row = rows
+        .get("native_moge_model_resource")
+        .ok_or("MoGe ownership catalog row is missing")?;
+    assert_eq!(moge_row[status_column], "authoritative_owner_confirmed");
+    assert!(moge_row[competing_column].is_empty());
+    assert!(moge_row[definitions_column].contains("canonical@crates/comfy_model/src/moge.rs"));
+    assert!(
+        moge_row[definitions_column].contains("canonical_state@crates/comfy_model/src/moge.rs")
+    );
+    let dino_row = rows
+        .get("native_dinov2_backbone_execution")
+        .ok_or("DINOv2 ownership catalog row is missing")?;
+    assert_eq!(dino_row[status_column], "authoritative_owner_confirmed");
+    assert!(dino_row[competing_column].is_empty());
+    assert!(dino_row[definitions_column].contains("adapter@crates/comfy_model/src/moge.rs"));
+    assert!(dino_row[consumers_column].contains("NativeMogeResource"));
+    Ok(())
+}
+
+#[test]
+fn val_ownership_task393_style_model_resource_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let crate_root = fs::read_to_string(root.join("crates/comfy_model/src/comfy_model.rs"))?;
+    let resource =
+        fs::read_to_string(root.join("crates/comfy_model/src/conditioning_resources.rs"))?;
+    let payload = fs::read_to_string(root.join("crates/comfy_model/src/native_node_payload.rs"))?;
+    assert_eq!(
+        crate_root
+            .matches("pub mod conditioning_resources;")
+            .count(),
+        1
+    );
+    assert_eq!(
+        resource
+            .matches("pub struct NativeStyleModelResource")
+            .count(),
+        1
+    );
+    for required in [
+        "pub fn from_checkpoint(",
+        "pub fn reconstruct_checkpoint(",
+        "pub fn get_cond(",
+        "fn detect_configuration(",
+        "fn state_manifest(",
+        "fn split_three(",
+        "fn require_exact_fused_reconstruction(",
+        "scaled_dot_product_attention_tensor_with_context(",
+        "input.validate()?;",
+        "let hidden = &input.last_hidden_state;",
+    ] {
+        assert!(
+            resource.contains(required),
+            "STYLE_MODEL owner lacks {required}"
+        );
+    }
+    for forbidden in [
+        "fn scaled_dot_product_attention(",
+        "fn clip_vision_transformer(",
+        "fn post_layernorm(",
+    ] {
+        assert!(
+            !resource.contains(forbidden),
+            "STYLE_MODEL pre-claims or duplicates {forbidden}"
+        );
+    }
+    for required in [
+        "NativeModelResourceRole::StyleModel",
+        "\"zed-native-style-model-v1\"",
+        "NativeModelResource::StyleModel",
+        "NativeModelBackingKind::NativeStyleModelResource",
+        "pub fn style_model_resource(",
+    ] {
+        assert!(
+            payload.contains(required),
+            "STYLE_MODEL payload lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concerns = policy["concerns"]
+        .as_array()
+        .ok_or("ownership policy has no concerns")?;
+    let concern = concerns
+        .iter()
+        .find(|concern| concern["concern"].as_str() == Some("native_style_model_resource"))
+        .ok_or("STYLE_MODEL ownership concern is missing")?;
+    assert_eq!(
+        concern["canonical_owner"].as_str(),
+        Some("comfy_model::conditioning_resources::NativeStyleModelResource")
+    );
+    assert_eq!(concern["definitions"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        concern["required_mappings"].as_array().map(Vec::len),
+        Some(7)
+    );
+    assert_eq!(
+        concern["production_consumers"].as_array().map(Vec::len),
+        Some(1)
+    );
+    assert!(
+        concern["known_open_reasons"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+    );
+    let concern_text = serde_json::to_string(concern)?;
+    assert!(concern_text.contains("comfy_model::clip_vision::ClipVisionOutput"));
+    assert!(!concern_text.contains("NativeClipVisionOutput"));
+    assert!(!concern_text.contains("NativePhotoMakerResource"));
+    assert!(!concern_text.contains("NativeGligenResource"));
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let mut records = parse_csv_records(&catalog)?.into_iter();
+    let header = records.next().ok_or("ownership catalog has no header")?;
+    let column = |name: &str| {
+        header
+            .iter()
+            .position(|candidate| candidate == name)
+            .ok_or_else(|| format!("ownership catalog has no {name} column"))
+    };
+    let concern_column = column("concern")?;
+    let status_column = column("current_status")?;
+    let competing_column = column("competing_symbols")?;
+    let definitions_column = column("definition_hits")?;
+    let consumers_column = column("production_consumers")?;
+    let row = records
+        .find(|row| row[concern_column] == "native_style_model_resource")
+        .ok_or("STYLE_MODEL ownership catalog row is missing")?;
+    assert_eq!(row[status_column], "authoritative_owner_confirmed");
+    assert!(row[competing_column].is_empty());
+    assert!(
+        row[definitions_column]
+            .contains("canonical@crates/comfy_model/src/conditioning_resources.rs")
+    );
+    assert!(row[consumers_column].contains("STYLE_MODEL"));
     Ok(())
 }
 
@@ -8120,8 +8373,14 @@ fn run_ownership_validation(
     .into_iter()
     .flat_map(|needle| source_occurrences(&sources, needle))
     .collect::<Vec<_>>();
-    let component_lifecycle_adapter_impls =
+    let mut component_lifecycle_adapter_impls =
         production_source_occurrences(&sources, "impl ComponentLifecycleAdapter for ");
+    component_lifecycle_adapter_impls.extend(production_source_occurrences(
+        &sources,
+        "impl extension_host::ComponentLifecycleAdapter for ",
+    ));
+    component_lifecycle_adapter_impls.sort();
+    component_lifecycle_adapter_impls.dedup();
     let subgraph_library_definitions = source_occurrences(
         &sources,
         &["struct ", "SubgraphBlueprintLibrary", " {"].concat(),
@@ -9538,7 +9797,16 @@ fn run_ownership_validation(
                 && plugin_component_host.contains("policy: &ProviderPolicy")
                 && plugin_component_host.contains("pub(crate) fn bind_start_request(")
                 && plugin_component_host
+                    .contains("route_authority: Option<NativeProviderWorkerV2RouteAuthority>")
+                && plugin_component_host.contains(".route_authority\n            .take()")
+                && plugin_component_host.contains(".start(head, policy)")
+                && !plugin_component_host
                     .contains(".bind(&crate::sdk_request_head(&head), policy)")
+                && !plugin_component_host.contains("grant: ProviderRuntimeActivationGrant")
+                && !plugin_component_host
+                    .contains("grant: Option<ProviderRuntimeActivationGrant>")
+                && !plugin_component_host.contains("ProviderRuntimeActivationGrant::checked")
+                && !plugin_component_host.contains("ProviderRuntimeActivationGrant::new")
                 && !plugin_component_host.contains("provider_policy: ProviderPolicy")
                 && !plugin_component_host.contains("ProviderPolicy::new(")
                 && !plugin_component_host.contains("ProviderPolicy::default(")
@@ -9585,9 +9853,13 @@ fn run_ownership_validation(
         ),
         (
             "plugin_host_is_extension_lifecycle_adapter",
-            component_lifecycle_adapter_impls.len() == 1
-                && component_lifecycle_adapter_impls[0]
-                    .contains("crates/comfy_plugin_host/src/component_host.rs")
+            component_lifecycle_adapter_impls.len() == 2
+                && component_lifecycle_adapter_impls
+                    .iter()
+                    .any(|location| location.contains("crates/comfy_plugin_host/src/component_host.rs"))
+                && component_lifecycle_adapter_impls
+                    .iter()
+                    .any(|location| location.contains("crates/zed/src/zed.rs"))
                 && plugin_component_host
                     .contains("use extension_host::{ComponentLifecycleAdapter, ComponentRuntime")
                 && plugin_component_host
@@ -9596,8 +9868,16 @@ fn run_ownership_validation(
                     .contains("impl ComponentLifecycleAdapter for ComponentHost {")
                 && extension_host.contains("pub trait ComponentLifecycleAdapter: Send + Sync")
                 && zed_bootstrap.contains("ComponentHostRouter::with_initial_generation(")
-                && zed_bootstrap
-                    .contains("extension_host::register_component_lifecycle_adapter(Arc::new(")
+                && zed_bootstrap.contains(
+                    "impl extension_host::ComponentLifecycleAdapter for DesktopComponentLifecycleAdapter",
+                )
+                && zed_bootstrap.contains("let candidate_identity = candidate.identity().clone()")
+                && zed_bootstrap.contains(
+                    "extension_host::ComponentLifecycleAdapter::synchronize(\n                &router,",
+                )
+                && zed_bootstrap.contains(
+                    "extension_host::register_component_lifecycle_adapter(\n        Arc::new(DesktopComponentLifecycleAdapter",
+                )
                 && zed_bootstrap.contains("comfy_plugin_services::private_worker_services(")
                 && zed_plugin_services
                     .contains("PluginCapabilityBroker::new_with_provider_cost_acceptance(")
@@ -9691,7 +9971,16 @@ fn run_ownership_validation(
         ),
         (
             "desktop_api_headless_and_worker_consume_component_registry",
-            zed_bootstrap.contains("component_host.router.active_execution_registry_bundle()?")
+            zed_bootstrap.contains("fn accepted_desktop_component_registry_bundle(")
+                && zed_bootstrap.contains(
+                    "registry_bundle: Arc::new(router.active_execution_registry_bundle()?),",
+                )
+                && zed_bootstrap.contains(
+                    "let deployment = accepted_desktop_component_registry_bundle(",
+                )
+                && zed_bootstrap.contains(
+                    "NativeProviderDeploymentIdentity::from_registry_bundle(\n        &deployment.registry_bundle,\n        &deployment.candidate_identity,",
+                )
                 && zed_bootstrap.contains("worker.with_registry_deployment(")
                 && api_host_production.contains("pub fn with_registry_bundle(")
                 && api_host_production.contains("NativeRuntimeHttpServices::from_registry_bundle(")
@@ -9699,8 +9988,22 @@ fn run_ownership_validation(
                     .contains("for (class_type, runtime) in self.registry.descriptors()")
                 && api_services.contains("project_component_node(")
                 && api_headless.contains("active.runtime.host()")
-                && plugin_private_worker.contains("command.deployment")
-                && plugin_private_worker.contains("supervisor.deploy_registry("),
+                && plugin_private_worker.contains("enum PrivateWorkerCommand")
+                && plugin_private_worker.contains("Legacy {")
+                && plugin_private_worker
+                    .contains("#[cfg(feature = \"test-support\")]\n    ProviderV2 {")
+                && plugin_private_worker
+                    .matches("ensure_private_worker_supervisor(launch, state, &deployment).await?")
+                    .count()
+                    == 2
+                && plugin_private_worker
+                    .matches("supervisor.deploy_registry(deployment).await")
+                    .count()
+                    == 2
+                && plugin_private_worker.contains("deployment.begin().generation()")
+                && plugin_private_worker.contains("registry_digest_sha256()")
+                && plugin_private_worker.contains("authorization_verifier()")
+                && !plugin_private_worker.contains("command.deployment"),
         ),
         (
             "task367_production_consumers_use_the_comprehensive_generated_registry",
@@ -14923,6 +15226,165 @@ fn val_ownership_task555_general_video_codec_declarations_001()
 }
 
 #[test]
+fn val_ownership_task563_video_demux_decode_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    let service =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    let media = fs::read_to_string(root.join("crates/comfy_media/src/native_node_payload.rs"))?;
+
+    assert_eq!(
+        ffi.matches("fn decode_general_video_with_check(").count(),
+        1
+    );
+    let decode_start = ffi
+        .find("fn decode_general_video_with_check(")
+        .ok_or("general decode owner is absent")?;
+    let decode_end = ffi[decode_start..]
+        .find("\nfn seek_general_decode_window(")
+        .map(|offset| decode_start + offset)
+        .ok_or("general decode owner has no bounded end")?;
+    let decode = &ffi[decode_start..decode_end];
+    let mut previous = 0;
+    for operation in [
+        "open_general_bounded_input(",
+        "open_general_input(",
+        "select_general_decode_streams(",
+        "seek_general_decode_window(",
+        "read_general_decode_metadata(",
+        "run_general_decode_loop(",
+        "materialize_general_audio(",
+        "NativeVideoPayload::checked_cancellable(",
+        "NativeDecodedVideo::checked_cancellable(",
+    ] {
+        let position = decode[previous..]
+            .find(operation)
+            .map(|offset| previous + offset)
+            .ok_or("general decode owner omits an ordered admission step")?;
+        assert!(position >= previous, "general decode step order regressed");
+        previous = position;
+    }
+    for forbidden in ["std::process::Command", "File::open(", "PathBuf::from("] {
+        assert!(
+            !decode.contains(forbidden),
+            "general decode owner contains forbidden {forbidden}"
+        );
+    }
+    let audio_materializer = ffi
+        .find("fn materialize_general_audio(")
+        .ok_or("general audio materializer is absent")?;
+    assert!(ffi[audio_materializer..].contains("NativeAudioPayload::checked_cancellable("));
+
+    assert_eq!(
+        service
+            .matches("NativeLtxvCodecThreadService::start_general")
+            .count(),
+        1
+    );
+    assert_eq!(
+        service
+            .matches("let general_video_decode_service =")
+            .count(),
+        1
+    );
+    assert_eq!(
+        service
+            .matches("pub(crate) fn general_video_decode_service(&self)")
+            .count(),
+        1
+    );
+    assert_eq!(
+        service.matches(".general_video_decode_service()").count(),
+        0,
+        "Task563 decode port escaped the actor bundle before Task564"
+    );
+    let decode_service_start = service
+        .find("impl NativeGeneralVideoDecodeService")
+        .ok_or("general decode service implementation is absent")?;
+    let decode_service_end = service[decode_service_start..]
+        .find("\n}\n\nfn admit_general_video_decode_request")
+        .map(|offset| decode_service_start + offset)
+        .ok_or("general decode service implementation has no bounded end")?;
+    let decode_service = &service[decode_service_start..decode_service_end];
+    assert!(decode_service.contains("proxy.identity().configuration_sha256()"));
+    assert!(decode_service.contains("limits.configuration_values()"));
+    let worker_cache_start = service
+        .find("fn worker_service_cache_configuration_identity(")
+        .ok_or("worker service cache owner is absent")?;
+    let worker_cache_end = service[worker_cache_start..]
+        .find("\nfn worker_service_cache_configuration_identity_from_parts(")
+        .map(|offset| worker_cache_start + offset)
+        .ok_or("worker service cache owner has no bounded end")?;
+    assert!(
+        service[worker_cache_start..worker_cache_end].contains("decode.configuration_sha256()")
+    );
+    let reviewed_limits_start = service
+        .find("fn reviewed_general_video_codec_service_limits(")
+        .ok_or("reviewed general codec limits owner is absent")?;
+    let reviewed_limits_end = service[reviewed_limits_start..]
+        .find("\nfn map_worker_actor_startup_error(")
+        .map(|offset| reviewed_limits_start + offset)
+        .ok_or("reviewed general codec limits owner has no bounded end")?;
+    let reviewed_limits = &service[reviewed_limits_start..reviewed_limits_end];
+    assert!(reviewed_limits.contains("let decode = NativeVideoDecodeLimits::reviewed()"));
+    assert!(
+        reviewed_limits
+            .contains("checked_workspace_peak_bytes(REVIEWED_GENERAL_VIDEO_CODEC_SCRATCH_BYTES)")
+    );
+    for required in [
+        "validate_finite_f32_cancellable",
+        "hash_tensor_cancellable",
+        "NativeAudioPayload::checked_cancellable",
+        "NativeVideoPayload::checked_cancellable",
+        "general_video_demux_decode_cancels_chunked_media_scans_and_rejects_projection_drift",
+    ] {
+        assert!(
+            media.contains(required),
+            "canonical media owner lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy["concerns"]
+        .as_array()
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern["concern"]
+                    == "native_video_reviewed_codec_registry_ltxv_thread_general_video_demux_decode"
+            })
+        })
+        .ok_or("general demux/decode ownership concern is absent")?;
+    assert_eq!(
+        concern["canonical_owner"],
+        "comfy_runtime::native_video_codec_ffi::decode_general_video_with_check"
+    );
+    assert!(
+        concern["consolidation_tasks"]
+            .as_array()
+            .is_some_and(|tasks| tasks
+                .iter()
+                .any(|task| task == "comfy-parity-native-video-demux-decode-foundation"))
+    );
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let row = catalog
+        .lines()
+        .find(|line| {
+            line.starts_with(
+                "native_video_reviewed_codec_registry_ltxv_thread_general_video_demux_decode,",
+            )
+        })
+        .ok_or("general demux/decode ownership catalog row is absent")?;
+    assert!(row.contains("consolidation_required[known_integration_gap]"));
+    assert!(!row.contains("adapter_mapping_missing"));
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task562_video_codec_package_bootstrap_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
@@ -15226,12 +15688,7 @@ fn val_ownership_native_video_codec_symbol_binding_001() -> Result<(), Box<dyn s
             "native video codec typed binding lacks {required}"
         );
     }
-    for forbidden in [
-        "NativeCache",
-        "OutputCommitter",
-        "NativeStoredPayload",
-        "NativeVideoPayload",
-    ] {
+    for forbidden in ["NativeCache", "OutputCommitter", "NativeStoredPayload"] {
         assert!(
             !binding.contains(forbidden),
             "native video codec typed binding contains forbidden {forbidden}"

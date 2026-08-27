@@ -8,12 +8,16 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use comfy_tensor::{BackendCapabilityMatrix, CpuBackend, DeviceId};
+#[cfg(feature = "test-support")]
+use comfy_types::WorkerPluginExecutionFailure;
 use comfy_types::{
     AttemptId, BackendUnavailable, DeviceKind, MAX_ENCODED_PREVIEW_BYTES,
     MAX_WORKER_COMPONENT_CHUNK_BYTES, MAX_WORKER_FRAME_BYTES,
     MAX_WORKER_PLUGIN_CAPABILITY_PAYLOAD_BYTES, ProfileId, PromptId, RequestId,
     WORKER_PROTOCOL_VERSION, WorkerComponentContent, WorkerEnvelope, WorkerId,
-    WorkerLifecycleEvent, WorkerMessage, WorkerPluginExecutionOutcome, WorkerRegistryDeploymentAck,
+    WorkerLifecycleEvent, WorkerMessage, WorkerPluginExecutionOutcome, WorkerProviderStreamRequest,
+    WorkerProviderStreamResponse, WorkerProviderStreamTransportValidator,
+    WorkerProviderV2ProposalFinalization, WorkerRegistryDeploymentAck,
     WorkerRegistryDeploymentBegin, WorkerRegistryDeploymentChunk, WorkerRegistryDeploymentCommit,
     decode_worker_frame, encode_worker_frame,
 };
@@ -45,6 +49,279 @@ pub const MAX_PENDING_WORKER_MESSAGES: usize = 64;
 pub const MAX_TRACKED_WORKER_REQUESTS: usize = 8;
 
 type WorkerInput = Box<dyn AsyncWrite + Send + Unpin>;
+
+pub(crate) struct RuntimeProviderV2StreamCall {
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes provider-v2 stream call identities"
+        )
+    )]
+    pub(crate) call_id: u64,
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes this provider-v2 worker route"
+        )
+    )]
+    pub(crate) request: WorkerProviderStreamRequest,
+    response: async_channel::Sender<WorkerProviderStreamResponse>,
+}
+
+impl RuntimeProviderV2StreamCall {
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes provider-v2 stream call identities"
+        )
+    )]
+    pub(crate) const fn call_id(&self) -> u64 {
+        self.call_id
+    }
+
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes provider-v2 stream requests"
+        )
+    )]
+    pub(crate) fn request(&self) -> &WorkerProviderStreamRequest {
+        &self.request
+    }
+
+    #[cfg_attr(
+        not(any(test, feature = "test-support")),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes this provider-v2 worker route"
+        )
+    )]
+    pub(crate) fn respond(
+        self,
+        response: WorkerProviderStreamResponse,
+    ) -> Result<(), RuntimeSupervisorError> {
+        self.response.try_send(response).map_err(|error| {
+            RuntimeSupervisorError::Protocol(format!(
+                "provider-v2 stream response could not be delivered: {error}"
+            ))
+        })
+    }
+}
+
+pub(crate) struct RuntimeProviderV2Proposal {
+    #[cfg_attr(
+        not(any(test, feature = "test-support")),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes this provider-v2 worker route"
+        )
+    )]
+    pub(crate) outcome: WorkerPluginExecutionOutcome,
+    finalization: async_channel::Sender<RuntimeProviderV2FinalizedProposal>,
+}
+
+#[cfg_attr(
+    not(any(test, feature = "test-support")),
+    expect(
+        dead_code,
+        reason = "Task427 deployment actuator consumes finalized provider-v2 proposals"
+    )
+)]
+pub(crate) struct RuntimeProviderV2FinalizedProposal {
+    finalization: WorkerProviderV2ProposalFinalization,
+    materialization: crate::ProviderTransportResponse,
+}
+
+impl RuntimeProviderV2Proposal {
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes provider-v2 proposal outcomes"
+        )
+    )]
+    pub(crate) fn outcome(&self) -> &WorkerPluginExecutionOutcome {
+        &self.outcome
+    }
+
+    #[cfg_attr(
+        not(any(test, feature = "test-support")),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes this provider-v2 worker route"
+        )
+    )]
+    pub(crate) fn finalize(
+        self,
+        finalization: WorkerProviderV2ProposalFinalization,
+        materialization: crate::ProviderTransportResponse,
+    ) -> Result<(), RuntimeSupervisorError> {
+        self.finalization
+            .try_send(RuntimeProviderV2FinalizedProposal {
+                finalization,
+                materialization,
+            })
+            .map_err(|error| {
+                RuntimeSupervisorError::Protocol(format!(
+                    "provider-v2 finalization could not be delivered: {error}"
+                ))
+            })
+    }
+}
+
+#[cfg_attr(
+    not(any(test, feature = "test-support")),
+    expect(
+        dead_code,
+        reason = "Task427 deployment actuator consumes the provider-v2 supervisor bridge"
+    )
+)]
+pub(crate) struct RuntimeProviderV2Bridge {
+    stream_calls: async_channel::Sender<RuntimeProviderV2StreamCall>,
+    proposal: async_channel::Sender<RuntimeProviderV2Proposal>,
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes provider-v2 validation state"
+        )
+    )]
+    validator: WorkerProviderStreamTransportValidator,
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes provider-v2 cancellation state"
+        )
+    )]
+    cancellation: comfy_types::CancellationToken,
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes provider-v2 invocation deadlines"
+        )
+    )]
+    invocation_timeout: Duration,
+}
+
+#[cfg_attr(
+    not(any(test, feature = "test-support")),
+    expect(
+        dead_code,
+        reason = "Task427 deployment actuator consumes provider-v2 finalization phases"
+    )
+)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ProviderV2FinalizationPhase {
+    PreCommit,
+    Committed,
+}
+
+#[cfg_attr(
+    not(any(test, feature = "test-support")),
+    expect(
+        dead_code,
+        reason = "Task427 deployment actuator consumes provider-v2 cancellation transitions"
+    )
+)]
+fn should_begin_provider_v2_cancellation(
+    phase: ProviderV2FinalizationPhase,
+    cancellation: &comfy_types::CancellationToken,
+    cancellation_request_id: Option<RequestId>,
+) -> bool {
+    phase == ProviderV2FinalizationPhase::PreCommit
+        && cancellation.is_cancelled()
+        && cancellation_request_id.is_none()
+}
+
+#[cfg_attr(
+    not(any(test, feature = "test-support")),
+    expect(
+        dead_code,
+        reason = "Task427 deployment actuator consumes provider-v2 precommit suppression"
+    )
+)]
+fn suppress_provider_v2_precommit_message(
+    phase: ProviderV2FinalizationPhase,
+    cancellation_request_id: Option<RequestId>,
+    message: &WorkerMessage,
+) -> bool {
+    phase == ProviderV2FinalizationPhase::PreCommit
+        && cancellation_request_id.is_some()
+        && matches!(
+            message,
+            WorkerMessage::ProviderStreamRequest { .. }
+                | WorkerMessage::PluginResult {
+                    outcome: WorkerPluginExecutionOutcome::Succeeded(_)
+                }
+        )
+}
+
+#[cfg_attr(
+    not(any(test, feature = "test-support")),
+    expect(
+        dead_code,
+        reason = "Task427 deployment actuator consumes provider-v2 cancellation close precedence"
+    )
+)]
+fn provider_v2_wait_close_is_cancellation(
+    phase: ProviderV2FinalizationPhase,
+    cancellation: &comfy_types::CancellationToken,
+) -> bool {
+    phase == ProviderV2FinalizationPhase::PreCommit && cancellation.is_cancelled()
+}
+
+impl RuntimeProviderV2Bridge {
+    #[cfg_attr(
+        not(any(test, feature = "test-support")),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes this provider-v2 worker route"
+        )
+    )]
+    pub(crate) fn capacity_one(
+        context: comfy_types::WorkerProviderInvocationContext,
+        contract: comfy_types::WorkerProviderStreamingContract,
+        cancellation: comfy_types::CancellationToken,
+        invocation_timeout: Duration,
+    ) -> Result<
+        (
+            Self,
+            async_channel::Receiver<RuntimeProviderV2StreamCall>,
+            async_channel::Receiver<RuntimeProviderV2Proposal>,
+        ),
+        RuntimeSupervisorError,
+    > {
+        if invocation_timeout.is_zero() {
+            return Err(RuntimeSupervisorError::InvalidConfiguration(
+                "provider-v2 invocation timeout must be non-zero".to_owned(),
+            ));
+        }
+        let (stream_calls, stream_receiver) = async_channel::bounded(1);
+        let (proposal, proposal_receiver) = async_channel::bounded(1);
+        Ok((
+            Self {
+                stream_calls,
+                proposal,
+                validator: WorkerProviderStreamTransportValidator::checked_for_host_session(
+                    context,
+                    contract,
+                    cancellation.clone(),
+                )
+                .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?,
+                cancellation,
+                invocation_timeout,
+            },
+            stream_receiver,
+            proposal_receiver,
+        ))
+    }
+}
 
 pub struct RetainedPluginExecution {
     outcome: WorkerPluginExecutionOutcome,
@@ -1154,6 +1431,7 @@ enum RequestKind {
     RegistryDeployment,
     Execute,
     ExecutePlugin,
+    ExecuteProviderV2,
     Cancel,
     Shutdown,
     Other,
@@ -1181,6 +1459,8 @@ impl From<&WorkerMessage> for RequestKind {
             | WorkerMessage::PluginCapabilityResponse { .. }
             | WorkerMessage::ProviderStreamRequest { .. }
             | WorkerMessage::ProviderStreamResponse { .. }
+            | WorkerMessage::ProviderV2ProposalFinalization { .. }
+            | WorkerMessage::ProviderV2ProposalFinalizationAck { .. }
             | WorkerMessage::PluginResult { .. }
             | WorkerMessage::Heartbeat
             | WorkerMessage::Fatal { .. } => Self::Other,
@@ -1229,6 +1509,45 @@ impl SupervisorShared {
         }
         self.snapshot.active_prompt_id = scope.prompt_id;
         self.snapshot.active_attempt_id = scope.attempt_id;
+    }
+
+    #[cfg_attr(
+        not(any(test, feature = "test-support")),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator retires provider-v2 execution scopes"
+        )
+    )]
+    fn retire_provider_v2_request(&mut self, request_id: RequestId) {
+        if self
+            .request_scopes
+            .remove(&request_id)
+            .is_some_and(|scope| scope.kind == RequestKind::ExecuteProviderV2)
+        {
+            self.request_order.retain(|tracked| *tracked != request_id);
+            self.snapshot.active_prompt_id = None;
+            self.snapshot.active_attempt_id = None;
+            if !self.snapshot.health.is_terminal() {
+                self.snapshot.health = WorkerHealth::BackendReady;
+            }
+        }
+    }
+
+    #[cfg_attr(
+        not(any(test, feature = "test-support")),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator retires provider-v2 cancellation scopes"
+        )
+    )]
+    fn retire_provider_v2_cancel_request(&mut self, request_id: RequestId) {
+        if self
+            .request_scopes
+            .remove(&request_id)
+            .is_some_and(|scope| scope.kind == RequestKind::Cancel)
+        {
+            self.request_order.retain(|tracked| *tracked != request_id);
+        }
     }
 
     fn accept(&mut self, envelope: &WorkerEnvelope) -> Result<(), RuntimeSupervisorError> {
@@ -1345,7 +1664,7 @@ impl SupervisorShared {
                 event: WorkerLifecycleEvent::ExecutionStarted,
             } if matches!(
                 scope.kind,
-                RequestKind::Execute | RequestKind::ExecutePlugin
+                RequestKind::Execute | RequestKind::ExecutePlugin | RequestKind::ExecuteProviderV2
             ) => {}
             WorkerMessage::Lifecycle {
                 event: WorkerLifecycleEvent::CancellationRequested { .. },
@@ -1372,12 +1691,33 @@ impl SupervisorShared {
                 self.snapshot.active_prompt_id = None;
                 self.snapshot.active_attempt_id = None;
             }
+            WorkerMessage::PluginResult {
+                outcome: WorkerPluginExecutionOutcome::Failed(_),
+            } if scope.kind == RequestKind::ExecuteProviderV2 => {
+                self.snapshot.health = WorkerHealth::BackendReady;
+                self.snapshot.active_prompt_id = None;
+                self.snapshot.active_attempt_id = None;
+            }
+            WorkerMessage::PluginResult {
+                outcome: WorkerPluginExecutionOutcome::Succeeded(_),
+            } if scope.kind == RequestKind::ExecuteProviderV2 => {}
+            WorkerMessage::ProviderStreamRequest { .. }
+                if scope.kind == RequestKind::ExecuteProviderV2 => {}
+            WorkerMessage::ProviderV2ProposalFinalizationAck { .. }
+                if scope.kind == RequestKind::ExecuteProviderV2 =>
+            {
+                self.snapshot.health = WorkerHealth::BackendReady;
+                self.snapshot.active_prompt_id = None;
+                self.snapshot.active_attempt_id = None;
+            }
             WorkerMessage::RegistryDeploymentAck { .. }
                 if scope.kind == RequestKind::RegistryDeployment => {}
             WorkerMessage::RegistryDeploymentRejected { .. }
                 if scope.kind == RequestKind::RegistryDeployment => {}
             WorkerMessage::ProviderStreamRequest { .. }
-            | WorkerMessage::ProviderStreamResponse { .. } => {
+            | WorkerMessage::ProviderStreamResponse { .. }
+            | WorkerMessage::ProviderV2ProposalFinalization { .. }
+            | WorkerMessage::ProviderV2ProposalFinalizationAck { .. } => {
                 let error = RuntimeSupervisorError::Protocol(
                     "provider stream routing is unavailable until the canonical bridge is active"
                         .to_owned(),
@@ -1897,6 +2237,465 @@ impl RuntimeSupervisor {
         }
     }
 
+    #[cfg(feature = "test-support")]
+    pub async fn execute_provider_v2(
+        &mut self,
+        prompt_id: PromptId,
+        attempt_id: AttemptId,
+        invocation: Vec<u8>,
+        mut supervised_route: crate::NativeProviderWorkerV2SupervisorBridge,
+    ) -> Result<
+        (
+            WorkerPluginExecutionOutcome,
+            Option<crate::ProviderTransportResponse>,
+        ),
+        RuntimeSupervisorError,
+    > {
+        let mut bridge = supervised_route.take()?;
+        if invocation.is_empty() {
+            bridge.cancellation.cancel();
+            return Err(RuntimeSupervisorError::InvalidConfiguration(
+                "worker provider-v2 invocation is empty".to_owned(),
+            ));
+        }
+        let request_id = match self
+            .send_with_kind(
+                Some(prompt_id),
+                Some(attempt_id),
+                WorkerMessage::ExecutePlugin { invocation },
+                RequestKind::ExecuteProviderV2,
+            )
+            .await
+        {
+            Ok(request_id) => request_id,
+            Err(error) => {
+                bridge.cancellation.cancel();
+                return Err(error);
+            }
+        };
+        let response_deadline = Instant::now()
+            .checked_add(bridge.invocation_timeout)
+            .ok_or(RuntimeSupervisorError::Timeout {
+                stage: "provider-v2 execution",
+            })?;
+        let mut cancellation_request_id = None;
+        let result = async {
+            let mut proposal_outcome = None;
+            let mut expected_finalization = None;
+            let mut proposal_materialization = None;
+            let mut finalization_phase = ProviderV2FinalizationPhase::PreCommit;
+            let mut cancellation_lifecycle_observed = false;
+            loop {
+                if should_begin_provider_v2_cancellation(
+                    finalization_phase,
+                    &bridge.cancellation,
+                    cancellation_request_id,
+                ) {
+                    cancellation_request_id = Some(
+                        self.cancel(prompt_id, attempt_id, "provider-v2 app route was cancelled")
+                            .await?,
+                    );
+                }
+                let remaining = response_deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    return Err(RuntimeSupervisorError::Timeout {
+                        stage: "provider-v2 execution",
+                    });
+                }
+                let envelope = self
+                    .receive_one(remaining.min(Duration::from_millis(10)))
+                    .await;
+                let envelope = match envelope {
+                    Err(RuntimeSupervisorError::Timeout { .. }) => continue,
+                    result => result?,
+                };
+                if should_begin_provider_v2_cancellation(
+                    finalization_phase,
+                    &bridge.cancellation,
+                    cancellation_request_id,
+                ) {
+                    cancellation_request_id = Some(
+                        self.cancel(prompt_id, attempt_id, "provider-v2 app route was cancelled")
+                            .await?,
+                    );
+                }
+                let cancellation_lifecycle = cancellation_request_id == Some(envelope.request_id)
+                    && matches!(
+                        &envelope.message,
+                        WorkerMessage::Lifecycle {
+                            event: WorkerLifecycleEvent::CancellationRequested { .. }
+                        }
+                    );
+                if envelope.request_id != request_id
+                    && !cancellation_lifecycle
+                    && !matches!(&envelope.message, WorkerMessage::Heartbeat)
+                {
+                    return Err(RuntimeSupervisorError::IdentityMismatch);
+                }
+                if suppress_provider_v2_precommit_message(
+                    finalization_phase,
+                    cancellation_request_id,
+                    &envelope.message,
+                ) {
+                    continue;
+                }
+                match envelope.message {
+                    WorkerMessage::Lifecycle {
+                        event: WorkerLifecycleEvent::ExecutionStarted,
+                    }
+                    | WorkerMessage::Heartbeat => {}
+                    WorkerMessage::Lifecycle {
+                        event: WorkerLifecycleEvent::CancellationRequested { .. },
+                    } if cancellation_request_id == Some(envelope.request_id) => {
+                        cancellation_lifecycle_observed = true;
+                    }
+                    WorkerMessage::ProviderStreamRequest { call_id, request } => {
+                        if proposal_outcome.is_some() {
+                            return Err(RuntimeSupervisorError::Protocol(
+                                "provider-v2 stream request arrived after its proposal".to_owned(),
+                            ));
+                        }
+                        bridge
+                            .validator
+                            .validate_request(call_id, &request)
+                            .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+                        let response_timeout = match &request {
+                            WorkerProviderStreamRequest::WaitResponse(request) => {
+                                Duration::from_millis(request.timeout_milliseconds).min(remaining)
+                            }
+                            _ => remaining,
+                        };
+                        let (response, response_receiver) = async_channel::bounded(1);
+                        bridge
+                            .stream_calls
+                            .try_send(RuntimeProviderV2StreamCall {
+                                call_id,
+                                request,
+                                response,
+                            })
+                            .map_err(|error| {
+                                RuntimeSupervisorError::Protocol(format!(
+                                    "provider-v2 capacity-one route rejected a call: {error}"
+                                ))
+                            })?;
+                        let call_response_deadline = Instant::now()
+                            .checked_add(response_timeout)
+                            .ok_or(RuntimeSupervisorError::Timeout {
+                                stage: "provider-v2 stream response",
+                            })?;
+                        let response = loop {
+                            if should_begin_provider_v2_cancellation(
+                                finalization_phase,
+                                &bridge.cancellation,
+                                cancellation_request_id,
+                            ) {
+                                cancellation_request_id = Some(
+                                    self.cancel(
+                                        prompt_id,
+                                        attempt_id,
+                                        "provider-v2 app route was cancelled",
+                                    )
+                                    .await?,
+                                );
+                                break None;
+                            }
+                            let response_remaining = call_response_deadline
+                                .saturating_duration_since(Instant::now());
+                            if response_remaining.is_zero() {
+                                return Err(RuntimeSupervisorError::Timeout {
+                                    stage: "provider-v2 stream response",
+                                });
+                            }
+                            let poll = response_remaining.min(Duration::from_millis(10));
+                            let received = smol::future::race(
+                                async {
+                                    response_receiver.recv().await.map(Some).map_err(|_| {
+                                        RuntimeSupervisorError::Protocol(
+                                            "provider-v2 stream route lost its response".to_owned(),
+                                        )
+                                    })
+                                },
+                                async {
+                                    supervisor_delay(poll).await;
+                                    Ok(None)
+                                },
+                            )
+                            .await;
+                            let received = match received {
+                                Ok(received) => received,
+                                Err(_)
+                                    if provider_v2_wait_close_is_cancellation(
+                                        finalization_phase,
+                                        &bridge.cancellation,
+                                    ) =>
+                                {
+                                    if cancellation_request_id.is_none() {
+                                        cancellation_request_id = Some(
+                                            self.cancel(
+                                                prompt_id,
+                                                attempt_id,
+                                                "provider-v2 app route was cancelled",
+                                            )
+                                            .await?,
+                                        );
+                                    }
+                                    break None;
+                                }
+                                Err(error) => return Err(error),
+                            };
+                            if received.is_some() {
+                                break received;
+                            }
+                        };
+                        let Some(response) = response else {
+                            continue;
+                        };
+                        if should_begin_provider_v2_cancellation(
+                            finalization_phase,
+                            &bridge.cancellation,
+                            cancellation_request_id,
+                        ) {
+                            cancellation_request_id = Some(
+                                self.cancel(
+                                    prompt_id,
+                                    attempt_id,
+                                    "provider-v2 app route was cancelled",
+                                )
+                                .await?,
+                            );
+                            continue;
+                        }
+                        bridge
+                            .validator
+                            .validate_response(call_id, &response)
+                            .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))?;
+                        self.send_for_existing_request(
+                            request_id,
+                            Some(prompt_id),
+                            Some(attempt_id),
+                            WorkerMessage::ProviderStreamResponse { call_id, response },
+                        )
+                        .await?;
+                    }
+                    WorkerMessage::PluginResult { outcome } if proposal_outcome.is_none() => {
+                        if should_begin_provider_v2_cancellation(
+                            finalization_phase,
+                            &bridge.cancellation,
+                            cancellation_request_id,
+                        ) {
+                            cancellation_request_id = Some(
+                                self.cancel(
+                                    prompt_id,
+                                    attempt_id,
+                                    "provider-v2 app route was cancelled",
+                                )
+                                .await?,
+                            );
+                        }
+                        if cancellation_request_id.is_some() {
+                            match &outcome {
+                                WorkerPluginExecutionOutcome::Failed(
+                                    WorkerPluginExecutionFailure::Cancelled,
+                                ) if cancellation_lifecycle_observed => {
+                                    return Ok((outcome, None));
+                                }
+                                WorkerPluginExecutionOutcome::Failed(
+                                    WorkerPluginExecutionFailure::Cancelled,
+                                ) => {
+                                    return Err(RuntimeSupervisorError::Protocol(
+                                        "provider-v2 cancellation terminal preceded its lifecycle"
+                                            .to_owned(),
+                                    ));
+                                }
+                                WorkerPluginExecutionOutcome::Succeeded(_) => continue,
+                                WorkerPluginExecutionOutcome::Failed(failure) => {
+                                    return Err(RuntimeSupervisorError::Protocol(
+                                        format!(
+                                            "provider-v2 cancelled execution returned a non-cancelled terminal: {failure:?}"
+                                        ),
+                                    ));
+                                }
+                            }
+                        }
+                        if matches!(outcome, WorkerPluginExecutionOutcome::Failed(_)) {
+                            return Ok((outcome, None));
+                        }
+                        let (finalization, finalization_receiver) = async_channel::bounded(1);
+                        bridge
+                            .proposal
+                            .try_send(RuntimeProviderV2Proposal {
+                                outcome: outcome.clone(),
+                                finalization,
+                            })
+                            .map_err(|error| {
+                                RuntimeSupervisorError::Protocol(format!(
+                                    "provider-v2 proposal route rejected the proposal: {error}"
+                                ))
+                            })?;
+                        let finalized = loop {
+                            if should_begin_provider_v2_cancellation(
+                                finalization_phase,
+                                &bridge.cancellation,
+                                cancellation_request_id,
+                            ) {
+                                cancellation_request_id = Some(
+                                    self.cancel(
+                                        prompt_id,
+                                        attempt_id,
+                                        "provider-v2 app route was cancelled",
+                                    )
+                                    .await?,
+                                );
+                                break None;
+                            }
+                            let finalization_remaining = response_deadline
+                                .saturating_duration_since(Instant::now());
+                            if finalization_remaining.is_zero() {
+                                return Err(RuntimeSupervisorError::Timeout {
+                                    stage: "provider-v2 proposal finalization",
+                                });
+                            }
+                            let poll = finalization_remaining.min(Duration::from_millis(10));
+                            let received = smol::future::race(
+                                async {
+                                    finalization_receiver.recv().await.map(Some).map_err(|_| {
+                                        RuntimeSupervisorError::Protocol(
+                                            "provider-v2 proposal was dropped before finalization"
+                                                .to_owned(),
+                                        )
+                                    })
+                                },
+                                async {
+                                    supervisor_delay(poll).await;
+                                    Ok(None)
+                                },
+                            )
+                            .await;
+                            let received = match received {
+                                Ok(received) => received,
+                                Err(_)
+                                    if provider_v2_wait_close_is_cancellation(
+                                        finalization_phase,
+                                        &bridge.cancellation,
+                                    ) =>
+                                {
+                                    if cancellation_request_id.is_none() {
+                                        cancellation_request_id = Some(
+                                            self.cancel(
+                                                prompt_id,
+                                                attempt_id,
+                                                "provider-v2 app route was cancelled",
+                                            )
+                                            .await?,
+                                        );
+                                    }
+                                    break None;
+                                }
+                                Err(error) => return Err(error),
+                            };
+                            if received.is_some() {
+                                break received;
+                            }
+                        };
+                        let Some(finalized) = finalized else {
+                            continue;
+                        };
+                        let RuntimeProviderV2FinalizedProposal {
+                            finalization,
+                            materialization,
+                        } = finalized;
+                        if should_begin_provider_v2_cancellation(
+                            finalization_phase,
+                            &bridge.cancellation,
+                            cancellation_request_id,
+                        ) {
+                            cancellation_request_id = Some(
+                                self.cancel(
+                                    prompt_id,
+                                    attempt_id,
+                                    "provider-v2 app route was cancelled",
+                                )
+                                .await?,
+                            );
+                            continue;
+                        }
+                        self.send_for_existing_request(
+                            request_id,
+                            Some(prompt_id),
+                            Some(attempt_id),
+                            WorkerMessage::ProviderV2ProposalFinalization {
+                                finalization: finalization.clone(),
+                            },
+                        )
+                        .await?;
+                        finalization_phase = ProviderV2FinalizationPhase::Committed;
+                        proposal_outcome = Some(outcome);
+                        expected_finalization = Some(finalization);
+                        proposal_materialization = Some(materialization);
+                    }
+                    WorkerMessage::ProviderV2ProposalFinalizationAck { acknowledgement } => {
+                        acknowledgement.validate().map_err(|error| {
+                            RuntimeSupervisorError::Protocol(format!(
+                                "provider-v2 finalization acknowledgement is invalid: {error}"
+                            ))
+                        })?;
+                        let expected = expected_finalization.take().ok_or_else(|| {
+                            RuntimeSupervisorError::Protocol(
+                                "provider-v2 finalization acknowledgement preceded its proposal"
+                                    .to_owned(),
+                            )
+                        })?;
+                        if acknowledgement.finalization != expected {
+                            return Err(RuntimeSupervisorError::IdentityMismatch);
+                        }
+                        acknowledgement.result.map_err(|error| {
+                            RuntimeSupervisorError::Protocol(format!(
+                                "provider-v2 finalization was rejected: {error}"
+                            ))
+                        })?;
+                        let outcome = proposal_outcome.take().ok_or_else(|| {
+                            RuntimeSupervisorError::Protocol(
+                                "provider-v2 finalization lost its proposal outcome".to_owned(),
+                            )
+                        })?;
+                        let materialization = proposal_materialization.take().ok_or_else(|| {
+                            RuntimeSupervisorError::Protocol(
+                                "provider-v2 finalization lost its retained materialization"
+                                    .to_owned(),
+                            )
+                        })?;
+                        return Ok((outcome, Some(materialization)));
+                    }
+                    WorkerMessage::Fatal { code, message } => {
+                        return Err(RuntimeSupervisorError::WorkerFatal { code, message });
+                    }
+                    message => {
+                        return Err(RuntimeSupervisorError::Protocol(format!(
+                            "worker emitted {message:?} during provider-v2 execution"
+                        )));
+                    }
+                }
+            }
+        }
+        .await;
+        bridge.stream_calls.close();
+        bridge.proposal.close();
+        bridge.validator.revoke();
+        let successful = matches!(
+            &result,
+            Ok((WorkerPluginExecutionOutcome::Succeeded(_), Some(_)))
+        );
+        if !successful {
+            bridge.cancellation.cancel();
+        }
+        let mut shared = self.shared.lock();
+        if let Some(cancellation_request_id) = cancellation_request_id {
+            shared.retire_provider_v2_cancel_request(cancellation_request_id);
+        }
+        shared.retire_provider_v2_request(request_id);
+        result
+    }
+
     pub async fn cancel(
         &mut self,
         prompt_id: PromptId,
@@ -2069,8 +2868,19 @@ impl RuntimeSupervisor {
         attempt_id: Option<AttemptId>,
         message: WorkerMessage,
     ) -> Result<RequestId, RuntimeSupervisorError> {
-        let request_id = RequestId(Uuid::new_v4());
         let kind = RequestKind::from(&message);
+        self.send_with_kind(prompt_id, attempt_id, message, kind)
+            .await
+    }
+
+    async fn send_with_kind(
+        &mut self,
+        prompt_id: Option<PromptId>,
+        attempt_id: Option<AttemptId>,
+        message: WorkerMessage,
+        kind: RequestKind,
+    ) -> Result<RequestId, RuntimeSupervisorError> {
+        let request_id = RequestId(Uuid::new_v4());
         let sequence = self.next_input_sequence;
         self.next_input_sequence = self.next_input_sequence.checked_add(1).ok_or_else(|| {
             RuntimeSupervisorError::Protocol("input sequence overflow".to_owned())
@@ -2121,7 +2931,7 @@ impl RuntimeSupervisor {
             || scope.attempt_id != attempt_id
             || !matches!(
                 scope.kind,
-                RequestKind::Execute | RequestKind::ExecutePlugin
+                RequestKind::Execute | RequestKind::ExecutePlugin | RequestKind::ExecuteProviderV2
             )
         {
             return Err(RuntimeSupervisorError::IdentityMismatch);
@@ -2325,8 +3135,14 @@ async fn monitor_heartbeats(shared: Arc<Mutex<SupervisorShared>>, policy: Superv
 // Runtime supervision has no GPUI context; this single owner keeps production
 // deadlines async while GPUI-facing callers retain their own executor timers.
 #[allow(clippy::disallowed_methods)]
-async fn supervisor_delay(duration: Duration) {
+pub(crate) async fn supervisor_delay(duration: Duration) {
     smol::Timer::after(duration).await;
+}
+
+#[cfg(feature = "test-support")]
+#[doc(hidden)]
+pub async fn supervisor_test_delay(duration: Duration) {
+    supervisor_delay(duration).await;
 }
 
 async fn write_async_frame(
@@ -2743,6 +3559,274 @@ mod tests {
                 shared.snapshot.health,
                 WorkerHealth::ProtocolIncompatible { .. }
             ));
+        }
+    }
+
+    #[test]
+    fn provider_v2_bridge_is_capacity_one_and_finalization_is_consuming() {
+        let context = comfy_types::WorkerProviderInvocationContext {
+            session_id: uuid::Uuid::from_u128(0x425_300),
+            session_generation: 3,
+            invocation: 5,
+            generation: 7,
+        };
+        let contract = comfy_types::WorkerProviderStreamingContract {
+            methods: vec![comfy_types::WorkerProviderHttpMethod::Post],
+            maximum_headers: 4,
+            maximum_header_bytes: 1024,
+            maximum_request_body_bytes: 1024,
+            maximum_response_body_bytes: 1024,
+            maximum_chunk_bytes: 256,
+            maximum_ndjson_line_bytes: 256,
+            maximum_wait_milliseconds: 100,
+            maximum_uploads: 1,
+            maximum_upload_body_bytes: 1024,
+            maximum_cost_requests: 1,
+            maximum_progress_total: 100,
+            uploads: true,
+            cost_requests: true,
+        };
+        let (bridge, stream_receiver, proposal_receiver) = RuntimeProviderV2Bridge::capacity_one(
+            context.clone(),
+            contract,
+            comfy_types::CancellationToken::default(),
+            Duration::from_secs(1),
+        )
+        .expect("checked bridge");
+        let request = comfy_types::WorkerProviderStreamRequest::CheckCancelled(
+            comfy_types::WorkerProviderStreamHandle {
+                session_id: uuid::Uuid::from_u128(0x425_300),
+                session_generation: 3,
+                invocation: 5,
+                slot: 1,
+                generation: 7,
+            },
+        );
+        let (first_response, first_receiver) = async_channel::bounded(1);
+        bridge
+            .stream_calls
+            .try_send(RuntimeProviderV2StreamCall {
+                call_id: 1,
+                request: request.clone(),
+                response: first_response,
+            })
+            .expect("first provider call occupies the route");
+        let (second_response, _) = async_channel::bounded(1);
+        assert!(
+            bridge
+                .stream_calls
+                .try_send(RuntimeProviderV2StreamCall {
+                    call_id: 2,
+                    request,
+                    response: second_response,
+                })
+                .is_err()
+        );
+        stream_receiver
+            .recv_blocking()
+            .expect("first provider call remains queued")
+            .respond(comfy_types::WorkerProviderStreamResponse::Unit(Ok(())))
+            .expect("response returns to the execution route");
+        assert_eq!(
+            first_receiver
+                .recv_blocking()
+                .expect("response is retained"),
+            comfy_types::WorkerProviderStreamResponse::Unit(Ok(()))
+        );
+
+        let finalization = WorkerProviderV2ProposalFinalization {
+            handle: comfy_types::WorkerProviderStreamHandle {
+                session_id: context.session_id,
+                session_generation: context.session_generation,
+                invocation: context.invocation,
+                slot: 1,
+                generation: context.generation,
+            },
+            context,
+            proposal_generation: 11,
+            finalization_nonce: [0x42; 32],
+            receipt_identity_sha256: comfy_types::WorkerSha256Digest::new("a".repeat(64))
+                .expect("receipt identity"),
+            materialization_identity_sha256: comfy_types::WorkerSha256Digest::new("b".repeat(64))
+                .expect("materialization identity"),
+        };
+        let (sender, receiver) = async_channel::bounded(1);
+        bridge
+            .proposal
+            .try_send(RuntimeProviderV2Proposal {
+                outcome: WorkerPluginExecutionOutcome::Succeeded(vec![1]),
+                finalization: sender,
+            })
+            .expect("first proposal occupies the route");
+        let proposal = proposal_receiver
+            .recv_blocking()
+            .expect("proposal remains armed");
+        assert_eq!(
+            proposal.outcome,
+            WorkerPluginExecutionOutcome::Succeeded(vec![1])
+        );
+        let materialization = crate::ProviderTransportResponse::checked("fixture", Vec::new())
+            .expect("checked materialization");
+        proposal
+            .finalize(finalization.clone(), materialization.clone())
+            .expect("consuming proposal retains its finalization bundle once");
+        let retained = receiver
+            .recv_blocking()
+            .expect("finalization bundle retained");
+        assert_eq!(retained.finalization, finalization);
+        assert_eq!(retained.materialization, materialization);
+
+        let (closed_sender, closed_receiver) = async_channel::bounded(1);
+        closed_receiver.close();
+        let dropped = RuntimeProviderV2Proposal {
+            outcome: WorkerPluginExecutionOutcome::Succeeded(vec![2]),
+            finalization: closed_sender,
+        };
+        assert!(matches!(
+            dropped.finalize(
+                retained.finalization,
+                crate::ProviderTransportResponse::checked("fixture", Vec::new())
+                    .expect("checked rejected materialization"),
+            ),
+            Err(RuntimeSupervisorError::Protocol(message))
+                if message.contains("could not be delivered")
+        ));
+    }
+
+    #[test]
+    fn provider_v2_cancellation_stops_at_the_finalization_commit_boundary() {
+        let cancellation = comfy_types::CancellationToken::default();
+        let cancellation_request_id = RequestId(Uuid::new_v4());
+        let succeeded = WorkerMessage::PluginResult {
+            outcome: WorkerPluginExecutionOutcome::Succeeded(vec![0x42]),
+        };
+        let stream_request = WorkerMessage::ProviderStreamRequest {
+            call_id: 1,
+            request: comfy_types::WorkerProviderStreamRequest::CheckCancelled(
+                comfy_types::WorkerProviderStreamHandle {
+                    session_id: Uuid::from_u128(0x425_500),
+                    session_generation: 3,
+                    invocation: 5,
+                    slot: 1,
+                    generation: 7,
+                },
+            ),
+        };
+
+        assert!(!should_begin_provider_v2_cancellation(
+            ProviderV2FinalizationPhase::PreCommit,
+            &cancellation,
+            None,
+        ));
+        cancellation.cancel();
+        assert!(should_begin_provider_v2_cancellation(
+            ProviderV2FinalizationPhase::PreCommit,
+            &cancellation,
+            None,
+        ));
+        assert!(provider_v2_wait_close_is_cancellation(
+            ProviderV2FinalizationPhase::PreCommit,
+            &cancellation,
+        ));
+        assert!(suppress_provider_v2_precommit_message(
+            ProviderV2FinalizationPhase::PreCommit,
+            Some(cancellation_request_id),
+            &succeeded,
+        ));
+        assert!(suppress_provider_v2_precommit_message(
+            ProviderV2FinalizationPhase::PreCommit,
+            Some(cancellation_request_id),
+            &stream_request,
+        ));
+        assert!(!should_begin_provider_v2_cancellation(
+            ProviderV2FinalizationPhase::Committed,
+            &cancellation,
+            None,
+        ));
+        assert!(!provider_v2_wait_close_is_cancellation(
+            ProviderV2FinalizationPhase::Committed,
+            &cancellation,
+        ));
+        assert!(!provider_v2_wait_close_is_cancellation(
+            ProviderV2FinalizationPhase::PreCommit,
+            &comfy_types::CancellationToken::default(),
+        ));
+        assert!(!suppress_provider_v2_precommit_message(
+            ProviderV2FinalizationPhase::Committed,
+            Some(cancellation_request_id),
+            &succeeded,
+        ));
+        assert!(!suppress_provider_v2_precommit_message(
+            ProviderV2FinalizationPhase::PreCommit,
+            Some(cancellation_request_id),
+            &WorkerMessage::ProviderV2ProposalFinalizationAck {
+                acknowledgement: comfy_types::WorkerProviderV2ProposalFinalizationAck {
+                    finalization: WorkerProviderV2ProposalFinalization {
+                        handle: comfy_types::WorkerProviderStreamHandle {
+                            session_id: Uuid::from_u128(0x425_500),
+                            session_generation: 3,
+                            invocation: 5,
+                            slot: 1,
+                            generation: 7,
+                        },
+                        context: comfy_types::WorkerProviderInvocationContext {
+                            session_id: Uuid::from_u128(0x425_500),
+                            session_generation: 3,
+                            invocation: 5,
+                            generation: 7,
+                        },
+                        proposal_generation: 11,
+                        finalization_nonce: [0x42; 32],
+                        receipt_identity_sha256: comfy_types::WorkerSha256Digest::new(
+                            "a".repeat(64),
+                        )
+                        .expect("receipt identity"),
+                        materialization_identity_sha256: comfy_types::WorkerSha256Digest::new(
+                            "b".repeat(64),
+                        )
+                        .expect("materialization identity"),
+                    },
+                    result: Ok(()),
+                },
+            },
+        ));
+    }
+
+    #[test]
+    fn provider_v2_cancellation_retires_both_request_scopes_before_retry() {
+        let (mut shared, _) = shared();
+        shared.request_scopes.clear();
+        shared.request_order.clear();
+        let prompt_id = PromptId(Uuid::new_v4());
+        let attempt_id = AttemptId(Uuid::new_v4());
+
+        for _ in 0..2 {
+            let execution_request_id = RequestId(Uuid::new_v4());
+            let cancellation_request_id = RequestId(Uuid::new_v4());
+            shared.register_request(
+                execution_request_id,
+                RequestScope {
+                    prompt_id: Some(prompt_id),
+                    attempt_id: Some(attempt_id),
+                    kind: RequestKind::ExecuteProviderV2,
+                },
+            );
+            shared.register_request(
+                cancellation_request_id,
+                RequestScope {
+                    prompt_id: Some(prompt_id),
+                    attempt_id: Some(attempt_id),
+                    kind: RequestKind::Cancel,
+                },
+            );
+
+            shared.retire_provider_v2_cancel_request(cancellation_request_id);
+            shared.retire_provider_v2_request(execution_request_id);
+
+            assert!(shared.request_scopes.is_empty());
+            assert!(shared.request_order.is_empty());
+            assert_eq!(shared.snapshot.active_prompt_id, None);
+            assert_eq!(shared.snapshot.active_attempt_id, None);
         }
     }
 

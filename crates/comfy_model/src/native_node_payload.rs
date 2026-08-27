@@ -14,10 +14,12 @@ use crate::{
     GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256, GEMMA3_MULTIMODAL_SOURCE_SHA256,
     GEMMA4_MULTIMODAL_SOURCE_SHA256, LLAMA_SOURCE_SHA256, NativeAudioEncoder,
     NativeBackgroundRemovalResource, NativeDecoderTextEncoder, NativeDepthAnything3Resource,
-    NativeFrameInterpolationModel, NativeGemmaMultimodal, NativeLatentUpscaleModelResource,
+    NativeFrameInterpolationModel, NativeGemmaMultimodal, NativeGligenResource,
+    NativeLatentUpscaleModelResource, NativeMogeResource, NativePhotoMakerResource,
     NativePromptTokenizer, NativeQwenMultimodal, NativeRaftLarge, NativeSdPoseModel,
-    NativeStructuredVae, NativeVae, QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256,
-    QWEN3VL_SOURCE_SHA256, QWEN35_SOURCE_SHA256,
+    NativeStructuredVae, NativeStyleModelResource, NativeVae,
+    QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256,
+    QWEN35_SOURCE_SHA256,
     clip::{LoadedSd1Clip, NativeClipResidentOwnerKind, NativeClipResource, NativeTokenizer},
     clip_vision::NativeClipVision,
     generated_native_diffusion::{Sd1Tokenizer, Sd15TinyModel},
@@ -311,6 +313,18 @@ enum NativeModelResource {
     DepthAnything3 {
         resource: Arc<NativeDepthAnything3Resource>,
     },
+    Moge {
+        resource: Arc<NativeMogeResource>,
+    },
+    Gligen {
+        resource: Arc<NativeGligenResource>,
+    },
+    PhotoMaker {
+        resource: Arc<NativePhotoMakerResource>,
+    },
+    StyleModel {
+        resource: Arc<NativeStyleModelResource>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -345,6 +359,10 @@ pub enum NativeModelBackingKind {
     NativeLatentUpscaleModel,
     NativeBackgroundRemovalResource,
     NativeDepthAnything3Resource,
+    NativeMogeResource,
+    NativeGligenResource,
+    NativePhotoMakerResource,
+    NativeStyleModelResource,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1090,6 +1108,226 @@ impl NativeModelPayload {
         })
     }
 
+    pub fn moge(
+        resource: Arc<NativeMogeResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if !resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "MoGe production source-exact profile",
+            ));
+        }
+        Self::moge_checked(resource, cancellation)
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn moge_test_fixture(
+        resource: Arc<NativeMogeResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "MoGe reduced test fixture profile",
+            ));
+        }
+        Self::moge_checked(resource, cancellation)
+    }
+
+    fn moge_checked(
+        resource: Arc<NativeMogeResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        resource
+            .validate(cancellation)
+            .map_err(|error| match error {
+                crate::moge::NativeMogeError::Cancelled => {
+                    NativeModelPayloadError::Tensor(TensorError::Cancelled)
+                }
+                crate::moge::NativeMogeError::Tensor(error) => {
+                    NativeModelPayloadError::Tensor(error)
+                }
+                error => NativeModelPayloadError::ResourceAccounting(error.to_string()),
+            })?;
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::MogeModel,
+            resource.identifier(),
+            "zed-native-moge-v1",
+            resource.artifact_sha256(),
+            resource.semantic_digest_sha256(),
+        )?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, resource.resident_bytes())?,
+            identity,
+            resource: NativeModelResource::Moge { resource },
+        })
+    }
+
+    pub fn gligen(
+        resource: Arc<NativeGligenResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if !resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "GLIGEN production source-exact profile",
+            ));
+        }
+        Self::gligen_checked(resource, cancellation)
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn gligen_test_fixture(
+        resource: Arc<NativeGligenResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "GLIGEN reduced test fixture profile",
+            ));
+        }
+        Self::gligen_checked(resource, cancellation)
+    }
+
+    fn gligen_checked(
+        resource: Arc<NativeGligenResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        resource
+            .validate(cancellation)
+            .map_err(|error| match error {
+                crate::conditioning_resources::NativeGligenError::Cancelled => {
+                    NativeModelPayloadError::Tensor(TensorError::Cancelled)
+                }
+                crate::conditioning_resources::NativeGligenError::Tensor(error) => {
+                    NativeModelPayloadError::Tensor(error)
+                }
+                error => NativeModelPayloadError::ResourceAccounting(error.to_string()),
+            })?;
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::Gligen,
+            resource.identifier(),
+            "zed-native-gligen-v1",
+            resource.artifact_sha256(),
+            resource.semantic_digest_sha256(),
+        )?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, resource.resident_bytes())?,
+            identity,
+            resource: NativeModelResource::Gligen { resource },
+        })
+    }
+
+    pub fn photomaker(
+        resource: Arc<NativePhotoMakerResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if !resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "PHOTOMAKER production source-exact profile",
+            ));
+        }
+        Self::photomaker_checked(resource, cancellation)
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn photomaker_test_fixture(
+        resource: Arc<NativePhotoMakerResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "PHOTOMAKER reduced test fixture profile",
+            ));
+        }
+        Self::photomaker_checked(resource, cancellation)
+    }
+
+    fn photomaker_checked(
+        resource: Arc<NativePhotoMakerResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        resource
+            .validate(cancellation)
+            .map_err(|error| match error {
+                crate::conditioning_resources::NativePhotoMakerError::Cancelled => {
+                    NativeModelPayloadError::Tensor(TensorError::Cancelled)
+                }
+                crate::conditioning_resources::NativePhotoMakerError::Tensor(error) => {
+                    NativeModelPayloadError::Tensor(error)
+                }
+                error => NativeModelPayloadError::ResourceAccounting(error.to_string()),
+            })?;
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::Photomaker,
+            resource.identifier(),
+            "zed-native-photomaker-v1",
+            resource.artifact_sha256(),
+            resource.semantic_digest_sha256(),
+        )?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, resource.resident_bytes())?,
+            identity,
+            resource: NativeModelResource::PhotoMaker { resource },
+        })
+    }
+
+    pub fn style_model(
+        resource: Arc<NativeStyleModelResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if !resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "STYLE_MODEL production source-exact profile",
+            ));
+        }
+        Self::style_model_checked(resource, cancellation)
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn style_model_test_fixture(
+        resource: Arc<NativeStyleModelResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "STYLE_MODEL reduced test fixture profile",
+            ));
+        }
+        Self::style_model_checked(resource, cancellation)
+    }
+
+    fn style_model_checked(
+        resource: Arc<NativeStyleModelResource>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeModelPayloadError> {
+        resource
+            .validate(cancellation)
+            .map_err(|error| match error {
+                crate::conditioning_resources::NativeStyleModelError::Cancelled => {
+                    NativeModelPayloadError::Tensor(TensorError::Cancelled)
+                }
+                crate::conditioning_resources::NativeStyleModelError::Tensor(error) => {
+                    NativeModelPayloadError::Tensor(error)
+                }
+                error => NativeModelPayloadError::ResourceAccounting(error.to_string()),
+            })?;
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::StyleModel,
+            resource.identifier(),
+            "zed-native-style-model-v1",
+            resource.artifact_sha256(),
+            resource.semantic_digest_sha256(),
+        )?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, resource.resident_bytes())?,
+            identity,
+            resource: NativeModelResource::StyleModel { resource },
+        })
+    }
+
     pub fn identity(&self) -> &NativeModelResourceIdentity {
         &self.identity
     }
@@ -1534,6 +1772,98 @@ impl NativeModelPayload {
                     })?,
                 }]
             }
+            NativeModelResource::Moge { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::NativeMogeResource,
+                    address: Arc::as_ptr(resource) as usize,
+                    resident_bytes: resource.resident_owned_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                }]
+            }
+            NativeModelResource::Gligen { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::NativeGligenResource,
+                    address: Arc::as_ptr(resource) as usize,
+                    resident_bytes: resource.resident_owned_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                }]
+            }
+            NativeModelResource::PhotoMaker { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::NativePhotoMakerResource,
+                    address: Arc::as_ptr(resource) as usize,
+                    resident_bytes: resource.resident_owned_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                }]
+            }
+            NativeModelResource::StyleModel { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::NativeStyleModelResource,
+                    address: Arc::as_ptr(resource) as usize,
+                    resident_bytes: resource.resident_owned_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                }]
+            }
         };
         let parts = NativeModelResidentParts {
             owned_bytes,
@@ -1570,7 +1900,11 @@ impl NativeModelPayload {
             | NativeModelResource::FrameInterpolation { .. }
             | NativeModelResource::LatentUpscaleModel { .. }
             | NativeModelResource::BackgroundRemoval { .. }
-            | NativeModelResource::DepthAnything3 { .. } => None,
+            | NativeModelResource::DepthAnything3 { .. }
+            | NativeModelResource::Moge { .. }
+            | NativeModelResource::Gligen { .. }
+            | NativeModelResource::PhotoMaker { .. }
+            | NativeModelResource::StyleModel { .. } => None,
         }
     }
 
@@ -1601,7 +1935,11 @@ impl NativeModelPayload {
             | NativeModelResource::FrameInterpolation { .. }
             | NativeModelResource::LatentUpscaleModel { .. }
             | NativeModelResource::BackgroundRemoval { .. }
-            | NativeModelResource::DepthAnything3 { .. } => None,
+            | NativeModelResource::DepthAnything3 { .. }
+            | NativeModelResource::Moge { .. }
+            | NativeModelResource::Gligen { .. }
+            | NativeModelResource::PhotoMaker { .. }
+            | NativeModelResource::StyleModel { .. } => None,
         }
     }
 
@@ -1623,7 +1961,11 @@ impl NativeModelPayload {
             | NativeModelResource::FrameInterpolation { .. }
             | NativeModelResource::LatentUpscaleModel { .. }
             | NativeModelResource::BackgroundRemoval { .. }
-            | NativeModelResource::DepthAnything3 { .. } => None,
+            | NativeModelResource::DepthAnything3 { .. }
+            | NativeModelResource::Moge { .. }
+            | NativeModelResource::Gligen { .. }
+            | NativeModelResource::PhotoMaker { .. }
+            | NativeModelResource::StyleModel { .. } => None,
         }
     }
 
@@ -1659,7 +2001,11 @@ impl NativeModelPayload {
             | NativeModelResource::FrameInterpolation { .. }
             | NativeModelResource::LatentUpscaleModel { .. }
             | NativeModelResource::BackgroundRemoval { .. }
-            | NativeModelResource::DepthAnything3 { .. } => None,
+            | NativeModelResource::DepthAnything3 { .. }
+            | NativeModelResource::Moge { .. }
+            | NativeModelResource::Gligen { .. }
+            | NativeModelResource::PhotoMaker { .. }
+            | NativeModelResource::StyleModel { .. } => None,
         }
     }
 
@@ -1681,7 +2027,11 @@ impl NativeModelPayload {
             | NativeModelResource::FrameInterpolation { .. }
             | NativeModelResource::LatentUpscaleModel { .. }
             | NativeModelResource::BackgroundRemoval { .. }
-            | NativeModelResource::DepthAnything3 { .. } => None,
+            | NativeModelResource::DepthAnything3 { .. }
+            | NativeModelResource::Moge { .. }
+            | NativeModelResource::Gligen { .. }
+            | NativeModelResource::PhotoMaker { .. }
+            | NativeModelResource::StyleModel { .. } => None,
         }
     }
 
@@ -1746,6 +2096,34 @@ impl NativeModelPayload {
     pub fn depth_anything_3_resource(&self) -> Option<&Arc<NativeDepthAnything3Resource>> {
         match &self.resource {
             NativeModelResource::DepthAnything3 { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
+    pub fn moge_resource(&self) -> Option<&Arc<NativeMogeResource>> {
+        match &self.resource {
+            NativeModelResource::Moge { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
+    pub fn gligen_resource(&self) -> Option<&Arc<NativeGligenResource>> {
+        match &self.resource {
+            NativeModelResource::Gligen { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
+    pub fn photomaker_resource(&self) -> Option<&Arc<NativePhotoMakerResource>> {
+        match &self.resource {
+            NativeModelResource::PhotoMaker { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
+    pub fn style_model_resource(&self) -> Option<&Arc<NativeStyleModelResource>> {
+        match &self.resource {
+            NativeModelResource::StyleModel { resource } => Some(resource),
             _ => None,
         }
     }
@@ -1836,6 +2214,76 @@ impl NativeModelPayload {
                     {
                         return Err(NativeModelPayloadError::ResourceMismatch(
                             "Depth Anything 3 reduced test fixture profile",
+                        ));
+                    }
+                }
+            }
+            NativeModelResource::Moge { resource } => {
+                if resource.is_source_exact_profile() {
+                    Self::moge(resource.clone(), &CancellationToken::default())?
+                } else {
+                    #[cfg(feature = "test-support")]
+                    {
+                        Self::moge_test_fixture(resource.clone(), &CancellationToken::default())?
+                    }
+                    #[cfg(not(feature = "test-support"))]
+                    {
+                        return Err(NativeModelPayloadError::ResourceMismatch(
+                            "MoGe reduced test fixture profile",
+                        ));
+                    }
+                }
+            }
+            NativeModelResource::Gligen { resource } => {
+                if resource.is_source_exact_profile() {
+                    Self::gligen(resource.clone(), &CancellationToken::default())?
+                } else {
+                    #[cfg(feature = "test-support")]
+                    {
+                        Self::gligen_test_fixture(resource.clone(), &CancellationToken::default())?
+                    }
+                    #[cfg(not(feature = "test-support"))]
+                    {
+                        return Err(NativeModelPayloadError::ResourceMismatch(
+                            "GLIGEN reduced test fixture profile",
+                        ));
+                    }
+                }
+            }
+            NativeModelResource::PhotoMaker { resource } => {
+                if resource.is_source_exact_profile() {
+                    Self::photomaker(resource.clone(), &CancellationToken::default())?
+                } else {
+                    #[cfg(feature = "test-support")]
+                    {
+                        Self::photomaker_test_fixture(
+                            resource.clone(),
+                            &CancellationToken::default(),
+                        )?
+                    }
+                    #[cfg(not(feature = "test-support"))]
+                    {
+                        return Err(NativeModelPayloadError::ResourceMismatch(
+                            "PHOTOMAKER reduced test fixture profile",
+                        ));
+                    }
+                }
+            }
+            NativeModelResource::StyleModel { resource } => {
+                if resource.is_source_exact_profile() {
+                    Self::style_model(resource.clone(), &CancellationToken::default())?
+                } else {
+                    #[cfg(feature = "test-support")]
+                    {
+                        Self::style_model_test_fixture(
+                            resource.clone(),
+                            &CancellationToken::default(),
+                        )?
+                    }
+                    #[cfg(not(feature = "test-support"))]
+                    {
+                        return Err(NativeModelPayloadError::ResourceMismatch(
+                            "STYLE_MODEL reduced test fixture profile",
                         ));
                     }
                 }

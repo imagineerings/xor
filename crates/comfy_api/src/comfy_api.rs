@@ -141,6 +141,7 @@ pub struct NativeRuntimeApiHost {
     profile_id: comfy_runtime::ProfileId,
     presentation: comfy_runtime::SharedExecutionPresentationService,
     event_bridge_diagnostic: Arc<Mutex<Option<String>>>,
+    provider_deployment: Option<NativeProviderDeploymentIdentity>,
     _event_bridge: smol::Task<Result<(), NativeApiHostError>>,
 }
 
@@ -148,6 +149,7 @@ impl NativeRuntimeApiHost {
     #[allow(clippy::too_many_arguments)]
     pub fn with_registry_bundle(
         bundle: Arc<comfy_runtime::NativeExecutionRegistryBundle>,
+        candidate_identity: &extension_host::ComponentInventoryCandidateIdentity,
         presentation: comfy_runtime::SharedExecutionPresentationService,
         controller: Arc<dyn comfy_runtime::ExecutionController>,
         event_bus: &comfy_runtime::ExecutionEventBus,
@@ -172,7 +174,7 @@ impl NativeRuntimeApiHost {
                 .with_assets(assets, asset_authorization)
                 .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
         }
-        Self::from_services(
+        let mut runtime = Self::from_services(
             bundle.profile_id(),
             presentation,
             controller,
@@ -183,7 +185,12 @@ impl NativeRuntimeApiHost {
             security_config,
             permission_policy,
             idempotency_store,
-        )
+        )?;
+        runtime.provider_deployment = Some(NativeProviderDeploymentIdentity::from_registry_bundle(
+            &bundle,
+            candidate_identity,
+        )?);
+        Ok(runtime)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -356,6 +363,7 @@ impl NativeRuntimeApiHost {
             profile_id,
             presentation,
             event_bridge_diagnostic,
+            provider_deployment: None,
             _event_bridge: event_bridge,
         })
     }
@@ -383,6 +391,16 @@ impl NativeRuntimeApiHost {
             .lock()
             .map(|diagnostic| diagnostic.clone())
             .map_err(|_| NativeApiHostError::StateUnavailable)
+    }
+
+    pub fn deployment_identity_sha256(&self) -> Option<&str> {
+        self.provider_deployment
+            .as_ref()
+            .map(NativeProviderDeploymentIdentity::execution_bundle_identity_sha256)
+    }
+
+    pub fn provider_deployment(&self) -> Option<&NativeProviderDeploymentIdentity> {
+        self.provider_deployment.as_ref()
     }
 
     pub fn shutdown(&self, reason: impl Into<String>) -> Result<(), NativeApiHostError> {

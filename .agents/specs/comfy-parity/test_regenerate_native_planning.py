@@ -11,6 +11,37 @@ import validate_backend_dependencies as backend_dependencies
 
 
 class ValidationGenerationTests(unittest.TestCase):
+    def test_generated_tasks_preserve_in_progress_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.joinpath("tasks.md").write_text(
+                "- [~] 1. Active task\n"
+                "  - _id: active-task\n",
+                encoding="utf-8",
+            )
+            task = {
+                "id": "active-task",
+                "title": "Active task",
+                "outcome": "Retain the active task.",
+                "done": "The active task remains incomplete.",
+                "requirements": [],
+                "criterion_ids": [],
+                "designs": [],
+                "validations": [],
+                "reads": [],
+                "writes": [],
+                "dependencies": [],
+                "validation_packages": [],
+                "cargo_features": {},
+                "locked": True,
+            }
+            with patch.object(planning, "ROOT", root):
+                annotation = planning.existing_task_annotations()["active-task"]
+                self.assertTrue(annotation["started"])
+                self.assertFalse(annotation["complete"])
+                planning.write_tasks([task], {})
+            self.assertIn("- [~] 1. Active task", root.joinpath("tasks.md").read_text())
+
     def test_dependency_ledger_reopens_until_current_lock_allowlist_evidence_is_fresh(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repository_root = Path(directory)
@@ -164,7 +195,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 725)
+        self.assertEqual(len(tasks), 732)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -299,14 +330,59 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-native-depth-anything-3-resource-foundation",
             "comfy-parity-native-dinov2-backbone-owner-foundation",
             "comfy-parity-native-moge-resource-foundation",
+            "comfy-parity-native-style-model-resource-foundation",
+            "comfy-parity-native-clip-vision-context-construction",
+            "comfy-parity-native-photomaker-resource-foundation",
+            "comfy-parity-native-gligen-resource-foundation",
             "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+            "comfy-parity-native-model-store-stream-source-foundation",
+            "comfy-parity-native-model-source-worker-bridge-foundation",
             "comfy-parity-native-model-resource-service-foundation",
+            "comfy-parity-native-model-resource-service-recipe-closure",
         ]
         self.assertEqual(
             tasks_by_id[model_resource_phases[0]]["dependencies"],
             [
                 value_id,
                 "comfy-parity-native-asset-name-resolution-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        model_store_stream_task = tasks_by_id[
+            "comfy-parity-native-model-store-stream-source-foundation"
+        ]
+        model_source_bridge_task = tasks_by_id[
+            "comfy-parity-native-model-source-worker-bridge-foundation"
+        ]
+        model_resource_service_task = tasks_by_id[
+            "comfy-parity-native-model-resource-service-foundation"
+        ]
+        model_resource_recipe_task = tasks_by_id[
+            "comfy-parity-native-model-resource-service-recipe-closure"
+        ]
+        self.assertEqual(
+            model_store_stream_task["dependencies"],
+            [
+                "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+                "comfy-parity-native-asset-name-resolution-foundation",
+            ],
+        )
+        self.assertEqual(
+            model_source_bridge_task["dependencies"],
+            [
+                "comfy-parity-native-model-store-stream-source-foundation",
+            ],
+        )
+        self.assertEqual(
+            model_resource_service_task["dependencies"],
+            [
+                "comfy-parity-native-model-source-worker-bridge-foundation",
+            ],
+        )
+        self.assertEqual(
+            model_resource_recipe_task["dependencies"],
+            [
+                "comfy-parity-native-model-resource-service-foundation",
                 "comfy-parity-model-detection-any-of-key-selector-consolidation",
             ],
         )
@@ -516,6 +592,7 @@ class ValidationGenerationTests(unittest.TestCase):
             ],
         )
         for moge_write in (
+            "crates/comfy_model/src/dino2.rs",
             "crates/comfy_model/src/moge.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
@@ -550,6 +627,7 @@ class ValidationGenerationTests(unittest.TestCase):
             "invalid-focal 60-degree fallback",
             "F32/F16/BF16 retained storage",
             "shared-StorageId residency",
+            "now-fulfilled future-consumer dead-code expectation",
             "Panorama splitting and Poisson merge",
             "comfy-parity-native-model-resource-execution-foundation",
         ):
@@ -562,6 +640,457 @@ class ValidationGenerationTests(unittest.TestCase):
             "ownership_consolidation val_ownership_001",
         ):
             self.assertIn(command, moge_validation)
+        style_task = tasks_by_id["comfy-parity-native-style-model-resource-foundation"]
+        clip_vision_context_task = tasks_by_id[
+            "comfy-parity-native-clip-vision-context-construction"
+        ]
+        photomaker_task = tasks_by_id[
+            "comfy-parity-native-photomaker-resource-foundation"
+        ]
+        gligen_task = tasks_by_id["comfy-parity-native-gligen-resource-foundation"]
+        conditioning_auxiliary = tasks_by_id[
+            "comfy-parity-native-conditioning-auxiliary-resource-foundation"
+        ]
+        self.assertEqual(
+            style_task["dependencies"],
+            [
+                "comfy-parity-native-moge-resource-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        self.assertEqual(
+            clip_vision_context_task["dependencies"],
+            [
+                "comfy-parity-native-style-model-resource-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        self.assertEqual(
+            photomaker_task["dependencies"],
+            [
+                "comfy-parity-native-clip-vision-context-construction",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        for path in (
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(path, photomaker_task["writes"])
+        self.assertEqual(
+            gligen_task["dependencies"],
+            [
+                "comfy-parity-native-photomaker-resource-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        self.assertEqual(
+            conditioning_auxiliary["dependencies"],
+            [
+                "comfy-parity-native-gligen-resource-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        for source_path in (
+            "projects/comfy/ComfyUI/comfy/gligen.py",
+            "projects/comfy/ComfyUI/comfy/sd.py",
+            "projects/comfy/ComfyUI/comfy/t2i_adapter/adapter.py",
+            "projects/comfy/ComfyUI/comfy/ldm/flux/redux.py",
+            "projects/comfy/ComfyUI/comfy/clip_model.py",
+            "projects/comfy/ComfyUI/comfy/clip_vision.py",
+        ):
+            self.assertTrue(
+                any(
+                    source_path in item["reads"]
+                    for item in (
+                        style_task,
+                        clip_vision_context_task,
+                        photomaker_task,
+                        gligen_task,
+                        conditioning_auxiliary,
+                    )
+                )
+            )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
+            style_task["writes"],
+        )
+        for style_read in (
+            "projects/comfy/ComfyUI/comfy/sd.py",
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/src/attention.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_08.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs",
+            "crates/comfy_tensor/src/ops/linear_algebra_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+        ):
+            self.assertIn(style_read, style_task["reads"])
+        for ownership_path in (
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(ownership_path, style_task["writes"])
+        for style_gate in (
+            "strict complete ordered schema for every source checkpoint entry",
+            "exact 42-entry source schema",
+            "checked-splits each fused attn.in_proj_weight and attn.in_proj_bias",
+            "reconstructs the exact fused source keys",
+            "exclusively to canonical comfy_model::attention",
+            "without owning a second attention equation or policy",
+            "asserts the exact source key sets",
+            "manual-cast disposition",
+            "canonical ClipVisionOutput last_hidden_state",
+            "StyleAdapter-before-FluxRedux detection precedence",
+            "STYLE_MODEL-specific ownership concern",
+            "without pre-claiming GLIGEN or PHOTOMAKER closure",
+        ):
+            self.assertIn(style_gate, style_task["done"])
+        style_validation = planning.task_validation_commands(style_task)
+        for command in (
+            "cargo test --locked -p comfy_test_support --test native_conditioning_integration style_model_resource -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task393_style_model_resource_001 -- --exact --nocapture",
+        ):
+            self.assertIn(command, style_validation)
+        self.assertNotIn(
+            "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+            style_validation,
+        )
+        for clip_vision_read in (
+            "crates/comfy_model/tests/clip_vision.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(clip_vision_read, clip_vision_context_task["reads"])
+        self.assertEqual(
+            clip_vision_context_task["writes"],
+            [
+                "crates/comfy_model/src/clip_vision.rs",
+                "crates/comfy_model/tests/clip_vision.rs",
+                "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+            ],
+        )
+        for clip_vision_gate in (
+            "NativeClipVision::new_with_cancellation(configuration, weights, &CancellationToken)",
+            "NativeClipVision::reconstruct(&self, &CancellationToken)",
+            "strictly reprojects the complete retained ordered canonical checkpoint",
+            "rather than cloning the model",
+            "before and between every layer's layer-normalization, attention QKV and output, and MLP module phases",
+            "StorageIds and alias deduplication",
+            "output F32 bytes",
+            "post-layernorm, pre-visual-projection pooled hidden tensor",
+            "public NativeClipVision::forward delegates to that path",
+            "preserving public ClipVisionOutput identity, residency, and bytes",
+            "native payload remains read-only and unchanged",
+            "No PhotoMaker-specific fork, second CLIP transformer, ExecutionContext requirement",
+        ):
+            self.assertIn(clip_vision_gate, clip_vision_context_task["done"])
+        clip_vision_validation = planning.task_validation_commands(
+            clip_vision_context_task
+        )
+        for command in (
+            "cargo test --locked -p comfy_model --test clip_vision -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_conditioning_integration native_clip_vision_context_construction -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task340_clip_vision_001 -- --exact --nocapture",
+        ):
+            self.assertIn(command, clip_vision_validation)
+        for photomaker_read in (
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/tests/clip_vision.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/indexing_masking_01.rs",
+            "crates/comfy_tensor/src/ops/reduction_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(photomaker_read, photomaker_task["reads"])
+        self.assertIn(
+            "crates/comfy_model/src/clip_vision.rs", photomaker_task["writes"]
+        )
+        for photomaker_gate in (
+            "exact 407-entry ordered source schema",
+            "392 delegated NativeClipVision keys plus 15 PhotoMaker-owned keys",
+            "1024 to 1280 without bias",
+            "concatenates the canonical 768 and 1280 projections to width 2048",
+            "MLP1 applies LayerNorm 4096",
+            "MLP2 applies LayerNorm 2048",
+            "count_true(mask) equal to N",
+            "source row-major true positions pair with images in order",
+            "unmasked rows remain bit-identical",
+            "Batch greater than one rejects",
+            "reconstruction calls NativeClipVision::reconstruct(token)",
+            "noncontiguous multi-identity mask and scatter",
+            "max-plus-one OOM",
+            "without changing the StyleAdapter or Flux Redux fixture hashes",
+        ):
+            self.assertIn(photomaker_gate, photomaker_task["done"])
+        photomaker_validation = planning.task_validation_commands(photomaker_task)
+        for command in (
+            "cargo test --locked -p comfy_model photomaker_resource -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_conditioning_integration photomaker_resource -- --exact --nocapture",
+            "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+            "cargo test --locked -p comfy_model --test clip_vision -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task340_clip_vision_001 -- --exact --nocapture",
+        ):
+            self.assertIn(command, photomaker_validation)
+        for gligen_read in (
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py",
+            "projects/comfy/ComfyUI/comfy/samplers.py",
+            "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/src/attention.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_02.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(gligen_read, gligen_task["reads"])
+        for gligen_gate in (
+            "input_blocks 0 through 19, middle_block 0 through 19, then output_blocks 0 through 19",
+            "Sparse structural locations are source-valid and never treated as gaps",
+            "exact 17-key suffix set",
+            "Strict ordered state is 8 plus 17 times fuser_count",
+            "positive 100 ** (arange(8)/8)",
+            "key_dim 768 to eight heads",
+            "GatedSelfAttentionDense",
+            "exclusively to canonical comfy_model::attention",
+            "GatedCrossAttentionDense and GatedSelfAttentionDense2",
+            "after node-level division of image coordinates by eight",
+            "without clamping",
+            "opaque non-Clone prepared-position object",
+            "alias-deduplicated StorageIds",
+            "quadratic (V+30)^2 workspace",
+            "sparse multi-region order and compact indices",
+            "max-plus-one OOM",
+        ):
+            self.assertIn(gligen_gate, gligen_task["done"])
+        gligen_validation = planning.task_validation_commands(gligen_task)
+        for command in (
+            "cargo test --locked -p comfy_model gligen_resource -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_conditioning_integration gligen_resource -- --exact --nocapture",
+            "cargo test --locked -p comfy_model attention -- --nocapture",
+            "cargo test --locked -p comfy_model photomaker_resource -- --nocapture",
+            "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+        ):
+            self.assertIn(command, gligen_validation)
+        for conditioning_read in (
+            "projects/comfy/ComfyUI/comfy/clip_vision.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/src/attention.rs",
+            "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+        ):
+            self.assertIn(conditioning_read, conditioning_auxiliary["reads"])
+        self.assertEqual(
+            conditioning_auxiliary["writes"],
+            [
+                "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ],
+        )
+        for phrase in (
+            "three concrete non-Clone resource structs",
+            "NativeModelPayload and its private NativeModelResource backing remain intentionally Clone through Arc",
+            "Option<&Arc<T>> views that return None on the wrong role",
+            "exact ResourceMismatch",
+            "preserves the existing native_style_model_resource ownership concern byte-for-byte",
+            "native_photomaker_model_resource and native_gligen_model_resource",
+            "no aggregate or generic conditioning-resource concern",
+            "NativeClipVision's exact pooled-hidden adapter for PhotoMaker",
+            "canonical comfy_model::attention for GLIGEN",
+            "exactly four cases: GLIGEN, PhotoMaker, StyleAdapter, and Flux Redux",
+            "full three-by-three wrong-role matrix",
+            "This task owns only role registration and ownership, cross-role, and frozen-fixture evidence",
+            "Handle publication, cache, durable persistence, restart, and stale-generation behavior remain exclusively assigned",
+        ):
+            self.assertIn(phrase, conditioning_auxiliary["done"])
+        conditioning_validation = planning.task_validation_commands(
+            conditioning_auxiliary
+        )
+        for command in (
+            "cargo test --locked -p comfy_model style_model_resource -- --nocapture",
+            "cargo test --locked -p comfy_model photomaker_resource -- --nocapture",
+            "cargo test --locked -p comfy_model gligen_resource -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_conditioning_integration conditioning_auxiliary_resource_roles -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/generate_ownership_catalog.py",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task397_conditioning_auxiliary_resources_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task393_style_model_resource_001 -- --exact --nocapture",
+        ):
+            self.assertIn(command, conditioning_validation)
+        self.assertEqual(
+            model_store_stream_task["writes"],
+            [
+                "crates/comfy_model/src/model_store.rs",
+                "crates/comfy_model/src/comfy_model.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ],
+        )
+        for phrase in (
+            "non-Clone opaque verified source manifest",
+            "exact ordered ArtifactKeys",
+            "tensor names, dtypes, shapes and byte ranges",
+            "revalidates ArtifactIndex and source identity",
+            "max-plus-one size",
+            "No path, file handle, parser, raw ArtifactIndex getter",
+            "ModelStore::load remains the sole parser and verified parse-cache owner",
+        ):
+            self.assertIn(phrase, model_store_stream_task["done"])
+        model_store_validation = planning.task_validation_commands(
+            model_store_stream_task
+        )
+        self.assertIn(
+            "cargo test --locked -p comfy_model model_store_stream_source -- --nocapture",
+            model_store_validation,
+        )
+        for bridge_write in (
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_runtime/src/runtime_supervisor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+        ):
+            self.assertIn(bridge_write, model_source_bridge_task["writes"])
+        for phrase in (
+            "never overloads provider streaming",
+            "one-use source-session ID",
+            "fixed chunk ceiling below the worker frame maximum",
+            "worker receives no path, file handle, authorization grant, ArtifactIndex, ModelStore",
+            "fresh attempt restarts at ordinal one",
+            "Legacy WorkerMessage bytes remain frozen",
+            "WorkerMessage direction and lifecycle matches remain exhaustive",
+            "no wildcard acceptance",
+            "larger than the 12 MiB native execution frame",
+        ):
+            self.assertIn(phrase, model_source_bridge_task["done"])
+        bridge_validation = planning.task_validation_commands(
+            model_source_bridge_task
+        )
+        self.assertIn(
+            "native_worker_resilience model_source_worker_bridge_restarts_without_duplicate_publication",
+            bridge_validation,
+        )
+        self.assertNotIn(
+            "crates/comfy_model/src/native_node_payload.rs",
+            model_resource_service_task["writes"],
+        )
+        for source_loader_read in (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_hidream.py",
+        ):
+            self.assertIn(source_loader_read, model_resource_service_task["reads"])
+        for service_write in (
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(service_write, model_resource_service_task["writes"])
+        for phrase in (
+            "object-safe Send+Sync NativeModelResourceService port",
+            "Arc<NativeModelPayload> only",
+            "one through four ordered source names",
+            "same NativeNodeServiceIdentity attempt and node before and after every call",
+            "STYLE_MODEL from style_models, PHOTOMAKER from photomaker, and GLIGEN from gligen",
+            "SD3's three-source and HiDream's four-source CLIP loaders",
+            "every other recipe remains typed unavailable here",
+            "remain assigned to comfy-parity-native-model-resource-execution-foundation",
+            "already returned local Arcs are not retroactively revoked",
+            "Canonical verified ModelStore parse-cache retention",
+            "native_model_resource_service concern",
+            "forbids a second parser, store, index, path, grant, cache, handle/publication, lifecycle, persistence, or resource-constructor owner",
+        ):
+            self.assertIn(phrase, model_resource_service_task["done"])
+        service_validation = planning.task_validation_commands(
+            model_resource_service_task
+        )
+        for command in (
+            "cargo test --locked -p comfy_nodes native_model_resource_service -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_model_resource_service -- --nocapture",
+            "native_model_resource_service_loads_style_photomaker_and_gligen",
+            "native_worker_resilience val_recovery_005",
+            "val_ownership_task400_native_model_resource_service_001",
+        ):
+            self.assertIn(command, service_validation)
+        for recipe_read in (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_audio_encoder.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_hidream.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_void.py",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_runtime/src/executor.rs",
+        ):
+            self.assertIn(recipe_read, model_resource_recipe_task["reads"])
+        self.assertIn(
+            "complete source-valid one-, two-, three-, and four-source recipe matrix",
+            model_resource_recipe_task["outcome"],
+        )
+        for recipe_gate in (
+            "one checkpoints source selected as MODEL, CLIP, or VAE",
+            "one through four ordered text_encoders sources as CLIP",
+            "SD3 triple, and HiDream quadruple order",
+            "one geometry_estimation source selected as DA3_MODEL or MOGE_MODEL",
+            "CONTROL_NET remains NativeControlPayload-owned",
+            "UPSCALE_MODEL remains typed unavailable",
+            "FACE_DETECTION remains unavailable",
+            "native_node_registry remains the sole handle lifecycle, lease, cache, and generation owner",
+            "remain assigned to comfy-parity-native-model-resource-execution-foundation",
+        ):
+            self.assertIn(recipe_gate, model_resource_recipe_task["done"])
+        recipe_validation = planning.task_validation_commands(
+            model_resource_recipe_task
+        )
+        for command in (
+            "cargo test --locked -p comfy_nodes native_model_resource_service_recipes -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_model_resource_service_recipes -- --nocapture",
+            "native_model_resource_service_recipe_matrix",
+            "model_resource_recipe_restart_is_atomic",
+            "val_ownership_task401_native_model_resource_service_recipes_001",
+        ):
+            self.assertIn(command, recipe_validation)
+        for item in (
+            style_task,
+            clip_vision_context_task,
+            photomaker_task,
+            gligen_task,
+            conditioning_auxiliary,
+        ):
+            validation = planning.task_validation_commands(item)
+            self.assertIn(
+                "conditioning-auxiliary-resource-foundation/generate_oracle.py --check",
+                validation,
+            )
+            self.assertIn("native_conditioning_integration conditioning_auxiliary", validation)
         for path in (
             "projects/comfy/ComfyUI/comfy_extras/nodes_lt_upsampler.py",
             "projects/comfy/ComfyUI/comfy/ldm/hunyuan_video/upsampler.py",
@@ -842,14 +1371,68 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(writers, [execution_id])
         self.assertIn(execution_id, tasks_by_id[audio_id]["done"])
         self.assertIn(execution_id, tasks_by_id[latent_upscale_id]["done"])
+        for lifecycle_delegate in (
+            style_task,
+            photomaker_task,
+            gligen_task,
+            conditioning_auxiliary,
+        ):
+            self.assertIn(execution_id, lifecycle_delegate["done"])
+            self.assertNotIn(
+                "remain assigned to comfy-parity-native-model-resource-service-foundation",
+                lifecycle_delegate["done"],
+            )
+        for required_read in (
+            "projects/comfy/ComfyUI/comfy_extras/nodes_void.py",
+            "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/src/background_removal.rs",
+            "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/src/depth_anything_3.rs",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/latent_upscale_model.rs",
+            "crates/comfy_model/src/moge.rs",
+            "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/src/upscale_model.rs",
+            "crates/comfy_model/src/vision_models.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/persistence.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+        ):
+            self.assertIn(required_read, tasks_by_id[execution_id]["reads"])
+        self.assertIn(
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            tasks_by_id[execution_id]["writes"],
+        )
         for required in [
             "AUDIO_ENCODER",
             "LATENT_UPSCALE_MODEL",
-            "persisted",
-            "restart",
-            "stale",
+            "NativeDiffusionPayload transports only diffusion MODEL",
+            "NativeStoredModelPayload::model_resource directly admits only concrete NativeModelPayload resources",
+            "CONTROL_NET remains exclusively NativeStoredPayload::Control",
+            "UPSCALE_MODEL returns typed unavailable",
+            "FACE_DETECTION returns typed unavailable",
+            "HOOKS, HOOK_KEYFRAMES, LATENT_OPERATION, LORA_MODEL, and MODEL_PATCH remain typed unavailable",
+            "native_node_registry concern",
+            "NativeOpaqueHandle, NativeStoredPayload, NativeModelPayload, tensor bytes, Arc state, ModelStore manifests or sessions, and NativeCache are never serialized",
+            "fresh handle in a new NativeHandleStoreGeneration",
+            "old handle rejects exact WrongGeneration",
+            "fresh handle has the same semantic digest",
         ]:
             self.assertIn(required, tasks_by_id[execution_id]["done"])
+        execution_validation = planning.task_validation_commands(
+            tasks_by_id[execution_id]
+        )
+        for command in (
+            "cargo test --locked -p comfy_nodes native_model_resource_execution -- --nocapture",
+            "cargo test --locked -p comfy_runtime native_model_resource_execution -- --nocapture",
+            "native_model_resource_execution_matrix",
+            "model_resource_execution_restarts_with_fresh_generation",
+            "val_ownership_native_model_resource_execution_001",
+        ):
+            self.assertIn(command, execution_validation)
         video_phases = [
             "comfy-parity-native-video-codec-general-abi-foundation",
             "comfy-parity-native-video-codec-package-bootstrap-foundation",
@@ -1536,6 +2119,18 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_plugin_host/src/private_worker.rs",
             provider_worker_bridge["writes"],
         )
+        self.assertIn(
+            "crates/comfy_types/src/worker_protocol.rs",
+            provider_worker_bridge["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
+            provider_worker_bridge["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
+            provider_worker_bridge["writes"],
+        )
         for bridge_completion_owner in (
             "crates/comfy_plugin_host/src/component_host.rs",
             "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
@@ -1543,11 +2138,59 @@ class ValidationGenerationTests(unittest.TestCase):
             self.assertIn(bridge_completion_owner, provider_worker_bridge["reads"])
             self.assertIn(bridge_completion_owner, provider_worker_bridge["writes"])
         for bridge_completion_read in (
-            "crates/comfy_runtime/src/provider_materialization.rs",
             "crates/comfy_runtime/src/trust.rs",
         ):
             self.assertIn(bridge_completion_read, provider_worker_bridge["reads"])
             self.assertNotIn(bridge_completion_read, provider_worker_bridge["writes"])
+        self.assertIn(
+            "crates/comfy_runtime/src/provider_materialization.rs",
+            provider_worker_bridge["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_runtime/src/provider_materialization.rs",
+            provider_worker_bridge["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
+            provider_worker_bridge["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
+            provider_worker_bridge["writes"],
+        )
+        for native_controller_diagnostic_read in (
+            "crates/comfy_test_support/tests/native_controller_e2e.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            "crates/comfy_test_support/tests/native_image_e2e.rs",
+            "crates/comfy_test_support/tests/support/native_controller.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(native_controller_diagnostic_read, provider_worker_bridge["reads"])
+        for provider_bridge_test_owner in (
+            "crates/comfy_test_support/tests/support/native_controller.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(provider_bridge_test_owner, provider_worker_bridge["writes"])
+        for bridge_feature_manifest in (
+            "crates/comfy_plugin_host/Cargo.toml",
+            "crates/comfy_test_support/Cargo.toml",
+        ):
+            self.assertIn(bridge_feature_manifest, provider_worker_bridge["reads"])
+            self.assertIn(bridge_feature_manifest, provider_worker_bridge["writes"])
+        for bridge_fixture_path in (
+            "crates/comfy_plugin_host/tests/component_contract.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component",
+            "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source/guest.rs",
+        ):
+            self.assertIn(bridge_fixture_path, provider_worker_bridge["reads"])
+            self.assertIn(bridge_fixture_path, provider_worker_bridge["writes"])
+        for bridge_fixture_source in (
+            "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source/Cargo.toml",
+            "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source/Cargo.lock",
+            "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source/rebuild_fixture.rs",
+        ):
+            self.assertIn(bridge_fixture_source, provider_worker_bridge["reads"])
+            self.assertNotIn(bridge_fixture_source, provider_worker_bridge["writes"])
         self.assertIn(
             "app-side native controller allocates the WorkerProviderInvocationContext",
             provider_worker_bridge["done"],
@@ -1557,11 +2200,18 @@ class ValidationGenerationTests(unittest.TestCase):
             "distinct app-to-worker provider-v2 invocation envelope",
             "NativeProviderWorkerRequest::Begin bytes remain unchanged",
             "canonical transport validator only from that envelope",
+            "distinct bounded app-to-worker ProviderV2ProposalFinalization control",
+            "one-use finalization nonce",
+            "returns a typed success acknowledgement",
+            "all legacy postcard bytes remain frozen",
+            "exhaustive test worker fixture classifies ProviderV2ProposalFinalization only as an unsupported supervisor-to-worker component input",
+            "ProviderV2ProposalFinalizationAck only as a worker-to-supervisor output",
+            "with no wildcard arm",
             "No public raw-field constructor",
         ):
             self.assertIn(worker_bridge_context_gate, provider_worker_bridge["done"])
         self.assertIn(
-            "first valid-grant end-to-end success path",
+            "first valid-grant bridge path with a test-only scripted actuator",
             provider_worker_bridge["done"],
         )
         for bridge_completion_gate in (
@@ -1571,14 +2221,201 @@ class ValidationGenerationTests(unittest.TestCase):
             "ProviderRuntimeReceiptV2",
             "does not carry WorkerProviderInvocationContext",
             "canonical all-or-none materialization",
+            "canonical provider materialization owner exposes only an opaque checked proposal-to-transport identity transition",
+            "worker independently derives the expected receipt and canonical materialization identities",
             "unrelated valid receipt",
             "completion token, no-argument disarm",
             "proposal/context/handle/receipt/materialization binding",
+            "test-only scripted actuator",
+            "Production provider-v2 remains fail-closed without an actuator",
+            "focused provider_worker_stream_bridge integration target proves the desktop hermetic first valid-grant bridge path",
+            "actuator construction, attachment, route response, finish, finalization, and scripted component-host execution surfaces exist only behind comfy_plugin_host's test-support feature",
+            "narrowly enables comfy_runtime/test-support and is enabled only by comfy_test_support",
+            "no service getter, grant constructor, context constructor, or raw authority factory",
+            "comfy-parity-provider-hermetic-component-harness",
+            "one catalog-valid COMFY-NODE four-digit feature identity",
+            "component-contract test and focused bridge test consume those same pinned bytes",
+            "no embedded replacement blob, runtime fixture compiler, subprocess, or alternate guest",
+            "explicit non-empty phase label at all five waits",
+            "initial Started, initial Cancelled, retry Started, retry Interrupted, and retry Succeeded",
+            "exact target-attempt events observed so far including sequence and kind",
+            "Diagnostic collection does not change any deadline, polling cadence, event consumption, canonical-event assertion, predicate, controller ordering, fixture, or success behavior",
+            "route_authority: Option<NativeProviderWorkerV2RouteAuthority>",
+            "consumes it exactly once through route_authority.take() before start(head, policy)",
+            "both PrivateWorkerCommand::Legacy and test-support ProviderV2",
+            "exactly two ensure_private_worker_supervisor(launch, state, &deployment).await callsites",
         ):
             self.assertIn(bridge_completion_gate, provider_worker_bridge["done"])
+        provider_worker_bridge_commands = planning.task_validation_commands(
+            provider_worker_bridge
+        )
+        for diagnostic_command in (
+            "cargo test --locked -p comfy_test_support --test native_controller_e2e native_controller_drives_packaged_worker_commands_and_typed_outputs -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_worker_resilience val_recovery_008 -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_image_e2e val_native_e2e_001 -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+        ):
+            self.assertIn(diagnostic_command, provider_worker_bridge_commands)
         provider_deployment = tasks_by_id[
             "comfy-parity-provider-deployment-lifecycle"
         ]
+        for deployment_read in (
+            "crates/comfy_runtime/src/settings.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/permissions.rs",
+            "crates/paths/src/paths.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_streaming_component",
+        ):
+            self.assertIn(deployment_read, provider_deployment["reads"])
+            self.assertNotIn(deployment_read, provider_deployment["writes"])
+        deployment_witness = "crates/comfy_test_support/tests/plugin_e2e.rs"
+        self.assertIn(deployment_witness, provider_deployment["reads"])
+        self.assertIn(deployment_witness, provider_deployment["writes"])
+        self.assertIn(
+            "crates/extension_host/src/extension_host.rs",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/extension_host/src/extension_host.rs",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/extension_host/src/extension_store_test.rs",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/extension_host/src/extension_store_test.rs",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/extension_host/Cargo.toml",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/extension_host/Cargo.toml",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_api/Cargo.toml",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_api/Cargo.toml",
+            provider_deployment["writes"],
+        )
+        self.assertIn("crates/zed/Cargo.toml", provider_deployment["reads"])
+        self.assertIn("crates/zed/Cargo.toml", provider_deployment["writes"])
+        self.assertIn("Cargo.lock", provider_deployment["reads"])
+        self.assertIn("Cargo.lock", provider_deployment["writes"])
+        self.assertIn(
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/provider_worker_stream_bridge.rs",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/support/provider_worker_stream_bridge.rs",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/support/provider_worker_stream_bridge.rs",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/provider_deployment_lifecycle.rs",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/plugin_e2e.rs",
+            provider_deployment["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            provider_deployment["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            provider_deployment["writes"],
+        )
+        for deployment_gate in (
+            "canonical paths::extensions_dir inventory",
+            "neither rescans files, substitutes PluginTrustPolicy::default()",
+            "commit the whole VerifiedComponentGeneration atomically",
+            "without invoking any component adapter",
+            "invalid inventory is distinct from a legitimate empty deployment",
+            "only a valid empty candidate synchronizes adapters to empty",
+            "one canonical owner-derived SHA-256 candidate digest",
+            "opaque owner-issued ComponentInventoryCandidateIdentity",
+            "exact accepted replay is a generation-idempotent no-op",
+            "rejected candidate retains the prior descriptors",
+            "staged replacement runtime before quiescing",
+            "Ready state and controller registration wait for the first accepted canonical inventory candidate",
+            "Each mode independently generates its authorization sealer",
+            "remain mode-local opaque values",
+            "starts the replacement with start_with_provider_worker_bridge",
+            "publishes Ready/API state only after attachment succeeds",
+            "Headless remains fail-closed for provider, network, credential, and cost actuation",
+            "focused provider_deployment_lifecycle test reuses Task425's nonconstructible scripted bridge",
+            "must exact-match them to the signed worker deployment before minting or activation",
+            "changed candidate paired with an old otherwise-valid registry bundle is denied",
+            "atomically re-drives the exact previously accepted opaque candidate through the replacement router",
+            "exactly one helper-only owner in tests/support/provider_worker_stream_bridge.rs with no test entrypoints",
+            "provider_worker_stream_bridge.rs retains exactly its three Task425 tests",
+            "provider_deployment_lifecycle.rs retains exactly its one Task433 test",
+            "private production transition is concrete over NativeProviderWorkerBridgeAttachment",
+            "exactly one ProviderRuntimeStreamService::new owner",
+        ):
+            self.assertIn(deployment_gate, provider_deployment["done"])
+        self.assertIn(
+            "cargo test --locked -p comfy_test_support --test provider_worker_stream_bridge -- --list",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "cargo test --locked -p comfy_test_support --test provider_worker_stream_bridge -- --nocapture",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "cargo test --locked -p comfy_test_support --test provider_deployment_lifecycle -- --list",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "cargo test --locked -p comfy_test_support --test provider_deployment_lifecycle provider_deployment_lifecycle_preserves_cross_mode_generation_and_recovery -- --exact --nocapture",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "cargo test --locked -p extension_host --all-targets",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "cargo test --locked -p zed --features comfy-test-support --all-targets",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/validate_backend_dependencies.py",
+            planning.task_validation_commands(provider_deployment),
+        )
+        self.assertIn(
+            "cargo test --locked -p extension_host component_inventory_candidate -- --nocapture",
+            planning.task_validation_commands(provider_deployment),
+        )
         for deployment_attachment_read in (
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_runtime/src/plugin_services.rs",
@@ -1721,8 +2558,14 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("current 217 external-service rows", catalog_outcome)
         self.assertIn("61 unresolved methods", catalog_done)
         self.assertIn("zero UNKNOWN", catalog_done)
+        sequential_model_resource_phases = model_resource_phases[
+            : model_resource_phases.index(
+                "comfy-parity-native-model-store-stream-source-foundation"
+            )
+        ]
         for previous, current in zip(
-            model_resource_phases, model_resource_phases[1:]
+            sequential_model_resource_phases,
+            sequential_model_resource_phases[1:],
         ):
             dependencies = tasks_by_id[current]["dependencies"]
             self.assertEqual(dependencies[0], previous)
@@ -4001,6 +4844,75 @@ class ValidationGenerationTests(unittest.TestCase):
                 "writes"
             ],
         )
+        demux_decode_task = tasks_by_id[
+            "comfy-parity-native-video-demux-decode-foundation"
+        ]
+        for path in [
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/basic_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "projects/comfy/ComfyUI/requirements.txt",
+            ".agents/specs/comfy-parity/baseline.md",
+            "crates/comfy_model/src/artifact_index.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_video_codec_package.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_test_support/tests/video_codec_package_bootstrap.rs",
+        ]:
+            self.assertIn(path, demux_decode_task["reads"])
+        for path in [
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_test_support/src/bin/generate_video_general_demux_decode_fixture.rs",
+            "crates/comfy_test_support/fixtures/video/general-demux-decode",
+            "crates/comfy_test_support/tests/video_general_demux_decode.rs",
+        ]:
+            self.assertIn(path, demux_decode_task["writes"])
+        demux_decode_done = demux_decode_task["done"]
+        for phrase in [
+            "deterministic offline fixture checker",
+            "first-video and last-decodable-audio selection",
+            "component frame rate uses average-rate then one-fps fallback",
+            "bounded backward keyframe seek",
+            "non-yuvj conversion width is not 32-aligned",
+            "height-only nonalignment does not enter that branch",
+            "same capacity-one retained actor",
+            "No second loader, binding, actor, thread, FFmpeg namespace, path, or subprocess",
+            "same CancellationToken",
+            "NativeVideoPayload::Components",
+            "canonical cancellable audio/video constructors",
+            "fixed-size finite-value validation and tensor hashing",
+            "actually certified FFmpeg 7.1 general-video package",
+            "synthetic package symbols or mock callbacks are not accepted",
+        ]:
+            self.assertIn(phrase, demux_decode_done)
+        demux_decode_commands = planning.task_validation_commands(demux_decode_task)
+        for command in [
+            "cargo run --locked -p comfy_test_support --bin generate_video_general_demux_decode_fixture -- --check",
+            "cargo test --locked -p comfy_test_support --test video_general_demux_decode",
+            "COMFY_CERTIFIED_FFMPEG_7_1_PACKAGE_ROOT=/path/to/certified-package",
+            "--features hardware-certification --test video_general_demux_decode certified_ffmpeg_7_1_goldens_match -- --ignored --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task563_video_demux_decode_001 -- --exact",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+        ]:
+            self.assertIn(command, demux_decode_commands)
+        video_slice_task = tasks_by_id[
+            "comfy-parity-native-video-source-slice-materialization-foundation"
+        ]
+        for path in [
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
+        ]:
+            self.assertIn(path, video_slice_task["reads"])
+        for path in [
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
+        ]:
+            self.assertIn(path, video_slice_task["writes"])
         self.assertIn(
             "crates/comfy_model/src/frame_interpolation.rs",
             tasks_by_id[video_foundation_id]["reads"],

@@ -52,6 +52,7 @@ multiplayer-tools = [
     "workspace/multiplayer-tools",
 ]
 comfy = [
+    "dep:clock",
     "dep:comfy_api",
     "dep:comfy_model",
     "dep:comfy_plugin_host",

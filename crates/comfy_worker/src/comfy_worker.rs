@@ -41,9 +41,12 @@ enum NextWorkerInput {
             async_channel::RecvError,
         >,
     ),
-    PluginJob(Result<WorkerPluginExecutionOutcome, async_channel::RecvError>),
+    PluginTask(Result<plugin_runtime::WorkerPluginTaskEvent, async_channel::RecvError>),
     PluginCapability(
         Result<plugin_runtime::WorkerCapabilityBridgeRequest, async_channel::RecvError>,
+    ),
+    ProviderV2Stream(
+        Result<comfy_plugin_host::ProviderV2WorkerStreamCall, async_channel::RecvError>,
     ),
     JobEvent(Result<AttemptEvent, async_channel::RecvError>),
 }
@@ -56,9 +59,11 @@ struct ActiveExecution {
             Result<comfy_runtime::NativeImageExecutionResult, NativeImageRuntimeError>,
         >,
     >,
-    plugin_result: Option<async_channel::Receiver<WorkerPluginExecutionOutcome>>,
+    plugin_result: Option<async_channel::Receiver<plugin_runtime::WorkerPluginTaskEvent>>,
     plugin_capabilities:
         Option<async_channel::Receiver<plugin_runtime::WorkerCapabilityBridgeRequest>>,
+    provider_v2_streams:
+        Option<async_channel::Receiver<comfy_plugin_host::ProviderV2WorkerStreamCall>>,
     events: Option<async_channel::Receiver<AttemptEvent>>,
 }
 
@@ -140,6 +145,30 @@ pub fn apply_worker_control_cancellation(
         WorkerMessage::Cancel { .. } | WorkerMessage::Shutdown => Some(cancellation.cancel()),
         _ => None,
     }
+}
+
+fn cancel_rejected_provider_v2_finalization(
+    result: &Result<(), comfy_types::WorkerProviderStreamError>,
+    cancellation: &CancellationToken,
+) {
+    if result.is_err() {
+        cancellation.cancel();
+    }
+}
+
+fn clear_pending_provider_v2_after_cancellation<Proposal, Stream>(
+    cancellation: &CancellationToken,
+    pending_proposal: &mut Option<Proposal>,
+    pending_streams: &mut BTreeMap<u64, Stream>,
+) -> anyhow::Result<bool> {
+    if !cancellation.is_cancelled() {
+        return Err(anyhow::anyhow!(
+            "provider-v2 pending work cannot be cleared before cancellation"
+        ));
+    }
+    let cancelled_proposal = pending_proposal.take().is_some();
+    pending_streams.clear();
+    Ok(cancelled_proposal)
 }
 
 pub fn write_frame(mut writer: impl Write, envelope: &WorkerEnvelope) -> Result<(), FrameError> {
@@ -630,6 +659,13 @@ async fn run_worker_process_with_configuration(
     let mut plugin_registry: Option<CommittedPluginRegistry> = None;
     let mut pending_plugin_capabilities: BTreeMap<u64, async_channel::Sender<Vec<u8>>> =
         BTreeMap::new();
+    let mut pending_provider_v2_streams: BTreeMap<
+        u64,
+        comfy_plugin_host::ProviderV2WorkerStreamCall,
+    > = BTreeMap::new();
+    let mut pending_provider_v2_proposal: Option<
+        comfy_plugin_host::ProviderV2WorkerPendingInvocation,
+    > = None;
     'worker: loop {
         let delay = next_heartbeat.saturating_duration_since(Instant::now());
         let next = smol::future::race(
@@ -661,7 +697,7 @@ async fn run_worker_process_with_configuration(
                                 .as_ref()
                                 .and_then(|active| active.plugin_result.as_ref())
                             {
-                                NextWorkerInput::PluginJob(result.recv().await)
+                                NextWorkerInput::PluginTask(result.recv().await)
                             } else {
                                 pending().await
                             }
@@ -677,16 +713,28 @@ async fn run_worker_process_with_configuration(
                                     pending().await
                                 }
                             },
-                            async {
-                                if let Some(events) = active_execution
-                                    .as_ref()
-                                    .and_then(|active| active.events.as_ref())
-                                {
-                                    NextWorkerInput::JobEvent(events.recv().await)
-                                } else {
-                                    pending().await
-                                }
-                            },
+                            smol::future::race(
+                                async {
+                                    if let Some(requests) = active_execution
+                                        .as_ref()
+                                        .and_then(|active| active.provider_v2_streams.as_ref())
+                                    {
+                                        NextWorkerInput::ProviderV2Stream(requests.recv().await)
+                                    } else {
+                                        pending().await
+                                    }
+                                },
+                                async {
+                                    if let Some(events) = active_execution
+                                        .as_ref()
+                                        .and_then(|active| active.events.as_ref())
+                                    {
+                                        NextWorkerInput::JobEvent(events.recv().await)
+                                    } else {
+                                        pending().await
+                                    }
+                                },
+                            ),
                         ),
                     ),
                 ),
@@ -983,6 +1031,7 @@ async fn run_worker_process_with_configuration(
                                     native_result: Some(result),
                                     plugin_result: None,
                                     plugin_capabilities: native_provider_capabilities.clone(),
+                                    provider_v2_streams: None,
                                     events: Some(events),
                                 });
                             }
@@ -991,6 +1040,9 @@ async fn run_worker_process_with_configuration(
                                     comfy_plugin_host::WorkerPluginInvocation::from_bytes(
                                         invocation,
                                     )?;
+                                if invocation.provider_v2().is_some() {
+                                    session.mark_provider_v2_execution()?;
+                                }
                                 let component_limits = invocation.component_limits().clone();
                                 let reuse_registry =
                                     plugin_registry.as_ref().is_some_and(|registry| {
@@ -1022,9 +1074,12 @@ async fn run_worker_process_with_configuration(
                                 let cancellation = CancellationToken::default();
                                 let (capability_sender, plugin_capabilities) =
                                     async_channel::bounded(8);
-                                let bridge = Arc::new(plugin_runtime::WorkerCapabilityBridge::new(
-                                    capability_sender,
-                                ));
+                                let (provider_v2_sender, provider_v2_streams) =
+                                    async_channel::bounded(1);
+                                let bridge = Arc::new(
+                                    plugin_runtime::WorkerCapabilityBridge::new(capability_sender)
+                                        .with_provider_v2_sender(provider_v2_sender),
+                                );
                                 let (result_sender, plugin_result) = async_channel::bounded(1);
                                 let cancellation_for_job = cancellation.clone();
                                 smol::spawn(async move {
@@ -1032,8 +1087,8 @@ async fn run_worker_process_with_configuration(
                                         registry.execute(invocation, bridge, cancellation_for_job)
                                     })
                                     .await;
-                                    let outcome = plugin_runtime::encode_plugin_outcome(result);
-                                    if let Err(error) = result_sender.send(outcome).await {
+                                    let event = plugin_runtime::encode_plugin_task_event(result);
+                                    if let Err(error) = result_sender.send(event).await {
                                         eprintln!(
                                             "comfy-worker: plugin result receiver closed: {error}"
                                         );
@@ -1046,6 +1101,7 @@ async fn run_worker_process_with_configuration(
                                     native_result: None,
                                     plugin_result: Some(plugin_result),
                                     plugin_capabilities: Some(plugin_capabilities),
+                                    provider_v2_streams: Some(provider_v2_streams),
                                     events: None,
                                 });
                             }
@@ -1066,6 +1122,48 @@ async fn run_worker_process_with_configuration(
                                     )
                                 })?;
                             }
+                            comfy_types::WorkerMessage::ProviderStreamResponse {
+                                call_id,
+                                response,
+                            } => {
+                                let call = pending_provider_v2_streams.remove(call_id).ok_or_else(
+                                    || {
+                                        anyhow::anyhow!(
+                                            "worker received an unknown provider-v2 stream response"
+                                        )
+                                    },
+                                )?;
+                                call.respond(response.clone())
+                                    .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+                            }
+                            comfy_types::WorkerMessage::ProviderV2ProposalFinalization {
+                                finalization,
+                            } => {
+                                if active_execution.is_some() {
+                                    let result = match pending_provider_v2_proposal.take() {
+                                        Some(pending) => pending.finalize(finalization),
+                                        None => Err(
+                                            comfy_types::WorkerProviderStreamError::InvalidOrder,
+                                        ),
+                                    };
+                                    if let Some(active) = &active_execution {
+                                        cancel_rejected_provider_v2_finalization(
+                                            &result,
+                                            &active.cancellation,
+                                        );
+                                    }
+                                    pending_provider_v2_streams.clear();
+                                    let acknowledgement =
+                                        comfy_types::WorkerProviderV2ProposalFinalizationAck {
+                                            finalization: finalization.clone(),
+                                            result,
+                                        };
+                                    let response = session
+                                        .complete_provider_v2_finalization(acknowledgement)?;
+                                    write_frame(&mut stdout, &response)?;
+                                    active_execution = None;
+                                }
+                            }
                             comfy_types::WorkerMessage::Cancel { .. } => {
                                 let active = active_execution.as_mut().ok_or_else(|| {
                                     anyhow::anyhow!("cancellation has no active execution")
@@ -1082,6 +1180,21 @@ async fn run_worker_process_with_configuration(
                                     return Err(anyhow::anyhow!(
                                         "worker cancellation branch received a non-control message"
                                     ));
+                                }
+                                let cancelled_provider_v2_proposal =
+                                    clear_pending_provider_v2_after_cancellation(
+                                        &active.cancellation,
+                                        &mut pending_provider_v2_proposal,
+                                        &mut pending_provider_v2_streams,
+                                    )?;
+                                if cancelled_provider_v2_proposal {
+                                    let response = session.complete_plugin_execution(
+                                        WorkerPluginExecutionOutcome::Failed(
+                                            comfy_types::WorkerPluginExecutionFailure::Cancelled,
+                                        ),
+                                    )?;
+                                    write_frame(&mut stdout, &response)?;
+                                    active_execution = None;
                                 }
                             }
                             comfy_types::WorkerMessage::Shutdown => {
@@ -1105,6 +1218,17 @@ async fn run_worker_process_with_configuration(
                                             "worker shutdown branch received a non-control message"
                                         ));
                                     }
+                                    clear_pending_provider_v2_after_cancellation(
+                                        &active.cancellation,
+                                        &mut pending_provider_v2_proposal,
+                                        &mut pending_provider_v2_streams,
+                                    )?;
+                                } else if pending_provider_v2_proposal.is_some()
+                                    || !pending_provider_v2_streams.is_empty()
+                                {
+                                    return Err(anyhow::anyhow!(
+                                        "worker shutdown found provider-v2 work without an active execution"
+                                    ));
                                 }
                             }
                             _ => {}
@@ -1215,7 +1339,9 @@ async fn run_worker_process_with_configuration(
             NextWorkerInput::NativeJob(Err(error)) => {
                 return Err(anyhow::anyhow!("worker execution channel closed: {error}"));
             }
-            NextWorkerInput::PluginJob(Ok(outcome)) => {
+            NextWorkerInput::PluginTask(Ok(plugin_runtime::WorkerPluginTaskEvent::Terminal(
+                outcome,
+            ))) => {
                 if matches!(outcome, WorkerPluginExecutionOutcome::Succeeded(_))
                     && !pending_plugin_capabilities.is_empty()
                 {
@@ -1228,10 +1354,61 @@ async fn run_worker_process_with_configuration(
                 write_frame(&mut stdout, &response)?;
                 active_execution = None;
             }
-            NextWorkerInput::PluginJob(Err(error)) => {
+            NextWorkerInput::PluginTask(Ok(
+                plugin_runtime::WorkerPluginTaskEvent::ProviderV2Proposal { outcome, pending },
+            )) => {
+                if !pending_plugin_capabilities.is_empty()
+                    || !pending_provider_v2_streams.is_empty()
+                    || pending_provider_v2_proposal.is_some()
+                {
+                    return Err(anyhow::anyhow!(
+                        "provider-v2 proposal arrived with unfinished bridge calls"
+                    ));
+                }
+                let response = session.provider_v2_proposal(outcome)?;
+                write_frame(&mut stdout, &response)?;
+                pending_provider_v2_proposal = Some(pending);
+                if let Some(active) = &mut active_execution {
+                    active.plugin_result = None;
+                }
+            }
+            NextWorkerInput::PluginTask(Err(error)) => {
                 return Err(anyhow::anyhow!(
                     "worker plugin execution channel closed: {error}"
                 ));
+            }
+            NextWorkerInput::ProviderV2Stream(Ok(call)) => {
+                if pending_provider_v2_proposal.is_some() {
+                    if let Some(active) = &active_execution {
+                        active.cancellation.cancel();
+                    }
+                    return Err(anyhow::anyhow!(
+                        "worker provider-v2 stream call arrived after its proposal"
+                    ));
+                }
+                let call_id = call.call_id();
+                if !pending_provider_v2_streams.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "worker provider-v2 capacity-one route received concurrent calls"
+                    ));
+                }
+                if pending_provider_v2_streams.insert(call_id, call).is_some() {
+                    return Err(anyhow::anyhow!(
+                        "worker provider-v2 stream repeated a call identifier"
+                    ));
+                }
+                let request = pending_provider_v2_streams
+                    .get(&call_id)
+                    .ok_or_else(|| anyhow::anyhow!("provider-v2 stream call vanished"))?
+                    .request()
+                    .clone();
+                let response = session.provider_stream_request(call_id, request)?;
+                write_frame(&mut stdout, &response)?;
+            }
+            NextWorkerInput::ProviderV2Stream(Err(_)) => {
+                if let Some(active) = &mut active_execution {
+                    active.provider_v2_streams = None;
+                }
             }
             NextWorkerInput::PluginCapability(Ok(request)) => {
                 if pending_plugin_capabilities
@@ -1471,6 +1648,10 @@ async fn worker_delay(duration: Duration) {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
 
     use comfy_types::{
         ProfileId, RequestId, WORKER_PROTOCOL_VERSION, WorkerId, WorkerMessage,
@@ -1554,6 +1735,95 @@ mod tests {
             apply_worker_control_cancellation(&WorkerMessage::Heartbeat, &clone),
             None
         );
+    }
+
+    #[test]
+    fn rejected_provider_v2_finalization_cancels_before_active_execution_drop() {
+        let accepted = CancellationToken::default();
+        cancel_rejected_provider_v2_finalization(&Ok(()), &accepted);
+        assert!(!accepted.is_cancelled());
+
+        let rejected = CancellationToken::default();
+        cancel_rejected_provider_v2_finalization(
+            &Err(comfy_types::WorkerProviderStreamError::StaleGeneration),
+            &rejected,
+        );
+        assert!(rejected.is_cancelled());
+    }
+
+    #[test]
+    fn provider_v2_cancellation_precedes_pending_route_drop() {
+        struct CancellationObservedOnDrop {
+            cancellation: CancellationToken,
+            observed: Arc<AtomicBool>,
+        }
+
+        impl Drop for CancellationObservedOnDrop {
+            fn drop(&mut self) {
+                self.observed
+                    .store(self.cancellation.is_cancelled(), Ordering::Release);
+            }
+        }
+
+        let cancellation = CancellationToken::default();
+        let observed = Arc::new(AtomicBool::new(false));
+        let mut pending_proposal = Some(());
+        let mut pending_streams = BTreeMap::from([(
+            1,
+            CancellationObservedOnDrop {
+                cancellation: cancellation.clone(),
+                observed: observed.clone(),
+            },
+        )]);
+
+        assert!(
+            clear_pending_provider_v2_after_cancellation(
+                &cancellation,
+                &mut pending_proposal,
+                &mut pending_streams,
+            )
+            .is_err()
+        );
+        assert!(pending_proposal.is_some());
+        assert_eq!(pending_streams.len(), 1);
+        assert!(!observed.load(Ordering::Acquire));
+
+        cancellation.cancel();
+        assert!(
+            clear_pending_provider_v2_after_cancellation(
+                &cancellation,
+                &mut pending_proposal,
+                &mut pending_streams,
+            )
+            .expect("cancelled pending work can be cleared")
+        );
+        assert!(pending_proposal.is_none());
+        assert!(pending_streams.is_empty());
+        assert!(observed.load(Ordering::Acquire));
+
+        let shutdown_cancellation = CancellationToken::default();
+        let shutdown_observed = Arc::new(AtomicBool::new(false));
+        let mut shutdown_proposal = Some(());
+        let mut shutdown_streams = BTreeMap::from([(
+            1,
+            CancellationObservedOnDrop {
+                cancellation: shutdown_cancellation.clone(),
+                observed: shutdown_observed.clone(),
+            },
+        )]);
+        assert_eq!(
+            apply_worker_control_cancellation(&WorkerMessage::Shutdown, &shutdown_cancellation,),
+            Some(true)
+        );
+        clear_pending_provider_v2_after_cancellation(
+            &shutdown_cancellation,
+            &mut shutdown_proposal,
+            &mut shutdown_streams,
+        )
+        .expect("shutdown cancellation permits pending teardown");
+        assert!(shutdown_proposal.is_none());
+        assert!(shutdown_streams.is_empty());
+        assert!(shutdown_observed.load(Ordering::Acquire));
     }
 
     #[test]

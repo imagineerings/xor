@@ -965,6 +965,38 @@ pub fn materialize_provider_invocation_result_v2(
     registry: &TypeRegistry,
     cancellation: &CancellationToken,
 ) -> Result<ProviderTransportResponse, ProviderMaterializationError> {
+    validate_provider_invocation_result_v2_for_materialization(result, registry, cancellation)?;
+    cancellation
+        .check()
+        .map_err(|_| ProviderMaterializationError::Cancelled)?;
+    if crate::provider_terminal_completed_receipt_sha256(&result.receipt)
+        != verified_receipt.identity().terminal_receipt_sha256
+    {
+        return Err(ProviderMaterializationError::InvalidTransportProjection);
+    }
+    materialize_validated_provider_invocation_result_v2(result, cancellation)
+}
+
+pub fn provider_invocation_result_v2_materialization_identity(
+    result: &ProviderInvocationResultV2,
+    registry: &TypeRegistry,
+    cancellation: &CancellationToken,
+) -> Result<[u8; 32], ProviderMaterializationError> {
+    validate_provider_invocation_result_v2_for_materialization(result, registry, cancellation)?;
+    let materialization =
+        materialize_validated_provider_invocation_result_v2(result, cancellation)?;
+    let bytes = materialization.to_bytes()?;
+    cancellation
+        .check()
+        .map_err(|_| ProviderMaterializationError::Cancelled)?;
+    Ok(Sha256::digest(bytes).into())
+}
+
+fn validate_provider_invocation_result_v2_for_materialization(
+    result: &ProviderInvocationResultV2,
+    registry: &TypeRegistry,
+    cancellation: &CancellationToken,
+) -> Result<(), ProviderMaterializationError> {
     cancellation
         .check()
         .map_err(|_| ProviderMaterializationError::Cancelled)?;
@@ -981,15 +1013,13 @@ pub fn materialize_provider_invocation_result_v2(
     }
     result
         .validate(registry)
-        .map_err(|_| ProviderMaterializationError::InvalidTransportProjection)?;
-    cancellation
-        .check()
-        .map_err(|_| ProviderMaterializationError::Cancelled)?;
-    if crate::provider_terminal_completed_receipt_sha256(&result.receipt)
-        != verified_receipt.identity().terminal_receipt_sha256
-    {
-        return Err(ProviderMaterializationError::InvalidTransportProjection);
-    }
+        .map_err(|_| ProviderMaterializationError::InvalidTransportProjection)
+}
+
+fn materialize_validated_provider_invocation_result_v2(
+    result: &ProviderInvocationResultV2,
+    cancellation: &CancellationToken,
+) -> Result<ProviderTransportResponse, ProviderMaterializationError> {
     let mut ports = Vec::new();
     ports
         .try_reserve_exact(result.outputs.len())

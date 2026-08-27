@@ -6971,7 +6971,7 @@
       ],
       "allowed_adapters": [
         "comfy_model::NativeDepthAnything3Resource retains DA3 resource identity, complete state residency, invocation, geometry, payload, persistence, and restart authority while delegating every DINO state projection and execution phase to NativeDino2Backbone",
-        "future comfy_model::moge may consume NativeDino2Backbone but is not a Task391 production callsite and owns no DINO transformer, position, attention, or intermediate-feature equation",
+        "comfy_model::moge::NativeMogeResource retains MoGe state, head, geometry, payload, and invocation authority while delegating ordinary DINO execution and intermediate or class-token extraction to NativeDino2Backbone",
         "the pure-standard-library DINO fixture is an independent development-reference oracle and confers no production state, tensor, storage, mutation, callsite, or consumer authority"
       ],
       "definitions": [
@@ -6986,11 +6986,18 @@
           "qualified": "comfy_model::NativeDepthAnything3Resource",
           "role": "adapter",
           "symbol": "NativeDepthAnything3Resource"
+        },
+        {
+          "path": "crates/comfy_model/src/moge.rs",
+          "qualified": "comfy_model::moge::NativeMogeResource",
+          "role": "adapter",
+          "symbol": "NativeMogeResource"
         }
       ],
       "call_symbols": [
         "NativeDino2Backbone",
-        "NativeDepthAnything3Resource"
+        "NativeDepthAnything3Resource",
+        "NativeMogeResource"
       ],
       "required_mappings": [
         {
@@ -7009,6 +7016,11 @@
           "pattern": "get_intermediate_layers_da3"
         },
         {
+          "name": "moge-executes-through-ordinary-owner-route",
+          "path": "crates/comfy_model/src/moge.rs",
+          "pattern": "dino_backbone[\\s\\S]*bind_parent_preflighted[\\s\\S]*execution\\.get_intermediate_layers"
+        },
+        {
           "name": "owner-implements-ordinary-and-da3-routes",
           "path": "crates/comfy_model/src/dino2.rs",
           "pattern": "pub\\(crate\\) fn get_intermediate_layers_da3\\([\\s\\S]*pub\\(crate\\) fn get_intermediate_layers\\("
@@ -7016,10 +7028,12 @@
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
-        "comfy-parity-native-dinov2-backbone-owner-foundation"
+        "comfy-parity-native-dinov2-backbone-owner-foundation",
+        "comfy-parity-native-moge-resource-foundation"
       ],
       "production_consumers": [
-        "comfy_model::NativeDepthAnything3Resource"
+        "comfy_model::NativeDepthAnything3Resource",
+        "comfy_model::moge::NativeMogeResource"
       ],
       "requirements": [
         "Requirement 6.3",
@@ -7058,7 +7072,7 @@
         "VAL-CANCEL-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "NativeDino2Backbone is the only native owner of DINOv2 state schema, checked storage projection, position interpolation, transformer execution, and intermediate extraction. DA3 is a resource adapter; MoGe remains a future non-authoritative consumer until its later task."
+      "decision_reason": "NativeDino2Backbone is the only native owner of DINOv2 state schema, checked storage projection, position interpolation, transformer execution, and intermediate extraction. DA3 and MoGe retain their distinct resource, head, geometry, payload, and invocation domains while adapting exclusively through the DA3 or ordinary DINO route."
     },
     {
       "concern": "native_execution_cache",
@@ -10028,7 +10042,7 @@
         {
           "name": "general-video-bootstrap-captures-capability-bytes-and-seals-through-shared-owner",
           "path": "crates/comfy_runtime/src/native_video_codec_package.rs",
-          "pattern": "capture_private_file[\\s\\S]*capture_native_library_bytes\\(captured[\\s\\S]*RetainedNativeLibraryImage"
+          "pattern": "(?=[\\s\\S]*fn required_capture[\\s\\S]*root\\.capture_private_file\\(Path::new\\(path\\), maximum_bytes, cancellation\\))(?=[\\s\\S]*fn inspect_and_seal_images[\\s\\S]*capture_native_library_bytes\\(captured, &digest\\)[\\s\\S]*\\.seal\\([\\s\\S]*GeneralVideoCodecImageSet::Loadable\\(retained_images\\))"
         }
       ],
       "known_open_reasons": [],
@@ -10921,6 +10935,126 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "comfy_model::vae is the single authoritative VAE domain: it owns profile compatibility, persisted identity admission, descriptors, model binding, generic and typed structured execution boundaries, cancellation, and publication. The pinned-source vae_architecture module only recognizes and normalizes source checkpoint forms, then maps them through the canonical ModelStore, latent registry, VAE profile, descriptor, and NativeModule contracts. vae_structured owns only Hunyuan3D and TripoSplat source topology, exact state manifests, and equations; it consumes canonical Tensor handles plus caller workspace, RNG, and cancellation and does not create a 3D media, asset, path, index, plan, retry, queue, cache, persistence, or transaction owner."
+    },
+    {
+      "concern": "native_moge_model_resource",
+      "canonical_owner": "comfy_model::moge::NativeMogeResource",
+      "owner_files": [
+        "crates/comfy_model/src/moge.rs",
+        "crates/comfy_model/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeMogeResource",
+        "NativeMogeGeometry"
+      ],
+      "allowed_adapters": [
+        "NativeDino2Backbone retains the sole ordinary DINO state projection, interpolation, transformer, attention, and intermediate or class-token extraction owner",
+        "canonical comfy_tensor operators retain tensor storage, allocation, convolution, normalization, interpolation, linear algebra, cancellation, and workspace authority while NativeMogeResource composes only the source MoGe heads and geometry order",
+        "NativeModelPayload seals MOGE_MODEL role, identity, alias-aware residency, and reconstruction without creating handle, cache, persistence, restart, or stale-generation authority",
+        "the pure-standard-library reduced MoGe fixture is an independent development-reference equation oracle and confers no production model, tensor, geometry, or publication authority",
+        "panorama splitting, Poisson merge, rendering, triangulation, mesh or media publication, loader handles, cache, persistence, restart, and stale-generation behavior remain assigned to their later native node and model-resource tasks"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/moge.rs",
+          "qualified": "comfy_model::moge::NativeMogeResource",
+          "role": "canonical",
+          "symbol": "NativeMogeResource",
+          "pattern": "^pub struct NativeMogeResource \\{"
+        },
+        {
+          "path": "crates/comfy_model/src/moge.rs",
+          "qualified": "comfy_model::moge::NativeMogeGeometry",
+          "role": "canonical_state",
+          "symbol": "NativeMogeGeometry",
+          "pattern": "^pub struct NativeMogeGeometry \\{"
+        }
+      ],
+      "call_symbols": [
+        "NativeMogeResource::from_checkpoint",
+        "NativeMogeResource::from_nested_checkpoint",
+        "NativeMogeResource::execute",
+        "NativeModelPayload::moge",
+        "moge_resource"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "moge-admission-normalizes-and-strictly-binds-versioned-state",
+          "path": "crates/comfy_model/src/moge.rs",
+          "pattern": "pub fn from_checkpoint\\([\\s\\S]*normalize_state[\\s\\S]*detect_configuration[\\s\\S]*state_manifest[\\s\\S]*projected_resident_preflight"
+        },
+        {
+          "name": "moge-delegates-dino-and-executes-versioned-heads",
+          "path": "crates/comfy_model/src/moge.rs",
+          "pattern": "bind_parent_preflighted[\\s\\S]*get_intermediate_layers[\\s\\S]*execute_moge_head"
+        },
+        {
+          "name": "moge-geometry-recovers-and-publishes-checked-typed-results",
+          "path": "crates/comfy_model/src/moge.rs",
+          "pattern": "fn project_geometry\\([\\s\\S]*recover_focal_shift[\\s\\S]*publish_geometry"
+        },
+        {
+          "name": "moge-payload-seals-role-identity-and-residency",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "pub fn moge\\([\\s\\S]*NativeModelResourceRole::MogeModel[\\s\\S]*zed-native-moge-v1[\\s\\S]*NativeModelResource::Moge[\\s\\S]*NativeModelBackingKind::NativeMogeResource"
+        },
+        {
+          "name": "moge-fixture-is-source-pinned-independent-and-bounded",
+          "path": "crates/comfy_test_support/fixtures/models/moge-resource-foundation/provenance.json",
+          "pattern": "Pure Python standard-library source equations[\\s\\S]*independent f64 finite-difference source-equation oracle[\\s\\S]*SciPy is not executed or certified"
+        },
+        {
+          "name": "moge-e2e-publishes-typed-source-oracle-geometry",
+          "path": "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+          "pattern": "native_moge_resources_execute_source_oracle_and_publish_typed_geometry[\\s\\S]*NativeMogeGeometry[\\s\\S]*NativeMogeInvocation"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-moge-resource-foundation"
+      ],
+      "production_consumers": [
+        "native MOGE_MODEL payload admission and typed perspective geometry invocation"
+      ],
+      "requirements": [
+        "Requirement 6.3",
+        "Requirement 7.2",
+        "Requirement 18.1",
+        "Requirement 26.2",
+        "Requirement 28.2",
+        "Requirement 31.5",
+        "Requirement 34.2",
+        "Requirement 34.6",
+        "Requirement 35.2",
+        "Requirement 37.5",
+        "Requirement 38.3",
+        "Requirement 41.2",
+        "Requirement 44.1",
+        "Requirement 44.3"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeMogeResource is the sole retained owner of strict v1 or v2 MoGe checkpoint identity, source head composition, bounded invocation, focal and shift recovery, and checked typed perspective geometry. It delegates every DINO phase to NativeDino2Backbone and every shared tensor operation to canonical comfy_tensor owners. NativeMogeGeometry is the sealed checked result state; payload sealing, future handle lifecycle, panorama, rendering, triangulation, mesh, and media publication remain separate domains."
     },
     {
       "concern": "native_node_registry",
@@ -14376,6 +14510,124 @@
       "decision_reason": "NativeSgd alone owns SGD hyperparameter validation and momentum-buffer transitions. It stages every updated parameter and buffer before publishing either collection, delegates allocation and tensor identity to CpuBackend and Tensor, and does not introduce a generic optimizer registry, autograd tape, queue, persistence layer, or cancellation token."
     },
     {
+      "concern": "native_style_model_resource",
+      "canonical_owner": "comfy_model::conditioning_resources::NativeStyleModelResource",
+      "owner_files": [
+        "crates/comfy_model/src/conditioning_resources.rs",
+        "crates/comfy_model/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeStyleModelResource"
+      ],
+      "allowed_adapters": [
+        "canonical comfy_model::attention retains the sole scaled-dot-product attention equation and policy while NativeStyleModelResource owns only StyleAdapter source choreography and checked fused-QKV projection views",
+        "canonical comfy_model native_ops and comfy_tensor operators retain linear, layer-normalization, activation, reshape, concatenation, storage, allocation, cancellation, and workspace authority",
+        "comfy_model::clip_vision::ClipVisionOutput retains the canonical CLIP-vision output identity and validation boundary; NativeStyleModelResource consumes only its checked last_hidden_state tensor and owns no CLIP transformer, post-layer-normalization, or projection equation",
+        "NativeModelPayload seals STYLE_MODEL role, identity, alias-aware residency, reconstruction, and the borrowed selector-free style_model_resource view without creating handle, cache, persistence, restart, or stale-generation authority",
+        "the pure-standard-library reduced StyleAdapter and Flux Redux fixture is an independent development-reference equation oracle and confers no production model, tensor, attention, or publication authority",
+        "GLIGEN and PHOTOMAKER checkpoint, reconstruction, invocation, and payload ownership remain assigned to their separate native resource tasks"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "qualified": "comfy_model::conditioning_resources::NativeStyleModelResource",
+          "role": "canonical",
+          "symbol": "NativeStyleModelResource",
+          "pattern": "^pub struct NativeStyleModelResource \\{"
+        }
+      ],
+      "call_symbols": [
+        "NativeStyleModelResource::from_checkpoint",
+        "NativeStyleModelResource::reconstruct_checkpoint",
+        "NativeStyleModelResource::get_cond",
+        "NativeModelPayload::style_model",
+        "style_model_resource"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "style-model-admission-detects-strict-state-and-binds-execution",
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "pattern": "pub fn from_checkpoint\\([\\s\\S]*fn checked\\([\\s\\S]*raw_checkpoint_preflight[\\s\\S]*detect_configuration[\\s\\S]*state_manifest[\\s\\S]*validate_ordered_keys[\\s\\S]*build_style_attention[\\s\\S]*semantic_digest"
+        },
+        {
+          "name": "style-model-reconstructs-complete-ordered-source-state",
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "pattern": "pub fn reconstruct_checkpoint\\([\\s\\S]*state_manifest[\\s\\S]*self\\.source_state[\\s\\S]*NativeStyleModelCheckpoint"
+        },
+        {
+          "name": "style-model-validates-canonical-clip-output-and-publishes-bounded-conditioning",
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "pattern": "pub fn get_cond\\([\\s\\S]*input\\.validate\\(\\)\\?[\\s\\S]*last_hidden_state[\\s\\S]*preflight_invocation_memory[\\s\\S]*execute_style_adapter[\\s\\S]*execute_flux_redux[\\s\\S]*context\\.check\\(\\)\\?[\\s\\S]*Ok\\(output\\)"
+        },
+        {
+          "name": "style-adapter-fused-qkv-reconstruction-delegates-canonical-attention",
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "pattern": "scaled_dot_product_attention_tensor_with_context[\\s\\S]*build_style_attention[\\s\\S]*split_three[\\s\\S]*require_exact_fused_reconstruction"
+        },
+        {
+          "name": "style-model-payload-seals-role-identity-and-residency",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "pub fn style_model\\([\\s\\S]*NativeModelResourceRole::StyleModel[\\s\\S]*zed-native-style-model-v1[\\s\\S]*NativeModelResource::StyleModel[\\s\\S]*NativeModelBackingKind::NativeStyleModelResource[\\s\\S]*pub fn style_model_resource"
+        },
+        {
+          "name": "style-model-fixture-is-source-pinned-independent-and-bounded",
+          "path": "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation/provenance.json",
+          "pattern": "Pure Python standard-library source equations[\\s\\S]*reduced_profiles_are_source_exact[\\s\\S]*style_state_count"
+        },
+        {
+          "name": "style-model-integration-covers-source-oracle-and-atomic-failure",
+          "path": "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+          "pattern": "fn style_model_resource\\([\\s\\S]*NativeStyleModelResource[\\s\\S]*get_cond[\\s\\S]*NativeModelPayload::style_model_test_fixture"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-style-model-resource-foundation"
+      ],
+      "production_consumers": [
+        "native STYLE_MODEL payload admission and typed StyleAdapter or Flux Redux conditioning invocation"
+      ],
+      "requirements": [
+        "Requirement 6.3",
+        "Requirement 7.2",
+        "Requirement 18.1",
+        "Requirement 26.2",
+        "Requirement 28.2",
+        "Requirement 31.5",
+        "Requirement 34.2",
+        "Requirement 34.6",
+        "Requirement 35.2",
+        "Requirement 37.5",
+        "Requirement 38.3",
+        "Requirement 41.2",
+        "Requirement 44.1",
+        "Requirement 44.3"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeStyleModelResource is the sole retained owner of strict StyleAdapter and Flux Redux checkpoint identity, source-ordered reconstruction, checked F32 execution projection, bounded get_cond invocation, and conditioning publication. It delegates shared tensor equations and scaled-dot-product attention to their canonical owners, consumes only canonical ClipVisionOutput last_hidden_state, and exposes the sealed STYLE_MODEL payload projection without claiming GLIGEN, PHOTOMAKER, handle, cache, persistence, restart, or stale-generation authority."
+    },
+    {
       "concern": "native_tensor_transform_composition",
       "canonical_owner": "comfy_tensor::generated_external_tensor_kernel_03::compose_with_context_exact_native",
       "owner_files": [
@@ -14999,7 +15251,7 @@
         {
           "name": "general-video-profile-reuses-the-sole-loader-through-crate-private-projections",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "pub\\(crate\\) fn load_certified_general_video_codec_closure[\\s\\S]*load_video_codec_projection[\\s\\S]*pub\\(crate\\) fn bind_certified_general_video_codec_abi[\\s\\S]*NativeGeneralVideoCodecBinding"
+          "pattern": "(?=[\\s\\S]*pub\\(crate\\) fn load_certified_general_video_codec_closure[\\s\\S]*let loaded = load_video_codec_projection\\(&projection, cancellation\\)\\?;[\\s\\S]*Ok\\(NativeGeneralVideoCodecLoad)(?=[\\s\\S]*pub\\(crate\\) fn bind_certified_general_video_codec_abi[\\s\\S]*Ok\\(NativeGeneralVideoCodecBinding)"
         }
       ],
       "known_open_reasons": [],
@@ -16542,6 +16794,175 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "One backend-independent signed package authority admits the exact general FFmpeg closure and moves it once into the existing retained codec actor. Shared capability, coverage, ELF, certification, loader, memory-planning, and executor owners remain authoritative; the bootstrap adds no downloader, subprocess, private production key, second parser, second unsafe loader, second actor, filesystem cache identity, or partial service publication."
+    },
+    {
+      "concern": "native_video_reviewed_codec_registry_ltxv_thread_general_video_demux_decode",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::decode_general_video_with_check",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+        "crates/comfy_runtime/src/native_video_codec_service.rs",
+        "crates/comfy_media/src/native_node_payload.rs",
+        "crates/comfy_media/src/video.rs"
+      ],
+      "owner_symbols": [
+        "NativeVideoCodecDecodeError",
+        "NativeGeneralVideoDecodeService",
+        "NativeCancellableMediaPayloadError",
+        "NativeVideoDecodeLimits",
+        "NativeVideoDecodeRequest",
+        "NativeDecodedVideo",
+        "decode_general_video_with_check"
+      ],
+      "allowed_adapters": [
+        "the signed general-video package and retained binding owners supply only the already certified six-library function table inside the sole codec actor",
+        "the bounded memory AVIO and CPU workspace owners supply caller-authorized input, staging, tensor materialization, and cancellation without a path, subprocess, second allocator, or second loader",
+        "the canonical media payload owner alone validates and hashes completed audio and component VIDEO values with the same cancellation token before actor publication",
+        "NativeVideoCodecWorkerServices retains one actor-internal decode port but no worker executor or NativeNodeServices adapter may receive that port before Task564"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::decode_general_video_with_check",
+          "role": "canonical_service",
+          "symbol": "decode_general_video_with_check",
+          "pattern": "^fn decode_general_video_with_check\\("
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecDecodeError",
+          "role": "canonical_policy",
+          "symbol": "NativeVideoCodecDecodeError"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::native_video_codec_service::NativeGeneralVideoDecodeService",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeGeneralVideoDecodeService"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeCancellableMediaPayloadError",
+          "role": "canonical_policy",
+          "symbol": "NativeCancellableMediaPayloadError"
+        },
+        {
+          "path": "crates/comfy_media/src/video.rs",
+          "qualified": "comfy_media::NativeVideoDecodeLimits",
+          "role": "canonical_policy",
+          "symbol": "NativeVideoDecodeLimits"
+        },
+        {
+          "path": "crates/comfy_media/src/video.rs",
+          "qualified": "comfy_media::NativeVideoDecodeRequest",
+          "role": "sealed_authorization",
+          "symbol": "NativeVideoDecodeRequest"
+        },
+        {
+          "path": "crates/comfy_media/src/video.rs",
+          "qualified": "comfy_media::NativeDecodedVideo",
+          "role": "canonical",
+          "symbol": "NativeDecodedVideo"
+        }
+      ],
+      "call_symbols": [
+        "NativeVideoCodecDecodeError",
+        "NativeGeneralVideoDecodeService",
+        "NativeCancellableMediaPayloadError",
+        "NativeVideoDecodeLimits",
+        "NativeVideoDecodeRequest",
+        "NativeDecodedVideo",
+        "decode_general_video_with_check"
+      ],
+      "call_path_prefixes": [
+        "crates/comfy_media/",
+        "crates/comfy_runtime/"
+      ],
+      "required_mappings": [
+        {
+          "name": "general-video-decode-reuses-bounded-avio-and-one-certified-binding",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "fn decode_general_video_with_check[\\s\\S]*open_general_bounded_input[\\s\\S]*open_general_input[\\s\\S]*select_general_decode_streams[\\s\\S]*seek_general_decode_window[\\s\\S]*run_general_decode_loop"
+        },
+        {
+          "name": "general-video-decode-materializes-only-through-cancellable-media-owner",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "fn decode_general_video_with_check[\\s\\S]*materialize_general_audio[\\s\\S]*NativeVideoPayload::checked_cancellable[\\s\\S]*NativeDecodedVideo::checked_cancellable"
+        },
+        {
+          "name": "general-video-audio-materialization-uses-cancellable-media-owner",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "fn materialize_general_audio[\\s\\S]*NativeAudioPayload::checked_cancellable"
+        },
+        {
+          "name": "general-video-decode-port-is-retained-by-the-existing-single-actor-bundle",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "NativeGeneralVideoDecodeService[\\s\\S]*NativeVideoCodecWorkerServices[\\s\\S]*general_video_decode_service[\\s\\S]*NativeLtxvCodecThreadService::start_general"
+        },
+        {
+          "name": "general-video-decode-limits-fit-the-frozen-codec-scratch",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "let decode = NativeVideoDecodeLimits::reviewed\\(\\)[\\s\\S]*decode[\\s\\S]*checked_workspace_peak_bytes\\(REVIEWED_GENERAL_VIDEO_CODEC_SCRATCH_BYTES\\)"
+        },
+        {
+          "name": "general-video-decode-service-identity-binds-reviewed-limits",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "impl NativeGeneralVideoDecodeService[\\s\\S]*proxy.identity\\(\\).configuration_sha256\\(\\)[\\s\\S]*limits.configuration_values\\(\\)"
+        },
+        {
+          "name": "general-video-worker-cache-binds-decode-service-identity",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "fn worker_service_cache_configuration_identity[\\s\\S]*decode.configuration_sha256\\(\\)"
+        },
+        {
+          "name": "general-video-cancellable-payload-owner-chunks-validation-and-hashing",
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "pattern": "validate_finite_f32_cancellable[\\s\\S]*hash_tensor_cancellable[\\s\\S]*general_video_demux_decode_cancels_chunked_media_scans_and_rejects_projection_drift"
+        },
+        {
+          "name": "general-video-demux-decode-ownership-oracle-rejects-second-authority",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "val_ownership_task563_video_demux_decode_001"
+        }
+      ],
+      "known_open_reasons": [
+        "Task563 remains incomplete until an x86_64-linux-gnu certified FFmpeg 7.1 package decodes the committed real golden media to its pinned oracle"
+      ],
+      "consolidation_tasks": [
+        "comfy-parity-native-video-demux-decode-foundation"
+      ],
+      "production_consumers": [
+        "the following Task564 worker, executor, NativeNodeServices, and GetVideoComponents adapters"
+      ],
+      "requirements": [
+        "Requirement 26",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 36",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D11",
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-NATIVE-E2E-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-RECOVERY-005",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One actor-internal owner demuxes and decodes sealed bytes through the existing certified general-video binding, bounded AVIO, workspace, and sole codec actor. It publishes only a completed canonical component VIDEO after cancellable media validation and does not expose the retained port to worker executors before Task564 or claim real-codec interoperability before the required Linux golden run."
     },
     {
       "concern": "native_video_reviewed_codec_registry_ltxv_thread_service",
@@ -20374,7 +20795,7 @@
         {
           "name": "private-worker-transfers-canonical-invocation-session",
           "path": "crates/comfy_plugin_host/src/private_worker.rs",
-          "pattern": "PluginCapabilityBroker[\\s\\S]*RuntimeSupervisor::start[\\s\\S]*execute_plugin_retaining_capabilities\\("
+          "pattern": "PluginCapabilityBroker[\\s\\S]*begin_invocation\\(service_context\\)[\\s\\S]*PrivateWorkerCommand::Legacy[\\s\\S]*capability_invocation[\\s\\S]*execute_private_worker_command[\\s\\S]*execute_plugin_retaining_capabilities\\("
         },
         {
           "name": "zed-production-composes-existing-service-owners",
@@ -21298,7 +21719,7 @@
         {
           "name": "task412-controller-shares-service-and-delegates-v1-cleanup",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "provider_streams: ProviderRuntimeStreamService[\\s\\S]*provider_bridge_live: Arc<AtomicBool>[\\s\\S]*pub struct NativeProviderWorkerBridgeAttachment[\\s\\S]*Weak<NativeExecutionController>[\\s\\S]*provider_bridge_live\\.load\\(Ordering::Acquire\\)[\\s\\S]*pub fn start_with_provider_worker_bridge\\([\\s\\S]*ProviderRuntimeStreamService::new\\(\\)[\\s\\S]*runner_provider_bridge_live[\\s\\S]*invalidate_provider_worker_bridge\\([\\s\\S]*fn revoke_provider_worker_bridge\\([\\s\\S]*fn invalidate_provider_worker_bridge\\([\\s\\S]*live\\.swap\\(false, Ordering::AcqRel\\)[\\s\\S]*\\.begin_legacy\\([\\s\\S]*\\.call_legacy\\([\\s\\S]*\\.resolve_legacy\\([\\s\\S]*\\.finish_legacy\\([\\s\\S]*abort_legacy\\([\\s\\S]*fn abort_provider_sessions\\([\\s\\S]*provider_streams\\.revoke_all\\("
+          "pattern": "provider_streams: ProviderRuntimeStreamService[\\s\\S]*provider_bridge_live: Arc<AtomicBool>[\\s\\S]*provider_bridge_attempt: Arc<Mutex<Option<NativeProviderWorkerBridgeActiveAttempt>>>[\\s\\S]*pub struct NativeProviderWorkerBridgeAttachment[\\s\\S]*Weak<NativeExecutionController>[\\s\\S]*provider_bridge_live\\.load\\(Ordering::Acquire\\)[\\s\\S]*pub fn start_with_provider_worker_bridge\\([\\s\\S]*ProviderRuntimeStreamService::new\\(\\)[\\s\\S]*runner_provider_bridge_live[\\s\\S]*runner_provider_bridge_attempt[\\s\\S]*invalidate_provider_worker_bridge\\([\\s\\S]*fn revoke_provider_worker_bridge\\([\\s\\S]*fn invalidate_provider_worker_bridge\\([\\s\\S]*live\\.store\\(false, Ordering::Release\\)[\\s\\S]*abort_native_provider_worker_sessions[\\s\\S]*fn retire_native_provider_worker_sessions\\([\\s\\S]*provider_bridge_attempt\\.lock\\(\\)\\.take\\(\\)[\\s\\S]*provider_streams\\.revoke_all\\(\\)[\\s\\S]*fn abort_native_provider_worker_sessions\\([\\s\\S]*active\\.cancellation\\.cancel\\(\\)[\\s\\S]*provider_streams\\.revoke_all\\(\\)[\\s\\S]*\\.begin_legacy\\([\\s\\S]*\\.call_legacy\\([\\s\\S]*\\.resolve_legacy\\([\\s\\S]*\\.finish_legacy\\([\\s\\S]*abort_legacy\\([\\s\\S]*fn abort_provider_sessions\\([\\s\\S]*abort_native_provider_worker_sessions[\\s\\S]*fn retire_provider_sessions\\([\\s\\S]*retire_native_provider_worker_sessions"
         },
         {
           "name": "task423-private-executor-retains-only-one-live-weak-controller-attachment",
@@ -21989,7 +22410,7 @@
         {
           "name": "cli-consumes-canonical-packaged-worker-config",
           "path": "crates/zed/src/comfy_cli.rs",
-          "pattern": "build_native_runtime_for_profile[\\s\\S]*headless_native_profile[\\s\\S]*WorkerLaunchConfig::for_packaged_worker_profile"
+          "pattern": "prepare_native_runtime_for_profile[\\s\\S]*headless_native_configuration[\\s\\S]*WorkerLaunchConfig::for_packaged_worker_profile"
         }
       ],
       "production_consumers": [

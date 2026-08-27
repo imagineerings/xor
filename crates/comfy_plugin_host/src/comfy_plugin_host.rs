@@ -25,6 +25,10 @@ pub use legacy_mapping::{
     MappingCandidate, MappingProvenance, MappingSource, MappingTarget,
 };
 pub use private_worker::PrivateWorkerPluginExecutor;
+#[cfg(feature = "test-support")]
+pub use private_worker::{
+    PrivateWorkerProviderV2ActuatorAttachment, private_worker_provider_v2_actuator_route,
+};
 pub use registry_adapter::{
     PluginRegistryAdapterError, PreparedNativeProviderInvocation,
     materialize_native_provider_response, prepare_native_provider_invocation,
@@ -37,14 +41,13 @@ use comfy_plugin_sdk::{
     PROVIDER_COMPONENT_WORLD, PROVIDER_STREAMING_API_FEATURE_V2, PluginContractError,
     PluginInvocation, PluginManifest, PluginNode, PluginValue, PluginValueRepresentation,
     PortCardinality, PortDirection, PortPresence, PortSerialization, ProviderBindingClaim,
-    ProviderBindingSet, ProviderEncodedValueV2, ProviderHeaderV2, ProviderHttpMethodV2,
-    ProviderInvocationResultV2, ProviderMaterializedOutputV2, ProviderPluginManifestV2,
-    ProviderRequestHeadV2, ProviderResultReceiptSet, ProviderStreamingContractV2, RustComfyPlugin,
-    TypeRegistry, ValueFamily, ValueHandle,
+    ProviderBindingSet, ProviderEncodedValueV2, ProviderHttpMethodV2, ProviderInvocationResultV2,
+    ProviderMaterializedOutputV2, ProviderPluginManifestV2, ProviderResultReceiptSet,
+    ProviderStreamingContractV2, RustComfyPlugin, TypeRegistry, ValueFamily, ValueHandle,
 };
 use comfy_runtime::{
     AssetIdentity, AssetNamespace, PluginAuthorization, ProviderManifestAuthorizationV2,
-    ResolvedProviderResult, TrustError,
+    ResolvedProviderResult, TrustError, WorkerProviderV2InvocationEnvelope,
 };
 use comfy_types::{
     MAX_WORKER_PROVIDER_PENDING_CALLS, MAX_WORKER_PROVIDER_WAIT_MILLISECONDS,
@@ -54,8 +57,8 @@ use comfy_types::{
     WorkerProviderResponseFrameEvent, WorkerProviderStreamError, WorkerProviderStreamHandle,
     WorkerProviderStreamRequest, WorkerProviderStreamResponse,
     WorkerProviderStreamTransportValidator, WorkerProviderStreamingContract,
-    WorkerProviderTerminal, WorkerProviderUploadRequest, WorkerProviderWaitOutcome,
-    WorkerProviderWaitRequest,
+    WorkerProviderTerminal, WorkerProviderUploadRequest, WorkerProviderV2ProposalFinalization,
+    WorkerProviderWaitOutcome, WorkerProviderWaitRequest,
 };
 use extension_host::ComponentRuntime;
 use sha2::{Digest, Sha256};
@@ -279,13 +282,6 @@ enum WasmBindings {
 }
 
 #[derive(Debug)]
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
-)]
 pub(crate) struct ProviderV2StreamRouteCall {
     call_id: u64,
     request: WorkerProviderStreamRequest,
@@ -375,13 +371,6 @@ impl ProviderV2BoundStartCall {
 }
 
 #[derive(Debug)]
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
-)]
 pub(crate) enum ProviderV2StreamRouteMessage {
     Request(ProviderV2StreamRouteCall),
     Revoke {
@@ -389,26 +378,12 @@ pub(crate) enum ProviderV2StreamRouteMessage {
     },
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
-)]
 pub(crate) struct ProviderV2StreamRouteReceiver {
     receiver: Receiver<ProviderV2StreamRouteMessage>,
     revoke_receiver: Receiver<ProviderV2StreamRouteMessage>,
     revoked: Arc<AtomicBool>,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
-)]
 impl ProviderV2StreamRouteReceiver {
     pub(crate) fn try_receive(&self) -> Result<ProviderV2StreamRouteMessage, TryRecvError> {
         if self.revoked.load(Ordering::Acquire) {
@@ -452,14 +427,60 @@ pub(crate) struct ProviderV2RuntimeHost {
     terminal_failure: Option<WorkerProviderStreamError>,
 }
 
+pub struct ProviderV2WorkerStreamCall {
+    call_id: u64,
+    request: WorkerProviderStreamRequest,
+    response: async_channel::Sender<WorkerProviderStreamResponse>,
+}
+
+impl ProviderV2WorkerStreamCall {
+    pub fn call_id(&self) -> u64 {
+        self.call_id
+    }
+
+    pub fn request(&self) -> &WorkerProviderStreamRequest {
+        &self.request
+    }
+
+    pub fn respond(
+        self,
+        response: WorkerProviderStreamResponse,
+    ) -> Result<(), WorkerProviderStreamError> {
+        self.response
+            .try_send(response)
+            .map_err(|error| match error {
+                async_channel::TrySendError::Full(_) => WorkerProviderStreamError::InvalidOrder,
+                async_channel::TrySendError::Closed(_) => WorkerProviderStreamError::RevokedHandle,
+            })
+    }
+}
+
 impl ProviderV2RuntimeHost {
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-        )
-    )]
+    fn route_disconnection_error(&self) -> WorkerProviderStreamError {
+        if self.cancellation.is_cancelled() {
+            WorkerProviderStreamError::Cancelled
+        } else {
+            WorkerProviderStreamError::RevokedHandle
+        }
+    }
+
+    fn checked_for_worker_bridge(
+        context: WorkerProviderInvocationContext,
+        contract: WorkerProviderStreamingContract,
+        cancellation: CancellationToken,
+        sender: async_channel::Sender<ProviderV2WorkerStreamCall>,
+    ) -> Result<Self, WorkerProviderStreamError> {
+        let (route, receiver) = provider_v2_stream_route();
+        let runtime = Self::checked_from_certified_capsule(context, contract, cancellation, route)?;
+        drop(
+            std::thread::Builder::new()
+                .name("comfy-provider-v2-worker-route".to_owned())
+                .spawn(move || relay_provider_v2_worker_route(receiver, sender))
+                .map_err(|_| WorkerProviderStreamError::HostFailure)?,
+        );
+        Ok(runtime)
+    }
+
     fn checked_from_certified_capsule(
         context: WorkerProviderInvocationContext,
         contract: WorkerProviderStreamingContract,
@@ -515,7 +536,8 @@ impl ProviderV2RuntimeHost {
         let call_id = self.next_call_id;
         self.validator.validate_request(call_id, &request)?;
         let (reply, receiver) = sync_channel(1);
-        self.route
+        match self
+            .route
             .sender
             .try_send(ProviderV2StreamRouteMessage::Request(
                 ProviderV2StreamRouteCall {
@@ -523,11 +545,13 @@ impl ProviderV2RuntimeHost {
                     request,
                     reply,
                 },
-            ))
-            .map_err(|error| match error {
-                TrySendError::Full(_) => WorkerProviderStreamError::InvalidOrder,
-                TrySendError::Disconnected(_) => WorkerProviderStreamError::RevokedHandle,
-            })?;
+            )) {
+            Ok(()) => {}
+            Err(TrySendError::Full(_)) => return Err(WorkerProviderStreamError::InvalidOrder),
+            Err(TrySendError::Disconnected(_)) => {
+                return Err(self.route_disconnection_error());
+            }
+        }
         let deadline = Instant::now()
             .checked_add(self.reply_deadline)
             .ok_or(WorkerProviderStreamError::TimedOut)?;
@@ -536,7 +560,7 @@ impl ProviderV2RuntimeHost {
                 .check()
                 .map_err(|_| WorkerProviderStreamError::Cancelled)?;
             if self.route.revoked.load(Ordering::Acquire) {
-                return Err(WorkerProviderStreamError::RevokedHandle);
+                return Err(self.route_disconnection_error());
             }
             let now = Instant::now();
             if now >= deadline {
@@ -550,10 +574,13 @@ impl ProviderV2RuntimeHost {
                 Ok(response) => break response,
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                    return Err(WorkerProviderStreamError::RevokedHandle);
+                    return Err(self.route_disconnection_error());
                 }
             }
         };
+        self.cancellation
+            .check()
+            .map_err(|_| WorkerProviderStreamError::Cancelled)?;
         self.validator.validate_response(call_id, &response)?;
         self.next_call_id = self
             .next_call_id
@@ -596,13 +623,6 @@ impl ProviderV2RuntimeHost {
         }
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-        )
-    )]
     fn ensure_completed(&self) -> Result<(), WorkerProviderStreamError> {
         if let Some(error) = &self.terminal_failure {
             return Err(error.clone());
@@ -610,6 +630,19 @@ impl ProviderV2RuntimeHost {
         if !self.stream_terminal || self.revocation_complete {
             return Err(WorkerProviderStreamError::InvalidTerminal);
         }
+        Ok(())
+    }
+
+    fn completed_handle(&self) -> Result<WorkerProviderStreamHandle, WorkerProviderStreamError> {
+        self.ensure_completed()?;
+        self.validator
+            .primary_handle()
+            .ok_or(WorkerProviderStreamError::InvalidHandle)
+    }
+
+    fn complete_non_revoking(&mut self) -> Result<(), WorkerProviderStreamError> {
+        self.ensure_completed()?;
+        self.revocation_complete = true;
         Ok(())
     }
 
@@ -645,6 +678,87 @@ impl ProviderV2RuntimeHost {
             Err(TrySendError::Full(_)) => Err(WorkerProviderStreamError::InvalidOrder),
             Err(TrySendError::Disconnected(_)) => Err(WorkerProviderStreamError::RevokedHandle),
         }
+    }
+}
+
+fn relay_provider_v2_worker_route(
+    receiver: ProviderV2StreamRouteReceiver,
+    sender: async_channel::Sender<ProviderV2WorkerStreamCall>,
+) {
+    loop {
+        match receiver.try_receive() {
+            Ok(ProviderV2StreamRouteMessage::Request(call)) => {
+                let (response, response_receiver) = async_channel::bounded(1);
+                let worker_call = ProviderV2WorkerStreamCall {
+                    call_id: call.call_id,
+                    request: call.request.clone(),
+                    response,
+                };
+                let mut worker_call = worker_call;
+                loop {
+                    if relay_provider_v2_revoke(&receiver) {
+                        return;
+                    }
+                    match sender.try_send(worker_call) {
+                        Ok(()) => break,
+                        Err(async_channel::TrySendError::Full(returned)) => {
+                            worker_call = returned;
+                            std::thread::sleep(Duration::from_millis(1));
+                        }
+                        Err(async_channel::TrySendError::Closed(_)) => {
+                            receiver.mark_revoked();
+                            return;
+                        }
+                    }
+                }
+                let response = loop {
+                    if relay_provider_v2_revoke(&receiver) {
+                        return;
+                    }
+                    match response_receiver.try_recv() {
+                        Ok(response) => break response,
+                        Err(async_channel::TryRecvError::Empty) => {
+                            std::thread::sleep(Duration::from_millis(1));
+                        }
+                        Err(async_channel::TryRecvError::Closed) => {
+                            receiver.mark_revoked();
+                            return;
+                        }
+                    }
+                };
+                if call.reply.try_send(response).is_err() {
+                    receiver.mark_revoked();
+                    break;
+                }
+            }
+            Ok(ProviderV2StreamRouteMessage::Revoke { reply }) => {
+                receiver.mark_revoked();
+                if let Err(error) = reply.try_send(Ok(())) {
+                    eprintln!("provider-v2 worker route revoke reply was lost: {error}");
+                }
+                break;
+            }
+            Err(TryRecvError::Empty) => std::thread::sleep(Duration::from_millis(1)),
+            Err(TryRecvError::Disconnected) => break,
+        }
+    }
+}
+
+fn relay_provider_v2_revoke(receiver: &ProviderV2StreamRouteReceiver) -> bool {
+    match receiver.revoke_receiver.try_recv() {
+        Ok(ProviderV2StreamRouteMessage::Revoke { reply }) => {
+            receiver.mark_revoked();
+            if let Err(error) = reply.try_send(Ok(())) {
+                eprintln!("provider-v2 worker route revoke reply was lost: {error}");
+            }
+            true
+        }
+        Ok(ProviderV2StreamRouteMessage::Request(_)) => {
+            receiver.mark_revoked();
+            true
+        }
+        Err(TryRecvError::Empty) => receiver.revoked.load(Ordering::Acquire),
+        Err(TryRecvError::Disconnected) => true,
     }
 }
 
@@ -696,13 +810,6 @@ fn worker_response_terminal_disposition(
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
-)]
 fn provider_v2_stream_route() -> (ProviderV2StreamRoute, ProviderV2StreamRouteReceiver) {
     let (sender, receiver) = sync_channel(MAX_WORKER_PROVIDER_PENDING_CALLS);
     let (revoke_sender, revoke_receiver) = sync_channel(1);
@@ -721,10 +828,6 @@ fn provider_v2_stream_route() -> (ProviderV2StreamRoute, ProviderV2StreamRouteRe
     )
 }
 
-#[expect(
-    dead_code,
-    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-)]
 fn worker_streaming_contract(
     contract: &ProviderStreamingContractV2,
 ) -> WorkerProviderStreamingContract {
@@ -785,10 +888,6 @@ fn sdk_provider_streaming_contract(
     }
 }
 
-#[expect(
-    dead_code,
-    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-)]
 fn worker_http_method(method: ProviderHttpMethodV2) -> WorkerProviderHttpMethod {
     match method {
         ProviderHttpMethodV2::Delete => WorkerProviderHttpMethod::Delete,
@@ -798,35 +897,6 @@ fn worker_http_method(method: ProviderHttpMethodV2) -> WorkerProviderHttpMethod 
         ProviderHttpMethodV2::Patch => WorkerProviderHttpMethod::Patch,
         ProviderHttpMethodV2::Post => WorkerProviderHttpMethod::Post,
         ProviderHttpMethodV2::Put => WorkerProviderHttpMethod::Put,
-    }
-}
-
-#[expect(
-    dead_code,
-    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-)]
-fn sdk_request_head(head: &WorkerProviderRequestHead) -> ProviderRequestHeadV2 {
-    ProviderRequestHeadV2 {
-        endpoint: head.endpoint.clone(),
-        secret_id: head.secret_id.clone(),
-        method: match head.method {
-            WorkerProviderHttpMethod::Delete => ProviderHttpMethodV2::Delete,
-            WorkerProviderHttpMethod::Get => ProviderHttpMethodV2::Get,
-            WorkerProviderHttpMethod::Head => ProviderHttpMethodV2::Head,
-            WorkerProviderHttpMethod::Options => ProviderHttpMethodV2::Options,
-            WorkerProviderHttpMethod::Patch => ProviderHttpMethodV2::Patch,
-            WorkerProviderHttpMethod::Post => ProviderHttpMethodV2::Post,
-            WorkerProviderHttpMethod::Put => ProviderHttpMethodV2::Put,
-        },
-        headers: head
-            .headers
-            .iter()
-            .map(|header| ProviderHeaderV2 {
-                name: header.name.clone(),
-                value: header.value.clone(),
-            })
-            .collect(),
-        declared_body_bytes: head.declared_body_bytes,
     }
 }
 
@@ -954,13 +1024,6 @@ fn wit_provider_stream_error(
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )
-)]
 fn worker_provider_stream_error(
     error: provider_v2_wit_contract::zed::comfy_provider_plugin::types::StreamError,
 ) -> WorkerProviderStreamError {
@@ -1004,10 +1067,6 @@ fn wit_provider_input_error(error: WorkerProviderStreamError) -> WitInvocationEr
     }
 }
 
-#[expect(
-    dead_code,
-    reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-)]
 fn sdk_provider_invocation_result(
     result: provider_v2_wit_contract::zed::comfy_provider_plugin::types::InvocationResult,
     invocation: &Option<InvocationHost>,
@@ -1058,11 +1117,56 @@ pub struct ProviderInvocationResult {
 
 pub struct ProviderV2InvocationProposal {
     result: ProviderInvocationResultV2,
-    #[expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )]
     runtime: ProviderV2RuntimeHost,
+}
+
+pub struct ProviderV2WorkerPendingInvocation {
+    proposal: ProviderV2InvocationProposal,
+    envelope: WorkerProviderV2InvocationEnvelope,
+    registry: TypeRegistry,
+    cancellation: CancellationToken,
+}
+
+impl ProviderV2WorkerPendingInvocation {
+    pub fn result(&self) -> &ProviderInvocationResultV2 {
+        self.proposal.result()
+    }
+
+    pub fn finalize(
+        self,
+        finalization: &WorkerProviderV2ProposalFinalization,
+    ) -> Result<(), WorkerProviderStreamError> {
+        if finalization.context != *self.envelope.context()
+            || finalization.proposal_generation != self.envelope.proposal_generation()
+            || finalization.finalization_nonce != self.envelope.finalization_nonce()
+        {
+            return Err(WorkerProviderStreamError::StaleGeneration);
+        }
+        finalization.validate()?;
+        let receipt_identity_sha256 = encode_hex(&Sha256::digest(&self.proposal.result.receipt));
+        let materialization_identity_sha256 = encode_hex(
+            &comfy_runtime::provider_invocation_result_v2_materialization_identity(
+                &self.proposal.result,
+                &self.registry,
+                &self.cancellation,
+            )
+            .map_err(|_| WorkerProviderStreamError::InvalidInvocationResult)?,
+        );
+        if finalization.receipt_identity_sha256.as_str() != receipt_identity_sha256
+            || finalization.materialization_identity_sha256.as_str()
+                != materialization_identity_sha256
+        {
+            return Err(WorkerProviderStreamError::InvalidInvocationResult);
+        }
+        let ProviderV2InvocationProposal {
+            result: _,
+            mut runtime,
+        } = self.proposal;
+        if runtime.completed_handle()? != finalization.handle {
+            return Err(WorkerProviderStreamError::ForeignHandle);
+        }
+        runtime.complete_non_revoking()
+    }
 }
 
 impl ProviderV2InvocationProposal {
@@ -1229,10 +1333,6 @@ impl WasmPluginInstance {
         Ok(manifest_projection)
     }
 
-    #[expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )]
     pub(crate) fn invoke_provider_v2(
         mut self,
         node_id: &str,
@@ -1656,6 +1756,79 @@ impl PluginHost {
         Ok(compiled)
     }
 
+    pub fn compile_provider_component_v2_for_worker(
+        &self,
+        bytes: &[u8],
+        manifest: &ProviderPluginManifestV2,
+        authorization: &PluginAuthorization,
+    ) -> Result<CompiledPlugin, PluginError> {
+        manifest.validate(&self.registry)?;
+        self.validate(&manifest.manifest, authorization)?;
+        if bytes.len() > self.limits.maximum_component_bytes {
+            return Err(PluginError::ComponentTooLarge);
+        }
+        let digest = encode_hex(&Sha256::digest(bytes));
+        if !constant_time_equal(
+            digest.as_bytes(),
+            manifest.manifest.digest_sha256.as_bytes(),
+        ) {
+            return Err(PluginError::ManifestProjectionMismatch);
+        }
+        let component = self.runtime.compile_component(bytes).map_err(|error| {
+            PluginError::ComponentCompilation(sanitize_diagnostic(&error.to_string()))
+        })?;
+        let compiled = CompiledPlugin {
+            component,
+            identifier: manifest.manifest.identifier.clone(),
+            digest_sha256: digest,
+            manifest_projection: manifest.manifest.component_projection(),
+            provider_binding: manifest.manifest.provider_binding.clone(),
+            provider_manifest_v2: Some(manifest.clone()),
+            world: ComponentWorld::ProviderV2,
+        };
+        self.preflight_component(&compiled)?;
+        Ok(compiled)
+    }
+
+    pub fn invoke_provider_component_v2_for_worker(
+        &self,
+        plugin: &CompiledPlugin,
+        invocation: InvocationHost,
+        node_id: &str,
+        envelope: WorkerProviderV2InvocationEnvelope,
+        cancellation: CancellationToken,
+        sender: async_channel::Sender<ProviderV2WorkerStreamCall>,
+    ) -> Result<ProviderV2WorkerPendingInvocation, PluginError> {
+        let registry = invocation.registry.clone();
+        let expected_manifest = plugin
+            .provider_manifest_v2
+            .as_ref()
+            .ok_or(PluginError::ProviderInvocationUnavailable)?;
+        let expected_manifest_sha256 =
+            encode_hex(&Sha256::digest(expected_manifest.signing_payload()?));
+        if envelope.provider_manifest_sha256().as_str() != expected_manifest_sha256
+            || envelope.streaming_contract()
+                != &worker_streaming_contract(&expected_manifest.streaming)
+        {
+            return Err(PluginError::ProviderRuntimeActivationDenied);
+        }
+        let runtime = ProviderV2RuntimeHost::checked_for_worker_bridge(
+            envelope.context().clone(),
+            envelope.streaming_contract().clone(),
+            cancellation.clone(),
+            sender,
+        )
+        .map_err(PluginError::ProviderStreaming)?;
+        let instance = self.instantiate_provider_component_v2(plugin, invocation, runtime)?;
+        let proposal = instance.invoke_provider_v2(node_id)?;
+        Ok(ProviderV2WorkerPendingInvocation {
+            proposal,
+            envelope,
+            registry,
+            cancellation,
+        })
+    }
+
     fn new_wasm_store(&self) -> Result<Store<WasmStoreState>, PluginError> {
         self.make_wasm_store(None, None)
     }
@@ -1667,10 +1840,6 @@ impl PluginHost {
         self.make_wasm_store(Some(invocation), None)
     }
 
-    #[expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )]
     fn new_wasm_provider_v2_store(
         &self,
         invocation: InvocationHost,
@@ -1712,10 +1881,6 @@ impl PluginHost {
         Ok(instance)
     }
 
-    #[expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )]
     pub(crate) fn instantiate_provider_component_v2(
         &self,
         plugin: &CompiledPlugin,
@@ -2185,10 +2350,6 @@ impl InvocationHost {
         })
     }
 
-    #[expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
-    )]
     fn finish_provider_v2_inputs(mut self) -> Result<(), InvocationError> {
         self.check_active()?;
         self.check_cancellation()?;
@@ -4665,6 +4826,10 @@ mod tests {
 
         let (mut disconnected_runtime, disconnected_receiver) =
             started_provider_runtime(CancellationToken::default())?;
+        assert_eq!(
+            disconnected_runtime.route_disconnection_error(),
+            WorkerProviderStreamError::RevokedHandle
+        );
         drop(disconnected_receiver);
         assert_eq!(
             disconnected_runtime.exchange(check_cancelled_request(1)),
@@ -4677,11 +4842,31 @@ mod tests {
             started_provider_runtime(cancellation.clone())?;
         assert!(cancellation.cancel());
         assert_eq!(
+            cancelled_runtime.route_disconnection_error(),
+            WorkerProviderStreamError::Cancelled
+        );
+        assert_eq!(
             cancelled_runtime.exchange(check_cancelled_request(1)),
             Err(WorkerProviderStreamError::Cancelled)
         );
         assert!(cancelled_runtime.route.revoked.load(Ordering::Acquire));
         drop(cancelled_receiver);
+
+        let blocked_cancellation = CancellationToken::default();
+        let (mut blocked_runtime, blocked_receiver) =
+            started_provider_runtime(blocked_cancellation.clone())?;
+        let blocked_exchange =
+            std::thread::spawn(move || blocked_runtime.exchange(check_cancelled_request(1)));
+        let blocked_call = receive_provider_route_request(&blocked_receiver)?;
+        assert!(blocked_cancellation.cancel());
+        drop(blocked_call);
+        drop(blocked_receiver);
+        assert_eq!(
+            blocked_exchange
+                .join()
+                .expect("blocked provider exchange thread remains available"),
+            Err(WorkerProviderStreamError::Cancelled)
+        );
         Ok(())
     }
 

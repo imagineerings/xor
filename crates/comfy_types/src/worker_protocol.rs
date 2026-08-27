@@ -47,6 +47,7 @@ pub const MAX_WORKER_PROVIDER_RECEIPT_BYTES: usize = 32 * 1024;
 pub const MAX_WORKER_PROVIDER_PENDING_CALLS: usize = 1;
 pub const MAX_WORKER_PROVIDER_ENDPOINT_BYTES: usize = 2_048;
 pub const MAX_WORKER_PROVIDER_SECRET_ID_BYTES: usize = 1_024;
+pub const MAX_WORKER_PROVIDER_FINALIZATION_IDENTITY_BYTES: usize = 64;
 pub const WORKER_OPERATION_SUPPORT_VERSION: u16 = 2;
 pub const LEGACY_WORKER_OPERATION_SUPPORT_VERSION: u16 = 1;
 pub const WORKER_REGISTRY_DIGEST_DOMAIN: &[u8] = b"zed-comfy-worker-registry-v1";
@@ -1810,6 +1811,51 @@ pub enum WorkerProviderStreamResponse {
     Cost(Result<WorkerProviderCostResponse, WorkerProviderStreamError>),
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderV2ProposalFinalization {
+    pub context: WorkerProviderInvocationContext,
+    pub handle: WorkerProviderStreamHandle,
+    pub proposal_generation: u64,
+    pub finalization_nonce: [u8; 32],
+    pub receipt_identity_sha256: WorkerSha256Digest,
+    pub materialization_identity_sha256: WorkerSha256Digest,
+}
+
+impl WorkerProviderV2ProposalFinalization {
+    pub fn validate(&self) -> Result<(), WorkerProviderStreamError> {
+        validate_provider_context(&self.context)?;
+        validate_provider_handle_wire(self.handle)?;
+        if self.handle.session_id != self.context.session_id
+            || self.handle.session_generation != self.context.session_generation
+            || self.handle.invocation != self.context.invocation
+            || self.handle.generation != self.context.generation
+            || self.proposal_generation == 0
+            || self.finalization_nonce == [0; 32]
+            || self.receipt_identity_sha256.as_str().len()
+                != MAX_WORKER_PROVIDER_FINALIZATION_IDENTITY_BYTES
+            || self.materialization_identity_sha256.as_str().len()
+                != MAX_WORKER_PROVIDER_FINALIZATION_IDENTITY_BYTES
+        {
+            return Err(WorkerProviderStreamError::InvalidInvocationResult);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerProviderV2ProposalFinalizationAck {
+    pub finalization: WorkerProviderV2ProposalFinalization,
+    pub result: Result<(), WorkerProviderStreamError>,
+}
+
+impl WorkerProviderV2ProposalFinalizationAck {
+    pub fn validate(&self) -> Result<(), WorkerProviderStreamError> {
+        self.finalization.validate()
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum WorkerProviderPendingResponse {
     PrimaryStream,
@@ -1864,6 +1910,10 @@ pub struct WorkerProviderStreamTransportValidator {
 }
 
 impl WorkerProviderStreamTransportValidator {
+    pub const fn primary_handle(&self) -> Option<WorkerProviderStreamHandle> {
+        self.handle
+    }
+
     pub fn checked_for_host_session(
         expected_host_context: WorkerProviderInvocationContext,
         contract: WorkerProviderStreamingContract,
@@ -2790,6 +2840,12 @@ pub enum WorkerMessage {
         call_id: u64,
         response: WorkerProviderStreamResponse,
     },
+    ProviderV2ProposalFinalization {
+        finalization: WorkerProviderV2ProposalFinalization,
+    },
+    ProviderV2ProposalFinalizationAck {
+        acknowledgement: WorkerProviderV2ProposalFinalizationAck,
+    },
 }
 
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -2961,6 +3017,12 @@ fn validate_message_bounds(message: &WorkerMessage) -> Result<(), WorkerProtocol
             validate_provider_stream_response_wire(response)
                 .map_err(WorkerProtocolError::InvalidProviderStream)
         }
+        WorkerMessage::ProviderV2ProposalFinalization { finalization } => finalization
+            .validate()
+            .map_err(WorkerProtocolError::InvalidProviderStream),
+        WorkerMessage::ProviderV2ProposalFinalizationAck { acknowledgement } => acknowledgement
+            .validate()
+            .map_err(WorkerProtocolError::InvalidProviderStream),
         _ => Ok(()),
     }
 }
@@ -3227,6 +3289,17 @@ mod tests {
         }
     }
 
+    fn provider_finalization() -> WorkerProviderV2ProposalFinalization {
+        WorkerProviderV2ProposalFinalization {
+            context: provider_context(),
+            handle: provider_handle(1),
+            proposal_generation: 9,
+            finalization_nonce: [0x5a; 32],
+            receipt_identity_sha256: digest('a'),
+            materialization_identity_sha256: digest('b'),
+        }
+    }
+
     fn provider_contract() -> WorkerProviderStreamingContract {
         WorkerProviderStreamingContract {
             methods: vec![
@@ -3484,6 +3557,58 @@ mod tests {
         };
         assert_eq!(postcard::to_stdvec(&request).expect("request")[0], 20);
         assert_eq!(postcard::to_stdvec(&response).expect("response")[0], 21);
+
+        let finalization = WorkerMessage::ProviderV2ProposalFinalization {
+            finalization: provider_finalization(),
+        };
+        let acknowledgement = WorkerMessage::ProviderV2ProposalFinalizationAck {
+            acknowledgement: WorkerProviderV2ProposalFinalizationAck {
+                finalization: provider_finalization(),
+                result: Ok(()),
+            },
+        };
+        assert_eq!(
+            postcard::to_stdvec(&finalization).expect("finalization")[0],
+            22
+        );
+        assert_eq!(
+            postcard::to_stdvec(&acknowledgement).expect("acknowledgement")[0],
+            23
+        );
+    }
+
+    #[test]
+    fn provider_v2_finalization_is_bounded_and_round_trips_independently() {
+        let finalization = provider_finalization();
+        finalization.validate().expect("finalization is valid");
+        for message in [
+            WorkerMessage::ProviderV2ProposalFinalization {
+                finalization: finalization.clone(),
+            },
+            WorkerMessage::ProviderV2ProposalFinalizationAck {
+                acknowledgement: WorkerProviderV2ProposalFinalizationAck {
+                    finalization: finalization.clone(),
+                    result: Ok(()),
+                },
+            },
+        ] {
+            let original = envelope(message);
+            let frame = encode_worker_frame(&original).expect("finalization frame is bounded");
+            assert_eq!(decode_worker_frame(&frame), Ok(original));
+        }
+
+        let mut invalid = finalization.clone();
+        invalid.finalization_nonce = [0; 32];
+        assert_eq!(
+            invalid.validate(),
+            Err(WorkerProviderStreamError::InvalidInvocationResult)
+        );
+        let mut foreign = finalization;
+        foreign.handle.invocation = foreign.handle.invocation.saturating_add(1);
+        assert_eq!(
+            foreign.validate(),
+            Err(WorkerProviderStreamError::InvalidInvocationResult)
+        );
     }
 
     #[test]

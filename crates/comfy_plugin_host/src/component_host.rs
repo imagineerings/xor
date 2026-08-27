@@ -6,14 +6,16 @@ use comfy_nodes::NativeSchemaValue;
 use comfy_plugin_sdk::{PluginManifest, ProviderPluginManifestV2};
 use comfy_runtime::{
     NativeNodeRegistry, NativeProviderInvocationAuthority, NativeProviderInvocationScope,
-    NativeProviderRegistryPin, NodeContext, PermissionPolicy, PluginAuthorization,
-    PluginAuthorizationSealer, PluginAuthorizationVerifier, PluginCapabilityBroker,
-    PluginCapabilityInvocation, PluginServiceError, PluginServiceInvocationContext,
-    PluginTrustPolicy, PreflightedProviderRuntimeActivationGrant,
-    ProviderCostAuthorizationAuthority, ProviderManifestAuthorizationV2, ProviderPolicy,
-    ProviderResultReceiptAuthority, ProviderResultReceiptIssuer, ProviderRuntimeActivationGrant,
-    ProviderRuntimeAuthorityInput, WorkerRegistryDeploymentPlan,
+    NativeProviderRegistryPin, NativeProviderWorkerV2Activation,
+    NativeProviderWorkerV2RouteAuthority, NativeProviderWorkerV2RouteSession, NodeContext,
+    PermissionPolicy, PluginAuthorization, PluginAuthorizationSealer, PluginAuthorizationVerifier,
+    PluginCapabilityBroker, PluginCapabilityInvocation, PluginServiceError,
+    PluginServiceInvocationContext, PluginTrustPolicy, ProviderCostAuthorizationAuthority,
+    ProviderManifestAuthorizationV2, ProviderPolicy, ProviderResultReceiptAuthority,
+    ProviderResultReceiptIssuer, WorkerProviderV2InvocationEnvelope, WorkerRegistryDeploymentPlan,
 };
+#[cfg(feature = "test-support")]
+use comfy_types::WorkerPluginExecutionOutcome;
 use comfy_types::{
     CancellationToken, MAX_WORKER_COMPONENT_CHUNK_BYTES,
     MAX_WORKER_PLUGIN_CAPABILITY_PAYLOAD_BYTES, MAX_WORKER_PLUGIN_INVOCATION_BYTES,
@@ -85,6 +87,18 @@ pub trait PluginInvocationExecutor: Send + Sync {
     ) -> Pin<
         Box<dyn Future<Output = Result<ProviderInvocationResult, ComponentHostError>> + Send + 'a>,
     >;
+
+    fn execute_provider_v2<'a>(
+        &'a self,
+        invocation: PreparedPluginInvocation,
+    ) -> Pin<
+        Box<
+            dyn Future<
+                    Output = Result<comfy_runtime::ProviderTransportResponse, ComponentHostError>,
+                > + Send
+                + 'a,
+        >,
+    >;
 }
 
 #[derive(Clone)]
@@ -108,9 +122,12 @@ struct VerifiedPlugin {
     manifest: Arc<PluginManifest>,
     authorization: Arc<PluginAuthorization>,
     provider_manifest_v2: Option<Arc<ProviderPluginManifestV2>>,
-    #[expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes retained provider-v2 authorization"
+        )
     )]
     provider_authorization_v2: Option<Arc<ProviderManifestAuthorizationV2>>,
     compiled: Arc<crate::CompiledPlugin>,
@@ -199,6 +216,8 @@ pub struct WorkerPluginInvocation {
     inputs: InvocationInputs,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     provider_request: Option<Vec<u8>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    provider_v2: Option<WorkerProviderV2InvocationEnvelope>,
     timeout_milliseconds: u64,
     maximum_response_bytes: u64,
     component_limits: ComponentLimits,
@@ -279,8 +298,32 @@ impl WorkerPluginInvocation {
         self.provider_request.as_deref()
     }
 
-    pub fn into_execution_parts(self) -> (InvocationInputs, Option<Vec<u8>>) {
-        (self.inputs, self.provider_request)
+    pub fn provider_v2(&self) -> Option<&WorkerProviderV2InvocationEnvelope> {
+        self.provider_v2.as_ref()
+    }
+
+    pub fn with_provider_v2(
+        mut self,
+        provider_v2: WorkerProviderV2InvocationEnvelope,
+    ) -> Result<Self, ComponentHostError> {
+        if self.provider_request.is_some() || self.provider_v2.is_some() {
+            return Err(worker_deployment_error(
+                "worker provider invocation modes are mutually exclusive",
+            ));
+        }
+        self.provider_v2 = Some(provider_v2);
+        self.validate()?;
+        Ok(self)
+    }
+
+    pub fn into_execution_parts(
+        self,
+    ) -> (
+        InvocationInputs,
+        Option<Vec<u8>>,
+        Option<WorkerProviderV2InvocationEnvelope>,
+    ) {
+        (self.inputs, self.provider_request, self.provider_v2)
     }
 
     pub const fn timeout_milliseconds(&self) -> u64 {
@@ -310,12 +353,16 @@ impl WorkerPluginInvocation {
             || self.provider_request.as_ref().is_some_and(|request| {
                 request.is_empty() || request.len() > MAX_WORKER_PLUGIN_CAPABILITY_PAYLOAD_BYTES
             })
+            || (self.provider_request.is_some() && self.provider_v2.is_some())
         {
             return Err(worker_deployment_error(
                 "worker plugin invocation metadata is invalid",
             ));
         }
         self.component_limits.validate()?;
+        if let Some(provider_v2) = &self.provider_v2 {
+            provider_v2.validate().map_err(worker_deployment_error)?;
+        }
         Ok(())
     }
 }
@@ -389,6 +436,7 @@ impl VerifiedComponentGeneration {
             timeout_milliseconds,
             maximum_response_bytes,
             component_limits,
+            false,
         )
     }
 
@@ -411,6 +459,36 @@ impl VerifiedComponentGeneration {
             timeout_milliseconds,
             maximum_response_bytes,
             component_limits,
+            false,
+        )
+    }
+
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator prepares provider-v2 worker invocations"
+        )
+    )]
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn prepare_worker_provider_v2_invocation(
+        &self,
+        extension_id: &str,
+        node_id: &str,
+        inputs: InvocationInputs,
+        timeout_milliseconds: u64,
+        maximum_response_bytes: u64,
+        component_limits: ComponentLimits,
+    ) -> Result<WorkerPluginInvocation, ComponentHostError> {
+        self.prepare_worker_invocation_with_provider_request(
+            extension_id,
+            node_id,
+            inputs,
+            None,
+            timeout_milliseconds,
+            maximum_response_bytes,
+            component_limits,
+            true,
         )
     }
 
@@ -424,6 +502,7 @@ impl VerifiedComponentGeneration {
         timeout_milliseconds: u64,
         maximum_response_bytes: u64,
         component_limits: ComponentLimits,
+        provider_v2_route: bool,
     ) -> Result<WorkerPluginInvocation, ComponentHostError> {
         let component = self
             .components
@@ -435,10 +514,9 @@ impl VerifiedComponentGeneration {
                 extension_id: component.extension_id.clone(),
                 message: error.to_string(),
             })?;
-        if provider_manifest_v2.is_some() {
+        if provider_manifest_v2.is_some() != provider_v2_route {
             return Err(ComponentHostError::ExecutionBoundary(
-                "provider-v8 worker routing is unavailable until the canonical bridge is active"
-                    .to_owned(),
+                "worker invocation route disagrees with the signed provider world".to_owned(),
             ));
         }
         if !manifest.nodes.iter().any(|node| node.id == node_id) {
@@ -452,7 +530,7 @@ impl VerifiedComponentGeneration {
                 .iter()
                 .any(|claim| claim.node_id == node_id)
         });
-        if node_is_provider_bound != provider_request.is_some() {
+        if node_is_provider_bound != (provider_request.is_some() || provider_v2_route) {
             return Err(ComponentHostError::ExecutionBoundary(
                 "worker invocation mode disagrees with the signed provider binding".to_owned(),
             ));
@@ -477,6 +555,7 @@ impl VerifiedComponentGeneration {
             node_id: node_id.to_owned(),
             inputs,
             provider_request,
+            provider_v2: None,
             timeout_milliseconds,
             maximum_response_bytes,
             component_limits,
@@ -671,9 +750,12 @@ impl InstalledVerifiedPlugin {
         self.inner.provider_manifest_v2.as_deref()
     }
 
-    #[expect(
-        dead_code,
-        reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes retained provider-v2 authorization"
+        )
     )]
     pub(crate) fn provider_authorization_v2(&self) -> Option<&ProviderManifestAuthorizationV2> {
         self.inner.provider_authorization_v2.as_deref()
@@ -696,35 +778,220 @@ pub struct PreparedPluginInvocation {
     authorization: PluginAuthorization,
     context: NodeContext,
     plugin: InstalledVerifiedPlugin,
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes the provider-v2 component generation"
+        )
+    )]
+    generation: VerifiedComponentGeneration,
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes the provider-v2 plugin host"
+        )
+    )]
+    plugin_host: Arc<PluginHost>,
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes the provider-v2 lease host"
+        )
+    )]
+    lease_host: Arc<ComponentHostInner>,
     provider_price_badge: Option<NativeSchemaValue>,
-    _lease: InvocationLease,
+    _lease: Option<InvocationLease>,
 }
 
-#[allow(dead_code)]
 pub(crate) struct PreflightedProviderComponentCapsule {
-    grant: PreflightedProviderRuntimeActivationGrant,
-    worker_context: WorkerProviderInvocationContext,
+    route_authority: NativeProviderWorkerV2RouteAuthority,
+    envelope: WorkerProviderV2InvocationEnvelope,
     manifest_authorization: ProviderManifestAuthorizationV2,
     plugin: InstalledVerifiedPlugin,
     generation: VerifiedComponentGeneration,
     node_id: Arc<str>,
     plugin_host: Arc<PluginHost>,
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes the preflighted worker invocation"
+        )
+    )]
+    worker_invocation: WorkerPluginInvocation,
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes the preflighted deployment"
+        )
+    )]
+    deployment: WorkerRegistryDeploymentPlan,
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes the preflighted authorization"
+        )
+    )]
+    authorization: PluginAuthorization,
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes the preflighted node context"
+        )
+    )]
+    context: NodeContext,
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes the preflighted price badge"
+        )
+    )]
+    provider_price_badge: Option<NativeSchemaValue>,
     _lease: InvocationLease,
 }
 
-#[allow(dead_code)]
+#[cfg_attr(
+    not(feature = "test-support"),
+    expect(
+        dead_code,
+        reason = "Task427 deployment actuator consumes prepared provider-v2 worker execution"
+    )
+)]
+pub(crate) struct PreparedProviderV2WorkerExecution {
+    worker_invocation: WorkerPluginInvocation,
+    deployment: WorkerRegistryDeploymentPlan,
+    authorization: PluginAuthorization,
+    context: NodeContext,
+    plugin: InstalledVerifiedPlugin,
+    generation: VerifiedComponentGeneration,
+    route_authority: NativeProviderWorkerV2RouteAuthority,
+    provider_price_badge: Option<NativeSchemaValue>,
+    _lease: InvocationLease,
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) struct PreparedProviderV2SupervisorExecution {
+    invocation: Vec<u8>,
+    prompt_id: comfy_types::PromptId,
+    attempt_id: comfy_types::AttemptId,
+    bridge: comfy_runtime::NativeProviderWorkerV2SupervisorBridge,
+    _deployment: WorkerRegistryDeploymentPlan,
+    _authorization: PluginAuthorization,
+    _context: NodeContext,
+    _plugin: InstalledVerifiedPlugin,
+    _generation: VerifiedComponentGeneration,
+    _provider_price_badge: Option<NativeSchemaValue>,
+    _lease: InvocationLease,
+}
+
+impl PreparedProviderV2WorkerExecution {
+    #[cfg(feature = "test-support")]
+    pub fn into_supervised_parts(
+        self,
+    ) -> Result<
+        (
+            PreparedProviderV2SupervisorExecution,
+            comfy_runtime::NativeProviderWorkerV2ActuatorRoute,
+        ),
+        ComponentHostError,
+    > {
+        let timeout = Duration::from_millis(self.worker_invocation.timeout_milliseconds());
+        let cancellation = self.context.cancellation.clone();
+        let (bridge, actuator) = self
+            .route_authority
+            .into_supervised_route(timeout, cancellation)
+            .map_err(worker_deployment_error)?;
+        let invocation = self.worker_invocation.to_bytes()?;
+        Ok((
+            PreparedProviderV2SupervisorExecution {
+                invocation,
+                prompt_id: self.context.prompt_id,
+                attempt_id: self.context.attempt_id,
+                bridge,
+                _deployment: self.deployment,
+                _authorization: self.authorization,
+                _context: self.context,
+                _plugin: self.plugin,
+                _generation: self.generation,
+                _provider_price_badge: self.provider_price_badge,
+                _lease: self._lease,
+            },
+            actuator,
+        ))
+    }
+}
+
+#[cfg(feature = "test-support")]
+impl PreparedProviderV2SupervisorExecution {
+    pub async fn execute(
+        self,
+        supervisor: &mut comfy_runtime::RuntimeSupervisor,
+    ) -> Result<
+        (
+            WorkerPluginExecutionOutcome,
+            Option<comfy_runtime::ProviderTransportResponse>,
+        ),
+        ComponentHostError,
+    > {
+        supervisor
+            .execute_provider_v2(
+                self.prompt_id,
+                self.attempt_id,
+                self.invocation,
+                self.bridge,
+            )
+            .await
+            .map_err(worker_deployment_error)
+    }
+}
+
 impl PreflightedProviderComponentCapsule {
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes the provider-v2 preflight capsule"
+        )
+    )]
     pub(crate) fn new(
-        host: &ComponentHost,
-        grant: ProviderRuntimeActivationGrant,
-        worker_context: WorkerProviderInvocationContext,
+        prepared: PreparedPluginInvocation,
+        activation: NativeProviderWorkerV2Activation,
         worker_start: &comfy_runtime::NativeProviderWorkerSessionStart,
         manifest_authorization: ProviderManifestAuthorizationV2,
     ) -> Result<Self, ComponentHostError> {
-        let plugin = host.installed_plugin(&worker_start.extension_id)?;
-        let generation = host.verified_generation()?;
-        let deployment = generation.worker_deployment_plan()?;
-        let node_id: Arc<str> = Arc::from(worker_start.node_id.as_str());
+        let PreparedPluginInvocation {
+            worker_invocation,
+            deployment,
+            authorization,
+            context,
+            plugin,
+            generation,
+            plugin_host,
+            lease_host,
+            provider_price_badge,
+            _lease,
+        } = prepared;
+        if _lease.is_some() {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "provider-v2 preflight received an invocation lease too early".to_owned(),
+            ));
+        }
+        let node_id: Arc<str> = Arc::from(worker_invocation.node_id());
+        if worker_start.node_id != node_id.as_ref()
+            || worker_start.extension_id != plugin.extension_id()
+            || deployment.begin().generation() != worker_invocation.registry_generation()
+        {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "provider-v2 prepared invocation differs from its retained capsule".to_owned(),
+            ));
+        }
         if !plugin
             .manifest()
             .nodes
@@ -735,9 +1002,8 @@ impl PreflightedProviderComponentCapsule {
                 node_id.to_string(),
             )));
         }
-        let grant = grant
+        let preflight = activation
             .preflight_installed_component(
-                &worker_context,
                 &deployment,
                 worker_start,
                 manifest_authorization.clone(),
@@ -748,17 +1014,47 @@ impl PreflightedProviderComponentCapsule {
                     "provider component activation preflight failed: {error}"
                 )),
             })?;
-        let lease = host.begin_invocation_lease(&plugin)?;
+        let lease = begin_invocation_lease_for_host(&lease_host, &plugin)?;
+        let (envelope, route_authority) = preflight
+            .into_transport_parts()
+            .map_err(|error| ComponentHostError::ExecutionBoundary(error.to_string()))?;
+        let worker_invocation = worker_invocation.with_provider_v2(envelope.clone())?;
         Ok(Self {
-            grant,
-            worker_context,
+            route_authority,
+            envelope,
             manifest_authorization,
             plugin,
             generation,
             node_id,
-            plugin_host: host.inner.plugin_host.clone(),
+            plugin_host,
+            worker_invocation,
+            deployment,
+            authorization,
+            context,
+            provider_price_badge,
             _lease: lease,
         })
+    }
+
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes preflighted provider-v2 execution"
+        )
+    )]
+    pub(crate) fn into_worker_execution(self) -> PreparedProviderV2WorkerExecution {
+        PreparedProviderV2WorkerExecution {
+            worker_invocation: self.worker_invocation,
+            deployment: self.deployment,
+            authorization: self.authorization,
+            context: self.context,
+            plugin: self.plugin,
+            generation: self.generation,
+            route_authority: self.route_authority,
+            provider_price_badge: self.provider_price_badge,
+            _lease: self._lease,
+        }
     }
 }
 
@@ -767,7 +1063,7 @@ impl PreflightedProviderComponentCapsule {
     reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 pub(crate) struct PreparedProviderV2Invocation {
-    grant: Option<PreflightedProviderRuntimeActivationGrant>,
+    route_authority: Option<NativeProviderWorkerV2RouteAuthority>,
     worker_context: WorkerProviderInvocationContext,
     manifest_authorization: ProviderManifestAuthorizationV2,
     plugin: InstalledVerifiedPlugin,
@@ -797,7 +1093,7 @@ pub(crate) struct ProviderV2ComponentInvocation {
     reason = "production consumer is comfy-parity-provider-worker-stream-bridge"
 )]
 pub(crate) struct ProviderV2AppRoute {
-    grant: Option<PreflightedProviderRuntimeActivationGrant>,
+    route_authority: Option<NativeProviderWorkerV2RouteAuthority>,
     worker_context: WorkerProviderInvocationContext,
     manifest_authorization: ProviderManifestAuthorizationV2,
     route: crate::ProviderV2StreamRouteReceiver,
@@ -816,15 +1112,15 @@ impl PreflightedProviderComponentCapsule {
             crate::worker_streaming_contract(self.manifest_authorization.streaming_contract());
         let (route, receiver) = crate::provider_v2_stream_route();
         let runtime = crate::ProviderV2RuntimeHost::checked_from_certified_capsule(
-            self.worker_context.clone(),
+            self.envelope.context().clone(),
             contract,
             cancellation.clone(),
             route,
         )
         .map_err(|error| ComponentHostError::ExecutionBoundary(error.to_string()))?;
         Ok(PreparedProviderV2Invocation {
-            grant: Some(self.grant),
-            worker_context: self.worker_context,
+            route_authority: Some(self.route_authority),
+            worker_context: self.envelope.context().clone(),
             manifest_authorization: self.manifest_authorization,
             plugin: self.plugin,
             generation: self.generation,
@@ -870,7 +1166,7 @@ impl PreparedProviderV2Invocation {
                 _lease: self._lease,
             },
             ProviderV2AppRoute {
-                grant: self.grant,
+                route_authority: self.route_authority,
                 worker_context: self.worker_context,
                 manifest_authorization: self.manifest_authorization,
                 route: self.route,
@@ -902,7 +1198,7 @@ impl ProviderV2AppRoute {
         policy: &ProviderPolicy,
     ) -> Result<
         (
-            ProviderRuntimeAuthorityInput,
+            NativeProviderWorkerV2RouteSession,
             crate::ProviderV2BoundStartCall,
         ),
         ComponentHostError,
@@ -915,20 +1211,17 @@ impl ProviderV2AppRoute {
                 "provider-v2 route context differs from its certified activation".to_owned(),
             ));
         }
-        let authority = self
-            .grant
+        let session = self
+            .route_authority
             .take()
             .ok_or_else(|| {
                 ComponentHostError::ExecutionBoundary(
                     "provider-v2 activation grant was already consumed".to_owned(),
                 )
             })?
-            .bind(&crate::sdk_request_head(&head), policy)
+            .start(head, policy)
             .map_err(|error| ComponentHostError::ExecutionBoundary(error.to_string()))?;
-        Ok((
-            authority,
-            crate::ProviderV2BoundStartCall { call_id, reply },
-        ))
+        Ok((session, crate::ProviderV2BoundStartCall { call_id, reply }))
     }
 
     pub(crate) fn try_receive_stream_call(
@@ -959,19 +1252,23 @@ mod activation_preflight_tests {
             })
             .expect("private provider component capsule is missing");
         for retained in [
-            "grant:",
-            "worker_context:",
+            "route_authority:",
+            "envelope:",
             "manifest_authorization:",
             "plugin:",
             "generation:",
             "node_id:",
             "plugin_host:",
+            "worker_invocation:",
+            "deployment:",
+            "authorization:",
+            "context:",
             "_lease:",
         ] {
             assert!(fields.contains(retained));
         }
-        assert!(!fields.contains("pub grant:"));
-        assert!(!fields.contains("pub worker_context:"));
+        assert!(!fields.contains("pub route_authority:"));
+        assert!(!fields.contains("pub envelope:"));
         assert!(!fields.contains("pub manifest_authorization:"));
         let capsule = source
             .split("impl PreflightedProviderComponentCapsule")
@@ -983,30 +1280,20 @@ mod activation_preflight_tests {
             .nth(1)
             .and_then(|source| source.split(") -> Result").next())
             .expect("private capsule constructor signature is missing");
-        assert_eq!(constructor_signature.matches("worker_context").count(), 1);
-        assert_eq!(
-            constructor_signature
-                .matches("WorkerProviderInvocationContext")
-                .count(),
-            1
-        );
-        assert!(capsule.contains("let plugin = host.installed_plugin"));
-        assert!(capsule.contains("let generation = host.verified_generation"));
-        assert!(capsule.contains("let deployment = generation.worker_deployment_plan"));
+        assert_eq!(constructor_signature.matches("prepared").count(), 1);
+        assert_eq!(constructor_signature.matches("activation").count(), 1);
         let compact_capsule = capsule.split_whitespace().collect::<String>();
         assert!(compact_capsule.contains("plugin.manifest().nodes.iter().any"));
         assert!(compact_capsule.contains(
-            "grant.preflight_installed_component(&worker_context,&deployment,worker_start,manifest_authorization.clone(),)"
+            "activation.preflight_installed_component(&deployment,worker_start,manifest_authorization.clone(),)"
         ));
         assert!(capsule.contains(&call));
-        assert!(capsule.contains("&worker_context"));
         let ordered = [
-            "let plugin = host.installed_plugin",
-            "let generation = host.verified_generation",
-            "let deployment = generation.worker_deployment_plan",
+            "let PreparedPluginInvocation",
             "node.id == node_id.as_ref()",
             call.as_str(),
-            "let lease = host.begin_invocation_lease",
+            "into_transport_parts",
+            "worker_invocation.with_provider_v2",
             "Ok(Self",
         ];
         let mut previous = 0;
@@ -1079,7 +1366,7 @@ mod activation_preflight_tests {
             })
             .expect("prepared provider-v2 invocation fields are missing");
         for retained in [
-            "grant:",
+            "route_authority:",
             "worker_context:",
             "manifest_authorization:",
             "plugin:",
@@ -1096,6 +1383,8 @@ mod activation_preflight_tests {
                 "missing retained field {retained}"
             );
         }
+        assert!(!prepared.contains("grant:"));
+        assert!(!prepared.contains("ProviderRuntimeActivationGrant"));
         assert!(!prepared.contains("Clone"));
 
         let execution = source
@@ -1136,20 +1425,48 @@ mod activation_preflight_tests {
             .split("#[cfg(test)]")
             .next()
             .expect("plugin-host production source must exist");
+        let component_host_instantiations = production_source
+            .matches("instantiate_provider_component_v2(")
+            .count();
+        let plugin_host_instantiations = production_host_source
+            .matches("instantiate_provider_component_v2(")
+            .count();
+        assert_eq!(component_host_instantiations, 1);
+        assert_eq!(plugin_host_instantiations, 2);
         assert_eq!(
-            production_source
-                .matches("instantiate_provider_component_v2(")
-                .count()
-                + production_host_source
-                    .matches("instantiate_provider_component_v2(")
-                    .count(),
-            2,
-            "v2 instantiation must have one definition and one production callsite"
+            component_host_instantiations + plugin_host_instantiations,
+            3,
+            "v2 instantiation must have one private definition and two certified callsites"
         );
         assert!(
             production_host_source.contains("pub(crate) fn instantiate_provider_component_v2(")
         );
         assert!(!production_host_source.contains("pub fn instantiate_provider_component_v2("));
+
+        let worker_invocation = production_host_source
+            .split("pub fn invoke_provider_component_v2_for_worker(")
+            .nth(1)
+            .and_then(|source| source.split("\n    fn new_wasm_store(").next())
+            .expect("provider-v2 worker invocation owner is missing");
+        let ordered_worker_gates = [
+            ".provider_manifest_v2",
+            "Sha256::digest(expected_manifest.signing_payload()?)",
+            "envelope.provider_manifest_sha256().as_str() != expected_manifest_sha256",
+            "envelope.streaming_contract()",
+            "ProviderV2RuntimeHost::checked_for_worker_bridge(",
+            "self.instantiate_provider_component_v2(",
+        ];
+        let mut previous = 0;
+        for gate in ordered_worker_gates {
+            let position = worker_invocation
+                .find(gate)
+                .unwrap_or_else(|| panic!("provider-v2 worker gate is missing: {gate}"));
+            assert!(
+                position >= previous,
+                "provider-v2 worker gate is out of order: {gate}"
+            );
+            previous = position;
+        }
     }
 }
 
@@ -1180,6 +1497,112 @@ impl PreparedPluginInvocation {
 
     pub fn provider_price_badge(&self) -> Option<&NativeSchemaValue> {
         self.provider_price_badge.as_ref()
+    }
+
+    pub(crate) fn is_provider_v2(&self) -> bool {
+        self.plugin.is_provider_v2()
+    }
+
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator consumes provider-v2 activation"
+        )
+    )]
+    pub(crate) fn activate_provider_v2(
+        self,
+        attachment: &comfy_runtime::NativeProviderWorkerBridgeAttachment,
+    ) -> Result<PreparedProviderV2WorkerExecution, ComponentHostError> {
+        if !self.plugin.is_provider_v2()
+            || self.worker_invocation.provider_request().is_some()
+            || self.worker_invocation.provider_v2().is_some()
+        {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "provider-v2 worker activation mode is invalid".to_owned(),
+            ));
+        }
+        let manifest_authorization = self
+            .plugin
+            .provider_authorization_v2()
+            .cloned()
+            .ok_or_else(|| {
+                ComponentHostError::ExecutionBoundary(
+                    "provider-v2 worker activation omitted signed authorization".to_owned(),
+                )
+            })?;
+        let binding_set_sha256 = self
+            .plugin
+            .manifest()
+            .provider_binding
+            .as_ref()
+            .map(|binding| binding.bindings_sha256.clone())
+            .ok_or_else(|| {
+                ComponentHostError::ExecutionBoundary(
+                    "provider-v2 worker activation omitted its binding set".to_owned(),
+                )
+            })?;
+        let compiled_plan_sha256 = self
+            .context
+            .provider_execution()
+            .map_err(worker_deployment_error)?
+            .compiled_plan_sha256()
+            .to_owned();
+        let worker_start = comfy_runtime::NativeProviderWorkerSessionStart {
+            session_id: "provider-v2-controller-owned".to_owned(),
+            registry_generation: self.worker_invocation.registry_generation().get(),
+            registry_digest_sha256: self
+                .worker_invocation
+                .registry_digest_sha256()
+                .as_str()
+                .to_owned(),
+            extension_id: self.worker_invocation.extension_id().to_owned(),
+            extension_version: self.worker_invocation.extension_version().to_owned(),
+            plugin_identifier: self.worker_invocation.plugin_identifier().to_owned(),
+            plugin_version: self.worker_invocation.plugin_version().to_owned(),
+            manifest_digest_sha256: self
+                .worker_invocation
+                .manifest_digest_sha256()
+                .as_str()
+                .to_owned(),
+            component_digest_sha256: self
+                .worker_invocation
+                .component_digest_sha256()
+                .as_str()
+                .to_owned(),
+            authorization_generation_sha256: self
+                .worker_invocation
+                .authorization_generation()
+                .as_str()
+                .to_owned(),
+            binding_set_sha256,
+            node_id: self.worker_invocation.node_id().to_owned(),
+            compiled_plan_sha256,
+            maximum_response_bytes: self.worker_invocation.maximum_response_bytes(),
+        };
+        let profile_id = uuid::Uuid::parse_str(self.authorization.capabilities().profile_id())
+            .map(comfy_types::ProfileId)
+            .map_err(worker_deployment_error)?;
+        let activation = attachment
+            .activate_provider_v2(
+                profile_id,
+                self.context.prompt_id,
+                self.context.attempt_id,
+                &self.context.node_id.0,
+                self.worker_invocation.node_id(),
+                &self.deployment,
+                &worker_start,
+                manifest_authorization.clone(),
+                crate::worker_streaming_contract(manifest_authorization.streaming_contract()),
+            )
+            .map_err(worker_deployment_error)?;
+        PreflightedProviderComponentCapsule::new(
+            self,
+            activation,
+            &worker_start,
+            manifest_authorization,
+        )
+        .map(PreflightedProviderComponentCapsule::into_worker_execution)
     }
 }
 
@@ -1213,6 +1636,42 @@ struct InvocationGate {
 
 struct InvocationLease {
     host: Arc<ComponentHostInner>,
+}
+
+fn begin_invocation_lease_for_host(
+    host: &Arc<ComponentHostInner>,
+    plugin: &InstalledVerifiedPlugin,
+) -> Result<InvocationLease, ComponentHostError> {
+    let mut gate = host
+        .invocation_gate
+        .lock()
+        .map_err(|_| ComponentHostError::StateUnavailable)?;
+    while gate.quiescing {
+        gate = host
+            .invocation_gate_changed
+            .wait(gate)
+            .map_err(|_| ComponentHostError::StateUnavailable)?;
+    }
+    let state = host
+        .state
+        .read()
+        .map_err(|_| ComponentHostError::StateUnavailable)?;
+    let active = state
+        .by_extension
+        .get(plugin.extension_id())
+        .ok_or_else(|| ComponentHostError::Revoked(plugin.extension_id().to_owned()))?;
+    if !Arc::ptr_eq(&active.inner, &plugin.inner) {
+        return Err(ComponentHostError::Revoked(
+            plugin.extension_id().to_owned(),
+        ));
+    }
+    gate.active = gate
+        .active
+        .checked_add(1)
+        .ok_or(ComponentHostError::StateUnavailable)?;
+    drop(state);
+    drop(gate);
+    Ok(InvocationLease { host: host.clone() })
 }
 
 struct ConformanceInProcessExecutor {
@@ -1287,6 +1746,24 @@ impl PluginInvocationExecutor for ConformanceInProcessExecutor {
             instance
                 .invoke_provider(invocation.worker_invocation.node_id(), &provider_request)
                 .map_err(ComponentHostError::from)
+        })
+    }
+
+    fn execute_provider_v2<'a>(
+        &'a self,
+        _invocation: PreparedPluginInvocation,
+    ) -> Pin<
+        Box<
+            dyn Future<
+                    Output = Result<comfy_runtime::ProviderTransportResponse, ComponentHostError>,
+                > + Send
+                + 'a,
+        >,
+    > {
+        Box::pin(async {
+            Err(ComponentHostError::ExecutionBoundary(
+                "provider-v2 private worker route is unavailable in conformance mode".to_owned(),
+            ))
         })
     }
 }
@@ -1768,8 +2245,11 @@ impl ComponentHost {
             authorization: plugin.authorization().clone(),
             context,
             plugin: plugin.clone(),
+            generation,
+            plugin_host: self.inner.plugin_host.clone(),
+            lease_host: self.inner.clone(),
             provider_price_badge: None,
-            _lease: lease,
+            _lease: Some(lease),
         })
     }
 
@@ -1811,8 +2291,54 @@ impl ComponentHost {
             authorization: plugin.authorization().clone(),
             context,
             plugin: plugin.clone(),
+            generation,
+            plugin_host: self.inner.plugin_host.clone(),
+            lease_host: self.inner.clone(),
             provider_price_badge,
-            _lease: lease,
+            _lease: Some(lease),
+        })
+    }
+
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "Task427 deployment actuator prepares provider-v2 worker invocations"
+        )
+    )]
+    pub(crate) fn prepare_provider_v2_worker_invocation(
+        &self,
+        plugin: &InstalledVerifiedPlugin,
+        node_id: &str,
+        inputs: InvocationInputs,
+        context: NodeContext,
+    ) -> Result<PreparedPluginInvocation, ComponentHostError> {
+        if !plugin.is_provider_v2() {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "provider-v2 worker route requires a signed provider-v8 component".to_owned(),
+            ));
+        }
+        let generation = self.verified_generation()?;
+        let worker_invocation = generation.prepare_worker_provider_v2_invocation(
+            plugin.extension_id(),
+            node_id,
+            inputs,
+            self.inner.invocation_timeout_milliseconds,
+            self.inner.invocation_maximum_response_bytes,
+            self.inner.plugin_host.limits().clone(),
+        )?;
+        let deployment = generation.worker_deployment_plan()?;
+        Ok(PreparedPluginInvocation {
+            worker_invocation,
+            deployment,
+            authorization: plugin.authorization().clone(),
+            context,
+            plugin: plugin.clone(),
+            generation,
+            plugin_host: self.inner.plugin_host.clone(),
+            lease_host: self.inner.clone(),
+            provider_price_badge: None,
+            _lease: None,
         })
     }
 
@@ -1843,6 +2369,19 @@ impl ComponentHost {
         let prepared =
             self.prepare_provider_invocation(plugin, node_id, inputs, provider_request, context)?;
         self.executor().execute_provider(prepared).await
+    }
+
+    #[cfg(feature = "test-support")]
+    pub async fn execute_provider_v2_worker(
+        &self,
+        plugin: &InstalledVerifiedPlugin,
+        node_id: &str,
+        inputs: InvocationInputs,
+        context: NodeContext,
+    ) -> Result<comfy_runtime::ProviderTransportResponse, ComponentHostError> {
+        let prepared =
+            self.prepare_provider_v2_worker_invocation(plugin, node_id, inputs, context)?;
+        self.executor().execute_provider_v2(prepared).await
     }
 
     pub fn invoke(
@@ -1891,41 +2430,7 @@ impl ComponentHost {
         &self,
         plugin: &InstalledVerifiedPlugin,
     ) -> Result<InvocationLease, ComponentHostError> {
-        let mut gate = self
-            .inner
-            .invocation_gate
-            .lock()
-            .map_err(|_| ComponentHostError::StateUnavailable)?;
-        while gate.quiescing {
-            gate = self
-                .inner
-                .invocation_gate_changed
-                .wait(gate)
-                .map_err(|_| ComponentHostError::StateUnavailable)?;
-        }
-        let state = self
-            .inner
-            .state
-            .read()
-            .map_err(|_| ComponentHostError::StateUnavailable)?;
-        let active = state
-            .by_extension
-            .get(plugin.extension_id())
-            .ok_or_else(|| ComponentHostError::Revoked(plugin.extension_id().to_owned()))?;
-        if !Arc::ptr_eq(&active.inner, &plugin.inner) {
-            return Err(ComponentHostError::Revoked(
-                plugin.extension_id().to_owned(),
-            ));
-        }
-        gate.active = gate
-            .active
-            .checked_add(1)
-            .ok_or(ComponentHostError::StateUnavailable)?;
-        drop(state);
-        drop(gate);
-        Ok(InvocationLease {
-            host: self.inner.clone(),
-        })
+        begin_invocation_lease_for_host(&self.inner, plugin)
     }
 
     fn synchronize_components(

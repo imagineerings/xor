@@ -54,7 +54,7 @@ clock.workspace = true
 comfy_api.workspace = true
 comfy_backend_metal = { workspace = true, features = ["test-support"] }
 comfy_nodes.workspace = true
-comfy_plugin_host.workspace = true
+comfy_plugin_host = { workspace = true, features = ["test-support"] }
 comfy_plugin_sdk = { workspace = true, features = ["signing-tooling"] }
 extension_host.workspace = true
 fs = { workspace = true, features = ["test-support"] }

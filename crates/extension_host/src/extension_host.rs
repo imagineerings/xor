@@ -46,6 +46,7 @@ use remote::RemoteClient;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use settings::{SemanticTokenRules, Settings, SettingsStore};
+use sha2::{Digest as _, Sha256};
 use std::ops::RangeInclusive;
 use std::str::FromStr;
 use std::sync::LazyLock;
@@ -78,8 +79,11 @@ pub const COMFY_COMPONENT_MANIFEST_FILE: &str = "comfy-plugin.json";
 pub const COMFY_COMPONENT_BINARY_FILE: &str = "comfy-plugin.wasm";
 const MAXIMUM_COMFY_COMPONENT_MANIFEST_BYTES: u64 = 4 * 1024 * 1024;
 const MAXIMUM_COMFY_COMPONENT_BINARY_BYTES: u64 = 64 * 1024 * 1024;
+const MAXIMUM_EXTENSION_INDEX_BYTES: u64 = 16 * 1024 * 1024;
+const MAXIMUM_COMFY_COMPONENT_COUNT: usize = 1_024;
+const MAXIMUM_COMFY_COMPONENT_INVENTORY_BYTES: u64 = 1024 * 1024 * 1024;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InstalledComponent {
     extension_id: Arc<str>,
     extension_version: Arc<str>,
@@ -136,8 +140,115 @@ impl InstalledComponent {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ComponentInventoryCandidateDescriptorIdentity {
+    extension_id: Arc<str>,
+    extension_version: Arc<str>,
+    manifest_sha256: Arc<str>,
+    component_sha256: Arc<str>,
+}
+
+impl ComponentInventoryCandidateDescriptorIdentity {
+    pub fn extension_id(&self) -> &str {
+        &self.extension_id
+    }
+
+    pub fn extension_version(&self) -> &str {
+        &self.extension_version
+    }
+
+    pub fn manifest_sha256(&self) -> &str {
+        &self.manifest_sha256
+    }
+
+    pub fn component_sha256(&self) -> &str {
+        &self.component_sha256
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ComponentInventoryCandidateIdentity {
+    sha256: Arc<str>,
+    descriptors: Arc<[ComponentInventoryCandidateDescriptorIdentity]>,
+}
+
+impl ComponentInventoryCandidateIdentity {
+    pub fn as_sha256(&self) -> &str {
+        &self.sha256
+    }
+
+    pub fn descriptors(&self) -> &[ComponentInventoryCandidateDescriptorIdentity] {
+        &self.descriptors
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ComponentInventoryCandidate {
+    components: Vec<InstalledComponent>,
+    payload_bytes: u64,
+    identity: ComponentInventoryCandidateIdentity,
+}
+
+impl ComponentInventoryCandidate {
+    pub fn components(&self) -> &[InstalledComponent] {
+        &self.components
+    }
+
+    pub fn payload_bytes(&self) -> u64 {
+        self.payload_bytes
+    }
+
+    pub fn identity_sha256(&self) -> &str {
+        self.identity.as_sha256()
+    }
+
+    pub fn identity(&self) -> &ComponentInventoryCandidateIdentity {
+        &self.identity
+    }
+
+    pub fn into_components(self) -> Vec<InstalledComponent> {
+        self.components
+    }
+
+    pub fn into_parts(self) -> (Vec<InstalledComponent>, ComponentInventoryCandidateIdentity) {
+        (self.components, self.identity)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ComponentInventoryRejection {
+    diagnostic: Arc<str>,
+}
+
+impl ComponentInventoryRejection {
+    fn new(error: impl std::fmt::Display) -> Self {
+        Self {
+            diagnostic: Arc::from(error.to_string()),
+        }
+    }
+
+    pub fn diagnostic(&self) -> &str {
+        &self.diagnostic
+    }
+}
+
+impl std::fmt::Display for ComponentInventoryRejection {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.diagnostic)
+    }
+}
+
+impl std::error::Error for ComponentInventoryRejection {}
+
 pub trait ComponentLifecycleAdapter: Send + Sync {
     fn adapter_id(&self) -> &'static str;
+
+    fn synchronize_candidate(
+        &self,
+        candidate: ComponentInventoryCandidate,
+    ) -> BoxFuture<'static, std::result::Result<(), String>> {
+        self.synchronize(candidate.into_components())
+    }
 
     fn synchronize(
         &self,
@@ -296,6 +407,17 @@ fn format_component_adapter_errors(errors: &BTreeMap<String, String>) -> String 
         .join("; ")
 }
 
+fn component_inventory_adapter_errors(
+    diagnostic: &str,
+    adapters: &[Arc<dyn ComponentLifecycleAdapter>],
+) -> BTreeMap<String, String> {
+    log::error!("Failed to load installed components: {diagnostic}");
+    adapters
+        .iter()
+        .map(|adapter| (adapter.adapter_id().to_owned(), diagnostic.to_owned()))
+        .collect()
+}
+
 /// Extensions that should no longer be loaded or downloaded.
 ///
 /// These snippets should no longer be downloaded or loaded, because their
@@ -369,6 +491,7 @@ pub struct ExtensionStore {
     pub ssh_registered_tx: UnboundedSender<()>,
     component_lifecycle_adapters: Vec<Arc<dyn ComponentLifecycleAdapter>>,
     component_adapter_errors: BTreeMap<String, String>,
+    accepted_component_candidate: Option<ComponentInventoryCandidate>,
 }
 
 #[derive(Clone, Copy)]
@@ -498,7 +621,7 @@ pub fn init(
         .map(|adapters| adapters.0.clone())
         .unwrap_or_default();
     let store = cx.new(move |cx| {
-        let mut store = ExtensionStore::new(
+        ExtensionStore::new(
             paths::extensions_dir().clone(),
             None,
             extension_host_proxy,
@@ -507,10 +630,9 @@ pub fn init(
             client.http_client(),
             Some(client.telemetry().clone()),
             node_runtime,
+            component_lifecycle_adapters,
             cx,
-        );
-        store.component_lifecycle_adapters = component_lifecycle_adapters;
-        store
+        )
     });
 
     cx.on_action(|_: &ReloadExtensions, cx| {
@@ -545,6 +667,7 @@ impl ExtensionStore {
         builder_client: Arc<dyn HttpClient>,
         telemetry: Option<Arc<Telemetry>>,
         node_runtime: NodeRuntime,
+        component_lifecycle_adapters: Vec<Arc<dyn ComponentLifecycleAdapter>>,
         cx: &mut Context<Self>,
     ) -> Self {
         let work_dir = extensions_dir.join("work");
@@ -582,8 +705,9 @@ impl ExtensionStore {
 
             remote_clients: Default::default(),
             ssh_registered_tx: connection_registered_tx,
-            component_lifecycle_adapters: Vec::new(),
+            component_lifecycle_adapters,
             component_adapter_errors: BTreeMap::new(),
+            accepted_component_candidate: None,
         };
 
         // The extensions store maintains an index file, which contains a complete
@@ -619,7 +743,8 @@ impl ExtensionStore {
 
         // Immediately load all of the extensions in the initial manifest. If the
         // index needs to be rebuild, then enqueue
-        let load_initial_extensions = this.extensions_updated(extension_index, cx);
+        let load_initial_extensions =
+            this.extensions_updated(extension_index, !extension_index_needs_rebuild, cx);
         let mut reload_future = None;
         if extension_index_needs_rebuild {
             reload_future = Some(this.reload(None, cx));
@@ -654,7 +779,7 @@ impl ExtensionStore {
                                 let index = this
                                     .update(cx, |this, cx| this.rebuild_extension_index(cx))?
                                     .await;
-                                this.update(cx, |this, cx| this.extensions_updated(index, cx))?
+                                this.update(cx, |this, cx| this.extensions_updated(index, true, cx))?
                                     .await;
                                 index_changed = false;
                             }
@@ -1443,6 +1568,7 @@ impl ExtensionStore {
     fn extensions_updated(
         &mut self,
         mut new_index: ExtensionIndex,
+        component_inventory_is_canonical: bool,
         cx: &mut Context<Self>,
     ) -> Task<()> {
         let old_index = &self.extension_index;
@@ -1722,9 +1848,21 @@ impl ExtensionStore {
             .iter()
             .filter_map(|name| new_index.extensions.get(name).cloned())
             .collect::<Vec<_>>();
-        let component_extension_entries =
-            new_index.extensions.values().cloned().collect::<Vec<_>>();
+        let component_index_json = if component_inventory_is_canonical {
+            serde_json::to_string_pretty(&new_index).map_err(ComponentInventoryRejection::new)
+        } else {
+            Err(ComponentInventoryRejection::new(
+                "extension index is unavailable or stale and must be rebuilt",
+            ))
+        };
+        let component_extensions_dir = self
+            .installed_dir
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| self.installed_dir.clone());
+        let component_index_path = self.index_path.clone();
         let component_lifecycle_adapters = self.component_lifecycle_adapters.clone();
+        let accepted_component_candidate = self.accepted_component_candidate.clone();
         self.extension_index = new_index;
         cx.notify();
         cx.emit(Event::ExtensionsUpdated);
@@ -1766,13 +1904,40 @@ impl ExtensionStore {
             })
             .await;
 
-            let component_adapter_errors = Self::synchronize_component_adapters(
-                fs.clone(),
-                &root_dir,
-                &component_extension_entries,
-                &component_lifecycle_adapters,
-            )
-            .await;
+            let (component_adapter_errors, accepted_component_candidate) = match async {
+                let component_index_json = component_index_json?;
+                fs.save(
+                    &component_index_path,
+                    &component_index_json.as_str().into(),
+                    Default::default(),
+                )
+                .await
+                .map_err(ComponentInventoryRejection::new)?;
+                Self::canonical_component_inventory_candidate(fs.clone(), &component_extensions_dir)
+                    .await
+            }
+            .await
+            {
+                Ok(candidate) if accepted_component_candidate.as_ref() == Some(&candidate) => {
+                    (BTreeMap::new(), None)
+                }
+                Ok(candidate) => {
+                    let errors = Self::synchronize_component_candidate(
+                        candidate.clone(),
+                        &component_lifecycle_adapters,
+                    )
+                    .await;
+                    let accepted = errors.is_empty().then_some(candidate);
+                    (errors, accepted)
+                }
+                Err(error) => (
+                    component_inventory_adapter_errors(
+                        error.diagnostic(),
+                        &component_lifecycle_adapters,
+                    ),
+                    None,
+                ),
+            };
 
             let mut wasm_extensions = Vec::new();
             for extension in extension_entries {
@@ -1810,6 +1975,9 @@ impl ExtensionStore {
 
             this.update(cx, |this, cx| {
                 this.component_adapter_errors = component_adapter_errors;
+                if let Some(candidate) = accepted_component_candidate {
+                    this.accepted_component_candidate = Some(candidate);
+                }
                 let reload_result = if this.component_adapter_errors.is_empty() {
                     Ok(())
                 } else {
@@ -1886,28 +2054,29 @@ impl ExtensionStore {
             return BTreeMap::new();
         }
 
-        let components = match Self::load_installed_components(fs, installed_dir, entries).await {
-            Ok(components) => components,
+        let candidate = match Self::component_inventory_candidate_from_entries(
+            fs,
+            installed_dir,
+            entries,
+        )
+        .await
+        {
+            Ok(candidate) => candidate,
             Err(error) => {
-                let inventory_error = error.to_string();
-                log::error!("Failed to load installed components: {inventory_error}");
-                let mut errors = BTreeMap::new();
-                for adapter in adapters {
-                    let error = match adapter.synchronize(Vec::new()).await {
-                        Ok(()) => inventory_error.clone(),
-                        Err(revocation_error) => format!(
-                            "{inventory_error}; additionally failed to revoke stale component state: {revocation_error}"
-                        ),
-                    };
-                    errors.insert(adapter.adapter_id().to_owned(), error);
-                }
-                return errors;
+                return component_inventory_adapter_errors(error.diagnostic(), adapters);
             }
         };
 
+        Self::synchronize_component_candidate(candidate, adapters).await
+    }
+
+    async fn synchronize_component_candidate(
+        candidate: ComponentInventoryCandidate,
+        adapters: &[Arc<dyn ComponentLifecycleAdapter>],
+    ) -> BTreeMap<String, String> {
         let mut errors = BTreeMap::new();
         for adapter in adapters {
-            if let Err(error) = adapter.synchronize(components.clone()).await {
+            if let Err(error) = adapter.synchronize_candidate(candidate.clone()).await {
                 log::error!(
                     "Component lifecycle adapter {} failed: {error}",
                     adapter.adapter_id()
@@ -1918,12 +2087,170 @@ impl ExtensionStore {
         errors
     }
 
+    pub async fn canonical_component_inventory_candidate(
+        fs: Arc<dyn Fs>,
+        extensions_dir: &Path,
+    ) -> Result<ComponentInventoryCandidate, ComponentInventoryRejection> {
+        let index_path = extensions_dir.join("index.json");
+        let installed_dir = extensions_dir.join("installed");
+        let installed_metadata = fs
+            .metadata(&installed_dir)
+            .await
+            .map_err(ComponentInventoryRejection::new)?
+            .ok_or_else(|| {
+                ComponentInventoryRejection::new("installed extension directory is missing")
+            })?;
+        if installed_metadata.is_symlink || !installed_metadata.is_dir {
+            return Err(ComponentInventoryRejection::new(
+                "installed extension directory is not a direct real directory",
+            ));
+        }
+        let metadata = fs
+            .metadata(&index_path)
+            .await
+            .map_err(ComponentInventoryRejection::new)?
+            .ok_or_else(|| ComponentInventoryRejection::new("extension index is missing"))?;
+        if !metadata.mtime.bad_is_greater_than(installed_metadata.mtime) {
+            return Err(ComponentInventoryRejection::new(
+                "extension index is stale relative to the installed directory",
+            ));
+        }
+        validate_component_file_metadata(
+            &metadata,
+            &metadata,
+            metadata.len,
+            MAXIMUM_EXTENSION_INDEX_BYTES,
+            "extension index",
+            "installed",
+        )
+        .map_err(ComponentInventoryRejection::new)?;
+        let index_json = fs
+            .load(&index_path)
+            .await
+            .map_err(ComponentInventoryRejection::new)?;
+        let loaded_bytes = u64::try_from(index_json.len())
+            .map_err(|_| ComponentInventoryRejection::new("extension index length overflowed"))?;
+        let loaded_metadata = fs
+            .metadata(&index_path)
+            .await
+            .map_err(ComponentInventoryRejection::new)?
+            .ok_or_else(|| {
+                ComponentInventoryRejection::new("extension index disappeared while loading")
+            })?;
+        validate_component_file_metadata(
+            &metadata,
+            &loaded_metadata,
+            loaded_bytes,
+            MAXIMUM_EXTENSION_INDEX_BYTES,
+            "extension index",
+            "installed",
+        )
+        .map_err(ComponentInventoryRejection::new)?;
+        if loaded_bytes == 0 {
+            return Err(ComponentInventoryRejection::new(
+                "extension index cannot be empty",
+            ));
+        }
+        let index: ExtensionIndex =
+            serde_json::from_str(&index_json).map_err(ComponentInventoryRejection::new)?;
+        Self::component_inventory_candidate_for_index(fs, extensions_dir, &index).await
+    }
+
+    async fn component_inventory_candidate_for_index(
+        fs: Arc<dyn Fs>,
+        extensions_dir: &Path,
+        index: &ExtensionIndex,
+    ) -> Result<ComponentInventoryCandidate, ComponentInventoryRejection> {
+        let entries = index.extensions.values().cloned().collect::<Vec<_>>();
+        Self::component_inventory_candidate_from_entries(
+            fs,
+            &extensions_dir.join("installed"),
+            &entries,
+        )
+        .await
+    }
+
+    async fn component_inventory_candidate_from_entries(
+        fs: Arc<dyn Fs>,
+        installed_dir: &Path,
+        entries: &[ExtensionIndexEntry],
+    ) -> Result<ComponentInventoryCandidate, ComponentInventoryRejection> {
+        let components = Self::load_installed_components(fs, installed_dir, entries)
+            .await
+            .map_err(ComponentInventoryRejection::new)?;
+        let payload_bytes = components.iter().try_fold(0_u64, |total, component| {
+            let manifest_bytes = u64::try_from(component.manifest_bytes().len()).ok()?;
+            let component_bytes = u64::try_from(component.component_bytes().len()).ok()?;
+            total
+                .checked_add(manifest_bytes)?
+                .checked_add(component_bytes)
+        });
+        let payload_bytes = payload_bytes.ok_or_else(|| {
+            ComponentInventoryRejection::new("component inventory payload length overflowed")
+        })?;
+        let mut digest = Sha256::new();
+        digest.update(b"zed.extension-host.component-inventory-candidate.v1\0");
+        digest.update(
+            u64::try_from(components.len())
+                .map_err(ComponentInventoryRejection::new)?
+                .to_le_bytes(),
+        );
+        for component in &components {
+            for field in [
+                component.extension_id().as_bytes(),
+                component.extension_version().as_bytes(),
+                component.manifest_bytes(),
+                component.component_bytes(),
+            ] {
+                digest.update(
+                    u64::try_from(field.len())
+                        .map_err(ComponentInventoryRejection::new)?
+                        .to_le_bytes(),
+                );
+                digest.update(field);
+            }
+        }
+        let descriptors = components
+            .iter()
+            .map(|component| ComponentInventoryCandidateDescriptorIdentity {
+                extension_id: component.extension_id.clone(),
+                extension_version: component.extension_version.clone(),
+                manifest_sha256: Arc::from(format!(
+                    "{:x}",
+                    Sha256::digest(component.manifest_bytes())
+                )),
+                component_sha256: Arc::from(format!(
+                    "{:x}",
+                    Sha256::digest(component.component_bytes())
+                )),
+            })
+            .collect::<Vec<_>>();
+        Ok(ComponentInventoryCandidate {
+            components,
+            payload_bytes,
+            identity: ComponentInventoryCandidateIdentity {
+                sha256: Arc::from(format!("{:x}", digest.finalize())),
+                descriptors: descriptors.into(),
+            },
+        })
+    }
+
     async fn load_installed_components(
         fs: Arc<dyn Fs>,
         installed_dir: &Path,
         entries: &[ExtensionIndexEntry],
     ) -> Result<Vec<InstalledComponent>> {
+        if entries.len() > MAXIMUM_COMFY_COMPONENT_COUNT {
+            bail!(
+                "component inventory contains {} entries; maximum is {MAXIMUM_COMFY_COMPONENT_COUNT}",
+                entries.len()
+            );
+        }
         let mut components = Vec::new();
+        components
+            .try_reserve(entries.len())
+            .map_err(|_| anyhow!("component inventory allocation failed"))?;
+        let mut payload_bytes = 0_u64;
         for entry in entries {
             let extension_id = entry.manifest.id.clone();
             let extension_dir = checked_extension_dir(installed_dir, &extension_id)?;
@@ -2010,6 +2337,22 @@ impl ExtensionStore {
                 &extension_id,
             )
             .await?;
+            payload_bytes =
+                payload_bytes
+                    .checked_add(u64::try_from(manifest_bytes.len()).map_err(|_| {
+                        anyhow!("component manifest for `{extension_id}` is oversized")
+                    })?)
+                    .and_then(|total| {
+                        u64::try_from(component_bytes.len())
+                            .ok()
+                            .and_then(|length| total.checked_add(length))
+                    })
+                    .ok_or_else(|| anyhow!("component inventory payload length overflowed"))?;
+            if payload_bytes > MAXIMUM_COMFY_COMPONENT_INVENTORY_BYTES {
+                bail!(
+                    "component inventory contains {payload_bytes} payload bytes; maximum is {MAXIMUM_COMFY_COMPONENT_INVENTORY_BYTES}"
+                );
+            }
             components.push(InstalledComponent::checked(
                 extension_id,
                 entry.manifest.version.clone(),

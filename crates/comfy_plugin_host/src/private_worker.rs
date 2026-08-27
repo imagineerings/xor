@@ -1,14 +1,19 @@
+#[cfg(feature = "test-support")]
+use crate::component_host::PreparedProviderV2SupervisorExecution;
 use crate::{
     ComponentHostError, InvocationResult, PluginError, PluginInvocationExecutor,
     PreparedPluginInvocation, ProviderInvocationResult,
 };
 use comfy_plugin_sdk::InvocationError;
 use comfy_plugin_sdk::ProviderResultReceiptSet;
+#[cfg(feature = "test-support")]
+use comfy_runtime::NativeProviderWorkerV2ActuatorRoute;
 use comfy_runtime::{
     NativeProviderWorkerBridgeAttachment, PluginAuthorizationVerifier, PluginCapabilityBroker,
     PluginCapabilityInvocation, PluginServiceInvocationContext, ProviderCostAuthorizationAuthority,
-    ProviderResultReceiptAuthority, ProviderResultReceiptIssuer, RetainedPluginExecution,
-    RuntimeSupervisor, RuntimeSupervisorError, WorkerLaunchConfig, WorkerRegistryDeploymentPlan,
+    ProviderResultReceiptAuthority, ProviderResultReceiptIssuer, ProviderTransportResponse,
+    RetainedPluginExecution, RuntimeSupervisor, RuntimeSupervisorError, WorkerLaunchConfig,
+    WorkerRegistryDeploymentPlan,
 };
 use comfy_types::{
     AttemptId, ProfileId, PromptId, WorkerPluginExecutionFailure, WorkerPluginExecutionOutcome,
@@ -26,7 +31,27 @@ pub struct PrivateWorkerPluginExecutor {
     broker: PluginCapabilityBroker,
     provider_result_receipts: Option<PrivateWorkerProviderResultReceipts>,
     provider_worker_bridge: Mutex<Option<NativeProviderWorkerBridgeAttachment>>,
+    #[cfg(feature = "test-support")]
+    provider_v2_actuator: Mutex<Option<PrivateWorkerProviderV2ActuatorAttachment>>,
     commands: async_channel::Sender<PrivateWorkerCommand>,
+}
+
+#[cfg(feature = "test-support")]
+#[derive(Clone)]
+pub struct PrivateWorkerProviderV2ActuatorAttachment {
+    sender: async_channel::Sender<NativeProviderWorkerV2ActuatorRoute>,
+}
+
+#[cfg(feature = "test-support")]
+pub fn private_worker_provider_v2_actuator_route() -> (
+    PrivateWorkerProviderV2ActuatorAttachment,
+    async_channel::Receiver<NativeProviderWorkerV2ActuatorRoute>,
+) {
+    let (sender, receiver) = async_channel::bounded(1);
+    (
+        PrivateWorkerProviderV2ActuatorAttachment { sender },
+        receiver,
+    )
 }
 
 #[derive(Clone)]
@@ -37,13 +62,29 @@ struct PrivateWorkerProviderResultReceipts {
     cost_authority: Option<Arc<dyn ProviderCostAuthorizationAuthority>>,
 }
 
-struct PrivateWorkerCommand {
-    deployment: WorkerRegistryDeploymentPlan,
-    invocation: Vec<u8>,
-    prompt_id: PromptId,
-    attempt_id: AttemptId,
-    capability_invocation: PluginCapabilityInvocation,
-    response: async_channel::Sender<Result<RetainedPluginExecution, RuntimeSupervisorError>>,
+enum PrivateWorkerCommand {
+    Legacy {
+        deployment: WorkerRegistryDeploymentPlan,
+        invocation: Vec<u8>,
+        prompt_id: PromptId,
+        attempt_id: AttemptId,
+        capability_invocation: PluginCapabilityInvocation,
+        response: async_channel::Sender<Result<RetainedPluginExecution, RuntimeSupervisorError>>,
+    },
+    #[cfg(feature = "test-support")]
+    ProviderV2 {
+        deployment: WorkerRegistryDeploymentPlan,
+        execution: PreparedProviderV2SupervisorExecution,
+        response: async_channel::Sender<
+            Result<
+                (
+                    WorkerPluginExecutionOutcome,
+                    Option<ProviderTransportResponse>,
+                ),
+                RuntimeSupervisorError,
+            >,
+        >,
+    },
 }
 
 struct PrivateWorkerState {
@@ -127,6 +168,8 @@ impl PrivateWorkerPluginExecutor {
             broker,
             provider_result_receipts,
             provider_worker_bridge: Mutex::new(None),
+            #[cfg(feature = "test-support")]
+            provider_v2_actuator: Mutex::new(None),
             commands,
         }))
     }
@@ -155,6 +198,28 @@ impl PrivateWorkerPluginExecutor {
         Ok(())
     }
 
+    #[cfg(feature = "test-support")]
+    pub fn attach_provider_v2_actuator(
+        &self,
+        actuator: PrivateWorkerProviderV2ActuatorAttachment,
+    ) -> Result<(), ComponentHostError> {
+        let mut current = self.provider_v2_actuator.lock().map_err(|error| {
+            ComponentHostError::ExecutionBoundary(format!(
+                "private worker provider-v2 actuator slot is unavailable: {error}"
+            ))
+        })?;
+        if current
+            .as_ref()
+            .is_some_and(|attachment| !attachment.sender.is_closed())
+        {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "private worker already has a live provider-v2 actuator route".to_owned(),
+            ));
+        }
+        *current = Some(actuator);
+        Ok(())
+    }
+
     async fn execute_prepared(
         &self,
         invocation: PreparedPluginInvocation,
@@ -167,6 +232,12 @@ impl PrivateWorkerPluginExecutor {
             self.launch.profile_id,
             invocation.authorization().capabilities().profile_id(),
         )?;
+        if invocation.is_provider_v2() {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "provider-v2 production actuation is unavailable until a deployment-owned actuator is installed"
+                    .to_owned(),
+            ));
+        }
         let timeout =
             std::time::Duration::from_millis(invocation.worker_invocation().timeout_milliseconds());
         let deadline = Instant::now().checked_add(timeout).ok_or_else(|| {
@@ -239,7 +310,7 @@ impl PrivateWorkerPluginExecutor {
             .begin_invocation(service_context)
             .map_err(worker_boundary_error)?;
         let (response, result) = async_channel::bounded(1);
-        let command = PrivateWorkerCommand {
+        let command = PrivateWorkerCommand::Legacy {
             deployment: invocation.deployment().clone(),
             invocation: invocation.worker_invocation().to_bytes()?,
             prompt_id: context.prompt_id,
@@ -261,6 +332,88 @@ impl PrivateWorkerPluginExecutor {
                 )
             })?
             .map_err(worker_boundary_error)
+    }
+
+    #[cfg(feature = "test-support")]
+    async fn execute_provider_v2_prepared(
+        &self,
+        invocation: PreparedPluginInvocation,
+    ) -> Result<
+        (
+            WorkerPluginExecutionOutcome,
+            Option<ProviderTransportResponse>,
+        ),
+        ComponentHostError,
+    > {
+        let context = invocation.context();
+        context.cancellation.check().map_err(|_| {
+            ComponentHostError::Plugin(PluginError::Invocation(InvocationError::Cancelled))
+        })?;
+        verify_profile(
+            self.launch.profile_id,
+            invocation.authorization().capabilities().profile_id(),
+        )?;
+        let deployment = invocation.deployment().clone();
+        let prepared = {
+            let bridge = self.provider_worker_bridge.lock().map_err(|error| {
+                ComponentHostError::ExecutionBoundary(format!(
+                    "private worker provider bridge slot is unavailable: {error}"
+                ))
+            })?;
+            let attachment = bridge.as_ref().ok_or_else(|| {
+                ComponentHostError::ExecutionBoundary(
+                    "provider-v2 private worker execution requires the live controller bridge"
+                        .to_owned(),
+                )
+            })?;
+            invocation.activate_provider_v2(attachment)?
+        };
+        let actuator_sender = self
+            .provider_v2_actuator
+            .lock()
+            .map_err(|error| {
+                ComponentHostError::ExecutionBoundary(format!(
+                    "private worker provider-v2 actuator slot is unavailable: {error}"
+                ))
+            })?
+            .as_ref()
+            .filter(|attachment| !attachment.sender.is_closed())
+            .map(|attachment| attachment.sender.clone())
+            .ok_or_else(|| {
+                ComponentHostError::ExecutionBoundary(
+                    "provider-v2 production actuation is unavailable until a deployment-owned actuator is installed"
+                        .to_owned(),
+                )
+            })?;
+        let (execution, actuator) = prepared.into_supervised_parts()?;
+        actuator_sender.try_send(actuator).map_err(|error| {
+            ComponentHostError::ExecutionBoundary(format!(
+                "provider-v2 actuator capacity-one route rejected execution: {error}"
+            ))
+        })?;
+        let (response, result) = async_channel::bounded(1);
+        self.commands
+            .send(PrivateWorkerCommand::ProviderV2 {
+                deployment,
+                execution,
+                response,
+            })
+            .await
+            .map_err(|_| {
+                ComponentHostError::ExecutionBoundary(
+                    "private plugin worker actor is unavailable".to_owned(),
+                )
+            })?;
+        let outcome = result
+            .recv()
+            .await
+            .map_err(|_| {
+                ComponentHostError::ExecutionBoundary(
+                    "private plugin worker actor closed its provider-v2 response".to_owned(),
+                )
+            })?
+            .map_err(worker_boundary_error)?;
+        validate_provider_v2_worker_outcome(outcome)
     }
 }
 
@@ -311,6 +464,42 @@ impl PluginInvocationExecutor for PrivateWorkerPluginExecutor {
             }
         })
     }
+
+    fn execute_provider_v2<'a>(
+        &'a self,
+        invocation: PreparedPluginInvocation,
+    ) -> Pin<
+        Box<dyn Future<Output = Result<ProviderTransportResponse, ComponentHostError>> + Send + 'a>,
+    > {
+        Box::pin(async move {
+            #[cfg(feature = "test-support")]
+            {
+                let (outcome, materialization) =
+                    self.execute_provider_v2_prepared(invocation).await?;
+                return match outcome {
+                    WorkerPluginExecutionOutcome::Succeeded(_) => {
+                        materialization.ok_or_else(|| {
+                            ComponentHostError::ExecutionBoundary(
+                                "provider-v2 successful execution lost its materialization"
+                                    .to_owned(),
+                            )
+                        })
+                    }
+                    WorkerPluginExecutionOutcome::Failed(failure) => {
+                        decode_worker_failure(&failure)
+                    }
+                };
+            }
+            #[cfg(not(feature = "test-support"))]
+            {
+                drop(invocation);
+                Err(ComponentHostError::ExecutionBoundary(
+                    "provider-v2 production actuation is unavailable until Task427 installs the deployment-owned actuator"
+                        .to_owned(),
+                ))
+            }
+        })
+    }
 }
 
 fn run_private_worker_actor(
@@ -324,20 +513,49 @@ fn run_private_worker_actor(
             authorization_verifier: None,
         };
         while let Ok(command) = commands.recv().await {
-            let response = command.response.clone();
-            let result = execute_private_worker_command(&launch, &mut state, command).await;
-            if result
-                .as_ref()
-                .is_err_and(worker_failure_requires_supervisor_reset)
-            {
-                state.supervisor = None;
-                state.deployed_registry_identity = None;
-                state.authorization_verifier = None;
-            }
-            if response.send(result).await.is_err() {
-                state.supervisor = None;
-                state.deployed_registry_identity = None;
-                state.authorization_verifier = None;
+            match command {
+                PrivateWorkerCommand::Legacy {
+                    deployment,
+                    invocation,
+                    prompt_id,
+                    attempt_id,
+                    capability_invocation,
+                    response,
+                } => {
+                    let result = execute_private_worker_command(
+                        &launch,
+                        &mut state,
+                        deployment,
+                        invocation,
+                        prompt_id,
+                        attempt_id,
+                        capability_invocation,
+                    )
+                    .await;
+                    let reset = result
+                        .as_ref()
+                        .is_err_and(worker_failure_requires_supervisor_reset);
+                    if response.send(result).await.is_err() || reset {
+                        reset_private_worker_state(&mut state);
+                    }
+                }
+                #[cfg(feature = "test-support")]
+                PrivateWorkerCommand::ProviderV2 {
+                    deployment,
+                    execution,
+                    response,
+                } => {
+                    let result = execute_private_worker_provider_v2_command(
+                        &launch, &mut state, deployment, execution,
+                    )
+                    .await;
+                    let reset = result
+                        .as_ref()
+                        .is_err_and(worker_failure_requires_supervisor_reset);
+                    if response.send(result).await.is_err() || reset {
+                        reset_private_worker_state(&mut state);
+                    }
+                }
             }
         }
     });
@@ -346,59 +564,98 @@ fn run_private_worker_actor(
 async fn execute_private_worker_command(
     launch: &WorkerLaunchConfig,
     state: &mut PrivateWorkerState,
-    command: PrivateWorkerCommand,
+    deployment: WorkerRegistryDeploymentPlan,
+    invocation: Vec<u8>,
+    prompt_id: PromptId,
+    attempt_id: AttemptId,
+    capability_invocation: PluginCapabilityInvocation,
 ) -> Result<RetainedPluginExecution, RuntimeSupervisorError> {
-    let registry_identity = (
-        command.deployment.begin().generation(),
-        command
-            .deployment
-            .begin()
-            .registry_digest_sha256()
-            .as_str()
-            .to_owned(),
-    );
-    if state.authorization_verifier.as_ref() != Some(command.deployment.authorization_verifier()) {
-        state.supervisor = None;
-        state.deployed_registry_identity = None;
-        state.authorization_verifier = None;
-    }
-    if state.supervisor.is_none() {
-        let mut launch = launch.clone();
-        launch.plugin_authorization_verifier =
-            Some(command.deployment.authorization_verifier().clone());
-        let mut supervisor = RuntimeSupervisor::start(launch).await?;
-        if let Err(error) = supervisor.deploy_registry(&command.deployment).await {
-            return Err(worker_failure_with_logs(error, &supervisor));
-        }
-        state.supervisor = Some(supervisor);
-        state.deployed_registry_identity = Some(registry_identity.clone());
-        state.authorization_verifier = Some(command.deployment.authorization_verifier().clone());
-    } else if state.deployed_registry_identity.as_ref() != Some(&registry_identity) {
-        let supervisor = state
-            .supervisor
-            .as_mut()
-            .ok_or(RuntimeSupervisorError::NotRunning)?;
-        if let Err(error) = supervisor.deploy_registry(&command.deployment).await {
-            return Err(worker_failure_with_logs(error, supervisor));
-        }
-        state.deployed_registry_identity = Some(registry_identity);
-    }
+    ensure_private_worker_supervisor(launch, state, &deployment).await?;
     let supervisor = state
         .supervisor
         .as_mut()
         .ok_or(RuntimeSupervisorError::NotRunning)?;
     match supervisor
         .execute_plugin_retaining_capabilities(
-            command.prompt_id,
-            command.attempt_id,
-            command.invocation,
-            command.capability_invocation,
+            prompt_id,
+            attempt_id,
+            invocation,
+            capability_invocation,
         )
         .await
     {
         Ok(outcome) => Ok(outcome),
         Err(error) => Err(worker_failure_with_logs(error, supervisor)),
     }
+}
+
+#[cfg(feature = "test-support")]
+async fn execute_private_worker_provider_v2_command(
+    launch: &WorkerLaunchConfig,
+    state: &mut PrivateWorkerState,
+    deployment: WorkerRegistryDeploymentPlan,
+    execution: PreparedProviderV2SupervisorExecution,
+) -> Result<
+    (
+        WorkerPluginExecutionOutcome,
+        Option<ProviderTransportResponse>,
+    ),
+    RuntimeSupervisorError,
+> {
+    ensure_private_worker_supervisor(launch, state, &deployment).await?;
+    let supervisor = state
+        .supervisor
+        .as_mut()
+        .ok_or(RuntimeSupervisorError::NotRunning)?;
+    execution
+        .execute(supervisor)
+        .await
+        .map_err(|error| RuntimeSupervisorError::Protocol(error.to_string()))
+}
+
+async fn ensure_private_worker_supervisor(
+    launch: &WorkerLaunchConfig,
+    state: &mut PrivateWorkerState,
+    deployment: &WorkerRegistryDeploymentPlan,
+) -> Result<(), RuntimeSupervisorError> {
+    let registry_identity = (
+        deployment.begin().generation(),
+        deployment
+            .begin()
+            .registry_digest_sha256()
+            .as_str()
+            .to_owned(),
+    );
+    if state.authorization_verifier.as_ref() != Some(deployment.authorization_verifier()) {
+        reset_private_worker_state(state);
+    }
+    if state.supervisor.is_none() {
+        let mut launch = launch.clone();
+        launch.plugin_authorization_verifier = Some(deployment.authorization_verifier().clone());
+        let mut supervisor = RuntimeSupervisor::start(launch).await?;
+        if let Err(error) = supervisor.deploy_registry(deployment).await {
+            return Err(worker_failure_with_logs(error, &supervisor));
+        }
+        state.supervisor = Some(supervisor);
+        state.deployed_registry_identity = Some(registry_identity.clone());
+        state.authorization_verifier = Some(deployment.authorization_verifier().clone());
+    } else if state.deployed_registry_identity.as_ref() != Some(&registry_identity) {
+        let supervisor = state
+            .supervisor
+            .as_mut()
+            .ok_or(RuntimeSupervisorError::NotRunning)?;
+        if let Err(error) = supervisor.deploy_registry(deployment).await {
+            return Err(worker_failure_with_logs(error, supervisor));
+        }
+        state.deployed_registry_identity = Some(registry_identity);
+    }
+    Ok(())
+}
+
+fn reset_private_worker_state(state: &mut PrivateWorkerState) {
+    state.supervisor = None;
+    state.deployed_registry_identity = None;
+    state.authorization_verifier = None;
 }
 
 fn worker_failure_with_logs(
@@ -513,6 +770,25 @@ fn decode_worker_failure<T>(
     })
 }
 
+#[cfg(any(test, feature = "test-support"))]
+fn validate_provider_v2_worker_outcome(
+    outcome: (
+        WorkerPluginExecutionOutcome,
+        Option<ProviderTransportResponse>,
+    ),
+) -> Result<
+    (
+        WorkerPluginExecutionOutcome,
+        Option<ProviderTransportResponse>,
+    ),
+    ComponentHostError,
+> {
+    if let WorkerPluginExecutionOutcome::Failed(failure) = &outcome.0 {
+        return decode_worker_failure(failure);
+    }
+    Ok(outcome)
+}
+
 fn worker_boundary_error(error: impl std::fmt::Display) -> ComponentHostError {
     ComponentHostError::ExecutionBoundary(error.to_string())
 }
@@ -520,6 +796,19 @@ fn worker_boundary_error(error: impl std::fmt::Display) -> ComponentHostError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn provider_v2_cancelled_worker_outcome_preserves_typed_cancellation() {
+        assert!(matches!(
+            validate_provider_v2_worker_outcome((
+                WorkerPluginExecutionOutcome::Failed(WorkerPluginExecutionFailure::Cancelled),
+                None,
+            )),
+            Err(ComponentHostError::Plugin(PluginError::Invocation(
+                InvocationError::Cancelled
+            )))
+        ));
+    }
 
     #[test]
     fn rejected_registry_replacement_preserves_the_live_supervisor() {

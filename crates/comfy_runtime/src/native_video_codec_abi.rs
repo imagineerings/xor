@@ -81,6 +81,7 @@ pub(crate) struct AvChannelLayout {
 pub(crate) const AV_NUM_DATA_POINTERS: usize = 8;
 pub(crate) const AV_MEDIA_TYPE_VIDEO: c_int = 0;
 pub(crate) const AV_MEDIA_TYPE_AUDIO: c_int = 1;
+pub(crate) const AV_CHANNEL_ORDER_NATIVE: c_int = 1;
 pub(crate) const AV_CODEC_ID_H264: c_int = 27;
 pub(crate) const AV_CODEC_ID_VP9: c_int = 167;
 pub(crate) const AV_CODEC_ID_AV1: c_int = 225;
@@ -108,6 +109,7 @@ pub(crate) const AV_ROUND_PASS_MIN_MAX: c_int = 8192;
 pub(crate) const AV_NO_PRESENTATION_TIMESTAMP: i64 = i64::MIN;
 pub(crate) const AV_SEEK_SIZE: c_int = 0x1_0000;
 pub(crate) const AV_SEEK_FORCE: c_int = 0x2_0000;
+pub(crate) const AV_SEEK_FLAG_BACKWARD: c_int = 1;
 pub(crate) const AV_FORMAT_FLAG_CUSTOM_IO: c_int = 0x0080;
 pub(crate) const AV_CODEC_FLAG_GLOBAL_HEADER: c_int = 1 << 22;
 pub(crate) const AV_OPTION_SEARCH_CHILDREN: c_int = 1;

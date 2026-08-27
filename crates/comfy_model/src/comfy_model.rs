@@ -14,6 +14,7 @@ pub mod clip_tokenizer;
 pub mod clip_vision;
 pub mod cogvideox_family;
 pub mod conditioning;
+pub mod conditioning_resources;
 pub mod controlnet;
 pub mod cosmos_family;
 pub mod depth_anything_3;
@@ -33,6 +34,7 @@ pub mod ltx_family;
 pub mod lumina_zimage_family;
 pub mod model_family;
 pub mod model_store;
+pub mod moge;
 pub mod native_node_payload;
 pub mod native_ops;
 pub mod omnigen2_boogu_family;
@@ -220,6 +222,16 @@ pub use cogvideox_family::{
     COGVIDEOX_DETECTION_MARKER_KEYS, COGVIDEOX_LAYOUT_SIGNATURES, COGVIDEOX_PATCH_PROJECTION_KEYS,
     CogVideoXConfiguration, CogVideoXLatentVariant, CogVideoXLayout,
     configuration_for_probe as cogvideox_configuration_for_probe,
+};
+pub use conditioning_resources::{
+    FLUX_REDUX_SOURCE_SHA256, GLIGEN_ATTENTION_SOURCE_SHA256, GLIGEN_OPENAIMODEL_SOURCE_SHA256,
+    GLIGEN_SAMPLERS_SOURCE_SHA256, GLIGEN_SOURCE_SHA256, NativeGligenCheckpoint, NativeGligenError,
+    NativeGligenFuserLocation, NativeGligenPositionParameter, NativeGligenPreparedPositions,
+    NativeGligenRegion, NativeGligenResource, NativePhotoMakerCheckpoint,
+    NativePhotoMakerCheckpointEntry, NativePhotoMakerError, NativePhotoMakerResource,
+    NativeStyleModelCheckpoint, NativeStyleModelError, NativeStyleModelResource,
+    PHOTOMAKER_CLIP_VISION_SOURCE_SHA256, PHOTOMAKER_SOURCE_SHA256, STYLE_ADAPTER_SOURCE_SHA256,
+    STYLE_MODEL_NODES_SOURCE_SHA256, STYLE_MODEL_OPS_SOURCE_SHA256, STYLE_MODEL_SD_SOURCE_SHA256,
 };
 pub use cosmos_family::{
     COSMOS_ANIMA_DETECTION_MARKER_KEYS, COSMOS_CLIP_CANDIDATES, COSMOS_CLIP_CONFIGURATION,
@@ -439,6 +451,17 @@ pub use model_store::{
     ModelOperationRecord, ModelOperationStage, ModelStore, ModelStoreError,
     VerifiedEmbeddingArchivePayload, VerifiedModelTensor, VerifiedModelTensorPayload,
     VerifiedSentencePieceVocabulary,
+};
+pub use moge::{
+    MOGE_DINO2_SOURCE_SHA256, MOGE_GEOMETRY_SOURCE_SHA256, MOGE_MODEL_SOURCE_SHA256,
+    MOGE_MODULES_SOURCE_SHA256, NODES_MOGE_SOURCE_SHA256, NativeMogeCheckpoint, NativeMogeError,
+    NativeMogeGeometry, NativeMogeInvocation, NativeMogeNestedCheckpoint, NativeMogeResource,
+    NativeMogeVersion,
+};
+#[cfg(any(test, feature = "test-support"))]
+pub use moge::{
+    MogeFixtureMutation, MogeFixtureProfile, deterministic_reduced_moge_checkpoint,
+    mutate_reduced_moge_checkpoint,
 };
 pub use native_node_payload::{
     AudioEncoderOutput, AudioEncoderOutputKind, IcLoraParameters, LossMap, NativeModelBackingKind,

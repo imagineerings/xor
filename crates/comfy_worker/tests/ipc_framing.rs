@@ -31,7 +31,10 @@ use comfy_runtime::{
 use comfy_types::DeviceKind;
 use comfy_types::{
     ApiPrompt, AttemptId, NodeId, ProfileId, PromptId, PromptNode, PromptSubmission, RequestId,
-    WorkerEnvelope, WorkerId, WorkerMessage, WorkerOutputProposal,
+    WorkerEnvelope, WorkerId, WorkerMessage, WorkerOutputProposal, WorkerProviderInvocationContext,
+    WorkerProviderStreamHandle, WorkerProviderStreamRequest, WorkerProviderStreamResponse,
+    WorkerProviderV2ProposalFinalization, WorkerProviderV2ProposalFinalizationAck,
+    WorkerSha256Digest,
 };
 use comfy_worker::{FrameError, read_frame};
 use serde_json::json;
@@ -66,6 +69,60 @@ fn native_handle_kind_postcard_discriminants_are_append_only()
             postcard::to_stdvec(&kind)?,
             vec![u8::try_from(discriminant)?],
         );
+    }
+    Ok(())
+}
+
+#[test]
+fn provider_v2_finalization_is_append_only_and_legacy_stream_bytes_are_frozen()
+-> Result<(), Box<dyn std::error::Error>> {
+    let context = WorkerProviderInvocationContext {
+        session_id: uuid::Uuid::from_u128(0x4250),
+        session_generation: 7,
+        invocation: 11,
+        generation: 13,
+    };
+    let handle = WorkerProviderStreamHandle {
+        session_id: context.session_id,
+        session_generation: context.session_generation,
+        invocation: context.invocation,
+        slot: 1,
+        generation: context.generation,
+    };
+    let request = WorkerMessage::ProviderStreamRequest {
+        call_id: 17,
+        request: WorkerProviderStreamRequest::CheckCancelled(handle),
+    };
+    let response = WorkerMessage::ProviderStreamResponse {
+        call_id: 17,
+        response: WorkerProviderStreamResponse::Unit(Ok(())),
+    };
+    let finalization = WorkerProviderV2ProposalFinalization {
+        context,
+        handle,
+        proposal_generation: 19,
+        finalization_nonce: [0x5a; 32],
+        receipt_identity_sha256: WorkerSha256Digest::new("a".repeat(64))?,
+        materialization_identity_sha256: WorkerSha256Digest::new("b".repeat(64))?,
+    };
+    let finalize = WorkerMessage::ProviderV2ProposalFinalization {
+        finalization: finalization.clone(),
+    };
+    let acknowledgement = WorkerMessage::ProviderV2ProposalFinalizationAck {
+        acknowledgement: WorkerProviderV2ProposalFinalizationAck {
+            finalization,
+            result: Ok(()),
+        },
+    };
+    for (message, expected_discriminant) in [
+        (request, 20),
+        (response, 21),
+        (finalize, 22),
+        (acknowledgement, 23),
+    ] {
+        let bytes = postcard::to_stdvec(&message)?;
+        assert_eq!(bytes.first().copied(), Some(expected_discriminant));
+        assert_eq!(postcard::from_bytes::<WorkerMessage>(&bytes)?, message);
     }
     Ok(())
 }
@@ -223,6 +280,8 @@ fn packaged_worker_handshake_heartbeat_cancel_and_stop() {
     smol::block_on(async {
         let (temporary, roots) = fixture_roots().expect("fixture roots");
         write_fixture_png(&roots).expect("fixture PNG");
+        let execution_delay = Duration::from_secs(10);
+        let heartbeat_probe = Duration::from_millis(3_200);
         let plan = fixture_plan(10_000).expect("native image plan");
         let mut config = worker_config();
         config.profile_id = ProfileId(
@@ -233,6 +292,13 @@ fn packaged_worker_handshake_heartbeat_cancel_and_stop() {
             missed_heartbeat_limit: 1,
             ..SupervisorPolicy::default()
         };
+        let cancellation_timeout = config.policy.shutdown_timeout;
+        assert!(
+            heartbeat_probe
+                .checked_add(cancellation_timeout)
+                .is_some_and(|bounded_cancellation| bounded_cancellation < execution_delay),
+            "the cancellation bound must expire before natural execution completion"
+        );
         let mut supervisor = RuntimeSupervisor::start(config)
             .await
             .expect("worker becomes ready");
@@ -250,7 +316,7 @@ fn packaged_worker_handshake_heartbeat_cancel_and_stop() {
             }
         );
 
-        test_delay(Duration::from_millis(3_200)).await;
+        test_delay(heartbeat_probe).await;
         assert_eq!(supervisor.snapshot().health, WorkerHealth::BackendReady);
         assert_eq!(supervisor.snapshot().missed_heartbeats, 0);
 
@@ -277,7 +343,7 @@ fn packaged_worker_handshake_heartbeat_cancel_and_stop() {
             .await
             .expect("cancellation sent");
         let cancellation_requested = supervisor
-            .next_event(Duration::from_secs(1))
+            .next_event(cancellation_timeout)
             .await
             .unwrap_or_else(|error| {
                 panic!(
@@ -292,7 +358,7 @@ fn packaged_worker_handshake_heartbeat_cancel_and_stop() {
             }
         ));
         let cancelled = supervisor
-            .next_event(Duration::from_secs(2))
+            .next_event(cancellation_timeout)
             .await
             .expect("cancellation completion event");
         let WorkerMessage::Event { event } = cancelled.message else {

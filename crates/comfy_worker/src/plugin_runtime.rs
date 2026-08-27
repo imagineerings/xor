@@ -14,12 +14,13 @@ use comfy_nodes::{
 use comfy_plugin_host::{
     CapabilityServiceContext, ComponentLimits, InvocationInputs, InvocationResult,
     PluginCapabilityServices, PluginError, PluginHost, ProviderInvocationResult,
-    WorkerPluginInvocation, materialize_native_provider_response,
-    prepare_native_provider_invocation, rollback_native_provider_outputs,
+    ProviderV2WorkerPendingInvocation, ProviderV2WorkerStreamCall, WorkerPluginInvocation,
+    materialize_native_provider_response, prepare_native_provider_invocation,
+    rollback_native_provider_outputs,
 };
 use comfy_plugin_sdk::{
     CapabilityKind, InvocationError, ModelValue, PluginManifest, PluginNode,
-    ProviderResultReceiptSet,
+    ProviderPluginManifestV2, ProviderResultReceiptSet,
 };
 use comfy_runtime::{
     AssetIdentity, NativeNodeRegistry, NativeProviderBindingActivation,
@@ -31,7 +32,7 @@ use comfy_runtime::{
 use comfy_tensor::CancellationToken;
 use comfy_types::{
     MAX_WORKER_PLUGIN_CAPABILITY_PAYLOAD_BYTES, MAX_WORKER_PLUGIN_RESULT_BYTES, ProfileId,
-    WorkerPluginExecutionFailure, WorkerPluginExecutionOutcome,
+    WorkerPluginExecutionFailure, WorkerPluginExecutionOutcome, WorkerProviderStreamError,
     WorkerRegistryDeploymentRejectionReason,
 };
 use sha2::{Digest, Sha256};
@@ -45,6 +46,15 @@ const CAPABILITY_BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(5);
 pub(crate) enum WorkerPluginInvocationResult {
     Node(InvocationResult),
     Provider(ProviderInvocationResult),
+    ProviderV2(ProviderV2WorkerPendingInvocation),
+}
+
+pub(crate) enum WorkerPluginTaskEvent {
+    Terminal(WorkerPluginExecutionOutcome),
+    ProviderV2Proposal {
+        outcome: WorkerPluginExecutionOutcome,
+        pending: ProviderV2WorkerPendingInvocation,
+    },
 }
 
 pub(crate) struct WorkerCapabilityBridgeRequest {
@@ -56,6 +66,7 @@ pub(crate) struct WorkerCapabilityBridgeRequest {
 #[derive(Clone)]
 pub(crate) struct WorkerCapabilityBridge {
     sender: async_channel::Sender<WorkerCapabilityBridgeRequest>,
+    provider_v2_sender: Option<async_channel::Sender<ProviderV2WorkerStreamCall>>,
     next_call_id: Arc<AtomicU64>,
     native_provider_session_id: Option<String>,
 }
@@ -64,14 +75,32 @@ impl WorkerCapabilityBridge {
     pub fn new(sender: async_channel::Sender<WorkerCapabilityBridgeRequest>) -> Self {
         Self {
             sender,
+            provider_v2_sender: None,
             next_call_id: Arc::new(AtomicU64::new(1)),
             native_provider_session_id: None,
         }
     }
 
+    pub fn with_provider_v2_sender(
+        mut self,
+        provider_v2_sender: async_channel::Sender<ProviderV2WorkerStreamCall>,
+    ) -> Self {
+        self.provider_v2_sender = Some(provider_v2_sender);
+        self
+    }
+
+    fn provider_v2_sender(
+        &self,
+    ) -> Result<async_channel::Sender<ProviderV2WorkerStreamCall>, WorkerPluginRuntimeError> {
+        self.provider_v2_sender
+            .clone()
+            .ok_or(WorkerPluginRuntimeError::InvocationFailed)
+    }
+
     pub fn for_native_provider(&self, native_provider_session_id: impl Into<String>) -> Self {
         Self {
             sender: self.sender.clone(),
+            provider_v2_sender: self.provider_v2_sender.clone(),
             next_call_id: self.next_call_id.clone(),
             native_provider_session_id: Some(native_provider_session_id.into()),
         }
@@ -478,6 +507,7 @@ struct WorkerCompiledPlugin {
     manifest: Arc<PluginManifest>,
     authorization: Arc<PluginAuthorization>,
     compiled: Arc<comfy_plugin_host::CompiledPlugin>,
+    provider_v2: bool,
 }
 
 struct WorkerNativeProviderNode {
@@ -710,8 +740,13 @@ impl WorkerPluginRegistry {
             ) {
                 return Err(WorkerPluginRuntimeError::InvalidDeployment);
             }
-            let manifest: PluginManifest = serde_json::from_slice(component.manifest_bytes())
-                .map_err(|_| WorkerPluginRuntimeError::InvalidDeployment)?;
+            let provider_manifest_v2 =
+                serde_json::from_slice::<ProviderPluginManifestV2>(component.manifest_bytes()).ok();
+            let manifest: PluginManifest = match &provider_manifest_v2 {
+                Some(provider_manifest) => provider_manifest.manifest.clone(),
+                None => serde_json::from_slice(component.manifest_bytes())
+                    .map_err(|_| WorkerPluginRuntimeError::InvalidDeployment)?,
+            };
             if manifest.identifier != component.plugin_identifier()
                 || manifest.plugin_version.to_string() != component.plugin_version()
                 || manifest.digest_sha256 != component.component_digest_sha256().as_str()
@@ -728,8 +763,16 @@ impl WorkerPluginRegistry {
             if authorization.capabilities().profile_id() != profile_id.0.to_string() {
                 return Err(WorkerPluginRuntimeError::InvalidDeployment);
             }
-            let compiled =
-                host.compile_component(component.component_bytes(), &manifest, &authorization)?;
+            let compiled = match &provider_manifest_v2 {
+                Some(provider_manifest) => host.compile_provider_component_v2_for_worker(
+                    component.component_bytes(),
+                    provider_manifest,
+                    &authorization,
+                )?,
+                None => {
+                    host.compile_component(component.component_bytes(), &manifest, &authorization)?
+                }
+            };
             let extension_id = component.extension_id().to_owned();
             if components
                 .insert(
@@ -744,6 +787,7 @@ impl WorkerPluginRegistry {
                         manifest: Arc::new(manifest),
                         authorization: Arc::new(authorization),
                         compiled: Arc::new(compiled),
+                        provider_v2: provider_manifest_v2.is_some(),
                     },
                 )
                 .is_some()
@@ -906,7 +950,7 @@ impl WorkerPluginRegistry {
     pub fn execute(
         &self,
         invocation: WorkerPluginInvocation,
-        bridge: Arc<dyn PluginCapabilityServices>,
+        bridge: Arc<WorkerCapabilityBridge>,
         cancellation: CancellationToken,
     ) -> Result<WorkerPluginInvocationResult, WorkerPluginRuntimeError> {
         if invocation.registry_generation() != self.generation
@@ -929,7 +973,7 @@ impl WorkerPluginRegistry {
             return Err(WorkerPluginRuntimeError::StaleGeneration);
         }
         let node_id = invocation.node_id().to_owned();
-        let (inputs, provider_request) = invocation.into_execution_parts();
+        let (inputs, provider_request, provider_v2) = invocation.into_execution_parts();
         let node_is_provider_bound =
             component
                 .manifest
@@ -941,7 +985,11 @@ impl WorkerPluginRegistry {
                         .iter()
                         .any(|claim| claim.node_id == node_id)
                 });
-        if node_is_provider_bound != provider_request.is_some() {
+        if component.provider_v2 {
+            if !node_is_provider_bound || provider_request.is_some() || provider_v2.is_none() {
+                return Err(WorkerPluginRuntimeError::InvalidDeployment);
+            }
+        } else if provider_v2.is_some() || node_is_provider_bound != provider_request.is_some() {
             return Err(WorkerPluginRuntimeError::InvalidDeployment);
         }
         let invocation_host = self.host.begin_invocation(
@@ -949,9 +997,23 @@ impl WorkerPluginRegistry {
             &component.authorization,
             &node_id,
             inputs,
-            bridge,
-            cancellation,
+            bridge.clone(),
+            cancellation.clone(),
         )?;
+        if let Some(provider_v2) = provider_v2 {
+            return self
+                .host
+                .invoke_provider_component_v2_for_worker(
+                    &component.compiled,
+                    invocation_host,
+                    &node_id,
+                    provider_v2,
+                    cancellation,
+                    bridge.provider_v2_sender()?,
+                )
+                .map(WorkerPluginInvocationResult::ProviderV2)
+                .map_err(Into::into);
+        }
         let mut instance = self
             .host
             .instantiate_component(&component.compiled, invocation_host)?;
@@ -982,13 +1044,42 @@ fn digest_matches(bytes: &[u8], expected: &comfy_types::WorkerSha256Digest) -> b
     actual == expected.bytes()
 }
 
+pub(crate) fn encode_plugin_task_event(
+    result: Result<WorkerPluginInvocationResult, WorkerPluginRuntimeError>,
+) -> WorkerPluginTaskEvent {
+    match result {
+        Ok(WorkerPluginInvocationResult::ProviderV2(pending)) => {
+            match serde_json::to_vec(pending.result()) {
+                Ok(bytes) if !bytes.is_empty() && bytes.len() <= MAX_WORKER_PLUGIN_RESULT_BYTES => {
+                    WorkerPluginTaskEvent::ProviderV2Proposal {
+                        outcome: WorkerPluginExecutionOutcome::Succeeded(bytes),
+                        pending,
+                    }
+                }
+                Ok(_) | Err(_) => WorkerPluginTaskEvent::Terminal(
+                    WorkerPluginExecutionOutcome::Failed(WorkerPluginExecutionFailure::HostFailure),
+                ),
+            }
+        }
+        result => WorkerPluginTaskEvent::Terminal(encode_plugin_outcome(result)),
+    }
+}
+
 pub(crate) fn encode_plugin_outcome(
     result: Result<WorkerPluginInvocationResult, WorkerPluginRuntimeError>,
 ) -> WorkerPluginExecutionOutcome {
     match result {
+        Ok(WorkerPluginInvocationResult::ProviderV2(_)) => {
+            WorkerPluginExecutionOutcome::Failed(WorkerPluginExecutionFailure::HostFailure)
+        }
         Ok(result) => match match result {
             WorkerPluginInvocationResult::Node(result) => serde_json::to_vec(&result),
             WorkerPluginInvocationResult::Provider(result) => serde_json::to_vec(&result),
+            WorkerPluginInvocationResult::ProviderV2(_) => {
+                return WorkerPluginExecutionOutcome::Failed(
+                    WorkerPluginExecutionFailure::HostFailure,
+                );
+            }
         } {
             Ok(bytes) if !bytes.is_empty() && bytes.len() <= MAX_WORKER_PLUGIN_RESULT_BYTES => {
                 WorkerPluginExecutionOutcome::Succeeded(bytes)
@@ -1046,6 +1137,12 @@ impl WorkerPluginRuntimeError {
             Self::Plugin(PluginError::Invocation(InvocationError::TimedOut)) => {
                 WorkerPluginExecutionFailure::TimedOut
             }
+            Self::Plugin(PluginError::ProviderStreaming(WorkerProviderStreamError::Cancelled)) => {
+                WorkerPluginExecutionFailure::Cancelled
+            }
+            Self::Plugin(PluginError::ProviderStreaming(WorkerProviderStreamError::TimedOut)) => {
+                WorkerPluginExecutionFailure::TimedOut
+            }
             Self::Plugin(PluginError::Invocation(InvocationError::CapabilityDenied { .. })) => {
                 WorkerPluginExecutionFailure::CapabilityDenied
             }
@@ -1099,6 +1196,31 @@ fn context_required(service: &str) -> InvocationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn provider_stream_terminal_dispositions_preserve_typed_worker_failures() {
+        assert_eq!(
+            WorkerPluginRuntimeError::Plugin(PluginError::ProviderStreaming(
+                WorkerProviderStreamError::Cancelled,
+            ))
+            .failure(),
+            WorkerPluginExecutionFailure::Cancelled
+        );
+        assert_eq!(
+            WorkerPluginRuntimeError::Plugin(PluginError::ProviderStreaming(
+                WorkerProviderStreamError::TimedOut,
+            ))
+            .failure(),
+            WorkerPluginExecutionFailure::TimedOut
+        );
+        assert_eq!(
+            WorkerPluginRuntimeError::Plugin(PluginError::ProviderStreaming(
+                WorkerProviderStreamError::InvalidOrder,
+            ))
+            .failure(),
+            WorkerPluginExecutionFailure::HostFailure
+        );
+    }
 
     #[test]
     fn native_provider_capability_bridge_routes_the_complete_session_protocol() {

@@ -1,4 +1,5 @@
 use comfy_tensor::{DType, DeviceId, StorageId, Tensor, TensorError};
+use comfy_types::CancellationToken;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -1038,6 +1039,22 @@ impl NativeAudioPayload {
         })
     }
 
+    pub fn checked_cancellable(
+        waveform: Tensor,
+        sample_rate: u32,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeCancellableMediaPayloadError> {
+        validate_audio_cancellable(&waveform, sample_rate, cancellation)?;
+        let (semantic_digest_sha256, resident_bytes) =
+            project_audio_cancellable(&waveform, sample_rate, cancellation)?;
+        Ok(Self {
+            waveform,
+            sample_rate,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
     pub const fn waveform(&self) -> &Tensor {
         &self.waveform
     }
@@ -1069,6 +1086,23 @@ impl NativeAudioPayload {
         )?;
         self.resident_parts()?;
         Ok(())
+    }
+
+    pub fn validate_cancellable(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<(), NativeCancellableMediaPayloadError> {
+        validate_audio_cancellable(&self.waveform, self.sample_rate, cancellation)?;
+        let (digest, resident_bytes) =
+            project_audio_cancellable(&self.waveform, self.sample_rate, cancellation)?;
+        require_projection(
+            self.semantic_digest_sha256,
+            digest,
+            self.resident_bytes,
+            resident_bytes,
+        )?;
+        self.resident_parts()?;
+        check_media_cancellation(cancellation)
     }
 }
 
@@ -1166,6 +1200,50 @@ impl NativeVideoPayload {
             audio.as_ref(),
             alpha.as_ref(),
             &metadata,
+        )?;
+        Ok(Self::Components(NativeVideoComponentsPayload {
+            frames,
+            frame_rate_numerator,
+            frame_rate_denominator,
+            bit_depth,
+            audio,
+            alpha,
+            metadata,
+            semantic_digest_sha256,
+            resident_bytes,
+        }))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn checked_cancellable(
+        frames: Tensor,
+        frame_rate_numerator: u64,
+        frame_rate_denominator: u64,
+        bit_depth: NativeVideoBitDepth,
+        audio: Option<NativeAudioPayload>,
+        alpha: Option<Tensor>,
+        metadata: BTreeMap<String, String>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeCancellableMediaPayloadError> {
+        validate_video_cancellable(
+            &frames,
+            frame_rate_numerator,
+            frame_rate_denominator,
+            bit_depth,
+            audio.as_ref(),
+            alpha.as_ref(),
+            &metadata,
+            cancellation,
+        )?;
+        let (semantic_digest_sha256, resident_bytes) = project_video_cancellable(
+            &frames,
+            frame_rate_numerator,
+            frame_rate_denominator,
+            bit_depth,
+            audio.as_ref(),
+            alpha.as_ref(),
+            &metadata,
+            cancellation,
         )?;
         Ok(Self::Components(NativeVideoComponentsPayload {
             frames,
@@ -1318,6 +1396,43 @@ impl NativeVideoPayload {
             Self::Components(components) => components.validate(),
             Self::Encoded(encoded) => encoded.validate(),
         }
+    }
+
+    pub fn validate_components_cancellable(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<(), NativeCancellableMediaPayloadError> {
+        let Self::Components(components) = self else {
+            return Err(NativeMediaPayloadError::InvalidVideo.into());
+        };
+        validate_video_cancellable(
+            &components.frames,
+            components.frame_rate_numerator,
+            components.frame_rate_denominator,
+            components.bit_depth,
+            components.audio.as_ref(),
+            components.alpha.as_ref(),
+            &components.metadata,
+            cancellation,
+        )?;
+        let (digest, resident_bytes) = project_video_cancellable(
+            &components.frames,
+            components.frame_rate_numerator,
+            components.frame_rate_denominator,
+            components.bit_depth,
+            components.audio.as_ref(),
+            components.alpha.as_ref(),
+            &components.metadata,
+            cancellation,
+        )?;
+        require_projection(
+            components.semantic_digest_sha256,
+            digest,
+            components.resident_bytes,
+            resident_bytes,
+        )?;
+        components.resident_parts()?;
+        check_media_cancellation(cancellation)
     }
 }
 
@@ -2313,6 +2428,14 @@ pub enum NativeMediaPayloadError {
     DescriptorEncoding(#[from] serde_json::Error),
 }
 
+#[derive(Debug, Error)]
+pub enum NativeCancellableMediaPayloadError {
+    #[error("media payload construction was cancelled")]
+    Cancelled,
+    #[error(transparent)]
+    Payload(#[from] NativeMediaPayloadError),
+}
+
 fn project_bounding_boxes(
     frames: &[Box<[NativeBoundingBox]>],
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
@@ -2745,6 +2868,27 @@ fn validate_audio(waveform: &Tensor, sample_rate: u32) -> Result<(), NativeMedia
     validate_finite_f32(waveform, NativeMediaPayloadError::InvalidAudio)
 }
 
+fn validate_audio_cancellable(
+    waveform: &Tensor,
+    sample_rate: u32,
+    cancellation: &CancellationToken,
+) -> Result<(), NativeCancellableMediaPayloadError> {
+    let descriptor = waveform.descriptor();
+    let shape = descriptor.shape();
+    if descriptor.dtype() != DType::F32
+        || shape.len() != 3
+        || shape.contains(&0)
+        || !(8_000..=384_000).contains(&sample_rate)
+    {
+        return Err(NativeMediaPayloadError::InvalidAudio.into());
+    }
+    validate_finite_f32_cancellable(
+        waveform,
+        NativeMediaPayloadError::InvalidAudio,
+        cancellation,
+    )
+}
+
 fn project_audio(
     waveform: &Tensor,
     sample_rate: u32,
@@ -2752,6 +2896,18 @@ fn project_audio(
     let mut projection = Projection::new::<NativeAudioPayload>(b"zed.comfy.media.audio.v1")?;
     projection.hasher.update(sample_rate.to_le_bytes());
     projection.hash_tensor(b"waveform", waveform)?;
+    projection.add_tensor_storages([waveform])?;
+    Ok(projection.finish())
+}
+
+fn project_audio_cancellable(
+    waveform: &Tensor,
+    sample_rate: u32,
+    cancellation: &CancellationToken,
+) -> Result<([u8; 32], u64), NativeCancellableMediaPayloadError> {
+    let mut projection = Projection::new::<NativeAudioPayload>(b"zed.comfy.media.audio.v1")?;
+    projection.hasher.update(sample_rate.to_le_bytes());
+    projection.hash_tensor_cancellable(b"waveform", waveform, cancellation)?;
     projection.add_tensor_storages([waveform])?;
     Ok(projection.finish())
 }
@@ -2808,6 +2964,84 @@ fn validate_video(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+fn validate_video_cancellable(
+    frames: &Tensor,
+    frame_rate_numerator: u64,
+    frame_rate_denominator: u64,
+    _bit_depth: NativeVideoBitDepth,
+    audio: Option<&NativeAudioPayload>,
+    alpha: Option<&Tensor>,
+    metadata: &BTreeMap<String, String>,
+    cancellation: &CancellationToken,
+) -> Result<(), NativeCancellableMediaPayloadError> {
+    check_media_cancellation(cancellation)?;
+    let descriptor = frames.descriptor();
+    let shape = descriptor.shape();
+    if !matches!(descriptor.dtype(), DType::F32 | DType::U8)
+        || shape.len() != 4
+        || shape.contains(&0)
+        || !matches!(shape[3], 1 | 3 | 4)
+        || frame_rate_numerator == 0
+        || frame_rate_denominator == 0
+        || greatest_common_divisor(frame_rate_numerator, frame_rate_denominator) != 1
+        || alpha.is_some_and(|alpha| {
+            alpha.descriptor().dtype() != DType::F32
+                || alpha.descriptor().shape() != [shape[0], shape[1], shape[2], 1]
+        })
+        || metadata.len() > 128
+        || metadata.iter().any(|(key, value)| {
+            key.is_empty()
+                || key.len() > MAX_TEXT_BYTES
+                || value.len() > MAX_TEXT_BYTES
+                || key.chars().any(char::is_control)
+                || value.chars().any(char::is_control)
+        })
+    {
+        return Err(NativeMediaPayloadError::InvalidVideo.into());
+    }
+    if descriptor.dtype() == DType::F32 {
+        validate_finite_f32_cancellable(
+            frames,
+            NativeMediaPayloadError::InvalidVideo,
+            cancellation,
+        )?;
+    }
+    if let Some(audio) = audio {
+        validate_audio_cancellable(audio.waveform(), audio.sample_rate(), cancellation)?;
+        if audio.waveform().descriptor().shape()[0] != 1 {
+            return Err(NativeMediaPayloadError::InvalidVideo.into());
+        }
+        let (digest, resident_bytes) =
+            project_audio_cancellable(audio.waveform(), audio.sample_rate(), cancellation)?;
+        require_projection(
+            *audio.semantic_digest_sha256(),
+            digest,
+            audio.resident_bytes(),
+            resident_bytes,
+        )?;
+        audio.resident_parts()?;
+    }
+    if let Some(alpha) = alpha {
+        let bytes = alpha
+            .contiguous_bytes()
+            .map_err(NativeMediaPayloadError::Tensor)?;
+        if bytes.len() % 4 != 0 {
+            return Err(NativeMediaPayloadError::InvalidVideo.into());
+        }
+        for chunk in bytes.chunks(64 * 1024) {
+            check_media_cancellation(cancellation)?;
+            if chunk.chunks_exact(4).any(|value| {
+                let value = f32::from_ne_bytes([value[0], value[1], value[2], value[3]]);
+                !value.is_finite() || !(0.0..=1.0).contains(&value)
+            }) {
+                return Err(NativeMediaPayloadError::InvalidVideo.into());
+            }
+        }
+    }
+    check_media_cancellation(cancellation)
+}
+
 fn greatest_common_divisor(mut left: u64, mut right: u64) -> u64 {
     while right != 0 {
         let remainder = left % right;
@@ -2860,6 +3094,56 @@ fn project_video(
         projection.add_bytes(value.capacity())?;
     }
     projection.add_tensor_storages(storages)?;
+    Ok(projection.finish())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn project_video_cancellable(
+    frames: &Tensor,
+    frame_rate_numerator: u64,
+    frame_rate_denominator: u64,
+    bit_depth: NativeVideoBitDepth,
+    audio: Option<&NativeAudioPayload>,
+    alpha: Option<&Tensor>,
+    metadata: &BTreeMap<String, String>,
+    cancellation: &CancellationToken,
+) -> Result<([u8; 32], u64), NativeCancellableMediaPayloadError> {
+    let mut projection = Projection::new::<NativeVideoPayload>(b"zed.comfy.media.video.v2")?;
+    projection.hasher.update(frame_rate_numerator.to_le_bytes());
+    projection
+        .hasher
+        .update(frame_rate_denominator.to_le_bytes());
+    projection.hasher.update([bit_depth.bits()]);
+    projection.hash_tensor_cancellable(b"frames", frames, cancellation)?;
+    let mut storages = vec![frames];
+    match audio {
+        Some(audio) => {
+            projection.hasher.update([1]);
+            projection.hasher.update(audio.semantic_digest_sha256());
+            storages.push(audio.waveform());
+        }
+        None => projection.hasher.update([0]),
+    }
+    match alpha {
+        Some(alpha) => {
+            projection.hasher.update([1]);
+            projection.hash_tensor_cancellable(b"alpha", alpha, cancellation)?;
+            storages.push(alpha);
+        }
+        None => projection.hasher.update([0]),
+    }
+    projection.hash_len(metadata.len())?;
+    for (key, value) in metadata {
+        check_media_cancellation(cancellation)?;
+        projection.hash_len(key.len())?;
+        projection.hasher.update(key.as_bytes());
+        projection.hash_len(value.len())?;
+        projection.hasher.update(value.as_bytes());
+        projection.add_bytes(key.capacity())?;
+        projection.add_bytes(value.capacity())?;
+    }
+    projection.add_tensor_storages(storages)?;
+    check_media_cancellation(cancellation)?;
     Ok(projection.finish())
 }
 
@@ -3169,7 +3453,9 @@ fn validate_splat_values(
 }
 
 fn tensor_f32_values(tensor: &Tensor) -> Result<Vec<f32>, NativeMediaPayloadError> {
-    let bytes = tensor.contiguous_bytes()?;
+    let bytes = tensor
+        .contiguous_bytes()
+        .map_err(NativeMediaPayloadError::Tensor)?;
     if !bytes.len().is_multiple_of(4) {
         return Err(NativeMediaPayloadError::InvalidSplat);
     }
@@ -3437,7 +3723,9 @@ fn validate_finite_f32(
     if tensor.descriptor().dtype() != DType::F32 {
         return Err(error);
     }
-    let bytes = tensor.contiguous_bytes()?;
+    let bytes = tensor
+        .contiguous_bytes()
+        .map_err(NativeMediaPayloadError::Tensor)?;
     if bytes.len() % 4 != 0
         || bytes
             .chunks_exact(4)
@@ -3446,6 +3734,63 @@ fn validate_finite_f32(
         return Err(error);
     }
     Ok(())
+}
+
+fn validate_finite_f32_cancellable(
+    tensor: &Tensor,
+    error: NativeMediaPayloadError,
+    cancellation: &CancellationToken,
+) -> Result<(), NativeCancellableMediaPayloadError> {
+    if tensor.descriptor().dtype() != DType::F32 {
+        return Err(error.into());
+    }
+    let bytes = tensor
+        .contiguous_bytes()
+        .map_err(NativeMediaPayloadError::Tensor)?;
+    if bytes.len() % 4 != 0 {
+        return Err(error.into());
+    }
+    for chunk in bytes.chunks(64 * 1024) {
+        check_media_cancellation(cancellation)?;
+        if chunk
+            .chunks_exact(4)
+            .any(|value| !f32::from_ne_bytes([value[0], value[1], value[2], value[3]]).is_finite())
+        {
+            return Err(error.into());
+        }
+    }
+    check_media_cancellation(cancellation)
+}
+
+#[cfg(test)]
+thread_local! {
+    static MEDIA_TEST_CANCEL_AFTER_CHECKS: std::cell::Cell<Option<usize>> = const {
+        std::cell::Cell::new(None)
+    };
+}
+
+#[cfg(test)]
+fn set_media_test_cancel_after_checks(checks: Option<usize>) {
+    MEDIA_TEST_CANCEL_AFTER_CHECKS.set(checks);
+}
+
+fn check_media_cancellation(
+    cancellation: &CancellationToken,
+) -> Result<(), NativeCancellableMediaPayloadError> {
+    #[cfg(test)]
+    MEDIA_TEST_CANCEL_AFTER_CHECKS.with(|remaining| {
+        if let Some(checks) = remaining.get() {
+            if checks == 0 {
+                remaining.set(None);
+                cancellation.cancel();
+            } else {
+                remaining.set(Some(checks - 1));
+            }
+        }
+    });
+    cancellation
+        .check()
+        .map_err(|_| NativeCancellableMediaPayloadError::Cancelled)
 }
 
 struct Projection {
@@ -3518,10 +3863,40 @@ impl Projection {
         for dimension in descriptor.shape() {
             self.hasher.update(dimension.to_le_bytes());
         }
-        let bytes = tensor.contiguous_bytes()?;
+        let bytes = tensor
+            .contiguous_bytes()
+            .map_err(NativeMediaPayloadError::Tensor)?;
         self.hash_len(bytes.len())?;
         self.hasher.update(bytes);
         Ok(())
+    }
+
+    fn hash_tensor_cancellable(
+        &mut self,
+        role: &[u8],
+        tensor: &Tensor,
+        cancellation: &CancellationToken,
+    ) -> Result<(), NativeCancellableMediaPayloadError> {
+        check_media_cancellation(cancellation)?;
+        self.hash_len(role.len())?;
+        self.hasher.update(role);
+        let descriptor = tensor.descriptor();
+        let dtype = descriptor.dtype().catalog_name().as_bytes();
+        self.hash_len(dtype.len())?;
+        self.hasher.update(dtype);
+        self.hash_len(descriptor.shape().len())?;
+        for dimension in descriptor.shape() {
+            self.hasher.update(dimension.to_le_bytes());
+        }
+        let bytes = tensor
+            .contiguous_bytes()
+            .map_err(NativeMediaPayloadError::Tensor)?;
+        self.hash_len(bytes.len())?;
+        for chunk in bytes.chunks(64 * 1024) {
+            check_media_cancellation(cancellation)?;
+            self.hasher.update(chunk);
+        }
+        check_media_cancellation(cancellation)
     }
 
     fn add_allocation<Value>(&mut self, length: usize) -> Result<(), NativeMediaPayloadError> {
@@ -4131,6 +4506,169 @@ mod tests {
         assert_ne!(
             baseline,
             digest(b"media-domain-a", b"tensor-role-a", &u32_tensor)?
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_demux_decode_cancellable_projection_preserves_canonical_identity()
+    -> Result<(), Box<dyn Error>> {
+        let f32_bytes = |values: &[f32]| {
+            values
+                .iter()
+                .flat_map(|value| value.to_ne_bytes())
+                .collect::<Vec<_>>()
+        };
+        let waveform = tensor(
+            vec![1, 1, 4],
+            DType::F32,
+            f32_bytes(&[0.0, 0.25, -0.25, 1.0]),
+        )?;
+        let frames = tensor(vec![1, 2, 2, 3], DType::F32, f32_bytes(&[0.25; 12]))?;
+        let cancellation = CancellationToken::default();
+        let canonical_audio = NativeAudioPayload::checked(waveform.clone(), 48_000)?;
+        let cancellable_audio =
+            NativeAudioPayload::checked_cancellable(waveform, 48_000, &cancellation)?;
+        assert_eq!(
+            canonical_audio.semantic_digest_sha256(),
+            cancellable_audio.semantic_digest_sha256()
+        );
+        assert_eq!(
+            canonical_audio.resident_bytes(),
+            cancellable_audio.resident_bytes()
+        );
+        let metadata = BTreeMap::from([("codec".to_owned(), "fixture".to_owned())]);
+        let canonical_video = NativeVideoPayload::checked(
+            frames.clone(),
+            24,
+            1,
+            NativeVideoBitDepth::Eight,
+            Some(canonical_audio),
+            None,
+            metadata.clone(),
+        )?;
+        let cancellable_video = NativeVideoPayload::checked_cancellable(
+            frames.clone(),
+            24,
+            1,
+            NativeVideoBitDepth::Eight,
+            Some(cancellable_audio),
+            None,
+            metadata,
+            &cancellation,
+        )?;
+        assert_eq!(
+            canonical_video.semantic_digest_sha256(),
+            cancellable_video.semantic_digest_sha256()
+        );
+        assert_eq!(
+            canonical_video.resident_bytes(),
+            cancellable_video.resident_bytes()
+        );
+        cancellable_video.validate_components_cancellable(&cancellation)?;
+
+        cancellation.cancel();
+        assert!(matches!(
+            NativeVideoPayload::checked_cancellable(
+                frames,
+                24,
+                1,
+                NativeVideoBitDepth::Eight,
+                None,
+                None,
+                BTreeMap::new(),
+                &cancellation,
+            ),
+            Err(NativeCancellableMediaPayloadError::Cancelled)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn general_video_demux_decode_cancels_chunked_media_scans_and_rejects_projection_drift()
+    -> Result<(), Box<dyn Error>> {
+        let value_count = 3 * 64 * 1024 / size_of::<f32>();
+        let f32_bytes = |values: &[f32]| {
+            values
+                .iter()
+                .flat_map(|value| value.to_ne_bytes())
+                .collect::<Vec<_>>()
+        };
+        let values = vec![0.25_f32; value_count];
+        let waveform = tensor(
+            vec![1, 1, u64::try_from(value_count)?],
+            DType::F32,
+            f32_bytes(&values),
+        )?;
+
+        let finite_cancellation = CancellationToken::default();
+        set_media_test_cancel_after_checks(Some(1));
+        assert!(matches!(
+            validate_finite_f32_cancellable(
+                &waveform,
+                NativeMediaPayloadError::InvalidAudio,
+                &finite_cancellation,
+            ),
+            Err(NativeCancellableMediaPayloadError::Cancelled)
+        ));
+
+        let hash_cancellation = CancellationToken::default();
+        let mut projection = Projection::new::<NativeAudioPayload>(b"test.chunked.audio")?;
+        set_media_test_cancel_after_checks(Some(2));
+        assert!(matches!(
+            projection.hash_tensor_cancellable(b"waveform", &waveform, &hash_cancellation),
+            Err(NativeCancellableMediaPayloadError::Cancelled)
+        ));
+
+        let frame_width = u64::try_from(value_count)?;
+        let frames = tensor(
+            vec![1, 1, frame_width, 3],
+            DType::U8,
+            vec![127; value_count * 3],
+        )?;
+        let alpha = tensor(vec![1, 1, frame_width, 1], DType::F32, f32_bytes(&values))?;
+        let alpha_cancellation = CancellationToken::default();
+        set_media_test_cancel_after_checks(Some(2));
+        assert!(matches!(
+            validate_video_cancellable(
+                &frames,
+                24,
+                1,
+                NativeVideoBitDepth::Eight,
+                None,
+                Some(&alpha),
+                &BTreeMap::new(),
+                &alpha_cancellation,
+            ),
+            Err(NativeCancellableMediaPayloadError::Cancelled)
+        ));
+
+        let cancellation = CancellationToken::default();
+        let mut audio = NativeAudioPayload::checked_cancellable(waveform, 48_000, &cancellation)?;
+        audio.semantic_digest_sha256[0] ^= 1;
+        assert!(audio.validate_cancellable(&cancellation).is_err());
+
+        let mut video = NativeVideoPayload::checked_cancellable(
+            frames,
+            24,
+            1,
+            NativeVideoBitDepth::Eight,
+            None,
+            Some(alpha),
+            BTreeMap::new(),
+            &cancellation,
+        )?;
+        let NativeVideoPayload::Components(components) = &mut video else {
+            return Err("expected component video".into());
+        };
+        components.resident_bytes = components
+            .resident_bytes
+            .checked_add(1)
+            .ok_or("resident byte test overflow")?;
+        assert!(
+            video
+                .validate_components_cancellable(&cancellation)
+                .is_err()
         );
         Ok(())
     }
