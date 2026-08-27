@@ -22410,7 +22410,7 @@
         {
           "name": "cli-consumes-canonical-packaged-worker-config",
           "path": "crates/zed/src/comfy_cli.rs",
-          "pattern": "build_native_runtime_for_profile[\\s\\S]*headless_native_profile[\\s\\S]*WorkerLaunchConfig::for_packaged_worker_profile"
+          "pattern": "prepare_native_runtime_for_profile[\\s\\S]*headless_native_configuration[\\s\\S]*WorkerLaunchConfig::for_packaged_worker_profile"
         }
       ],
       "production_consumers": [

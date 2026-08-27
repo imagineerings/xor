@@ -672,6 +672,12 @@ class ValidationGenerationTests(unittest.TestCase):
                 "comfy-parity-model-detection-any-of-key-selector-consolidation",
             ],
         )
+        for path in (
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ):
+            self.assertIn(path, photomaker_task["writes"])
         self.assertEqual(
             gligen_task["dependencies"],
             [
