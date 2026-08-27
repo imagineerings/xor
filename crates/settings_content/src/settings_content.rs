@@ -97,9 +97,12 @@ macro_rules! settings_overrides {
         }
     }
 }
-use std::collections::{BTreeMap, BTreeSet};
 use std::hash::Hash;
 use std::sync::Arc;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 pub use util::serde::default_true;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -206,6 +209,9 @@ pub struct SettingsContent {
     /// Configuration of audio in Zed.
     pub audio: Option<AudioSettingsContent>,
 
+    /// Native Comfy execution profiles and compatibility-host policy.
+    pub comfy_runtime: Option<ComfyRuntimeSettingsContent>,
+
     /// Whether or not to automatically check for updates.
     ///
     /// Default: true
@@ -265,6 +271,15 @@ pub struct SettingsContent {
     pub language_models: Option<AllLanguageModelSettingsContent>,
 
     pub outline_panel: Option<OutlinePanelSettingsContent>,
+
+    #[cfg(feature = "rust-tools")]
+    pub cargo_panel: Option<CargoPanelSettingsContent>,
+
+    #[cfg(feature = "rust-tools")]
+    pub cargo: Option<CargoSettingsContent>,
+
+    #[cfg(feature = "test-explorer")]
+    pub tests_panel: Option<TestsPanelSettingsContent>,
 
     pub project_panel: Option<ProjectPanelSettingsContent>,
 
@@ -326,6 +341,132 @@ pub struct SettingsContent {
     /// Settings for developer-oriented instrumentation tools (profilers,
     /// tracers, etc.) that can be toggled at runtime.
     pub instrumentation: Option<InstrumentationSettingsContent>,
+}
+
+#[with_fallible_options]
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyRuntimeSettingsContent {
+    pub active_profile: Option<String>,
+    pub profiles: Option<Vec<ComfyRuntimeProfileContent>>,
+    /// Padding used when fitting a group around selected nodes, bounded to 0 through 100.
+    pub group_selected_nodes_padding: Option<f32>,
+    /// Whether the graph uses the detailed native node renderer instead of the compact renderer.
+    pub native_node_renderer: Option<bool>,
+    /// Whether reroute nodes show their resolved type unless overridden per reroute.
+    pub show_reroute_types: Option<bool>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[with_fallible_options]
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyRuntimeProfileContent {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub model_roots: Option<Vec<String>>,
+    pub device: Option<String>,
+    pub memory_policy: Option<String>,
+    pub api_host_enabled: Option<bool>,
+    pub api_bind: Option<String>,
+    pub plugin_policy: Option<String>,
+    pub plugin_security: Option<ComfyPluginSecurityPolicyContent>,
+    pub rocm_package_root: Option<String>,
+    pub rocm_package_signer: Option<String>,
+    pub rocm_package_public_key_hex: Option<String>,
+    pub metal_package_root: Option<String>,
+    pub metal_package_signer: Option<String>,
+    pub metal_package_public_key_hex: Option<String>,
+    pub mlu_package_root: Option<String>,
+    pub mlu_package_signer: Option<String>,
+    pub mlu_package_public_key_hex: Option<String>,
+    pub npu_package_root: Option<String>,
+    pub npu_package_signer: Option<String>,
+    pub npu_package_public_key_hex: Option<String>,
+    pub cuda_package_root: Option<String>,
+    pub cuda_package_signer: Option<String>,
+    pub cuda_package_public_key_hex: Option<String>,
+    pub xpu_package_root: Option<String>,
+    pub xpu_package_signer: Option<String>,
+    pub xpu_package_public_key_hex: Option<String>,
+    pub directml_package_root: Option<String>,
+    pub directml_package_signer: Option<String>,
+    pub directml_package_public_key_hex: Option<String>,
+    pub video_codec_package_root: Option<String>,
+    pub video_codec_package_signer: Option<String>,
+    pub video_codec_package_public_key_hex: Option<String>,
+    pub provider_scope: Option<String>,
+    pub compatibility_version: Option<u16>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[with_fallible_options]
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyPluginSecurityPolicyContent {
+    pub enabled: Option<bool>,
+    pub verification_keys: Option<Vec<ComfyPluginVerificationKeyContent>>,
+    pub permission_grants: Option<Vec<ComfyPluginPermissionGrantContent>>,
+    pub provider_mode: Option<String>,
+    pub provider_endpoints: Option<Vec<ComfyProviderEndpointContent>>,
+    pub credential_scopes: Option<Vec<ComfyCredentialScopeContent>>,
+    /// Legacy shared-secret grants are retained only so runtime projection can reject them.
+    pub provider_secret_ids: Option<Vec<String>>,
+    pub component_registry_generation: Option<u64>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[with_fallible_options]
+#[derive(PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyPluginVerificationKeyContent {
+    pub key_id: Option<String>,
+    pub public_key_hex: Option<String>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+impl fmt::Debug for ComfyPluginVerificationKeyContent {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ComfyPluginVerificationKeyContent")
+            .field("key_id", &self.key_id)
+            .field("public_key_hex", &self.public_key_hex)
+            .field(
+                "unknown_field_names",
+                &self.unknown_fields.keys().collect::<Vec<_>>(),
+            )
+            .finish()
+    }
+}
+
+#[with_fallible_options]
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyPluginPermissionGrantContent {
+    pub subject_id: Option<String>,
+    pub capabilities: Option<Vec<String>>,
+    pub provenance: Option<String>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[with_fallible_options]
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyProviderEndpointContent {
+    pub provider: Option<String>,
+    pub endpoint: Option<String>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[with_fallible_options]
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyCredentialScopeContent {
+    pub profile_id: Option<String>,
+    pub subject_id: Option<String>,
+    pub provider: Option<String>,
+    pub secret_id: Option<String>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
 }
 
 /// Configuration for developer-oriented instrumentation tools that collect
@@ -580,11 +721,11 @@ impl From<Option<String>> for AudioOutputDeviceName {
 pub struct TelemetrySettingsContent {
     /// Send debug info like crash reports.
     ///
-    /// Default: true
+    /// Default: false
     pub diagnostics: Option<bool>,
     /// Send anonymized usage data like what languages you're using Zed with.
     ///
-    /// Default: true
+    /// Default: false
     pub metrics: Option<bool>,
     /// Allow sending requests to Anthropic models that cannot be offered with
     /// Zero Data Retention.
@@ -596,8 +737,8 @@ pub struct TelemetrySettingsContent {
 impl Default for TelemetrySettingsContent {
     fn default() -> Self {
         Self {
-            diagnostics: Some(true),
-            metrics: Some(true),
+            diagnostics: Some(false),
+            metrics: Some(false),
             anthropic_retention: Some(false),
         }
     }

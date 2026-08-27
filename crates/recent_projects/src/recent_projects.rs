@@ -545,8 +545,9 @@ pub fn init(cx: &mut App) {
             let Some(window) = window else {
                 return;
             };
+            let project = workspace.project().clone();
             cx.subscribe_in(
-                workspace.project(),
+                &project,
                 window,
                 move |workspace, project, event, window, cx| {
                     if let project::Event::WorktreeUpdatedEntries(worktree_id, updated_entries) =
@@ -564,6 +565,27 @@ pub fn init(cx: &mut App) {
                 },
             )
             .detach();
+
+            if workspace.open_in_dev_container() {
+                let worktree_ids = project
+                    .read(cx)
+                    .worktrees(cx)
+                    .map(|worktree| worktree.read(cx).id())
+                    .collect::<Vec<_>>();
+                for worktree_id in worktree_ids {
+                    dev_container_suggest::suggest_on_worktree_updated(
+                        workspace,
+                        worktree_id,
+                        &Default::default(),
+                        &project,
+                        window,
+                        cx,
+                    );
+                    if !workspace.open_in_dev_container() {
+                        break;
+                    }
+                }
+            }
         },
     )
     .detach();

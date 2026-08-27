@@ -1,5 +1,6 @@
 use crate::handle_open_request;
 use crate::restore_or_create_workspace;
+#[cfg(feature = "agentic-tools")]
 use agent_ui::ExternalSourcePrompt;
 use anyhow::{Context as _, Result, anyhow};
 use cli::{CliRequest, CliResponse, CliResponseSink};
@@ -57,9 +58,11 @@ pub enum OpenRequestKind {
     Extension {
         extension_id: String,
     },
+    #[cfg(feature = "agentic-tools")]
     AgentPanel {
         external_source_prompt: Option<ExternalSourcePrompt>,
     },
+    #[cfg(feature = "agentic-tools")]
     InstallSkill {
         /// Full `SKILL.md` contents embedded in a `zed://skill` share link.
         content: String,
@@ -91,12 +94,14 @@ impl std::fmt::Debug for OpenRequestKind {
                 .debug_struct("Extension")
                 .field("extension_id", extension_id)
                 .finish(),
+            #[cfg(feature = "agentic-tools")]
             Self::AgentPanel {
                 external_source_prompt,
             } => f
                 .debug_struct("AgentPanel")
                 .field("external_source_prompt", external_source_prompt)
                 .finish(),
+            #[cfg(feature = "agentic-tools")]
             Self::InstallSkill { content } => f
                 .debug_struct("InstallSkill")
                 .field("content_len", &content.len())
@@ -155,6 +160,7 @@ impl OpenRequest {
         }
 
         for url in request.urls {
+            let url = product_flavor::normalize_url(&url);
             if let Some(server_name) = url.strip_prefix("zed-cli://") {
                 this.kind = Some(OpenRequestKind::CliConnection(connect_to_cli(server_name)?));
             } else if let Some(action_index) = url.strip_prefix("zed-dock-action://") {
@@ -172,10 +178,20 @@ impl OpenRequest {
                 this.kind = Some(OpenRequestKind::Extension {
                     extension_id: extension_id.to_string(),
                 });
-            } else if url.starts_with(agent_skills::SKILL_SHARE_LINK_PREFIX) {
-                this.parse_skill_install_url(&url)?
-            } else if let Some(agent_path) = url.strip_prefix("zed://agent") {
-                this.parse_agent_url(agent_path)
+            } else if url.starts_with("zed://skill") {
+                #[cfg(feature = "agentic-tools")]
+                this.parse_skill_install_url(&url)?;
+                #[cfg(not(feature = "agentic-tools"))]
+                log::error!(
+                    "skill URL ignored because this Zed build was compiled without the `agentic-tools` feature: {url}"
+                );
+            } else if let Some(_agent_path) = url.strip_prefix("zed://agent") {
+                #[cfg(feature = "agentic-tools")]
+                this.parse_agent_url(_agent_path);
+                #[cfg(not(feature = "agentic-tools"))]
+                log::error!(
+                    "agent URL ignored because this Zed build was compiled without the `agentic-tools` feature: {url}"
+                );
             } else if url == "zed://" || url == "zed://open" || url == "zed://open/" {
                 this.kind = Some(OpenRequestKind::FocusApp);
             } else if let Some(schema_path) = url.strip_prefix("zed://schemas/") {
@@ -220,6 +236,7 @@ impl OpenRequest {
         }
     }
 
+    #[cfg(feature = "agentic-tools")]
     fn parse_agent_url(&mut self, agent_path: &str) {
         // Format: "" or "?prompt=<text>".
         let agent_path = agent_path.strip_prefix('/').unwrap_or(agent_path);
@@ -233,6 +250,7 @@ impl OpenRequest {
         });
     }
 
+    #[cfg(feature = "agentic-tools")]
     fn parse_skill_install_url(&mut self, url: &str) -> Result<()> {
         // Format: zed://skill?data=<base64url of SKILL.md contents>
         let content = agent_skills::decode_skill_share_link(url)?;
@@ -1437,6 +1455,7 @@ mod tests {
         assert!(options.add_dirs_to_sidebar);
     }
 
+    #[cfg(feature = "agentic-tools")]
     #[gpui::test]
     fn test_parse_agent_url(cx: &mut TestAppContext) {
         let _app_state = init_test(cx);
@@ -1462,6 +1481,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "agentic-tools")]
     #[gpui::test]
     fn test_parse_skill_install_url(cx: &mut TestAppContext) {
         let _app_state = init_test(cx);
@@ -1491,6 +1511,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "agentic-tools")]
     #[gpui::test]
     fn test_parse_malformed_skill_install_url_errors(cx: &mut TestAppContext) {
         let _app_state = init_test(cx);
@@ -1508,12 +1529,37 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg(not(feature = "agentic-tools"))]
+    #[gpui::test]
+    fn test_agentic_urls_are_rejected_when_agentic_is_disabled(cx: &mut TestAppContext) {
+        let _app_state = init_test(cx);
+
+        for url in ["zed://agent?prompt=hello", "zed://skill?data=ignored"] {
+            let request = cx.update(|cx| {
+                OpenRequest::parse(
+                    RawOpenRequest {
+                        urls: vec![url.into()],
+                        ..Default::default()
+                    },
+                    cx,
+                )
+                .expect("unavailable agentic URLs must fail safely")
+            });
+            assert!(
+                request.kind.is_none(),
+                "unavailable agentic URL must not be reinterpreted: {url}"
+            );
+        }
+    }
+
+    #[cfg(feature = "agentic-tools")]
     fn agent_url_with_prompt(prompt: &str) -> String {
         let mut serializer = url::form_urlencoded::Serializer::new("zed://agent?".to_string());
         serializer.append_pair("prompt", prompt);
         serializer.finish()
     }
 
+    #[cfg(feature = "agentic-tools")]
     #[gpui::test]
     fn test_parse_agent_url_with_prompt(cx: &mut TestAppContext) {
         let _app_state = init_test(cx);
@@ -1545,6 +1591,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "agentic-tools")]
     #[gpui::test]
     fn test_parse_agent_url_with_trailing_slash(cx: &mut TestAppContext) {
         let _app_state = init_test(cx);
@@ -1602,6 +1649,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "agentic-tools")]
     #[gpui::test]
     fn test_parse_agent_url_with_empty_prompt(cx: &mut TestAppContext) {
         let _app_state = init_test(cx);
@@ -2054,7 +2102,7 @@ mod tests {
             OpenRequest::parse(
                 RawOpenRequest {
                     urls: vec![
-                        "zed://git/clone/?repo=https://github.com/zed-industries/zed.git".into(),
+                        "zed://git/clone/?repo=https://github.com/simtropolis/zed.git".into(),
                     ],
                     ..Default::default()
                 },
@@ -2065,7 +2113,7 @@ mod tests {
 
         match request.kind {
             Some(OpenRequestKind::GitClone { repo_url }) => {
-                assert_eq!(repo_url, "https://github.com/zed-industries/zed.git");
+                assert_eq!(repo_url, "https://github.com/simtropolis/zed.git");
             }
             _ => panic!("Expected GitClone kind"),
         }
@@ -2079,7 +2127,7 @@ mod tests {
             OpenRequest::parse(
                 RawOpenRequest {
                     urls: vec![
-                        "zed://git/clone?repo=https://github.com/zed-industries/zed.git".into(),
+                        "zed://git/clone?repo=https://github.com/simtropolis/zed.git".into(),
                     ],
                     ..Default::default()
                 },
@@ -2090,7 +2138,7 @@ mod tests {
 
         match request.kind {
             Some(OpenRequestKind::GitClone { repo_url }) => {
-                assert_eq!(repo_url, "https://github.com/zed-industries/zed.git");
+                assert_eq!(repo_url, "https://github.com/simtropolis/zed.git");
             }
             _ => panic!("Expected GitClone kind"),
         }
@@ -2104,7 +2152,7 @@ mod tests {
             OpenRequest::parse(
                 RawOpenRequest {
                     urls: vec![
-                        "zed://git/clone/?repo=https%3A%2F%2Fgithub.com%2Fzed-industries%2Fzed.git"
+                        "zed://git/clone/?repo=https%3A%2F%2Fgithub.com%2Fsimtropolis%2Fzed.git"
                             .into(),
                     ],
                     ..Default::default()
@@ -2116,7 +2164,7 @@ mod tests {
 
         match request.kind {
             Some(OpenRequestKind::GitClone { repo_url }) => {
-                assert_eq!(repo_url, "https://github.com/zed-industries/zed.git");
+                assert_eq!(repo_url, "https://github.com/simtropolis/sim.git");
             }
             _ => panic!("Expected GitClone kind"),
         }

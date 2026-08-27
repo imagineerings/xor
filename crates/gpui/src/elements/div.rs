@@ -1336,6 +1336,12 @@ pub trait StatefulInteractiveElement: InteractiveElement {
         self
     }
 
+    /// Set the disabled state for this element.
+    fn aria_disabled(mut self, disabled: bool) -> Self {
+        self.interactivity().aria.disabled = Some(disabled);
+        self
+    }
+
     /// Set the expanded state for this element.
     fn aria_expanded(mut self, expanded: bool) -> Self {
         self.interactivity().aria.expanded = Some(expanded);
@@ -2001,6 +2007,7 @@ pub(crate) struct AriaProperties {
     pub(crate) description: Option<SharedString>,
     pub(crate) keyshortcuts: Option<SharedString>,
     pub(crate) selected: Option<bool>,
+    pub(crate) disabled: Option<bool>,
     pub(crate) expanded: Option<bool>,
     pub(crate) toggled: Option<accesskit::Toggled>,
     pub(crate) numeric_value: Option<f64>,
@@ -2968,7 +2975,7 @@ impl Interactivity {
                                 // if the hitbox is not being hovered.
                                 // This avoids dragging elements that changed their position
                                 // immediately after being clicked.
-                                // See https://github.com/zed-industries/zed/issues/24600 for more details
+                                // See https://github.com/simtropolis/zed/issues/24600 for more details
                                 pending_mouse_down.take();
                                 window.refresh();
                             }
@@ -3404,6 +3411,13 @@ impl Interactivity {
         }
         if let Some(selected) = self.aria.selected {
             node.set_selected(selected);
+        }
+        if let Some(disabled) = self.aria.disabled {
+            if disabled {
+                node.set_disabled();
+            } else {
+                node.clear_disabled();
+            }
         }
         if let Some(expanded) = self.aria.expanded {
             node.set_expanded(expanded);
@@ -4872,6 +4886,7 @@ mod tests {
         interactivity.aria.min_numeric_value = Some(6.0);
         interactivity.aria.max_numeric_value = Some(72.0);
         interactivity.aria.numeric_value_step = Some(1.0);
+        interactivity.aria.disabled = Some(true);
 
         let mut node = accesskit::Node::new(accesskit::Role::SpinButton);
         interactivity.write_a11y_info(&mut node);
@@ -4884,6 +4899,7 @@ mod tests {
         assert_eq!(node.min_numeric_value(), Some(6.0));
         assert_eq!(node.max_numeric_value(), Some(72.0));
         assert_eq!(node.numeric_value_step(), Some(1.0));
+        assert!(node.is_disabled());
     }
 
     /// Two focusable, clickable elements ("a" and "b") used to exercise the

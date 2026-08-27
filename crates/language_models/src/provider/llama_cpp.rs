@@ -4,7 +4,7 @@ use credentials_provider::CredentialsProvider;
 use fs::Fs;
 use futures::Stream;
 use futures::{FutureExt, StreamExt, future::BoxFuture, stream::BoxStream};
-use gpui::{App, AsyncApp, Context, Entity, Task, TaskExt};
+use gpui::{App, AsyncApp, Context, Entity, Task, TaskExt, Window};
 use http_client::{CustomHeaders, HttpClient};
 use language_model::util::parse_tool_arguments;
 use language_model::{

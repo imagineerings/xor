@@ -189,10 +189,6 @@ pub fn setup_sentry() -> Step<Use> {
     .add_with(("token", vars::SENTRY_AUTH_TOKEN))
 }
 
-pub fn prettier() -> Step<Run> {
-    named::bash("./script/prettier")
-}
-
 pub fn cargo_fmt() -> Step<Run> {
     named::bash("cargo fmt --all -- --check")
 }
@@ -258,10 +254,6 @@ pub fn clippy(platform: Platform, target: Option<&str>) -> Step<Run> {
             None => named::bash("./script/clippy"),
         },
     }
-}
-
-pub fn install_rustup_target(target: &str) -> Step<Run> {
-    named::bash(format!("rustup target add {target}"))
 }
 
 pub fn cache_rust_dependencies_namespace() -> Step<Use> {
@@ -353,7 +345,7 @@ pub struct NamedJob<J: JobType = RunJob> {
 // }
 
 pub(crate) const DEFAULT_REPOSITORY_OWNER_GUARD: &str =
-    "(github.repository_owner == 'zed-industries' || github.repository_owner == 'zed-extensions')";
+    "(github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions')";
 
 pub fn repository_owner_guard_expression(trigger_always: bool) -> Expression {
     Expression::new(format!(
@@ -676,7 +668,6 @@ pub(crate) struct UploadArtifactStep {
     if_no_files_found: Option<IfNoFilesFound>,
     retention_days: Option<u32>,
     if_condition: Option<Expression>,
-    overwrite: bool,
 }
 
 impl UploadArtifactStep {
@@ -692,11 +683,6 @@ impl UploadArtifactStep {
 
     pub fn if_condition(mut self, condition: Expression) -> Self {
         self.if_condition = Some(condition);
-        self
-    }
-
-    pub fn overwrite(mut self, overwrite: bool) -> Self {
-        self.overwrite = overwrite;
         self
     }
 }
@@ -716,7 +702,6 @@ impl From<UploadArtifactStep> for Step<Use> {
             .when_some(value.if_condition, |step, condition| {
                 step.if_condition(condition)
             })
-            .when(value.overwrite, |step| step.add_with(("overwrite", true)))
     }
 }
 

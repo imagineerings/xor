@@ -17,6 +17,7 @@ doctest = false
 anyhow.workspace = true
 log.workspace = true
 simplelog.workspace = true
+product_flavor.workspace = true
 
 [target.'cfg(target_os = "windows")'.dependencies]
 scopeguard = "1.2"

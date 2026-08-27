@@ -5733,6 +5733,24 @@ impl AgentPanel {
 
                             menu = menu
                                 .separator()
+                                .header("MCP Servers")
+                                .action(
+                                    "Add Server…",
+                                    Box::new(zed_actions::OpenSettingsAt {
+                                        path: "context_servers".to_string(),
+                                        target: None,
+                                    }),
+                                )
+                                .action(
+                                    "Install New Servers…",
+                                    Box::new(zed_actions::Extensions {
+                                        category_filter: Some(
+                                            zed_actions::ExtensionCategoryFilter::ContextServers,
+                                        ),
+                                        id: None,
+                                    }),
+                                )
+                                .separator()
                                 .action("Profiles", Box::new(ManageProfiles::default()));
                         }
 
@@ -10884,6 +10902,7 @@ mod tests {
         let source_session_id = acp::SessionId::new("source-thread-session");
         let source_title: SharedString = "Source Thread Title".into();
         let db_thread = agent::DbThread {
+            goal: None,
             title: source_title.clone(),
             messages: Vec::new(),
             updated_at: Utc::now(),

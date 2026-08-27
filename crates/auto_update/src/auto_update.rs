@@ -119,6 +119,27 @@ pub struct AssetQuery<'a> {
     is_staff: Option<bool>,
 }
 
+fn build_update_asset_url(base_url: &str, path: &str, query: AssetQuery<'_>) -> Result<url::Url> {
+    let mut url = url::Url::parse(&format!("{}{path}", base_url.trim_end_matches('/')))?;
+    {
+        let mut pairs = url.query_pairs_mut();
+        pairs
+            .append_pair("asset", query.asset)
+            .append_pair("os", query.os)
+            .append_pair("arch", query.arch);
+        if let Some(metrics_id) = query.metrics_id {
+            pairs.append_pair("metrics_id", metrics_id);
+        }
+        if let Some(system_id) = query.system_id {
+            pairs.append_pair("system_id", system_id);
+        }
+        if let Some(is_staff) = query.is_staff {
+            pairs.append_pair("is_staff", if is_staff { "true" } else { "false" });
+        }
+    }
+    Ok(url)
+}
+
 #[derive(Clone, Debug)]
 pub enum AutoUpdateStatus {
     Idle,
@@ -187,6 +208,7 @@ pub struct AutoUpdater {
 pub struct ReleaseAsset {
     pub version: String,
     pub url: String,
+    pub product_id: String,
 }
 
 struct MacOsUnmounter<'a> {
@@ -338,23 +360,19 @@ pub fn check(_: &Check, window: &mut Window, cx: &mut App) {
 
 pub fn release_notes_url(cx: &mut App) -> Option<String> {
     let release_channel = ReleaseChannel::try_global(cx)?;
-    let url = match release_channel {
-        ReleaseChannel::Stable | ReleaseChannel::Preview => {
-            let auto_updater = AutoUpdater::get(cx)?;
-            let auto_updater = auto_updater.read(cx);
-            let mut current_version = auto_updater.current_version.clone();
-            current_version.pre = semver::Prerelease::EMPTY;
-            current_version.build = semver::BuildMetadata::EMPTY;
-            let release_channel = release_channel.dev_name();
-            let path = format!("/releases/{release_channel}/{current_version}");
-            auto_updater.client.http_client().build_url(&path)
-        }
-        ReleaseChannel::Nightly => {
-            "https://github.com/zed-industries/zed/commits/nightly/".to_string()
-        }
-        ReleaseChannel::Dev => "https://github.com/zed-industries/zed/commits/main/".to_string(),
-    };
-    Some(url)
+    let update_base_url = option_env!("ZED_PRODUCT_UPDATE_BASE_URL")?;
+    let auto_updater = AutoUpdater::get(cx)?;
+    let auto_updater = auto_updater.read(cx);
+    let mut current_version = auto_updater.current_version.clone();
+    current_version.pre = semver::Prerelease::EMPTY;
+    current_version.build = semver::BuildMetadata::EMPTY;
+    Some(format!(
+        "{}/releases/{}/{}/{}",
+        update_base_url.trim_end_matches('/'),
+        product_flavor::UPDATE_NAMESPACE,
+        release_channel.dev_name(),
+        current_version
+    ))
 }
 
 pub fn view_release_notes(_: &ViewReleaseNotes, cx: &mut App) -> Option<()> {
@@ -364,7 +382,7 @@ pub fn view_release_notes(_: &ViewReleaseNotes, cx: &mut App) -> Option<()> {
 }
 
 #[cfg(not(target_os = "windows"))]
-const INSTALLER_DIR_PREFIX: &str = "zed-auto-update";
+const INSTALLER_DIR_PREFIX: &str = product_flavor::SELECTED_AUTO_UPDATE_DIR_PREFIX;
 
 #[cfg(not(target_os = "windows"))]
 struct InstallerDir(tempfile::TempDir);
@@ -392,7 +410,12 @@ impl InstallerDir {
     async fn new() -> Result<Self> {
         let installer_dir = std::env::current_exe()?
             .parent()
-            .context("No parent dir for Zed.exe")?
+            .with_context(|| {
+                format!(
+                    "No parent directory for {}.exe",
+                    product_flavor::EXECUTABLE_NAME
+                )
+            })?
             .join("updates");
         if smol::fs::metadata(&installer_dir).await.is_ok() {
             smol::fs::remove_dir_all(&installer_dir).await?;
@@ -669,8 +692,16 @@ impl AutoUpdater {
         };
         let http_client = client.http_client();
 
-        let path = format!("/releases/{}/{}/asset", release_channel.dev_name(), version,);
-        let url = http_client.build_zed_cloud_url_with_query(
+        let path = format!(
+            "/releases/{}/{}/{}/asset",
+            product_flavor::UPDATE_NAMESPACE,
+            release_channel.dev_name(),
+            version,
+        );
+        let update_base_url = option_env!("ZED_PRODUCT_UPDATE_BASE_URL")
+            .context("product update endpoint is not configured")?;
+        let url = build_update_asset_url(
+            update_base_url,
             &path,
             AssetQuery {
                 os,
@@ -694,12 +725,19 @@ impl AutoUpdater {
             String::from_utf8_lossy(&body),
         );
 
-        serde_json::from_slice(body.as_slice()).with_context(|| {
+        let asset: ReleaseAsset = serde_json::from_slice(body.as_slice()).with_context(|| {
             format!(
                 "error deserializing release {:?}",
                 String::from_utf8_lossy(&body),
             )
-        })
+        })?;
+        anyhow::ensure!(
+            asset.product_id == product_flavor::ID,
+            "release asset belongs to product `{}`, expected `{}`",
+            asset.product_id,
+            product_flavor::ID
+        );
+        Ok(asset)
     }
 
     async fn update(this: Entity<Self>, cx: &mut AsyncApp) -> Result<()> {
@@ -721,8 +759,16 @@ impl AutoUpdater {
             cx.notify();
         });
 
-        let fetched_release_data =
-            Self::get_release_asset(&this, release_channel, None, "zed", OS, ARCH, cx).await?;
+        let fetched_release_data = Self::get_release_asset(
+            &this,
+            release_channel,
+            None,
+            product_flavor::ID,
+            OS,
+            ARCH,
+            cx,
+        )
+        .await?;
         let fetched_version = fetched_release_data.clone().version;
         let app_commit_sha = Ok(cx.update(|cx| AppCommitSha::try_global(cx).map(|sha| sha.full())));
         let newer_version = Self::check_if_fetched_version_is_newer(
@@ -883,9 +929,9 @@ impl AutoUpdater {
 
     async fn target_path(installer_dir: &InstallerDir) -> Result<PathBuf> {
         let filename = match OS {
-            "macos" => anyhow::Ok("Zed.dmg"),
-            "linux" => Ok("zed.tar.gz"),
-            "windows" => Ok("Zed.exe"),
+            "macos" => anyhow::Ok(format!("{}.dmg", product_flavor::ID)),
+            "linux" => Ok(format!("{}.tar.gz", product_flavor::ID)),
+            "windows" => Ok(format!("{}.exe", product_flavor::ID)),
             unsupported_os => anyhow::bail!("not supported: {unsupported_os}"),
         }?;
 
@@ -1095,7 +1141,7 @@ async fn install_release_linux(
 ) -> Result<Option<PathBuf>> {
     let home_dir = PathBuf::from(env::var("HOME").context("no HOME env var set")?);
 
-    let extracted = temp_dir.path().join("zed");
+    let extracted = temp_dir.path().join(product_flavor::ID);
     fs::create_dir_all(&extracted)
         .await
         .context("failed to create directory into which to extract update")?;
@@ -1123,12 +1169,16 @@ async fn install_release_linux(
     } else {
         String::default()
     };
-    let app_folder_name = format!("zed{}.app", suffix);
+    let app_folder_name = format!("{}{}.app", product_flavor::EXECUTABLE_NAME, suffix);
 
     let from = extracted.join(&app_folder_name);
     let mut to = home_dir.join(".local");
 
-    let expected_suffix = format!("{}/libexec/zed-editor", app_folder_name);
+    let expected_suffix = format!(
+        "{}/libexec/{}-editor",
+        app_folder_name,
+        product_flavor::EXECUTABLE_NAME
+    );
 
     if let Some(prefix) = running_app_path
         .to_str()
@@ -1165,7 +1215,7 @@ async fn install_release_macos(
         .file_name()
         .with_context(|| format!("invalid running app path {running_app_path:?}"))?;
 
-    let mount_path = temp_dir.path().join("Zed");
+    let mount_path = temp_dir.path().join(product_flavor::DISPLAY_NAME);
     let mut mounted_app_path: OsString = mount_path.join(running_app_filename).into();
 
     mounted_app_path.push("/");
@@ -1260,7 +1310,12 @@ async fn cleanup_stale_installer_dirs() {
 async fn cleanup_windows() -> Result<()> {
     let parent = std::env::current_exe()?
         .parent()
-        .context("No parent dir for Zed.exe")?
+        .with_context(|| {
+            format!(
+                "No parent directory for {}",
+                product_flavor::EXECUTABLE_NAME
+            )
+        })?
         .to_owned();
 
     // keep in sync with crates/auto_update_helper/src/updater.rs
@@ -1287,7 +1342,12 @@ async fn install_release_windows(downloaded_installer: &Path) -> Result<Option<P
     // deleting the old one, and launching the new binary.
     let helper_path = std::env::current_exe()?
         .parent()
-        .context("No parent dir for Zed.exe")?
+        .with_context(|| {
+            format!(
+                "No parent directory for {}",
+                product_flavor::EXECUTABLE_NAME
+            )
+        })?
         .join("tools")
         .join("auto_update_helper.exe");
     Ok(Some(helper_path))
@@ -1343,6 +1403,29 @@ mod tests {
 
     pub(super) struct InstallOverride(pub Rc<dyn Fn(&Path, &AsyncApp) -> Result<Option<PathBuf>>>);
     impl Global for InstallOverride {}
+
+    #[test]
+    fn product_update_url_uses_configured_origin_and_namespace() -> Result<()> {
+        let url = build_update_asset_url(
+            "https://updates.example.test/",
+            "/releases/rust/stable/latest/asset",
+            AssetQuery {
+                asset: "rust",
+                os: "macos",
+                arch: "aarch64",
+                metrics_id: None,
+                system_id: None,
+                is_staff: None,
+            },
+        )?;
+        assert_eq!(url.host_str(), Some("updates.example.test"));
+        assert_eq!(url.path(), "/releases/rust/stable/latest/asset");
+        assert_eq!(
+            url.query_pairs().collect::<Vec<_>>(),
+            [("asset", "rust"), ("os", "macos"), ("arch", "aarch64")]
+        );
+        Ok(())
+    }
 
     #[gpui::test]
     fn test_auto_update_defaults_to_true(cx: &mut TestAppContext) {
@@ -1495,6 +1578,7 @@ mod tests {
         let release = ReleaseAsset {
             version: "1.0.0".to_string(),
             url: "https://test.example/download".to_string(),
+            product_id: product_flavor::ID.to_string(),
         };
 
         let reported = Rc::new(std::cell::RefCell::new(Vec::<f32>::new()));
@@ -1555,6 +1639,7 @@ mod tests {
         let release = ReleaseAsset {
             version: "1.0.0".to_string(),
             url: "https://test.example/download".to_string(),
+            product_id: product_flavor::ID.to_string(),
         };
 
         let reported = Rc::new(std::cell::RefCell::new(Vec::<Option<f32>>::new()));

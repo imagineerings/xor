@@ -1960,7 +1960,7 @@ mod tests {
             "filter range text '{filter_text}' should contain 'ref' for filtering to work",
         );
 
-        // Test for correct range calculation with mixed empty and non-empty tabstops.(See https://github.com/zed-industries/zed/issues/44825)
+        // Test for correct range calculation with mixed empty and non-empty tabstops.(See https://github.com/simtropolis/zed/issues/44825)
         let res = adapter
             .label_for_completion(
                 &lsp::CompletionItem {
@@ -2191,7 +2191,7 @@ mod tests {
                         required_features: Vec::new(),
                         target_kind: TargetKind::Bin,
                     }),
-                    Arc::from("/path/to/zed".as_ref()),
+                    Arc::from(Path::new("/path/to/zed")),
                 )),
             ),
             (
@@ -2204,7 +2204,7 @@ mod tests {
                         required_features: Vec::new(),
                         target_kind: TargetKind::Bin,
                     }),
-                    Arc::from("/path/to/custom-package".as_ref()),
+                    Arc::from(Path::new("/path/to/custom-package")),
                 )),
             ),
             (
@@ -2217,7 +2217,7 @@ mod tests {
                         required_features: Vec::new(),
                         target_kind: TargetKind::Example,
                     }),
-                    Arc::from("/path/to/custom-package".as_ref()),
+                    Arc::from(Path::new("/path/to/custom-package")),
                 )),
             ),
             (
@@ -2230,7 +2230,7 @@ mod tests {
                         required_features: vec!["foo".to_owned(), "bar".to_owned()],
                         target_kind: TargetKind::Example,
                     }),
-                    Arc::from("/path/to/custom-package".as_ref()),
+                    Arc::from(Path::new("/path/to/custom-package")),
                 )),
             ),
             (
@@ -2243,13 +2243,13 @@ mod tests {
                         required_features: vec![],
                         target_kind: TargetKind::Example,
                     }),
-                    Arc::from("/path/to/custom-package".as_ref()),
+                    Arc::from(Path::new("/path/to/custom-package")),
                 )),
             ),
             (
                 r#"{"packages":[{"id":"path+file:///path/to/custom-package#my-custom-package@0.1.0","targets":[{"name":"my-custom-package","kind":["lib"],"src_path":"/path/to/custom-package/src/main.rs"}],"manifest_path":"/path/to/custom-package/Cargo.toml"}]}"#,
                 "/path/to/custom-package/src/main.rs",
-                Some((None, Arc::from("/path/to/custom-package".as_ref()))),
+                Some((None, Arc::from(Path::new("/path/to/custom-package")))),
             ),
         ] {
             let metadata: CargoMetadata = serde_json::from_str(input).context(input).unwrap();

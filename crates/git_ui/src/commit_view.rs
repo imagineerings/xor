@@ -280,6 +280,7 @@ impl CommitView {
             editor.rhs_editor().update(cx, |editor, cx| {
                 editor.set_show_bookmarks(false, cx);
                 editor.set_show_breakpoints(false, cx);
+                #[cfg(feature = "agentic")]
                 editor.set_show_diff_review_button(true, cx);
             });
 
@@ -1205,6 +1206,7 @@ impl Item for CommitView {
                     editor.rhs_editor().update(cx, |editor, cx| {
                         editor.set_show_bookmarks(false, cx);
                         editor.set_show_breakpoints(false, cx);
+                        #[cfg(feature = "agentic")]
                         editor.set_show_diff_review_button(true, cx);
                         editor.register_addon(CommitDiffAddon {
                             file_statuses,

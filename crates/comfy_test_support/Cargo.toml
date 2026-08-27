@@ -1,0 +1,63 @@
+[package]
+name = "comfy_test_support"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+license = "GPL-3.0-or-later"
+[lints]
+workspace = true
+[lib]
+path = "src/comfy_test_support.rs"
+[[bin]]
+name = "comfy_plugin_worker_fixture"
+path = "src/bin/comfy_plugin_worker_fixture.rs"
+[features]
+default = ["cpu"]
+hardware-certification = []
+cpu = ["comfy_tensor/cpu"]
+cuda = ["comfy_tensor/cuda"]
+rocm = ["comfy_tensor/rocm"]
+metal = ["comfy_runtime/metal", "comfy_tensor/metal"]
+directml = ["comfy_tensor/directml"]
+xpu = ["comfy_tensor/xpu"]
+npu = ["comfy_tensor/npu"]
+mlu = ["comfy_tensor/mlu"]
+corex = ["comfy_tensor/corex"]
+
+[[test]]
+name = "device_cpu_comfy_model_0016"
+path = "tests/device_cpu_comfy_model_0016.rs"
+required-features = ["hardware-certification"]
+
+[dependencies]
+anyhow.workspace = true
+async-channel.workspace = true
+comfy_media.workspace = true
+comfy_model = { workspace = true, features = ["test-support"] }
+comfy_runtime = { workspace = true, features = ["signing-tooling", "test-support"] }
+comfy_sampler.workspace = true
+comfy_tensor.workspace = true
+comfy_types.workspace = true
+comfy_worker.workspace = true
+gpui = { workspace = true, features = ["test-support"] }
+postcard.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+ring.workspace = true
+smol.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+clock.workspace = true
+comfy_api.workspace = true
+comfy_backend_metal = { workspace = true, features = ["test-support"] }
+comfy_nodes.workspace = true
+comfy_plugin_host.workspace = true
+comfy_plugin_sdk = { workspace = true, features = ["signing-tooling"] }
+extension_host.workspace = true
+fs = { workspace = true, features = ["test-support"] }
+half.workspace = true
+libc.workspace = true
+tempfile.workspace = true

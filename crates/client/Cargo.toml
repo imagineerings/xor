@@ -37,6 +37,7 @@ http_client_tls.workspace = true
 log.workspace = true
 parking_lot.workspace = true
 paths.workspace = true
+product_flavor.workspace = true
 postage.workspace = true
 proxy_handshake = { workspace = true, features = ["tokio"] }
 rand.workspace = true

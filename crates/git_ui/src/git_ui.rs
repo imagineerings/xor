@@ -35,6 +35,8 @@ use crate::{
 
 pub mod branch_diff;
 pub mod branch_picker;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_review;
 mod commit_context_menu;
 mod commit_modal;
 pub mod commit_tooltip;
@@ -58,6 +60,7 @@ pub mod text_diff_view;
 pub mod unstaged_diff;
 
 pub use blame_ui::GitBlameStatus;
+#[cfg(feature = "agentic")]
 pub use conflict_view::MergeConflictIndicator;
 
 pub fn init(cx: &mut App) {

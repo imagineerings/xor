@@ -1,0 +1,107 @@
+# Implementation plan: Sim Zed 1.16 port audit
+
+## Tasks
+
+- [x] 1. Produce the immutable tree-delta port ledger
+  - _id: sim-zed-1-16-port-audit-ledger_
+  - _priority: P0_
+  - _value: high_
+  - _wave: 1_
+  - _reads: Git trees at v1.10.2, sim-dev, v1.16.1, and HEAD_
+  - _writes: .agents/specs/sim-zed-1-16-port-audit/generate_audit.py, .agents/specs/sim-zed-1-16-port-audit/inventory.md, .agents/specs/sim-zed-1-16-port-audit/port-ledger.csv_
+  - _validation: python3 .agents/specs/sim-zed-1-16-port-audit/generate_audit.py --check_
+  - _Requirements: 1.1, 1.2, 1.3, 1.4_
+  - Outcome: Every old-delta path and every rebased-only path has a reproducible disposition tied to full commit IDs.
+  - Design: D1 / immutable tree-delta comparison
+  - Done when: Regeneration is clean, complete, and explicitly records the unrelated-history limitation.
+  - Validation evidence: `generate_audit.py --check` passed with 4,059 classified paths and full immutable ref IDs.
+
+- [x] 2. Reconcile existing Zed dependencies to v1.16.1
+  - _id: sim-zed-1-16-port-audit-dependencies_
+  - _priority: P0_
+  - _value: high_
+  - _wave: 2_
+  - _blocked_by: sim-zed-1-16-port-audit-ledger_
+  - _reads: all current manifests, corresponding v1.16.1 manifests, current regenerated Cargo.lock_
+  - _writes: Cargo.toml, affected crate manifests, Cargo.lock, .agents/specs/sim-zed-1-16-port-audit/dependency-audit.md_
+  - _validation: cargo generate-lockfile && cargo metadata --no-deps --format-version 1_
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - Outcome: Existing Zed dependencies use exact v1.16.1 declarations, Sim-only additions remain, and the regenerated graph has an explicit drift report.
+  - Design: D4 / upstream-authoritative dependency reconciliation
+  - Done when: No unapproved Sim fork substitutes for a v1.16.1 dependency and the regenerated lockfile loads.
+  - Validation evidence: The deterministic dependency audit found 5,717 exact upstream declarations, 79 reviewed Sim additions in existing manifests, 27 new Sim manifests, and zero drifted, missing, or fork-substituted declarations. `Cargo.lock` preserves 1,608 v1.16.1 external records, replaces three registry versions required by retained Sim additions, adds 28 records, and contains no Sim fork sources. `cargo metadata --no-deps --format-version 1` and `generate_dependency_audit.py --check` passed.
+
+- [x] 3. Repair port-induced workspace and runnable-target failures
+  - _id: sim-zed-1-16-port-audit-repair_
+  - _priority: P0_
+  - _value: high_
+  - _wave: 3_
+  - _blocked_by: sim-zed-1-16-port-audit-dependencies_
+  - _reads: Cargo.toml, Cargo.lock, crates/agent_ui/Cargo.toml, crates/zed/Cargo.toml, old and upstream versions of each failing path_
+  - _writes: build-critical manifests and Rust sources confirmed by diagnostics_
+  - _validation: cargo metadata --no-deps --format-version 1 && cargo check -p zed_
+  - _Requirements: 2.1, 2.2, 2.3_
+  - Outcome: The current workspace loads and the Sim desktop target compiles against the v1.16.1 dependency graph.
+  - Design: D2 / incremental Cargo repair
+  - Done when: Cargo metadata and the runnable-package check pass with each correction traced to old Sim intent and new upstream structure.
+  - Validation evidence: `cargo metadata --no-deps --format-version 1 --locked`, `cargo check -p zed --features runtime-shaders`, and `cargo check -p zed --features runtime-shaders,rust-tools` passed. The ordinary macOS shader build reaches the host's missing Metal command-line toolchain, not a Rust or manifest error.
+
+- [x] 4. Validate representative Sim behavior and record residual risk
+  - _id: sim-zed-1-16-port-audit-validate_
+  - _priority: P1_
+  - _value: high_
+  - _wave: 4_
+  - _blocked_by: sim-zed-1-16-port-audit-repair_
+  - _reads: imported Sim specifications, affected tests, runnable target configuration_
+  - _writes: .agents/specs/sim-zed-1-16-port-audit/audit.md_
+  - _validation: cargo fmt --all -- --check; focused GPUI, settings, project, workspace, UI, Zed, and agent_ui tests; ZED_STATELESS=1 cargo run -p zed --features runtime-shaders,rust-tools_
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+  - Outcome: Automated and startup evidence is recorded separately from Sim workflows that still need manual verification.
+  - Design: D3 / layered functional evidence
+  - Done when: Relevant checks complete and the audit report lists all environment-bound or otherwise unverified behaviors without claiming full parity.
+  - Validation evidence: Formatting, metadata, ledger checks, dependency checks, 15 Cargo workspace tests, 4 task scheduling tests, 3 language-server merge tests, GPUI/UI accessibility tests, the Zed base-keymap test, and all 428 `agent_ui` tests passed. The stateless application stayed active after initialization and was stopped with Ctrl-C. Comfy's pre-existing evidence-digest failure, manual UI workflows, cross-platform backends, and the headless `gpui_macos` pasteboard abort remain recorded risks.
+
+- [x] 5. Complete the Sim icon asset rename
+  - _id: sim-zed-1-16-port-audit-icon-assets_
+  - _priority: P0_
+  - _value: high_
+  - _wave: 5_
+  - _blocked_by: sim-zed-1-16-port-audit-repair_
+  - _reads: crates/icons/src/icons.rs, assets/icons/ai_zed.svg, assets/icons/zed_*.svg_
+  - _writes: assets/icons/ai_sim.svg, assets/icons/sim_*.svg, .agents/specs/sim-zed-1-16-port-audit/audit.md_
+  - _validation: cargo test -p icons_
+  - _Requirements: 5.1, 5.2, 5.3_
+  - Outcome: Every Sim-branded icon enum variant resolves to its bundled artwork and no obsolete Zed-named copy remains dangling.
+  - Design: D5 / icon variant and asset-stem identity
+  - Done when: Both exhaustive icon inventory tests pass and content hashes prove the renames did not alter the SVG artwork.
+  - Validation evidence: `cargo test -p icons` passed both exhaustive inventory tests; byte comparisons against all eleven pre-rename Git blobs passed; no stale Zed-branded icon path remained in runtime source; and the stateless application completed startup without asset-loading errors.
+
+- [x] 6. Complete the Sim vector-image asset rename
+  - _id: sim-zed-1-16-port-audit-vector-assets_
+  - _priority: P0_
+  - _value: high_
+  - _wave: 6_
+  - _blocked_by: sim-zed-1-16-port-audit-icon-assets_
+  - _reads: crates/ui/src/components/image.rs, assets/images/zed_logo.svg, assets/images/zed_x_copilot.svg_
+  - _writes: crates/ui/src/components/image.rs, assets/images/sim_logo.svg, assets/images/sim_x_copilot.svg, .agents/specs/sim-zed-1-16-port-audit/audit.md_
+  - _validation: cargo test -p ui components::image::tests_
+  - _Requirements: 6.1, 6.2, 6.3_
+  - Outcome: Every Sim-branded vector enum resolves to bundled artwork and obsolete Zed-named copies no longer mask an incomplete branding port.
+  - Design: D6 / vector variant and asset-stem identity
+  - Done when: Both exhaustive vector inventory tests pass and byte comparisons prove the asset renames preserved their SVG artwork.
+  - Validation evidence: The original stale `vector_path` assertion failed with `images/sim_logo.svg` versus `images/zed_logo.svg`; after correction, both exhaustive vector inventory tests passed, both renamed SVGs matched their pre-rename Git blobs byte-for-byte, no stale Zed image path remained in runtime source, and stateless application startup emitted no image asset-loading errors.
+
+- [x] 7. Reconcile existing assets to upstream v1.16.1 identity
+  - _id: sim-zed-1-16-port-audit-upstream-assets_
+  - _priority: P0_
+  - _value: high_
+  - _wave: 7_
+  - _blocked_by: sim-zed-1-16-port-audit-vector-assets_
+  - _reads: v1.16.1 assets tree, current assets tree, crates/icons/src/icons.rs, crates/ui/src/components/image.rs, all Rust call sites for the affected variants_
+  - _writes: assets, affected Rust call sites, .agents/specs/sim-zed-1-16-port-audit/asset-audit.md, .agents/specs/sim-zed-1-16-port-audit/audit.md_
+  - _validation: cargo test -p icons && cargo test -p ui components::image::tests_
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
+  - Outcome: Every existing upstream asset, enum identity, and reference is restored exactly; genuinely new Sim asset files remain separate and inventoried.
+  - Design: D7 / upstream asset identity and additive Sim boundary
+  - Done when: The complete v1.16.1 asset tree has zero missing or drifted blobs, no replacement Sim enum remains, focused tests pass, and the stateless app starts without asset-loading errors.
+  - Validation evidence: All 463 v1.16.1 asset paths matched their upstream Git blob IDs; the only additions are the two Comfy defaults; no replacement Sim enum or renamed SVG remains; icon tests passed 2/2, vector tests passed 2/2, the Zed check and base-keymap test passed, and stateless startup emitted no missing-asset errors.

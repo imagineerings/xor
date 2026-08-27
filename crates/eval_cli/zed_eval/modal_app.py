@@ -38,7 +38,7 @@ LLM_PROVIDERS_SECRET_NAME = os.environ.get(
     "AGENT_EVALS_LLM_PROVIDERS_SECRET", config.DEFAULT_LLM_PROVIDERS_SECRET_NAME
 )
 REPO_URL = os.environ.get(
-    "AGENT_EVALS_REPO_URL", "https://github.com/zed-industries/zed.git"
+    "AGENT_EVALS_REPO_URL", "https://github.com/simtropolis/zed.git"
 )
 ZIG_URL = (
     f"https://ziglang.org/download/{ZIG_VERSION}/zig-x86_64-linux-{ZIG_VERSION}.tar.xz"

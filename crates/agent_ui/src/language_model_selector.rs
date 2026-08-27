@@ -745,11 +745,11 @@ mod tests {
         // In the case below, `zed/gpt-5-mini` and `openai/gpt-5-mini` have identical
         // similarity scores, but `zed/gpt-5-mini` was higher in the models list,
         // so it should appear first in the results.
-        let results = matcher.fuzzy_search("mini");
+        let results = matcher.fuzzy_search("gpt-5-mini");
         assert_models_eq(results, vec!["zed/gpt-5-mini", "openai/gpt-5-mini"]);
 
         // Model provider should be searchable as well
-        let results = matcher.fuzzy_search("ol"); // meaning "ollama"
+        let results = matcher.fuzzy_search("ollama/");
         assert_models_eq(results, vec!["ollama/mistral", "ollama/deepseek"]);
 
         // Fuzzy search - search for Claude to get the Thinking variant

@@ -63,13 +63,17 @@ use std::{
     ops::RangeInclusive,
     path::{Path, PathBuf},
     rc::Rc,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 use util::{ResultExt, debug_panic, markdown::MarkdownCodeBlock, paths::PathStyle};
 use uuid::Uuid;
 
 const TOOL_CANCELED_MESSAGE: &str = "Tool canceled by user";
+pub(crate) const GRIND_SATISFACTION_TOOL_NAME: &str = "report_goal_satisfied";
 const TOOL_CALL_INTERRUPTED_BY_FOLLOW_UP_MESSAGE: &str =
     "Permission denied: user sent a follow-up message instead of approving the tool call.";
 pub(crate) const FOLLOW_UP_PERMISSION_DENIED_OPTION_ID: &str = "follow_up_permission_denied";
@@ -168,6 +172,56 @@ impl std::fmt::Display for PromptId {
 
 pub(crate) const MAX_RETRY_ATTEMPTS: u8 = 4;
 pub(crate) const BASE_RETRY_DELAY: Duration = Duration::from_secs(5);
+
+#[derive(Debug, Deserialize, JsonSchema, Serialize)]
+pub struct GrindSatisfactionInput {
+    /// A brief user-facing summary of why the active goal is fully satisfied.
+    pub summary: String,
+}
+
+struct GrindSatisfactionTool {
+    satisfied: Arc<AtomicBool>,
+}
+
+impl AgentTool for GrindSatisfactionTool {
+    type Input = GrindSatisfactionInput;
+    type Output = String;
+
+    const NAME: &'static str = GRIND_SATISFACTION_TOOL_NAME;
+
+    fn kind() -> acp::ToolKind {
+        acp::ToolKind::Other
+    }
+
+    fn initial_title(
+        &self,
+        _input: Result<Self::Input, serde_json::Value>,
+        _cx: &mut App,
+    ) -> SharedString {
+        "Goal satisfied".into()
+    }
+
+    fn run(
+        self: Arc<Self>,
+        input: ToolInput<Self::Input>,
+        _event_stream: ToolCallEventStream,
+        cx: &mut App,
+    ) -> Task<Result<Self::Output, Self::Output>> {
+        cx.spawn(async move |_cx| {
+            let input = input.recv().await.map_err(|error| error.to_string())?;
+            self.satisfied.store(true, Ordering::SeqCst);
+            Ok(format!("Goal satisfaction recorded: {}", input.summary))
+        })
+    }
+}
+
+struct GrindTurnContext {
+    goal: SharedString,
+    turn_number: u8,
+    max_turns: u8,
+    satisfied: Arc<AtomicBool>,
+    tool: Arc<dyn AnyAgentTool>,
+}
 
 #[derive(Debug, Clone)]
 enum RetryStrategy {
@@ -1236,6 +1290,8 @@ pub struct Thread {
     pending_summary_generation: Option<Shared<Task<Option<SharedString>>>>,
     summary: Option<SharedString>,
     messages: Vec<Arc<Message>>,
+    goal: Option<SharedString>,
+    grind_turn_context: Option<GrindTurnContext>,
     user_store: Entity<UserStore>,
     /// Holds the task that handles agent interaction until the end of the turn.
     /// Survives across multiple requests as the model performs tool calls and
@@ -1386,6 +1442,8 @@ impl Thread {
             pending_summary_generation: None,
             summary: None,
             messages: Vec::new(),
+            goal: None,
+            grind_turn_context: None,
             user_store: project.read(cx).user_store(),
             running_turn: None,
             end_turn_at_next_boundary: false,
@@ -1769,6 +1827,8 @@ impl Thread {
             pending_summary_generation: None,
             summary: db_thread.detailed_summary,
             messages: db_thread.messages,
+            goal: db_thread.goal,
+            grind_turn_context: None,
             user_store: project.read(cx).user_store(),
             running_turn: None,
             end_turn_at_next_boundary: false,
@@ -1884,6 +1944,7 @@ impl Thread {
             title: self.title().unwrap_or_default(),
             messages: self.messages.clone(),
             updated_at: self.updated_at,
+            goal: self.goal.clone(),
             detailed_summary: self.summary.clone(),
             initial_project_snapshot: None,
             cumulative_token_usage: self.cumulative_token_usage,
@@ -1941,7 +2002,57 @@ impl Thread {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.messages.is_empty() && self.title.is_none()
+        self.messages.is_empty() && self.title.is_none() && self.goal.is_none()
+    }
+
+    pub fn goal(&self) -> Option<&SharedString> {
+        self.goal.as_ref()
+    }
+
+    pub fn set_goal(&mut self, goal: Option<SharedString>, cx: &mut Context<Self>) {
+        if self.goal == goal {
+            return;
+        }
+        self.goal = goal;
+        self.updated_at = Utc::now();
+        cx.notify();
+    }
+
+    pub(crate) fn begin_grind_turn(
+        &mut self,
+        goal: SharedString,
+        turn_number: u8,
+        max_turns: u8,
+    ) -> Result<()> {
+        if self.grind_turn_context.is_some() {
+            anyhow::bail!("A grind turn is already configured");
+        }
+        if self.running_turn.is_some() {
+            anyhow::bail!("A conversation turn is already running");
+        }
+        if turn_number == 0 || turn_number > max_turns {
+            anyhow::bail!("Invalid grind turn progress");
+        }
+
+        let satisfied = Arc::new(AtomicBool::new(false));
+        let tool = GrindSatisfactionTool {
+            satisfied: satisfied.clone(),
+        }
+        .erase();
+        self.grind_turn_context = Some(GrindTurnContext {
+            goal,
+            turn_number,
+            max_turns,
+            satisfied,
+            tool,
+        });
+        Ok(())
+    }
+
+    pub(crate) fn finish_grind_turn(&mut self) -> bool {
+        self.grind_turn_context
+            .take()
+            .is_some_and(|context| context.satisfied.load(Ordering::SeqCst))
     }
 
     pub fn draft_prompt(&self) -> Option<&[acp::ContentBlock]> {
@@ -2382,6 +2493,27 @@ impl Thread {
         self.clear_summary();
         cx.notify();
         Ok(())
+    }
+
+    pub fn can_clear_conversation(&self) -> bool {
+        self.running_turn.is_none() && self.running_subagents.is_empty()
+    }
+
+    pub fn clear_conversation(&mut self, cx: &mut Context<Self>) {
+        debug_assert!(self.can_clear_conversation());
+        self.messages.clear();
+        self.pending_message = None;
+        self.end_turn_at_next_boundary = false;
+        self.request_token_usage.clear();
+        self.cumulative_token_usage = Default::default();
+        self.current_request_token_usage = Default::default();
+        self.pending_compaction_telemetry = None;
+        self.draft_prompt = None;
+        self.ui_scroll_position = None;
+        self.updated_at = Utc::now();
+        self.clear_summary();
+        cx.emit(TokenUsageUpdated(None));
+        cx.notify();
     }
 
     pub fn latest_request_token_usage(&self) -> Option<language_model::TokenUsage> {
@@ -3010,12 +3142,45 @@ impl Thread {
 
             let end_turn = tool_results.is_empty() && early_tool_results.is_empty();
 
+            let mut grind_tool_failed = false;
             for (owning_message_ix, tool_result) in early_tool_results {
+                grind_tool_failed |= tool_result.is_error;
                 Self::process_tool_result(this, event_stream, cx, owning_message_ix, tool_result)?;
             }
-            while let Some((owning_message_ix, tool_result)) = tool_results.next().await {
-                Self::process_tool_result(this, event_stream, cx, owning_message_ix, tool_result)?;
+            let is_grind_turn = this.read_with(cx, |this, _| this.grind_turn_context.is_some())?;
+            while !tool_results.is_empty() {
+                if is_grind_turn {
+                    futures::select! {
+                        (owning_message_ix, tool_result) = futures::StreamExt::select_next_some(&mut tool_results) => {
+                            grind_tool_failed |= tool_result.is_error;
+                            Self::process_tool_result(
+                                this,
+                                event_stream,
+                                cx,
+                                owning_message_ix,
+                                tool_result,
+                            )?;
+                        }
+                        _ = cancellation_rx.changed().fuse() => {
+                            if *cancellation_rx.borrow() {
+                                cancelled = true;
+                                break;
+                            }
+                        }
+                    }
+                } else if let Some((owning_message_ix, tool_result)) = tool_results.next().await {
+                    grind_tool_failed |= tool_result.is_error;
+                    Self::process_tool_result(
+                        this,
+                        event_stream,
+                        cx,
+                        owning_message_ix,
+                        tool_result,
+                    )?;
+                }
             }
+
+            let stop_for_grind_tool_failure = grind_tool_failed && is_grind_turn;
 
             this.update(cx, |this, cx| {
                 this.flush_pending_message(cx);
@@ -3026,6 +3191,11 @@ impl Thread {
 
             if cancelled {
                 log::debug!("Turn cancelled by user, exiting");
+                return Ok(());
+            }
+
+            if stop_for_grind_tool_failure {
+                log::debug!("Grind turn stopped after a tool failure");
                 return Ok(());
             }
 
@@ -4084,6 +4254,23 @@ impl Thread {
         let messages = self.build_request_messages(available_tools, cx);
         log::debug!("Request will include {} messages", messages.len());
 
+        let mut messages = messages;
+        if let Some(context) = &self.grind_turn_context {
+            messages.push(LanguageModelRequestMessage {
+                role: Role::User,
+                content: vec![format!(
+                    "<grind_control>\nThe user authorized bounded automatic continuation for turn {}/{}. Continue working toward the goal below. Call `{}` only when the goal is fully satisfied; otherwise do not call it.\n<goal>{}</goal>\n</grind_control>",
+                    context.turn_number,
+                    context.max_turns,
+                    GRIND_SATISFACTION_TOOL_NAME,
+                    crate::tools::xml_escape(context.goal.as_ref()),
+                )
+                .into()],
+                cache: false,
+                reasoning_details: None,
+            });
+        }
+
         let request = LanguageModelRequest {
             thread_id: Some(self.id.to_string()),
             prompt_id: Some(self.prompt_id.to_string()),
@@ -4195,6 +4382,10 @@ impl Thread {
             } else {
                 tools.insert(tool_name, tool.clone());
             }
+        }
+
+        if let Some(context) = &self.grind_turn_context {
+            tools.insert(GRIND_SATISFACTION_TOOL_NAME.into(), context.tool.clone());
         }
 
         tools
@@ -6892,6 +7083,154 @@ mod tests {
             content: vec![AgentMessageContent::Text(text.to_string())],
             ..Default::default()
         }))
+    }
+
+    #[gpui::test]
+    async fn test_grind_transient_context_is_not_persisted(cx: &mut TestAppContext) {
+        let (thread, _event_stream) = setup_thread_for_test(cx).await;
+        cx.update(|cx| {
+            thread.update(cx, |thread, _cx| {
+                thread
+                    .begin_grind_turn("finish <all> checks".into(), 1, 5)
+                    .unwrap();
+            });
+        });
+
+        let snapshot = thread.update(cx, |thread, cx| thread.to_db(cx)).await;
+        let serialized = serde_json::to_string(&snapshot).unwrap();
+        assert!(!serialized.contains("finish <all> checks"));
+        assert!(!serialized.contains("grind_control"));
+        assert!(!serialized.contains(GRIND_SATISFACTION_TOOL_NAME));
+        assert!(!thread.update(cx, |thread, _cx| thread.finish_grind_turn()));
+    }
+
+    #[gpui::test]
+    async fn test_grind_turn_adds_control_and_scoped_satisfaction_tool(cx: &mut TestAppContext) {
+        let (thread, _event_stream) = setup_thread_for_test(cx).await;
+        let model = Arc::new(FakeLanguageModel::default());
+        let mut events = cx
+            .update(|cx| {
+                thread.update(cx, |thread, cx| {
+                    thread.set_model(model.clone(), cx);
+                    thread
+                        .begin_grind_turn("finish </goal> safely".into(), 2, 5)
+                        .unwrap();
+                    thread.resume(cx)
+                })
+            })
+            .unwrap();
+        cx.run_until_parked();
+
+        let request = model.pending_completions().pop().unwrap();
+        assert!(
+            request
+                .tools
+                .iter()
+                .any(|tool| tool.name == GRIND_SATISFACTION_TOOL_NAME)
+        );
+        let control = request.messages.last().unwrap().string_contents();
+        assert!(control.contains("turn 2/5"));
+        assert!(control.contains(GRIND_SATISFACTION_TOOL_NAME));
+        assert!(control.contains("finish &lt;/goal&gt; safely"));
+        assert!(!control.contains("finish </goal> safely"));
+
+        model.send_completion_stream_text_chunk(&request, "Still working.");
+        model.end_completion_stream(&request);
+        cx.run_until_parked();
+        while let Some(event) = events.next().await {
+            if matches!(event, Ok(ThreadEvent::Stop(_))) {
+                break;
+            }
+        }
+        assert!(!thread.update(cx, |thread, _cx| thread.finish_grind_turn()));
+
+        let mut ordinary_events = cx
+            .update(|cx| {
+                thread.update(cx, |thread, cx| {
+                    thread.send(ClientUserMessageId::new(), ["ordinary turn"], cx)
+                })
+            })
+            .unwrap();
+        cx.run_until_parked();
+        let ordinary_request = model.pending_completions().pop().unwrap();
+        assert!(
+            ordinary_request
+                .tools
+                .iter()
+                .all(|tool| tool.name != GRIND_SATISFACTION_TOOL_NAME)
+        );
+        assert!(
+            ordinary_request
+                .messages
+                .iter()
+                .all(|message| !message.string_contents().contains("grind_control"))
+        );
+        model.end_completion_stream(&ordinary_request);
+        cx.run_until_parked();
+        while let Some(event) = ordinary_events.next().await {
+            if matches!(event, Ok(ThreadEvent::Stop(_))) {
+                break;
+            }
+        }
+    }
+
+    #[gpui::test]
+    async fn test_grind_satisfaction_tool_records_result_and_reports_success(
+        cx: &mut TestAppContext,
+    ) {
+        let (thread, _event_stream) = setup_thread_for_test(cx).await;
+        let model = Arc::new(FakeLanguageModel::default());
+        let mut events = cx
+            .update(|cx| {
+                thread.update(cx, |thread, cx| {
+                    thread.set_model(model.clone(), cx);
+                    thread
+                        .begin_grind_turn("finish the focused tests".into(), 1, 5)
+                        .unwrap();
+                    thread.resume(cx)
+                })
+            })
+            .unwrap();
+        cx.run_until_parked();
+
+        let first_request = model.pending_completions().pop().unwrap();
+        model.send_completion_stream_event(
+            &first_request,
+            LanguageModelCompletionEvent::ToolUse(LanguageModelToolUse {
+                id: "goal-satisfied-1".into(),
+                name: GRIND_SATISFACTION_TOOL_NAME.into(),
+                raw_input: json!({"summary": "All focused tests pass"}).to_string(),
+                input: language_model::LanguageModelToolUseInput::Json(
+                    json!({"summary": "All focused tests pass"}),
+                ),
+                is_input_complete: true,
+                thought_signature: None,
+            }),
+        );
+        model.end_completion_stream(&first_request);
+        cx.run_until_parked();
+
+        let final_request = model.pending_completions().pop().unwrap();
+        assert!(final_request.messages.iter().any(|message| {
+            message
+                .string_contents()
+                .contains("Goal satisfaction recorded: All focused tests pass")
+        }));
+        model.send_completion_stream_text_chunk(&final_request, "The goal is complete.");
+        model.end_completion_stream(&final_request);
+        cx.run_until_parked();
+        while let Some(event) = events.next().await {
+            if matches!(event, Ok(ThreadEvent::Stop(_))) {
+                break;
+            }
+        }
+
+        assert!(thread.update(cx, |thread, _cx| thread.finish_grind_turn()));
+        let snapshot = thread.update(cx, |thread, cx| thread.to_db(cx)).await;
+        let serialized = serde_json::to_string(&snapshot).unwrap();
+        assert!(serialized.contains(GRIND_SATISFACTION_TOOL_NAME));
+        assert!(serialized.contains("Goal satisfaction recorded"));
+        assert!(!serialized.contains("grind_control"));
     }
 
     fn summary_compaction(summary: &str) -> Arc<Message> {

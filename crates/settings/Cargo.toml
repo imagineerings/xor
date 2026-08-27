@@ -13,6 +13,9 @@ path = "src/settings.rs"
 doctest = false
 
 [features]
+default = []
+rust-tools = ["settings_content/rust-tools"]
+test-explorer = ["settings_content/test-explorer"]
 test-support = ["gpui/test-support", "fs/test-support"]
 
 [dependencies]
@@ -26,6 +29,7 @@ inventory.workspace = true
 log.workspace = true
 migrator.workspace = true
 paths.workspace = true
+product_flavor.workspace = true
 release_channel.workspace = true
 rust-embed.workspace = true
 schemars.workspace = true

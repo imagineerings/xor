@@ -19,6 +19,7 @@ name = "remote_server"
 [features]
 default = []
 debug-embed = ["dep:rust-embed"]
+rust-tools = ["project/rust-tests", "project/rust-coverage"]
 test-support = ["fs/test-support"]
 
 [dependencies]

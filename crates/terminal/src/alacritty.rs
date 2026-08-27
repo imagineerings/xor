@@ -9,7 +9,7 @@ mod hyperlinks;
 use alacritty_terminal::{
     event::{Event as AlacTermEvent, EventListener, Notify, WindowSize},
     event_loop::{EventLoop, Msg, Notifier},
-    grid::{Dimensions, Grid, GridIterator, Row, Scroll as AlacScroll},
+    grid::{Dimensions, Grid, GridCell, GridIterator, Row, Scroll as AlacScroll},
     index::{Boundary, Column, Direction as AlacDirection, Line, Point as AlacPoint},
     selection::{
         Selection as AlacSelection, SelectionRange as AlacSelectionRange,
@@ -802,10 +802,6 @@ pub(super) fn clear_saved_screen(term: &mut Term<ZedListener>) {
     }
 }
 
-pub(super) fn shrink_to_used(term: &mut Term<ZedListener>) {
-    term.grid_mut().truncate();
-}
-
 pub(super) fn used_lines(term: &Term<ZedListener>) -> usize {
     if term.mode().contains(TermMode::ALT_SCREEN) {
         return term.total_lines();
@@ -870,6 +866,51 @@ pub(super) fn content_text(term: &Term<ZedListener>) -> String {
 
 pub(super) fn total_lines(term: &Term<ZedListener>) -> usize {
     term.total_lines()
+}
+
+struct UsedTerminalDimensions {
+    lines: usize,
+    columns: usize,
+}
+
+impl Dimensions for UsedTerminalDimensions {
+    fn total_lines(&self) -> usize {
+        self.lines
+    }
+
+    fn screen_lines(&self) -> usize {
+        self.lines
+    }
+
+    fn columns(&self) -> usize {
+        self.columns
+    }
+}
+
+pub(super) fn shrink_to_used(term: &mut AlacrittyTerm) {
+    let grid = term.grid();
+    let screen_lines = grid.screen_lines();
+    let cursor_lines = usize::try_from(grid.cursor.point.line.0)
+        .unwrap_or_default()
+        .saturating_add(1);
+    let content_lines = (0..screen_lines)
+        .rev()
+        .find_map(|line| {
+            let line_index = i32::try_from(line).ok()?;
+            grid[Line(line_index)][..]
+                .iter()
+                .any(|cell| !cell.is_empty())
+                .then_some(line.saturating_add(1))
+        })
+        .unwrap_or(1);
+    let lines = cursor_lines.max(content_lines).clamp(1, screen_lines);
+
+    if lines < screen_lines {
+        term.resize(UsedTerminalDimensions {
+            lines,
+            columns: term.columns(),
+        });
+    }
 }
 
 pub(super) fn screen_lines(term: &Term<ZedListener>) -> usize {

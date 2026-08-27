@@ -37,7 +37,7 @@ impl GoDebugAdapter {
         delegate: &Arc<dyn DapDelegate>,
     ) -> Result<AdapterVersion> {
         let release = latest_github_release(
-            "zed-industries/delve-shim-dap",
+            "simtropolis/delve-shim-dap",
             true,
             false,
             delegate.http_client(),

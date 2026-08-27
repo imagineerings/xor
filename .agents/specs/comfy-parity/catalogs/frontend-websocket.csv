@@ -1,0 +1,25 @@
+feature_id,message,wire_kind,schema_or_payload,direction,availability,source_file,evidence_level
+COMFY-QUEUE-008,status,JSON,StatusWsMessage → StatusWsMessageStatus,server-to-client,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-009,progress,JSON,ProgressWsMessage,server-to-client,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-010,progress_state,JSON,ProgressStateWsMessage,server-to-client,conditional,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-011,progress_text,binary type 3 / typed custom event,ProgressTextWsMessage,server-to-client,conditional,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-012,executing,JSON,ExecutingWsMessage; dispatches display_node or node ID,server-to-client,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-013,executed,JSON,ExecutedWsMessage with passthrough node outputs and optional merge,server-to-client,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-014,execution_start,JSON,ExecutionStartWsMessage,server-to-client,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-015,execution_success,JSON,ExecutionSuccessWsMessage,server-to-client,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-016,execution_error,JSON,ExecutionErrorWsMessage,server-to-client,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-017,execution_interrupted,JSON,ExecutionInterruptedWsMessage,server-to-client,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-018,execution_cached,JSON,ExecutionCachedWsMessage,server-to-client,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-UI-041,notification,JSON,NotificationWsMessage,server-to-client,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-UI-042,logs,JSON,LogsWsMessage,server-to-client,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-FRONTEXT-EXT-079,feature_flags,JSON bidirectional hello/update,FeatureFlagsWsMessage / clientFeatureFlags,bidirectional,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-ASSET-036,asset_download,JSON,AssetDownloadWsMessage,server-to-client,conditional,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-ASSET-037,asset_export,JSON,AssetExportWsMessage,server-to-client,conditional,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-019,b_preview,binary type 1,JPEG/PNG Blob,server-to-client,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-020,b_preview_with_metadata,binary type 4,JSON-length-prefixed metadata + image bytes; also dispatches legacy b_preview,server-to-client,conditional,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-WORKFLOW-056,graphChanged,frontend CustomEvent,ComfyWorkflowJSON,frontend-local,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-021,promptQueueing,frontend CustomEvent,"{requestId,batchCount,number?}",frontend-local,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-022,promptQueued,frontend CustomEvent,"{number,batchCount,requestId?}",frontend-local,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-GRAPH-025,graphCleared,frontend CustomEvent,no detail,frontend-local,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-023,reconnecting,frontend CustomEvent,no detail,frontend-local,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed
+COMFY-QUEUE-024,reconnected,frontend CustomEvent,no detail,frontend-local,active,src/scripts/api.ts; src/schemas/apiSchema.ts,test-backed

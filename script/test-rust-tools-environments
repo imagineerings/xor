@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  echo "Usage: $0 --matrix [--offline]" >&2
+}
+
+matrix=false
+offline=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --matrix) matrix=true ;;
+    --offline) offline=true ;;
+    *) usage; exit 2 ;;
+  esac
+  shift
+done
+
+if [[ "$matrix" != true ]]; then
+  usage
+  exit 2
+fi
+
+repository_root="$(git rev-parse --show-toplevel)"
+fixture="$repository_root/crates/project/test_data/rust_test_provider/physical-workspace/Cargo.toml"
+if [[ "$offline" == true ]]; then
+  export CARGO_NET_OFFLINE=true
+fi
+
+result_file="$(mktemp)"
+cleanup() {
+  rm -f -- "$result_file"
+}
+trap cleanup EXIT
+
+record() {
+  printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$result_file"
+}
+
+run_fixture() {
+  local label="$1"
+  cargo test --manifest-path "$fixture" --offline --no-run --message-format=json >/dev/null
+  cargo test --manifest-path "$fixture" --offline tests::unit_passes -- --exact >/dev/null
+  cargo test --manifest-path "$fixture" --offline --test integration >/dev/null
+  cargo test --manifest-path "$fixture" --offline -- --ignored >/dev/null
+
+  ZED_RUST_TOOLS_LONG_TEST=1 cargo test --manifest-path "$fixture" --offline tests::cancellable -- --exact >/dev/null 2>&1 &
+  local cancellation_pid=$!
+  kill -TERM "$cancellation_pid" 2>/dev/null || true
+  if wait "$cancellation_pid" 2>/dev/null; then
+    echo "$label cancellation probe unexpectedly completed" >&2
+    return 1
+  fi
+
+  cargo test -p project --features test-support,cargo-workspace,structured-execution,rust-tests rust_test_provider_isolates_partial_roots_and_retains_stale_results >/dev/null
+}
+
+if run_fixture local; then
+  record local automated "offline discovery/run/cancel/stale harness passed on $(uname -s)-$(uname -m)"
+else
+  record local failed "offline fixture or stale-generation check failed"
+fi
+
+if [[ -n "${ZED_RUST_TOOLS_SSH_HOST:-}" && -n "${ZED_RUST_TOOLS_SSH_REPO:-}" ]]; then
+  if ssh "$ZED_RUST_TOOLS_SSH_HOST" "cd '$ZED_RUST_TOOLS_SSH_REPO' && ./script/test-rust-tools-environments --matrix --offline"; then
+    record ssh observed "remote checkout harness passed; complete the production Zed SSH checklist"
+  else
+    record ssh failed "remote checkout harness failed"
+  fi
+else
+  record ssh unavailable "set ZED_RUST_TOOLS_SSH_HOST and ZED_RUST_TOOLS_SSH_REPO"
+fi
+
+if command -v wsl.exe >/dev/null 2>&1 && [[ -n "${ZED_RUST_TOOLS_WSL_DISTRO:-}" && -n "${ZED_RUST_TOOLS_WSL_REPO:-}" ]]; then
+  if wsl.exe --distribution "$ZED_RUST_TOOLS_WSL_DISTRO" --cd "$ZED_RUST_TOOLS_WSL_REPO" ./script/test-rust-tools-environments --matrix --offline; then
+    record wsl observed "WSL checkout harness passed; complete the production Zed WSL checklist"
+  else
+    record wsl failed "WSL checkout harness failed"
+  fi
+else
+  record wsl unavailable "requires Windows plus ZED_RUST_TOOLS_WSL_DISTRO and ZED_RUST_TOOLS_WSL_REPO"
+fi
+
+if command -v docker >/dev/null 2>&1 && [[ -n "${ZED_RUST_TOOLS_CONTAINER:-}" && -n "${ZED_RUST_TOOLS_CONTAINER_REPO:-}" ]]; then
+  if docker exec --workdir "$ZED_RUST_TOOLS_CONTAINER_REPO" "$ZED_RUST_TOOLS_CONTAINER" ./script/test-rust-tools-environments --matrix --offline; then
+    record dev-container observed "container checkout harness passed; complete the production Zed container checklist"
+  else
+    record dev-container failed "container checkout harness failed"
+  fi
+else
+  record dev-container unavailable "set ZED_RUST_TOOLS_CONTAINER and ZED_RUST_TOOLS_CONTAINER_REPO"
+fi
+
+if [[ -f "${ZED_RUST_TOOLS_MULTIPLAYER_EVIDENCE:-}" ]]; then
+  record multiplayer observed "evidence file supplied; validate it against the release checklist"
+else
+  record multiplayer unavailable "set ZED_RUST_TOOLS_MULTIPLAYER_EVIDENCE to a completed checklist"
+fi
+
+printf 'cell\tstatus\tdetail\n'
+sort "$result_file"
+
+if grep -q $'\tfailed\t' "$result_file"; then
+  exit 1
+fi
+if [[ "${ZED_RUST_TOOLS_REQUIRE_PHYSICAL:-0}" == 1 ]] && grep -Eq $'\t(unavailable|observed)\t' "$result_file"; then
+  echo "physical certification was required but one or more cells remain uncertified" >&2
+  exit 1
+fi

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "fixture_id": "native-video-codec-vp9-webm-floating-crf-v1",
+  "truth_mode": "synthetic-source-compatible-vp9-webm-floating-crf",
+  "source": {
+    "comfyui_version": "0.27.1",
+    "canonical_file_count": 949,
+    "canonical_tree_sha256": "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f",
+    "nodes_video_sha256": "db1d0d40e065a50a4b10c2780511e4a9a75482916a76c175000e58ab875da7c9",
+    "save_webm_symbol_sha256": "e3d052815071a6baa6df18ea51be79fed5d2f740537a8fa88e360392ec83505d",
+    "observable": "SaveWEBM declares CRF as FLOAT from 0 through 63 and passes str(crf) to the codec option dictionary"
+  },
+  "dependencies": {
+    "codec_plan_manifest_sha256": "9ff5dde7b0d4fdde599fc377031e88c455e00afcf428e190069569b0c548704f",
+    "codec_vp9_webm_encode_manifest_sha256": "95ca98dd0bd59acc0a0056963044e00a3b636b0e25980b06d2105aeac5ad628a",
+    "codec_vp9_webm_sequence_encode_manifest_sha256": "ed044cf79dfe6f6897ebbe94c8871db0ff349db6b36ebf7bb0be6a14e30a11bb",
+    "codec_vp9_webm_thread_bridge_manifest_sha256": "87144351d8ba528ca629e121837c5498922d1b6830e1745732e18311cc6f50b8"
+  },
+  "contract": {
+    "canonical_value": "NativeVideoCrf stores the exact checked finite f64 bits, including negative zero",
+    "admitted_range": [0.0, 63.0],
+    "integer_narrowing": false,
+    "actor_transport": "the sole retained codec actor carries the checked value without conversion",
+    "ffi_option": "the VP9 session writes a bounded NUL-terminated source-compatible floating string before avcodec_open2",
+    "ltxv_h264_integer_crf_unchanged": true,
+    "codec_thread_identity_version": "zed.comfy.video-codec-thread.v4"
+  },
+  "vectors": [
+    { "value": 0.0, "rendered": "0.0" },
+    { "value": -0.0, "rendered": "-0.0" },
+    { "value": 31.5, "rendered": "31.5" },
+    { "value": 32.0, "rendered": "32.0" },
+    { "value": 0.00001, "rendered": "1e-05" },
+    { "value": 0.0000001, "rendered": "1e-07" },
+    { "value": 63.0, "rendered": "63.0" }
+  ],
+  "claims": {
+    "checked_f64_bits_preserved_through_plan_actor_and_ffi": true,
+    "fractional_option_observed_by_exact_signature_mock": true,
+    "licensed_or_installed_ffmpeg_or_libvpx_package": false,
+    "production_codec_availability": false,
+    "playable_webm_or_numeric_libvpx_oracle": false,
+    "prompt_or_extra_metadata_supported": false,
+    "alpha_av1_aac_or_audio_supported": false,
+    "node_effect_path_or_output_committer_reachable": false,
+    "media_payload_handle_cache_persistence_recovery_or_publication_owned": false
+  }
+}

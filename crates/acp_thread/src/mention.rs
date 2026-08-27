@@ -1637,7 +1637,7 @@ mod tests {
 
     #[test]
     fn test_single_line_number() {
-        // https://github.com/zed-industries/zed/issues/46114
+        // https://github.com/simtropolis/zed/issues/46114
         let uri = uri!("file:///path/to/file.rs#L1872");
         let parsed = MentionUri::parse(uri, PathStyle::local()).unwrap();
         match &parsed {

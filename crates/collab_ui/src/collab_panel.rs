@@ -2,6 +2,8 @@ mod channel_modal;
 mod contact_finder;
 
 use self::channel_modal::ChannelModal;
+#[cfg(feature = "multiplayer-tools")]
+use crate::channel_messaging::ChannelMessagingTransport;
 use crate::{CollaborationPanelSettings, channel_view::ChannelView};
 use anyhow::Context as _;
 use call::ActiveCall;
@@ -42,7 +44,7 @@ use ui::{
 use util::{ResultExt, TryFutureExt, maybe};
 use workspace::{
     AutoWatch, CopyRoomId, Deafen, LeaveCall, MultiWorkspace, Mute, OpenChannelNotes,
-    OpenChannelNotesById, ScreenShare, ShareProject, Workspace,
+    OpenChannelNotesById, OpenCollaborators, ScreenShare, ShareProject, Workspace,
     dock::{DockPosition, Panel, PanelEvent},
     notifications::{
         DetachAndPromptErr, Notification as WorkspaceNotification, NotificationId, NotifyResultExt,
@@ -122,6 +124,13 @@ pub fn init(cx: &mut App) {
                 workspace.close_panel::<CollabPanel>(window, cx);
             }
         });
+        workspace.register_action(|workspace, _: &OpenCollaborators, window, cx| {
+            if workspace.panel::<CollabPanel>(cx).is_some() {
+                workspace.focus_panel::<CollabPanel>(window, cx);
+            } else {
+                workspace.toggle_panel_focus::<CollabPanel>(window, cx);
+            }
+        });
         workspace.register_action(|_, _: &OpenChannelNotes, window, cx| {
             let channel_id = ActiveCall::global(cx)
                 .read(cx)
@@ -140,7 +149,46 @@ pub fn init(cx: &mut App) {
             let channel_id = client::ChannelId(action.channel_id);
             let workspace = cx.entity();
             window.defer(cx, move |window, cx| {
-                ChannelView::open(channel_id, None, workspace, window, cx).detach_and_log_err(cx)
+                #[cfg(not(feature = "multiplayer-tools"))]
+                ChannelView::open(channel_id, None, workspace, window, cx).detach_and_log_err(cx);
+
+                #[cfg(feature = "multiplayer-tools")]
+                {
+                    let channel = ChannelStore::global(cx)
+                        .read(cx)
+                        .channel_for_id(channel_id)
+                        .cloned();
+                    let user = workspace.read(cx).user_store().read(cx).current_user();
+                    if let (Some(channel), Some(user)) = (channel, user) {
+                        let client = workspace.read(cx).client().clone();
+                        let project = workspace.read(cx).project().clone();
+                        match ChannelMessagingTransport::open(
+                            channel,
+                            user,
+                            client,
+                            project,
+                            workspace.clone(),
+                            window,
+                            cx,
+                        ) {
+                            Ok(views) => workspace.update(cx, |workspace, cx| {
+                                workspace.set_collaborative_channel_timeline(
+                                    channel_id.0,
+                                    views.timeline.into(),
+                                    cx,
+                                );
+                                workspace.set_collaborative_channel_composer(
+                                    channel_id.0,
+                                    views.composer,
+                                    cx,
+                                );
+                            }),
+                            Err(error) => {
+                                log::error!("could not open collaborative channel: {error:#}");
+                            }
+                        }
+                    }
+                }
             });
         });
         // TODO: make it possible to bind this one to a held key for push to talk?
@@ -179,16 +227,24 @@ pub fn init(cx: &mut App) {
         });
         workspace.register_action(|workspace, _: &ShareProject, window, cx| {
             let project = workspace.project().clone();
-            println!("{project:?}");
+            let workspace = cx.weak_entity();
             window.defer(cx, move |_window, cx| {
                 ActiveCall::global(cx).update(cx, move |call, cx| {
                     if let Some(room) = call.room() {
-                        println!("{room:?}");
                         if room.read(cx).is_sharing_project() {
                             call.unshare_project(project, cx).ok();
                         } else {
                             call.share_project(project, cx).detach_and_log_err(cx);
                         }
+                    } else {
+                        workspace
+                            .update(cx, |workspace, cx| {
+                                workspace.show_error(
+                            "Join or start a collaboration call before sharing this project.",
+                            cx,
+                        );
+                            })
+                            .log_err();
                     }
                 });
             });

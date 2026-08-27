@@ -56,7 +56,7 @@ MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 5
 
 GITHUB_API_URL = "https://api.github.com"
-REPO_OWNER = "zed-industries"
+REPO_OWNER = "simtropolis"
 REPO_NAME = "zed"
 STAFF_TEAM_SLUG = "staff"
 

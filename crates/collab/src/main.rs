@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{Context as _, anyhow};
 use axum::headers::HeaderMapExt;
 use axum::{
     Extension, Router,
@@ -60,6 +60,9 @@ async fn main() -> Result<()> {
             let mut app = Router::new()
                 .route("/", get(handle_root))
                 .route("/healthz", get(handle_liveness_probe))
+                .merge(collab::compatibility::http_router(Arc::new(
+                    collab::compatibility::CompatibilityPolicy::current(),
+                )))
                 .layer(Extension(mode));
 
             let listener = TcpListener::bind(format!("0.0.0.0:{}", config.http_port))
@@ -77,7 +80,7 @@ async fn main() -> Result<()> {
                         .db
                         .create_server(&state.config.zed_environment)
                         .await?;
-                    let rpc_server = collab::rpc::Server::new(epoch, state.clone());
+                    let rpc_server = collab::rpc::Server::try_new(epoch, state.clone())?;
                     rpc_server.start().await?;
 
                     app = app.merge(collab::rpc::routes(rpc_server.clone()));
@@ -184,6 +187,14 @@ async fn main() -> Result<()> {
 }
 
 async fn setup_app_database(config: &Config) -> Result<()> {
+    let migration_pool = sqlx::PgPool::connect(&config.database_url)
+        .await
+        .context("failed to connect to PostgreSQL for collaboration migrations")?;
+    sqlx::migrate!("./migrations")
+        .run(&migration_pool)
+        .await
+        .context("failed to apply collaboration migrations")?;
+
     let db_options = db::ConnectOptions::new(config.database_url.clone());
     let mut db = Database::new(db_options).await?;
 

@@ -31,7 +31,7 @@ import requests
 
 GITHUB_API = "https://api.github.com"
 GRAPHQL_URL = "https://api.github.com/graphql"
-REPO_OWNER = "zed-industries"
+REPO_OWNER = "simtropolis"
 REPO_NAME = "zed"
 STAFF_TEAM_SLUG = "staff"
 BOT_LOGIN = "zed-community-bot[bot]"

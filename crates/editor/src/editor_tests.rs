@@ -36812,7 +36812,7 @@ async fn test_paste_url_from_other_app_creates_markdown_link_over_selected_text(
 
     let mut cx = EditorTestContext::new(cx).await;
     cx.update_buffer(|buffer, cx| buffer.set_language(Some(markdown_language), cx));
-    cx.set_state("Hello, «editorˇ».\nZed is «ˇgreat» (see this link: ˇ)");
+    cx.set_state("Hello, «editorˇ».\nSim is «ˇgreat» (see this link: ˇ)");
 
     cx.update_editor(|editor, window, cx| {
         cx.write_to_clipboard(ClipboardItem::new_string(url.to_string()));
@@ -36820,7 +36820,7 @@ async fn test_paste_url_from_other_app_creates_markdown_link_over_selected_text(
     });
 
     cx.assert_editor_state(&format!(
-        "Hello, [editor]({url})ˇ.\nZed is [great]({url})ˇ (see this link: {url}ˇ)"
+        "Hello, [editor]({url})ˇ.\nSim is [great]({url})ˇ (see this link: {url}ˇ)"
     ));
 }
 
@@ -36971,7 +36971,7 @@ async fn test_paste_url_from_zed_copy_creates_markdown_link_over_selected_text(
     let mut cx = EditorTestContext::new(cx).await;
     cx.update_buffer(|buffer, cx| buffer.set_language(Some(markdown_language), cx));
     cx.set_state(&format!(
-        "Hello, editor.\nZed is great (see this link: )\n«{url}ˇ»"
+        "Hello, editor.\nSim is great (see this link: )\n«{url}ˇ»"
     ));
 
     cx.update_editor(|editor, window, cx| {
@@ -36979,7 +36979,7 @@ async fn test_paste_url_from_zed_copy_creates_markdown_link_over_selected_text(
     });
 
     cx.set_state(&format!(
-        "Hello, «editorˇ».\nZed is «ˇgreat» (see this link: ˇ)\n{url}"
+        "Hello, «editorˇ».\nSim is «ˇgreat» (see this link: ˇ)\n{url}"
     ));
 
     cx.update_editor(|editor, window, cx| {
@@ -36987,7 +36987,7 @@ async fn test_paste_url_from_zed_copy_creates_markdown_link_over_selected_text(
     });
 
     cx.assert_editor_state(&format!(
-        "Hello, [editor]({url})ˇ.\nZed is [great]({url})ˇ (see this link: {url}ˇ)\n{url}"
+        "Hello, [editor]({url})ˇ.\nSim is [great]({url})ˇ (see this link: {url}ˇ)\n{url}"
     ));
 }
 
@@ -37037,14 +37037,14 @@ async fn test_paste_plain_text_from_other_app_replaces_selection_without_creatin
 
     let mut cx = EditorTestContext::new(cx).await;
     cx.update_buffer(|buffer, cx| buffer.set_language(Some(markdown_language), cx));
-    cx.set_state("Hello, «editorˇ».\nZed is «ˇgreat»");
+    cx.set_state("Hello, «editorˇ».\nSim is «ˇgreat»");
 
     cx.update_editor(|editor, window, cx| {
         cx.write_to_clipboard(ClipboardItem::new_string(text.to_string()));
         editor.paste(&Paste, window, cx);
     });
 
-    cx.assert_editor_state(&format!("Hello, {text}ˇ.\nZed is {text}ˇ"));
+    cx.assert_editor_state(&format!("Hello, {text}ˇ.\nSim is {text}ˇ"));
 }
 
 #[gpui::test]
@@ -39889,6 +39889,7 @@ fn test_editor_rendering_when_positioned_above_viewport(cx: &mut TestAppContext)
     // If we get here without hanging, the test passes
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 async fn test_diff_review_indicator_created_on_gutter_hover(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -39932,6 +39933,7 @@ async fn test_diff_review_indicator_created_on_gutter_hover(cx: &mut TestAppCont
     });
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 async fn test_diff_review_button_hidden_when_ai_disabled(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -39993,6 +39995,7 @@ async fn test_diff_review_button_hidden_when_ai_disabled(cx: &mut TestAppContext
     });
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 async fn test_diff_review_button_shown_when_ai_enabled(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40056,6 +40059,7 @@ async fn test_diff_review_button_shown_when_ai_enabled(cx: &mut TestAppContext) 
 /// Helper function to create a DiffHunkKey for testing.
 /// Uses Anchor::Min as a placeholder anchor since these tests don't need
 /// real buffer positioning.
+#[cfg(feature = "agentic")]
 fn test_hunk_key(file_path: &str) -> DiffHunkKey {
     DiffHunkKey {
         file_path: if file_path.is_empty() {
@@ -40068,6 +40072,7 @@ fn test_hunk_key(file_path: &str) -> DiffHunkKey {
 }
 
 /// Helper function to create a DiffHunkKey with a specific anchor for testing.
+#[cfg(feature = "agentic")]
 fn test_hunk_key_with_anchor(file_path: &str, anchor: Anchor) -> DiffHunkKey {
     DiffHunkKey {
         file_path: if file_path.is_empty() {
@@ -40080,6 +40085,7 @@ fn test_hunk_key_with_anchor(file_path: &str, anchor: Anchor) -> DiffHunkKey {
 }
 
 /// Helper function to add a review comment with default anchors for testing.
+#[cfg(feature = "agentic")]
 fn add_test_comment(
     editor: &mut Editor,
     key: DiffHunkKey,
@@ -40089,6 +40095,7 @@ fn add_test_comment(
     editor.add_review_comment(key, comment.to_string(), Anchor::Min..Anchor::Max, cx)
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_review_comment_add_to_hunk(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40111,6 +40118,7 @@ fn test_review_comment_add_to_hunk(cx: &mut TestAppContext) {
     });
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_review_comments_are_per_hunk(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40143,6 +40151,7 @@ fn test_review_comments_are_per_hunk(cx: &mut TestAppContext) {
     });
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_review_comment_remove(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40166,6 +40175,7 @@ fn test_review_comment_remove(cx: &mut TestAppContext) {
     });
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_review_comment_update(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40187,6 +40197,7 @@ fn test_review_comment_update(cx: &mut TestAppContext) {
     });
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_review_comment_take_all(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40236,6 +40247,7 @@ fn test_review_comment_take_all(cx: &mut TestAppContext) {
     });
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_diff_review_overlay_show_and_dismiss(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40275,6 +40287,7 @@ fn test_diff_review_overlay_show_and_dismiss(cx: &mut TestAppContext) {
         .unwrap();
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_diff_review_overlay_dismiss_via_cancel(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40310,6 +40323,7 @@ fn test_diff_review_overlay_dismiss_via_cancel(cx: &mut TestAppContext) {
         .unwrap();
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_diff_review_empty_comment_not_submitted(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40357,6 +40371,7 @@ fn test_diff_review_empty_comment_not_submitted(cx: &mut TestAppContext) {
         .unwrap();
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_diff_review_inline_edit_flow(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40410,6 +40425,7 @@ fn test_diff_review_inline_edit_flow(cx: &mut TestAppContext) {
         .unwrap();
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_orphaned_comments_are_cleaned_up(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40453,6 +40469,7 @@ fn test_orphaned_comments_are_cleaned_up(cx: &mut TestAppContext) {
         .unwrap();
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_orphaned_comments_cleanup_called_on_buffer_edit(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40498,6 +40515,7 @@ fn test_orphaned_comments_cleanup_called_on_buffer_edit(cx: &mut TestAppContext)
         .unwrap();
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_comments_stored_for_multiple_hunks(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40570,6 +40588,7 @@ fn test_comments_stored_for_multiple_hunks(cx: &mut TestAppContext) {
     });
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_same_hunk_detected_by_matching_keys(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40618,6 +40637,7 @@ fn test_same_hunk_detected_by_matching_keys(cx: &mut TestAppContext) {
     });
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_overlay_comments_expanded_state(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40678,6 +40698,7 @@ fn test_overlay_comments_expanded_state(cx: &mut TestAppContext) {
         .unwrap();
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_diff_review_multiline_selection(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40726,6 +40747,7 @@ fn test_diff_review_multiline_selection(cx: &mut TestAppContext) {
         .unwrap();
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_diff_review_drag_state(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40804,6 +40826,7 @@ fn test_diff_review_drag_state(cx: &mut TestAppContext) {
         .unwrap();
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_diff_review_drag_cancel(cx: &mut TestAppContext) {
     init_test(cx, |_| {});
@@ -40840,6 +40863,7 @@ fn test_diff_review_drag_cancel(cx: &mut TestAppContext) {
         .unwrap();
 }
 
+#[cfg(feature = "agentic")]
 #[gpui::test]
 fn test_calculate_overlay_height(cx: &mut TestAppContext) {
     init_test(cx, |_| {});

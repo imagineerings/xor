@@ -4,8 +4,8 @@ use zed_extension_api::{self as zed, LanguageServerId, Result, serde_json::json}
 
 const BINARY_NAME: &str = "vscode-html-language-server";
 const SERVER_PATH: &str =
-    "node_modules/@zed-industries/vscode-langservers-extracted/bin/vscode-html-language-server";
-const PACKAGE_NAME: &str = "@zed-industries/vscode-langservers-extracted";
+    "node_modules/@simtropolis/vscode-langservers-extracted/bin/vscode-html-language-server";
+const PACKAGE_NAME: &str = "@simtropolis/vscode-langservers-extracted";
 
 struct HtmlExtension {
     cached_binary_path: Option<String>,

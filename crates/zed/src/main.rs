@@ -1,24 +1,19 @@
 // Disable command line from opening on release mode
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(feature = "comfy")]
+mod comfy_cli;
 mod reliability;
 mod zed;
 
-// Ensure the binary name stays in sync with APP_NAME so that the paths used
-// at runtime (data dir, config dir, etc.) match what the binary is called.
-const _: () = assert!(
-    paths::APP_NAME_LOWERCASE
-        .as_bytes()
-        .eq_ignore_ascii_case(env!("CARGO_BIN_NAME").as_bytes()),
-    "paths::APP_NAME_LOWERCASE must match the binary name. \
-     Forks: update APP_NAME in crates/paths/src/paths.rs when renaming the binary.",
-);
-
+#[cfg(feature = "agentic-tools")]
 use agent_ui::AgentPanel;
 use anyhow::{Context as _, Result};
 use clap::Parser;
 use cli::FORCE_CLI_MODE_ENV_VAR_NAME;
-use client::{Client, ProxySettings, RefreshLlmTokenListener, UserStore, parse_zed_link};
+#[cfg(feature = "agentic-tools")]
+use client::RefreshLlmTokenListener;
+use client::{Client, ProxySettings, UserStore, parse_zed_link};
 use collab_ui::channel_view::ChannelView;
 use collections::HashMap;
 use crashes::InitCrashHandler;
@@ -38,6 +33,7 @@ use gpui_tokio::Tokio;
 use language::LanguageRegistry;
 use onboarding::{FIRST_OPEN, show_onboarding_view};
 use project_panel::ProjectPanel;
+#[cfg(feature = "agentic-tools")]
 use prompt_store::PromptBuilder;
 use remote::RemoteConnectionOptions;
 use reqwest_client::ReqwestClient;
@@ -84,12 +80,11 @@ use crate::zed::{CrashHandler, OpenRequestKind, eager_load_active_theme_and_icon
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn build_application() -> Application {
-    let platform = gpui_platform::current_platform(false);
-    if std::env::var("ZED_EXPERIMENTAL_A11Y").as_deref() == Ok("1") {
-        Application::with_platform(platform)
-    } else {
-        Application::new_inaccessible(platform)
-    }
+    build_application_with_platform(gpui_platform::current_platform(false))
+}
+
+fn build_application_with_platform(platform: Rc<dyn gpui::Platform>) -> Application {
+    Application::with_platform(platform)
 }
 
 fn files_not_created_on_launch(errors: HashMap<io::ErrorKind, Vec<&Path>>) {
@@ -209,6 +204,18 @@ fn main() {
     #[cfg(unix)]
     util::prevent_root_execution();
 
+    #[cfg(all(not(debug_assertions), target_os = "windows", feature = "comfy"))]
+    unsafe {
+        use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
+
+        let needs_console = std::env::args_os()
+            .skip(1)
+            .any(|argument| argument == "comfy" || argument == "--foreground");
+        if needs_console {
+            let _attachment_result = AttachConsole(ATTACH_PARENT_PROCESS);
+        }
+    }
+
     let args = Args::parse();
 
     // `zed --askpass` Makes zed operate in nc/netcat mode for use with askpass
@@ -248,15 +255,6 @@ fn main() {
         return;
     }
 
-    #[cfg(all(not(debug_assertions), target_os = "windows"))]
-    unsafe {
-        use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
-
-        if args.foreground {
-            let _ = AttachConsole(ATTACH_PARENT_PROCESS);
-        }
-    }
-
     // `zed --printenv` Outputs environment variables as JSON to stdout
     if args.printenv {
         util::shell_env::print_env();
@@ -271,6 +269,15 @@ fn main() {
     // Set custom data directory.
     if let Some(dir) = &args.user_data_dir {
         paths::set_custom_data_dir(dir);
+    }
+
+    #[cfg(feature = "comfy")]
+    if let Some(SimCommand::Comfy(comfy_args)) = args.command.clone() {
+        let exit_code = comfy_cli::run(comfy_args);
+        if exit_code != 0 {
+            process::exit(exit_code);
+        }
+        return;
     }
 
     #[cfg(target_os = "windows")]
@@ -622,6 +629,7 @@ fn main() {
         })
         .detach();
 
+        #[cfg(feature = "agentic-tools")]
         let is_new_install = matches!(&installation_id, Some(IdType::New(_)));
 
         // We should rename these in the future to `first app open`, `first app open for release channel`, and `app open`
@@ -690,35 +698,44 @@ fn main() {
 
         copilot_ui::init(&app_state, cx);
         language_model::init(cx);
-        RefreshLlmTokenListener::register(
-            app_state.client.clone(),
-            app_state.user_store.clone(),
-            cx,
-        );
-        language_models::init(app_state.user_store.clone(), app_state.client.clone(), cx);
-        acp_tools::init(cx);
+        #[cfg(feature = "agentic-tools")]
+        {
+            RefreshLlmTokenListener::register(
+                app_state.client.clone(),
+                app_state.user_store.clone(),
+                cx,
+            );
+            language_models::init(app_state.user_store.clone(), app_state.client.clone(), cx);
+            acp_tools::init(cx);
+        }
         zed::telemetry_log::init(cx);
         zed::remote_debug::init(cx);
         edit_prediction_ui::init(cx);
-        web_search::init(cx);
-        web_search_providers::init(app_state.client.clone(), app_state.user_store.clone(), cx);
+        #[cfg(feature = "agentic-tools")]
+        {
+            web_search::init(cx);
+            web_search_providers::init(app_state.client.clone(), app_state.user_store.clone(), cx);
+        }
         snippet_provider::init(cx);
         edit_prediction_registry::init(app_state.client.clone(), app_state.user_store.clone(), cx);
-        let prompt_builder = PromptBuilder::load(app_state.fs.clone(), stdout_is_a_pty(), cx);
-        project::AgentRegistryStore::init_global(
-            cx,
-            app_state.fs.clone(),
-            app_state.client.http_client(),
-        );
-        agent_ui::init(
-            app_state.fs.clone(),
-            prompt_builder,
-            app_state.languages.clone(),
-            is_new_install,
-            false,
-            cx,
-        );
-        zed::watch_user_agents_md(app_state.fs.clone(), cx);
+        #[cfg(feature = "agentic-tools")]
+        {
+            let prompt_builder = PromptBuilder::load(app_state.fs.clone(), stdout_is_a_pty(), cx);
+            project::AgentRegistryStore::init_global(
+                cx,
+                app_state.fs.clone(),
+                app_state.client.http_client(),
+            );
+            agent_ui::init(
+                app_state.fs.clone(),
+                prompt_builder,
+                app_state.languages.clone(),
+                is_new_install,
+                false,
+                cx,
+            );
+            zed::watch_user_agents_md(app_state.fs.clone(), cx);
+        }
 
         repl::init(app_state.fs.clone(), cx);
         recent_projects::init(cx);
@@ -742,6 +759,8 @@ fn main() {
         project_symbols::init(cx);
         project_panel::init(cx);
         outline_panel::init(cx);
+        #[cfg(feature = "rust-tools")]
+        cargo_ui::init(cx);
         tasks_ui::init(cx);
         snippets_ui::init(cx);
         channel::init(&app_state.client.clone(), app_state.user_store.clone(), cx);
@@ -1031,6 +1050,7 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
                 })
                 .detach_and_log_err(cx);
             }
+            #[cfg(feature = "agentic-tools")]
             OpenRequestKind::AgentPanel {
                 external_source_prompt,
             } => {
@@ -1068,6 +1088,7 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
                 })
                 .detach_and_log_err(cx);
             }
+            #[cfg(feature = "agentic-tools")]
             OpenRequestKind::InstallSkill { content } => {
                 cx.spawn(async move |cx| {
                     let multi_workspace =
@@ -1096,7 +1117,7 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
                                     .project()
                                     .update(cx, |project, _| project.lsp_store())
                             })?;
-                            let uri = format!("zed://schemas/{}", schema_path);
+                            let uri = format!("zed://schemas/{schema_path}");
                             let json_schema_content =
                                 json_schema_store::handle_schema_request(lsp_store, uri, cx)
                                     .await?;
@@ -1684,8 +1705,17 @@ fn stdout_is_a_pty() -> bool {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "zed", disable_version_flag = true, max_term_width = 100)]
+#[command(
+    name = "zed",
+    disable_version_flag = true,
+    max_term_width = 100,
+    subcommand_precedence_over_arg = true
+)]
 struct Args {
+    #[cfg(feature = "comfy")]
+    #[command(subcommand)]
+    command: Option<SimCommand>,
+
     /// A sequence of space-separated paths or urls that you want to open.
     ///
     /// Use `path:line:row` syntax to open a file at a specific location.
@@ -1747,7 +1777,7 @@ struct Args {
 
     /// Run zed in the foreground, only used on Windows, to match the behavior on macOS.
     #[arg(long)]
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "windows", feature = "comfy"))]
     #[arg(hide = true)]
     foreground: bool,
 
@@ -1792,6 +1822,13 @@ struct Args {
     etw_socket: Option<String>,
 }
 
+#[cfg(feature = "comfy")]
+#[derive(clap::Subcommand, Clone, Debug)]
+enum SimCommand {
+    /// Run native Comfy lifecycle, automation, and compatibility-host commands.
+    Comfy(comfy_cli::ComfyArgs),
+}
+
 #[derive(Clone, Debug)]
 enum IdType {
     New(String),
@@ -1811,6 +1848,8 @@ fn parse_url_arg(arg: &str, cx: &App) -> String {
         Ok(path) => format!("file://{}", path.display()),
         Err(_) => {
             if arg.starts_with("file://")
+                || arg.starts_with(product_flavor::URL_PREFIX)
+                || arg.starts_with(product_flavor::CLI_URL_PREFIX)
                 || arg.starts_with("zed://")
                 || arg.starts_with("zed-cli://")
                 || arg.starts_with("ssh://")

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spec-Driven Coding"
+  short_description: "Deliver complete features from spec through code"
+  default_prompt: "Use $coding to specify this feature as needed, then implement and validate the complete requested delivery."

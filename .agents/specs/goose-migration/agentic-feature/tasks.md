@@ -1,0 +1,226 @@
+# Implementation Plan: Agentic compile-time feature boundary
+
+## Approach
+
+Make `zed` the product selector, forward a non-default feature through each shared integration edge, gate the existing agentic implementation at cohesive ownership boundaries, and validate the resolved graph plus observable registrations. All Goose migration plans inherit the classification and future-write rule in `../feature-boundary.md`.
+
+## Tasks
+
+### Milestone 1: Application ownership and shared action boundary
+
+- [x] 1. Define the Cargo product and action surface
+  - [x] 1.1. Make `zed` own a default-enabled `agentic` feature
+    - Activate pure agent dependencies optionally and explicitly forward the feature to every direct participating crate.
+    - Make application features that require the subsystem include `agentic`.
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.2_
+    - _Depends on: none_
+    - _Reads: Cargo.toml, crates/zed/Cargo.toml_
+    - _Writes: crates/zed/Cargo.toml_
+    - _Validation: `cargo metadata --format-version 1 --no-deps` reports `zed` default `agentic`; both resolved product graphs succeed_
+    - _Evidence: Metadata reports `default = ["agentic"]` with explicit participant forwarding; all three product builds passed (see `validation.md`)._
+  - [x] 1.2. Gate shared action definitions
+    - Remove agent, assistant, sidebar, ACP-registry, agent-settings, and editor review actions from the disabled action registry.
+    - _Requirements: 2.1, 2.3, 4.2_
+    - _Depends on: 1.1_
+    - _Reads: crates/zed_actions/Cargo.toml, crates/zed_actions/src/lib.rs_
+    - _Writes: crates/zed_actions/Cargo.toml, crates/zed_actions/src/lib.rs_
+    - _Validation: the disabled action namespace test proves agent namespaces and explicit editor/ACP actions are absent_
+    - _Evidence: `script/check-agentic-feature` passed the disabled `test_action_namespaces` assertion._
+  - [x] 1.3. Gate the editor's Goose review model and actions
+    - Compile review state, overlays, actions, configuration, and comment workflow only with `editor/agentic`.
+    - _Requirements: 2.1, 2.3, 5.1_
+    - _Depends on: 1.2_
+    - _Reads: crates/editor/Cargo.toml, crates/editor/src/actions.rs, crates/editor/src/config.rs, crates/editor/src/editor.rs, crates/editor/src/git.rs_
+    - _Writes: crates/editor/Cargo.toml, crates/editor/src/actions.rs, crates/editor/src/config.rs, crates/editor/src/editor.rs, crates/editor/src/git.rs_
+    - _Validation: `cargo check -p zed --no-default-features` succeeds and review actions are absent_
+    - _Evidence: The disabled product built and tested successfully; its action registry omits the gated review actions._
+  - [x] 1.4. Gate editor render and interaction adapters
+    - Remove agent context-menu, inline-assist, review gutter, drag, and overlay rendering paths from the disabled editor.
+    - _Requirements: 2.1, 2.3, 3.3_
+    - _Depends on: 1.3_
+    - _Reads: crates/editor/src/element.rs, crates/editor/src/element/mouse.rs, crates/editor/src/mouse_context_menu.rs, crates/editor/src/split.rs_
+    - _Writes: crates/editor/src/element.rs, crates/editor/src/element/mouse.rs, crates/editor/src/mouse_context_menu.rs, crates/editor/src/split.rs_
+    - _Validation: enabled and disabled `zed` checks both compile the shared editor crate_
+    - _Evidence: Default, explicit-agentic, and disabled builds all compiled `editor` successfully._
+
+### Milestone 2: Participating crate boundaries
+
+- [x] 2. Gate each shared integration at its owner
+  - [x] 2.1. Gate update announcements that install agent skills
+    - _Requirements: 2.1, 2.2, 2.3_
+    - _Depends on: 1.2_
+    - _Reads: crates/auto_update_ui/Cargo.toml, crates/auto_update_ui/src/auto_update_ui.rs_
+    - _Writes: crates/auto_update_ui/Cargo.toml, crates/auto_update_ui/src/auto_update_ui.rs_
+    - _Validation: the disabled normal dependency graph excludes `agent_skills` and `prompt_store`_
+    - _Evidence: `script/check-agentic-feature` passed with both packages absent from the disabled normal graph._
+  - [x] 2.2. Gate diagnostic inline-assist controls
+    - _Requirements: 2.1, 2.2, 2.3_
+    - _Depends on: 1.2_
+    - _Reads: crates/diagnostics/Cargo.toml, crates/diagnostics/src/toolbar_controls.rs_
+    - _Writes: crates/diagnostics/Cargo.toml, crates/diagnostics/src/toolbar_controls.rs_
+    - _Validation: disabled `zed` compiles diagnostics without `agent_settings`_
+    - _Evidence: The disabled product built successfully and its normal graph excludes `agent_settings`._
+  - [x] 2.3. Gate the reusable AI-onboarding component
+    - _Requirements: 2.1, 2.3_
+    - _Depends on: 1.2_
+    - _Reads: crates/ai_onboarding/Cargo.toml, crates/ai_onboarding/src/ai_onboarding.rs_
+    - _Writes: crates/ai_onboarding/Cargo.toml, crates/ai_onboarding/src/ai_onboarding.rs_
+    - _Validation: feature-unification checks distinguish enabled and disabled `ai_onboarding`_
+    - _Evidence: The inverse feature-tree audit found `ai_onboarding/agentic` only in the explicit-agentic graph._
+  - [x] 2.4. Gate desktop onboarding agent UI and telemetry
+    - _Requirements: 2.1, 2.3_
+    - _Depends on: 2.3_
+    - _Reads: crates/onboarding/Cargo.toml, crates/onboarding/src/basics_page.rs, crates/onboarding/src/onboarding.rs_
+    - _Writes: crates/onboarding/Cargo.toml, crates/onboarding/src/basics_page.rs, crates/onboarding/src/onboarding.rs_
+    - _Validation: enabled and disabled `zed` checks compile onboarding_
+    - _Evidence: All three product builds compiled `onboarding`; disabled tests passed._
+  - [x] 2.5. Gate agent settings pages and registrations
+    - _Requirements: 2.1, 2.2, 2.3, 4.2_
+    - _Depends on: 1.2_
+    - _Reads: crates/settings_ui/Cargo.toml, crates/settings_ui/src/page_data.rs, crates/settings_ui/src/pages.rs, crates/settings_ui/src/settings_ui.rs_
+    - _Writes: crates/settings_ui/Cargo.toml, crates/settings_ui/src/page_data.rs, crates/settings_ui/src/pages.rs, crates/settings_ui/src/settings_ui.rs_
+    - _Validation: disabled `zed` compiles settings without agent, skill, context-server, or model-provider dependencies_
+    - _Evidence: The disabled product built successfully and the dependency denylist passed._
+  - [x] 2.6. Make sidebar's shared feature forwarding explicit
+    - _Requirements: 1.1, 1.3, 2.2_
+    - _Depends on: 1.2_
+    - _Reads: crates/sidebar/Cargo.toml_
+    - _Writes: crates/sidebar/Cargo.toml_
+    - _Validation: sidebar is absent from the disabled application graph and compiles in the enabled graph_
+    - _Evidence: Graph inspection excluded `sidebar` when disabled and the default build compiled it._
+  - [x] 2.7. Make the pure agent UI forward shared features explicitly
+    - _Requirements: 1.1, 2.4_
+    - _Depends on: 1.4, 2.3, 2.6_
+    - _Reads: crates/agent_ui/Cargo.toml_
+    - _Writes: crates/agent_ui/Cargo.toml_
+    - _Validation: the default and explicit-agentic products compile `agent_ui` with all required shared integrations_
+    - _Evidence: Both enabled builds compiled `agent_ui`; its shared dependency edges explicitly forward participating features._
+  - [x] 2.8. Gate terminal agent actions and controls
+    - _Requirements: 2.1, 2.3_
+    - _Depends on: 1.4_
+    - _Reads: crates/terminal_view/Cargo.toml, crates/terminal_view/src/terminal_panel.rs, crates/terminal_view/src/terminal_view.rs_
+    - _Writes: crates/terminal_view/Cargo.toml, crates/terminal_view/src/terminal_panel.rs, crates/terminal_view/src/terminal_view.rs_
+    - _Validation: enabled and disabled `zed` checks compile terminal views_
+    - _Evidence: All three product builds compiled `terminal_view`; their test suites passed._
+  - [x] 2.9. Gate title-bar agent menus and settings
+    - _Requirements: 2.1, 2.2, 2.3_
+    - _Depends on: 1.2_
+    - _Reads: crates/title_bar/Cargo.toml, crates/title_bar/src/title_bar.rs_
+    - _Writes: crates/title_bar/Cargo.toml, crates/title_bar/src/title_bar.rs_
+    - _Validation: disabled `zed` compiles title bar without `agent_settings`_
+    - _Evidence: The disabled product compiled `title_bar` with `agent_settings` absent from its normal graph._
+  - [x] 2.10. Gate workspace sidebar and agent registrations
+    - _Requirements: 2.1, 2.2, 2.3, 3.2, 3.4, 4.1_
+    - _Depends on: 1.2, 2.6_
+    - _Reads: crates/workspace/Cargo.toml, crates/workspace/src/multi_workspace.rs, crates/workspace/src/status_bar.rs, crates/workspace/src/welcome.rs, crates/workspace/src/workspace.rs_
+    - _Writes: crates/workspace/Cargo.toml, crates/workspace/src/multi_workspace.rs, crates/workspace/src/status_bar.rs, crates/workspace/src/welcome.rs, crates/workspace/src/workspace.rs_
+    - _Validation: disabled workspace initialization and restoration tests complete without an agent panel registration_
+    - _Evidence: The disabled suite passed multi-workspace grouping and session-restoration tests while the sidebar package and actions were absent._
+  - [x] 2.11. Define the Git UI feature and core registrations
+    - _Requirements: 1.1, 2.1, 2.2, 2.3_
+    - _Depends on: 1.3_
+    - _Reads: crates/git_ui/Cargo.toml, crates/git_ui/src/commit_modal.rs, crates/git_ui/src/commit_view.rs, crates/git_ui/src/git_ui.rs_
+    - _Writes: crates/git_ui/Cargo.toml, crates/git_ui/src/commit_modal.rs, crates/git_ui/src/commit_view.rs, crates/git_ui/src/git_ui.rs_
+    - _Validation: disabled `zed` compiles Git UI without model, prompt, or agent-settings dependencies_
+    - _Evidence: The disabled product compiled `git_ui`; the agent-only dependency denylist passed._
+  - [x] 2.12. Gate Git review-to-agent adapters
+    - _Requirements: 2.1, 2.3, 5.1_
+    - _Depends on: 1.4, 2.11_
+    - _Reads: crates/git_ui/src/branch_diff.rs, crates/git_ui/src/diff_multibuffer.rs, crates/git_ui/src/project_diff.rs_
+    - _Writes: crates/git_ui/src/branch_diff.rs, crates/git_ui/src/diff_multibuffer.rs, crates/git_ui/src/project_diff.rs_
+    - _Validation: the disabled build has no review-to-agent controls, action dispatch, or comment subscription_
+    - _Evidence: Disabled compilation and action-absence tests passed with the review-to-agent adapters excluded._
+  - [x] 2.13. Gate Git panel generation and conflict-agent UI
+    - _Requirements: 2.1, 2.3_
+    - _Depends on: 2.11_
+    - _Reads: crates/git_ui/src/conflict_view.rs, crates/git_ui/src/git_panel.rs_
+    - _Writes: crates/git_ui/src/conflict_view.rs, crates/git_ui/src/git_panel.rs_
+    - _Validation: enabled and disabled `zed` checks compile Git panel and conflict views_
+    - _Evidence: All three product builds compiled the feature-neutral Git views; enabled builds retained the agent adapters._
+
+### Milestone 3: Desktop startup and compatibility
+
+- [x] 3. Gate application registration boundaries
+  - [x] 3.1. Exclude agent startup and network initialization
+    - Preserve feature-neutral language-model registry initialization required by edit prediction while gating provider, agent, tool, prompt, and watcher startup.
+    - _Requirements: 2.1, 2.2, 2.4, 3.2_
+    - _Depends on: 2.1, 2.2, 2.4, 2.5, 2.7, 2.8, 2.9, 2.10, 2.13_
+    - _Reads: crates/zed/Cargo.toml, crates/zed/src/main.rs_
+    - _Writes: crates/zed/src/main.rs_
+    - _Validation: enabled and disabled application checks succeed; disabled resolved graph excludes agent-only packages_
+    - _Evidence: All product builds passed and `script/check-agentic-feature` found no denied package in the disabled normal graph._
+  - [x] 3.2. Exclude panels, menus, toolbars, and background watchers
+    - _Requirements: 2.1, 2.4, 3.2, 3.4_
+    - _Depends on: 3.1_
+    - _Reads: crates/zed/src/zed.rs, crates/zed/src/zed/app_menus.rs, crates/zed/src/zed/quick_action_bar.rs_
+    - _Writes: crates/zed/src/zed.rs, crates/zed/src/zed/app_menus.rs, crates/zed/src/zed/quick_action_bar.rs_
+    - _Validation: disabled action/registration tests and both application checks succeed_
+    - _Evidence: Disabled action-namespace tests and the full three-product build/test matrix passed._
+  - [x] 3.3. Reject unavailable persisted actions and external URLs safely
+    - Load valid non-agent keybindings from built-in assets while reporting unavailable actions; reject skill/agent URLs without reinterpretation; rely on tested recoverable unknown-panel restoration.
+    - _Requirements: 4.1, 4.2, 4.3_
+    - _Depends on: 3.2_
+    - _Reads: crates/zed/src/zed.rs, crates/zed/src/zed/open_listener.rs, crates/workspace/src/workspace.rs_
+    - _Writes: crates/zed/src/zed.rs, crates/zed/src/zed/open_listener.rs_
+    - _Validation: disabled keymap, action-absence, URL-rejection, and empty-workspace restoration tests pass_
+    - _Evidence: The disabled suite passed keymap, action, URL-rejection, empty-workspace, and session-restoration coverage._
+
+### Milestone 4: Migration governance and traceability
+
+- [x] 4. Reconcile every Goose migration write
+  - [x] 4.1. Add the canonical feature specification and cross-pack classification
+    - _Requirements: 5.1, 5.2, 5.3, 6.1_
+    - _Depends on: none_
+    - _Reads: .agents/specs/goose-migration/coverage-catalog.md, .agents/specs/goose-migration/master-migration-plan.md_
+    - _Writes: .agents/specs/goose-migration/agentic-feature/requirements.md, .agents/specs/goose-migration/agentic-feature/design.md, .agents/specs/goose-migration/feature-boundary.md, .agents/specs/goose-migration/master-migration-plan.md, .agents/specs/goose-migration/coverage-summary.md_
+    - _Validation: canonical spec validator succeeds and the classification accounts for all 18 migration packs_
+    - _Evidence: Canonical validation passed and `feature-boundary.md` classifies all 18 pre-existing migration packs._
+  - [x] 4.2. Link migration task plans in the first portfolio group
+    - Preserve task IDs, state, dependencies, and evidence while adding the inherited contract.
+    - _Requirements: 5.1, 5.2, 5.3_
+    - _Depends on: 4.1_
+    - _Reads: .agents/specs/goose-migration/feature-boundary.md_
+    - _Writes: .agents/specs/goose-migration/additional-llm-providers/tasks.md, .agents/specs/goose-migration/agent-infrastructure/tasks.md, .agents/specs/goose-migration/auth/tasks.md, .agents/specs/goose-migration/desktop-ui/tasks.md, .agents/specs/goose-migration/developer-experience/tasks.md_
+    - _Validation: a link-presence audit confirms the inherited contract while a diff audit confirms historical task structure is unchanged_
+    - _Evidence: All five plans contain the contract link and each diff contains only two added lines._
+  - [x] 4.3. Link migration task plans in the second portfolio group
+    - _Requirements: 5.1, 5.2, 5.3_
+    - _Depends on: 4.2_
+    - _Reads: .agents/specs/goose-migration/feature-boundary.md_
+    - _Writes: .agents/specs/goose-migration/dictation/tasks.md, .agents/specs/goose-migration/documentation/tasks.md, .agents/specs/goose-migration/evaluation/tasks.md, .agents/specs/goose-migration/gateway/tasks.md, .agents/specs/goose-migration/goal-grind-commands/tasks.md_
+    - _Validation: a link-presence audit confirms the inherited contract while a diff audit confirms historical task structure is unchanged_
+    - _Evidence: All five plans contain the contract link and each diff contains only two added lines._
+  - [x] 4.4. Link migration task plans in the third portfolio group
+    - _Requirements: 5.1, 5.2, 5.3_
+    - _Depends on: 4.3_
+    - _Reads: .agents/specs/goose-migration/feature-boundary.md_
+    - _Writes: .agents/specs/goose-migration/mcp-tools/tasks.md, .agents/specs/goose-migration/misc-services/tasks.md, .agents/specs/goose-migration/observability-analytics/tasks.md, .agents/specs/goose-migration/recipe-system/tasks.md, .agents/specs/goose-migration/rest-api-server/tasks.md_
+    - _Validation: a link-presence audit confirms the inherited contract while a diff audit confirms historical task structure is unchanged_
+    - _Evidence: All five plans contain the contract link and each diff contains only two added lines._
+  - [x] 4.5. Link migration task plans in the final portfolio group
+    - _Requirements: 5.1, 5.2, 5.3_
+    - _Depends on: 4.4_
+    - _Reads: .agents/specs/goose-migration/feature-boundary.md_
+    - _Writes: .agents/specs/goose-migration/security-permissions/tasks.md, .agents/specs/goose-migration/text-ui/tasks.md, .agents/specs/goose-migration/typescript-sdk/tasks.md_
+    - _Validation: a link-presence audit confirms the inherited contract while a diff audit confirms historical task structure is unchanged_
+    - _Evidence: All three plans contain the contract link and each diff contains only two added lines._
+
+### Milestone 5: Reproducible two-product validation
+
+- [x] 5. Validate dependency, registration, build, test, and launch behavior
+  - [x] 5.1. Add deterministic boundary checks
+    - Inspect normal dependency graphs, inverse feature trees for every participant, and disabled action/URL behavior.
+    - _Requirements: 1.3, 2.1, 2.2, 6.3, 6.4_
+    - _Depends on: 3.3_
+    - _Reads: crates/zed/Cargo.toml, crates/zed/src/zed.rs, crates/zed/src/zed/open_listener.rs_
+    - _Writes: script/check-agentic-feature_
+    - _Validation: `script/check-agentic-feature` succeeds_
+    - _Evidence: The script passed dependency, feature-unification, action-registration, and URL-boundary checks._
+  - [x] 5.2. Run and record the complete product matrix
+    - Record exact default, explicit-agentic, and disabled build/test commands plus executable and GUI-environment launch evidence.
+    - _Requirements: 1.4, 2.4, 3.1, 3.2, 6.1, 6.2, 6.3, 6.4_
+    - _Depends on: 4.5, 5.1_
+    - _Reads: .agents/specs/goose-migration/agentic-feature/design.md, script/check-agentic-feature_
+    - _Writes: .agents/specs/goose-migration/agentic-feature/tasks.md, .agents/specs/goose-migration/agentic-feature/validation.md_
+    - _Validation: all documented commands complete with results recorded in task evidence_
+    - _Evidence: Default and explicit-agentic suites each passed 80 tests with 1 ignored; disabled passed 74 with 1 ignored; all builds and the bounded disabled launch passed as recorded in `validation.md`._

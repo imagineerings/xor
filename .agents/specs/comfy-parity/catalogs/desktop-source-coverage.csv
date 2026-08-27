@@ -1,0 +1,736 @@
+path,classification,feature_ids,coverage_disposition,reason
+projects/comfy/Comfy-Desktop/.gitattributes,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/.github/workflows/build-bootstrap-python.yml,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/.github/workflows/build-release.yml,production,COMFY-DESKTOP-107;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/.github/workflows/ci-cursor-review.yml,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/.github/workflows/ci.yml,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/.github/workflows/cla.yml,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/.github/workflows/release-from-pr-label.yml,production,COMFY-DESKTOP-107;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/.github/workflows/version-bump.yml,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/.gitignore,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/.husky/pre-commit,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/.prettierrc.json,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/AGENTS.md,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/LICENSE,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/README.md,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/assets/Comfy_Logo_mac_x1024.png,asset,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/assets/Comfy_Logo_x1024.png,asset,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/assets/Comfy_Logo_x256.png,asset,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/assets/Comfy_Logo_x32.png,asset,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/assets/Comfy_Logo_x512.png,asset,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/assets/Comfy_Logo_x64.png,asset,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/assets/hero.png,asset,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/docs/instance-navigation-926-handoff.md,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/docs/legacy-desktop-adopt-migration.md,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/chooser.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/copy-update-destination.test.ts,test-only,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/dashboard-delete-flow.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/devhooks-smoke.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/downloads-shelf.test.ts,test-only,COMFY-DESKTOP-136,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/dropdowns.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/launchApp.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-add-existing.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-cancel-flow.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-cloud.test.ts,test-only,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-copy-update-fail.test.ts,test-only,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-copy.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-deep-links.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-delete-untrack.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-dismiss-error.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-first-use-migrate.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-first-use-skip.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-migrate.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-periodic-update-check.test.ts,test-only,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-picker-cluster.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-port-conflict.test.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-progress-reboot.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-snapshot-export.test.ts,test-only,COMFY-DESKTOP-121;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-snapshot-import.test.ts,test-only,COMFY-DESKTOP-121;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-snapshot-restore.test.ts,test-only,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-snapshot-roundtrip.test.ts,test-only,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-snapshot-share.test.ts,test-only,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-snapshot.test.ts,test-only,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-startup-update-check.test.ts,test-only,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle-update-check.test.ts,test-only,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/lifecycle.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/nav-matrix-cloud.test.ts,test-only,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/nav-matrix-dashboard.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/nav-matrix-instance.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/picker-settings-staleness.test.ts,test-only,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/picker-stop-confirm.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/progress-error-overflow.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/quit-flow.spec.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/support/cdpPages.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/support/chooserHelpers.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/support/devHooks.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/support/electronHarness.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/support/evalRetry.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/support/hoverGate.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/support/navMatrixHelpers.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/support/testIds.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/title-bar-hover-gate-comfy-window.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/title-bar-hover-gate.test.ts,test-only,COMFY-DESKTOP-189,mapped,Mapped to the deterministic E2E shell-control capability; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/e2e/update-pills.test.ts,test-only,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/e2e/window-visible.spec.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/electron-builder.yml,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/electron.vite.config.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/eslint.config.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/lib/git_operations.py,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/lib/pygit2_compat.py,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/lib/update_comfyui.py,production,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/linux-dev.sh,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/locales/drafts/README.md,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/locales/en.json,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/locales/zh.json,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/package.json,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/packages/comfyui-desktop-bridge-types/comfyDesktopBridge.d.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/packages/comfyui-desktop-bridge-types/index.d.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/packages/comfyui-desktop-bridge-types/index.js,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/packages/comfyui-desktop-bridge-types/package.json,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/playwright.config.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/pnpm-lock.yaml,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/resources/apparmor-profile,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/resources/dmg/background.png,asset,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/resources/dmg/background.tiff,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/resources/dmg/background@2x.png,asset,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/resources/icon.png,asset,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/resources/installerHeader.bmp,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/resources/installerHeaderIcon.ico,asset,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/resources/installerIcon.ico,asset,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/resources/installerSidebar.bmp,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/resources/uninstallerIcon.ico,asset,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/resources/uninstallerSidebar.bmp,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/scripts/after-install.sh,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/scripts/after-remove.sh,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/scripts/afterPack.mjs,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/scripts/build-bootstrap-python.mjs,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/scripts/build-dmg-background.swift,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/scripts/datadog-release-version.cjs,production,COMFY-DESKTOP-167;COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/scripts/fetch-bootstrap-python.mjs,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/scripts/fetch-font.mjs,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/scripts/generate-sandbox.mjs,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/scripts/installer.nsh,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/scripts/postinstall.mjs,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/scripts/prepare.mjs,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/scripts/reset-linux.sh,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/scripts/reset-mac.sh,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/scripts/reset-windows.ps1,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/scripts/swap-installations.ps1,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/scripts/swap-installations.sh,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/scripts/todesktop-afterPack.cjs,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/scripts/todesktop-beforeBuild.cjs,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/scripts/todesktop-beforeInstall.cjs,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/scripts/upload-datadog-sourcemaps.mjs,production,COMFY-DESKTOP-167;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/bridgeHtml.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/config.test.ts,test-only,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/config.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/copyLinkBanner.test.ts,test-only,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/copyLinkBanner.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/index.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/inject.test.ts,test-only,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/inject.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/intercept.test.ts,test-only,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/intercept.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/oauth.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/server.test.ts,test-only,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/auth/firebaseBridge/server.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/host/attach.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/host/attachHostPreview.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/host/createHostWindow.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/host/createHostWindow.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/host/detach.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/host/detach.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/host/panelView.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/host/panelView.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/host/registry.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/host/registry.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/index.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/installations.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/installations.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/__fixtures__/launch/first-run.log,production,COMFY-DESKTOP-095;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/actions.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/allowedPopups.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/allowedPopups.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/appLog.test.ts,test-only,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/appLog.ts,production,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/bootPhaseBuffer.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/bootPhaseBuffer.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/bundledScript.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/bundledScript.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/cache.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/canvasEntry.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/canvasEntry.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/channel-cards.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/channel-cards.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/cloudCapacity.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/cloudEntry.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/cloudUrl.test.ts,test-only,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/cloudUrl.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/cnr.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/cnr.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/comfy-args.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/comfy-args.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/comfy-feature-flags.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/comfy-feature-flags.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/comfyContentScript.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/comfyContentScript.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/comfyDownloadManager.test.ts,test-only,COMFY-DESKTOP-136,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/comfyDownloadManager.ts,production,COMFY-DESKTOP-136,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/comfyTerminalContentScript.test.ts,test-only,COMFY-DESKTOP-091,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/comfyTerminalContentScript.ts,production,COMFY-DESKTOP-091,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/comfyui-releases.test.ts,test-only,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/comfyui-releases.ts,production,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/contextMenu.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/contextMenu.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/copy.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/crashBuffer.test.ts,test-only,COMFY-DESKTOP-099,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/crashBuffer.ts,production,COMFY-DESKTOP-099,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/crashDumps.test.ts,test-only,COMFY-DESKTOP-099,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/crashDumps.ts,production,COMFY-DESKTOP-099,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/delete.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/desktopAdopt.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/desktopAdopt.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/desktopDetect.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/desktopDetect.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/devShortcuts.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/devShortcuts.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/deviceId.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/deviceId.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/disk.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/download.test.ts,test-only,COMFY-DESKTOP-136,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/download.ts,production,COMFY-DESKTOP-136,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/downloadAttribution.test.ts,test-only,COMFY-DESKTOP-136,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/downloadAttribution.ts,production,COMFY-DESKTOP-136,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/e2eHooks.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/e2eOverrides.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/executionTap.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/executionTap.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/exitCodeInfo.test.ts,test-only,COMFY-DESKTOP-099,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/exitCodeInfo.ts,production,COMFY-DESKTOP-099,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/experiments.test.ts,test-only,COMFY-DESKTOP-167,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/experiments.ts,production,COMFY-DESKTOP-167,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/extract.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/fetch.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/fetch.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/file-lock-info.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/file-lock-info.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/firstUseDetection.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/git.test.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/git.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/github-mirror.test.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/github-mirror.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/githubStars.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/globalSettingsEvents.ts,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/gpu.test.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/gpu.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/hardwareTap.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/hardwareTap.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/i18n.ts,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/installer.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/installer.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/broadcast.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/broadcast.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/index.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/installDirState.test.ts,test-only,COMFY-DESKTOP-001;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/registerAppHandlers.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/registerAssetDownloadHandlers.ts,production,COMFY-DESKTOP-136;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/registerCrashHandlers.ts,production,COMFY-DESKTOP-099;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/registerDownloadHandlers.ts,production,COMFY-DESKTOP-136;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/registerInstallationHandlers.ts,production,COMFY-DESKTOP-001;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/registerLogsHandlers.ts,production,COMFY-DESKTOP-095;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/registerSessionHandlers.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/registerSettingsHandlers.ts,production,COMFY-DESKTOP-149;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/registerSnapshotHandlers.ts,production,COMFY-DESKTOP-121;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/registerTelemetryHandlers.test.ts,test-only,COMFY-DESKTOP-167;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/registerTelemetryHandlers.ts,production,COMFY-DESKTOP-167;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/registerTerminalHandlers.ts,production,COMFY-DESKTOP-091;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/basic.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/basic.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/copy.integration.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/copy.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/delegate.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/delete.integration.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/delete.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/index.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/launch.test.ts,test-only,COMFY-DESKTOP-051;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/launch.ts,production,COMFY-DESKTOP-051;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/migrate.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/migrate.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/types.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionActions/withAbortable.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/sessionStartTelemetry.ts,production,COMFY-DESKTOP-167;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/ipc/shared.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/lastSession.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/lastSession.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/launchPhases.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/launchProgress.test.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/launchProgress.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/localMigration.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/logRotation.test.ts,test-only,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/logRotation.ts,production,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/logged-process.test.ts,test-only,COMFY-DESKTOP-095;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/logged-process.ts,production,COMFY-DESKTOP-095;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/logsBroadcast.ts,production,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/logsPopoutWindow.ts,production,COMFY-DESKTOP-095;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/managerConfig.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/managerConfig.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/migrate.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/models.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/models.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/nodes.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/nodes.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/oem.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/oem.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/opMarker.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/opMarker.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/paths.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/paths.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/pip.test.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/pip.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/popoutWindows.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/popoutWindows.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/process.test.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/process.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/processErrorHandlers.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/pythonEnv.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/quit-state.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/r2Mirror.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/r2Mirror.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/relaunchPage.test.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/relaunchPage.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/release-cache-startup.ts,production,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/release-cache.test.ts,test-only,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/release-cache.ts,production,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/safe-file.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/snapshots/diff.ts,production,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/snapshots/exportImport.ts,production,COMFY-DESKTOP-121;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/snapshots/index.ts,production,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/snapshots/restore.ts,production,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/snapshots/store.test.ts,test-only,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/snapshots/store.ts,production,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/snapshots/tabData.ts,production,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/snapshots/types.ts,production,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/snapshots.test.ts,test-only,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/standaloneMigration.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/stderrTail.test.ts,test-only,COMFY-DESKTOP-099,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/stderrTail.ts,production,COMFY-DESKTOP-099,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/telemetry.test.ts,test-only,COMFY-DESKTOP-167,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/telemetry.ts,production,COMFY-DESKTOP-167,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/terminal.test.ts,test-only,COMFY-DESKTOP-091,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/terminal.ts,production,COMFY-DESKTOP-091,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/terminalPopoutWindow.ts,production,COMFY-DESKTOP-091;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/theme.ts,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/titleBarOverlay.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/updateSplash.ts,production,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/updater.test.ts,test-only,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/updater.ts,production,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/userTier.test.ts,test-only,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/userTier.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/util.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/vcRuntimeAudit.test.ts,test-only,COMFY-DESKTOP-099,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/vcRuntimeAudit.ts,production,COMFY-DESKTOP-099,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/version-resolve.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/version-resolve.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/version.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/main/lib/version.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/main/lib/windowState.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/lib/zoom.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/menu.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/menu.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/popups/checkoutBackdrop.ts,production,COMFY-DESKTOP-162;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/popups/embeddedPopupView.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/popups/embeddedPopupView.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/popups/pickerSettingsHandlers.ts,production,COMFY-DESKTOP-149;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/popups/systemModal.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/popups/titleCoachmark.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/popups/titleCoachmark.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/popups/titlePopup.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/popups/titlePopup.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/popups/titleTooltip.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/settings.test.ts,test-only,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/settings.ts,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/cloud.ts,production,COMFY-DESKTOP-162;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/common/launchSettingsFields.test.ts,test-only,COMFY-DESKTOP-149;COMFY-DESKTOP-001;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/common/launchSettingsFields.ts,production,COMFY-DESKTOP-149;COMFY-DESKTOP-001;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/common/nestedRoot.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/common/nestedRoot.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/common/urlSource.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/common/urlSource.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/desktop.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/desktop.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/getTerminalEnv.test.ts,test-only,COMFY-DESKTOP-091;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/git.ts,production,COMFY-DESKTOP-001;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/index.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/portable.probe.test.ts,test-only,COMFY-DESKTOP-001;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/portable.ts,production,COMFY-DESKTOP-001;COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/remote.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/actions.integration.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/actions.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/curatedTemplates.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/curatedTemplates.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/envPaths.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/envPaths.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/index.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/index.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/install.probe.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/install.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/macRepair.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/templateCatalog.test.ts,test-only,COMFY-DESKTOP-095;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/templateCatalog.ts,production,COMFY-DESKTOP-095;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/templateDownloadCore.test.ts,test-only,COMFY-DESKTOP-136;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/templateDownloadCore.ts,production,COMFY-DESKTOP-136;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/templateDownloadGate.test.ts,test-only,COMFY-DESKTOP-136;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/templateDownloadTask.ts,production,COMFY-DESKTOP-136;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/templateInputAssets.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/templateInputAssets.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/templateModels.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/templateModels.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/torchRepair.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/torchRepair.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/updateOrchestrator.integration.test.ts,test-only,COMFY-DESKTOP-107;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/updateOrchestrator.test.ts,test-only,COMFY-DESKTOP-107;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/updateOrchestrator.ts,production,COMFY-DESKTOP-107;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/updateSections.test.ts,test-only,COMFY-DESKTOP-107;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/sources/standalone/updateSections.ts,production,COMFY-DESKTOP-107;COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/main/types/sources.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/preload/api.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/preload/comfyPreload.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/preload/comfySystemModalPreload.ts,production,COMFY-DESKTOP-076;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/preload/comfyTitleBarPreload.ts,production,COMFY-DESKTOP-076;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/preload/comfyTitlePopupPreload.ts,production,COMFY-DESKTOP-076;COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/preload/comfyTitleTooltipPreload.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/preload/index.d.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/preload/index.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/comfySystemModal.html,generated-or-declaration,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/comfyTitleBar.html,generated-or-declaration,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/comfyTitlePopup.html,generated-or-declaration,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/comfyTitleTooltip.html,generated-or-declaration,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/csp.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/panel.html,generated-or-declaration,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/public/fonts/README.md,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/public/images/amd-logo.png,asset,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/public/images/apple-mps-logo.png,asset,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/public/images/intel-logo.png,asset,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/public/images/nvidia-logo.jpg,production,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/public/images/templates/3d_triposplat_image_to_gaussian_splat-still.webp,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/public/images/templates/3d_triposplat_image_to_gaussian_splat.webp,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/public/images/templates/audio_stable_audio_3_medium.webp,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/public/images/templates/image_z_image_turbo.webp,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/public/images/templates/text_to_video_wan-still.webp,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/public/images/templates/text_to_video_wan.webp,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/assets/first-use/why-cloud-hero.svg,asset,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/assets/fonts/inter-latin-italic.woff2,asset,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/assets/fonts/inter-latin-normal.woff2,asset,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/assets/lighting/beam.svg,asset,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/assets/lighting/beam_2.svg,asset,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/assets/main.css,asset,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/assets/proprietaryFonts.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfySystemModal/SystemModalApp.vue,production,COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-8082FD6C9915,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-8082FD6C9915; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfySystemModal/main.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleBar/TitleBarApp.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleBar/TitleBarApp.vue,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleBar/main.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleBar/useCentralPillCoachmark.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleBar/useCentralPillCoachmark.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleBar/useTitleBarHoverGate.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleBar/useTitleBarIdentity.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleBar/useTitleBarMenus.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleBar/useTitleBarMenus.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleBar/useTitleBarTooltip.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleBar/useUpdatePills.ts,production,COMFY-DESKTOP-107;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/DownloadsFullView.vue,production,COMFY-DESKTOP-136;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/DownloadsView.test.ts,test-only,COMFY-DESKTOP-136;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/DownloadsView.vue,production,COMFY-DESKTOP-136;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/GlobalSettingsView.test.ts,test-only,COMFY-DESKTOP-149;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/GlobalSettingsView.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/InstancePickerView.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/InstancePickerView.vue,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/MenuView.vue,production,COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-434D1C4D8901,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-434D1C4D8901; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/PickerInlineProgress.vue,production,COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-2AA6D33E1630,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-2AA6D33E1630; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/TitlePopupApp.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/TitlePopupApp.vue,production,COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-7484263E17F2,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-7484263E17F2; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/dismissPickerModals.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/dismissPickerModals.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/globalSettings/GitHubLinkCard.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-051;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-0556BA11E26B,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-0556BA11E26B; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/globalSettings/GlobalSettingsMicroSection.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-40DECFED10F1,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-40DECFED10F1; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/globalSettings/GlobalStorageSections.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-C26AC23368A0,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-C26AC23368A0; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/globalSettings/ModelsDirList.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-DD428673BF77,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-DD428673BF77; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/globalSettings/UpdatesSection.vue,production,COMFY-DESKTOP-107;COMFY-DESKTOP-149;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-139E276AF49C,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-139E276AF49C; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/instancePicker/InstanceRow.vue,production,COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-84472AC5DBC6,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-84472AC5DBC6; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/instancePicker/PickerSnapshotsList.vue,production,COMFY-DESKTOP-121;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-573BB227624A,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-573BB227624A; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/main.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/pickerSettingsApiShim.test.ts,test-only,COMFY-DESKTOP-149;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitlePopup/pickerSettingsApiShim.ts,production,COMFY-DESKTOP-149;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleTooltip/TitleTooltipApp.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/comfyTitleTooltip/main.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ArgRadioGroup.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ArgRadioGroup.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ArgRow.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ArgsBuilder.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ArgsBuilder.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/BrandBackground.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/BrandFinishedSurface.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/BrandFinishedSurface.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/BrandProgressView.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/BrandProgressView.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/BrandTakeoverLayout.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/BrandVariantList.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ChoiceCard.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ContextMenu.vue,production,COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-29A542E5D510,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-29A542E5D510; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/DetailSection.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/DetailSection.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/DialogHost.vue,production,COMFY-DESKTOP-095;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-A7D64DA6D729,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-A7D64DA6D729; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/DownloadThumbnail.vue,production,COMFY-DESKTOP-136;COMFY-DESKTOP-RENDERER-F21F44BE08F6,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-F21F44BE08F6; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/EnvVarsEditor.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/FeedbackModal.vue,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ImportPreviewModal.vue,production,COMFY-DESKTOP-051;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-8D9541B1CC22,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-8D9541B1CC22; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/InfoTooltip.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/InfoTooltip.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/InlineRichText.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/InstallNamePath.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/InstallNamePath.vue,production,COMFY-DESKTOP-001;COMFY-DESKTOP-RENDERER-11ACBC4B9075,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-11ACBC4B9075; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/MigrateConfirmBody.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/MigrationBanner.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/MigrationBanner.vue,production,COMFY-DESKTOP-001;COMFY-DESKTOP-RENDERER-B1BC51035F77,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-B1BC51035F77; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/Modal.vue,production,COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-A3C67D192026,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-A3C67D192026; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ModalDialog.vue,production,COMFY-DESKTOP-095;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-F9C1DABEC9B9,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-F9C1DABEC9B9; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ModalShell.vue,production,COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-54F98FAB2836,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-54F98FAB2836; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/PathDiskInfo.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ProgressStep.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/RestoreModal.vue,production,COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-DD2CFC73EDF9,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-DD2CFC73EDF9; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/SnapshotDiffView.vue,production,COMFY-DESKTOP-121;COMFY-DESKTOP-RENDERER-8E1D70D56A8F,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-8E1D70D56A8F; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/SnapshotFilePreviewContent.vue,production,COMFY-DESKTOP-121;COMFY-DESKTOP-RENDERER-2F898A4C9F1C,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-2F898A4C9F1C; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/SnapshotInspector.vue,production,COMFY-DESKTOP-121;COMFY-DESKTOP-RENDERER-6237AC4E4458,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-6237AC4E4458; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/SnapshotTab.vue,production,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/StorageItemIcon.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/TakeoverBack.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/TakeoverBack.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/TakeoverHeader.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/TemplatePickerStep.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/TemplatePickerStep.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/TermsModal.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/TermsModal.vue,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/TitleBar.vue,production,COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-A367B9A056D8,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-A367B9A056D8; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/TooltipWrap.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/TruncatedText.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/TruncatedText.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/VariantCardGrid.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/WhyTryCloudModal.vue,production,COMFY-DESKTOP-162;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-44373866E776,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-44373866E776; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ZoomBanner.vue,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/icons/BrandProgressGlyph.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/icons/ComfyCLogo.vue,production,COMFY-DESKTOP-095;COMFY-DESKTOP-RENDERER-03024D76F761,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-03024D76F761; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/icons/ComfyWordmark.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/settings/ComfyUISettingsContent.test.ts,test-only,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/settings/ComfyUISettingsContent.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-RENDERER-895AD039F8D5,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-895AD039F8D5; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BaseAccordion.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BaseActionSheet.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BaseActionSheet.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BaseAlert.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BaseAlert.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BaseCopyButton.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BaseInput.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BaseMenu.vue,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BaseModal.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BaseModal.vue,production,COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-1923FB082EFD,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-1923FB082EFD; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BasePrompt.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BasePrompt.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/BaseSelect.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/OperationErrorDetail.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/Tooltip.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/Tooltip.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/components/ui/index.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/actionShoppingList.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useActionGuard.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useActionGuard.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useAdoptAction.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useAdoptPromptBridge.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useAdoptPromptBridge.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useAppUpdatePrompts.ts,production,COMFY-DESKTOP-107,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useArgsAutocomplete.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useArgsAutocomplete.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useCloudCapacity.test.ts,test-only,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useCloudCapacity.ts,production,COMFY-DESKTOP-162,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useComfyUISettings.test.ts,test-only,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useComfyUISettings.ts,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useDeepLinkRouter.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useDialogs.test.ts,test-only,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useDialogs.ts,production,COMFY-DESKTOP-095,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useDownloadThumbnail.ts,production,COMFY-DESKTOP-136,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useElectronApi.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useElectronApi.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useInstallContextMenu.test.ts,test-only,COMFY-DESKTOP-001;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useInstallContextMenu.ts,production,COMFY-DESKTOP-001;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useInstallCta.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useInstallCta.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useInstallList.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useInstallList.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useInstanceActions.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useInstanceActions.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useInstanceNavState.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useInstanceNavState.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useLauncherPrefs.test.ts,test-only,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useLauncherPrefs.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useListAction.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useListAction.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useLocalInstanceGuard.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useLocalInstanceGuard.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useMigrateAction.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useModal.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useModal.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useModalOverlay.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useOverlay.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useOverlay.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/usePlatform.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useReturnToDashboardConfirm.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useReturnToDashboardConfirm.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useSendFeedback.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useStopAction.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useTemplateTabs.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useTemplateTabs.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useTerminalScroll.ts,production,COMFY-DESKTOP-091,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useTheme.ts,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useThumbnailPrefetch.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useThumbnailPrefetch.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useTooltip.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/composables/useTruncation.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/env.d.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/i18n.ts,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/argsParser.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/argsParser.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/colorScheme.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/datadogPathNormalization.test.ts,test-only,COMFY-DESKTOP-167,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/datadogPathNormalization.ts,production,COMFY-DESKTOP-167,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/datetime.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/downloadFormatters.ts,production,COMFY-DESKTOP-136,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/draggableList.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/draggableList.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/findAction.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/findAction.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/formatting.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/i18nFactory.ts,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/i18nMessages.ts,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/installHelpers.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/installHelpers.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/installTypeIcon.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/installTypeIcon.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/legalDocs.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/legalDocs.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/localeCoverage.test.ts,test-only,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/modalLinkify.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/openablePath.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/openablePath.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/pickerProgressRouting.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/pickerProgressRouting.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/pickerTabs.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/pickerTabs.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/progressOpKind.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/progressStatusLabel.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/progressStatusLabel.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/progressTerminalPresets.test.ts,test-only,COMFY-DESKTOP-091,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/progressTerminalPresets.ts,production,COMFY-DESKTOP-091,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/progressViewModel.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/progressWeights.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/progressWeights.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/rendererBootstrap.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/snapshots.ts,production,COMFY-DESKTOP-121,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/stopWarning.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/supportUrl.ts,production,COMFY-DESKTOP-051,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/telemetry.test.ts,test-only,COMFY-DESKTOP-167,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/telemetry.ts,production,COMFY-DESKTOP-167,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/uiTiming.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/useAppLocale.ts,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/variants.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/lib/variants.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/panel/ComfyLifecycleView.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/panel/ComfyLifecycleView.vue,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/panel/PanelApp.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/panel/PanelApp.vue,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/panel/e2eRendererHooks.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/panel/main.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/panel/useChooserHandoff.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/panel/useFirstUseChain.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/panel/useFirstUseChain.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/panel/usePanelOverlays.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/stores/downloadStore.test.ts,test-only,COMFY-DESKTOP-136,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/stores/downloadStore.ts,production,COMFY-DESKTOP-136,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/stores/installationStore.test.ts,test-only,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/stores/installationStore.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/stores/progressStore.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/stores/progressStore.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/stores/sessionStore.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/stores/sessionStore.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/types/context-menu.ts,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/types/installation.ts,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/types/ipc.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/utils/fuzzyMatch.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/ChooserView.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/ChooserView.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/ConsoleModal.vue,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/DetailModal.vue,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/FirstUseTakeover.test.ts,test-only,COMFY-DESKTOP-181,mapped,Mapped to shared renderer interaction/accessibility behavior; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/FirstUseTakeover.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/InstallWizardModal.test.ts,test-only,COMFY-DESKTOP-001;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/InstallWizardModal.vue,production,COMFY-DESKTOP-001;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/LoadSnapshotModal.vue,production,COMFY-DESKTOP-121;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/ManageInstallModal.vue,production,COMFY-DESKTOP-001;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-117AF36C58B5,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-117AF36C58B5; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/MigrateConfirmTakeover.vue,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/ProgressModal.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/ProgressModal.vue,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/QuickInstallModal.vue,production,COMFY-DESKTOP-001;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/TrackModal.test.ts,test-only,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/TrackModal.vue,production,COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/chooser/ChooserInstallTile.vue,production,COMFY-DESKTOP-001,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/chooser/chooser-tiles.css,asset,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/ArgsBuilderField.test.ts,test-only,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/ArgsBuilderField.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-RENDERER-9FF99F7CBB57,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-9FF99F7CBB57; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/ArgsBuilderPage.test.ts,test-only,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/ArgsBuilderPage.vue,production,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/ArgsRawInput.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-RENDERER-A878BB29BC52,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-A878BB29BC52; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/BooleanToggle.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-RENDERER-2110E7FDB878,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-2110E7FDB878; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/ChannelPicker.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-RENDERER-018409E4A585,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-018409E4A585; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/ConsoleTerminalPane.test.ts,test-only,COMFY-DESKTOP-091;COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/ConsoleTerminalPane.vue,production,COMFY-DESKTOP-091;COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/EnvVarsField.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-RENDERER-A1C557B68D67,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-A1C557B68D67; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/ExtraModelPathsModal.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-96D5F90D2BA7,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-96D5F90D2BA7; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/MoreMenu.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-58AFBA10D2B6,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-58AFBA10D2B6; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/PathField.test.ts,test-only,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/PathField.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-RENDERER-A4115871315B,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-A4115871315B; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/SettingsSectionList.test.ts,test-only,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/SettingsSectionList.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-RENDERER-0EF8EEACF161,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-0EF8EEACF161; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/SnapshotRow.vue,production,COMFY-DESKTOP-121;COMFY-DESKTOP-149;COMFY-DESKTOP-RENDERER-97672F2EBEE1,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-97672F2EBEE1; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/SnapshotsView.test.ts,test-only,COMFY-DESKTOP-121;COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/SnapshotsView.vue,production,COMFY-DESKTOP-121;COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/StatusFactPanel.test.ts,test-only,COMFY-DESKTOP-149;COMFY-DESKTOP-076,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/StatusFactPanel.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-076;COMFY-DESKTOP-RENDERER-A7B1C36F9451,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-A7B1C36F9451; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/StorageDirRow.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-RENDERER-D4C7CC0B0BBC,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-D4C7CC0B0BBC; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/StoragePane.test.ts,test-only,COMFY-DESKTOP-149,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/renderer/src/views/comfyUISettings/StoragePane.vue,production,COMFY-DESKTOP-149;COMFY-DESKTOP-RENDERER-635C921F0D2C,mapped,Mapped to source-specific renderer contract COMFY-DESKTOP-RENDERER-635C921F0D2C; coarse parent capability IDs are retained for reverse traceability.
+projects/comfy/Comfy-Desktop/src/shared/colorLuminance.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/shared/datadogMirroredEvents.test.ts,test-only,COMFY-DESKTOP-167,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/shared/datadogMirroredEvents.ts,production,COMFY-DESKTOP-167,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/shared/errorBucket.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/shared/firstUseMode.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/shared/firstUseMode.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/shared/navigation/navDecision.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/shared/navigation/navDecision.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/shared/operationStatus.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/shared/piiScrub.test.ts,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/src/shared/piiScrub.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/shared/posthogConfig.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/shared/terminalShortcuts.test.ts,test-only,COMFY-DESKTOP-091,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/shared/terminalShortcuts.ts,production,COMFY-DESKTOP-091,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/src/shared/testIds.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/shared/viewKind.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/types/comfyDesktopBridge.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/src/types/ipc.ts,production,COMFY-DESKTOP-174,mapped,Mapped by source subsystem to the named desktop capability cluster.
+projects/comfy/Comfy-Desktop/todesktop.json,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/tsconfig.comfy-desktop-bridge-types.json,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/tsconfig.e2e.json,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/tsconfig.json,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/tsconfig.node.json,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/tsconfig.test.json,test-only,COMFY-DESKTOP-174,mapped,Mapped to the shared desktop service/bridge contract; case titles retain the more specific exercised behavior.
+projects/comfy/Comfy-Desktop/tsconfig.vitest-integration.json,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/tsconfig.web.json,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/vitest.config.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/vitest.integration.config.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.
+projects/comfy/Comfy-Desktop/vitest.setup.ts,infrastructure-only,,explicitly-classified,Classified as shared UI/build/type infrastructure; retained explicitly rather than silently excluded.

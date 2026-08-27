@@ -1,0 +1,4 @@
+interface:
+  display_name: "Execute Spec Task"
+  short_description: "Implement bounded tasks from approved specs"
+  default_prompt: "Use $execute-spec-task to implement task 2.1 from this approved feature specification, then stop."

@@ -1,4 +1,41 @@
+#[cfg(all(test, not(feature = "test-support")))]
+extern crate self as workspace;
+
 pub mod active_file_name;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_accessibility;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_composer;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_focus;
+#[cfg(feature = "multiplayer-tools")]
+mod collaborative_layout;
+#[cfg(feature = "multiplayer-tools")]
+mod collaborative_layout_persistence;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_navigation;
+#[cfg(all(test, feature = "multiplayer-tools"))]
+#[path = "../tests/collaborative_ownership_invariants.rs"]
+mod collaborative_ownership_invariants;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_participants;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_review;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_review_actions;
+#[cfg(all(test, feature = "multiplayer-tools", not(feature = "test-support")))]
+#[path = "../tests/collaborative_review.rs"]
+mod collaborative_review_regression;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_review_summary;
+#[cfg(feature = "multiplayer-tools")]
+mod collaborative_shell_state;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_timeline;
+#[cfg(feature = "multiplayer-tools")]
+mod collaborative_top_bar;
+#[cfg(feature = "multiplayer-tools")]
+mod collaborative_workspace;
 pub mod dock;
 pub mod history_manager;
 pub mod invalid_item_view;
@@ -7,6 +44,7 @@ mod modal_layer;
 mod multi_workspace;
 #[cfg(test)]
 mod multi_workspace_tests;
+pub mod multiplayer_capability;
 pub mod notifications;
 pub mod pane;
 pub mod pane_group;
@@ -27,15 +65,26 @@ mod toast_layer;
 mod toolbar;
 pub mod welcome;
 pub mod workspace_error;
+mod workspace_presentation;
+mod workspace_presentation_actions;
 mod workspace_settings;
 
 pub use dock::Panel;
+#[cfg(feature = "agentic")]
+pub use multi_workspace::sidebar_side_context_menu;
+#[cfg(feature = "agentic")]
 pub use multi_workspace::{
-    CloseWorkspaceSidebar, DraggedSidebar, FocusWorkspaceSidebar, MoveProjectToNewWindow,
-    MultiWorkspace, MultiWorkspaceEvent, NewThread, NextProject, NextThread, PreviousProject,
-    PreviousThread, ProjectGroup, ProjectGroupKey, RemovalIntent, SerializedProjectGroupState,
-    Sidebar, SidebarEvent, SidebarHandle, SidebarRenderState, SidebarSide, ToggleWorkspaceSidebar,
-    sidebar_side_context_menu,
+    CloseWorkspaceSidebar, FocusWorkspaceSidebar, NewThread, NextProject, NextThread,
+    PreviousProject, PreviousThread, ToggleWorkspaceSidebar,
+};
+pub use multi_workspace::{
+    DraggedSidebar, MoveProjectToNewWindow, MultiWorkspace, MultiWorkspaceEvent, ProjectGroup,
+    ProjectGroupKey, RemovalIntent, SerializedProjectGroupState, Sidebar, SidebarEvent,
+    SidebarHandle, SidebarRenderState, SidebarSide,
+};
+pub use multiplayer_capability::{
+    MULTIPLAYER_TOOLS_CAPABILITY, MultiplayerCapabilityAdvertisement, MultiplayerCapabilityError,
+    admit_multiplayer_operation, multiplayer_tools_available,
 };
 pub use path_list::{PathList, SerializedPathList};
 pub use remote::{
@@ -43,11 +92,43 @@ pub use remote::{
 };
 pub use toast_layer::{ToastAction, ToastLayer, ToastView};
 
+#[cfg(all(test, feature = "multiplayer-tools"))]
+use crate::collaborative_participants::CollaborativeParticipantProviderState;
 use anyhow::{Context as _, Result, anyhow};
 use client::{
     ChannelId, Client, ErrorExt, ParticipantIndex, Status, TypedEnvelope, User, UserStore,
     proto::{self, ErrorCode, PanelId, PeerId},
 };
+#[cfg(feature = "multiplayer-tools")]
+use collaborative_composer::{
+    CollaborativeComposerActionError, CollaborativeComposerHost, CollaborativeComposerProvider,
+    CollaborativeComposerRegistration, CollaborativeComposerRegistrationError,
+};
+#[cfg(feature = "multiplayer-tools")]
+use collaborative_focus::{
+    CollaborativeFocusOrder, CollaborativeFocusRegion, FocusNextCollaborativeRegion,
+    FocusPreviousCollaborativeRegion, RestoreCollaborativeFocus,
+};
+#[cfg(feature = "multiplayer-tools")]
+use collaborative_navigation::CollaborativeNavigation;
+#[cfg(feature = "multiplayer-tools")]
+use collaborative_participants::{
+    CollaborativeParticipantHost, CollaborativeParticipantProvider,
+    CollaborativeParticipantProviderError, CollaborativeParticipantRegistration,
+};
+#[cfg(feature = "multiplayer-tools")]
+use collaborative_review::{
+    CollaborativeReviewHost, CollaborativeReviewRegistration, CollaborativeReviewRegistrationError,
+    CollaborativeReviewSelectionError, CollaborativeReviewSlot, SelectAgentReview,
+    SelectProjectReview,
+};
+#[cfg(feature = "multiplayer-tools")]
+use collaborative_timeline::{
+    CollaborativeTimelineHost, CollaborativeTimelineProvider, CollaborativeTimelineRegistration,
+    CollaborativeTimelineRegistrationError,
+};
+#[cfg(feature = "multiplayer-tools")]
+use collaborative_workspace::CollaborativeWorkspace;
 use collections::{HashMap, HashSet, TypeIdHashMap, hash_map};
 use dock::{Dock, DockPosition, PanelButtons, PanelHandle, RESIZE_HANDLE_SIZE};
 use fs::Fs;
@@ -59,6 +140,8 @@ use futures::{
     },
     future::{Shared, try_join_all},
 };
+#[cfg(feature = "multiplayer-tools")]
+use gpui::KeyDownEvent;
 use gpui::{
     Action, AnyEntity, AnyView, AnyWeakView, App, AsyncApp, AsyncWindowContext, Axis, Bounds,
     Context, CursorStyle, Decorations, DragMoveEvent, Entity, EntityId, EventEmitter, FocusHandle,
@@ -91,7 +174,7 @@ pub use persistence::{
         DockData, DockStructure, ItemId, MultiWorkspaceState, SerializedMultiWorkspace,
         SerializedProjectGroup, SerializedWorkspaceLocation, SessionWorkspace,
     },
-    read_serialized_multi_workspaces,
+    read_serialized_multi_workspaces, workspace_scoped_state_key,
 };
 use persistence::{SerializedWindowBounds, model::SerializedWorkspace};
 use postage::stream::Stream;
@@ -115,6 +198,8 @@ use settings::{
     update_settings_file,
 };
 
+#[cfg(feature = "multiplayer-tools")]
+pub use collaborative_review::ToggleCollaborativeReview;
 use sqlez::{
     bindable::{Bind, Column, StaticColumnCount},
     statement::Statement,
@@ -154,6 +239,10 @@ use util::{
     serde::default_true,
 };
 use uuid::Uuid;
+pub use workspace_presentation::{WorkspacePresentation, effective_workspace_presentation};
+#[cfg(feature = "multiplayer-tools")]
+pub use workspace_presentation_actions::SwitchToCollaborativeWorkspace;
+pub use workspace_presentation_actions::SwitchToEditorWorkspace;
 pub use workspace_settings::{
     AccessibleMode, AutosaveSetting, BottomDockLayout, EncodingDisplayOptions, FocusFollowsMouse,
     RestoreOnStartupBehavior, StatusBarSettings, TabBarSettings, WorkspaceSettings,
@@ -193,6 +282,20 @@ pub trait TerminalProvider {
         window: &mut Window,
         cx: &mut App,
     ) -> Task<Option<Result<ExitStatus>>>;
+
+    fn spawn_structured(
+        &self,
+        task: SpawnInTerminal,
+        handle: task::StructuredTaskHandle,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Task<Option<Result<ExitStatus>>> {
+        if handle.state().is_terminal() {
+            return Task::ready(None);
+        }
+        handle.mark_running(None, cx);
+        self.spawn(task, window, cx)
+    }
 }
 
 pub trait DebuggerProvider {
@@ -1414,6 +1517,25 @@ pub struct Workspace {
     pane_history_timestamp: Arc<AtomicUsize>,
     bounds: Bounds<Pixels>,
     pub centered_layout: bool,
+    workspace_presentation: WorkspacePresentation,
+    #[cfg(feature = "multiplayer-tools")]
+    collaborative_workspace: Entity<CollaborativeWorkspace>,
+    #[cfg(feature = "multiplayer-tools")]
+    collaborative_navigation: CollaborativeNavigation,
+    #[cfg(feature = "multiplayer-tools")]
+    collaborative_composer: CollaborativeComposerHost,
+    #[cfg(feature = "multiplayer-tools")]
+    collaborative_participants: CollaborativeParticipantHost,
+    #[cfg(feature = "multiplayer-tools")]
+    collaborative_timeline: CollaborativeTimelineHost,
+    #[cfg(feature = "multiplayer-tools")]
+    collaborative_channel_timeline: Option<(u64, AnyView)>,
+    #[cfg(feature = "multiplayer-tools")]
+    collaborative_channel_composer: Option<(u64, CollaborativeComposerProvider)>,
+    #[cfg(feature = "multiplayer-tools")]
+    collaborative_review: CollaborativeReviewHost,
+    #[cfg(feature = "multiplayer-tools")]
+    collaborative_focus_order: CollaborativeFocusOrder,
     bounds_save_task_queued: Option<Task<()>>,
     on_prompt_for_new_path: Option<PromptForNewPath>,
     on_prompt_for_open_path: Option<PromptForOpenPath>,
@@ -1752,8 +1874,13 @@ impl Workspace {
             .flatten()
             .map(|mw| mw.downgrade());
         let status_bar = cx.new(|cx| {
-            let mut status_bar =
-                StatusBar::new(&center_pane.clone(), multi_workspace.clone(), window, cx);
+            let mut status_bar = StatusBar::new(
+                &center_pane.clone(),
+                project.clone(),
+                multi_workspace.clone(),
+                window,
+                cx,
+            );
             status_bar.add_left_item(left_dock_buttons, window, cx);
             status_bar.add_right_item(right_dock_buttons, window, cx);
             status_bar.add_right_item(bottom_dock_buttons, window, cx);
@@ -1816,6 +1943,8 @@ impl Workspace {
                 }
             }),
         ];
+        #[cfg(feature = "multiplayer-tools")]
+        let mut subscriptions = subscriptions;
 
         cx.defer_in(window, move |this, window, cx| {
             this.update_window_title(window, cx);
@@ -1825,6 +1954,47 @@ impl Workspace {
         let mut center = PaneGroup::new(center_pane.clone());
         center.set_is_center(true);
         center.mark_positions(cx);
+
+        let workspace_presentation = WorkspaceSettings::get_global(cx).workspace_presentation;
+        #[cfg(feature = "multiplayer-tools")]
+        if workspace_presentation == WorkspacePresentation::Collaborative {
+            status_bar.update(cx, |status_bar, cx| {
+                status_bar.set_collaborative_participants(true, None, cx);
+            });
+        }
+        #[cfg(feature = "multiplayer-tools")]
+        let collaborative_layout_state = workspace_id
+            .map(|workspace_id| {
+                collaborative_layout_persistence::read_collaborative_layout_state(
+                    &db::kvp::KeyValueStore::global(cx),
+                    workspace_id,
+                )
+            })
+            .unwrap_or_default();
+        #[cfg(feature = "multiplayer-tools")]
+        let collaborative_navigation = workspace_id
+            .map(|workspace_id| {
+                collaborative_navigation::read_collaborative_navigation(
+                    &db::kvp::KeyValueStore::global(cx),
+                    workspace_id,
+                )
+            })
+            .unwrap_or_default();
+        #[cfg(feature = "multiplayer-tools")]
+        let collaborative_workspace = cx.new(|cx| {
+            CollaborativeWorkspace::new(
+                project.clone(),
+                cx.focus_handle(),
+                collaborative_layout_state,
+                cx,
+            )
+        });
+        #[cfg(feature = "multiplayer-tools")]
+        subscriptions.push(cx.observe_in(
+            &collaborative_workspace,
+            window,
+            |workspace, _, window, cx| workspace.serialize_workspace(window, cx),
+        ));
 
         Workspace {
             weak_self: weak_handle.clone(),
@@ -1873,6 +2043,25 @@ impl Workspace {
             // This data will be incorrect, but it will be overwritten by the time it needs to be used.
             bounds: Default::default(),
             centered_layout: false,
+            workspace_presentation,
+            #[cfg(feature = "multiplayer-tools")]
+            collaborative_workspace,
+            #[cfg(feature = "multiplayer-tools")]
+            collaborative_navigation,
+            #[cfg(feature = "multiplayer-tools")]
+            collaborative_composer: CollaborativeComposerHost::new(project.clone()),
+            #[cfg(feature = "multiplayer-tools")]
+            collaborative_participants: CollaborativeParticipantHost::new(project.clone()),
+            #[cfg(feature = "multiplayer-tools")]
+            collaborative_timeline: CollaborativeTimelineHost::new(project.clone()),
+            #[cfg(feature = "multiplayer-tools")]
+            collaborative_channel_timeline: None,
+            #[cfg(feature = "multiplayer-tools")]
+            collaborative_channel_composer: None,
+            #[cfg(feature = "multiplayer-tools")]
+            collaborative_review: CollaborativeReviewHost::new(project.clone()),
+            #[cfg(feature = "multiplayer-tools")]
+            collaborative_focus_order: CollaborativeFocusOrder::default(),
             bounds_save_task_queued: None,
             on_prompt_for_new_path: None,
             on_prompt_for_open_path: None,
@@ -2005,6 +2194,9 @@ impl Workspace {
                         .as_ref()
                         .map(|w| w.centered_layout)
                         .unwrap_or(false);
+                    let workspace_presentation = serialized_workspace
+                        .as_ref()
+                        .map(|workspace| workspace.workspace_presentation);
 
                     let workspace = window.update(cx, |multi_workspace, window, cx| {
                         let workspace = cx.new(|cx| {
@@ -2017,6 +2209,9 @@ impl Workspace {
                             );
 
                             workspace.centered_layout = centered_layout;
+                            if let Some(workspace_presentation) = workspace_presentation {
+                                workspace.workspace_presentation = workspace_presentation;
+                            }
 
                             // Call init callback to add items before window renders
                             if let Some(init) = init {
@@ -2067,6 +2262,9 @@ impl Workspace {
                         .as_ref()
                         .map(|w| w.centered_layout)
                         .unwrap_or(false);
+                    let workspace_presentation = serialized_workspace
+                        .as_ref()
+                        .map(|workspace| workspace.workspace_presentation);
                     let window = cx.open_window(options, {
                         let app_state = app_state.clone();
                         let project_handle = project_handle.clone();
@@ -2080,6 +2278,9 @@ impl Workspace {
                                     cx,
                                 );
                                 workspace.centered_layout = centered_layout;
+                                if let Some(workspace_presentation) = workspace_presentation {
+                                    workspace.workspace_presentation = workspace_presentation;
+                                }
 
                                 // Call init callback to add items before window renders
                                 if let Some(init) = init {
@@ -6940,6 +7141,511 @@ impl Workspace {
         self.database_id
     }
 
+    pub fn workspace_presentation(&self) -> WorkspacePresentation {
+        workspace_presentation::effective_workspace_presentation(self.workspace_presentation)
+    }
+
+    pub fn collaborative_title_bar(&self, _cx: &App) -> Option<gpui::AnyElement> {
+        #[cfg(feature = "multiplayer-tools")]
+        if self.workspace_presentation() == WorkspacePresentation::Collaborative {
+            return Some(
+                self.collaborative_workspace
+                    .read(_cx)
+                    .top_bar(_cx)
+                    .into_any_element(),
+            );
+        }
+
+        None
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn collaborative_rail_width(&self, cx: &App) -> Pixels {
+        self.collaborative_workspace.read(cx).rail_width(cx)
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn collaborative_navigation(&self) -> &CollaborativeNavigation {
+        &self.collaborative_navigation
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn toggle_collaborative_pin(
+        &mut self,
+        target: collaborative_navigation::CollaborativeNavigationTarget,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> std::result::Result<bool, collaborative_navigation::CollaborativeNavigationError> {
+        let pinned = self.collaborative_navigation.toggle_pin(target)?;
+        self.serialize_workspace(window, cx);
+        cx.notify();
+        Ok(pinned)
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn collaborative_composer(&self) -> &CollaborativeComposerHost {
+        &self.collaborative_composer
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn register_collaborative_composer_provider(
+        &mut self,
+        provider: CollaborativeComposerProvider,
+        cx: &mut Context<Self>,
+    ) -> std::result::Result<
+        CollaborativeComposerRegistration,
+        CollaborativeComposerRegistrationError,
+    > {
+        let registration = self.collaborative_composer.register(provider)?;
+        self.synchronize_collaborative_composer_view(cx);
+        cx.notify();
+        Ok(registration)
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn unregister_collaborative_composer_provider(
+        &mut self,
+        registration: CollaborativeComposerRegistration,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let removed = self.collaborative_composer.unregister(registration);
+        if removed {
+            self.synchronize_collaborative_composer_view(cx);
+            cx.notify();
+        }
+        removed
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn submit_collaborative_composer(
+        &self,
+        cx: &mut App,
+    ) -> std::result::Result<(), CollaborativeComposerActionError> {
+        if let Some((_, provider)) = &self.collaborative_channel_composer {
+            provider.submit(cx)
+        } else {
+            self.collaborative_composer.submit(cx)
+        }
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn cancel_collaborative_composer(
+        &self,
+        cx: &mut App,
+    ) -> std::result::Result<(), CollaborativeComposerActionError> {
+        if let Some((_, provider)) = &self.collaborative_channel_composer {
+            provider.cancel(cx)
+        } else {
+            self.collaborative_composer.cancel(cx)
+        }
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    fn synchronize_collaborative_composer_view(&mut self, cx: &mut Context<Self>) {
+        let selected_channel_id = match self.collaborative_navigation.current() {
+            Some(collaborative_navigation::CollaborativeNavigationTarget::Channel {
+                channel_id,
+            }) => channel_id.parse::<u64>().ok(),
+            _ => None,
+        };
+        let channel_provider = self
+            .collaborative_channel_composer
+            .as_ref()
+            .filter(|(channel_id, _)| Some(*channel_id) == selected_channel_id)
+            .map(|(_, provider)| provider);
+        let composer_view = channel_provider
+            .map(|provider| provider.view().clone())
+            .or_else(|| {
+                selected_channel_id
+                    .is_none()
+                    .then(|| self.collaborative_composer.view())
+                    .flatten()
+            });
+        let composer_focus_handle = channel_provider
+            .and_then(CollaborativeComposerProvider::focus_handle)
+            .or_else(|| {
+                selected_channel_id
+                    .is_none()
+                    .then(|| self.collaborative_composer.focus_handle())
+                    .flatten()
+            });
+        let unavailable_message = (selected_channel_id.is_some() && channel_provider.is_none())
+            .then(|| "Loading authorized channel messaging…".into());
+        self.collaborative_workspace.update(cx, |workspace, cx| {
+            workspace.set_composer_view(
+                composer_view,
+                composer_focus_handle,
+                unavailable_message,
+                cx,
+            )
+        });
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn collaborative_participants(&self) -> &CollaborativeParticipantHost {
+        &self.collaborative_participants
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn register_collaborative_timeline_provider(
+        &mut self,
+        provider: CollaborativeTimelineProvider,
+        cx: &mut Context<Self>,
+    ) -> std::result::Result<
+        CollaborativeTimelineRegistration,
+        CollaborativeTimelineRegistrationError,
+    > {
+        let registration = self.collaborative_timeline.register(provider)?;
+        self.synchronize_collaborative_timeline_view(cx);
+        cx.notify();
+        Ok(registration)
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn unregister_collaborative_timeline_provider(
+        &mut self,
+        registration: CollaborativeTimelineRegistration,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let removed = self.collaborative_timeline.unregister(registration);
+        if removed {
+            self.synchronize_collaborative_timeline_view(cx);
+            cx.notify();
+        }
+        removed
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    fn synchronize_collaborative_timeline_view(&mut self, cx: &mut Context<Self>) {
+        let selected_channel_id = match self.collaborative_navigation.current() {
+            Some(collaborative_navigation::CollaborativeNavigationTarget::Channel {
+                channel_id,
+            }) => channel_id.parse::<u64>().ok(),
+            _ => None,
+        };
+        let timeline_view = self
+            .collaborative_channel_timeline
+            .as_ref()
+            .filter(|(channel_id, _)| Some(*channel_id) == selected_channel_id)
+            .map(|(_, view)| view.clone())
+            .or_else(|| {
+                selected_channel_id
+                    .is_none()
+                    .then(|| self.collaborative_timeline.view())
+                    .flatten()
+            });
+        self.collaborative_workspace.update(cx, |workspace, cx| {
+            workspace.set_timeline_view(timeline_view, cx)
+        });
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn set_collaborative_channel_timeline(
+        &mut self,
+        channel_id: u64,
+        view: AnyView,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let is_current = matches!(
+            self.collaborative_navigation.current(),
+            Some(collaborative_navigation::CollaborativeNavigationTarget::Channel {
+                channel_id: selected_channel_id,
+            }) if selected_channel_id == &channel_id.to_string()
+        );
+        if !is_current {
+            return false;
+        }
+        self.collaborative_channel_timeline = Some((channel_id, view));
+        self.synchronize_collaborative_timeline_view(cx);
+        cx.notify();
+        true
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn set_collaborative_channel_composer(
+        &mut self,
+        channel_id: u64,
+        provider: CollaborativeComposerProvider,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let is_current = matches!(
+            self.collaborative_navigation.current(),
+            Some(collaborative_navigation::CollaborativeNavigationTarget::Channel {
+                channel_id: selected_channel_id,
+            }) if selected_channel_id == &channel_id.to_string()
+        );
+        if !is_current || provider.project().entity_id() != self.project.entity_id() {
+            return false;
+        }
+        self.collaborative_channel_composer = Some((channel_id, provider));
+        self.synchronize_collaborative_composer_view(cx);
+        cx.notify();
+        true
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn register_collaborative_participant_provider(
+        &mut self,
+        provider: CollaborativeParticipantProvider,
+        cx: &mut Context<Self>,
+    ) -> std::result::Result<
+        CollaborativeParticipantRegistration,
+        CollaborativeParticipantProviderError,
+    > {
+        let registration = self.collaborative_participants.register(provider)?;
+        self.synchronize_collaborative_participant_surfaces(cx);
+        cx.notify();
+        Ok(registration)
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn unregister_collaborative_participant_provider(
+        &mut self,
+        registration: CollaborativeParticipantRegistration,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let removed = self.collaborative_participants.unregister(registration);
+        if removed {
+            self.synchronize_collaborative_participant_surfaces(cx);
+            cx.notify();
+        }
+        removed
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub(crate) fn synchronize_collaborative_participant_surfaces(
+        &mut self,
+        cx: &mut Context<Self>,
+    ) {
+        let provider = self.collaborative_participants.provider();
+        self.collaborative_workspace.update(cx, |workspace, cx| {
+            workspace.set_participant_provider(provider.clone(), cx);
+        });
+        let collaborative_workspace_active =
+            self.workspace_presentation == WorkspacePresentation::Collaborative;
+        let status_provider = collaborative_workspace_active.then_some(provider).flatten();
+        self.status_bar.update(cx, |status_bar, cx| {
+            status_bar.set_collaborative_participants(
+                collaborative_workspace_active,
+                status_provider,
+                cx,
+            );
+        });
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn collaborative_review(&self) -> &CollaborativeReviewHost {
+        &self.collaborative_review
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn register_collaborative_review_provider(
+        &mut self,
+        slot: CollaborativeReviewSlot,
+        project: &Entity<Project>,
+        provider: AnyView,
+        cx: &mut Context<Self>,
+    ) -> std::result::Result<CollaborativeReviewRegistration, CollaborativeReviewRegistrationError>
+    {
+        let registration = self
+            .collaborative_review
+            .register(slot, project, provider)?;
+        self.synchronize_collaborative_review_view(cx);
+        cx.notify();
+        Ok(registration)
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn unregister_collaborative_review_provider(
+        &mut self,
+        registration: CollaborativeReviewRegistration,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let removed = self.collaborative_review.unregister(registration);
+        if removed {
+            self.synchronize_collaborative_review_view(cx);
+            cx.notify();
+        }
+        removed
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn select_collaborative_review_provider(
+        &mut self,
+        slot: CollaborativeReviewSlot,
+        cx: &mut Context<Self>,
+    ) -> std::result::Result<bool, CollaborativeReviewSelectionError> {
+        let changed = self.collaborative_review.select(slot)?;
+        if changed {
+            self.synchronize_collaborative_review_view(cx);
+            cx.notify();
+        }
+        Ok(changed)
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    fn synchronize_collaborative_review_view(&mut self, cx: &mut Context<Self>) {
+        let review_view = self.collaborative_review.selected_view();
+        let selected_slot = self.collaborative_review.selected_slot();
+        let agent_available = self
+            .collaborative_review
+            .provider_available(CollaborativeReviewSlot::AgentChanges);
+        let project_available = self
+            .collaborative_review
+            .provider_available(CollaborativeReviewSlot::ProjectChanges);
+        self.collaborative_workspace.update(cx, |workspace, cx| {
+            workspace.set_review_view(
+                review_view,
+                selected_slot,
+                agent_available,
+                project_available,
+                cx,
+            )
+        });
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    fn select_agent_review(
+        &mut self,
+        _: &SelectAgentReview,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.select_collaborative_review_provider(CollaborativeReviewSlot::AgentChanges, cx)
+            .log_err();
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    fn select_project_review(
+        &mut self,
+        _: &SelectProjectReview,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.select_collaborative_review_provider(CollaborativeReviewSlot::ProjectChanges, cx)
+            .log_err();
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    fn toggle_collaborative_review(
+        &mut self,
+        _: &ToggleCollaborativeReview,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.collaborative_workspace.update(cx, |workspace, cx| {
+            workspace.toggle_review(cx);
+        });
+        cx.notify();
+    }
+
+    #[cfg(all(feature = "multiplayer-tools", any(test, feature = "test-support")))]
+    pub fn toggle_collaborative_review_for_tests(&mut self, cx: &mut Context<Self>) {
+        self.collaborative_workspace.update(cx, |workspace, cx| {
+            workspace.toggle_review(cx);
+        });
+        cx.notify();
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn collaborative_review_view(&self, cx: &App) -> Option<AnyView> {
+        let review_requested = self
+            .collaborative_workspace
+            .read(cx)
+            .layout_state(cx)
+            .review_requested();
+        self.collaborative_review.visible_view(review_requested)
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn navigate_collaborative_to(
+        &mut self,
+        target: collaborative_navigation::CollaborativeNavigationTarget,
+        is_available: impl FnOnce(&collaborative_navigation::CollaborativeNavigationTarget) -> bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> std::result::Result<bool, collaborative_navigation::CollaborativeNavigationError> {
+        let target_for_surface = target.clone();
+        let changed = self
+            .collaborative_navigation
+            .navigate_to(target, is_available)?;
+        if changed {
+            if !matches!(
+                target_for_surface,
+                collaborative_navigation::CollaborativeNavigationTarget::Channel { .. }
+            ) {
+                self.collaborative_channel_timeline = None;
+                self.collaborative_channel_composer = None;
+            }
+            self.synchronize_collaborative_timeline_view(cx);
+            self.synchronize_collaborative_composer_view(cx);
+            self.serialize_workspace(window, cx);
+            cx.notify();
+        }
+        Ok(changed)
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn navigate_collaborative_backward(
+        &mut self,
+        is_available: impl FnOnce(&collaborative_navigation::CollaborativeNavigationTarget) -> bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> std::result::Result<
+        collaborative_navigation::CollaborativeNavigationTarget,
+        collaborative_navigation::CollaborativeNavigationError,
+    > {
+        let target = self
+            .collaborative_navigation
+            .go_backward(is_available)?
+            .clone();
+        self.serialize_workspace(window, cx);
+        cx.notify();
+        Ok(target)
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub fn navigate_collaborative_forward(
+        &mut self,
+        is_available: impl FnOnce(&collaborative_navigation::CollaborativeNavigationTarget) -> bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> std::result::Result<
+        collaborative_navigation::CollaborativeNavigationTarget,
+        collaborative_navigation::CollaborativeNavigationError,
+    > {
+        let target = self
+            .collaborative_navigation
+            .go_forward(is_available)?
+            .clone();
+        self.serialize_workspace(window, cx);
+        cx.notify();
+        Ok(target)
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub(crate) fn set_collaborative_rail_width(
+        &mut self,
+        width: Pixels,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.collaborative_workspace
+            .update(cx, |workspace, cx| workspace.set_rail_width(width, cx));
+        self.serialize_workspace(window, cx);
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    pub(crate) fn reset_collaborative_rail_width(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.collaborative_workspace
+            .update(cx, CollaborativeWorkspace::reset_rail_width);
+        self.serialize_workspace(window, cx);
+    }
+
     #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn set_database_id(&mut self, id: WorkspaceId) {
         self.database_id = Some(id);
@@ -7076,6 +7782,10 @@ impl Workspace {
         let Some(database_id) = self.database_id() else {
             return Task::ready(());
         };
+        #[cfg(feature = "multiplayer-tools")]
+        let collaborative_layout_state = self.collaborative_workspace.read(cx).layout_state(cx);
+        #[cfg(feature = "multiplayer-tools")]
+        let collaborative_navigation = self.collaborative_navigation.clone();
 
         fn serialize_pane_handle(
             pane_handle: &Entity<Pane>,
@@ -7175,6 +7885,7 @@ impl Workspace {
                     display: Default::default(),
                     docks,
                     centered_layout: self.centered_layout,
+                    workspace_presentation: self.workspace_presentation,
                     session_id: self.session_id.clone(),
                     bookmarks,
                     breakpoints,
@@ -7183,8 +7894,26 @@ impl Workspace {
                 };
 
                 let db = WorkspaceDb::global(cx);
+                #[cfg(feature = "multiplayer-tools")]
+                let key_value_store = db::kvp::KeyValueStore::global(cx);
                 window.spawn(cx, async move |_| {
                     db.save_workspace(serialized_workspace).await;
+                    #[cfg(feature = "multiplayer-tools")]
+                    collaborative_layout_persistence::write_collaborative_layout_state(
+                        &key_value_store,
+                        database_id,
+                        collaborative_layout_state,
+                    )
+                    .await
+                    .log_err();
+                    #[cfg(feature = "multiplayer-tools")]
+                    collaborative_navigation::write_collaborative_navigation(
+                        &key_value_store,
+                        database_id,
+                        &collaborative_navigation,
+                    )
+                    .await
+                    .log_err();
                 })
             }
             WorkspaceLocation::DetachFromSession => {
@@ -7206,6 +7935,22 @@ impl Workspace {
                     persistence::write_default_dock_state(&kvp, docks)
                         .await
                         .log_err();
+                    #[cfg(feature = "multiplayer-tools")]
+                    collaborative_layout_persistence::write_collaborative_layout_state(
+                        &kvp,
+                        database_id,
+                        collaborative_layout_state,
+                    )
+                    .await
+                    .log_err();
+                    #[cfg(feature = "multiplayer-tools")]
+                    collaborative_navigation::write_collaborative_navigation(
+                        &kvp,
+                        database_id,
+                        &collaborative_navigation,
+                    )
+                    .await
+                    .log_err();
                 })
             }
             WorkspaceLocation::None => {
@@ -7216,6 +7961,22 @@ impl Workspace {
                     persistence::write_default_dock_state(&kvp, docks)
                         .await
                         .log_err();
+                    #[cfg(feature = "multiplayer-tools")]
+                    collaborative_layout_persistence::write_collaborative_layout_state(
+                        &kvp,
+                        database_id,
+                        collaborative_layout_state,
+                    )
+                    .await
+                    .log_err();
+                    #[cfg(feature = "multiplayer-tools")]
+                    collaborative_navigation::write_collaborative_navigation(
+                        &kvp,
+                        database_id,
+                        &collaborative_navigation,
+                    )
+                    .await
+                    .log_err();
                 })
             }
         }
@@ -7492,9 +8253,127 @@ impl Workspace {
         context
     }
 
+    #[cfg(feature = "multiplayer-tools")]
+    fn collaborative_focus_regions(
+        &mut self,
+        cx: &App,
+    ) -> Vec<(CollaborativeFocusRegion, FocusHandle)> {
+        let mut regions = Vec::with_capacity(5);
+        if let Some(navigation) = self.sidebar_focus_handle.clone() {
+            regions.push((CollaborativeFocusRegion::Navigation, navigation));
+        }
+        regions.extend(
+            self.collaborative_workspace
+                .read(cx)
+                .focus_region_handles(cx),
+        );
+        let review_visible = regions
+            .iter()
+            .any(|(region, _)| *region == CollaborativeFocusRegion::Review);
+        self.collaborative_focus_order
+            .set_review_visible(review_visible);
+        regions.push((
+            CollaborativeFocusRegion::Status,
+            self.status_bar.read(cx).collaborative_focus_handle(),
+        ));
+        regions
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    fn focus_next_collaborative_region(
+        &mut self,
+        _: &FocusNextCollaborativeRegion,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.workspace_presentation != WorkspacePresentation::Collaborative {
+            return;
+        }
+        let regions = self.collaborative_focus_regions(cx);
+        let current = regions
+            .iter()
+            .find(|(_, handle)| handle.contains_focused(window, cx))
+            .map(|(region, _)| *region);
+        let target = current
+            .and_then(|current| {
+                self.collaborative_focus_order.record_focus(current);
+                self.collaborative_focus_order.next(current)
+            })
+            .or_else(|| Some(self.collaborative_focus_order.restore()));
+        if let Some((region, handle)) = target.and_then(|target| {
+            regions
+                .iter()
+                .find(|(region, _)| *region == target)
+                .cloned()
+        }) {
+            handle.focus(window, cx);
+            self.collaborative_focus_order.record_focus(region);
+        } else {
+            window.focus_next(cx);
+        }
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    fn focus_previous_collaborative_region(
+        &mut self,
+        _: &FocusPreviousCollaborativeRegion,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.workspace_presentation != WorkspacePresentation::Collaborative {
+            return;
+        }
+        let regions = self.collaborative_focus_regions(cx);
+        let current = regions
+            .iter()
+            .find(|(_, handle)| handle.contains_focused(window, cx))
+            .map(|(region, _)| *region);
+        let target = current
+            .and_then(|current| {
+                self.collaborative_focus_order.record_focus(current);
+                self.collaborative_focus_order.previous(current)
+            })
+            .or_else(|| Some(self.collaborative_focus_order.restore()));
+        if let Some((region, handle)) = target.and_then(|target| {
+            regions
+                .iter()
+                .find(|(region, _)| *region == target)
+                .cloned()
+        }) {
+            handle.focus(window, cx);
+            self.collaborative_focus_order.record_focus(region);
+        } else {
+            window.focus_prev(cx);
+        }
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    fn restore_collaborative_focus(
+        &mut self,
+        _: &RestoreCollaborativeFocus,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.workspace_presentation != WorkspacePresentation::Collaborative {
+            return;
+        }
+        let regions = self.collaborative_focus_regions(cx);
+        let target = self.collaborative_focus_order.restore();
+        if let Some((region, handle)) = regions
+            .iter()
+            .find(|(region, _)| *region == target)
+            .cloned()
+            .or_else(|| regions.first().cloned())
+        {
+            handle.focus(window, cx);
+            self.collaborative_focus_order.record_focus(region);
+        }
+    }
+
     /// Multiworkspace uses this to add workspace action handling to itself
     pub fn actions(&self, div: Div, window: &mut Window, cx: &mut Context<Self>) -> Div {
-        self.add_workspace_actions_listeners(div, window, cx)
+        let div = self
+            .add_workspace_actions_listeners(div, window, cx)
             .on_action(cx.listener(
                 |_workspace, action_sequence: &settings::ActionSequence, window, cx| {
                     for action in &action_sequence.0 {
@@ -7502,7 +8381,38 @@ impl Workspace {
                     }
                 },
             ))
-            .on_action(cx.listener(Self::close_inactive_items_and_panes))
+            .on_action(cx.listener(Workspace::switch_to_editor_workspace));
+        #[cfg(feature = "multiplayer-tools")]
+        let div = div
+            .on_action(cx.listener(Workspace::switch_to_collaborative_workspace))
+            .on_action(cx.listener(Workspace::select_agent_review))
+            .on_action(cx.listener(Workspace::select_project_review))
+            .on_action(cx.listener(Workspace::toggle_collaborative_review))
+            .on_action(cx.listener(Workspace::focus_next_collaborative_region))
+            .on_action(cx.listener(Workspace::focus_previous_collaborative_region))
+            .on_action(cx.listener(Workspace::restore_collaborative_focus))
+            .on_key_down(cx.listener(|workspace, event: &KeyDownEvent, window, cx| {
+                if workspace.workspace_presentation != WorkspacePresentation::Collaborative
+                    || event.keystroke.key != "tab"
+                {
+                    return;
+                }
+                cx.stop_propagation();
+                if event.keystroke.modifiers.shift {
+                    workspace.focus_previous_collaborative_region(
+                        &FocusPreviousCollaborativeRegion,
+                        window,
+                        cx,
+                    );
+                } else {
+                    workspace.focus_next_collaborative_region(
+                        &FocusNextCollaborativeRegion,
+                        window,
+                        cx,
+                    );
+                }
+            }));
+        div.on_action(cx.listener(Self::close_inactive_items_and_panes))
             .on_action(cx.listener(Self::close_all_items_and_panes))
             .on_action(cx.listener(Self::close_item_in_all_panes))
             .on_action(cx.listener(Self::save_all))
@@ -9198,8 +10108,8 @@ impl Render for Workspace {
                                     },
                                 ))
                             })
-                            .child({
-                                match bottom_dock_layout {
+                            .child(match self.workspace_presentation() {
+                                WorkspacePresentation::Editor => (match bottom_dock_layout {
                                     BottomDockLayout::Full => div()
                                         .flex()
                                         .flex_col()
@@ -9433,7 +10343,16 @@ impl Render for Workspace {
                                             window,
                                             cx,
                                         )),
+                                })
+                                .into_any_element(),
+                                #[cfg(feature = "multiplayer-tools")]
+                                WorkspacePresentation::Collaborative => {
+                                    self.collaborative_workspace.clone().into_any_element()
                                 }
+                                #[cfg(not(feature = "multiplayer-tools"))]
+                                WorkspacePresentation::Collaborative => unreachable!(
+                                    "effective workspace presentation is always Editor without multiplayer-tools"
+                                ),
                             })
                             .children(self.zoomed.as_ref().and_then(|view| {
                                 let zoomed_view = view.upgrade()?;
@@ -9822,6 +10741,8 @@ actions!(
         ScreenShare,
         /// Copies the current room name and session id for debugging purposes.
         CopyRoomId,
+        /// Opens the native collaboration panel for collaborators and invitations.
+        OpenCollaborators,
     ]
 );
 
@@ -10369,6 +11290,7 @@ pub fn open_workspace_by_id(
             .with_context(|| format!("Workspace {workspace_id:?} not found"))?;
 
         let centered_layout = serialized_workspace.centered_layout;
+        let workspace_presentation = serialized_workspace.workspace_presentation;
 
         let (window, workspace) = if let Some(window) = requesting_window {
             let workspace = window.update(cx, |multi_workspace, window, cx| {
@@ -10381,6 +11303,7 @@ pub fn open_workspace_by_id(
                         cx,
                     );
                     workspace.centered_layout = centered_layout;
+                    workspace.workspace_presentation = workspace_presentation;
                     workspace
                 });
                 multi_workspace.add(workspace.clone(), &*window, cx);
@@ -10421,6 +11344,7 @@ pub fn open_workspace_by_id(
                             cx,
                         );
                         workspace.centered_layout = centered_layout;
+                        workspace.workspace_presentation = workspace_presentation;
                         workspace
                     });
                     cx.new(|cx| MultiWorkspace::new(workspace, window, cx))
@@ -10866,6 +11790,7 @@ async fn open_remote_project_inner(
 
             if let Some(ref serialized) = serialized_workspace {
                 workspace.centered_layout = serialized.centered_layout;
+                workspace.workspace_presentation = serialized.workspace_presentation;
             }
 
             workspace
@@ -11639,6 +12564,9 @@ fn load_legacy_panel_size(
 mod tests {
     use std::{cell::RefCell, rc::Rc, sync::Arc, time::Duration};
 
+    #[cfg(feature = "multiplayer-tools")]
+    use std::cell::Cell;
+
     use super::*;
     use crate::{
         dock::{PanelEvent, test::TestPanel},
@@ -12166,7 +13094,7 @@ mod tests {
         assert!(task.await.unwrap());
     }
 
-    // See https://github.com/zed-industries/zed/issues/55726.
+    // See https://github.com/simtropolis/zed/issues/55726.
     //
     // macOS only: on Linux/Windows, closing the last window sets
     // `save_last_workspace`, which preserves the session (same as `Quit`),
@@ -12245,7 +13173,7 @@ mod tests {
         assert!(task.await.unwrap());
     }
 
-    // See https://github.com/zed-industries/zed/issues/55726.
+    // See https://github.com/simtropolis/zed/issues/55726.
     #[gpui::test]
     async fn test_replace_window_without_worktrees_prompts(cx: &mut TestAppContext) {
         init_test(cx);
@@ -13050,6 +13978,1165 @@ mod tests {
             assert!(!pane.can_navigate_backward());
             assert!(pane.can_navigate_forward());
         });
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_workspace_mounts(cx: &mut gpui::TestAppContext) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let project_entity_id = project.entity_id();
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("COLLABORATIVE-WORKSPACE").is_none());
+
+        let collaborative_workspace_switch = cx
+            .debug_bounds("OPEN-COLLABORATIVE-WORKSPACE")
+            .expect("Editor Workspace should expose a visible collaborative switch");
+        cx.simulate_click(
+            collaborative_workspace_switch.center(),
+            gpui::Modifiers::default(),
+        );
+        cx.run_until_parked();
+
+        assert!(cx.debug_bounds("COLLABORATIVE-WORKSPACE").is_some());
+        workspace.read_with(cx, |workspace, cx| {
+            assert_eq!(
+                workspace.workspace_presentation(),
+                WorkspacePresentation::Collaborative
+            );
+            assert_eq!(workspace.project().entity_id(), project_entity_id);
+            assert_eq!(
+                workspace
+                    .collaborative_workspace
+                    .read(cx)
+                    .project_entity_id(),
+                project_entity_id
+            );
+        });
+
+        cx.dispatch_action(SwitchToEditorWorkspace);
+        cx.run_until_parked();
+
+        assert_eq!(
+            workspace.read_with(cx, |workspace, _| workspace.workspace_presentation()),
+            WorkspacePresentation::Editor
+        );
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_timeline_host_mounts_and_replaces_providers(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs.clone(), [], cx).await;
+        let other_project = Project::test(fs, [], cx).await;
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+        let first_timeline = cx.new(|_| Empty);
+        let replacement_timeline = cx.new(|_| Empty);
+
+        cx.dispatch_action(SwitchToCollaborativeWorkspace);
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("COLLABORATIVE-TIMELINE-CONTENT").is_none());
+
+        workspace.update(cx, |workspace, cx| {
+            assert_eq!(
+                workspace
+                    .register_collaborative_timeline_provider(
+                        CollaborativeTimelineProvider::new(
+                            other_project,
+                            first_timeline.clone().into(),
+                        ),
+                        cx,
+                    )
+                    .expect_err("a timeline for another project must fail closed"),
+                CollaborativeTimelineRegistrationError::ProjectMismatch
+            );
+        });
+        let registration = workspace
+            .update(cx, |workspace, cx| {
+                workspace.register_collaborative_timeline_provider(
+                    CollaborativeTimelineProvider::new(
+                        project.clone(),
+                        first_timeline.clone().into(),
+                    ),
+                    cx,
+                )
+            })
+            .expect("the project timeline should register");
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("COLLABORATIVE-TIMELINE-CONTENT").is_some());
+
+        workspace.update(cx, |workspace, cx| {
+            assert_eq!(
+                workspace
+                    .register_collaborative_timeline_provider(
+                        CollaborativeTimelineProvider::new(
+                            project.clone(),
+                            replacement_timeline.clone().into(),
+                        ),
+                        cx,
+                    )
+                    .expect_err("a second timeline must not replace the owner implicitly"),
+                CollaborativeTimelineRegistrationError::ProviderOccupied
+            );
+            assert!(workspace.unregister_collaborative_timeline_provider(registration, cx));
+            assert!(!workspace.unregister_collaborative_timeline_provider(registration, cx));
+        });
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("COLLABORATIVE-TIMELINE-CONTENT").is_none());
+
+        let replacement = workspace
+            .update(cx, |workspace, cx| {
+                workspace.register_collaborative_timeline_provider(
+                    CollaborativeTimelineProvider::new(project, replacement_timeline.into()),
+                    cx,
+                )
+            })
+            .expect("an explicit replacement should register after removal");
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("COLLABORATIVE-TIMELINE-CONTENT").is_some());
+        assert!(workspace.update(cx, |workspace, cx| {
+            workspace.unregister_collaborative_timeline_provider(replacement, cx)
+        }));
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_channel_navigation_replaces_only_the_visible_surface(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        init_test(cx);
+
+        let project = Project::test(FakeFs::new(cx.executor()), [], cx).await;
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+        let agent_timeline = cx.new(|_| Empty);
+        let channel_timeline = cx.new(|_| Empty);
+
+        workspace
+            .update(cx, |workspace, cx| {
+                workspace.register_collaborative_timeline_provider(
+                    CollaborativeTimelineProvider::new(project, agent_timeline.clone().into()),
+                    cx,
+                )
+            })
+            .expect("agent timeline should register");
+        workspace
+            .update_in(cx, |workspace, window, cx| {
+                workspace.navigate_collaborative_to(
+                    collaborative_navigation::CollaborativeNavigationTarget::channel("42"),
+                    |_| true,
+                    window,
+                    cx,
+                )
+            })
+            .expect("channel navigation should succeed");
+
+        assert!(workspace.update(cx, |workspace, cx| {
+            workspace.set_collaborative_channel_timeline(42, channel_timeline.clone().into(), cx)
+        }));
+        workspace.read_with(cx, |workspace, _| {
+            assert_eq!(
+                workspace
+                    .collaborative_channel_timeline
+                    .as_ref()
+                    .map(|(_, view)| view.entity_id()),
+                Some(channel_timeline.entity_id())
+            );
+            assert_eq!(
+                workspace
+                    .collaborative_timeline
+                    .view()
+                    .map(|view| view.entity_id()),
+                Some(agent_timeline.entity_id()),
+                "channel selection must not destroy the authoritative ACP provider"
+            );
+        });
+
+        workspace
+            .update_in(cx, |workspace, window, cx| {
+                workspace.navigate_collaborative_to(
+                    collaborative_navigation::CollaborativeNavigationTarget::thread("thread-1"),
+                    |_| true,
+                    window,
+                    cx,
+                )
+            })
+            .expect("thread navigation should succeed");
+        workspace.read_with(cx, |workspace, _| {
+            assert!(workspace.collaborative_channel_timeline.is_none());
+        });
+        assert!(!workspace.update(cx, |workspace, cx| {
+            workspace.set_collaborative_channel_timeline(42, channel_timeline.into(), cx)
+        }));
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_review_host(cx: &mut gpui::TestAppContext) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs.clone(), [], cx).await;
+        let other_project = Project::test(fs, [], cx).await;
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+        let agent_view = cx.new(|_| Empty);
+        let project_view = cx.new(|_| Empty);
+        let replacement_project_view = cx.new(|_| Empty);
+
+        workspace.read_with(cx, |workspace, _| {
+            assert_eq!(
+                workspace.collaborative_review().project().entity_id(),
+                project.entity_id()
+            );
+        });
+
+        workspace.update(cx, |workspace, cx| {
+            let error = workspace
+                .register_collaborative_review_provider(
+                    CollaborativeReviewSlot::AgentChanges,
+                    &other_project,
+                    agent_view.clone().into(),
+                    cx,
+                )
+                .expect_err("a provider from another Project entity must fail closed");
+            assert_eq!(error, CollaborativeReviewRegistrationError::ProjectMismatch);
+        });
+
+        let agent_registration = workspace.update(cx, |workspace, cx| {
+            workspace
+                .register_collaborative_review_provider(
+                    CollaborativeReviewSlot::AgentChanges,
+                    &project,
+                    agent_view.clone().into(),
+                    cx,
+                )
+                .expect("the canonical project provider should register")
+        });
+        workspace.update(cx, |workspace, cx| {
+            let error = workspace
+                .register_collaborative_review_provider(
+                    CollaborativeReviewSlot::AgentChanges,
+                    &project,
+                    project_view.clone().into(),
+                    cx,
+                )
+                .expect_err("a slot must have only one provider");
+            assert_eq!(
+                error,
+                CollaborativeReviewRegistrationError::SlotOccupied(
+                    CollaborativeReviewSlot::AgentChanges
+                )
+            );
+        });
+        let project_registration = workspace.update(cx, |workspace, cx| {
+            workspace
+                .register_collaborative_review_provider(
+                    CollaborativeReviewSlot::ProjectChanges,
+                    &project,
+                    project_view.clone().into(),
+                    cx,
+                )
+                .expect("the other review slot should register independently")
+        });
+
+        workspace.read_with(cx, |workspace, cx| {
+            assert_eq!(
+                workspace.collaborative_review().selected_slot(),
+                Some(CollaborativeReviewSlot::AgentChanges)
+            );
+            assert_eq!(
+                workspace
+                    .collaborative_review_view(cx)
+                    .expect("expanded review should expose the selected provider")
+                    .entity_id(),
+                agent_view.entity_id()
+            );
+        });
+
+        workspace.update(cx, |workspace, cx| {
+            assert!(
+                workspace
+                    .select_collaborative_review_provider(
+                        CollaborativeReviewSlot::ProjectChanges,
+                        cx
+                    )
+                    .expect("the registered project slot should be selectable")
+            );
+        });
+        let layout = workspace.read_with(cx, |workspace, cx| {
+            workspace.collaborative_workspace.read(cx).layout_entity()
+        });
+        layout.update(cx, |layout, cx| layout.toggle_review(cx));
+        workspace.read_with(cx, |workspace, cx| {
+            assert!(workspace.collaborative_review_view(cx).is_none());
+            assert_eq!(
+                workspace.collaborative_review().selected_slot(),
+                Some(CollaborativeReviewSlot::ProjectChanges)
+            );
+        });
+
+        layout.update(cx, |layout, cx| layout.toggle_review(cx));
+        workspace.read_with(cx, |workspace, cx| {
+            assert_eq!(
+                workspace
+                    .collaborative_review_view(cx)
+                    .expect("restoring the pane should preserve its provider")
+                    .entity_id(),
+                project_view.entity_id()
+            );
+        });
+
+        let replacement_registration = workspace.update(cx, |workspace, cx| {
+            assert!(workspace.unregister_collaborative_review_provider(project_registration, cx));
+            workspace
+                .register_collaborative_review_provider(
+                    CollaborativeReviewSlot::ProjectChanges,
+                    &project,
+                    replacement_project_view.into(),
+                    cx,
+                )
+                .expect("a removed slot should accept a replacement")
+        });
+        workspace.update(cx, |workspace, cx| {
+            assert!(!workspace.unregister_collaborative_review_provider(project_registration, cx));
+            assert!(
+                workspace.unregister_collaborative_review_provider(replacement_registration, cx)
+            );
+            assert!(workspace.unregister_collaborative_review_provider(agent_registration, cx));
+            assert_eq!(
+                workspace
+                    .select_collaborative_review_provider(CollaborativeReviewSlot::AgentChanges, cx)
+                    .expect_err("a removed slot must not be selectable"),
+                CollaborativeReviewSelectionError::SlotUnavailable(
+                    CollaborativeReviewSlot::AgentChanges
+                )
+            );
+        });
+        workspace.read_with(cx, |workspace, cx| {
+            assert!(workspace.collaborative_review_view(cx).is_none());
+            assert_eq!(workspace.collaborative_review().selected_slot(), None);
+        });
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_top_bar(cx: &mut gpui::TestAppContext) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        fs.insert_tree("/root", json!({})).await;
+        let project = Project::test(fs, ["/root".as_ref()], cx).await;
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+        let layout = workspace.read_with(cx, |workspace, cx| {
+            workspace.collaborative_workspace.read(cx).layout_entity()
+        });
+
+        cx.dispatch_action(SwitchToCollaborativeWorkspace);
+        cx.run_until_parked();
+
+        assert!(workspace.read_with(cx, |workspace, cx| {
+            workspace.collaborative_title_bar(cx).is_some()
+        }));
+
+        let snapshot = cx.update(|_, cx| {
+            crate::collaborative_top_bar::CollaborativeTopBar::new(
+                project,
+                layout,
+                CollaborativeParticipantProviderState::Unavailable,
+            )
+            .test_snapshot(cx)
+        });
+        assert_eq!(&*snapshot.project_title, "root");
+        assert_eq!(snapshot.task_title.as_ref(), "Select a task or thread");
+        assert_eq!(snapshot.participants.as_ref(), "Participants unavailable");
+        assert_eq!(snapshot.connection.as_ref(), "Connection unavailable");
+        assert!(!snapshot.share_enabled);
+        assert!(snapshot.invite_enabled);
+        assert!(!snapshot.connection_details_enabled);
+        assert!(snapshot.review_layout_enabled);
+        assert!(snapshot.editor_layout_enabled);
+
+        cx.dispatch_action(SwitchToEditorWorkspace);
+        cx.run_until_parked();
+        assert_eq!(
+            workspace.read_with(cx, |workspace, _| workspace.workspace_presentation()),
+            WorkspacePresentation::Editor
+        );
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_participant_status_mount(cx: &mut gpui::TestAppContext) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+        let first_source = cx.new(|_| Empty);
+        let replacement_source = cx.new(|_| Empty);
+
+        cx.dispatch_action(SwitchToCollaborativeWorkspace);
+        cx.run_until_parked();
+        assert!(workspace.read_with(cx, |workspace, cx| {
+            workspace.collaborative_title_bar(cx).is_some()
+        }));
+        assert!(
+            cx.debug_bounds("COLLABORATIVE-PARTICIPANT-STATUS-UNAVAILABLE")
+                .is_some()
+        );
+        let ready = CollaborativeParticipantProviderState::Ready(
+            crate::collaborative_participants::CollaborativeParticipantViewData {
+                participants: vec![
+                    crate::collaborative_participants::CollaborativeParticipant::agent(
+                        "agent:first",
+                        "First Agent",
+                        None,
+                        crate::collaborative_participants::CollaborativeParticipantPresence::Online,
+                    ),
+                ],
+                execution: Some(
+                    crate::collaborative_participants::CollaborativeExecutionStatus {
+                        phase:
+                            crate::collaborative_participants::CollaborativeExecutionPhase::Running,
+                        model: Some("model-one".into()),
+                        runtime: Some("ACP".into()),
+                        location:
+                            crate::collaborative_participants::CollaborativeExecutionLocation::Local,
+                    },
+                ),
+                task_title: Some("First task".into()),
+                connection:
+                    crate::collaborative_participants::CollaborativeConnectionState::Disconnected,
+            },
+        );
+        let provider_ready = Rc::new(Cell::new(true));
+        let registration = workspace
+            .update(cx, |workspace, cx| {
+                workspace.register_collaborative_participant_provider(
+                    CollaborativeParticipantProvider::from_reader(
+                        project.clone(),
+                        first_source.entity_id(),
+                        {
+                            let provider_ready = provider_ready.clone();
+                            move |_| {
+                                if provider_ready.get() {
+                                    ready.clone()
+                                } else {
+                                    CollaborativeParticipantProviderState::failed(
+                                        "Agent metadata failed",
+                                    )
+                                }
+                            }
+                        },
+                    ),
+                    cx,
+                )
+            })
+            .expect("fake participant provider should register");
+        cx.run_until_parked();
+        assert!(
+            cx.debug_bounds("COLLABORATIVE-PARTICIPANT-STATUS-READY")
+                .is_some()
+        );
+
+        provider_ready.set(false);
+        workspace.update(cx, |_, cx| cx.notify());
+        cx.run_until_parked();
+        assert!(
+            cx.debug_bounds("COLLABORATIVE-PARTICIPANT-STATUS-FAILED")
+                .is_some()
+        );
+
+        assert!(workspace.update(cx, |workspace, cx| {
+            workspace.unregister_collaborative_participant_provider(registration, cx)
+        }));
+        let replacement = workspace
+            .update(cx, |workspace, cx| {
+                workspace.register_collaborative_participant_provider(
+                    CollaborativeParticipantProvider::new(
+                        project,
+                        replacement_source.entity_id(),
+                        CollaborativeParticipantProviderState::Ready(
+                            crate::collaborative_participants::CollaborativeParticipantViewData {
+                                participants: vec![crate::collaborative_participants::CollaborativeParticipant::agent(
+                                    "agent:replacement",
+                                    "Replacement Agent",
+                                    None,
+                                    crate::collaborative_participants::CollaborativeParticipantPresence::Online,
+                                )],
+                                execution: None,
+                                task_title: Some("Replacement task".into()),
+                                connection: crate::collaborative_participants::CollaborativeConnectionState::Disconnected,
+                            },
+                        ),
+                    ),
+                    cx,
+                )
+            })
+            .expect("replacement participant provider should register");
+        cx.run_until_parked();
+        workspace.read_with(cx, |workspace, cx| {
+            let CollaborativeParticipantProviderState::Ready(view_data) =
+                workspace.collaborative_participants().state(cx)
+            else {
+                panic!("replacement participant state should be ready");
+            };
+            assert_eq!(
+                view_data
+                    .participants
+                    .first()
+                    .expect("replacement participant should exist")
+                    .display_name
+                    .as_ref(),
+                "Replacement Agent"
+            );
+        });
+        assert!(
+            cx.debug_bounds("COLLABORATIVE-PARTICIPANT-STATUS-READY")
+                .is_some()
+        );
+
+        cx.dispatch_action(SwitchToEditorWorkspace);
+        cx.run_until_parked();
+        assert!(
+            cx.debug_bounds("COLLABORATIVE-PARTICIPANT-STATUS")
+                .is_none()
+        );
+        assert!(cx.debug_bounds("COLLABORATIVE-PROJECT-STATUS").is_none());
+        assert!(workspace.update(cx, |workspace, cx| {
+            workspace.unregister_collaborative_participant_provider(replacement, cx)
+        }));
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_focus_actions(cx: &mut gpui::TestAppContext) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+        let collaborative_focus = workspace.read_with(cx, |workspace, cx| {
+            workspace.collaborative_workspace.read(cx).focus_handle(cx)
+        });
+
+        cx.dispatch_action(SwitchToCollaborativeWorkspace);
+        cx.run_until_parked();
+        assert!(cx.update(|window, _| collaborative_focus.is_focused(window)));
+
+        cx.dispatch_action(crate::collaborative_focus::RestoreCollaborativeFocus);
+        cx.run_until_parked();
+        assert!(cx.update(|window, cx| collaborative_focus.contains_focused(window, cx)));
+
+        let mut visited = Vec::new();
+        let mut escaped_workspace = false;
+        let mut escaped_focus = None;
+        for _ in 0..16 {
+            cx.dispatch_action(crate::collaborative_focus::FocusNextCollaborativeRegion);
+            cx.run_until_parked();
+            if let Some(focused) = cx.update(|window, cx| window.focused(cx))
+                && !visited.contains(&focused)
+            {
+                visited.push(focused);
+            }
+            if !cx.update(|window, cx| collaborative_focus.contains_focused(window, cx)) {
+                escaped_workspace = true;
+                escaped_focus = cx.update(|window, cx| window.focused(cx));
+                break;
+            }
+        }
+        assert!(
+            visited.len() > 1,
+            "forward traversal should advance rather than trap one control"
+        );
+        assert!(
+            escaped_workspace,
+            "forward traversal should reach navigation or status outside the main surface"
+        );
+
+        cx.update(|window, cx| collaborative_focus.focus(window, cx));
+        cx.dispatch_action(crate::collaborative_focus::RestoreCollaborativeFocus);
+        cx.run_until_parked();
+        assert_eq!(
+            cx.update(|window, cx| window.focused(cx)),
+            escaped_focus,
+            "restoration should return to the last collaborative region"
+        );
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_layout_bounds(cx: &mut gpui::TestAppContext) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+        let layout = workspace.read_with(cx, |workspace, cx| {
+            workspace.collaborative_workspace.read(cx).layout_entity()
+        });
+
+        cx.dispatch_action(SwitchToCollaborativeWorkspace);
+        cx.run_until_parked();
+
+        let layout_bounds = cx
+            .debug_bounds("COLLABORATIVE-LAYOUT")
+            .expect("collaborative layout should render");
+        let timeline_bounds = cx
+            .debug_bounds("COLLABORATIVE-TIMELINE-REGION")
+            .expect("timeline region should render");
+        let review_bounds = cx
+            .debug_bounds("COLLABORATIVE-REVIEW-REGION")
+            .expect("review region should render at a wide viewport");
+        let resize_bounds = cx
+            .debug_bounds("COLLABORATIVE-REVIEW-RESIZE-HANDLE")
+            .expect("review resize handle should render");
+        assert!(timeline_bounds.size.width >= px(480.));
+        assert!(review_bounds.size.width >= px(320.));
+        assert_eq!(timeline_bounds.left(), layout_bounds.left());
+        assert_eq!(review_bounds.right(), layout_bounds.right());
+        assert_eq!(timeline_bounds.right(), resize_bounds.left());
+        assert_eq!(resize_bounds.right(), review_bounds.left());
+
+        let review_width_before_drag = review_bounds.size.width;
+        let drag_start = resize_bounds.center();
+        let drag_end = gpui::point(drag_start.x - px(48.), drag_start.y);
+        cx.simulate_mouse_down(
+            drag_start,
+            gpui::MouseButton::Left,
+            gpui::Modifiers::default(),
+        );
+        cx.simulate_mouse_move(
+            gpui::point(drag_start.x - px(8.), drag_start.y),
+            gpui::MouseButton::Left,
+            gpui::Modifiers::default(),
+        );
+        cx.simulate_mouse_move(
+            drag_end,
+            gpui::MouseButton::Left,
+            gpui::Modifiers::default(),
+        );
+        cx.simulate_mouse_up(
+            drag_end,
+            gpui::MouseButton::Left,
+            gpui::Modifiers::default(),
+        );
+        cx.run_until_parked();
+
+        let resized_review_bounds = cx
+            .debug_bounds("COLLABORATIVE-REVIEW-REGION")
+            .expect("review region should remain rendered after resize");
+        assert!(resized_review_bounds.size.width > review_width_before_drag);
+        assert_eq!(
+            resized_review_bounds.size.width,
+            layout.read_with(cx, |layout, _| layout.test_review_width())
+        );
+
+        cx.dispatch_action(ToggleCollaborativeReview);
+        cx.run_until_parked();
+
+        assert!(cx.debug_bounds("COLLABORATIVE-REVIEW-REGION").is_none());
+        assert!(
+            cx.debug_bounds("COLLABORATIVE-REVIEW-RESIZE-HANDLE")
+                .is_none()
+        );
+        let collapsed_timeline_bounds = cx
+            .debug_bounds("COLLABORATIVE-TIMELINE-REGION")
+            .expect("collapsed timeline should remain rendered");
+        assert_eq!(collapsed_timeline_bounds, layout_bounds);
+        assert!(!layout.read_with(cx, |layout, _| layout.review_requested()));
+
+        cx.dispatch_action(ToggleCollaborativeReview);
+        cx.run_until_parked();
+        let restored_review_bounds = cx
+            .debug_bounds("COLLABORATIVE-REVIEW-REGION")
+            .expect("review region should restore");
+        assert_eq!(
+            restored_review_bounds.size.width,
+            resized_review_bounds.size.width
+        );
+
+        let narrow = crate::collaborative_layout::CollaborativeLayout::geometry_for(
+            px(602.),
+            true,
+            restored_review_bounds.size.width,
+        );
+        assert!(!narrow.review_visible);
+        assert_eq!(narrow.timeline_width, px(602.));
+        assert_eq!(narrow.review_width, px(0.));
+
+        let minimum_expanded = crate::collaborative_layout::CollaborativeLayout::geometry_for(
+            px(603.),
+            true,
+            restored_review_bounds.size.width,
+        );
+        assert!(minimum_expanded.review_visible);
+        assert_eq!(minimum_expanded.timeline_width, px(320.));
+        assert_eq!(minimum_expanded.review_width, px(280.));
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_shell_state(cx: &mut gpui::TestAppContext) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let project_entity_id = project.entity_id();
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+        let shell_state = workspace.read_with(cx, |workspace, cx| {
+            workspace
+                .collaborative_workspace
+                .read(cx)
+                .shell_state_entity()
+        });
+        let retry_requests = Rc::new(RefCell::new(Vec::new()));
+        let retry_subscription = workspace.update(cx, |_, cx| {
+            let retry_requests = retry_requests.clone();
+            cx.subscribe(
+                &shell_state,
+                move |_, _, event: &crate::collaborative_shell_state::CollaborativeShellRetryRequested, _| {
+                    retry_requests.borrow_mut().push(*event);
+                },
+            )
+        });
+
+        cx.dispatch_action(SwitchToCollaborativeWorkspace);
+        shell_state.update(cx, |state, cx| {
+            state.transition(
+                crate::collaborative_shell_state::CollaborativeShellPhase::Loading {
+                    scope: crate::collaborative_shell_state::CollaborativeShellScope::Workspace,
+                    last_trustworthy_state: None,
+                },
+                cx,
+            );
+        });
+        cx.run_until_parked();
+
+        assert!(cx.debug_bounds("COLLABORATIVE-SHELL-STATUS").is_some());
+        assert!(cx.debug_bounds("COLLABORATIVE-LAYOUT").is_some());
+        assert_eq!(
+            workspace.read_with(cx, |workspace, cx| {
+                workspace
+                    .collaborative_workspace
+                    .read(cx)
+                    .project_entity_id()
+            }),
+            project_entity_id
+        );
+
+        shell_state.update(cx, |state, cx| {
+            state.transition(
+                crate::collaborative_shell_state::CollaborativeShellPhase::PartialFailure {
+                    scope: crate::collaborative_shell_state::CollaborativeShellScope::Realtime,
+                    summary: "Realtime updates are temporarily unavailable".into(),
+                    last_trustworthy_state: "Timeline through event 42".into(),
+                },
+                cx,
+            );
+        });
+        cx.run_until_parked();
+
+        let retry_bounds = cx
+            .debug_bounds("COLLABORATIVE-SHELL-RETRY")
+            .expect("partial failure should offer retry");
+        cx.simulate_click(retry_bounds.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+        assert_eq!(
+            shell_state.read_with(cx, |state, _| state.phase().clone()),
+            crate::collaborative_shell_state::CollaborativeShellPhase::Retrying {
+                scope: crate::collaborative_shell_state::CollaborativeShellScope::Realtime,
+                attempt: 1,
+                last_trustworthy_state: Some("Timeline through event 42".into()),
+            }
+        );
+        assert_eq!(
+            retry_requests.borrow().as_slice(),
+            &[
+                crate::collaborative_shell_state::CollaborativeShellRetryRequested {
+                    scope: crate::collaborative_shell_state::CollaborativeShellScope::Realtime,
+                    attempt: 1,
+                }
+            ]
+        );
+
+        shell_state.update(cx, |state, cx| {
+            state.transition(
+                crate::collaborative_shell_state::CollaborativeShellPhase::Ready,
+                cx,
+            );
+        });
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("COLLABORATIVE-SHELL-STATUS").is_none());
+        assert!(cx.debug_bounds("COLLABORATIVE-LAYOUT").is_some());
+
+        shell_state.update(cx, |state, cx| {
+            state.transition(
+                crate::collaborative_shell_state::CollaborativeShellPhase::InitializationFailed {
+                    scope: crate::collaborative_shell_state::CollaborativeShellScope::Timeline,
+                    summary: "Timeline initialization failed".into(),
+                    last_trustworthy_state: Some(
+                        "Local project and Editor state are intact".into(),
+                    ),
+                },
+                cx,
+            );
+        });
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("COLLABORATIVE-SHELL-RETRY").is_some());
+        assert!(
+            cx.debug_bounds("COLLABORATIVE-SHELL-EDITOR-FALLBACK")
+                .is_some()
+        );
+        assert_eq!(
+            workspace.read_with(cx, |workspace, _| workspace.workspace_presentation()),
+            WorkspacePresentation::Collaborative
+        );
+        assert!(cx.debug_bounds("COLLABORATIVE-LAYOUT").is_some());
+
+        drop(retry_subscription);
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn workspace_presentation_initialization_failure_fallback(cx: &mut gpui::TestAppContext) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let project_entity_id = project.entity_id();
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+        let workspace_entity_id = workspace.entity_id();
+        let pane_entity_id =
+            workspace.read_with(cx, |workspace, _| workspace.active_pane().entity_id());
+        let item = cx.new(|cx| {
+            TestItem::new(cx).with_project_items(&[TestProjectItem::new(1, "one.txt", cx)])
+        });
+        let item_entity_id = item.entity_id();
+        let database_id = workspace.update_in(cx, |workspace, window, cx| {
+            workspace.set_random_database_id();
+            workspace.add_item_to_active_pane(Box::new(item), None, true, window, cx);
+            workspace
+                .database_id()
+                .expect("test workspace should have an ID")
+        });
+        let shell_state = workspace.read_with(cx, |workspace, cx| {
+            workspace
+                .collaborative_workspace
+                .read(cx)
+                .shell_state_entity()
+        });
+
+        assert_eq!(
+            workspace.read_with(cx, |workspace, _| workspace.workspace_presentation()),
+            WorkspacePresentation::Editor
+        );
+
+        cx.dispatch_action(SwitchToCollaborativeWorkspace);
+        shell_state.update(cx, |state, cx| {
+            state.transition(
+                crate::collaborative_shell_state::CollaborativeShellPhase::InitializationFailed {
+                    scope: crate::collaborative_shell_state::CollaborativeShellScope::Workspace,
+                    summary: "Multiplayer Workspace initialization failed".into(),
+                    last_trustworthy_state: Some("Editor project state is intact".into()),
+                },
+                cx,
+            );
+        });
+        cx.run_until_parked();
+
+        let retry_bounds = cx
+            .debug_bounds("COLLABORATIVE-SHELL-RETRY")
+            .expect("initialization failure should offer retry");
+        cx.simulate_click(retry_bounds.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+        assert!(matches!(
+            shell_state.read_with(cx, |state, _| state.phase().clone()),
+            crate::collaborative_shell_state::CollaborativeShellPhase::Retrying {
+                scope: crate::collaborative_shell_state::CollaborativeShellScope::Workspace,
+                attempt: 1,
+                ..
+            }
+        ));
+        assert_eq!(
+            workspace.read_with(cx, |workspace, _| workspace.workspace_presentation()),
+            WorkspacePresentation::Collaborative
+        );
+
+        shell_state.update(cx, |state, cx| {
+            state.transition(
+                crate::collaborative_shell_state::CollaborativeShellPhase::InitializationFailed {
+                    scope: crate::collaborative_shell_state::CollaborativeShellScope::Workspace,
+                    summary: "Multiplayer Workspace initialization failed again".into(),
+                    last_trustworthy_state: Some("Editor project state is intact".into()),
+                },
+                cx,
+            );
+        });
+        cx.run_until_parked();
+        let fallback_bounds = cx
+            .debug_bounds("COLLABORATIVE-SHELL-EDITOR-FALLBACK")
+            .expect("initialization failure should offer Editor fallback");
+        cx.simulate_click(fallback_bounds.center(), gpui::Modifiers::default());
+        workspace
+            .update_in(cx, |workspace, window, cx| {
+                workspace.flush_serialization(window, cx)
+            })
+            .await;
+        cx.run_until_parked();
+
+        workspace.read_with(cx, |workspace, cx| {
+            assert_eq!(
+                workspace.workspace_presentation(),
+                WorkspacePresentation::Editor
+            );
+            assert_eq!(workspace.project().entity_id(), project_entity_id);
+            assert_eq!(workspace.active_pane().entity_id(), pane_entity_id);
+            assert_eq!(
+                workspace
+                    .active_pane()
+                    .read(cx)
+                    .active_item()
+                    .expect("active item should survive fallback")
+                    .item_id(),
+                item_entity_id
+            );
+        });
+        assert_eq!(workspace.entity_id(), workspace_entity_id);
+        assert_eq!(
+            cx.update(|_, cx| WorkspaceSettings::get_global(cx).workspace_presentation),
+            WorkspacePresentation::Editor
+        );
+        assert_eq!(
+            cx.update(|_, cx| WorkspaceDb::global(cx))
+                .workspace_for_id(database_id)
+                .expect("fallback presentation should be persisted")
+                .workspace_presentation,
+            WorkspacePresentation::Editor
+        );
+
+        shell_state.update(cx, |state, cx| {
+            state.transition(
+                crate::collaborative_shell_state::CollaborativeShellPhase::Ready,
+                cx,
+            );
+        });
+        cx.dispatch_action(SwitchToCollaborativeWorkspace);
+        workspace
+            .update_in(cx, |workspace, window, cx| {
+                workspace.flush_serialization(window, cx)
+            })
+            .await;
+        cx.run_until_parked();
+
+        workspace.read_with(cx, |workspace, cx| {
+            assert_eq!(
+                workspace.workspace_presentation(),
+                WorkspacePresentation::Collaborative
+            );
+            assert_eq!(workspace.project().entity_id(), project_entity_id);
+            assert_eq!(workspace.active_pane().entity_id(), pane_entity_id);
+            assert_eq!(
+                workspace
+                    .active_pane()
+                    .read(cx)
+                    .active_item()
+                    .expect("active item should survive later presentation switch")
+                    .item_id(),
+                item_entity_id
+            );
+        });
+        assert_eq!(workspace.entity_id(), workspace_entity_id);
+        assert!(cx.debug_bounds("COLLABORATIVE-SHELL-STATUS").is_none());
+        assert_eq!(
+            cx.update(|_, cx| WorkspaceSettings::get_global(cx).workspace_presentation),
+            WorkspacePresentation::Collaborative
+        );
+        assert_eq!(
+            cx.update(|_, cx| WorkspaceDb::global(cx))
+                .workspace_for_id(database_id)
+                .expect("explicit later presentation should be persisted")
+                .workspace_presentation,
+            WorkspacePresentation::Collaborative
+        );
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn switch_workspace_presentation_preserves_entities_and_navigation(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let project_entity_id = project.entity_id();
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+        let db = cx.update(|_, cx| WorkspaceDb::global(cx));
+        let workspace_entity_id = workspace.entity_id();
+        let pane = workspace.read_with(cx, |workspace, _| workspace.active_pane().clone());
+        let pane_entity_id = pane.entity_id();
+        let item = cx.new(|cx| {
+            TestItem::new(cx).with_project_items(&[TestProjectItem::new(1, "one.txt", cx)])
+        });
+        let item_entity_id = item.entity_id();
+
+        let database_id = workspace.update_in(cx, |workspace, window, cx| {
+            workspace.set_random_database_id();
+            workspace.add_item_to_active_pane(Box::new(item.clone()), None, true, window, cx);
+            workspace
+                .database_id()
+                .expect("test workspace should have an ID")
+        });
+        item.update_in(cx, |item, _, cx| {
+            item.set_state("navigated".to_owned(), cx);
+        });
+
+        let navigation_before = pane.read_with(cx, |pane, _| {
+            (pane.can_navigate_backward(), pane.can_navigate_forward())
+        });
+        let recent_navigation_before = workspace.read_with(cx, |workspace, cx| {
+            workspace.recent_navigation_history(None, cx)
+        });
+        assert_eq!(navigation_before, (true, false));
+        assert_eq!(
+            workspace.read_with(cx, |workspace, _| workspace.workspace_presentation()),
+            WorkspacePresentation::Editor
+        );
+
+        cx.dispatch_action(SwitchToCollaborativeWorkspace);
+        workspace
+            .update_in(cx, |workspace, window, cx| {
+                workspace.flush_serialization(window, cx)
+            })
+            .await;
+        cx.run_until_parked();
+
+        workspace.read_with(cx, |workspace, cx| {
+            assert_eq!(
+                workspace.workspace_presentation(),
+                WorkspacePresentation::Collaborative
+            );
+            assert_eq!(workspace.project().entity_id(), project_entity_id);
+            assert_eq!(workspace.active_pane().entity_id(), pane_entity_id);
+            assert_eq!(
+                workspace
+                    .active_pane()
+                    .read(cx)
+                    .active_item()
+                    .expect("active item should survive presentation switch")
+                    .item_id(),
+                item_entity_id
+            );
+            assert_eq!(
+                workspace.recent_navigation_history(None, cx),
+                recent_navigation_before
+            );
+        });
+        assert_eq!(
+            cx.update(|_, cx| WorkspaceSettings::get_global(cx).workspace_presentation),
+            WorkspacePresentation::Collaborative
+        );
+        assert_eq!(workspace.entity_id(), workspace_entity_id);
+        assert_eq!(
+            pane.read_with(cx, |pane, _| {
+                (pane.can_navigate_backward(), pane.can_navigate_forward())
+            }),
+            navigation_before
+        );
+        assert_eq!(
+            db.workspace_for_id(database_id)
+                .expect("collaborative presentation should be persisted")
+                .workspace_presentation,
+            WorkspacePresentation::Collaborative
+        );
+
+        cx.dispatch_action(SwitchToEditorWorkspace);
+        workspace
+            .update_in(cx, |workspace, window, cx| {
+                workspace.flush_serialization(window, cx)
+            })
+            .await;
+        cx.run_until_parked();
+
+        workspace.read_with(cx, |workspace, cx| {
+            assert_eq!(
+                workspace.workspace_presentation(),
+                WorkspacePresentation::Editor
+            );
+            assert_eq!(workspace.project().entity_id(), project_entity_id);
+            assert_eq!(workspace.active_pane().entity_id(), pane_entity_id);
+            assert_eq!(
+                workspace
+                    .active_pane()
+                    .read(cx)
+                    .active_item()
+                    .expect("active item should survive reverse presentation switch")
+                    .item_id(),
+                item_entity_id
+            );
+            assert_eq!(
+                workspace.recent_navigation_history(None, cx),
+                recent_navigation_before
+            );
+        });
+        assert_eq!(
+            cx.update(|_, cx| WorkspaceSettings::get_global(cx).workspace_presentation),
+            WorkspacePresentation::Editor
+        );
+        assert_eq!(workspace.entity_id(), workspace_entity_id);
+        assert_eq!(
+            pane.read_with(cx, |pane, _| {
+                (pane.can_navigate_backward(), pane.can_navigate_forward())
+            }),
+            navigation_before
+        );
+        assert_eq!(
+            db.workspace_for_id(database_id)
+                .expect("editor presentation should be persisted")
+                .workspace_presentation,
+            WorkspacePresentation::Editor
+        );
     }
 
     /// Tests that the navigation history deduplicates entries for the same item.

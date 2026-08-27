@@ -290,7 +290,10 @@ impl SettingsStore {
     }
 
     pub fn new_with_semantic_tokens(cx: &mut App, default_settings: &str) -> Self {
-        let default_settings = Self::parse_default_settings(default_settings).unwrap();
+        let mut default_settings = Self::parse_default_settings(default_settings).unwrap();
+        if let Some(agent) = &mut default_settings.agent {
+            agent.default_profile = Some(product_flavor::AGENT_PROFILE.into());
+        }
         Self::from_settings_content(cx, default_settings)
     }
 
@@ -1832,6 +1835,30 @@ mod tests {
             store.get::<AutoUpdateSetting>(None),
             &AutoUpdateSetting { auto_update: false },
             "dev override from default settings should apply",
+        );
+    }
+
+    #[gpui::test]
+    fn product_agent_profile_is_a_user_overridable_default(cx: &mut App) {
+        let mut store = SettingsStore::new(cx, &default_settings());
+        assert_eq!(
+            store
+                .merged_settings
+                .agent
+                .as_ref()
+                .and_then(|agent| agent.default_profile.as_deref()),
+            Some(product_flavor::AGENT_PROFILE)
+        );
+
+        let result = store.set_user_settings(r#"{ "agent": { "default_profile": "write" } }"#, cx);
+        assert!(matches!(result.parse_status, ParseStatus::Success));
+        assert_eq!(
+            store
+                .merged_settings
+                .agent
+                .as_ref()
+                .and_then(|agent| agent.default_profile.as_deref()),
+            Some("write")
         );
     }
 

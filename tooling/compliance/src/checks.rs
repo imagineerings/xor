@@ -13,7 +13,7 @@ use crate::{
 };
 
 const ZED_ZIPPY_COMMENT_APPROVAL_PATTERN: &str = "@zed-zippy approve";
-const ZED_ZIPPY_GROUP_APPROVAL: &str = "@zed-industries/approved";
+const ZED_ZIPPY_GROUP_APPROVAL: &str = "@simtropolis/approved";
 
 #[derive(Debug)]
 pub enum ReviewSuccess {
@@ -857,7 +857,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_comments(vec![comment(
                 "bob",
-                "@zed-industries/approved",
+                "@simtropolis/approved",
                 AuthorAssociation::Member,
             )])
             .run_scenario()
@@ -982,7 +982,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_reviews(vec![
                 review("bob", ReviewState::Other, AuthorAssociation::Member)
-                    .with_body("@zed-industries/approved"),
+                    .with_body("@simtropolis/approved"),
             ])
             .run_scenario()
             .await;

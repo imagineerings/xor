@@ -43,12 +43,9 @@ pub static RELEASE_CHANNEL: LazyLock<ReleaseChannel> =
 /// The app identifier for the current release channel, Windows only.
 #[cfg(target_os = "windows")]
 pub fn app_identifier() -> &'static str {
-    match *RELEASE_CHANNEL {
-        ReleaseChannel::Dev => "Zed-Editor-Dev",
-        ReleaseChannel::Nightly => "Zed-Editor-Nightly",
-        ReleaseChannel::Preview => "Zed-Editor-Preview",
-        ReleaseChannel::Stable => "Zed-Editor-Stable",
-    }
+    static IDENTIFIER: LazyLock<String> =
+        LazyLock::new(|| format!("{}-{}", product_flavor::ID, RELEASE_CHANNEL.dev_name()));
+    &IDENTIFIER
 }
 
 /// The Git commit SHA that Zed was built at.
@@ -199,17 +196,12 @@ impl ReleaseChannel {
 
     /// Returns whether we want to poll for updates for this [`ReleaseChannel`]
     pub fn poll_for_updates(&self) -> bool {
-        !matches!(self, ReleaseChannel::Dev)
+        !matches!(self, ReleaseChannel::Dev) && option_env!("ZED_PRODUCT_UPDATE_BASE_URL").is_some()
     }
 
     /// Returns the display name for this [`ReleaseChannel`].
     pub fn display_name(&self) -> &'static str {
-        match self {
-            ReleaseChannel::Dev => "Zed Dev",
-            ReleaseChannel::Nightly => "Zed Nightly",
-            ReleaseChannel::Preview => "Zed Preview",
-            ReleaseChannel::Stable => "Zed",
-        }
+        product_flavor::display_name(self.product_channel())
     }
 
     /// Returns the programmatic name for this [`ReleaseChannel`].
@@ -226,12 +218,12 @@ impl ReleaseChannel {
     /// and WM_CLASS on X11.
     /// This also has to match the bundle identifier for Zed on macOS.
     pub fn app_id(&self) -> &'static str {
-        match self {
-            ReleaseChannel::Dev => "dev.zed.Zed-Dev",
-            ReleaseChannel::Nightly => "dev.zed.Zed-Nightly",
-            ReleaseChannel::Preview => "dev.zed.Zed-Preview",
-            ReleaseChannel::Stable => "dev.zed.Zed",
-        }
+        product_flavor::app_id(self.product_channel())
+    }
+
+    /// Returns the product-scoped update namespace for this channel.
+    pub fn update_namespace(&self) -> String {
+        product_flavor::update_namespace(self.product_channel())
     }
 
     /// Returns the query parameter for this [`ReleaseChannel`].
@@ -258,6 +250,15 @@ impl ReleaseChannel {
             Some(channel) => format!("{ZED_DOCS_URL}/{channel}/{slug}"),
             None if slug.is_empty() => ZED_DOCS_URL.to_string(),
             None => format!("{ZED_DOCS_URL}/{slug}"),
+        }
+    }
+
+    fn product_channel(&self) -> product_flavor::Channel {
+        match self {
+            Self::Dev => product_flavor::Channel::Dev,
+            Self::Nightly => product_flavor::Channel::Nightly,
+            Self::Preview => product_flavor::Channel::Preview,
+            Self::Stable => product_flavor::Channel::Stable,
         }
     }
 }
@@ -301,6 +302,24 @@ mod tests {
         assert_eq!(
             ReleaseChannel::Stable.docs_url("settings"),
             "https://zed.dev/docs/settings"
+        );
+    }
+
+    #[test]
+    fn product_identity_is_channel_scoped() {
+        assert_eq!(
+            ReleaseChannel::Stable.display_name(),
+            product_flavor::DISPLAY_NAME
+        );
+        assert_eq!(ReleaseChannel::Stable.app_id(), "dev.ideflavors.rust");
+        assert_eq!(
+            ReleaseChannel::Preview.app_id(),
+            "dev.ideflavors.rust.preview"
+        );
+        assert_eq!(ReleaseChannel::Stable.update_namespace(), "rust/stable");
+        assert_ne!(
+            ReleaseChannel::Stable.app_id(),
+            ReleaseChannel::Preview.app_id()
         );
     }
 }

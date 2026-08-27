@@ -1,0 +1,27 @@
+[package]
+name = "comfy_plugin_sdk"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+license = "GPL-3.0-or-later"
+[lints]
+workspace = true
+[lib]
+path = "src/comfy_plugin_sdk.rs"
+[features]
+default = []
+signing-tooling = ["dep:ring", "dep:zeroize"]
+[dependencies]
+comfy_nodes.workspace = true
+comfy_tensor.workspace = true
+comfy_types.workspace = true
+ring = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+zeroize = { workspace = true, optional = true }
+
+[dev-dependencies]
+jsonschema.workspace = true
+ring.workspace = true
+zeroize.workspace = true

@@ -45,9 +45,18 @@ messages!(
     (Call, Foreground),
     (CallCanceled, Foreground),
     (CancelCall, Foreground),
+    (CancelCargoWorkspace, Foreground),
     (CancelLanguageServerWork, Foreground),
     (ChannelMessageSent, Foreground),
     (ChannelMessageUpdate, Foreground),
+    (CollaborativeMessageStreamUpdate, Foreground),
+    (OpenCollaborativeChannel, Foreground),
+    (OpenCollaborativeChannelResponse, Foreground),
+    (CloseCollaborativeChannel, Foreground),
+    (GetCollaborativeMessageWindow, Background),
+    (GetCollaborativeMessageWindowResponse, Background),
+    (ApplyCollaborativeMessageOperation, Foreground),
+    (ApplyCollaborativeMessageOperationResponse, Foreground),
     (CloseBuffer, Foreground),
     (Commit, Background),
     (RunGitHook, Background),
@@ -90,6 +99,21 @@ messages!(
     (GetChannelMessages, Background),
     (GetChannelMessagesById, Background),
     (GetChannelMessagesResponse, Background),
+    (GetCargoWorkspace, Background),
+    (CargoWorkspaceResponse, Background),
+    (GetRustTestDiscovery, Background),
+    (CancelRustTestDiscovery, Foreground),
+    (RustTestDiscoveryResponse, Background),
+    (ResolveRustTestAction, Foreground),
+    (RustTestActionPlanResponse, Foreground),
+    (UpdateRustTestRun, Foreground),
+    (GetStructuredExecutionSnapshot, Background),
+    (StructuredExecutionSnapshotPage, Background),
+    (GetStructuredExecutionEvents, Background),
+    (StructuredExecutionEventChunk, Background),
+    (GetSourceCoverage, Background),
+    (SourceCoverageResponse, Background),
+    (InterpretRustCoverageArtifact, Background),
     (GetCodeActions, Background),
     (GetCodeActionsResponse, Background),
     (GetCompletions, Background),
@@ -122,6 +146,12 @@ messages!(
     (GetProjectSymbolsResponse, Background),
     (GetReferences, Background),
     (GetReferencesResponse, Background),
+    (PrepareCallHierarchy, Background),
+    (PrepareCallHierarchyResponse, Background),
+    (GetIncomingCalls, Background),
+    (GetIncomingCallsResponse, Background),
+    (GetOutgoingCalls, Background),
+    (GetOutgoingCallsResponse, Background),
     (GetSignatureHelp, Background),
     (GetSignatureHelpResponse, Background),
     (GetTypeDefinition, Background),
@@ -408,6 +438,7 @@ request_messages!(
         ApplyCompletionAdditionalEditsResponse
     ),
     (Call, Ack),
+    (CancelCargoWorkspace, Ack),
     (CancelCall, Ack),
     (Commit, Ack),
     (RunGitHook, Ack),
@@ -431,6 +462,18 @@ request_messages!(
     (GetChannelMessages, GetChannelMessagesResponse),
     (GetChannelMessagesById, GetChannelMessagesResponse),
     (GetCodeActions, GetCodeActionsResponse),
+    (GetCargoWorkspace, CargoWorkspaceResponse),
+    (GetRustTestDiscovery, RustTestDiscoveryResponse),
+    (CancelRustTestDiscovery, Ack),
+    (ResolveRustTestAction, RustTestActionPlanResponse),
+    (UpdateRustTestRun, Ack),
+    (
+        GetStructuredExecutionSnapshot,
+        StructuredExecutionSnapshotPage
+    ),
+    (GetStructuredExecutionEvents, StructuredExecutionEventChunk),
+    (GetSourceCoverage, SourceCoverageResponse),
+    (InterpretRustCoverageArtifact, SourceCoverageResponse),
     (GetCompletions, GetCompletionsResponse),
     (GetDefinition, GetDefinitionResponse),
     (
@@ -449,6 +492,9 @@ request_messages!(
     (GetNotifications, GetNotificationsResponse),
     (GetProjectSymbols, GetProjectSymbolsResponse),
     (GetReferences, GetReferencesResponse),
+    (PrepareCallHierarchy, PrepareCallHierarchyResponse),
+    (GetIncomingCalls, GetIncomingCallsResponse),
+    (GetOutgoingCalls, GetOutgoingCallsResponse),
     (GetSignatureHelp, GetSignatureHelpResponse),
     (OpenUnstagedDiff, OpenUnstagedDiffResponse),
     (OpenUncommittedDiff, OpenUncommittedDiffResponse),
@@ -464,6 +510,16 @@ request_messages!(
     (JoinChannel, JoinRoomResponse),
     (JoinChannelBuffer, JoinChannelBufferResponse),
     (JoinChannelChat, JoinChannelChatResponse),
+    (OpenCollaborativeChannel, OpenCollaborativeChannelResponse),
+    (CloseCollaborativeChannel, Ack),
+    (
+        GetCollaborativeMessageWindow,
+        GetCollaborativeMessageWindowResponse
+    ),
+    (
+        ApplyCollaborativeMessageOperation,
+        ApplyCollaborativeMessageOperationResponse
+    ),
     (JoinProject, JoinProjectResponse),
     (JoinRoom, JoinRoomResponse),
     (LeaveChannelBuffer, Ack),
@@ -633,6 +689,9 @@ request_messages!(
 
 lsp_messages!(
     (GetReferences, GetReferencesResponse, true),
+    (PrepareCallHierarchy, PrepareCallHierarchyResponse, true),
+    (GetIncomingCalls, GetIncomingCallsResponse, true),
+    (GetOutgoingCalls, GetOutgoingCallsResponse, true),
     (GetDocumentColor, GetDocumentColorResponse, true),
     (GetFoldingRanges, GetFoldingRangesResponse, true),
     (GetDocumentSymbols, GetDocumentSymbolsResponse, true),
@@ -670,6 +729,7 @@ entity_messages!(
     BlameBuffer,
     BufferReloaded,
     BufferSaved,
+    CancelCargoWorkspace,
     CloseBuffer,
     Commit,
     RunGitHook,
@@ -692,6 +752,15 @@ entity_messages!(
     ApplyCodeActionKind,
     FormatBuffers,
     GetCodeActions,
+    GetCargoWorkspace,
+    GetRustTestDiscovery,
+    CancelRustTestDiscovery,
+    ResolveRustTestAction,
+    UpdateRustTestRun,
+    GetStructuredExecutionSnapshot,
+    GetStructuredExecutionEvents,
+    GetSourceCoverage,
+    InterpretRustCoverageArtifact,
     GetCodeLens,
     GetCompletions,
     GetDefinition,
@@ -704,6 +773,9 @@ entity_messages!(
     GetHover,
     GetProjectSymbols,
     GetReferences,
+    PrepareCallHierarchy,
+    GetIncomingCalls,
+    GetOutgoingCalls,
     GetSignatureHelp,
     OpenUnstagedDiff,
     OpenUncommittedDiff,
@@ -1051,6 +1123,9 @@ impl LspQuery {
             Some(lsp_query::Request::GetTypeDefinition(_)) => ("GetTypeDefinition", false),
             Some(lsp_query::Request::GetImplementation(_)) => ("GetImplementation", false),
             Some(lsp_query::Request::GetReferences(_)) => ("GetReferences", false),
+            Some(lsp_query::Request::PrepareCallHierarchy(_)) => ("PrepareCallHierarchy", false),
+            Some(lsp_query::Request::GetIncomingCalls(_)) => ("GetIncomingCalls", false),
+            Some(lsp_query::Request::GetOutgoingCalls(_)) => ("GetOutgoingCalls", false),
             Some(lsp_query::Request::GetDocumentColor(_)) => ("GetDocumentColor", false),
             Some(lsp_query::Request::GetFoldingRanges(_)) => ("GetFoldingRanges", false),
             Some(lsp_query::Request::GetDocumentSymbols(_)) => ("GetDocumentSymbols", false),
@@ -1064,6 +1139,8 @@ impl LspQuery {
 
 #[cfg(test)]
 mod tests {
+    use prost::Message as _;
+
     use super::*;
 
     #[test]
@@ -1088,6 +1165,39 @@ mod tests {
             id: u32::MAX,
         };
         assert_eq!(PeerId::from_u64(peer_id.as_u64()), peer_id);
+    }
+
+    #[test]
+    fn source_coverage_protocol_round_trips_only_project_relative_facts() {
+        let response = SourceCoverageResponse {
+            project_generation: 3,
+            provider_id: "fake-language".to_string(),
+            generation: 9,
+            status: SourceCoverageStatus::Current as i32,
+            files: vec![SourceCoverageFile {
+                path: Some(ProjectPath {
+                    worktree_id: 7,
+                    path: "src/lib.rs".to_string(),
+                }),
+                ranges: vec![SourceCoverageRange {
+                    start_line: 1,
+                    start_column: 0,
+                    end_line: 1,
+                    end_column: 8,
+                    hit_count: 4,
+                }],
+                covered_lines: 1,
+                uncovered_lines: 0,
+                truncated: false,
+            }],
+            truncated: false,
+            diagnostic: None,
+        };
+        let bytes = response.encode_to_vec();
+        let decoded = SourceCoverageResponse::decode(bytes.as_slice())
+            .expect("source coverage response should decode");
+        assert_eq!(decoded, response);
+        assert!(!String::from_utf8_lossy(&bytes).contains("/Users/"));
     }
 
     #[test]
@@ -1122,5 +1232,142 @@ mod tests {
         assert!(!chunks[0].is_last_update);
         assert!(!chunks[1].is_last_update);
         assert!(chunks[2].is_last_update);
+    }
+
+    #[test]
+    fn cargo_workspace_response_round_trips_project_paths_only() {
+        let response = CargoWorkspaceResponse {
+            request_id: 41,
+            revision: 7,
+            input_fingerprint: 11,
+            workspaces: vec![CargoWorkspace {
+                root: Some(ProjectPath {
+                    worktree_id: 3,
+                    path: "crates/example".to_string(),
+                }),
+                root_manifest: Some(ProjectPath {
+                    worktree_id: 3,
+                    path: "crates/example/Cargo.toml".to_string(),
+                }),
+                display_name: "example".to_string(),
+                is_virtual: false,
+                members: Vec::new(),
+                configuration: Some(CargoWorkspaceConfiguration {
+                    profiles: vec![CargoProfile {
+                        name: "dev".to_string(),
+                        origin: CargoProfileOrigin::Implicit as i32,
+                    }],
+                    declared_toolchain: None,
+                    host_compiler: Some(CargoHostCompiler {
+                        status: CargoHostCompilerStatus::Available as i32,
+                        release: Some("1.90.0".to_string()),
+                        host_target: Some("aarch64-apple-darwin".to_string()),
+                        stale: false,
+                    }),
+                    cargo_target: CargoTargetConfiguration::UnresolvedCargoDefault as i32,
+                    diagnostics: Vec::new(),
+                    partial: false,
+                }),
+            }],
+            failures: Vec::new(),
+            partial: false,
+        };
+        let encoded = response.encode_to_vec();
+        let decoded = CargoWorkspaceResponse::decode(encoded.as_slice())
+            .expect("Cargo workspace response should decode");
+        assert_eq!(decoded.request_id, 41);
+        let root = decoded
+            .workspaces
+            .first()
+            .and_then(|workspace| workspace.root.as_ref())
+            .expect("fixture should contain a workspace root");
+        assert_eq!(root.path, "crates/example");
+        assert!(!String::from_utf8_lossy(&encoded).contains("/Users/"));
+        assert!(!String::from_utf8_lossy(&encoded).contains("project_env"));
+    }
+
+    #[test]
+    fn cargo_dependency_provenance_round_trips_bounded_visible_facts() {
+        let dependency = CargoDependency {
+            declaration_name: "serde".to_string(),
+            rename: Some("serialization".to_string()),
+            kind: CargoDependencyKind::Normal as i32,
+            version_requirement: "^1".to_string(),
+            optional: true,
+            uses_default_features: false,
+            requested_features: vec!["derive".to_string()],
+            target: Some("cfg(unix)".to_string()),
+            source_kind: CargoDependencySourceKind::Registry as i32,
+            declaration_manifest: Some(ProjectPath {
+                worktree_id: 3,
+                path: "member/Cargo.toml".to_string(),
+            }),
+            declaration_origin: CargoDependencyDeclarationOrigin::WorkspaceInherited as i32,
+            resolved_instances: vec![CargoResolvedDependency {
+                name: "serde".to_string(),
+                version: "1.0.0".to_string(),
+                source_kind: CargoDependencySourceKind::Registry as i32,
+                enabled_features: vec!["derive".to_string()],
+                lock_status: CargoDependencyLockStatus::Locked as i32,
+                ..Default::default()
+            }],
+            feature_causality: CargoDependencyFeatureCausality::Validated as i32,
+            ..Default::default()
+        };
+        let encoded = dependency.encode_to_vec();
+        let decoded = CargoDependency::decode(encoded.as_slice())
+            .expect("Cargo dependency provenance should decode");
+        assert_eq!(decoded.resolved_instances.len(), 1);
+        assert_eq!(
+            decoded
+                .declaration_manifest
+                .as_ref()
+                .map(|path| path.path.as_str()),
+            Some("member/Cargo.toml")
+        );
+        let wire = String::from_utf8_lossy(&encoded);
+        assert!(!wire.contains("/Users/"));
+        assert!(!wire.contains(".cargo/registry"));
+    }
+
+    #[test]
+    fn structured_execution_protocol_is_bounded_and_path_safe() {
+        let page = StructuredExecutionSnapshotPage {
+            protocol_version: 1,
+            project_generation: 7,
+            provider_id: "web-tests".to_string(),
+            discovery_generation: 3,
+            status: StructuredProviderStatus::Current as i32,
+            nodes: vec![StructuredExecutionNode {
+                node_id: "case-a".to_string(),
+                parent_id: Some("suite".to_string()),
+                label: "renders a page".to_string(),
+                kind: StructuredExecutionNodeKind::Case as i32,
+                path: Some(ProjectPath {
+                    worktree_id: 2,
+                    path: "web/tests.js".to_string(),
+                }),
+            }],
+            next_page_start: 0,
+            partial: false,
+            diagnostic: None,
+            current_run: None,
+            last_complete_run: None,
+        };
+        let encoded = page.encode_to_vec();
+        let decoded = StructuredExecutionSnapshotPage::decode(encoded.as_slice())
+            .expect("structured execution page should decode");
+        assert_eq!(decoded.nodes.len(), 1);
+        assert_eq!(
+            decoded.nodes[0]
+                .path
+                .as_ref()
+                .map(|path| path.path.as_str()),
+            Some("web/tests.js")
+        );
+        let wire = String::from_utf8_lossy(&encoded);
+        assert!(!wire.contains("/Users/"));
+        assert!(!wire.contains("project_env"));
+        assert!(!wire.contains("terminal_bytes"));
     }
 }

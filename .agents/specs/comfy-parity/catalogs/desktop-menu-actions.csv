@@ -1,0 +1,46 @@
+surface,action,availability,condition,feature_id,observable_effect,source,evidence_level
+title-popup,Open Dashboard,active,normal mode,COMFY-DESKTOP-187,Return/focus dashboard,projects/comfy/Comfy-Desktop/src/main/popups/titlePopup.ts,code-inferred
+title-popup,New Instance,active,normal mode,COMFY-DESKTOP-174,Open install wizard,projects/comfy/Comfy-Desktop/src/main/popups/titlePopup.ts,code-inferred
+title-popup,Add Existing Instance,active,normal mode,COMFY-DESKTOP-174,Open probe/track modal,projects/comfy/Comfy-Desktop/src/main/popups/titlePopup.ts,code-inferred
+title-popup,Load Snapshot,active,normal mode,COMFY-DESKTOP-121,Open snapshot import/new-install flow,projects/comfy/Comfy-Desktop/src/main/popups/titlePopup.ts,code-inferred
+title-popup,Desktop Settings,active,normal mode,COMFY-DESKTOP-149,Open global settings,projects/comfy/Comfy-Desktop/src/main/popups/titlePopup.ts,code-inferred
+title-popup,Send Beta Feedback,active,normal mode,COMFY-DESKTOP-174,Open support URL,projects/comfy/Comfy-Desktop/src/main/popups/titlePopup.ts,code-inferred
+title-popup,Reset Zoom,conditional,non-default zoom,COMFY-DESKTOP-180,Reset host zoom,projects/comfy/Comfy-Desktop/src/main/popups/titlePopup.ts,code-inferred
+title-popup,Close Window,active,normal mode,COMFY-DESKTOP-076,Enter close consultation/confirmation,projects/comfy/Comfy-Desktop/src/main/popups/titlePopup.ts,code-inferred
+title-popup,Quit Desktop,active,normal mode,COMFY-DESKTOP-070,Enter app quit guards,projects/comfy/Comfy-Desktop/src/main/popups/titlePopup.ts,code-inferred
+title-popup,Skip Onboarding,conditional,post-consent takeover,COMFY-DESKTOP-174,Mark first use complete,projects/comfy/Comfy-Desktop/src/main/popups/titlePopup.ts,code-inferred
+context,Open Link in Browser,conditional,link target,COMFY-DESKTOP-187,Open validated URL externally,projects/comfy/Comfy-Desktop/src/main/lib/contextMenu.ts,code-inferred
+context,Copy Link Address,conditional,link target,COMFY-DESKTOP-174,Copy URL,projects/comfy/Comfy-Desktop/src/main/lib/contextMenu.ts,code-inferred
+context,Save Image,conditional,image target,COMFY-DESKTOP-174,Save image via download path,projects/comfy/Comfy-Desktop/src/main/lib/contextMenu.ts,code-inferred
+context,Copy Image,conditional,image target,COMFY-DESKTOP-174,Copy image,projects/comfy/Comfy-Desktop/src/main/lib/contextMenu.ts,code-inferred
+context,Cut,conditional,editable selection,COMFY-DESKTOP-174,Native cut,projects/comfy/Comfy-Desktop/src/main/lib/contextMenu.ts,code-inferred
+context,Copy,conditional,selection,COMFY-DESKTOP-174,Native copy,projects/comfy/Comfy-Desktop/src/main/lib/contextMenu.ts,code-inferred
+context,Paste,conditional,editable target,COMFY-DESKTOP-174,Native paste,projects/comfy/Comfy-Desktop/src/main/lib/contextMenu.ts,code-inferred
+context,Select All,conditional,editable/selectable target,COMFY-DESKTOP-174,Native select-all,projects/comfy/Comfy-Desktop/src/main/lib/contextMenu.ts,code-inferred
+mac-app,About,platform-specific,macOS,COMFY-DESKTOP-174,Native about panel,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-app,Check for Updates,platform-specific,macOS,COMFY-DESKTOP-107,Manual app update check,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-app,Services,platform-specific,macOS,COMFY-DESKTOP-174,Native services submenu,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-app,Hide,platform-specific,macOS,COMFY-DESKTOP-174,Hide app,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-app,Hide Others,platform-specific,macOS,COMFY-DESKTOP-174,Hide other apps,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-app,Show All,platform-specific,macOS,COMFY-DESKTOP-174,Unhide windows,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-app,Quit,platform-specific,macOS,COMFY-DESKTOP-070,Quit with desktop guards,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-edit,Undo,platform-specific,macOS,COMFY-DESKTOP-174,Native undo role,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-edit,Redo,platform-specific,macOS,COMFY-DESKTOP-174,Native redo role,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-edit,Cut,platform-specific,macOS,COMFY-DESKTOP-174,Native cut role,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-edit,Copy,platform-specific,macOS,COMFY-DESKTOP-174,Native copy role,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-edit,Paste,platform-specific,macOS,COMFY-DESKTOP-174,Native paste role,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-edit,Paste and Match Style,platform-specific,macOS,COMFY-DESKTOP-174,Native paste-and-match-style role,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-edit,Delete,platform-specific,macOS,COMFY-DESKTOP-174,Native delete role,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-edit,Select All,platform-specific,macOS,COMFY-DESKTOP-174,Native select-all role,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-edit,Start Speaking,platform-specific,macOS,COMFY-DESKTOP-174,Native start-speaking role in the edit menu,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-edit,Stop Speaking,platform-specific,macOS,COMFY-DESKTOP-174,Native stop-speaking role in the edit menu,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-window,Minimize,platform-specific,macOS,COMFY-DESKTOP-174,Minimize window,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-window,Zoom,platform-specific,macOS,COMFY-DESKTOP-180,Native zoom window,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-window,Toggle Full Screen,platform-specific,macOS,COMFY-DESKTOP-174,Fullscreen host and relayout views,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+mac-window,Bring All to Front,platform-specific,macOS,COMFY-DESKTOP-174,Raise all windows,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+nonmac-view,Toggle Full Screen,platform-specific,Windows/Linux,COMFY-DESKTOP-174,Fullscreen host and relayout views,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+development-view,Reload,developer-only,development,COMFY-DESKTOP-174,Reload focused renderer,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+development-view,Force Reload,developer-only,development,COMFY-DESKTOP-174,Reload ignoring cache,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+development-view,Toggle Developer Tools,developer-only,development,COMFY-DESKTOP-174,Open Chromium devtools,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+tray,Show App,deprecated/dead,tray disabled,COMFY-DESKTOP-174,Would show existing host,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred
+tray,Quit,deprecated/dead,tray disabled,COMFY-DESKTOP-070,Would quit desktop,projects/comfy/Comfy-Desktop/src/main/menu.ts,code-inferred

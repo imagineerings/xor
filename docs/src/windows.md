@@ -16,7 +16,7 @@ You can also build zed from source, see [these docs](https://zed.dev/docs/develo
 Additionally, you can install Zed using winget:
 
 ```sh
-winget install -e --id ZedIndustries.Zed
+winget install -e --id Simtropolis.Zed
 ```
 
 ## Uninstall

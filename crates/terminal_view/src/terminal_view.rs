@@ -59,6 +59,7 @@ use workspace::{
         Direction, SearchEvent, SearchOptions, SearchToken, SearchableItem, SearchableItemHandle,
     },
 };
+#[cfg(feature = "agentic")]
 use zed_actions::{agent::AddSelectionToThread, assistant::InlineAssist};
 
 struct ImeState {
@@ -514,6 +515,7 @@ impl TerminalView {
         cx.emit(Event::Wakeup);
     }
 
+    #[cfg_attr(not(feature = "agentic"), allow(unused_variables))]
     pub fn deploy_context_menu(
         &mut self,
         position: GpuiPoint<Pixels>,
@@ -521,13 +523,15 @@ impl TerminalView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        #[cfg(feature = "agentic")]
         let assistant_enabled = self
             .workspace
             .upgrade()
             .and_then(|workspace| workspace.read(cx).panel::<TerminalPanel>(cx))
             .is_some_and(|terminal_panel| terminal_panel.read(cx).assistant_enabled());
         let context_menu = ContextMenu::build(window, cx, |menu, _, _| {
-            menu.context(self.focus_handle.clone())
+            let menu = menu
+                .context(self.focus_handle.clone())
                 .when(self.shows_workspace_actions(), |menu| {
                     menu.action("New Terminal", Box::new(NewTerminal::default()))
                         .action(
@@ -548,26 +552,27 @@ impl TerminalView {
                 .when(
                     !matches!(self.mode, TerminalMode::Embedded { .. }),
                     |menu| menu.action("Clear", Box::new(Clear)),
+                );
+            #[cfg(feature = "agentic")]
+            let menu = menu.when(
+                assistant_enabled && !matches!(self.mode, TerminalMode::Embedded { .. }),
+                |menu| {
+                    menu.separator()
+                        .action("Inline Assist", Box::new(InlineAssist::default()))
+                        .when(has_selection && self.shows_workspace_actions(), |menu| {
+                            menu.action("Add to Agent Thread", Box::new(AddSelectionToThread))
+                        })
+                },
+            );
+            menu.when(self.shows_workspace_actions(), |menu| {
+                menu.separator().action(
+                    "Close Terminal Tab",
+                    Box::new(CloseActiveItem {
+                        save_intent: None,
+                        close_pinned: true,
+                    }),
                 )
-                .when(
-                    assistant_enabled && !matches!(self.mode, TerminalMode::Embedded { .. }),
-                    |menu| {
-                        menu.separator()
-                            .action("Inline Assist", Box::new(InlineAssist::default()))
-                            .when(has_selection && self.shows_workspace_actions(), |menu| {
-                                menu.action("Add to Agent Thread", Box::new(AddSelectionToThread))
-                            })
-                    },
-                )
-                .when(self.shows_workspace_actions(), |menu| {
-                    menu.separator().action(
-                        "Close Terminal Tab",
-                        Box::new(CloseActiveItem {
-                            save_intent: None,
-                            close_pinned: true,
-                        }),
-                    )
-                })
+            })
         });
 
         window.focus(&context_menu.focus_handle(cx), cx);

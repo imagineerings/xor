@@ -223,6 +223,7 @@ impl Editor {
         cx.notify();
     }
 
+    #[cfg(feature = "agentic")]
     pub fn set_show_diff_review_button(&mut self, show: bool, cx: &mut Context<Self>) {
         self.show_diff_review_button = show;
         cx.notify();

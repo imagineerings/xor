@@ -1,0 +1,278 @@
+# Design Document: Additional LLM Providers
+
+## 1. Overview
+
+Integrate the 18+ LLM provider implementations from goose that do not yet have equivalents in zed. Each provider adapts goose's provider trait to zed's `language_model` infrastructure, following the established patterns in `crates/language_models/src/provider/`.
+
+### Key Architectural Decisions
+
+- **Provider trait reuse**: Implement the existing `LanguageModelProvider` / `LanguageModel` traits from `crates/language_model_core/`, not goose's provider trait — zed already has a well-defined provider interface.
+- **Feature-gated crates**: Cloud providers (Azure, Vertex AI, etc.) that require heavy SDK dependencies get their own crates under `crates/`; simpler API-only providers (NanoGPT, Avian, etc.) can live in a single shared crate.
+- **ACP-based providers**: Claude ACP, Claude Code, ChatGPT/Codex, Cursor Agent communicate via spawning subprocesses or connecting via ACP — these follow the pattern of `crates/acp_thread/` rather than direct HTTP.
+- **Declarative providers**: Implemented entirely in configuration, no Rust code changes needed for new OpenAI-compatible endpoints.
+- **Local endpoint configuration**: Ollama and llama.cpp use the existing OpenAI-compatible provider path with a local `/v1` endpoint preset. The UI must not require a user-entered API key for these local endpoints, but Zed may store an internal placeholder credential so provider authentication state remains compatible with the existing OpenAI-compatible runtime.
+
+## 2. Architecture
+
+```mermaid
+graph TD
+    subgraph "zed Language Model System"
+        LM[language_model_core::LanguageModel trait]
+        LM_Models[language_models::Provider Registry]
+        LM_Providers[language_models::provider/ directory]
+    end
+
+    subgraph "New: Goose Providers"
+        Azure[azure]
+        Vertex[gcp_vertex_ai]
+        HF[huggingface]
+        LLM[litellm]
+        Snow[snowflake]
+        Sagemaker[sagemaker_tgi]
+        Nano[nanogpt]
+        Tetra[tetrate]
+        Avian[avian]
+        Kimi[kimicode]
+        DB1[databricks_v1]
+        DB2[databricks_v2]
+        ClaudeACP[claude_acp]
+        ClaudeCode[claude_code]
+        Codex[chatgpt_codex]
+        Cursor[cursor_agent]
+        GeminiCLI[gemini_cli]
+        LocalInf[local_inference]
+        Embed[embedding_providers]
+        Declarative[declarative_providers]
+        Registry[provider_registry]
+    end
+
+    Azure -->|implements| LM
+    Vertex -->|implements| LM
+    HF -->|implements| LM
+    LLM -->|implements| LM
+    Snow -->|implements| LM
+    Sagemaker -->|implements| LM
+    Nano -->|implements| LM
+    Tetra -->|implements| LM
+    Avian -->|implements| LM
+    Kimi -->|implements| LM
+    DB1 -->|implements| LM
+    DB2 -->|implements| LM
+    ClaudeACP -->|ACP protocol| LM
+    ClaudeCode -->|subprocess + ACP| LM
+    Codex -->|subprocess + ACP| LM
+    Cursor -->|subprocess + ACP| LM
+    GeminiCLI -->|OAuth + subprocess| LM
+    LocalInf -->|local model| LM
+    Embed -->|embedding trait| LM_Models
+    Declarative -->|config-driven| LM_Models
+    Registry --> LM_Models
+```
+
+## 3. Components and Interfaces
+
+### Component: Provider Modules (per provider)
+
+Each provider module implements `crate::language_model_core::LanguageModelProvider`:
+
+```rust
+impl LanguageModelProvider for AzureProvider {
+    fn id(&self) -> &str { "azure" }
+    fn name(&self) -> &str { "Azure OpenAI" }
+    fn available_models(&self, cx: &App) -> Vec<ModelId> { ... }
+    fn language_model(&self, model: &ModelId) -> Result<Arc<dyn LanguageModel>> { ... }
+    fn provider_credential_sources(&self) -> Vec<CredentialSource> { ... }
+    fn location(&self) -> ProviderLocation { ProviderLocation::Cloud }
+}
+```
+
+### Component: ACP-Based Provider Adapter
+
+For providers that communicate via ACP (Claude Code, Codex, etc.):
+
+```rust
+pub struct AcpSubprocessProvider {
+    binary_name: &'static str,
+    auth_method: AcpAuthMethod,
+}
+
+impl LanguageModelProvider for AcpSubprocessProvider {
+    // Spawns the binary, connects via ACP, wraps as LanguageModel
+}
+```
+
+### Component: Declarative Provider Config
+
+```rust
+#[derive(Deserialize)]
+pub struct DeclarativeProviderConfig {
+    pub name: String,
+    pub base_url: String,
+    pub api_key_env_var: Option<String>,
+    pub models: Vec<String>,
+    pub custom_headers: HashMap<String, String>,
+}
+```
+
+### Component: LLM Provider Configuration UI
+
+The agent configuration UI exposes `Add Provider` flows for OpenAI-compatible providers:
+
+- `OpenAI` uses the standard OpenAI-compatible API flow and requires an API key.
+- `Local Inference (Ollama / llama.cpp)` uses the same OpenAI-compatible settings schema, prefills `http://localhost:11434/v1`, and allows a blank API key for local servers that ignore authentication.
+
+Both flows write `language_models.openai_compatible` settings so models appear in the existing `LanguageModelRegistry` without a separate local-inference runtime.
+
+### Component: Provider Registry
+
+```rust
+pub struct ProviderRegistry {
+    builtin: HashMap<String, Box<dyn Fn() -> Box<dyn LanguageModelProvider>>>,
+    declarative: Vec<DeclarativeProviderInstance>,
+}
+```
+
+## 4. Data Models
+
+### Provider Instance
+```rust
+pub struct RegisteredProvider {
+    pub id: String,
+    pub name: String,
+    pub provider: Box<dyn LanguageModelProvider>,
+    pub source: ProviderSource, // Builtin | Declarative | Extension
+}
+```
+
+### ACP Auth Methods
+```rust
+pub enum AcpAuthMethod {
+    ApiKey { env_var: String },
+    OAuth { client_id: String, scopes: Vec<String> },
+    DeviceFlow { client_id: String },
+    None, // No auth needed (local binary)
+}
+```
+
+## 5. Correctness Properties
+
+### Property 1: Provider Isolation
+
+_For any_ provider configuration, [if the provider fails to initialize], THE system SHALL return an error specific to that provider without affecting other providers.
+
+**Validates: Requirement 1.6**
+
+### Property 2: Streaming Consistency
+
+_For any_ provider [that supports streaming], THE system SHALL deliver tokens in order without gaps.
+
+**Validates: Requirement 2.5**
+
+### Property 3: Registry Uniqueness
+
+_For any_ provider ID [registered in the provider registry], THE registry SHALL contain at most one entry per ID.
+
+**Validates: Requirement 7.2**
+
+### Property 4: Declarative Validation
+
+_For any_ declarative provider config [with invalid fields], THE system SHALL reject the config and enumerate all validation errors.
+
+**Validates: Requirement 6.5**
+
+### Property 6: Local Endpoint Configuration
+
+_For any_ local OpenAI-compatible provider configured through the UI, THE system SHALL persist the provider with a local API URL, at least one model, and usable authentication state even when the local endpoint does not require a user-entered API key.
+
+**Validates: Requirement 5.1, 5.2, 6.3, 6.4**
+
+### Property 5: Credential Safety
+
+_For any_ provider credential [stored or transmitted], THE system SHALL NOT log, display, or persist the credential in plaintext.
+
+**Validates: Requirement 1.6**
+
+## 6. Error Handling
+
+| Error Scenario | Handling |
+|---|---|
+| Invalid API key | Return `LanguageModelError::Authentication` with provider-specific message |
+| Rate limited | Return `LanguageModelError::RateLimited` with retry-after info |
+| Model unavailable | Return `LanguageModelError::ModelNotFound` |
+| ACP binary not found | Return `LanguageModelError::ProviderUnavailable` with install instructions |
+| Network timeout | Return `LanguageModelError::Timeout` with configurable timeout duration |
+| OAuth token expired | Trigger re-authentication flow before retry |
+
+## 7. Testing Strategy
+
+- **Unit tests**: Each provider's request formatting and response parsing
+- **Integration tests**: Mock HTTP server for each cloud provider API
+- **ACP mock tests**: Mock subprocess that speaks ACP for ACP-based providers
+- **Registry tests**: Registration, lookup, duplicates, missing providers
+- **Declarative tests**: Config parsing, validation errors, override behavior
+
+## Audit corrections
+
+- The audited provider set includes Amp ACP, Codex ACP, Pi ACP, and Copilot ACP in addition to the presets named by the earlier plan. ACP-backed agents should extend `agent_servers` instead of being duplicated as language-model providers unless a concrete incompatibility requires it.
+- The curated declarative catalog contains dozens of JSON definitions. Compatible services should be presets over Zed's existing OpenAI/Ollama-compatible providers; dedicated provider code requires evidence of protocol deviation.
+- Current local inference uses llama.cpp and MLX-oriented paths, not Candle. Reuse Zed's `llama_cpp` owner and make MLX/product/platform scope explicit.
+- The cited upstream embedding module does not exist. Requirement 8 now covers the actual provider normalization/canonical metadata behavior.
+- Local model search, authenticated download, progress/cancellation, cache management, eviction, deletion, templates, and tool emulation are first-class behaviors rather than a stub.
+
+### D-PROVIDER-OWNERSHIP
+
+Native HTTP providers extend the existing language-model provider registry. ACP/CLI agents extend the existing agent-server registry. Protocol-compatible services use curated presets. This prevents three overlapping registries.
+
+### D-LOCAL-MODEL-MANAGEMENT
+
+Reuse Zed's local inference, credentials, HTTP, cache, and model-configuration integration points for search/download/evict/delete lifecycle. A new shared downloader is justified only after existing owners cannot meet the multi-file/cancellation contract.
+
+## References
+
+- Source: `projects/goose/crates/goose/src/providers/` (all files listed in requirements)
+- Zed trait: `crates/language_model_core/`
+- Zed providers: `crates/language_models/src/provider/`
+
+## Requirements traceability
+
+| Requirement | Design element | Verification |
+| --- | --- | --- |
+| 1.1 | Cloud API Providers audit design | Observable scenario and failure-path test for 1.1 |
+| 1.2 | Cloud API Providers audit design | Observable scenario and failure-path test for 1.2 |
+| 1.3 | Cloud API Providers audit design | Observable scenario and failure-path test for 1.3 |
+| 1.4 | Cloud API Providers audit design | Observable scenario and failure-path test for 1.4 |
+| 1.5 | Cloud API Providers audit design | Observable scenario and failure-path test for 1.5 |
+| 1.6 | Cloud API Providers audit design | Observable scenario and failure-path test for 1.6 |
+| 1.7 | Cloud API Providers audit design | Observable scenario and failure-path test for 1.7 |
+| 2.1 | Consumer API Providers audit design | Observable scenario and failure-path test for 2.1 |
+| 2.2 | Consumer API Providers audit design | Observable scenario and failure-path test for 2.2 |
+| 2.3 | Consumer API Providers audit design | Observable scenario and failure-path test for 2.3 |
+| 2.4 | Consumer API Providers audit design | Observable scenario and failure-path test for 2.4 |
+| 2.5 | Consumer API Providers audit design | Observable scenario and failure-path test for 2.5 |
+| 3.1 | ACP-Based Providers audit design | Observable scenario and failure-path test for 3.1 |
+| 3.2 | ACP-Based Providers audit design | Observable scenario and failure-path test for 3.2 |
+| 3.3 | ACP-Based Providers audit design | Observable scenario and failure-path test for 3.3 |
+| 3.4 | ACP-Based Providers audit design | Observable scenario and failure-path test for 3.4 |
+| 3.5 | ACP-Based Providers audit design | Observable scenario and failure-path test for 3.5 |
+| 3.6 | ACP-Based Providers audit design | Observable scenario and failure-path test for 3.6 |
+| 4.1 | Databricks Provider audit design | Observable scenario and failure-path test for 4.1 |
+| 4.2 | Databricks Provider audit design | Observable scenario and failure-path test for 4.2 |
+| 4.3 | Databricks Provider audit design | Observable scenario and failure-path test for 4.3 |
+| 5.1 | Local Inference audit design | Observable scenario and failure-path test for 5.1 |
+| 5.2 | Local Inference audit design | Observable scenario and failure-path test for 5.2 |
+| 5.3 | Local Inference audit design | Observable scenario and failure-path test for 5.3 |
+| 5.4 | Local Inference audit design | Observable scenario and failure-path test for 5.4 |
+| 5.5 | Local Inference audit design | Observable scenario and failure-path test for 5.5 |
+| 5.6 | Local Inference audit design | Observable scenario and failure-path test for 5.6 |
+| 6.1 | Declarative Providers audit design | Observable scenario and failure-path test for 6.1 |
+| 6.2 | Declarative Providers audit design | Observable scenario and failure-path test for 6.2 |
+| 6.3 | Declarative Providers audit design | Observable scenario and failure-path test for 6.3 |
+| 6.4 | Declarative Providers audit design | Observable scenario and failure-path test for 6.4 |
+| 6.5 | Declarative Providers audit design | Observable scenario and failure-path test for 6.5 |
+| 7.1 | Provider Registry audit design | Observable scenario and failure-path test for 7.1 |
+| 7.2 | Provider Registry audit design | Observable scenario and failure-path test for 7.2 |
+| 7.3 | Provider Registry audit design | Observable scenario and failure-path test for 7.3 |
+| 8.1, 8.2, 8.3 | D-PROVIDER-OWNERSHIP | Differential normalization, metadata, and estimated-usage tests |
+| 9.1, 9.2, 9.3, 9.4, 9.5 | D-LOCAL-MODEL-MANAGEMENT | Search, compatibility, auth, download, cancellation, eviction, deletion, and resource-error tests |
+| 10.1, 10.2, 10.3, 10.4 | D-PROVIDER-OWNERSHIP | Preset inventory and ACP agent-server lifecycle tests |
+| 11.1, 11.2, 11.3, 11.4 | D-PROVIDER-OWNERSHIP | Catalog inventory, preset contract, invalid-definition isolation, and refresh tests |

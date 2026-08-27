@@ -4,7 +4,7 @@ use credentials_provider::CredentialsProvider;
 use fs::Fs;
 use futures::{FutureExt, StreamExt, future::BoxFuture, stream::BoxStream};
 use futures::{Stream, TryFutureExt, stream};
-use gpui::{App, AsyncApp, Context, Entity, Task, TaskExt};
+use gpui::{App, AsyncApp, Context, Entity, Task, TaskExt, Window};
 use http_client::{CustomHeaders, HttpClient};
 use language_model::{
     ApiKeyState, AuthenticateError, DisabledReason, EnvVar, IconOrSvg, InlineDescription,
@@ -1176,7 +1176,7 @@ mod tests {
 
     #[test]
     fn test_merge_settings_preserves_display_names_for_similar_models() {
-        // Regression test for https://github.com/zed-industries/zed/issues/43646
+        // Regression test for https://github.com/simtropolis/zed/issues/43646
         // When multiple models share the same base name (e.g., qwen2.5-coder:1.5b and qwen2.5-coder:3b),
         // each model should get its own display_name from settings, not a random one.
 

@@ -170,10 +170,42 @@ impl Component for Vector {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::path::PathBuf;
+
+    use strum::{IntoEnumIterator as _, ParseError};
+
+    use super::VectorName;
 
     #[test]
-    fn vector_path() {
-        assert_eq!(VectorName::ZedLogo.path().as_ref(), "images/zed_logo.svg");
+    fn test_all_vectors_exist() {
+        let asset_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+
+        for vector in VectorName::iter() {
+            let vector_path = asset_path.join(&*vector.path());
+            assert!(
+                vector_path.exists(),
+                "Vector {vector:?} does not exist at {vector_path:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn test_no_dangling_vectors() -> Result<(), ParseError> {
+        let images_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/images");
+
+        for entry in std::fs::read_dir(&images_dir).expect("failed to read images directory") {
+            let path = entry.expect("failed to read images directory entry").path();
+            if path.extension().is_none_or(|extension| extension != "svg") {
+                continue;
+            }
+            let file_stem = path
+                .file_stem()
+                .and_then(|file_stem| file_stem.to_str())
+                .expect("vector file name is not valid UTF-8");
+
+            file_stem.parse::<VectorName>()?;
+        }
+
+        Ok(())
     }
 }

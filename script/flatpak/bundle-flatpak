@@ -4,7 +4,21 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 shopt -s extglob
 
-script/bundle-linux --flatpak
+rust_tools=false
+if [[ "${1:-}" == "--rust-tools" ]]; then
+    rust_tools=true
+    shift
+fi
+if [[ $# -gt 0 ]]; then
+    echo "Usage: ${0##*/} [--rust-tools]" >&2
+    exit 1
+fi
+
+if [[ "$rust_tools" = true ]]; then
+    script/bundle-linux --flatpak --rust-tools
+else
+    script/bundle-linux --flatpak
+fi
 archive_match="zed(-[a-zA-Z0-9]+)?-linux-$(uname -m)\.tar\.gz"
 archive=$(ls "target/release" | grep -E ${archive_match})
 channel=$(<crates/zed/RELEASE_CHANNEL)

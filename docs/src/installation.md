@@ -30,7 +30,7 @@ Get the latest stable builds via [the download page](https://zed.dev/download). 
 Additionally, you can install Zed using winget:
 
 ```sh
-winget install -e --id ZedIndustries.Zed
+winget install -e --id Simtropolis.Zed
 ```
 
 ### Linux
@@ -127,4 +127,4 @@ Not yet available as an official download. Can be built [from source](./developm
 
 ### Web
 
-Not supported at this time. See our [Platform Support issue](https://github.com/zed-industries/zed/issues/5391).
+Not supported at this time. See our [Platform Support issue](https://github.com/simtropolis/zed/issues/5391).

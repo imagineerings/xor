@@ -4,7 +4,7 @@ use gpui::{App, ClipboardItem, PromptLevel, actions};
 use system_specs::{CopySystemSpecsIntoClipboard, SystemSpecs};
 use util::ResultExt;
 use workspace::Workspace;
-use zed_actions::feedback::{EmailZed, FileBugReport, RequestFeature};
+use zed_actions::feedback::{EmailSim, FileBugReport, RequestFeature};
 
 actions!(
     zed,
@@ -16,14 +16,14 @@ actions!(
     ]
 );
 
-const ZED_REPO_URL: &str = "https://github.com/zed-industries/zed";
+const ZED_REPO_URL: &str = "https://github.com/simtropolis/zed";
 
-const REQUEST_FEATURE_URL: &str = "https://github.com/zed-industries/zed/discussions/new/choose";
+const REQUEST_FEATURE_URL: &str = "https://github.com/simtropolis/zed/discussions/new/choose";
 
 fn file_bug_report_url(specs: &SystemSpecs) -> String {
     format!(
         concat!(
-            "https://github.com/zed-industries/zed/issues/new",
+            "https://github.com/simtropolis/zed/issues/new",
             "?",
             "template=10_bug_report.yml",
             "&",
@@ -96,7 +96,7 @@ pub fn init(cx: &mut App) {
                 })
                 .detach();
             })
-            .register_action(move |_, _: &EmailZed, window, cx| {
+            .register_action(move |_, _: &EmailSim, window, cx| {
                 let specs =
                     SystemSpecs::new(window, cx, telemetry::os_name(), telemetry::os_version());
                 cx.spawn_in(window, async move |_, cx| {

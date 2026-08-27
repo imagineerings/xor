@@ -1,3 +1,4 @@
+pub mod collaboration;
 mod ids;
 pub mod queries;
 mod tables;
@@ -252,6 +253,25 @@ impl Database {
             }
 
             test_options.runtime.block_on(future)
+        }
+
+        #[cfg(not(feature = "test-support"))]
+        {
+            future.await
+        }
+    }
+
+    pub(crate) async fn run_on_database_runtime<F, T>(&self, future: F) -> T
+    where
+        F: Future<Output = T>,
+    {
+        #[cfg(feature = "test-support")]
+        {
+            if let Some(test_options) = &self.test_options {
+                test_options.runtime.block_on(future)
+            } else {
+                future.await
+            }
         }
 
         #[cfg(not(feature = "test-support"))]

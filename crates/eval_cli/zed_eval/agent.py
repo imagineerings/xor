@@ -226,7 +226,7 @@ class ZedAgent(BaseInstalledAgent):
                     'ZED_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/zed"; '
                     'ESLINT_DIR="$ZED_DATA_DIR/languages/eslint/vscode-eslint-2.4.4"; '
                     'mkdir -p "$ESLINT_DIR"; '
-                    'curl -fsSL "https://github.com/zed-industries/vscode-eslint/archive/refs/tags/release/2.4.4.tar.gz" '
+                    'curl -fsSL "https://github.com/simtropolis/vscode-eslint/archive/refs/tags/release/2.4.4.tar.gz" '
                     '| tar -xz -C "$ESLINT_DIR"; '
                     'mv "$ESLINT_DIR"/vscode-eslint-release-2.4.4 "$ESLINT_DIR/vscode-eslint"; '
                     'cd "$ESLINT_DIR/vscode-eslint" && npm install && npm run compile'

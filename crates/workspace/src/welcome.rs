@@ -1,26 +1,31 @@
 use crate::{
-    NewFile, Open, OpenMode, PathList, RecentWorkspace, SerializedWorkspaceLocation,
-    ToggleWorkspaceSidebar, Workspace, WorkspaceSettings,
+    NewFile, Open, OpenMode, PathList, RecentWorkspace, SerializedWorkspaceLocation, Workspace,
+    WorkspaceSettings,
     item::{Item, ItemEvent},
     persistence::WorkspaceDb,
 };
+#[cfg(feature = "agentic")]
 use agent_settings::AgentSettings;
 use git::Clone as GitClone;
+use gpui::WeakEntity;
 use gpui::{
     Action, App, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement,
     ParentElement, Render, Styled, Task, TaskExt, Window, actions,
 };
-use gpui::{WeakEntity, linear_color_stop, linear_gradient};
+#[cfg(feature = "agentic")]
+use gpui::{linear_color_stop, linear_gradient};
 use menu::{SelectNext, SelectPrevious};
 
+#[cfg(feature = "agentic")]
+use crate::ToggleWorkspaceSidebar;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use settings::{DefaultOpenBehavior, Settings};
 use ui::{ButtonLike, Divider, DividerColor, KeyBinding, Vector, VectorName, prelude::*};
 use util::ResultExt;
-use zed_actions::{
-    Extensions, OpenKeymap, OpenOnboarding, OpenSettings, assistant::ToggleFocus, command_palette,
-};
+#[cfg(feature = "agentic")]
+use zed_actions::assistant::ToggleFocus;
+use zed_actions::{Extensions, OpenKeymap, OpenOnboarding, OpenSettings, command_palette};
 
 #[derive(PartialEq, Clone, Debug, Deserialize, Serialize, JsonSchema, Action)]
 #[action(namespace = welcome)]
@@ -326,6 +331,7 @@ impl WelcomePage {
         }
     }
 
+    #[cfg(feature = "agentic")]
     fn render_agent_card(&self, tab_index: usize, cx: &mut Context<Self>) -> impl IntoElement {
         let focus = self.focus_handle.clone();
         let color = cx.theme().colors();
@@ -415,9 +421,10 @@ impl Render for WelcomePage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let (first_section, second_section) = CONTENT;
         let first_section_entries = first_section.entries.len();
+        #[cfg(feature = "agentic")]
         let mut next_tab_index = first_section_entries + second_section.entries.len();
-
-        let ai_enabled = AgentSettings::get_global(cx).enabled(cx);
+        #[cfg(not(feature = "agentic"))]
+        let next_tab_index = first_section_entries + second_section.entries.len();
 
         let recent_projects = self
             .recent_workspaces
@@ -462,8 +469,8 @@ impl Render for WelcomePage {
             .size_full()
             .bg(cx.theme().colors().editor_background)
             .justify_center()
-            .child(
-                v_flex()
+            .child({
+                let content = v_flex()
                     .id("welcome-content")
                     .p_8()
                     .max_w_128()
@@ -488,26 +495,30 @@ impl Render for WelcomePage {
                             ),
                     )
                     .child(first_section.render(Default::default(), &self.focus_handle))
-                    .child(second_section)
-                    .when(ai_enabled && !showing_recent_projects, |this| {
+                    .child(second_section);
+                #[cfg(feature = "agentic")]
+                let content = content.when(
+                    AgentSettings::get_global(cx).enabled(cx) && !showing_recent_projects,
+                    |this| {
                         let agent_tab_index = next_tab_index;
                         next_tab_index += 1;
                         this.child(self.render_agent_card(agent_tab_index, cx))
-                    })
-                    .when(!self.fallback_to_recent_projects, |this| {
-                        this.child(
-                            v_flex().gap_4().child(Divider::horizontal()).child(
-                                Button::new("welcome-exit", "Return to Onboarding")
-                                    .tab_index(next_tab_index as isize)
-                                    .full_width()
-                                    .label_size(LabelSize::XSmall)
-                                    .on_click(|_, window, cx| {
-                                        window.dispatch_action(OpenOnboarding.boxed_clone(), cx);
-                                    }),
-                            ),
-                        )
-                    }),
-            )
+                    },
+                );
+                content.when(!self.fallback_to_recent_projects, |this| {
+                    this.child(
+                        v_flex().gap_4().child(Divider::horizontal()).child(
+                            Button::new("welcome-exit", "Return to Onboarding")
+                                .tab_index(next_tab_index as isize)
+                                .full_width()
+                                .label_size(LabelSize::XSmall)
+                                .on_click(|_, window, cx| {
+                                    window.dispatch_action(OpenOnboarding.boxed_clone(), cx);
+                                }),
+                        ),
+                    )
+                })
+            })
     }
 }
 

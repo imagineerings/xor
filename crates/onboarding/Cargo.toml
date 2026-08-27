@@ -13,6 +13,8 @@ path = "src/onboarding.rs"
 
 [features]
 default = []
+agentic = ["zed_actions/agentic"]
+multiplayer-tools = ["workspace/multiplayer-tools"]
 
 [dependencies]
 anyhow.workspace = true
@@ -29,6 +31,7 @@ menu.workspace = true
 notifications.workspace = true
 picker.workspace = true
 project.workspace = true
+product_flavor.workspace = true
 schemars.workspace = true
 serde.workspace = true
 settings.workspace = true
@@ -44,3 +47,4 @@ zlog.workspace = true
 
 [dev-dependencies]
 db = {workspace = true, features = ["test-support"]}
+settings = {workspace = true, features = ["test-support"]}

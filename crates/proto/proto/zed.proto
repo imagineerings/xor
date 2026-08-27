@@ -5,6 +5,7 @@ import "ai.proto";
 import "app.proto";
 import "buffer.proto";
 import "call.proto";
+import "cargo.proto";
 import "channel.proto";
 import "core.proto";
 import "debugger.proto";
@@ -13,6 +14,8 @@ import "git.proto";
 import "image.proto";
 import "lsp.proto";
 import "notification.proto";
+import "structured_execution.proto";
+import "source_coverage.proto";
 import "task.proto";
 import "toolchain.proto";
 import "worktree.proto";
@@ -70,6 +73,12 @@ message Envelope {
 
     GetReferences get_references = 36;
     GetReferencesResponse get_references_response = 37;
+    PrepareCallHierarchy prepare_call_hierarchy = 491;
+    PrepareCallHierarchyResponse prepare_call_hierarchy_response = 492;
+    GetIncomingCalls get_incoming_calls = 493;
+    GetIncomingCallsResponse get_incoming_calls_response = 494;
+    GetOutgoingCalls get_outgoing_calls = 495;
+    GetOutgoingCallsResponse get_outgoing_calls_response = 496;
     GetDocumentHighlights get_document_highlights = 38;
     GetDocumentHighlightsResponse get_document_highlights_response = 39;
     GetProjectSymbols get_project_symbols = 40;
@@ -505,7 +514,31 @@ message Envelope {
     RefreshDocumentColors refresh_document_colors = 474;
     RefreshDocumentLinks refresh_document_links = 475;
     RefreshFoldingRanges refresh_folding_ranges = 476;
-    RefreshDocumentSymbols refresh_document_symbols = 477; // current max
+    RefreshDocumentSymbols refresh_document_symbols = 477;
+    GetCargoWorkspace get_cargo_workspace = 478;
+    CargoWorkspaceResponse cargo_workspace_response = 479;
+    CancelCargoWorkspace cancel_cargo_workspace = 480;
+    GetStructuredExecutionSnapshot get_structured_execution_snapshot = 481;
+    StructuredExecutionSnapshotPage structured_execution_snapshot_page = 482;
+    GetStructuredExecutionEvents get_structured_execution_events = 483;
+    StructuredExecutionEventChunk structured_execution_event_chunk = 484;
+    GetRustTestDiscovery get_rust_test_discovery = 485;
+    CancelRustTestDiscovery cancel_rust_test_discovery = 486;
+    RustTestDiscoveryResponse rust_test_discovery_response = 487;
+    ResolveRustTestAction resolve_rust_test_action = 488;
+    RustTestActionPlanResponse rust_test_action_plan_response = 489;
+    UpdateRustTestRun update_rust_test_run = 490;
+    GetSourceCoverage get_source_coverage = 497;
+    SourceCoverageResponse source_coverage_response = 498;
+    InterpretRustCoverageArtifact interpret_rust_coverage_artifact = 499; // current max
+    OpenCollaborativeChannel open_collaborative_channel = 500;
+    OpenCollaborativeChannelResponse open_collaborative_channel_response = 501;
+    CloseCollaborativeChannel close_collaborative_channel = 502;
+    GetCollaborativeMessageWindow get_collaborative_message_window = 503;
+    GetCollaborativeMessageWindowResponse get_collaborative_message_window_response = 504;
+    ApplyCollaborativeMessageOperation apply_collaborative_message_operation = 505;
+    ApplyCollaborativeMessageOperationResponse apply_collaborative_message_operation_response = 506;
+    CollaborativeMessageStreamUpdate collaborative_message_stream_update = 507;
   }
 
   reserved 87 to 88;

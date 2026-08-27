@@ -282,6 +282,7 @@ pub(super) struct InlineBlamePopover {
 /// Represents a diff review button indicator that shows up when hovering over lines in the gutter
 /// in diff view mode.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg(feature = "agentic")]
 pub(super) struct PhantomDiffReviewIndicator {
     /// The starting anchor of the selection (or the only row if not dragging).
     pub(super) start: Anchor,
@@ -293,6 +294,7 @@ pub(super) struct PhantomDiffReviewIndicator {
 }
 
 #[derive(Clone, Debug)]
+#[cfg(feature = "agentic")]
 pub(super) struct DiffReviewDragState {
     start_anchor: Anchor,
     current_anchor: Anchor,
@@ -301,6 +303,7 @@ pub(super) struct DiffReviewDragState {
 /// Identifies a specific hunk in the diff buffer.
 /// Used as a key to group comments by their location.
 #[derive(Clone, Debug)]
+#[cfg(feature = "agentic")]
 pub(super) struct DiffHunkKey {
     /// The file path (relative to worktree) this hunk belongs to.
     pub(super) file_path: Arc<util::rel_path::RelPath>,
@@ -310,6 +313,7 @@ pub(super) struct DiffHunkKey {
 
 /// A review comment stored locally before being sent to the Agent panel.
 #[derive(Clone)]
+#[cfg(feature = "agentic")]
 pub(super) struct StoredReviewComment {
     /// Unique identifier for this comment (for edit/delete operations).
     pub(super) id: usize,
@@ -322,6 +326,7 @@ pub(super) struct StoredReviewComment {
 }
 
 /// Represents an active diff review overlay that appears when clicking the "Add Review" button.
+#[cfg(feature = "agentic")]
 pub(super) struct DiffReviewOverlay {
     pub(super) anchor_range: Range<Anchor>,
     /// The block ID for the overlay.
@@ -344,6 +349,7 @@ pub(super) struct DiffReviewOverlay {
     _subscription: Subscription,
 }
 
+#[cfg(feature = "agentic")]
 impl DiffReviewDragState {
     pub(super) fn row_range(
         &self,
@@ -356,6 +362,7 @@ impl DiffReviewDragState {
     }
 }
 
+#[cfg(feature = "agentic")]
 impl StoredReviewComment {
     fn new(id: usize, comment: String, anchor_range: Range<Anchor>) -> Self {
         Self {
@@ -693,6 +700,7 @@ impl Editor {
         });
     }
 
+    #[cfg(feature = "agentic")]
     pub fn show_diff_review_overlay(
         &mut self,
         display_range: Range<DisplayRow>,
@@ -833,6 +841,7 @@ impl Editor {
 
     /// Stores the diff review comment locally.
     /// Comments are stored per-hunk and can later be batch-submitted to the Agent panel.
+    #[cfg(feature = "agentic")]
     pub fn submit_diff_review_comment(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         // Find the overlay that currently has focus
         let overlay_index = self
@@ -869,6 +878,7 @@ impl Editor {
 
     /// Returns the prompt editor for the diff review overlay, if one is active.
     /// This is primarily used for testing.
+    #[cfg(feature = "agentic")]
     pub fn diff_review_prompt_editor(&self) -> Option<&Entity<Editor>> {
         self.diff_review_overlays
             .first()
@@ -877,6 +887,7 @@ impl Editor {
 
     /// Sets whether the comments section is expanded in the diff review overlay.
     /// This is primarily used for testing.
+    #[cfg(feature = "agentic")]
     pub fn set_diff_review_comments_expanded(&mut self, expanded: bool, cx: &mut Context<Self>) {
         for overlay in &mut self.diff_review_overlays {
             overlay.comments_expanded = expanded;
@@ -885,6 +896,7 @@ impl Editor {
     }
 
     /// Returns the total count of stored review comments across all hunks.
+    #[cfg(feature = "agentic")]
     pub(super) fn total_review_comment_count(&self) -> usize {
         self.stored_review_comments
             .iter()
@@ -893,6 +905,7 @@ impl Editor {
     }
 
     /// Adds a new review comment to a specific hunk.
+    #[cfg(feature = "agentic")]
     pub(super) fn add_review_comment(
         &mut self,
         hunk_key: DiffHunkKey,
@@ -1157,10 +1170,12 @@ impl Editor {
         self.toggle_diff_hunks_in_ranges(ranges, cx);
     }
 
+    #[cfg(feature = "agentic")]
     pub(super) fn show_diff_review_button(&self) -> bool {
         self.show_diff_review_button
     }
 
+    #[cfg(feature = "agentic")]
     pub(super) fn render_diff_review_button(
         &self,
         display_row: DisplayRow,
@@ -1194,6 +1209,7 @@ impl Editor {
             )
     }
 
+    #[cfg(feature = "agentic")]
     pub(super) fn start_diff_review_drag(
         &mut self,
         display_row: DisplayRow,
@@ -1212,6 +1228,7 @@ impl Editor {
         cx.notify();
     }
 
+    #[cfg(feature = "agentic")]
     pub(super) fn update_diff_review_drag(
         &mut self,
         display_row: DisplayRow,
@@ -1232,6 +1249,7 @@ impl Editor {
         }
     }
 
+    #[cfg(feature = "agentic")]
     pub(super) fn end_diff_review_drag(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(drag_state) = self.diff_review_drag_state.take() {
             let snapshot = self.snapshot(window, cx);
@@ -1241,12 +1259,14 @@ impl Editor {
         cx.notify();
     }
 
+    #[cfg(feature = "agentic")]
     pub(super) fn cancel_diff_review_drag(&mut self, cx: &mut Context<Self>) {
         self.diff_review_drag_state = None;
         cx.notify();
     }
 
     /// Dismisses all diff review overlays.
+    #[cfg(feature = "agentic")]
     pub(super) fn dismiss_all_diff_review_overlays(&mut self, cx: &mut Context<Self>) {
         if self.diff_review_overlays.is_empty() {
             return;
@@ -1261,6 +1281,7 @@ impl Editor {
     }
 
     /// Action handler for SubmitDiffReviewComment.
+    #[cfg(feature = "agentic")]
     pub(super) fn submit_diff_review_comment_action(
         &mut self,
         _: &SubmitDiffReviewComment,
@@ -1271,6 +1292,7 @@ impl Editor {
     }
 
     /// Returns comments for a specific hunk, ordered by creation time.
+    #[cfg(feature = "agentic")]
     pub(super) fn comments_for_hunk<'a>(
         &'a self,
         key: &DiffHunkKey,
@@ -1287,6 +1309,7 @@ impl Editor {
     }
 
     /// Returns the count of comments for a specific hunk.
+    #[cfg(feature = "agentic")]
     pub(super) fn hunk_comment_count(
         &self,
         key: &DiffHunkKey,
@@ -1303,6 +1326,7 @@ impl Editor {
     }
 
     /// Removes a review comment by ID from any hunk.
+    #[cfg(feature = "agentic")]
     pub(super) fn remove_review_comment(&mut self, id: usize, cx: &mut Context<Self>) -> bool {
         for (_, comments) in self.stored_review_comments.iter_mut() {
             if let Some(index) = comments.iter().position(|c| c.id == id) {
@@ -1318,6 +1342,7 @@ impl Editor {
     }
 
     /// Updates a review comment's text by ID.
+    #[cfg(feature = "agentic")]
     pub(super) fn update_review_comment(
         &mut self,
         id: usize,
@@ -1339,6 +1364,7 @@ impl Editor {
     }
 
     /// Sets a comment's editing state.
+    #[cfg(feature = "agentic")]
     pub(super) fn set_comment_editing(
         &mut self,
         id: usize,
@@ -1359,6 +1385,7 @@ impl Editor {
     ///
     /// This should be called when the buffer changes to prevent orphaned comments
     /// from accumulating.
+    #[cfg(feature = "agentic")]
     pub(super) fn cleanup_orphaned_review_comments(&mut self, cx: &mut Context<Self>) {
         let snapshot = self.buffer.read(cx).snapshot(cx);
         let original_count = self.total_review_comment_count();
@@ -1388,6 +1415,7 @@ impl Editor {
     }
 
     /// Toggles the expanded state of the comments section in the overlay.
+    #[cfg(feature = "agentic")]
     pub(super) fn toggle_review_comments_expanded(
         &mut self,
         _: &ToggleReviewCommentsExpanded,
@@ -1419,6 +1447,7 @@ impl Editor {
     }
 
     /// Handles the EditReviewComment action - sets a comment into editing mode.
+    #[cfg(feature = "agentic")]
     pub(super) fn edit_review_comment(
         &mut self,
         action: &EditReviewComment,
@@ -1504,6 +1533,7 @@ impl Editor {
     }
 
     /// Confirms an inline edit of a review comment.
+    #[cfg(feature = "agentic")]
     pub(super) fn confirm_edit_review_comment(
         &mut self,
         comment_id: usize,
@@ -1558,6 +1588,7 @@ impl Editor {
     }
 
     /// Cancels an inline edit of a review comment.
+    #[cfg(feature = "agentic")]
     pub(super) fn cancel_edit_review_comment(
         &mut self,
         comment_id: usize,
@@ -1594,6 +1625,7 @@ impl Editor {
     }
 
     /// Action handler for ConfirmEditReviewComment.
+    #[cfg(feature = "agentic")]
     pub(super) fn confirm_edit_review_comment_action(
         &mut self,
         action: &ConfirmEditReviewComment,
@@ -1604,6 +1636,7 @@ impl Editor {
     }
 
     /// Action handler for CancelEditReviewComment.
+    #[cfg(feature = "agentic")]
     pub(super) fn cancel_edit_review_comment_action(
         &mut self,
         action: &CancelEditReviewComment,
@@ -1614,6 +1647,7 @@ impl Editor {
     }
 
     /// Handles the DeleteReviewComment action - removes a comment.
+    #[cfg(feature = "agentic")]
     pub(super) fn delete_review_comment(
         &mut self,
         action: &DeleteReviewComment,
@@ -2084,6 +2118,7 @@ impl Editor {
     /// Calculates the appropriate block height for the diff review overlay.
     /// Height is in lines: 2 for input row, 1 for header when comments exist,
     /// and 2 lines per comment when expanded.
+    #[cfg(feature = "agentic")]
     pub(super) fn calculate_overlay_height(
         &self,
         hunk_key: &DiffHunkKey,
@@ -2329,6 +2364,7 @@ impl Editor {
 
     /// Dismisses overlays that have no comments stored for their hunks.
     /// Keeps overlays that have at least one comment.
+    #[cfg(feature = "agentic")]
     fn dismiss_overlays_without_comments(&mut self, cx: &mut Context<Self>) {
         let snapshot = self.buffer.read(cx).snapshot(cx);
 
@@ -2359,6 +2395,7 @@ impl Editor {
 
     /// Refreshes the diff review overlay block to update its height and render function.
     /// Uses resize_blocks and replace_blocks to avoid visual flicker from remove+insert.
+    #[cfg(feature = "agentic")]
     fn refresh_diff_review_overlay_height(
         &mut self,
         hunk_key: &DiffHunkKey,
@@ -2411,11 +2448,13 @@ impl Editor {
     }
 
     /// Compares two DiffHunkKeys for equality by resolving their anchors.
+    #[cfg(feature = "agentic")]
     fn hunk_keys_match(a: &DiffHunkKey, b: &DiffHunkKey, snapshot: &MultiBufferSnapshot) -> bool {
         a.file_path == b.file_path
             && a.hunk_start_anchor.to_point(snapshot) == b.hunk_start_anchor.to_point(snapshot)
     }
 
+    #[cfg(feature = "agentic")]
     fn render_diff_review_overlay(
         prompt_editor: &Entity<Editor>,
         hunk_key: &DiffHunkKey,
@@ -2598,6 +2637,7 @@ impl Editor {
             .into_any_element()
     }
 
+    #[cfg(feature = "agentic")]
     fn render_comments_section(
         comments: Vec<StoredReviewComment>,
         expanded: bool,
@@ -2665,6 +2705,7 @@ impl Editor {
             })
     }
 
+    #[cfg(feature = "agentic")]
     fn render_comment_row(
         comment: StoredReviewComment,
         inline_editor: Option<Entity<Editor>>,
@@ -2817,6 +2858,7 @@ impl Editor {
 impl Editor {
     /// Returns the line range for the first diff review overlay, if one is active.
     /// Returns (start_row, end_row) as physical line numbers in the underlying file.
+    #[cfg(feature = "agentic")]
     pub(super) fn diff_review_line_range(&self, cx: &App) -> Option<(u32, u32)> {
         let overlay = self.diff_review_overlays.first()?;
         let snapshot = self.buffer.read(cx).snapshot(cx);
@@ -2835,6 +2877,7 @@ impl Editor {
 
     /// Takes all stored comments from all hunks, clearing the storage.
     /// Returns a Vec of (hunk_key, comments) pairs.
+    #[cfg(feature = "agentic")]
     pub(super) fn take_all_review_comments(
         &mut self,
         cx: &mut Context<Self>,

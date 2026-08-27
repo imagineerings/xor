@@ -14,6 +14,7 @@ doctest = false
 
 [features]
 default = []
+agentic = ["dep:agent_settings"]
 
 test-support = [
     "call/test-support",
@@ -23,13 +24,14 @@ test-support = [
 
     "project/test-support",
     "remote/test-support",
+    "remote_connection/test-support",
     "util/test-support",
     "workspace/test-support",
     "recent_projects/test-support",
 ]
 
 [dependencies]
-agent_settings.workspace = true
+agent_settings = { workspace = true, optional = true }
 anyhow.workspace = true
 auto_update.workspace = true
 fs.workspace = true

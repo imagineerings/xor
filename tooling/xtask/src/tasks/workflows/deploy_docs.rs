@@ -36,14 +36,6 @@ impl DocsChannel {
             Self::Stable => "docs",
         }
     }
-
-    pub(crate) fn channel_name(&self) -> &'static str {
-        match self {
-            Self::Nightly => "nightly",
-            Self::Preview => "preview",
-            Self::Stable => "stable",
-        }
-    }
 }
 
 pub(crate) fn lychee_link_check(dir: &str) -> Step<Use> {
@@ -158,18 +150,6 @@ fn docs_deploy_steps(job: Job, project_name: &StepOutput) -> Job {
         .add_step(upload_wrangler_logs())
 }
 
-pub(crate) fn check_docs() -> NamedJob {
-    NamedJob {
-        name: "check_docs".to_owned(),
-        job: docs_build_steps(
-            release_job(&[]).add_step(steps::harden_runner()),
-            None,
-            DocsChannel::Stable.channel_name(),
-            DocsChannel::Stable.site_url(),
-        ),
-    }
-}
-
 fn resolve_channel_step(
     channel_expr: impl Into<String>,
 ) -> (Step<Run>, StepOutput, StepOutput, StepOutput) {
@@ -233,9 +213,7 @@ fn docs_job(channel_expr: impl Into<String>, checkout_ref: Option<String>) -> Na
         job: docs_deploy_steps(
             docs_build_steps(
                 release_job(&[])
-                    .cond(Expression::new(
-                        "github.repository_owner == 'zed-industries'",
-                    ))
+                    .cond(Expression::new("github.repository_owner == 'simtropolis'"))
                     .name("Build and Deploy Docs")
                     .add_step(resolve_step),
                 checkout_ref,
@@ -255,7 +233,7 @@ pub(crate) fn deploy_docs_workflow_call(
         .with_repository_owner_guard()
         .permissions(Permissions::default().contents(Level::Read))
         .uses(
-            "zed-industries",
+            "simtropolis",
             "zed",
             ".github/workflows/deploy_docs.yml",
             // Pinned to a commit rather than the mutable `main` ref (supply-chain hardening).

@@ -1,8 +1,15 @@
 mod app_menus;
+#[cfg(all(feature = "comfy", not(test)))]
+#[path = "comfy_plugin_services.rs"]
+pub mod comfy_plugin_services;
 pub mod edit_prediction_registry;
 #[cfg(target_os = "macos")]
 pub(crate) mod mac_only_instance;
 mod migrate;
+#[cfg(feature = "multiplayer-tools")]
+#[path = "migration.rs"]
+#[allow(dead_code)]
+pub mod migration;
 #[cfg(target_os = "macos")]
 pub(crate) mod move_to_applications;
 mod open_listener;
@@ -15,13 +22,21 @@ pub mod visual_tests;
 #[cfg(target_os = "windows")]
 pub(crate) mod windows_only_instance;
 
+#[cfg(feature = "agentic-tools")]
 use agent_settings::{UserAgentsMdState, init_user_agents_md};
+#[cfg(feature = "agentic-tools")]
 use agent_ui::AgentDiffToolbar;
+#[cfg(feature = "multiplayer-tools")]
+use agent_ui::AgentPanel;
+#[cfg(feature = "multiplayer-tools")]
+use agent_ui::AgentPanelEvent;
 use anyhow::Context as _;
 pub use app_menus::*;
 use assets::Assets;
 
 use breadcrumbs::Breadcrumbs;
+#[cfg(feature = "rust-tools")]
+use cargo_ui::CargoPanel;
 use client::zed_urls;
 use collections::VecDeque;
 use debugger_ui::debugger_panel::DebugPanel;
@@ -29,22 +44,27 @@ use editor::{Editor, MultiBuffer};
 use extension_host::ExtensionStore;
 use feature_flags::{FeatureFlagAppExt as _, PanicFeatureFlag};
 use fs::Fs;
-use futures::FutureExt as _;
 use futures::{StreamExt, channel::mpsc, select_biased};
 use git_ui::branch_diff::BranchDiffToolbar;
 use git_ui::commit_view::CommitViewToolbar;
 use git_ui::git_panel::GitPanel;
+#[cfg(feature = "multiplayer-tools")]
+use git_ui::project_diff::ProjectDiff;
 use git_ui::project_diff::ProjectDiffToolbar;
 use git_ui::solo_diff_view::{SoloDiffGitToolbar, SoloDiffStyleToolbar};
 use git_ui::staged_diff::StagedDiffToolbar;
 use git_ui::unstaged_diff::UnstagedDiffToolbar;
+#[cfg(feature = "agentic-tools")]
+use gpui::AsyncWindowContext;
 use gpui::{
-    Action, App, AppContext as _, AsyncWindowContext, ClipboardItem, Context, DismissEvent,
-    Element, Entity, FocusHandle, Focusable, Image, ImageFormat, KeyBinding, ParentElement,
-    PathPromptOptions, PromptLevel, ReadGlobal, SharedString, Size, Task, TaskExt, TitlebarOptions,
-    UpdateGlobal, WeakEntity, Window, WindowBounds, WindowHandle, WindowKind, WindowOptions,
-    actions, image_cache, img, point, px, retain_all,
+    Action, App, AppContext as _, ClipboardItem, Context, DismissEvent, Element, Entity,
+    FocusHandle, Focusable, Image, ImageFormat, KeyBinding, ParentElement, PathPromptOptions,
+    PromptLevel, ReadGlobal, SharedString, Size, Task, TaskExt, TitlebarOptions, UpdateGlobal,
+    WeakEntity, Window, WindowBounds, WindowHandle, WindowKind, WindowOptions, actions,
+    image_cache, img, point, px, retain_all,
 };
+#[cfg(feature = "multiplayer-tools")]
+use gpui::{EntityId, Subscription};
 use image_viewer::ImageInfo;
 use language::Capability;
 use language_onboarding::BasedPyrightBanner;
@@ -76,6 +96,7 @@ use settings::{
     SettingsFile, SettingsStore, VIM_KEYMAP_PATH, initial_local_debug_tasks_content,
     initial_project_settings_content, initial_tasks_content, update_settings_file,
 };
+#[cfg(feature = "agentic-tools")]
 use sidebar::Sidebar;
 #[cfg(debug_assertions)]
 use workspace::workspace_error::{ErrorAction, ErrorSeverity, WorkspaceError};
@@ -86,6 +107,8 @@ use std::{
     sync::Arc,
     sync::atomic::{self, AtomicBool},
 };
+#[cfg(feature = "multiplayer-tools")]
+use std::{cell::RefCell, rc::Rc};
 use terminal_view::terminal_panel::{self, TerminalPanel};
 use theme::{ActiveTheme, SystemAppearance, ThemeRegistry, deserialize_icon_theme};
 use theme_settings::{ThemeSettings, load_user_theme};
@@ -97,10 +120,27 @@ use uuid::Uuid;
 use vim_mode_setting::VimModeSetting;
 use workspace::notifications::{NotificationId, dismiss_app_notification, show_app_notification};
 
+#[cfg(feature = "agentic-tools")]
+use workspace::Panel;
+#[cfg(feature = "multiplayer-tools")]
+use workspace::collaborative_composer::CollaborativeComposerRegistration;
+#[cfg(feature = "multiplayer-tools")]
+use workspace::collaborative_participants::{
+    CollaborativeConnectionState, CollaborativeParticipant, CollaborativeParticipantPresence,
+    CollaborativeParticipantProvider, CollaborativeParticipantRegistration,
+};
+#[cfg(all(test, feature = "multiplayer-tools"))]
+use workspace::collaborative_participants::{
+    CollaborativeParticipantProviderState, CollaborativeParticipantViewData,
+};
+#[cfg(feature = "multiplayer-tools")]
+use workspace::collaborative_review::CollaborativeReviewRegistration;
+#[cfg(feature = "multiplayer-tools")]
+use workspace::collaborative_timeline::CollaborativeTimelineRegistration;
 use workspace::{
-    AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Panel, Toast, Workspace,
-    WorkspaceSettings, create_and_open_local_file,
-    notifications::simple_message_notification::MessageNotification, open_new,
+    AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Toast, Workspace, WorkspaceSettings,
+    create_and_open_local_file, notifications::simple_message_notification::MessageNotification,
+    open_new,
 };
 use workspace::{
     CloseIntent, CloseProject, CloseWindow, RestoreBanner, with_active_or_new_workspace,
@@ -110,7 +150,6 @@ use zed_actions::{
     About, GetMerch, OpenAccountSettings, OpenBrowser, OpenDocs, OpenProjectTasks,
     OpenServerSettings, OpenSettingsFile, OpenStatusPage, OpenZedUrl, Quit,
 };
-
 const DOCS_URL: &str = "https://zed.dev/docs/";
 const STATUS_URL: &str = "https://status.zed.dev";
 const MERCH_URL: &str = "https://merch.zed.dev/";
@@ -118,6 +157,1167 @@ const MERCH_URL: &str = "https://merch.zed.dev/";
 pub struct CrashHandler(pub Arc<crashes::Client>);
 
 impl gpui::Global for CrashHandler {}
+
+#[cfg(feature = "multiplayer-tools")]
+#[derive(Default)]
+struct CollaborativeReviewCompositionState {
+    agent_panel_id: Option<EntityId>,
+    agent_thread_id: Option<EntityId>,
+    agent_registration: Option<CollaborativeReviewRegistration>,
+    composer_thread_view_id: Option<EntityId>,
+    composer_registration: Option<CollaborativeComposerRegistration>,
+    participant_thread_view_id: Option<EntityId>,
+    participant_registration: Option<CollaborativeParticipantRegistration>,
+    participant_observed_thread_view_id: Option<EntityId>,
+    participant_thread_observation: Option<Subscription>,
+    participant_active_call_observation: Option<Subscription>,
+    participant_room_id: Option<EntityId>,
+    participant_room_observation: Option<Subscription>,
+    timeline_thread_view_id: Option<EntityId>,
+    timeline_registration: Option<CollaborativeTimelineRegistration>,
+    project_diff_id: Option<EntityId>,
+    project_registration: Option<CollaborativeReviewRegistration>,
+}
+
+#[cfg(feature = "multiplayer-tools")]
+struct CollaborativeParticipantProjection {
+    thread_view_id: EntityId,
+    provider: CollaborativeParticipantProvider,
+}
+
+#[cfg(feature = "multiplayer-tools")]
+impl CollaborativeParticipantProjection {
+    fn from_adapter(
+        adapter: agent_ui::collaborative_participants::CollaborativeParticipantAdapter,
+    ) -> Self {
+        let thread_view_id = adapter.thread_view_id();
+        let provider = adapter.into_provider();
+        Self {
+            thread_view_id,
+            provider,
+        }
+    }
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn reconcile_collaborative_composer(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: &Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut App,
+) {
+    let thread_view_id = agent_panel
+        .read(cx)
+        .active_thread_view(cx)
+        .map(|thread_view| thread_view.entity_id());
+    if state.borrow().composer_thread_view_id == thread_view_id {
+        return;
+    }
+
+    let adapter = agent_ui::collaborative_composer::CollaborativeComposerAdapter::from_agent_panel(
+        agent_panel,
+        workspace_handle,
+        cx,
+    );
+    let state = state.clone();
+    workspace_handle.update(cx, |workspace, cx| {
+        if let Some(registration) = state.borrow_mut().composer_registration.take() {
+            workspace.unregister_collaborative_composer_provider(registration, cx);
+        }
+        state.borrow_mut().composer_thread_view_id = None;
+
+        let adapter = match adapter {
+            Ok(adapter) => adapter,
+            Err(
+                agent_ui::collaborative_composer::CollaborativeComposerAdapterError::ThreadUnavailable,
+            ) => return,
+            Err(error) => {
+                log::warn!("failed to adapt collaborative composer: {error}");
+                return;
+            }
+        };
+        let thread_view_id = adapter.thread_view_id();
+        match adapter.register_in_workspace(workspace, cx) {
+            Ok(registration) => {
+                let mut state = state.borrow_mut();
+                state.composer_thread_view_id = Some(thread_view_id);
+                state.composer_registration = Some(registration);
+            }
+            Err(error) => {
+                log::warn!("failed to register collaborative composer: {error}");
+            }
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn reconcile_collaborative_timeline(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: &Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut App,
+) {
+    let thread_view_id = agent_panel
+        .read(cx)
+        .active_thread_view(cx)
+        .map(|thread_view| thread_view.entity_id());
+    if state.borrow().timeline_thread_view_id == thread_view_id {
+        return;
+    }
+
+    let adapter = agent_ui::collaborative_timeline::CollaborativeTimelineAdapter::from_agent_panel(
+        agent_panel,
+        workspace_handle,
+        cx,
+    );
+    let state = state.clone();
+    workspace_handle.update(cx, |workspace, cx| {
+        if let Some(registration) = state.borrow_mut().timeline_registration.take() {
+            workspace.unregister_collaborative_timeline_provider(registration, cx);
+        }
+        state.borrow_mut().timeline_thread_view_id = None;
+
+        let adapter = match adapter {
+            Ok(adapter) => adapter,
+            Err(
+                agent_ui::collaborative_timeline::CollaborativeTimelineAdapterError::ThreadUnavailable,
+            ) => return,
+            Err(error) => {
+                log::warn!("failed to adapt collaborative timeline: {error}");
+                return;
+            }
+        };
+        let thread_view_id = adapter.thread_view_id();
+        match adapter.register_in_workspace(workspace, cx) {
+            Ok(registration) => {
+                let mut state = state.borrow_mut();
+                state.timeline_thread_view_id = Some(thread_view_id);
+                state.timeline_registration = Some(registration);
+            }
+            Err(error) => log::warn!("failed to register collaborative timeline: {error}"),
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn apply_collaborative_participant_projection(
+    workspace_handle: &Entity<Workspace>,
+    projection: Option<CollaborativeParticipantProjection>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut App,
+) {
+    let projection_is_current = projection.as_ref().is_some_and(|projection| {
+        let state = state.borrow();
+        state.participant_thread_view_id == Some(projection.thread_view_id)
+            && state.participant_registration.is_some()
+    });
+    if projection_is_current {
+        workspace_handle.update(cx, |_, cx| cx.notify());
+        return;
+    }
+    if projection.is_none() && state.borrow().participant_registration.is_none() {
+        return;
+    }
+
+    let state = state.clone();
+    workspace_handle.update(cx, |workspace, cx| {
+        if let Some(projection) = projection {
+            if let Some(registration) = state.borrow_mut().participant_registration.take() {
+                workspace.unregister_collaborative_participant_provider(registration, cx);
+            }
+            state.borrow_mut().participant_thread_view_id = None;
+            match workspace.register_collaborative_participant_provider(projection.provider, cx) {
+                Ok(registration) => {
+                    let mut state = state.borrow_mut();
+                    state.participant_thread_view_id = Some(projection.thread_view_id);
+                    state.participant_registration = Some(registration);
+                }
+                Err(error) => {
+                    log::warn!("failed to register collaborative participant provider: {error}");
+                }
+            }
+        } else {
+            if let Some(registration) = state.borrow_mut().participant_registration.take() {
+                workspace.unregister_collaborative_participant_provider(registration, cx);
+            }
+            let mut state = state.borrow_mut();
+            state.participant_thread_view_id = None;
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn reconcile_collaborative_participants(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: &Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut App,
+) {
+    let projection = match agent_ui::collaborative_participants::CollaborativeParticipantAdapter::from_agent_panel(
+        agent_panel,
+        workspace_handle,
+        cx,
+    ) {
+        Ok(adapter) => {
+            let adapter = adapter.with_room_state_reader(|cx| {
+                call::ActiveCall::try_global(cx)
+                    .and_then(|active_call| active_call.read(cx).room().cloned())
+                    .map(|room| {
+                        room.read_with(cx, |room, cx| {
+                            let mut participants = Vec::new();
+                            if let Some(user) = room.local_participant_user(cx) {
+                                participants.push(CollaborativeParticipant::human(
+                                    &user,
+                                    CollaborativeParticipantPresence::Online,
+                                ));
+                            }
+                            participants.extend(
+                                room.remote_participants().values().map(|participant| {
+                                    CollaborativeParticipant::human(
+                                        &participant.user,
+                                        CollaborativeParticipantPresence::Online,
+                                    )
+                                }),
+                            );
+                            let connection = if room.status().is_online() {
+                                CollaborativeConnectionState::Connected
+                            } else if room.status().is_offline() {
+                                CollaborativeConnectionState::Failed
+                            } else {
+                                CollaborativeConnectionState::Connecting
+                            };
+                            (participants, connection)
+                        })
+                    })
+                    .unwrap_or_default()
+            });
+            Some(CollaborativeParticipantProjection::from_adapter(adapter))
+        }
+        Err(
+            agent_ui::collaborative_participants::CollaborativeParticipantAdapterError::ThreadUnavailable,
+        ) => None,
+        Err(error) => {
+            log::warn!("failed to adapt collaborative participants: {error}");
+            None
+        }
+    };
+    apply_collaborative_participant_projection(workspace_handle, projection, state, cx);
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn reconcile_collaborative_project_review(
+    workspace_handle: &Entity<Workspace>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let project_diff_id = workspace_handle
+        .read(cx)
+        .item_of_type::<ProjectDiff>(cx)
+        .map(|project_diff| project_diff.entity_id());
+    if state.borrow().project_diff_id == project_diff_id
+        || (project_diff_id.is_none() && state.borrow().project_registration.is_some())
+    {
+        return;
+    }
+
+    let adapter =
+        git_ui::collaborative_review::CollaborativeProjectReviewAdapter::from_workspace_or_create(
+            workspace_handle,
+            window,
+            cx,
+        );
+    let state = state.clone();
+    workspace_handle.update(cx, |workspace, cx| {
+        if let Some(registration) = state.borrow_mut().project_registration.take() {
+            workspace.unregister_collaborative_review_provider(registration, cx);
+        }
+        state.borrow_mut().project_diff_id = None;
+
+        let adapter = match adapter {
+            Ok(adapter) => adapter,
+            Err(
+                git_ui::collaborative_review::CollaborativeProjectReviewError::ProjectDiffUnavailable,
+            ) => return,
+            Err(error) => {
+                log::warn!("failed to adapt collaborative project review: {error}");
+                return;
+            }
+        };
+        let project_diff_id = adapter.project_diff().entity_id();
+        match adapter.register_in_workspace(workspace, cx) {
+            Ok(registration) => {
+                let mut state = state.borrow_mut();
+                state.project_diff_id = Some(project_diff_id);
+                state.project_registration = Some(registration);
+            }
+            Err(error) => {
+                log::warn!("failed to register collaborative project review: {error}");
+            }
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn reconcile_collaborative_agent_review(
+    workspace_handle: &Entity<Workspace>,
+    thread: Option<Entity<acp_thread::AcpThread>>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let thread_id = thread.as_ref().map(Entity::entity_id);
+    if state.borrow().agent_thread_id == thread_id {
+        return;
+    }
+
+    let adapter = agent_ui::collaborative_review::CollaborativeAgentReviewAdapter::new(
+        thread,
+        workspace_handle,
+        window,
+        cx,
+    );
+    let state = state.clone();
+    workspace_handle.update(cx, |workspace, cx| {
+        if let Some(registration) = state.borrow_mut().agent_registration.take() {
+            workspace.unregister_collaborative_review_provider(registration, cx);
+        }
+        state.borrow_mut().agent_thread_id = None;
+
+        let adapter = match adapter {
+            Ok(adapter) => adapter,
+            Err(
+                agent_ui::collaborative_review::CollaborativeAgentReviewError::ThreadUnavailable,
+            ) => {
+                return;
+            }
+            Err(error) => {
+                log::warn!("failed to adapt collaborative agent review: {error}");
+                return;
+            }
+        };
+        match adapter.register_in_workspace(workspace, cx) {
+            Ok(registration) => {
+                let mut state = state.borrow_mut();
+                state.agent_thread_id = thread_id;
+                state.agent_registration = Some(registration);
+            }
+            Err(error) => {
+                log::warn!("failed to register collaborative agent review: {error}");
+            }
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn schedule_collaborative_project_review_reconciliation(
+    workspace_handle: Entity<Workspace>,
+    state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    window: &Window,
+    cx: &mut Context<Workspace>,
+) {
+    let window_handle = window.window_handle();
+    cx.defer(move |cx| {
+        if let Err(error) = window_handle.update(cx, |_, window, cx| {
+            reconcile_collaborative_project_review(&workspace_handle, &state, window, cx);
+        }) {
+            log::warn!("failed to reconcile collaborative project review: {error}");
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn schedule_collaborative_agent_review_reconciliation(
+    workspace_handle: Entity<Workspace>,
+    thread: Option<Entity<acp_thread::AcpThread>>,
+    state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    window: &Window,
+    cx: &mut Context<Workspace>,
+) {
+    let window_handle = window.window_handle();
+    cx.defer(move |cx| {
+        if let Err(error) = window_handle.update(cx, |_, window, cx| {
+            reconcile_collaborative_agent_review(&workspace_handle, thread, &state, window, cx);
+        }) {
+            log::warn!("failed to reconcile collaborative agent review: {error}");
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn schedule_collaborative_composer_reconciliation(
+    workspace_handle: Entity<Workspace>,
+    agent_panel: Entity<AgentPanel>,
+    state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    cx.defer(move |cx| {
+        reconcile_collaborative_composer(&workspace_handle, &agent_panel, &state, cx);
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn schedule_collaborative_timeline_reconciliation(
+    workspace_handle: Entity<Workspace>,
+    agent_panel: Entity<AgentPanel>,
+    state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    cx.defer(move |cx| {
+        reconcile_collaborative_timeline(&workspace_handle, &agent_panel, &state, cx);
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn schedule_collaborative_participant_reconciliation(
+    workspace_handle: Entity<Workspace>,
+    agent_panel: Entity<AgentPanel>,
+    state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    cx.defer(move |cx| {
+        reconcile_collaborative_participants(&workspace_handle, &agent_panel, &state, cx);
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn observe_collaborative_participant_thread(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: &Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    let thread_view = agent_panel.read(cx).active_thread_view(cx);
+    let thread_view_id = thread_view.as_ref().map(Entity::entity_id);
+    if state.borrow().participant_observed_thread_view_id == thread_view_id {
+        return;
+    }
+
+    {
+        let mut state = state.borrow_mut();
+        state.participant_observed_thread_view_id = thread_view_id;
+        state.participant_thread_observation = None;
+    }
+    let Some(thread_view) = thread_view else {
+        return;
+    };
+
+    let workspace_handle = workspace_handle.clone();
+    let agent_panel = agent_panel.clone();
+    let weak_state = Rc::downgrade(state);
+    let observation = cx.observe(&thread_view, move |_, _, cx| {
+        let Some(state) = weak_state.upgrade() else {
+            return;
+        };
+        schedule_collaborative_participant_reconciliation(
+            workspace_handle.clone(),
+            agent_panel.clone(),
+            state,
+            cx,
+        );
+    });
+    state.borrow_mut().participant_thread_observation = Some(observation);
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn observe_collaborative_participant_room(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: &Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    let room = call::ActiveCall::try_global(cx)
+        .and_then(|active_call| active_call.read(cx).room().cloned());
+    let room_id = room.as_ref().map(Entity::entity_id);
+    if state.borrow().participant_room_id == room_id {
+        return;
+    }
+    {
+        let mut state = state.borrow_mut();
+        state.participant_room_id = room_id;
+        state.participant_room_observation = None;
+    }
+    let Some(room) = room else {
+        return;
+    };
+    let workspace_handle = workspace_handle.clone();
+    let agent_panel = agent_panel.clone();
+    let weak_state = Rc::downgrade(state);
+    let observation = cx.observe(&room, move |_, _, cx| {
+        let Some(state) = weak_state.upgrade() else {
+            return;
+        };
+        schedule_collaborative_participant_reconciliation(
+            workspace_handle.clone(),
+            agent_panel.clone(),
+            state,
+            cx,
+        );
+    });
+    state.borrow_mut().participant_room_observation = Some(observation);
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn subscribe_to_collaborative_review_agent_panel(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    window: &mut Window,
+    cx: &mut Context<Workspace>,
+) {
+    let agent_panel_id = agent_panel.entity_id();
+    if state.borrow().agent_panel_id == Some(agent_panel_id) {
+        return;
+    }
+    state.borrow_mut().agent_panel_id = Some(agent_panel_id);
+
+    schedule_collaborative_agent_review_reconciliation(
+        workspace_handle.clone(),
+        agent_panel.read(cx).active_agent_thread(cx),
+        state.clone(),
+        window,
+        cx,
+    );
+    schedule_collaborative_composer_reconciliation(
+        workspace_handle.clone(),
+        agent_panel.clone(),
+        state.clone(),
+        cx,
+    );
+    schedule_collaborative_timeline_reconciliation(
+        workspace_handle.clone(),
+        agent_panel.clone(),
+        state.clone(),
+        cx,
+    );
+    observe_collaborative_participant_thread(workspace_handle, &agent_panel, state, cx);
+    schedule_collaborative_participant_reconciliation(
+        workspace_handle.clone(),
+        agent_panel.clone(),
+        state.clone(),
+        cx,
+    );
+    observe_collaborative_participant_room(workspace_handle, &agent_panel, state, cx);
+    if state.borrow().participant_active_call_observation.is_none()
+        && let Some(active_call) = call::ActiveCall::try_global(cx)
+    {
+        let workspace_handle = workspace_handle.clone();
+        let agent_panel = agent_panel.clone();
+        let weak_state = Rc::downgrade(state);
+        let observation = cx.observe(&active_call, move |_, _, cx| {
+            let Some(state) = weak_state.upgrade() else {
+                return;
+            };
+            observe_collaborative_participant_room(&workspace_handle, &agent_panel, &state, cx);
+            schedule_collaborative_participant_reconciliation(
+                workspace_handle.clone(),
+                agent_panel.clone(),
+                state,
+                cx,
+            );
+        });
+        state.borrow_mut().participant_active_call_observation = Some(observation);
+    }
+
+    let workspace_handle = workspace_handle.clone();
+    let state = state.clone();
+    cx.subscribe_in(
+        &agent_panel,
+        window,
+        move |_, agent_panel, event: &AgentPanelEvent, window, cx| {
+            if matches!(event, AgentPanelEvent::ActiveViewChanged) {
+                schedule_collaborative_agent_review_reconciliation(
+                    workspace_handle.clone(),
+                    agent_panel.read(cx).active_agent_thread(cx),
+                    state.clone(),
+                    window,
+                    cx,
+                );
+                schedule_collaborative_composer_reconciliation(
+                    workspace_handle.clone(),
+                    agent_panel.clone(),
+                    state.clone(),
+                    cx,
+                );
+                schedule_collaborative_timeline_reconciliation(
+                    workspace_handle.clone(),
+                    agent_panel.clone(),
+                    state.clone(),
+                    cx,
+                );
+                observe_collaborative_participant_thread(
+                    &workspace_handle,
+                    agent_panel,
+                    &state,
+                    cx,
+                );
+                schedule_collaborative_participant_reconciliation(
+                    workspace_handle.clone(),
+                    agent_panel.clone(),
+                    state.clone(),
+                    cx,
+                );
+            }
+        },
+    )
+    .detach();
+}
+
+#[cfg(feature = "comfy")]
+struct ComfyComponentHostGlobal {
+    profile_id: String,
+    component_generation: u64,
+    #[cfg(not(test))]
+    plugin_security: comfy_runtime::NativePluginSecurityPolicy,
+    router: comfy_plugin_host::ComponentHostRouter,
+    provider_invocation_authority:
+        Option<Arc<dyn comfy_runtime::NativeProviderInvocationAuthority>>,
+    #[cfg(not(test))]
+    private_worker_executor: Arc<comfy_plugin_host::PrivateWorkerPluginExecutor>,
+    #[cfg(not(test))]
+    provider_cost_authority: Arc<comfy_runtime::ProviderCostApprovalAuthority>,
+}
+
+#[cfg(all(test, feature = "rust-tools"))]
+mod cargo_panel_feature_tests {
+    use super::*;
+
+    #[test]
+    fn cargo_panel_is_registered_in_rust_tools_builds() {
+        assert_eq!(<CargoPanel as workspace::Panel>::persistent_name(), "Cargo");
+        assert_eq!(<CargoPanel as workspace::Panel>::panel_key(), "CargoPanel");
+    }
+
+    #[test]
+    fn cargo_actions_are_registered_only_with_rust_tools() {
+        let actions = cargo_ui::CargoAction::ALL.map(cargo_ui::CargoAction::label);
+        assert_eq!(actions, ["Build", "Check", "Run", "Test", "Bench", "Debug"]);
+        let _ = cargo_ui::BuildSelected;
+        let _ = cargo_ui::CheckSelected;
+        let _ = cargo_ui::RunSelected;
+        let _ = cargo_ui::TestSelected;
+        let _ = cargo_ui::BenchSelected;
+        let _ = cargo_ui::DebugSelected;
+    }
+
+    #[test]
+    fn rust_test_explorer_actions_are_registered_only_with_rust_tools() {
+        let _ = tasks_ui::ToggleTestsPanel;
+        let _ = tasks_ui::RunSelectedTests;
+        let _ = tasks_ui::DebugSelectedTests;
+        let _ = tasks_ui::CancelTestRun;
+        let _ = tasks_ui::RerunFailedTests;
+        let _ = tasks_ui::RevealTestTerminal;
+    }
+
+    #[test]
+    fn rust_workspace_enabled_desktop_registers_cargo_and_tests_panels() {
+        assert!(cfg!(feature = "rust-tools"));
+        assert_eq!(<CargoPanel as workspace::Panel>::persistent_name(), "Cargo");
+        let _ = tasks_ui::ToggleTestsPanel;
+        let _ = cargo_ui::BuildSelected;
+    }
+}
+
+#[cfg(all(test, not(feature = "rust-tools")))]
+mod cargo_panel_disabled_feature_tests {
+    #[test]
+    fn cargo_panel_disabled_build_has_no_rust_tools_capability() {
+        assert!(!cfg!(feature = "rust-tools"));
+    }
+
+    #[test]
+    fn rust_workspace_disabled_desktop_has_no_rust_tools_capability() {
+        assert!(!cfg!(feature = "rust-tools"));
+    }
+}
+
+#[cfg(feature = "comfy")]
+impl gpui::Global for ComfyComponentHostGlobal {}
+
+#[cfg(feature = "comfy")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct NativeComfyRuntimeBinding {
+    profile_id: Uuid,
+    model_roots: Vec<PathBuf>,
+    device: comfy_types::DeviceKind,
+    memory_policy: comfy_runtime::MemoryPolicy,
+    api_host: comfy_runtime::NativeApiHostPolicy,
+    plugin_policy: comfy_runtime::PluginPolicy,
+    rocm_package: Option<comfy_runtime::NativeRocmPackageSettings>,
+    metal_package: Option<comfy_runtime::NativeMetalPackageSettings>,
+    mlu_package: Option<comfy_runtime::NativeMluPackageSettings>,
+    npu_package: Option<comfy_runtime::NativeNpuPackageSettings>,
+    cuda_package: Option<comfy_runtime::NativeCudaPackageSettings>,
+    xpu_package: Option<comfy_runtime::NativeXpuPackageSettings>,
+    directml_package: Option<comfy_runtime::NativeDirectMlPackageSettings>,
+    provider_scope: String,
+    compatibility_version: u16,
+    plugin_security: comfy_runtime::NativePluginSecurityPolicy,
+}
+
+#[cfg(feature = "comfy")]
+impl NativeComfyRuntimeBinding {
+    fn new(
+        profile: &comfy_runtime::NativeRuntimeProfile,
+        plugin_security: &comfy_runtime::NativePluginSecurityPolicy,
+    ) -> Self {
+        Self {
+            profile_id: profile.id,
+            model_roots: profile.model_roots.clone(),
+            device: profile.device,
+            memory_policy: profile.memory_policy,
+            api_host: profile.api_host.clone(),
+            plugin_policy: profile.plugin_policy,
+            rocm_package: profile.rocm_package.clone(),
+            metal_package: profile.metal_package.clone(),
+            mlu_package: profile.mlu_package.clone(),
+            npu_package: profile.npu_package.clone(),
+            cuda_package: profile.cuda_package.clone(),
+            xpu_package: profile.xpu_package.clone(),
+            directml_package: profile.directml_package.clone(),
+            provider_scope: profile.provider_scope.clone(),
+            compatibility_version: profile.compatibility_version,
+            plugin_security: plugin_security.clone(),
+        }
+    }
+}
+
+#[cfg(feature = "comfy")]
+impl gpui::Global for NativeComfyRuntimeBinding {}
+
+#[cfg(feature = "comfy")]
+#[derive(Clone)]
+struct SimComfyPluginContributionSource {
+    router: comfy_plugin_host::ComponentHostRouter,
+}
+
+#[cfg(feature = "comfy")]
+impl comfy_ui::PluginContributionSource for SimComfyPluginContributionSource {
+    fn verified_contributions(&self) -> anyhow::Result<Vec<comfy_ui::PluginContributionInput>> {
+        let plugins = self.router.current()?.installed_plugins()?;
+        let mut contributions = Vec::new();
+        for plugin in plugins {
+            let binding = plugin.binding();
+            for contribution in &plugin.manifest().ui {
+                contributions.push(comfy_ui::PluginContributionInput::from_verified_manifest(
+                    binding.signed_plugin_identifier(),
+                    binding.signed_digest_sha256(),
+                    contribution.id.as_str(),
+                    contribution.surface.as_str(),
+                    contribution.state_schema.as_str(),
+                )?);
+            }
+        }
+        Ok(contributions)
+    }
+}
+
+#[cfg(feature = "comfy")]
+fn register_comfy_plugin_contribution_source(
+    router: comfy_plugin_host::ComponentHostRouter,
+    cx: &mut App,
+) {
+    comfy_ui::register_plugin_contribution_source(
+        Arc::new(SimComfyPluginContributionSource { router }),
+        cx,
+    );
+}
+
+#[cfg(feature = "comfy")]
+fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
+    #[cfg(not(test))]
+    let (profile, plugin_security) = active_native_comfy_configuration(cx)?;
+    #[cfg(not(test))]
+    let profile_id = profile.id.to_string();
+    #[cfg(test)]
+    let profile_id = comfy_ui::LOCAL_EXECUTION_PROFILE_ID.0.to_string();
+
+    #[cfg(not(test))]
+    let (trust_policy, permission_policy, component_generation) = (
+        plugin_security.trust_policy().clone(),
+        plugin_security.permission_policy().clone(),
+        plugin_security.component_registry_generation(),
+    );
+    #[cfg(test)]
+    let (trust_policy, permission_policy, component_generation) = (
+        comfy_runtime::PluginTrustPolicy::default(),
+        comfy_runtime::PermissionPolicy::new(profile_id.clone(), std::iter::empty())?,
+        comfy_runtime::DEFAULT_COMPONENT_REGISTRY_GENERATION,
+    );
+
+    if let Some(component_host) = cx.try_global::<ComfyComponentHostGlobal>() {
+        let matches_current = component_host.profile_id == profile_id
+            && component_host.component_generation == component_generation
+            && {
+                #[cfg(not(test))]
+                {
+                    component_host.plugin_security == plugin_security
+                }
+                #[cfg(test)]
+                {
+                    true
+                }
+            };
+        if matches_current {
+            let router = component_host.router.clone();
+            router.current()?.installed_plugins()?;
+            register_comfy_plugin_contribution_source(router, cx);
+            return Ok(());
+        }
+    }
+
+    #[cfg(not(test))]
+    let plugin_services = {
+        let asset_service = comfy_ui::native_asset_services(cx)
+            .ok_or_else(|| anyhow::anyhow!("native Comfy asset service is unavailable"))?;
+        anyhow::ensure!(
+            asset_service.profile_id() == profile_id,
+            "native Comfy component and asset profiles differ"
+        );
+        let worker = native_comfy_worker_launch(&profile, comfy_types::WorkerId(Uuid::new_v4()))?;
+        let profile_bits = profile.id.as_u128();
+        let profile_seed = (profile_bits as u64) ^ ((profile_bits >> 64) as u64);
+        comfy_plugin_services::private_worker_services(
+            worker,
+            asset_service.assets(),
+            plugin_security.provider_policy().clone(),
+            profile_seed,
+            cx,
+        )?
+    };
+    #[cfg(not(test))]
+    let execution_boundary = plugin_services.boundary.clone();
+    #[cfg(not(test))]
+    let private_worker_executor = plugin_services.private_worker_executor();
+    #[cfg(test)]
+    let execution_boundary = comfy_plugin_host::ComponentExecutionBoundary::conformance_in_process(
+        Arc::new(comfy_plugin_host::UnavailablePluginCapabilityServices),
+    );
+
+    let runtime = extension_host::ComponentRuntime::no_wasi()?;
+    let replacement_host = comfy_plugin_host::ComponentHost::new(
+        runtime,
+        trust_policy,
+        permission_policy,
+        execution_boundary,
+        comfy_plugin_host::ComponentLimits::default(),
+        comfy_runtime::generated_native_node_registry_projection(None)?,
+    )?;
+    #[cfg(not(test))]
+    let provider_invocation_authority = Some(
+        plugin_services.invocation_authority(replacement_host.clone())?
+            as Arc<dyn comfy_runtime::NativeProviderInvocationAuthority>,
+    );
+    #[cfg(not(test))]
+    let provider_cost_authority = plugin_services.cost_authority();
+    #[cfg(test)]
+    let provider_invocation_authority = None;
+    if let Some(component_host) = cx.try_global::<ComfyComponentHostGlobal>() {
+        let router = component_host.router.clone();
+        router.replace_with_initial_generation(replacement_host, component_generation)?;
+        register_comfy_plugin_contribution_source(router, cx);
+        let component_host = cx.global_mut::<ComfyComponentHostGlobal>();
+        component_host.profile_id = profile_id;
+        component_host.component_generation = component_generation;
+        #[cfg(not(test))]
+        {
+            component_host.plugin_security = plugin_security;
+        }
+        component_host.provider_invocation_authority = provider_invocation_authority;
+        #[cfg(not(test))]
+        {
+            component_host.private_worker_executor = private_worker_executor;
+            component_host.provider_cost_authority = provider_cost_authority;
+        }
+        return Ok(());
+    }
+    let router = comfy_plugin_host::ComponentHostRouter::with_initial_generation(
+        replacement_host,
+        component_generation,
+    )?;
+    extension_host::register_component_lifecycle_adapter(Arc::new(router.clone()), cx)?;
+    register_comfy_plugin_contribution_source(router.clone(), cx);
+    #[cfg(not(test))]
+    let receiver = {
+        let receiver = router.subscribe_execution_registry_bundles()?;
+        let _initial_bundle = receiver.try_recv();
+        receiver
+    };
+    cx.set_global(ComfyComponentHostGlobal {
+        profile_id,
+        component_generation,
+        #[cfg(not(test))]
+        plugin_security,
+        router,
+        provider_invocation_authority,
+        #[cfg(not(test))]
+        private_worker_executor,
+        #[cfg(not(test))]
+        provider_cost_authority,
+    });
+    #[cfg(not(test))]
+    {
+        cx.spawn(async move |cx| {
+            while receiver.recv().await.is_ok() {
+                let profile = profile.clone();
+                if let Err(error) =
+                    cx.update(|cx| register_native_comfy_execution(&profile, false, cx))
+                {
+                    eprintln!("native Comfy component lifecycle rebind failed: {error}");
+                }
+            }
+        })
+        .detach();
+    }
+    Ok(())
+}
+
+#[cfg(feature = "comfy")]
+pub(crate) fn init_comfy_ui(cx: &mut App) {
+    #[cfg(test)]
+    comfy_ui::init(cx);
+
+    #[cfg(not(test))]
+    {
+        match active_native_comfy_profile(cx) {
+            Ok(profile) => {
+                comfy_ui::init_for_profile(comfy_types::ProfileId(profile.id), cx);
+            }
+            Err(error) => {
+                let profile_id = configured_native_comfy_profile_id(cx)
+                    .unwrap_or(comfy_types::ProfileId(Uuid::nil()));
+                comfy_ui::init_for_profile(profile_id, cx);
+                if let Err(clear_error) = comfy_ui::clear_native_execution_services(cx) {
+                    log::error!("native Comfy execution shutdown failed: {clear_error}");
+                }
+                let message = format!("native Comfy settings are invalid: {error}");
+                log::error!("{message}");
+                comfy_ui::set_initialization_error(message, cx);
+            }
+        }
+        cx.observe_global::<SettingsStore>(sync_active_native_comfy_profile)
+            .detach();
+    }
+}
+
+#[cfg(not(test))]
+#[cfg(feature = "comfy")]
+fn sync_active_native_comfy_profile(cx: &mut App) {
+    match active_native_comfy_configuration(cx) {
+        Ok((profile, plugin_security)) => {
+            let profile_id = comfy_types::ProfileId(profile.id);
+            let requires_activation = comfy_ui::initialized_profile_id(cx) != Some(profile_id);
+            let requires_recovery = comfy_ui::initialization_error(cx).is_some();
+            let next_binding = NativeComfyRuntimeBinding::new(&profile, &plugin_security);
+            let requires_rebind =
+                cx.try_global::<NativeComfyRuntimeBinding>() != Some(&next_binding);
+            if !requires_activation && !requires_recovery && !requires_rebind {
+                return;
+            }
+            comfy_ui::clear_initialization_error(cx);
+            comfy_ui::init_for_profile(profile_id, cx);
+            if let Err(error) = init_comfy_component_host(cx) {
+                let message = format!("native Comfy component host initialization failed: {error}");
+                log::error!("{message}");
+                comfy_ui::set_initialization_error(message, cx);
+            } else {
+                if let Err(error) = register_native_comfy_execution(&profile, requires_rebind, cx) {
+                    let message =
+                        format!("native Comfy worker registry initialization failed: {error}");
+                    log::error!("{message}");
+                    comfy_ui::set_initialization_error(message, cx);
+                } else {
+                    cx.set_global(next_binding);
+                }
+            }
+        }
+        Err(error) => {
+            if cx.has_global::<NativeComfyRuntimeBinding>() {
+                let _removed_binding = cx.remove_global::<NativeComfyRuntimeBinding>();
+            }
+            if let Err(clear_error) = comfy_ui::clear_native_execution_services(cx) {
+                log::error!("native Comfy execution shutdown failed: {clear_error}");
+            }
+            let profile_id = configured_native_comfy_profile_id(cx)
+                .unwrap_or(comfy_types::ProfileId(Uuid::nil()));
+            if comfy_ui::initialized_profile_id(cx) != Some(profile_id) {
+                comfy_ui::init_for_profile(profile_id, cx);
+            }
+            comfy_ui::clear_initialization_error(cx);
+            let message = format!("native Comfy settings are invalid: {error}");
+            log::error!("{message}");
+            comfy_ui::set_initialization_error(message, cx);
+        }
+    }
+}
+
+#[cfg(all(feature = "comfy", not(test)))]
+fn active_native_comfy_profile(cx: &App) -> anyhow::Result<comfy_runtime::NativeRuntimeProfile> {
+    let settings_store = cx
+        .try_global::<SettingsStore>()
+        .ok_or_else(|| anyhow::anyhow!("Zed settings store is unavailable"))?;
+    active_native_comfy_profile_from_settings(settings_store.merged_settings())
+}
+
+#[cfg(all(feature = "comfy", not(test)))]
+fn active_native_comfy_configuration(
+    cx: &App,
+) -> anyhow::Result<(
+    comfy_runtime::NativeRuntimeProfile,
+    comfy_runtime::NativePluginSecurityPolicy,
+)> {
+    let settings_store = cx
+        .try_global::<SettingsStore>()
+        .ok_or_else(|| anyhow::anyhow!("Zed settings store is unavailable"))?;
+    active_native_comfy_configuration_from_settings(settings_store.merged_settings())
+}
+
+#[cfg(all(feature = "comfy", not(test)))]
+fn configured_native_comfy_profile_id(cx: &App) -> Option<comfy_types::ProfileId> {
+    cx.try_global::<SettingsStore>()
+        .and_then(|store| native_comfy_profile_id_from_settings(store.merged_settings()))
+}
+
+#[cfg(feature = "comfy")]
+fn native_comfy_profile_id_from_settings(
+    settings: &settings::SettingsContent,
+) -> Option<comfy_types::ProfileId> {
+    let fallback = default_native_comfy_settings_content().ok();
+    let runtime = settings
+        .comfy_runtime
+        .as_ref()
+        .or_else(|| fallback.as_ref()?.comfy_runtime.as_ref())?;
+    let active_profile = runtime.active_profile.as_deref()?;
+    Uuid::parse_str(active_profile)
+        .ok()
+        .map(comfy_types::ProfileId)
+}
+
+#[cfg(feature = "comfy")]
+fn default_native_comfy_settings_content() -> anyhow::Result<settings::SettingsContent> {
+    <settings::SettingsContent as settings::RootUserSettings>::parse_json_with_comments(
+        include_str!("../../../assets/settings/default-comfy.json"),
+    )
+}
+
+#[cfg(feature = "comfy")]
+fn active_native_comfy_configuration_from_settings(
+    settings: &settings::SettingsContent,
+) -> anyhow::Result<(
+    comfy_runtime::NativeRuntimeProfile,
+    comfy_runtime::NativePluginSecurityPolicy,
+)> {
+    let fallback = default_native_comfy_settings_content()?;
+    let content = settings
+        .comfy_runtime
+        .as_ref()
+        .or(fallback.comfy_runtime.as_ref())
+        .ok_or_else(|| anyhow::anyhow!("native Comfy default settings are missing"))?;
+    let settings = comfy_runtime::parse_runtime_settings(content)?;
+    let profile = settings
+        .active_profile()
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("native Comfy active profile is unavailable"))?;
+    let plugin_security = settings
+        .active_plugin_security_policy()
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("native Comfy plugin security policy is unavailable"))?;
+    Ok((profile, plugin_security))
+}
+
+#[cfg(feature = "comfy")]
+fn active_native_comfy_profile_from_settings(
+    settings: &settings::SettingsContent,
+) -> anyhow::Result<comfy_runtime::NativeRuntimeProfile> {
+    active_native_comfy_configuration_from_settings(settings).map(|(profile, _)| profile)
+}
+
+#[cfg(all(feature = "comfy", not(test)))]
+fn native_comfy_worker_launch(
+    profile: &comfy_runtime::NativeRuntimeProfile,
+    worker_id: comfy_types::WorkerId,
+) -> anyhow::Result<comfy_runtime::WorkerLaunchConfig> {
+    Ok(
+        comfy_runtime::WorkerLaunchConfig::for_packaged_worker_profile(
+            profile,
+            worker_id,
+            comfy_runtime::NATIVE_IMAGE_REGISTRY_VERSION,
+            8 * 1024 * 1024 * 1024,
+        )?,
+    )
+}
+
+#[cfg(all(feature = "comfy", not(test)))]
+fn register_native_comfy_execution(
+    profile: &comfy_runtime::NativeRuntimeProfile,
+    replace_assets: bool,
+    cx: &mut App,
+) -> anyhow::Result<()> {
+    use comfy_runtime::{NativeExecutionControllerConfig, open_native_profile_asset_service};
+    use comfy_types::{ProfileId, WorkerId};
+
+    let profile_id = ProfileId(profile.id);
+    let assets = match comfy_ui::native_asset_services(cx) {
+        Some(services) if !replace_assets && services.profile_id() == profile_id.0.to_string() => {
+            services.assets()
+        }
+        _ => {
+            let root = paths::data_dir()
+                .join("comfy")
+                .join("native")
+                .join(profile.id.to_string());
+            let assets = open_native_profile_asset_service(
+                profile_id.0.to_string(),
+                &root,
+                &profile.model_roots,
+            )?;
+            comfy_ui::register_native_asset_services(assets.clone(), cx)?;
+            assets
+        }
+    };
+    let mut worker = native_comfy_worker_launch(profile, WorkerId(Uuid::new_v4()))?;
+    let (registry_bundle, provider_invocation_authority, private_worker_executor) = {
+        let component_host = cx
+            .try_global::<ComfyComponentHostGlobal>()
+            .filter(|component_host| component_host.profile_id == profile_id.0.to_string())
+            .ok_or_else(|| anyhow::anyhow!("native Comfy component host is unavailable"))?;
+        (
+            Arc::new(component_host.router.active_execution_registry_bundle()?),
+            component_host.provider_invocation_authority.clone(),
+            component_host.private_worker_executor.clone(),
+        )
+    };
+    worker = worker.with_registry_deployment(registry_bundle.worker_deployment().clone());
+    let presentation = comfy_ui::execution_ui_model(cx)
+        .ok_or_else(|| anyhow::anyhow!("native execution UI model is not initialized"))?
+        .read(cx)
+        .shared_service();
+    let mut config = NativeExecutionControllerConfig::new(assets, presentation, worker, true)?
+        .with_memory_policy(profile.memory_policy);
+    if let Some(provider_registry) = registry_bundle.provider_registry() {
+        config = config.with_provider_registry(provider_registry.clone())?;
+        config =
+            config.with_provider_invocation_authority(provider_invocation_authority.ok_or_else(
+                || anyhow::anyhow!("native provider invocation authority is unavailable"),
+            )?);
+    }
+    let provider_worker_bridge =
+        comfy_ui::register_native_execution_services(config, registry_bundle, cx)?;
+    if let Err(error) =
+        private_worker_executor.attach_provider_worker_bridge(provider_worker_bridge)
+    {
+        if let Err(clear_error) = comfy_ui::clear_native_execution_services(cx) {
+            return Err(anyhow::anyhow!(
+                "native provider bridge attachment failed: {error}; controller rollback failed: {clear_error}"
+            ));
+        }
+        return Err(anyhow::anyhow!(
+            "native provider bridge attachment failed: {error}"
+        ));
+    }
+    Ok(())
+}
 
 actions!(
     zed,
@@ -192,6 +1392,34 @@ actions!(
 );
 
 pub fn init(cx: &mut App) {
+    #[cfg(feature = "comfy")]
+    {
+        init_comfy_ui(cx);
+        match init_comfy_component_host(cx) {
+            Err(error) => {
+                let message = format!("native Comfy component host initialization failed: {error}");
+                log::error!("{message}");
+                comfy_ui::set_initialization_error(message, cx);
+            }
+            #[cfg(not(test))]
+            Ok(()) => {
+                if let Ok(profile) = active_native_comfy_profile(cx)
+                    && let Err(error) = register_native_comfy_execution(&profile, false, cx)
+                {
+                    let message =
+                        format!("native Comfy worker registry initialization failed: {error}");
+                    log::error!("{message}");
+                    comfy_ui::set_initialization_error(message, cx);
+                } else if let Ok((profile, plugin_security)) = active_native_comfy_configuration(cx)
+                {
+                    cx.set_global(NativeComfyRuntimeBinding::new(&profile, &plugin_security));
+                }
+            }
+            #[cfg(test)]
+            Ok(()) => {}
+        }
+    }
+
     #[cfg(target_os = "macos")]
     cx.on_action(|_: &Hide, cx| cx.hide());
     #[cfg(target_os = "macos")]
@@ -501,23 +1729,27 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
                 .unwrap_or(true)
         });
 
-        let window_handle = window.window_handle();
-        let multi_workspace_handle = cx.entity();
-        cx.subscribe_in(
-            &multi_workspace_handle,
-            window,
-            |this, _multi_workspace, event: &workspace::MultiWorkspaceEvent, window, cx| {
-                let workspace::MultiWorkspaceEvent::ActiveWorkspaceChanged { source_workspace } =
-                    event
-                else {
-                    return;
-                };
+        #[cfg(feature = "agentic-tools")]
+        {
+            let window_handle = window.window_handle();
+            let multi_workspace_handle = cx.entity();
+            cx.subscribe_in(
+                &multi_workspace_handle,
+                window,
+                |this, _multi_workspace, event: &workspace::MultiWorkspaceEvent, window, cx| {
+                    let workspace::MultiWorkspaceEvent::ActiveWorkspaceChanged {
+                        source_workspace,
+                    } = event
+                    else {
+                        return;
+                    };
 
-                let active_workspace = this.workspace().clone();
-                let source_workspace = source_workspace.clone();
-                active_workspace.update(cx, |workspace, cx| {
-                    if let Some(ref source) = source_workspace {
-                        if let Some(panel) = workspace.panel::<agent_ui::AgentPanel>(cx) {
+                    let active_workspace = this.workspace().clone();
+                    let source_workspace = source_workspace.clone();
+                    active_workspace.update(cx, |workspace, cx| {
+                        if let Some(ref source) = source_workspace
+                            && let Some(panel) = workspace.panel::<agent_ui::AgentPanel>(cx)
+                        {
                             panel.update(cx, |panel, cx| {
                                 panel.initialize_from_source_workspace_if_needed(
                                     source.clone(),
@@ -526,26 +1758,26 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
                                 );
                             });
                         }
-                    }
 
-                    ensure_agent_panel_for_workspace(workspace, source_workspace, window, cx)
-                        .detach_and_log_err(cx);
-                });
-            },
-        )
-        .detach();
-
-        cx.defer(move |cx| {
-            window_handle
-                .update(cx, |_, window, cx| {
-                    let sidebar =
-                        cx.new(|cx| Sidebar::new(multi_workspace_handle.clone(), window, cx));
-                    multi_workspace_handle.update(cx, |multi_workspace, cx| {
-                        multi_workspace.register_sidebar(sidebar, cx);
+                        ensure_agent_panel_for_workspace(workspace, source_workspace, window, cx)
+                            .detach_and_log_err(cx);
                     });
-                })
-                .ok();
-        });
+                },
+            )
+            .detach();
+
+            cx.defer(move |cx| {
+                window_handle
+                    .update(cx, |_, window, cx| {
+                        let sidebar =
+                            cx.new(|cx| Sidebar::new(multi_workspace_handle.clone(), window, cx));
+                        multi_workspace_handle.update(cx, |multi_workspace, cx| {
+                            multi_workspace.register_sidebar(sidebar, cx);
+                        });
+                    })
+                    .ok();
+            });
+        }
     })
     .detach();
 
@@ -555,13 +1787,58 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
         };
 
         let workspace_handle = cx.entity();
+        #[cfg(feature = "multiplayer-tools")]
+        let collaborative_review_state =
+            Rc::new(RefCell::new(CollaborativeReviewCompositionState::default()));
+        #[cfg(feature = "multiplayer-tools")]
+        schedule_collaborative_project_review_reconciliation(
+            workspace_handle.clone(),
+            collaborative_review_state.clone(),
+            window,
+            cx,
+        );
+        #[cfg(feature = "multiplayer-tools")]
+        if let Some(agent_panel) = workspace.panel::<AgentPanel>(cx) {
+            subscribe_to_collaborative_review_agent_panel(
+                &workspace_handle,
+                agent_panel,
+                &collaborative_review_state,
+                window,
+                cx,
+            );
+        }
         let center_pane = workspace.active_pane().clone();
         initialize_pane(workspace, &center_pane, window, cx);
 
         cx.subscribe_in(&workspace_handle, window, {
+            #[cfg(feature = "multiplayer-tools")]
+            let workspace_handle = workspace_handle.clone();
+            #[cfg(feature = "multiplayer-tools")]
+            let collaborative_review_state = collaborative_review_state.clone();
             move |workspace, _, event, window, cx| match event {
                 workspace::Event::PaneAdded(pane) => {
                     initialize_pane(workspace, pane, window, cx);
+                }
+                #[cfg(feature = "multiplayer-tools")]
+                workspace::Event::ItemAdded { .. } | workspace::Event::ItemRemoved { .. } => {
+                    schedule_collaborative_project_review_reconciliation(
+                        workspace_handle.clone(),
+                        collaborative_review_state.clone(),
+                        window,
+                        cx,
+                    );
+                }
+                #[cfg(feature = "multiplayer-tools")]
+                workspace::Event::PanelAdded(panel) => {
+                    if let Ok(agent_panel) = panel.clone().downcast::<AgentPanel>() {
+                        subscribe_to_collaborative_review_agent_panel(
+                            &workspace_handle,
+                            agent_panel,
+                            &collaborative_review_state,
+                            window,
+                            cx,
+                        );
+                    }
                 }
                 workspace::Event::OpenBundledFile {
                     text,
@@ -633,6 +1910,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
         let line_ending_indicator =
             cx.new(|_| line_ending_selector::LineEndingIndicator::default());
         let git_blame_status = cx.new(|_| git_ui::GitBlameStatus::default());
+        #[cfg(feature = "agentic-tools")]
         let merge_conflict_indicator =
             cx.new(|cx| git_ui::MergeConflictIndicator::new(workspace, cx));
         workspace.status_bar().update(cx, |status_bar, cx| {
@@ -641,6 +1919,7 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
             status_bar.add_left_item(diagnostic_summary, window, cx);
             status_bar.add_left_item(active_file_name, window, cx);
             status_bar.add_left_item(git_blame_status, window, cx);
+            #[cfg(feature = "agentic-tools")]
             status_bar.add_left_item(merge_conflict_indicator, window, cx);
             status_bar.add_left_item(activity_indicator, window, cx);
             status_bar.add_right_item(edit_prediction_ui, window, cx);
@@ -780,6 +2059,8 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
     cx.spawn_in(window, async move |workspace_handle, cx| {
         let project_panel = ProjectPanel::load(workspace_handle.clone(), cx.clone());
         let outline_panel = OutlinePanel::load(workspace_handle.clone(), cx.clone());
+        #[cfg(feature = "rust-tools")]
+        let cargo_panel = CargoPanel::load(workspace_handle.clone(), cx.clone());
         let terminal_panel = TerminalPanel::load(workspace_handle.clone(), cx.clone());
         let git_panel = GitPanel::load(workspace_handle.clone(), cx.clone());
         let channels_panel =
@@ -801,20 +2082,63 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
             }
         }
 
+        #[cfg(feature = "rust-tools")]
+        let cargo_panel_task =
+            add_panel_when_ready(cargo_panel, workspace_handle.clone(), cx.clone());
+        #[cfg(not(feature = "rust-tools"))]
+        let cargo_panel_task = std::future::ready(());
+
+        #[cfg(feature = "comfy")]
+        let comfy_workspace_handle = workspace_handle.clone();
+        let comfy_panels = async {
+            #[cfg(feature = "comfy")]
+            {
+                let mut execution_context = cx.clone();
+                let execution_panel = comfy_ui::ExecutionPanel::load(
+                    comfy_workspace_handle.clone(),
+                    &mut execution_context,
+                );
+                let mut properties_context = cx.clone();
+                let graph_properties_panel = comfy_ui::GraphPropertiesPanel::load(
+                    comfy_workspace_handle.clone(),
+                    &mut properties_context,
+                );
+                futures::join!(
+                    add_panel_when_ready(
+                        execution_panel,
+                        comfy_workspace_handle.clone(),
+                        cx.clone()
+                    ),
+                    add_panel_when_ready(
+                        graph_properties_panel,
+                        comfy_workspace_handle.clone(),
+                        cx.clone()
+                    ),
+                );
+            }
+        };
+
         futures::join!(
             add_panel_when_ready(project_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(outline_panel, workspace_handle.clone(), cx.clone()),
+            cargo_panel_task,
             add_panel_when_ready(terminal_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(git_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(channels_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(debug_panel, workspace_handle.clone(), cx.clone()),
-            initialize_agent_panel(workspace_handle, cx.clone()).map(|r| r.log_err()),
+            comfy_panels,
         );
+
+        #[cfg(feature = "agentic-tools")]
+        initialize_agent_panel(workspace_handle, cx.clone())
+            .await
+            .log_err();
 
         anyhow::Ok(())
     })
 }
 
+#[cfg(feature = "agentic-tools")]
 fn setup_or_teardown_ai_panel<P: Panel>(
     workspace: &mut Workspace,
     window: &mut Window,
@@ -851,6 +2175,7 @@ fn setup_or_teardown_ai_panel<P: Panel>(
     }
 }
 
+#[cfg(feature = "agentic-tools")]
 fn ensure_agent_panel_for_workspace(
     workspace: &mut Workspace,
     source_workspace: Option<WeakEntity<Workspace>>,
@@ -875,6 +2200,7 @@ fn ensure_agent_panel_for_workspace(
     })
 }
 
+#[cfg(feature = "agentic-tools")]
 async fn initialize_agent_panel(
     workspace_handle: WeakEntity<Workspace>,
     mut cx: AsyncWindowContext,
@@ -1260,7 +2586,8 @@ fn register_actions(
                         Toast::new(
                             NotificationId::unique::<RegisterZedScheme>(),
                             format!(
-                                "zed:// links will now open in {}.",
+                                "{} links will now open in {}.",
+                                product_flavor::URL_PREFIX,
                                 ReleaseChannel::global(cx).display_name()
                             ),
                         ),
@@ -1270,7 +2597,7 @@ fn register_actions(
                 Ok(())
             })
             .detach_and_prompt_err(
-                "Error registering zed:// scheme",
+                product_flavor::REGISTER_SCHEME_ERROR_TITLE,
                 window,
                 cx,
                 |_, _, _| None,
@@ -1407,6 +2734,7 @@ fn register_actions(
         });
     }
 
+    #[cfg(feature = "agentic-tools")]
     workspace.register_action(sidebar::dump_workspace_info);
 
     #[cfg(debug_assertions)]
@@ -1483,8 +2811,11 @@ fn initialize_pane(
             toolbar.add_item(lsp_log_item, window, cx);
             let dap_log_item = cx.new(|_| debugger_tools::DapLogToolbarItemView::new());
             toolbar.add_item(dap_log_item, window, cx);
-            let acp_tools_item = cx.new(|_| acp_tools::AcpToolsToolbarItemView::new());
-            toolbar.add_item(acp_tools_item, window, cx);
+            #[cfg(feature = "agentic-tools")]
+            {
+                let acp_tools_item = cx.new(|_| acp_tools::AcpToolsToolbarItemView::new());
+                toolbar.add_item(acp_tools_item, window, cx);
+            }
             let telemetry_log_item =
                 cx.new(|cx| telemetry_log::TelemetryLogToolbarItemView::new(window, cx));
             toolbar.add_item(telemetry_log_item, window, cx);
@@ -1508,8 +2839,11 @@ fn initialize_pane(
             toolbar.add_item(solo_diff_git_toolbar, window, cx);
             let commit_view_toolbar = cx.new(|_| CommitViewToolbar::new());
             toolbar.add_item(commit_view_toolbar, window, cx);
-            let agent_diff_toolbar = cx.new(AgentDiffToolbar::new);
-            toolbar.add_item(agent_diff_toolbar, window, cx);
+            #[cfg(feature = "agentic-tools")]
+            {
+                let agent_diff_toolbar = cx.new(AgentDiffToolbar::new);
+                toolbar.add_item(agent_diff_toolbar, window, cx);
+            }
             let basedpyright_banner = cx.new(|cx| BasedPyrightBanner::new(workspace, cx));
             toolbar.add_item(basedpyright_banner, window, cx);
             let image_view_toolbar = cx.new(|_| image_viewer::ImageViewToolbarControls::new());
@@ -1710,7 +3044,7 @@ fn open_about_window(cx: &mut App) {
     cx.open_window(
         WindowOptions {
             titlebar: Some(TitlebarOptions {
-                title: Some("About Zed".into()),
+                title: Some(format!("About {}", product_flavor::DISPLAY_NAME).into()),
                 appears_transparent: true,
                 traffic_light_position: Some(point(px(12.), px(12.))),
             }),
@@ -2150,6 +3484,7 @@ fn init_reduce_motion(cx: &mut App) {
 ///
 /// The file itself is loaded into [`agent_settings::UserAgentsMd`] for inclusion
 /// in prompts.
+#[cfg(feature = "agentic-tools")]
 pub fn watch_user_agents_md(fs: Arc<dyn fs::Fs>, cx: &mut App) {
     struct UserAgentsMdParseError;
     let notification_id = NotificationId::unique::<UserAgentsMdParseError>();
@@ -2220,7 +3555,7 @@ pub fn handle_keymap_file_changes(
             old_helix_enabled = new_helix_enabled;
             old_disable_ai = new_disable_ai;
 
-            base_keymap_tx.unbounded_send(()).unwrap();
+            base_keymap_tx.unbounded_send(()).log_err();
         }
     })
     .detach();
@@ -2403,44 +3738,35 @@ fn reload_keymaps(cx: &mut App, mut user_key_bindings: Vec<KeyBinding>) {
 
 pub fn load_default_keymap(cx: &mut App) {
     let base_keymap = *BaseKeymap::get_global(cx);
-    if base_keymap == BaseKeymap::None {
-        return;
+    let vim_enabled =
+        VimModeSetting::get_global(cx).0 || vim_mode_setting::HelixModeSetting::get_global(cx).0;
+    for (asset_path, source) in builtin_keymap_assets(base_keymap, vim_enabled) {
+        match load_builtin_keymap_asset(asset_path, source, cx) {
+            Ok(key_bindings) => cx.bind_keys(filter_disabled_ai_bindings(key_bindings, cx)),
+            Err(error) => {
+                log::error!("Failed to load built-in keymap {asset_path:?}: {error:#}");
+            }
+        }
     }
-
-    cx.bind_keys(filter_disabled_ai_bindings(
-        KeymapFile::load_asset(DEFAULT_KEYMAP_PATH, Some(KeybindSource::Default), cx).unwrap(),
-        cx,
-    ));
-
-    if let Some(asset_path) = base_keymap.asset_path() {
-        cx.bind_keys(filter_disabled_ai_bindings(
-            KeymapFile::load_asset(asset_path, Some(KeybindSource::Base), cx).unwrap(),
-            cx,
-        ));
-    }
-
-    if VimModeSetting::get_global(cx).0 || vim_mode_setting::HelixModeSetting::get_global(cx).0 {
-        cx.bind_keys(filter_disabled_ai_bindings(
-            KeymapFile::load_asset(VIM_KEYMAP_PATH, Some(KeybindSource::Vim), cx).unwrap(),
-            cx,
-        ));
-    }
-
-    cx.bind_keys(
-        KeymapFile::load_asset(
-            SPECIFIC_OVERRIDES_KEYMAP_PATH,
-            Some(KeybindSource::Default),
-            cx,
-        )
-        .unwrap(),
-    );
 }
 
-/// Namespaces of actions that are part of an AI feature. When the user opts out
-/// of AI via the `disable_ai` setting, bindings to these actions are dropped so
-/// that lower-precedence editor defaults (e.g. `editor::NewlineBelow` for
-/// `ctrl-enter`) can fire instead of being shadowed by an action whose handler
-/// silently no-ops.
+fn load_builtin_keymap_asset(
+    asset_path: &str,
+    source: KeybindSource,
+    cx: &App,
+) -> anyhow::Result<Vec<KeyBinding>> {
+    #[cfg(feature = "agentic-tools")]
+    let key_bindings = KeymapFile::load_asset(asset_path, Some(source), cx)?;
+    #[cfg(not(feature = "agentic-tools"))]
+    let mut key_bindings = KeymapFile::load_asset_allow_partial_failure(asset_path, cx)?;
+    #[cfg(not(feature = "agentic-tools"))]
+    for key_binding in &mut key_bindings {
+        key_binding.set_meta(source.meta());
+    }
+    Ok(key_bindings)
+}
+
+#[cfg(feature = "agentic-tools")]
 const AI_ACTION_NAMESPACES: &[&str] = &[
     "acp::",
     "agent::",
@@ -2450,6 +3776,9 @@ const AI_ACTION_NAMESPACES: &[&str] = &[
     "zeta::",
 ];
 
+#[cfg(not(feature = "agentic-tools"))]
+const AI_ACTION_NAMESPACES: &[&str] = &["acp::", "agent::", "assistant::", "inline_assistant::"];
+
 fn is_ai_keybinding(binding: &KeyBinding) -> bool {
     let name = binding.action().name();
     AI_ACTION_NAMESPACES
@@ -2458,13 +3787,34 @@ fn is_ai_keybinding(binding: &KeyBinding) -> bool {
 }
 
 fn filter_disabled_ai_bindings(bindings: Vec<KeyBinding>, cx: &App) -> Vec<KeyBinding> {
-    if !DisableAiSettings::get_global(cx).disable_ai {
+    if cfg!(feature = "agentic-tools") && !DisableAiSettings::get_global(cx).disable_ai {
         return bindings;
     }
     bindings
         .into_iter()
         .filter(|binding| !is_ai_keybinding(binding))
         .collect()
+}
+
+fn builtin_keymap_assets(
+    base_keymap: BaseKeymap,
+    vim_enabled: bool,
+) -> Vec<(&'static str, KeybindSource)> {
+    if base_keymap == BaseKeymap::None {
+        return Vec::new();
+    }
+
+    let mut assets = vec![(DEFAULT_KEYMAP_PATH, KeybindSource::Default)];
+    if let Some(asset_path) = base_keymap.asset_path() {
+        assets.push((asset_path, KeybindSource::Base));
+    }
+    if vim_enabled {
+        assets.push((VIM_KEYMAP_PATH, KeybindSource::Vim));
+    }
+    #[cfg(feature = "comfy")]
+    assets.push((comfy_ui::DEFAULT_COMFY_KEYMAP_PATH, KeybindSource::Default));
+    assets.push((SPECIFIC_OVERRIDES_KEYMAP_PATH, KeybindSource::Default));
+    assets
 }
 
 pub fn open_new_ssh_project_from_project(
@@ -2900,6 +4250,8 @@ pub(crate) fn eager_load_active_theme_and_icon_theme(fs: Arc<dyn Fs>, cx: &mut A
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "multiplayer-tools")]
+    use acp_thread::AgentConnection as _;
     use assets::Assets;
     use collections::HashSet;
     use editor::{
@@ -2907,16 +4259,21 @@ mod tests {
     };
     use extension::ExtensionHostProxy;
     use fs::FakeFs;
+    #[cfg(feature = "multiplayer-tools")]
+    use gpui::Empty;
     use gpui::{
         Action, AnyWindowHandle, App, AssetSource, BorrowAppContext, Modifiers, TestAppContext,
         UpdateGlobal, VisualTestContext, WindowHandle, actions, point, px,
     };
+    #[cfg(feature = "comfy")]
+    use gpui::{KeyContext, Keystroke, Menu, MenuItem};
     use http_client::BlockedHttpClient;
     use language::LanguageRegistry;
     use languages::{markdown_lang, rust_lang};
     use node_runtime::NodeRuntime;
     use pretty_assertions::{assert_eq, assert_ne};
     use project::{Project, ProjectPath};
+    #[cfg(feature = "agentic-tools")]
     use prompt_store::PromptBuilder;
     use remote::RemoteClient;
     use remote_server::{HeadlessAppState, HeadlessProject};
@@ -2928,12 +4285,54 @@ mod tests {
         sync::Arc,
         time::Duration,
     };
+
+    #[test]
+    fn provider_worker_bridge_bootstrap_retains_active_executor_and_headless_stays_denied() {
+        let desktop = include_str!("zed.rs");
+        let headless = include_str!("comfy_cli.rs");
+        for required in [
+            "private_worker_executor: Arc<comfy_plugin_host::PrivateWorkerPluginExecutor>",
+            "let private_worker_executor = plugin_services.private_worker_executor()",
+            "component_host.private_worker_executor = private_worker_executor",
+            "component_host.private_worker_executor.clone()",
+            "private_worker_executor.attach_provider_worker_bridge(provider_worker_bridge)",
+            "comfy_ui::clear_native_execution_services(cx)",
+        ] {
+            assert!(
+                desktop.contains(required),
+                "desktop provider bridge bootstrap lacks {required}"
+            );
+        }
+        let current_fast_path = desktop
+            .find("if matches_current")
+            .expect("same-generation component-host fast path");
+        let services_construction = desktop[current_fast_path..]
+            .find("comfy_plugin_services::private_worker_services(")
+            .map(|offset| current_fast_path + offset)
+            .expect("private-worker services construction");
+        assert!(current_fast_path < services_construction);
+
+        let register = desktop
+            .find("comfy_ui::register_native_execution_services(config, registry_bundle, cx)")
+            .expect("native controller registration");
+        let attach = desktop[register..]
+            .find("private_worker_executor.attach_provider_worker_bridge(provider_worker_bridge)")
+            .map(|offset| register + offset)
+            .expect("exact retained executor attachment");
+        assert!(register < attach);
+
+        assert!(headless.contains("ComponentExecutionBoundary::conformance_in_process"));
+        assert!(!headless.contains("attach_provider_worker_bridge"));
+        assert!(!headless.contains("NativeProviderWorkerBridgeAttachment"));
+    }
     use theme::ThemeRegistry;
     use util::{
         path,
         rel_path::{RelPath, rel_path},
     };
     use workspace::MultiWorkspace;
+    #[cfg(feature = "multiplayer-tools")]
+    use workspace::PathList;
     use workspace::{
         NewFile, OpenOptions, OpenVisible, SERIALIZATION_THROTTLE_TIME, SaveIntent, SplitDirection,
         WorkspaceHandle,
@@ -2941,6 +4340,657 @@ mod tests {
         item::{Item, ItemHandle},
         open_new, open_paths, pane,
     };
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_review_registration(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        let fs = fs::FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let connection = Rc::new(acp_thread::StubAgentConnection::new());
+        let thread = cx
+            .update(|cx| {
+                connection
+                    .clone()
+                    .new_session(project.clone(), PathList::new::<&Path>(&[]), cx)
+            })
+            .await
+            .expect("stub agent thread should start");
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+
+        workspace.update_in(cx, |workspace, window, cx| {
+            ProjectDiff::deploy_at(workspace, None, window, cx);
+        });
+        cx.run_until_parked();
+
+        let project_diff_id = workspace.read_with(cx, |workspace, cx| {
+            workspace
+                .item_of_type::<ProjectDiff>(cx)
+                .expect("native project diff should be open")
+                .entity_id()
+        });
+        let state = Rc::new(RefCell::new(CollaborativeReviewCompositionState::default()));
+        let workspace_handle = workspace.clone();
+        cx.update(|window, cx| {
+            reconcile_collaborative_agent_review(
+                &workspace_handle,
+                Some(thread.clone()),
+                &state,
+                window,
+                cx,
+            );
+        });
+
+        workspace.read_with(cx, |workspace, _| {
+            assert_eq!(
+                workspace.collaborative_review().project().entity_id(),
+                project.entity_id()
+            );
+            assert_eq!(
+                workspace.collaborative_review().selected_slot(),
+                Some(workspace::collaborative_review::CollaborativeReviewSlot::AgentChanges)
+            );
+            workspace
+                .collaborative_review()
+                .selected_view()
+                .expect("agent review should be selected")
+                .downcast::<agent_ui::AgentDiffPane>()
+                .expect("selected agent review should remain the native pane");
+        });
+
+        cx.dispatch_action(workspace::SwitchToCollaborativeWorkspace);
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("COLLABORATIVE-REVIEW-CONTENT").is_some());
+        assert!(cx.debug_bounds("COLLABORATIVE-COMPOSER").is_some());
+        assert!(cx.debug_bounds("COLLABORATIVE-COMPOSER-EDITOR").is_none());
+
+        workspace
+            .update(cx, |workspace, cx| {
+                workspace.select_collaborative_review_provider(
+                    workspace::collaborative_review::CollaborativeReviewSlot::ProjectChanges,
+                    cx,
+                )
+            })
+            .expect("project review should be available");
+        cx.run_until_parked();
+        workspace.read_with(cx, |workspace, _| {
+            let project_diff = workspace
+                .collaborative_review()
+                .selected_view()
+                .expect("project review should be selected")
+                .downcast::<ProjectDiff>()
+                .expect("selected project review should remain the native diff");
+            assert_eq!(project_diff.entity_id(), project_diff_id);
+        });
+        assert!(cx.debug_bounds("COLLABORATIVE-REVIEW-CONTENT").is_some());
+
+        let layout_bounds = cx
+            .debug_bounds("COLLABORATIVE-LAYOUT")
+            .expect("collaborative layout should render");
+        let review_toggle = cx
+            .debug_bounds("COLLABORATIVE-TOP-BAR-REVIEW-LAYOUT")
+            .expect("review toggle should render");
+        cx.simulate_click(review_toggle.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("COLLABORATIVE-REVIEW-CONTENT").is_none());
+        assert_eq!(
+            cx.debug_bounds("COLLABORATIVE-TIMELINE-REGION")
+                .expect("collapsed timeline should render"),
+            layout_bounds
+        );
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_participant_provider_registration(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        let fs = fs::FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+        let first_thread_view = cx.new(|_| Empty);
+        let replacement_thread_view = cx.new(|_| Empty);
+        let state = Rc::new(RefCell::new(CollaborativeReviewCompositionState::default()));
+
+        cx.update(|_, cx| {
+            apply_collaborative_participant_projection(&workspace, None, &state, cx);
+        });
+        assert_eq!(
+            workspace.read_with(cx, |workspace, cx| workspace
+                .collaborative_participants()
+                .state(cx)),
+            CollaborativeParticipantProviderState::Unavailable
+        );
+
+        let unknown_view_data = CollaborativeParticipantViewData {
+            participants: vec![
+                workspace::collaborative_participants::CollaborativeParticipant::agent(
+                    "agent:primary",
+                    "Primary Agent",
+                    None,
+                    workspace::collaborative_participants::CollaborativeParticipantPresence::Online,
+                ),
+            ],
+            execution: Some(
+                workspace::collaborative_participants::CollaborativeExecutionStatus {
+                    phase: workspace::collaborative_participants::CollaborativeExecutionPhase::Idle,
+                    model: None,
+                    runtime: Some("ACP".into()),
+                    location:
+                        workspace::collaborative_participants::CollaborativeExecutionLocation::Unknown,
+                },
+            ),
+            task_title: Some("Primary task".into()),
+            connection: CollaborativeConnectionState::Disconnected,
+        };
+        let current_view_data = Rc::new(RefCell::new(unknown_view_data.clone()));
+        cx.update(|_, cx| {
+            apply_collaborative_participant_projection(
+                &workspace,
+                Some(CollaborativeParticipantProjection {
+                    thread_view_id: first_thread_view.entity_id(),
+                    provider: CollaborativeParticipantProvider::from_reader(
+                        project.clone(),
+                        first_thread_view.entity_id(),
+                        {
+                            let current_view_data = current_view_data.clone();
+                            move |_| {
+                                CollaborativeParticipantProviderState::Ready(
+                                    current_view_data.borrow().clone(),
+                                )
+                            }
+                        },
+                    ),
+                }),
+                &state,
+                cx,
+            );
+        });
+        let first_registration = state
+            .borrow()
+            .participant_registration
+            .expect("active thread should register one participant provider");
+        assert_eq!(
+            workspace.read_with(cx, |workspace, cx| workspace
+                .collaborative_participants()
+                .state(cx)),
+            CollaborativeParticipantProviderState::Ready(unknown_view_data.clone())
+        );
+        let occupied = workspace.update(cx, |workspace, cx| {
+            workspace.register_collaborative_participant_provider(
+                CollaborativeParticipantProvider::new(
+                    project.clone(),
+                    replacement_thread_view.entity_id(),
+                    CollaborativeParticipantProviderState::Unavailable,
+                ),
+                cx,
+            )
+        });
+        assert_eq!(
+            occupied,
+            Err(
+                workspace::collaborative_participants::CollaborativeParticipantProviderError::ProviderOccupied
+            )
+        );
+
+        let updated_view_data = CollaborativeParticipantViewData {
+            execution: Some(
+                workspace::collaborative_participants::CollaborativeExecutionStatus {
+                    phase: workspace::collaborative_participants::CollaborativeExecutionPhase::WaitingForUser,
+                    model: Some("model-current".into()),
+                    runtime: Some("ACP".into()),
+                    location:
+                        workspace::collaborative_participants::CollaborativeExecutionLocation::Local,
+                },
+            ),
+            ..unknown_view_data.clone()
+        };
+        *current_view_data.borrow_mut() = updated_view_data.clone();
+        cx.update(|_, cx| {
+            apply_collaborative_participant_projection(
+                &workspace,
+                Some(CollaborativeParticipantProjection {
+                    thread_view_id: first_thread_view.entity_id(),
+                    provider: CollaborativeParticipantProvider::new(
+                        project.clone(),
+                        first_thread_view.entity_id(),
+                        CollaborativeParticipantProviderState::Ready(updated_view_data.clone()),
+                    ),
+                }),
+                &state,
+                cx,
+            );
+        });
+        assert_eq!(
+            state.borrow().participant_registration,
+            Some(first_registration),
+            "same-thread metadata updates should retain the sole registration"
+        );
+        assert_eq!(
+            workspace.read_with(cx, |workspace, cx| workspace
+                .collaborative_participants()
+                .state(cx)),
+            CollaborativeParticipantProviderState::Ready(updated_view_data)
+        );
+
+        let replacement_view_data = CollaborativeParticipantViewData {
+            participants: vec![
+                workspace::collaborative_participants::CollaborativeParticipant::agent(
+                    "agent:replacement",
+                    "Replacement Agent",
+                    None,
+                    workspace::collaborative_participants::CollaborativeParticipantPresence::Online,
+                ),
+            ],
+            execution: None,
+            task_title: Some("Replacement task".into()),
+            connection: CollaborativeConnectionState::Disconnected,
+        };
+        cx.update(|_, cx| {
+            apply_collaborative_participant_projection(
+                &workspace,
+                Some(CollaborativeParticipantProjection {
+                    thread_view_id: replacement_thread_view.entity_id(),
+                    provider: CollaborativeParticipantProvider::new(
+                        project,
+                        replacement_thread_view.entity_id(),
+                        CollaborativeParticipantProviderState::Ready(replacement_view_data.clone()),
+                    ),
+                }),
+                &state,
+                cx,
+            );
+        });
+        let replacement_registration = state
+            .borrow()
+            .participant_registration
+            .expect("replacement thread should register a participant provider");
+        assert_ne!(replacement_registration, first_registration);
+        assert!(!workspace.update(cx, |workspace, cx| {
+            workspace.unregister_collaborative_participant_provider(first_registration, cx)
+        }));
+
+        cx.update(|_, cx| {
+            apply_collaborative_participant_projection(&workspace, None, &state, cx);
+        });
+        assert!(state.borrow().participant_registration.is_none());
+        assert_eq!(
+            workspace.read_with(cx, |workspace, cx| workspace
+                .collaborative_participants()
+                .state(cx)),
+            CollaborativeParticipantProviderState::Unavailable
+        );
+    }
+
+    #[cfg(feature = "comfy")]
+    #[test]
+    fn comfy_build_boundary_loads_split_native_defaults() {
+        let content =
+            <settings::SettingsContent as settings::RootUserSettings>::parse_json_with_comments(
+                include_str!("../../../assets/settings/default.json"),
+            )
+            .expect("parse registered Zed defaults");
+        assert!(content.comfy_runtime.is_none());
+        let profile = active_native_comfy_profile_from_settings(&content)
+            .expect("fall back to the Comfy-only native runtime defaults");
+        assert_eq!(profile.id, comfy_runtime::DEFAULT_NATIVE_PROFILE_ID);
+        assert_eq!(profile.device, comfy_types::DeviceKind::Cpu);
+        assert_eq!(profile.provider_scope, "local");
+        assert!(!profile.api_host.enabled);
+    }
+
+    #[cfg(feature = "comfy")]
+    #[gpui::test(seed = 367)]
+    fn native_comfy_component_host_starts_from_the_comprehensive_generated_registry(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(|cx| {
+            init_comfy_component_host(cx).expect("initialize native Comfy component host");
+            let actual = cx
+                .global::<ComfyComponentHostGlobal>()
+                .router
+                .current()
+                .expect("read current native Comfy component generation")
+                .registry_snapshot()
+                .expect("read native Comfy component registry");
+            let expected = comfy_runtime::generated_native_node_registry_projection(None)
+                .expect("build comprehensive generated native registry");
+            actual
+                .validate_comprehensive_bindings()
+                .expect("validate component-host native registry");
+            assert_eq!(actual.descriptor_len(), expected.descriptor_len());
+            assert!(
+                expected
+                    .descriptors()
+                    .all(|(class_type, _)| actual.descriptor(class_type).is_some())
+            );
+        });
+    }
+
+    #[cfg(feature = "comfy")]
+    #[test]
+    fn native_comfy_runtime_binding_rebinds_same_profile_policy_changes() {
+        fn binding(settings: &str) -> NativeComfyRuntimeBinding {
+            let content = <settings::SettingsContent as settings::RootUserSettings>::parse_json_with_comments(settings)
+                .expect("parse native runtime settings");
+            let (profile, plugin_security) =
+                active_native_comfy_configuration_from_settings(&content)
+                    .expect("validate native runtime settings");
+            NativeComfyRuntimeBinding::new(&profile, &plugin_security)
+        }
+
+        let profile_id = comfy_runtime::DEFAULT_NATIVE_PROFILE_ID;
+        let baseline = binding(&format!(
+            r#"{{
+                "comfy_runtime": {{
+                    "active_profile": "{profile_id}",
+                    "profiles": [{{
+                        "id": "{profile_id}",
+                        "name": "Native Local",
+                        "model_roots": [],
+                        "device": "cpu",
+                        "memory_policy": "balanced",
+                        "api_host_enabled": false,
+                        "api_bind": "127.0.0.1:8188",
+                        "plugin_policy": "approved_only",
+                        "provider_scope": "local",
+                        "plugin_security": {{
+                            "component_registry_generation": 1
+                        }}
+                    }}]
+                }}
+            }}"#
+        ));
+        let changed_runtime_policy = binding(&format!(
+            r#"{{
+                "comfy_runtime": {{
+                    "active_profile": "{profile_id}",
+                    "profiles": [{{
+                        "id": "{profile_id}",
+                        "name": "Native Local",
+                        "model_roots": ["/tmp/native-models"],
+                        "device": "cpu",
+                        "memory_policy": "conservative",
+                        "api_host_enabled": false,
+                        "api_bind": "127.0.0.1:8188",
+                        "plugin_policy": "approved_only",
+                        "provider_scope": "local",
+                        "plugin_security": {{
+                            "component_registry_generation": 2
+                        }}
+                    }}]
+                }}
+            }}"#
+        ));
+        let cosmetic_only_change = binding(&format!(
+            r#"{{
+                "comfy_runtime": {{
+                    "active_profile": "{profile_id}",
+                    "profiles": [{{
+                        "id": "{profile_id}",
+                        "name": "Renamed profile",
+                        "model_roots": [],
+                        "device": "cpu",
+                        "memory_policy": "balanced",
+                        "api_host_enabled": false,
+                        "api_bind": "127.0.0.1:8188",
+                        "plugin_policy": "approved_only",
+                        "provider_scope": "local",
+                        "plugin_security": {{
+                            "component_registry_generation": 1
+                        }},
+                        "future_display_field": true
+                    }}]
+                }}
+            }}"#
+        ));
+
+        assert_ne!(baseline, changed_runtime_policy);
+        assert_eq!(baseline, cosmetic_only_change);
+
+        let rocm_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native ROCm",
+                            "model_roots": [],
+                            "device": "rocm",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "rocm_package_root": "{package_root}",
+                            "rocm_package_signer": "rocm.release",
+                            "rocm_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let rocm_baseline = rocm_binding("/reviewed/rocm-a", &"11".repeat(32));
+        let rotated_root = rocm_binding("/reviewed/rocm-b", &"11".repeat(32));
+        let rotated_key = rocm_binding("/reviewed/rocm-a", &"22".repeat(32));
+        assert_ne!(rocm_baseline, rotated_root);
+        assert_ne!(rocm_baseline, rotated_key);
+
+        let metal_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native Metal",
+                            "model_roots": [],
+                            "device": "metal",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "metal_package_root": "{package_root}",
+                            "metal_package_signer": "metal.release",
+                            "metal_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let metal_baseline = metal_binding("/reviewed/metal-a", &"33".repeat(32));
+        let metal_rotated_root = metal_binding("/reviewed/metal-b", &"33".repeat(32));
+        let metal_rotated_key = metal_binding("/reviewed/metal-a", &"44".repeat(32));
+        assert_ne!(metal_baseline, metal_rotated_root);
+        assert_ne!(metal_baseline, metal_rotated_key);
+
+        let mlu_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native MLU",
+                            "model_roots": [],
+                            "device": "mlu",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "mlu_package_root": "{package_root}",
+                            "mlu_package_signer": "mlu.release",
+                            "mlu_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let mlu_baseline = mlu_binding("/reviewed/mlu-a", &"55".repeat(32));
+        let mlu_rotated_root = mlu_binding("/reviewed/mlu-b", &"55".repeat(32));
+        let mlu_rotated_key = mlu_binding("/reviewed/mlu-a", &"66".repeat(32));
+        assert_ne!(mlu_baseline, mlu_rotated_root);
+        assert_ne!(mlu_baseline, mlu_rotated_key);
+
+        let npu_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native NPU",
+                            "model_roots": [],
+                            "device": "npu",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "npu_package_root": "{package_root}",
+                            "npu_package_signer": "npu.release",
+                            "npu_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let npu_baseline = npu_binding("/reviewed/npu-a", &"57".repeat(32));
+        let npu_rotated_root = npu_binding("/reviewed/npu-b", &"57".repeat(32));
+        let npu_rotated_key = npu_binding("/reviewed/npu-a", &"68".repeat(32));
+        assert_ne!(npu_baseline, npu_rotated_root);
+        assert_ne!(npu_baseline, npu_rotated_key);
+
+        let cuda_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native CUDA",
+                            "model_roots": [],
+                            "device": "cuda",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "cuda_package_root": "{package_root}",
+                            "cuda_package_signer": "cuda.release",
+                            "cuda_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let cuda_baseline = cuda_binding("/reviewed/cuda-a", &"56".repeat(32));
+        let cuda_rotated_root = cuda_binding("/reviewed/cuda-b", &"56".repeat(32));
+        let cuda_rotated_key = cuda_binding("/reviewed/cuda-a", &"67".repeat(32));
+        assert_ne!(cuda_baseline, cuda_rotated_root);
+        assert_ne!(cuda_baseline, cuda_rotated_key);
+
+        let xpu_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native XPU",
+                            "model_roots": [],
+                            "device": "xpu",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "xpu_package_root": "{package_root}",
+                            "xpu_package_signer": "xpu.release",
+                            "xpu_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let xpu_baseline = xpu_binding("/reviewed/xpu-a", &"69".repeat(32));
+        let xpu_rotated_root = xpu_binding("/reviewed/xpu-b", &"69".repeat(32));
+        let xpu_rotated_key = xpu_binding("/reviewed/xpu-a", &"7a".repeat(32));
+        assert_ne!(xpu_baseline, xpu_rotated_root);
+        assert_ne!(xpu_baseline, xpu_rotated_key);
+
+        let directml_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native DirectML",
+                            "model_roots": [],
+                            "device": "directml",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "directml_package_root": "{package_root}",
+                            "directml_package_signer": "directml.release",
+                            "directml_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let directml_baseline = directml_binding("/reviewed/directml-a", &"77".repeat(32));
+        let directml_rotated_root = directml_binding("/reviewed/directml-b", &"77".repeat(32));
+        let directml_rotated_key = directml_binding("/reviewed/directml-a", &"88".repeat(32));
+        assert_ne!(directml_baseline, directml_rotated_root);
+        assert_ne!(directml_baseline, directml_rotated_key);
+    }
+
+    #[cfg(feature = "comfy")]
+    #[test]
+    fn invalid_native_comfy_settings_preserve_the_selected_error_scope() {
+        let selected_profile_id = Uuid::from_u128(0x4_101);
+        let invalid_settings = format!(
+            r#"{{
+                "comfy_runtime": {{
+                    "active_profile": "{selected_profile_id}",
+                    "profiles": [{{
+                        "id": "{selected_profile_id}",
+                        "device": "future-device",
+                        "api_bind": "0.0.0.0:8188"
+                    }}]
+                }}
+            }}"#
+        );
+        let content =
+            <settings::SettingsContent as settings::RootUserSettings>::parse_json_with_comments(
+                &invalid_settings,
+            )
+            .expect("parse invalid native profile shape");
+
+        assert_eq!(
+            native_comfy_profile_id_from_settings(&content),
+            Some(comfy_types::ProfileId(selected_profile_id))
+        );
+        assert!(active_native_comfy_profile_from_settings(&content).is_err());
+        assert_ne!(
+            native_comfy_profile_id_from_settings(&content),
+            Some(comfy_ui::LOCAL_EXECUTION_PROFILE_ID)
+        );
+    }
 
     async fn flush_workspace_serialization(
         window: &WindowHandle<MultiWorkspace>,
@@ -2962,6 +5012,330 @@ mod tests {
             .unwrap();
 
         futures::future::join_all(all_tasks).await;
+    }
+
+    #[cfg(feature = "comfy")]
+    fn validation_digest(parts: impl IntoIterator<Item = impl AsRef<[u8]>>) -> String {
+        const OFFSETS: [u64; 4] = [
+            0xcbf29ce484222325,
+            0x84222325cbf29ce4,
+            0x9e3779b185ebca87,
+            0x517cc1b727220a95,
+        ];
+        let mut lanes = OFFSETS;
+        for part in parts {
+            for byte in part.as_ref() {
+                for (index, lane) in lanes.iter_mut().enumerate() {
+                    *lane ^= u64::from(*byte).wrapping_add(index as u64);
+                    *lane = lane.wrapping_mul(0x100000001b3);
+                }
+            }
+        }
+        lanes
+            .into_iter()
+            .map(|lane| format!("{lane:016x}"))
+            .collect()
+    }
+
+    #[cfg(feature = "comfy")]
+    fn collect_menu_action_names(items: &[MenuItem], names: &mut Vec<String>) {
+        for item in items {
+            match item {
+                MenuItem::Action { action, .. } => names.push(action.name().to_owned()),
+                MenuItem::Submenu(menu) => collect_menu_action_names(&menu.items, names),
+                MenuItem::Separator | MenuItem::SystemMenu(_) => {}
+            }
+        }
+    }
+
+    #[cfg(feature = "comfy")]
+    #[test]
+    fn comfy_keymap_loads_between_vim_and_specific_overrides() {
+        let keymap_order = builtin_keymap_assets(BaseKeymap::JetBrains, true);
+        let vim_position = keymap_order
+            .iter()
+            .position(|(path, _)| *path == VIM_KEYMAP_PATH)
+            .expect("Vim keymap must be present when enabled");
+        let comfy_position = keymap_order
+            .iter()
+            .position(|(path, _)| *path == comfy_ui::DEFAULT_COMFY_KEYMAP_PATH)
+            .expect("Comfy keymap must be present");
+        let override_position = keymap_order
+            .iter()
+            .position(|(path, _)| *path == SPECIFIC_OVERRIDES_KEYMAP_PATH)
+            .expect("specific overrides must be present");
+        assert!(vim_position < comfy_position);
+        assert_eq!(comfy_position + 1, override_position);
+        assert!(builtin_keymap_assets(BaseKeymap::None, true).is_empty());
+    }
+
+    #[cfg(feature = "comfy")]
+    #[gpui::test(seed = 16013)]
+    fn comfy_static_menu_has_registered_action_targets(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            let menus = app_menus(cx);
+            let comfy_menu = menus
+                .iter()
+                .find(|menu| menu.name.as_ref() == "Comfy")
+                .expect("static application menus must include Comfy");
+            let mut menu_action_names = Vec::new();
+            collect_menu_action_names(&comfy_menu.items, &mut menu_action_names);
+            assert!(!menu_action_names.is_empty());
+            let mut expected_action_names = comfy_ui::native_menu_action_names()
+                .expect("canonical Comfy menu registry must resolve")
+                .into_iter()
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            menu_action_names.sort();
+            expected_action_names.sort();
+            assert_eq!(menu_action_names, expected_action_names);
+            let registered_actions = cx
+                .all_action_names()
+                .iter()
+                .copied()
+                .collect::<HashSet<_>>();
+            for action_name in menu_action_names {
+                assert_ne!(action_name, "NoAction");
+                assert!(registered_actions.contains(action_name.as_str()));
+            }
+        });
+    }
+
+    #[cfg(feature = "comfy")]
+    #[gpui::test(seed = 16013)]
+    fn val_gpui_013(cx: &mut TestAppContext) {
+        const MAIN_SOURCE: &str = include_str!("main.rs");
+        const ZED_SOURCE: &str = include_str!("zed.rs");
+        const MENU_SOURCE: &str = include_str!("zed/app_menus.rs");
+
+        assert!(!MAIN_SOURCE.contains("Application::new_inaccessible"));
+        assert!(!MAIN_SOURCE.contains("ZED_EXPERIMENTAL_A11Y"));
+        assert!(MAIN_SOURCE.contains("Application::with_platform(platform)"));
+        assert!(
+            MAIN_SOURCE.contains(
+                "build_application_with_platform(gpui_platform::current_platform(false))"
+            )
+        );
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            let application =
+                crate::build_application_with_platform(gpui_platform::current_platform(true));
+            drop(application);
+        }
+
+        let (keymap_order, keymap_actions, user_override_evidence, menu_action_names) =
+            cx.update(|cx| {
+                cx.set_global(db::AppDatabase::test_new());
+                workspace::AppState::test(cx);
+                init_comfy_ui(cx);
+                init_comfy_ui(cx);
+                #[cfg(feature = "test-support")]
+                assert_eq!(comfy_ui::initialization_passes_for_test(cx), Some(1));
+
+                let keymap_order = builtin_keymap_assets(BaseKeymap::JetBrains, true)
+                    .into_iter()
+                    .map(|(path, source)| format!("{}:{path}", source.name()))
+                    .collect::<Vec<_>>();
+                let comfy_position = keymap_order
+                    .iter()
+                    .position(|entry| entry.ends_with(comfy_ui::DEFAULT_COMFY_KEYMAP_PATH))
+                    .expect("Comfy keymap must be present in the built-in order");
+                let vim_position = keymap_order
+                    .iter()
+                    .position(|entry| entry.ends_with(VIM_KEYMAP_PATH))
+                    .expect("Vim keymap must be present when enabled");
+                assert!(vim_position < comfy_position);
+                let expected_override = format!("Default:{SPECIFIC_OVERRIDES_KEYMAP_PATH}");
+                assert_eq!(
+                    keymap_order.get(comfy_position + 1).map(String::as_str),
+                    Some(expected_override.as_str()),
+                );
+                assert!(builtin_keymap_assets(BaseKeymap::None, true).is_empty());
+
+                load_default_keymap(cx);
+                let keymap_actions = {
+                    let keymap = cx.key_bindings();
+                    let keymap = keymap.borrow();
+                    keymap
+                        .bindings()
+                        .filter_map(|binding| {
+                            binding
+                                .predicate()
+                                .filter(|predicate| predicate.to_string().contains("ComfyGraph"))
+                                .map(|predicate| {
+                                    assert!(predicate.to_string().contains("ComfyGraph"));
+                                    binding.action().name().to_owned()
+                                })
+                        })
+                        .collect::<Vec<_>>()
+                };
+                assert!(
+                    !keymap_actions.is_empty(),
+                    "the embedded Comfy keymap must register scoped bindings"
+                );
+
+                reload_keymaps(
+                    cx,
+                    vec![KeyBinding::new(
+                        "ctrl-enter",
+                        zed_actions::About,
+                        Some("ComfyGraph"),
+                    )],
+                );
+                let keystroke = Keystroke::parse("ctrl-enter")
+                    .expect("parse the known conflicting Comfy keystroke");
+                let mut graph_context = KeyContext::new_with_defaults();
+                graph_context.add("ComfyGraph");
+                let keymap = cx.key_bindings();
+                let keymap = keymap.borrow();
+                let (resolved_bindings, pending) =
+                    keymap.bindings_for_input(&[keystroke], &[graph_context]);
+                assert!(!pending);
+                let winning_binding = resolved_bindings
+                    .first()
+                    .expect("the conflicting user binding must resolve");
+                assert_eq!(winning_binding.action().name(), zed_actions::About.name());
+                assert_eq!(
+                    winning_binding.meta().map(KeybindSource::from_meta),
+                    Some(KeybindSource::User)
+                );
+                assert!(
+                    resolved_bindings
+                        .iter()
+                        .skip(1)
+                        .any(|binding| binding.action().name() == "comfy_shell::QueuePrompt")
+                );
+                let user_override_evidence = format!(
+                    "ctrl-enter:{}:{}",
+                    winning_binding.action().name(),
+                    KeybindSource::User.name()
+                );
+                drop(keymap);
+
+                let menus = app_menus(cx);
+                let comfy_menu_index = menus
+                    .iter()
+                    .position(|menu| menu.name.as_ref() == "Comfy")
+                    .expect("static application menus must include Comfy");
+                let window_menu_index = menus
+                    .iter()
+                    .position(|menu| menu.name.as_ref() == "Window")
+                    .expect("static application menus must include Window");
+                assert!(comfy_menu_index < window_menu_index);
+                let comfy_menu: &Menu = menus
+                    .get(comfy_menu_index)
+                    .expect("Comfy menu index must remain valid");
+                let mut menu_action_names = Vec::new();
+                collect_menu_action_names(&comfy_menu.items, &mut menu_action_names);
+                assert!(
+                    !menu_action_names.is_empty(),
+                    "Comfy menu must contain executable actions"
+                );
+                let mut expected_menu_action_names = comfy_ui::native_menu_action_names()
+                    .expect("canonical Comfy menu registry must resolve")
+                    .into_iter()
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>();
+                menu_action_names.sort();
+                expected_menu_action_names.sort();
+                assert_eq!(
+                    menu_action_names, expected_menu_action_names,
+                    "production Comfy menu must exactly project its authoritative registry"
+                );
+                let registered_actions = cx
+                    .all_action_names()
+                    .iter()
+                    .copied()
+                    .collect::<HashSet<_>>();
+                for action_name in keymap_actions.iter().chain(&menu_action_names) {
+                    assert_ne!(action_name, "NoAction");
+                    assert!(
+                        registered_actions.contains(action_name.as_str()),
+                        "{action_name} must be registered with GPUI"
+                    );
+                }
+
+                (
+                    keymap_order,
+                    keymap_actions,
+                    user_override_evidence,
+                    menu_action_names,
+                )
+            });
+
+        assert!(ZED_SOURCE.contains("init_comfy_ui(cx);"));
+        assert!(ZED_SOURCE.contains("comfy_ui::init(cx);"));
+        assert!(MENU_SOURCE.contains("comfy_ui::comfy_menu()"));
+
+        let source_digest = validation_digest([MAIN_SOURCE, ZED_SOURCE, MENU_SOURCE]);
+        let keymap_digest = validation_digest(
+            keymap_order
+                .iter()
+                .chain(&keymap_actions)
+                .map(String::as_bytes),
+        );
+        let user_override_digest = validation_digest([user_override_evidence.as_bytes()]);
+        let menu_digest = validation_digest(menu_action_names.iter().map(String::as_bytes));
+        let artifact = serde_json::json!({
+            "validation_id": "VAL-GPUI-013",
+            "environment": {
+                "backend": "gpui-test",
+                "platform": if cfg!(target_os = "macos") {
+                    "test-app-and-compiled-production-bootstrap"
+                } else {
+                    "test-app-and-headless-bootstrap"
+                },
+                "os": std::env::consts::OS,
+                "arch": std::env::consts::ARCH,
+                "feature": "test-support",
+                "scheduler_seed": 16013,
+                "iterations": "1"
+            },
+            "fixture_digests": {
+                "production_sources": source_digest,
+                "keymap_order_and_actions": keymap_digest,
+                "user_keymap_precedence": user_override_digest,
+                "menu_actions": menu_digest
+            },
+            "cases": [
+                {
+                    "name": "production-accessibility-bootstrap",
+                    "passed": true,
+                    "digest": source_digest
+                },
+                {
+                    "name": "comfy-initialization-is-idempotently-invoked",
+                    "passed": true,
+                    "digest": validation_digest([ZED_SOURCE])
+                },
+                {
+                    "name": "comfy-keymap-load-order-and-context-scope",
+                    "passed": true,
+                    "digest": keymap_digest
+                },
+                {
+                    "name": "user-keymap-overrides-conflicting-comfy-default",
+                    "passed": true,
+                    "digest": user_override_digest
+                },
+                {
+                    "name": "comfy-static-menu-actions-are-registered",
+                    "passed": true,
+                    "digest": menu_digest
+                }
+            ],
+            "skipped": []
+        });
+        let artifact_directory =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/comfy-parity");
+        std::fs::create_dir_all(&artifact_directory)
+            .expect("create Comfy parity validation artifact directory");
+        std::fs::write(
+            artifact_directory.join("val-gpui-013.json"),
+            serde_json::to_vec_pretty(&artifact).expect("serialize VAL-GPUI-013 artifact"),
+        )
+        .expect("write VAL-GPUI-013 artifact");
     }
 
     #[gpui::test]
@@ -3711,6 +6085,19 @@ mod tests {
         let editor = multi_workspace
             .update(cx, |multi_workspace, _, cx| {
                 multi_workspace.workspace().update(cx, |workspace, cx| {
+                    #[cfg(feature = "comfy")]
+                    {
+                        assert!(
+                            workspace.panel::<comfy_ui::ExecutionPanel>(cx).is_some(),
+                            "the production workspace must register the native execution dock panel"
+                        );
+                        assert!(
+                            workspace
+                                .panel::<comfy_ui::GraphPropertiesPanel>(cx)
+                                .is_some(),
+                            "the production workspace must register the native graph properties dock panel"
+                        );
+                    }
                     let editor = workspace
                         .active_item(cx)
                         .unwrap()
@@ -5795,16 +8182,38 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(actions_without_namespace, Vec::<&str>::new());
 
+            #[cfg(not(feature = "agentic-tools"))]
+            for action_name in [
+                "editor::CancelEditReviewComment",
+                "editor::ConfirmEditReviewComment",
+                "editor::DeleteReviewComment",
+                "editor::EditReviewComment",
+                "editor::SendReviewToAgent",
+                "editor::SubmitDiffReviewComment",
+                "editor::ToggleReviewCommentsExpanded",
+                "zed::AcpRegistry",
+            ] {
+                assert!(
+                    !all_actions.contains(&action_name),
+                    "agentic action registered in disabled build: {action_name}"
+                );
+            }
+
             let expected_namespaces = vec![
                 "action",
                 "activity_indicator",
+                #[cfg(feature = "agentic-tools")]
                 "agent",
+                #[cfg(feature = "agentic-tools")]
                 "agents_sidebar",
                 "app_menu",
+                #[cfg(feature = "agentic-tools")]
                 "assistant",
+                #[cfg(feature = "agentic-tools")]
                 "assistant2",
                 "auto_update",
                 "branch_picker",
+                #[cfg(feature = "agentic-tools")]
                 "bedrock",
                 "branches",
                 "buffer_search",
@@ -5813,6 +8222,10 @@ mod tests {
                 "client",
                 "collab",
                 "collab_panel",
+                #[cfg(feature = "comfy")]
+                "comfy_graph",
+                #[cfg(feature = "comfy")]
+                "comfy_shell",
                 "command_palette",
                 "console",
                 "context_server",
@@ -5837,11 +8250,13 @@ mod tests {
                 "highlights_tree_view",
                 "icon_theme_selector",
                 "image_viewer",
+                #[cfg(feature = "agentic-tools")]
                 "inline_assistant",
                 "journal",
                 "keymap_editor",
                 "keystroke_input",
                 "language_selector",
+                "language_tool_tree",
                 "welcome",
                 "line_ending_selector",
                 "lsp_tool",
@@ -5866,6 +8281,7 @@ mod tests {
                 "search",
                 "settings_editor",
                 "settings_profile_selector",
+                #[cfg(feature = "agentic-tools")]
                 "skill_creator",
                 "snippets",
                 "stash_picker",
@@ -6040,7 +8456,11 @@ mod tests {
     }
 
     pub(crate) fn init_test(cx: &mut TestAppContext) -> Arc<AppState> {
-        init_test_with_state(cx, cx.update(AppState::test))
+        let app_state = cx.update(|cx| {
+            cx.set_global(db::AppDatabase::test_new());
+            AppState::test(cx)
+        });
+        init_test_with_state(cx, app_state)
     }
 
     fn init_test_with_state(
@@ -6065,10 +8485,14 @@ mod tests {
             release_channel::init(Version::new(0, 0, 0), cx);
             command_palette::init(cx);
             editor::init(cx);
+            #[cfg(feature = "comfy")]
+            init_comfy_ui(cx);
             collab_ui::init(&app_state, cx);
             git_ui::init(cx);
             project_panel::init(cx);
             outline_panel::init(cx);
+            #[cfg(feature = "rust-tools")]
+            cargo_ui::init(cx);
             terminal_view::init(cx);
             let credentials_provider = zed_credentials_provider::global(cx);
             copilot_chat::init(
@@ -6079,28 +8503,35 @@ mod tests {
             );
             image_viewer::init(cx);
             language_model::init(cx);
-            client::RefreshLlmTokenListener::register(
-                app_state.client.clone(),
-                app_state.user_store.clone(),
-                cx,
-            );
-            language_models::init(app_state.user_store.clone(), app_state.client.clone(), cx);
-            web_search::init(cx);
-            web_search_providers::init(app_state.client.clone(), app_state.user_store.clone(), cx);
-            let prompt_builder = PromptBuilder::load(app_state.fs.clone(), false, cx);
-            project::AgentRegistryStore::init_global(
-                cx,
-                app_state.fs.clone(),
-                app_state.client.http_client(),
-            );
-            agent_ui::init(
-                app_state.fs.clone(),
-                prompt_builder,
-                app_state.languages.clone(),
-                true,
-                false,
-                cx,
-            );
+            #[cfg(feature = "agentic-tools")]
+            {
+                client::RefreshLlmTokenListener::register(
+                    app_state.client.clone(),
+                    app_state.user_store.clone(),
+                    cx,
+                );
+                language_models::init(app_state.user_store.clone(), app_state.client.clone(), cx);
+                web_search::init(cx);
+                web_search_providers::init(
+                    app_state.client.clone(),
+                    app_state.user_store.clone(),
+                    cx,
+                );
+                let prompt_builder = PromptBuilder::load(app_state.fs.clone(), false, cx);
+                project::AgentRegistryStore::init_global(
+                    cx,
+                    app_state.fs.clone(),
+                    app_state.client.http_client(),
+                );
+                agent_ui::init(
+                    app_state.fs.clone(),
+                    prompt_builder,
+                    app_state.languages.clone(),
+                    true,
+                    false,
+                    cx,
+                );
+            }
 
             repl::init(app_state.fs.clone(), cx);
             repl::notebook::init(cx);
@@ -6367,6 +8798,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "agentic-tools")]
     #[gpui::test]
     async fn test_disable_ai_filters_keybindings(cx: &mut gpui::TestAppContext) {
         let _app_state = init_keymap_test(cx);

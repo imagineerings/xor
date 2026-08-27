@@ -1,3 +1,13 @@
+#[cfg(feature = "multiplayer-tools")]
+mod collaborative_navigation;
+#[cfg(feature = "multiplayer-tools")]
+mod collaborative_pinned;
+#[cfg(feature = "multiplayer-tools")]
+mod collaborative_projects;
+#[cfg(feature = "multiplayer-tools")]
+mod collaborative_rail;
+#[cfg(feature = "multiplayer-tools")]
+mod collaborative_tasks;
 mod thread_switcher;
 
 use acp_thread::ThreadStatus;
@@ -75,6 +85,8 @@ use zed_actions::{CreateWorktree, NewWorktreeBranchTarget, OpenRecent};
 
 use zed_actions::agents_sidebar::{FocusSidebarFilter, ToggleThreadSwitcher};
 
+#[cfg(feature = "multiplayer-tools")]
+use crate::collaborative_rail::CollaborativeRail;
 use crate::thread_switcher::{
     ThreadSwitcher, ThreadSwitcherEntry, ThreadSwitcherEvent, ThreadSwitcherSelection,
     ThreadSwitcherTerminalEntry, ThreadSwitcherThreadEntry,
@@ -735,6 +747,8 @@ pub struct Sidebar {
     multi_workspace: WeakEntity<MultiWorkspace>,
     width: Pixels,
     focus_handle: FocusHandle,
+    #[cfg(feature = "multiplayer-tools")]
+    collaborative_rail: Entity<CollaborativeRail>,
     filter_editor: Entity<Editor>,
     thread_rename_editor: Entity<Editor>,
     list_state: ListState,
@@ -798,6 +812,9 @@ impl Sidebar {
         cx: &mut Context<Self>,
     ) -> Self {
         let focus_handle = cx.focus_handle();
+        #[cfg(feature = "multiplayer-tools")]
+        let collaborative_rail =
+            cx.new(|cx| CollaborativeRail::new(multi_workspace.downgrade(), cx));
         cx.on_focus_in(&focus_handle, window, Self::focus_in)
             .detach();
 
@@ -890,6 +907,8 @@ impl Sidebar {
             multi_workspace: multi_workspace.downgrade(),
             width: DEFAULT_WIDTH,
             focus_handle,
+            #[cfg(feature = "multiplayer-tools")]
+            collaborative_rail,
             filter_editor,
             thread_rename_editor,
             list_state: ListState::new(0, gpui::ListAlignment::Top, px(1000.)),
@@ -7763,6 +7782,9 @@ impl Render for Sidebar {
 
         let no_open_projects = !self.contents.has_open_projects;
         let no_search_results = self.contents.entries.is_empty();
+        let collaborative_rail_width = self.collaborative_rail_width(cx);
+        let collaborative_workspace = collaborative_rail_width.is_some();
+        let rendered_width = collaborative_rail_width.unwrap_or(self.width);
 
         v_flex()
             .id("workspace-sidebar")
@@ -7799,7 +7821,7 @@ impl Render for Sidebar {
             .map(|el| {
                 let on_left = self.side(cx) == SidebarSide::Left;
                 match window.window_decorations() {
-                    Decorations::Server => el.h_full().w(self.width),
+                    Decorations::Server => el.h_full().w(rendered_width),
                     // With client-side decorations the sidebar owns the window
                     // corners on its side, so round them like the title bar and
                     // status bar do. The sidebar is stretched 1px outwards over
@@ -7839,45 +7861,60 @@ impl Render for Sidebar {
                 }
             })
             .bg(bg)
-            .when(self.side(cx) == SidebarSide::Left, |el| el.border_r_1())
-            .when(self.side(cx) == SidebarSide::Right, |el| el.border_l_1())
+            .when(
+                collaborative_workspace || self.side(cx) == SidebarSide::Left,
+                |el| el.border_r_1(),
+            )
+            .when(
+                !collaborative_workspace && self.side(cx) == SidebarSide::Right,
+                |el| el.border_l_1(),
+            )
             .border_color(color.border)
-            .map(|this| match &self.view {
-                SidebarView::ThreadList => this
-                    .child(self.render_sidebar_header(no_open_projects, window, cx))
-                    .map(|this| {
-                        if no_open_projects {
-                            this.child(self.render_empty_state(cx))
-                        } else {
-                            this.child(
-                                v_flex()
-                                    .relative()
-                                    .flex_1()
-                                    .overflow_hidden()
-                                    .child(
-                                        list(
-                                            self.list_state.clone(),
-                                            cx.processor(Self::render_list_entry),
-                                        )
+            .map(|this| {
+                #[cfg(feature = "multiplayer-tools")]
+                if collaborative_workspace {
+                    return this.child(self.collaborative_rail.clone());
+                }
+                match &self.view {
+                    SidebarView::ThreadList => this
+                        .child(self.render_sidebar_header(no_open_projects, window, cx))
+                        .map(|this| {
+                            if no_open_projects {
+                                this.child(self.render_empty_state(cx))
+                            } else {
+                                this.child(
+                                    v_flex()
+                                        .relative()
                                         .flex_1()
-                                        .size_full(),
-                                    )
-                                    .when(no_search_results, |this| {
-                                        this.child(self.render_no_results(cx))
-                                    })
-                                    .when_some(sticky_header, |this, header| this.child(header))
-                                    .custom_scrollbars(
-                                        Scrollbars::new(ScrollAxes::Vertical)
-                                            .tracked_scroll_handle(&self.list_state),
-                                        window,
-                                        cx,
-                                    ),
-                            )
-                        }
-                    }),
-                SidebarView::Archive(archive_view) => this.child(archive_view.clone()),
+                                        .overflow_hidden()
+                                        .child(
+                                            list(
+                                                self.list_state.clone(),
+                                                cx.processor(Self::render_list_entry),
+                                            )
+                                            .flex_1()
+                                            .size_full(),
+                                        )
+                                        .when(no_search_results, |this| {
+                                            this.child(self.render_no_results(cx))
+                                        })
+                                        .when_some(sticky_header, |this, header| this.child(header))
+                                        .custom_scrollbars(
+                                            Scrollbars::new(ScrollAxes::Vertical)
+                                                .tracked_scroll_handle(&self.list_state),
+                                            window,
+                                            cx,
+                                        ),
+                                )
+                            }
+                        }),
+                    SidebarView::Archive(archive_view) => this.child(archive_view.clone()),
+                }
             })
             .map(|this| {
+                if collaborative_workspace {
+                    return this;
+                }
                 let show_acp = self.should_render_acp_import_onboarding(cx);
                 let show_cross_channel = self.should_render_cross_channel_import_onboarding(cx);
 
@@ -7892,7 +7929,26 @@ impl Render for Sidebar {
                     this.child(self.render_cross_channel_import_onboarding(verbose, cx))
                 })
             })
-            .child(self.render_sidebar_bottom_bar(cx))
+            .when(!collaborative_workspace, |this| {
+                this.child(self.render_sidebar_bottom_bar(cx))
+            })
+    }
+}
+
+impl Sidebar {
+    #[cfg(feature = "multiplayer-tools")]
+    fn collaborative_rail_width(&self, cx: &App) -> Option<Pixels> {
+        self.multi_workspace.upgrade().and_then(|multi_workspace| {
+            let workspace = multi_workspace.read(cx).workspace().clone();
+            (workspace.read(cx).workspace_presentation()
+                == workspace::WorkspacePresentation::Collaborative)
+                .then(|| workspace.read(cx).collaborative_rail_width(cx))
+        })
+    }
+
+    #[cfg(not(feature = "multiplayer-tools"))]
+    fn collaborative_rail_width(&self, _cx: &App) -> Option<Pixels> {
+        None
     }
 }
 
@@ -7953,6 +8009,18 @@ fn all_thread_infos_for_workspace(
         });
 
     Some(threads).into_iter().flatten()
+}
+
+#[cfg(feature = "multiplayer-tools")]
+pub(crate) fn collaborative_live_thread_statuses(
+    multi_workspace: &MultiWorkspace,
+    cx: &App,
+) -> HashMap<acp::SessionId, AgentThreadStatus> {
+    multi_workspace
+        .workspaces()
+        .flat_map(|workspace| all_thread_infos_for_workspace(workspace, cx))
+        .map(|thread| (thread.session_id, thread.status))
+        .collect()
 }
 
 pub fn dump_workspace_info(

@@ -1,0 +1,250 @@
+# Design Document: Security and Permissions
+
+## 1. Overview
+
+Migrate goose's security and permission systems into zed's existing security infrastructure (`crates/sandbox/`). The security system provides adversarial input inspection, egress data inspection, content classification, and pattern-based threat detection. The permission system provides user-in-the-loop confirmation, intelligent judging, and persistent permission storage.
+
+### Key Architectural Decisions
+
+- **Layer on top of `crates/sandbox/`**: Zed already has sandbox primitives. The goose security system adds content-level inspection (not just OS-level sandboxing).
+- **Integration-point-first security ownership**: Content inspection composes with the existing agent, sandbox/network, settings, HTTP, and redaction boundaries. Extract a component only if the existing owner cannot preserve isolation.
+- **Existing permission owner**: Extend `crates/agent/src/tool_permissions.rs`, ACP permission requests, and agent UI confirmation rather than creating a second permission system.
+- **Pluggable inspectors**: The security scanner supports registering multiple inspectors, making it extensible.
+
+## 2. Architecture
+
+```mermaid
+graph TD
+    subgraph "Security inspection integrated with agent/sandbox"
+        Scanner[SecurityScanner]
+        Adversary[AdversaryInspector]
+        Egress[EgressInspector]
+        Classifier[ClassificationClient]
+        Patterns[PatternRegistry]
+    end
+
+    subgraph "Existing agent/ACP permission system"
+        Inspector[PermissionInspector]
+        Judge[PermissionJudge]
+        Confirmation[PermissionConfirmation UI]
+        Store[PermissionStore]
+    end
+
+    subgraph "Existing zed"
+        Sandbox[crates/sandbox/]
+        AgentTools[crates/agent/src/tool_permissions.rs]
+        Agent[crates/agent/]
+    end
+
+    Agent -- input --> Scanner
+    Agent -- output --> Scanner
+    Agent -- tool calls --> Inspector
+    Scanner --> Adversary
+    Scanner --> Classifier
+    Inspector --> Judge
+    Inspector --> Confirmation
+    Judge --> Store
+    Adversary --> Patterns
+    Egress --> Patterns
+    Sandbox --> OS_Level_Security
+```
+
+## 3. Components and Interfaces
+
+### Component: Security Scanner
+
+```rust
+pub struct SecurityScanner {
+    inspectors: Vec<Box<dyn SecurityInspector>>,
+}
+
+#[async_trait]
+pub trait SecurityInspector: Send + Sync {
+    fn name(&self) -> &str;
+    fn inspect_input(&self, content: &str, context: &InspectionContext) -> Result<InspectionResult>;
+    fn inspect_output(&self, content: &str, context: &InspectionContext) -> Result<InspectionResult>;
+}
+
+pub struct InspectionResult {
+    pub passed: bool,
+    pub severity: Severity,
+    pub findings: Vec<Finding>,
+}
+```
+
+### Component: Adversary Inspector
+
+```rust
+pub struct AdversaryInspector {
+    patterns: Vec<Pattern>,
+    sensitivity: SensitivityLevel,
+}
+
+impl SecurityInspector for AdversaryInspector {
+    // Checks for prompt injection, jailbreak attempts, indirect injection
+}
+```
+
+### Component: Egress Inspector
+
+```rust
+pub struct EgressInspector {
+    patterns: Vec<Pattern>,
+}
+
+impl SecurityInspector for EgressInspector {
+    // Checks for API keys, secrets, PII in outgoing content
+}
+```
+
+### Component: Permission System
+
+```rust
+pub struct PermissionInspector {
+    judge: PermissionJudge,
+    store: PermissionStore,
+}
+
+impl PermissionInspector {
+    pub async fn check_tool_call(&self, tool_call: &ToolCall, cx: &App) -> Result<PermissionDecision>;
+}
+
+pub enum PermissionDecision {
+    Allowed,
+    Denied(String),
+    NeedsConfirmation { reason: String, risk_level: RiskLevel },
+}
+
+pub struct PermissionStore {
+    // Persisted to SQLite/db
+    entries: HashMap<(String, String), StoredDecision>, // (tool, args_hash) -> decision
+}
+```
+
+## 4. Data Models
+
+```rust
+pub struct Pattern {
+    pub id: String,
+    pub name: String,
+    pub category: PatternCategory,
+    pub pattern: String, // regex or other format
+    pub severity: Severity,
+    pub action: PatternAction,
+}
+
+pub enum PatternCategory {
+    PromptInjection,
+    SensitiveData,
+    Pii,
+    Credentials,
+    HarmfulContent,
+    Custom(String),
+}
+
+pub struct StoredDecision {
+    pub tool_name: String,
+    pub args_pattern: String, // glob or regex
+    pub decision: DecisionType,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
+pub enum DecisionType {
+    AlwaysAllow,
+    AlwaysDeny,
+    AllowOnce,
+    DenyOnce,
+}
+```
+
+## 5. Correctness Properties
+
+### Property 1: Input Security
+
+_For any_ user input [containing known prompt injection patterns], AFTER adversary inspection, THE system SHALL block the input and notify the user.
+
+**Validates: Requirement 1.2**
+
+### Property 2: Output Security
+
+_For any_ agent output [containing configured sensitive data patterns], AFTER egress inspection, THE system SHALL redact or block the output.
+
+**Validates: Requirement 2.2**
+
+### Property 3: Permission Consistency
+
+_For any_ tool call [matching a stored "always allow" decision], THE system SHALL proceed without user confirmation.
+
+**Validates: Requirement 9.2**
+
+### Property 4: Never-Silent Failure
+
+_For any_ blocked action [by security or permission systems], THE system SHALL inform the user with a reason.
+
+**Validates: Requirements 1.2, 9.3**
+
+## 6. Error Handling
+
+| Error Scenario | Handling |
+|---|---|
+| Classification API unavailable | Fail-open (allow) or fail-closed (deny) based on configuration |
+| Permission store corrupted | Reset to defaults, log warning |
+| Pattern compilation error | Skip invalid pattern, warn during startup |
+| Concurrent permission check | Queue/atomic operations on store |
+
+## 7. Testing Strategy
+
+- **Unit tests**: Each inspector with known-good and known-bad inputs
+- **Pattern tests**: Pattern matching accuracy (no false positives for benign content)
+- **Permission store tests**: Persistence, expiration, concurrent access
+- **Integration tests**: Full security flow with mock agent
+- **Penetration tests**: Prompt injection attempts at various levels
+
+## References
+
+- Source: `projects/goose/crates/goose/src/security/`
+- Source: `projects/goose/crates/goose/src/permission/`
+- Zed: `crates/sandbox/`
+- Zed: `crates/agent/src/tool_permissions.rs`
+
+## Requirements traceability
+
+| Requirement | Design element | Verification |
+| --- | --- | --- |
+| 1.1 | Adversary Inspector audit design | Observable scenario and failure-path test for 1.1 |
+| 1.2 | Adversary Inspector audit design | Observable scenario and failure-path test for 1.2 |
+| 1.3 | Adversary Inspector audit design | Observable scenario and failure-path test for 1.3 |
+| 2.1 | Egress Inspector audit design | Observable scenario and failure-path test for 2.1 |
+| 2.2 | Egress Inspector audit design | Observable scenario and failure-path test for 2.2 |
+| 2.3 | Egress Inspector audit design | Observable scenario and failure-path test for 2.3 |
+| 3.1 | Classification Client audit design | Observable scenario and failure-path test for 3.1 |
+| 3.2 | Classification Client audit design | Observable scenario and failure-path test for 3.2 |
+| 3.3 | Classification Client audit design | Observable scenario and failure-path test for 3.3 |
+| 4.1 | Security Scanner audit design | Observable scenario and failure-path test for 4.1 |
+| 4.2 | Security Scanner audit design | Observable scenario and failure-path test for 4.2 |
+| 4.3 | Security Scanner audit design | Observable scenario and failure-path test for 4.3 |
+| 5.1 | Security Patterns audit design | Observable scenario and failure-path test for 5.1 |
+| 5.2 | Security Patterns audit design | Observable scenario and failure-path test for 5.2 |
+| 5.3 | Security Patterns audit design | Observable scenario and failure-path test for 5.3 |
+| 6.1 | Permission Confirmation audit design | Observable scenario and failure-path test for 6.1 |
+| 6.2 | Permission Confirmation audit design | Observable scenario and failure-path test for 6.2 |
+| 6.3 | Permission Confirmation audit design | Observable scenario and failure-path test for 6.3 |
+| 7.1 | Permission Inspector audit design | Observable scenario and failure-path test for 7.1 |
+| 7.2 | Permission Inspector audit design | Observable scenario and failure-path test for 7.2 |
+| 7.3 | Permission Inspector audit design | Observable scenario and failure-path test for 7.3 |
+| 8.1 | Permission Judge audit design | Observable scenario and failure-path test for 8.1 |
+| 8.2 | Permission Judge audit design | Observable scenario and failure-path test for 8.2 |
+| 8.3 | Permission Judge audit design | Observable scenario and failure-path test for 8.3 |
+| 8.4 | Permission Judge audit design | Observable scenario and failure-path test for 8.4 |
+| 9.1 | Permission Store audit design | Observable scenario and failure-path test for 9.1 |
+| 9.2 | Permission Store audit design | Observable scenario and failure-path test for 9.2 |
+| 9.3 | Permission Store audit design | Observable scenario and failure-path test for 9.3 |
+| 9.4 | Permission Store audit design | Observable scenario and failure-path test for 9.4 |
+| 9.5 | D-PERMISSION-STORE-PRIVACY | Redaction, file permission, atomicity, corruption, expiry, and scope tests |
+
+## Audit design corrections
+
+- **D-PERMISSION-OWNERSHIP:** Extend `crates/agent/src/tool_permissions.rs` and ACP permission request/UI paths. Do not create parallel `permission` and `security` crates merely to mirror Goose directories; extract a component only if the existing owner cannot maintain the boundary.
+- **D-PERMISSION-JUDGE:** Goose's model judge is a conservative read-only detector, not a generic low/medium/high autonomous risk engine. Its result can only reduce prompts for validated read-only request IDs and fails closed to normal confirmation.
+- **D-PERMISSION-STORE-PRIVACY:** Normalized patterns and readable context may contain secrets. Redact/minimize before persistence, use atomic private writes, and make corruption a visible recoverable state.

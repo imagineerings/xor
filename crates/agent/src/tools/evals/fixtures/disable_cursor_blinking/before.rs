@@ -10727,7 +10727,7 @@ impl Editor {
                     "No entry in selection_history found for undo. \
                      This may correspond to a bug where undo does not update the selection. \
                      If this is occurring, please add details to \
-                     https://github.com/zed-industries/zed/issues/22692"
+                     https://github.com/simtropolis/zed/issues/22692"
                 );
             }
             self.request_autoscroll(Autoscroll::fit(), cx);
@@ -10757,7 +10757,7 @@ impl Editor {
                     "No entry in selection_history found for redo. \
                      This may correspond to a bug where undo does not update the selection. \
                      If this is occurring, please add details to \
-                     https://github.com/zed-industries/zed/issues/22692"
+                     https://github.com/simtropolis/zed/issues/22692"
                 );
             }
             self.request_autoscroll(Autoscroll::fit(), cx);

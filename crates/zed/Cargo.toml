@@ -2,7 +2,7 @@
 description = "The fast, collaborative code editor."
 edition.workspace = true
 name = "zed"
-version = "1.16.1"
+version = "1.16.2"
 publish.workspace = true
 license = "GPL-3.0-or-later"
 authors = ["Zed Team <hi@zed.dev>"]
@@ -12,10 +12,72 @@ default-run = "zed"
 workspace = true
 
 [features]
+default = ["agentic-tools"]
+agentic-tools = [
+    "dep:acp_thread",
+    "dep:acp_tools",
+    "dep:agent",
+    "dep:agent-client-protocol",
+    "dep:agent_settings",
+    "dep:agent_skills",
+    "dep:agent_ui",
+    "dep:language_models",
+    "dep:prompt_store",
+    "dep:sidebar",
+    "dep:web_search",
+    "dep:web_search_providers",
+    "auto_update_ui/agentic",
+    "diagnostics/agentic",
+    "editor/agentic",
+    "git_ui/agentic",
+    "onboarding/agentic",
+    "settings_ui/agentic",
+    "terminal_view/agentic",
+    "title_bar/agentic",
+    "workspace/agentic",
+    "zed_actions/agentic",
+]
+multiplayer-tools = [
+    "agentic-tools",
+    "agent/multiplayer-tools",
+    "dep:nostr_compat",
+    "agent_ui/multiplayer-tools",
+    "channel/multiplayer-tools",
+    "collab_ui/multiplayer-tools",
+    "git_ui/multiplayer-tools",
+    "onboarding/multiplayer-tools",
+    "sidebar/multiplayer-tools",
+    "tasks_ui/multiplayer-tools",
+    "zed_credentials_provider/multiplayer-tools",
+    "workspace/multiplayer-tools",
+]
+comfy = [
+    "dep:comfy_api",
+    "dep:comfy_model",
+    "dep:comfy_plugin_host",
+    "dep:comfy_runtime",
+    "dep:comfy_tensor",
+    "dep:comfy_types",
+    "dep:comfy_ui",
+]
+comfy-test-support = ["comfy", "test-support", "comfy_ui/test-support"]
+rust-tools = ["dep:cargo_ui", "tasks_ui/rust-test-actions"]
+corex = ["comfy", "comfy_runtime/corex"]
+cuda = ["comfy", "comfy_runtime/cuda"]
+directml = ["comfy", "comfy_runtime/directml"]
+metal = ["comfy", "comfy_runtime/metal"]
+mlu = ["comfy", "comfy_runtime/mlu"]
+npu = ["comfy", "comfy_runtime/npu"]
+rocm = ["comfy", "comfy_runtime/rocm"]
+xpu = ["comfy", "comfy_runtime/xpu"]
 tracy = ["ztracing/tracy"]
+runtime-shaders = ["gpui_platform/runtime_shaders"]
 # LEAK_BACKTRACE=1 cargo run --features zed/track-project-leak --profile release-fast
 track-project-leak = ["gpui/leak-detection"]
 test-support = [
+    "agentic-tools",
+    "agent/test-support",
+    "dep:tempfile",
     "gpui/test-support",
     "gpui_platform/screen-capture",
     "dep:image",
@@ -29,6 +91,7 @@ test-support = [
     "title_bar/test-support",
 ]
 visual-tests = [
+    "agentic-tools",
     "gpui/test-support",
     "gpui_platform/screen-capture",
     "gpui_platform/test-support",
@@ -45,6 +108,7 @@ visual-tests = [
     "acp_thread/test-support",
     "action_log/test-support",
     "agent_ui/test-support",
+    "channel/test-support",
     "db/test-support",
     "agent/test-support",
     "language_model/test-support",
@@ -63,13 +127,22 @@ path = "src/visual_test_runner.rs"
 required-features = ["visual-tests"]
 
 [dependencies]
-acp_tools.workspace = true
+async-channel.workspace = true
+cargo_ui = { workspace = true, optional = true }
+comfy_api = { workspace = true, optional = true }
+comfy_model = { workspace = true, optional = true }
+comfy_plugin_host = { workspace = true, optional = true }
+comfy_runtime = { workspace = true, optional = true }
+comfy_tensor = { workspace = true, optional = true }
+comfy_types = { workspace = true, optional = true }
+comfy_ui = { workspace = true, optional = true }
+acp_tools = { workspace = true, optional = true }
 activity_indicator.workspace = true
-agent.workspace = true
-agent-client-protocol.workspace = true
-agent_settings.workspace = true
-agent_skills.workspace = true
-agent_ui = { workspace = true, features = ["audio"] }
+agent = { workspace = true, optional = true }
+agent-client-protocol = { workspace = true, optional = true }
+agent_settings = { workspace = true, optional = true }
+agent_skills = { workspace = true, optional = true }
+agent_ui = { workspace = true, features = ["audio"], optional = true }
 anyhow.workspace = true
 askpass.workspace = true
 assets.workspace = true
@@ -83,6 +156,7 @@ channel.workspace = true
 clap.workspace = true
 cli.workspace = true
 client.workspace = true
+product_flavor.workspace = true
 codestral.workspace = true
 collab_ui.workspace = true
 collections.workspace = true
@@ -127,10 +201,11 @@ gpui_platform = {workspace = true, features=["screen-capture", "font-kit", "wayl
 hdrhistogram.workspace = true
 image = { workspace = true, optional = true }
 itertools.workspace = true
+nostr_compat = { workspace = true, optional = true }
 semver.workspace = true
 tempfile = { workspace = true, optional = true }
 clock = { workspace = true, optional = true }
-acp_thread.workspace = true
+acp_thread = { workspace = true, optional = true }
 action_log = { workspace = true, optional = true }
 agent_servers = { workspace = true, optional = true }
 gpui_tokio.workspace = true
@@ -149,7 +224,7 @@ keymap_editor.workspace = true
 language.workspace = true
 language_extension.workspace = true
 language_model.workspace = true
-language_models.workspace = true
+language_models = { workspace = true, optional = true }
 language_onboarding.workspace = true
 language_selector.workspace = true
 language_tools.workspace = true
@@ -175,7 +250,7 @@ profiling.workspace = true
 project.workspace = true
 project_panel.workspace = true
 project_symbols.workspace = true
-prompt_store.workspace = true
+prompt_store = { workspace = true, optional = true }
 proto.workspace = true
 recent_projects.workspace = true
 release_channel.workspace = true
@@ -188,12 +263,14 @@ sandbox.workspace = true
 search.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
 session.workspace = true
 settings.workspace = true
 settings_profile_selector.workspace = true
 settings_ui.workspace = true
 shellexpand.workspace = true
-sidebar.workspace = true
+sidebar = { workspace = true, optional = true }
 smol.workspace = true
 snippet_provider.workspace = true
 snippets_ui.workspace = true
@@ -224,8 +301,8 @@ uuid.workspace = true
 vim.workspace = true
 vim_mode_setting.workspace = true
 watch.workspace = true
-web_search.workspace = true
-web_search_providers.workspace = true
+web_search = { workspace = true, optional = true }
+web_search_providers = { workspace = true, optional = true }
 which_key.workspace = true
 workspace.workspace = true
 zed_actions.workspace = true
@@ -278,43 +355,18 @@ terminal_view = { workspace = true, features = ["test-support"] }
 title_bar = { workspace = true, features = ["test-support"] }
 workspace = { workspace = true, features = ["test-support"] }
 image.workspace = true
-agent_ui = { workspace = true, features = ["test-support"] }
 search = { workspace = true, features = ["test-support"] }
 repl = { workspace = true, features = ["test-support"] }
 
 
 
-[package.metadata.bundle-dev]
-icon = ["resources/app-icon-dev@2x.png", "resources/app-icon-dev.png"]
-identifier = "dev.zed.Zed-Dev"
-name = "Zed Dev"
-osx_minimum_system_version = "10.15.7"
-osx_info_plist_exts = ["resources/info/*"]
-osx_url_schemes = ["zed"]
-
-[package.metadata.bundle-nightly]
-icon = ["resources/app-icon-nightly@2x.png", "resources/app-icon-nightly.png"]
-identifier = "dev.zed.Zed-Nightly"
-name = "Zed Nightly"
-osx_minimum_system_version = "10.15.7"
-osx_info_plist_exts = ["resources/info/*"]
-osx_url_schemes = ["zed"]
-
-[package.metadata.bundle-preview]
-icon = ["resources/app-icon-preview@2x.png", "resources/app-icon-preview.png"]
-identifier = "dev.zed.Zed-Preview"
-name = "Zed Preview"
-osx_minimum_system_version = "10.15.7"
-osx_info_plist_exts = ["resources/info/*"]
-osx_url_schemes = ["zed"]
-
-[package.metadata.bundle-stable]
+[package.metadata.bundle]
 icon = ["resources/app-icon@2x.png", "resources/app-icon.png"]
-identifier = "dev.zed.Zed"
-name = "Zed"
+identifier = "dev.zed.internal"
+name = "Zed Internal"
 osx_minimum_system_version = "10.15.7"
 osx_info_plist_exts = ["resources/info/*"]
-osx_url_schemes = ["zed"]
+osx_url_schemes = ["zed-internal"]
 
 [package.metadata.cargo-machete]
 ignored = ["profiling", "zstd", "tracing"]

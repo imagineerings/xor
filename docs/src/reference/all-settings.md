@@ -4227,8 +4227,8 @@ List of `integer` column numbers
 ```json [settings]
 {
   "telemetry": {
-    "diagnostics": true,
-    "metrics": true
+    "diagnostics": false,
+    "metrics": false
   }
 }
 ```
@@ -4239,7 +4239,7 @@ List of `integer` column numbers
 
 - Description: Setting for sending debug-related data, such as crash reports.
 - Setting: `diagnostics`
-- Default: `true`
+- Default: `false` (temporarily disabled; set to `true` to opt in)
 
 **Options**
 
@@ -4249,7 +4249,7 @@ List of `integer` column numbers
 
 - Description: Setting for sending anonymized usage data, such as what languages you're using Zed with.
 - Setting: `metrics`
-- Default: `true`
+- Default: `false` (temporarily disabled; set to `true` to opt in)
 
 **Options**
 

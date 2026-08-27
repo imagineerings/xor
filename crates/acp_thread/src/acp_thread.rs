@@ -1,3 +1,4 @@
+mod collaboration_observer;
 mod connection;
 mod diff;
 mod mention;
@@ -6,6 +7,7 @@ pub use ::terminal::HeadlessTerminal;
 use action_log::{ActionLog, ActionLogTelemetry};
 use agent_client_protocol::schema::{MaybeUndefined, v1 as acp};
 use anyhow::{Context as _, Result, anyhow};
+pub use collaboration_observer::*;
 use collections::HashSet;
 pub use connection::*;
 pub use diff::*;
@@ -2757,6 +2759,54 @@ impl AcpThread {
         self.push_assistant_content_block_with_indent(chunk, is_thought, false, cx)
     }
 
+    pub fn push_local_command_output(
+        &mut self,
+        output: impl Into<SharedString>,
+        cx: &mut Context<Self>,
+    ) {
+        Self::flush_streaming_text(&mut self.streaming_text_buffer, cx);
+        let language_registry = self.project.read(cx).languages().clone();
+        let path_style = self.project.read(cx).path_style(cx);
+        let block = ContentBlock::new(
+            acp::ContentBlock::from(output.into()),
+            &language_registry,
+            path_style,
+            cx,
+        );
+        self.push_entry(
+            AgentThreadEntry::AssistantMessage(AssistantMessage {
+                chunks: vec![AssistantMessageChunk::Message { id: None, block }],
+                indented: false,
+                is_subagent_output: false,
+            }),
+            cx,
+        );
+    }
+
+    pub fn clear_entries(&mut self, cx: &mut Context<Self>) {
+        debug_assert_eq!(self.status(), ThreadStatus::Idle);
+        Self::flush_streaming_text(&mut self.streaming_text_buffer, cx);
+
+        let removed_range = 0..self.entries.len();
+        self.entries.clear();
+        if !removed_range.is_empty() {
+            cx.emit(AcpThreadEvent::EntriesRemoved(removed_range));
+        }
+
+        self.elicitations = ElicitationStore::default();
+        self.plan = Plan::default();
+        for terminal in std::mem::take(&mut self.terminals).into_values() {
+            terminal.update(cx, |terminal, cx| terminal.kill(cx));
+        }
+        self.pending_terminal_output.clear();
+        self.pending_terminal_exit.clear();
+        self.had_error = false;
+        self.draft_prompt = None;
+        self.ui_scroll_position = None;
+        self.update_token_usage(None, cx);
+        cx.emit(AcpThreadEvent::PromptUpdated);
+    }
+
     pub fn push_assistant_content_block_with_indent(
         &mut self,
         chunk: acp::ContentBlock,
@@ -3663,6 +3713,7 @@ impl AcpThread {
         let git_store = self.project.read(cx).git_store().clone();
 
         let client_user_message_ids = self.connection.client_user_message_ids(cx);
+        let connection = self.connection.clone();
         let client_id = client_user_message_ids
             .as_ref()
             .map(|client_user_message_ids| client_user_message_ids.new_id());
@@ -3701,14 +3752,14 @@ impl AcpThread {
                 .ok();
             }
 
-            this.update(cx, |this, cx| {
+            let prompt_task = cx.update(|cx| {
                 if let (Some(prompt), Some(client_id)) = (client_user_message_ids, client_id) {
                     prompt.prompt(client_id, request, cx)
                 } else {
-                    this.connection.prompt(request, cx)
+                    connection.prompt(request, cx)
                 }
-            })?
-            .await
+            });
+            prompt_task.await
         })
     }
 
@@ -4716,6 +4767,46 @@ impl AcpThread {
             }
         }
     }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn register_test_terminal(
+        &mut self,
+        terminal_id: acp::TerminalId,
+        label: String,
+        cwd: Option<PathBuf>,
+        output: Vec<u8>,
+        cx: &mut Context<Self>,
+    ) {
+        let background_executor = cx.background_executor().clone();
+        let terminal = cx.new(|cx| {
+            ::terminal::TerminalBuilder::new_display_only(
+                ::terminal::terminal_settings::CursorShape::default(),
+                ::terminal::terminal_settings::AlternateScroll::On,
+                None,
+                0,
+                &background_executor,
+                PathStyle::local(),
+            )
+            .subscribe(cx)
+        });
+        self.on_terminal_provider_event(
+            TerminalProviderEvent::Created {
+                terminal_id: terminal_id.clone(),
+                label,
+                cwd,
+                output_byte_limit: None,
+                terminal,
+            },
+            cx,
+        );
+        self.on_terminal_provider_event(
+            TerminalProviderEvent::Output {
+                terminal_id,
+                data: output,
+            },
+            cx,
+        );
+    }
 }
 
 fn markdown_for_raw_output(
@@ -5512,6 +5603,105 @@ mod tests {
                 panic!("Expected UserMessage at index 2");
             }
         });
+    }
+
+    #[gpui::test]
+    async fn test_local_command_output_creates_distinct_transient_entries(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let connection = Rc::new(FakeAgentConnection::new());
+        let thread = cx
+            .update(|cx| {
+                connection.new_session(project, PathList::new(&[Path::new(path!("/test"))]), cx)
+            })
+            .await
+            .unwrap();
+
+        thread.update(cx, |thread, cx| {
+            thread.push_assistant_content_block("model output".into(), false, cx);
+            thread.push_local_command_output("first local result", cx);
+            thread.push_local_command_output("second local result", cx);
+        });
+
+        thread.read_with(cx, |thread, cx| {
+            assert_eq!(thread.entries().len(), 3);
+            assert!(thread.entries()[0].to_markdown(cx).contains("model output"));
+            assert!(
+                thread.entries()[1]
+                    .to_markdown(cx)
+                    .contains("first local result")
+            );
+            assert!(
+                thread.entries()[2]
+                    .to_markdown(cx)
+                    .contains("second local result")
+            );
+        });
+    }
+
+    #[gpui::test]
+    async fn test_clear_entries_resets_conversation_without_replacing_action_log(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let connection = Rc::new(FakeAgentConnection::new());
+        let thread = cx
+            .update(|cx| {
+                connection.new_session(project, PathList::new(&[Path::new(path!("/test"))]), cx)
+            })
+            .await
+            .unwrap();
+        let action_log_id = thread.read_with(cx, |thread, _| thread.action_log().entity_id());
+        let removed_events = Rc::new(RefCell::new(Vec::new()));
+        let token_events = Rc::new(RefCell::new(0));
+        let _subscription = cx.update(|cx| {
+            cx.subscribe(&thread, {
+                let removed_events = removed_events.clone();
+                let token_events = token_events.clone();
+                move |_thread, event, _cx| match event {
+                    AcpThreadEvent::EntriesRemoved(range) => {
+                        removed_events.borrow_mut().push(range.clone());
+                    }
+                    AcpThreadEvent::TokenUsageUpdated => *token_events.borrow_mut() += 1,
+                    _ => {}
+                }
+            })
+        });
+
+        thread.update(cx, |thread, cx| {
+            thread.push_user_content_block(None, "old user".into(), cx);
+            thread.push_assistant_content_block("old assistant".into(), false, cx);
+            thread.update_token_usage(
+                Some(TokenUsage {
+                    max_tokens: 100,
+                    used_tokens: 20,
+                    input_tokens: 12,
+                    output_tokens: 8,
+                    max_output_tokens: None,
+                }),
+                cx,
+            );
+            thread.set_draft_prompt(Some(vec!["draft".into()]), cx);
+            thread.clear_entries(cx);
+        });
+
+        thread.read_with(cx, |thread, _| {
+            assert!(thread.entries().is_empty());
+            assert!(thread.plan().is_empty());
+            assert!(thread.token_usage().is_none());
+            assert!(thread.cost().is_none());
+            assert!(thread.draft_prompt().is_none());
+            assert_eq!(thread.action_log().entity_id(), action_log_id);
+        });
+        assert_eq!(&*removed_events.borrow(), &[0..2]);
+        assert_eq!(*token_events.borrow(), 2);
     }
 
     #[gpui::test]

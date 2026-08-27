@@ -1,0 +1,42 @@
+# Design: Agentic Game Tools
+
+## Architecture
+
+Expose graph editing, world generation, and mesh generation through existing Zed agent tool registration. Tools produce diffs and typed requests, not direct unvalidated filesystem mutations.
+
+Agentic game tooling is implemented as native Zed functionality. The tools use `SimGame*`, `SimWorld*`, and `SimMesh*` records that convert into `world_model` graph, world-generation, mesh-generation, and provenance types; they do not expose Comfy compatibility labels or pass requests through to Comfy workflows.
+
+## Components
+
+- `SimGameGraphTool`
+- `SimWorldGenerationTool`
+- `SimMeshGenerationTool`
+
+## Correctness Properties
+
+### Property 1: Validated Agent Graph Edits
+
+_For any_ agent graph edit, the graph validator SHALL run before changes are committed.
+
+**Validates: Requirement 1.1**
+
+### Property 2: Typed Generation
+
+_For any_ agent generation request, the tool SHALL produce typed requests and provenance-aware outputs.
+
+**Validates: Requirement 2.1, 2.2**
+
+
+## Audit traceability reconciliation
+
+### D-TRACE: Preserve legacy design while exposing complete criterion coverage
+
+This reconciliation table preserves the existing design decisions and IDs while making every acceptance criterion visible to the current feature-spec validator. Capability-level gaps and ownership corrections are defined by the Godot full-port coverage catalog.
+
+## Requirements traceability
+
+| Requirement | Design element | Verification |
+| --- | --- | --- |
+| 1.1 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 2.1 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 2.2 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |

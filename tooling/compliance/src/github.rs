@@ -257,7 +257,7 @@ pub struct Repository<'a> {
 }
 
 impl<'a> Repository<'a> {
-    pub const ZED: Repository<'static> = Repository::new_static("zed-industries", "zed");
+    pub const ZED: Repository<'static> = Repository::new_static("simtropolis", "zed");
 
     pub fn new(owner: &'a str, name: &'a str) -> Self {
         Self {

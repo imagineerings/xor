@@ -3547,9 +3547,9 @@ pub fn init(cx: &mut App) {
 }
 
 fn is_zed_industries_repo(url: &str) -> bool {
-    url.strip_prefix("https://github.com/zed-industries/")
-        .or_else(|| url.strip_prefix("http://github.com/zed-industries/"))
-        .or_else(|| url.strip_prefix("git@github.com:zed-industries/"))
-        .or_else(|| url.strip_prefix("ssh://git@github.com/zed-industries/"))
+    url.strip_prefix("https://github.com/simtropolis/")
+        .or_else(|| url.strip_prefix("http://github.com/simtropolis/"))
+        .or_else(|| url.strip_prefix("git@github.com:simtropolis/"))
+        .or_else(|| url.strip_prefix("ssh://git@github.com/simtropolis/"))
         .is_some_and(|repo| !repo.is_empty())
 }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Feature Spec"
+  short_description: "Create planning-only feature specification packs"
+  default_prompt: "Use $feature-spec to create a complete planning-only specification pack for this feature."

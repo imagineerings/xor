@@ -36,7 +36,7 @@ cargo run --config 'profile.release.debug="full"'
 cargo build --config 'profile.release.debug="full"'
 ```
 
-> If you do not want to pass `--config` on every `cargo` command, you can also change the section in the [root `Cargo.toml`](https://github.com/zed-industries/zed/blob/main/Cargo.toml)
+> If you do not want to pass `--config` on every `cargo` command, you can also change the section in the [root `Cargo.toml`](https://github.com/simtropolis/zed/blob/main/Cargo.toml)
 >
 > from
 >

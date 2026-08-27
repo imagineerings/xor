@@ -42,7 +42,7 @@ fn extension_benchmarks(c: &mut Criterion) {
             |wasm_bytes| {
                 let _extension = cx
                     .foreground_executor()
-                    .block_on(wasm_host.load_extension(wasm_bytes, &manifest, &cx.to_async()))
+                    .block_test(wasm_host.load_extension(wasm_bytes, &manifest, &cx.to_async()))
                     .unwrap();
             },
             BatchSize::SmallInput,
@@ -58,7 +58,11 @@ fn init() -> TestAppContext {
     cx.update(|cx| {
         let store = SettingsStore::test(cx);
         cx.set_global(store);
-        release_channel::init(semver::Version::new(0, 0, 0), cx);
+        release_channel::init_test(
+            semver::Version::new(0, 0, 0),
+            release_channel::ReleaseChannel::Dev,
+            cx,
+        );
     });
 
     cx
@@ -73,7 +77,7 @@ fn wasm_bytes(cx: &TestAppContext, manifest: &mut ExtensionManifest, fs: Arc<dyn
         .unwrap()
         .join("extensions/test-extension");
     cx.foreground_executor()
-        .block_on(extension_builder.compile_extension(
+        .block_test(extension_builder.compile_extension(
             &path,
             manifest,
             CompileExtensionOptions {

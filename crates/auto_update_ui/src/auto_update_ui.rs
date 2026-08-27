@@ -1,27 +1,35 @@
+#[cfg(feature = "agentic")]
 use std::sync::Arc;
 
+#[cfg(feature = "agentic")]
 use agent_skills::GLOBAL_SKILLS_DIR_DISPLAY;
 use auto_update::{AutoUpdater, release_notes_url};
+#[cfg(feature = "agentic")]
 use client::zed_urls;
+#[cfg(feature = "agentic")]
 use db::kvp::Dismissable;
 use editor::{Editor, MultiBuffer};
-use gpui::{
-    App, DismissEvent, Entity, EventEmitter, FocusHandle, Focusable, TaskExt, Window, actions,
-    prelude::*,
-};
+use gpui::{App, DismissEvent, Entity, TaskExt, Window, actions, prelude::*};
+#[cfg(feature = "agentic")]
+use gpui::{EventEmitter, FocusHandle, Focusable};
 use markdown_preview::markdown_preview_view::{MarkdownPreviewMode, MarkdownPreviewView};
+#[cfg(feature = "agentic")]
 use prompt_store::rules_to_skills_migration;
 use release_channel::{AppVersion, ReleaseChannel};
+#[cfg(feature = "agentic")]
 use semver::Version;
 use serde::Deserialize;
 use smol::io::AsyncReadExt;
-use ui::{AnnouncementToast, ListBulletItem, SkillsIllustration, prelude::*};
+use ui::prelude::*;
+#[cfg(feature = "agentic")]
+use ui::{AnnouncementToast, ListBulletItem, SkillsIllustration};
 use util::{ResultExt as _, maybe};
+#[cfg(feature = "agentic")]
+use workspace::notifications::{Notification, SuppressEvent};
 use workspace::{
     Workspace,
     notifications::{
-        Notification, NotificationId, SuppressEvent, show_app_notification,
-        simple_message_notification::MessageNotification,
+        NotificationId, show_app_notification, simple_message_notification::MessageNotification,
     },
     workspace_error::{ErrorAction, ErrorSeverity, WorkspaceError},
 };
@@ -187,6 +195,7 @@ fn view_release_notes_locally(
     .detach();
 }
 
+#[cfg(feature = "agentic")]
 #[derive(Clone)]
 struct AnnouncementContent {
     heading: SharedString,
@@ -200,12 +209,15 @@ struct AnnouncementContent {
     on_dismiss: Option<Arc<dyn Fn(&mut App) + Send + Sync>>,
 }
 
+#[cfg(feature = "agentic")]
 struct SkillsAnnouncement;
 
+#[cfg(feature = "agentic")]
 impl Dismissable for SkillsAnnouncement {
     const KEY: &'static str = "skills_announcement_dismissed";
 }
 
+#[cfg(feature = "agentic")]
 fn announcement_for_version(version: &Version, cx: &App) -> Option<AnnouncementContent> {
     let version_with_skills = match ReleaseChannel::global(cx) {
         ReleaseChannel::Stable => Version::new(1, 4, 0),
@@ -250,11 +262,13 @@ fn announcement_for_version(version: &Version, cx: &App) -> Option<AnnouncementC
     }
 }
 
+#[cfg(feature = "agentic")]
 struct AnnouncementToastNotification {
     focus_handle: FocusHandle,
     content: AnnouncementContent,
 }
 
+#[cfg(feature = "agentic")]
 impl AnnouncementToastNotification {
     fn new(content: AnnouncementContent, cx: &mut App) -> Self {
         Self {
@@ -271,16 +285,21 @@ impl AnnouncementToastNotification {
     }
 }
 
+#[cfg(feature = "agentic")]
 impl Focusable for AnnouncementToastNotification {
     fn focus_handle(&self, _cx: &App) -> FocusHandle {
         self.focus_handle.clone()
     }
 }
 
+#[cfg(feature = "agentic")]
 impl EventEmitter<DismissEvent> for AnnouncementToastNotification {}
+#[cfg(feature = "agentic")]
 impl EventEmitter<SuppressEvent> for AnnouncementToastNotification {}
+#[cfg(feature = "agentic")]
 impl Notification for AnnouncementToastNotification {}
 
+#[cfg(feature = "agentic")]
 impl Render for AnnouncementToastNotification {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         AnnouncementToast::new()
@@ -337,34 +356,36 @@ fn show_update_notification(cx: &mut App) {
     version.build = semver::BuildMetadata::EMPTY;
     let app_name = ReleaseChannel::global(cx).display_name();
 
+    #[cfg(feature = "agentic")]
     if let Some(content) = announcement_for_version(&version, cx) {
         show_app_notification(
             NotificationId::unique::<UpdateNotification>(),
             cx,
             move |cx| cx.new(|cx| AnnouncementToastNotification::new(content.clone(), cx)),
         );
-    } else {
-        show_app_notification(
-            NotificationId::unique::<UpdateNotification>(),
-            cx,
-            move |cx| {
-                let workspace_handle = cx.entity().downgrade();
-                cx.new(|cx| {
-                    MessageNotification::new(format!("Updated to {app_name} {}", version), cx)
-                        .primary_message("View Release Notes")
-                        .primary_on_click(move |window, cx| {
-                            if let Some(workspace) = workspace_handle.upgrade() {
-                                workspace.update(cx, |workspace, cx| {
-                                    crate::view_release_notes_locally(workspace, window, cx);
-                                })
-                            }
-                            cx.emit(DismissEvent);
-                        })
-                        .show_suppress_button(false)
-                })
-            },
-        );
+        return;
     }
+
+    show_app_notification(
+        NotificationId::unique::<UpdateNotification>(),
+        cx,
+        move |cx| {
+            let workspace_handle = cx.entity().downgrade();
+            cx.new(|cx| {
+                MessageNotification::new(format!("Updated to {app_name} {}", version), cx)
+                    .primary_message("View Release Notes")
+                    .primary_on_click(move |window, cx| {
+                        if let Some(workspace) = workspace_handle.upgrade() {
+                            workspace.update(cx, |workspace, cx| {
+                                crate::view_release_notes_locally(workspace, window, cx);
+                            })
+                        }
+                        cx.emit(DismissEvent);
+                    })
+                    .show_suppress_button(false)
+            })
+        },
+    );
 }
 
 /// Shows a notification across all workspaces if an update was previously automatically installed

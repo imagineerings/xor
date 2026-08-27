@@ -13,6 +13,7 @@ path = "src/sidebar.rs"
 
 [features]
 default = []
+multiplayer-tools = ["workspace/multiplayer-tools"]
 
 [dependencies]
 acp_thread.workspace = true
@@ -24,6 +25,7 @@ agent_settings.workspace = true
 agent_ui = { workspace = true, features = ["audio"] }
 anyhow.workspace = true
 chrono.workspace = true
+channel.workspace = true
 editor.workspace = true
 feature_flags.workspace = true
 fs.workspace = true
@@ -37,6 +39,7 @@ notifications.workspace = true
 platform_title_bar.workspace = true
 project.workspace = true
 recent_projects.workspace = true
+release_channel.workspace = true
 remote.workspace = true
 remote_connection.workspace = true
 serde.workspace = true
@@ -48,9 +51,9 @@ theme_settings.workspace = true
 ui.workspace = true
 unicode-segmentation.workspace = true
 util.workspace = true
-workspace.workspace = true
+workspace = { workspace = true, features = ["agentic"] }
 git_ui_core.workspace = true
-zed_actions.workspace = true
+zed_actions = { workspace = true, features = ["agentic"] }
 
 [dev-dependencies]
 acp_thread = { workspace = true, features = ["test-support"] }
@@ -62,6 +65,7 @@ language = { workspace = true, features = ["test-support"] }
 language_model = { workspace = true, features = ["test-support"] }
 release_channel.workspace = true
 semver.workspace = true
+sha2.workspace = true
 pretty_assertions.workspace = true
 prompt_store.workspace = true
 recent_projects = { workspace = true, features = ["test-support"] }
@@ -78,5 +82,6 @@ project = { workspace = true, features = ["test-support"] }
 remote = { workspace = true, features = ["test-support"] }
 remote_connection = { workspace = true, features = ["test-support"] }
 remote_server = { workspace = true, features = ["test-support"] }
+rpc.workspace = true
 settings = { workspace = true, features = ["test-support"] }
 workspace = { workspace = true, features = ["test-support"] }

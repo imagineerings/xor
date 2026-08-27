@@ -31,6 +31,7 @@ use rpc::proto::{self};
 use settings::Settings;
 use std::sync::Arc;
 use task::{DebugScenario, SharedTaskContext};
+use zed_actions::debug_panel::ToggleFocus;
 
 use ui::{
     ButtonLike, ContextMenu, Divider, ElevationIndex, PopoverMenu, PopoverMenuHandle, SplitButton,
@@ -45,7 +46,6 @@ use workspace::{
     Item, Pane, Workspace,
     dock::{DockPosition, Panel, PanelEvent},
 };
-use zed_actions::debug_panel::ToggleFocus;
 
 pub struct DebuggerHistoryFeatureFlag;
 

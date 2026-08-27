@@ -28,6 +28,8 @@ path = "tests/integration/collab_tests.rs"
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
+base64.workspace = true
+bytes.workspace = true
 async-tungstenite = { workspace = true, features = ["tokio", "tokio-rustls-manual-roots" ] }
 aws-config = { version = "1.1.5" }
 aws-sdk-kinesis = "1.51.0"
@@ -37,18 +39,27 @@ chrono.workspace = true
 clock.workspace = true
 cloud_api_types.workspace = true
 collections.workspace = true
+collaboration_domain.workspace = true
+collaboration_workflow.workspace = true
+cron.workspace = true
 dashmap.workspace = true
 envy = "0.4.2"
+evalexpr.workspace = true
 futures.workspace = true
+flate2.workspace = true
 gpui.workspace = true
 hex.workspace = true
+hmac.workspace = true
 http_client.workspace = true
+image.workspace = true
 livekit_api.workspace = true
 log.workspace = true
 nanoid.workspace = true
+nostr_compat.workspace = true
 parking_lot.workspace = true
 prometheus = "0.14"
 prost.workspace = true
+mp4 = "0.14"
 rand.workspace = true
 reqwest = { version = "0.11", features = ["json"] }
 rpc.workspace = true
@@ -62,7 +73,9 @@ sha2.workspace = true
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "json", "time", "uuid", "any"] }
 strum.workspace = true
 telemetry_events.workspace = true
+tempfile.workspace = true
 text.workspace = true
+thiserror.workspace = true
 time.workspace = true
 tokio = { workspace = true, features = ["full"] }
 toml.workspace = true
@@ -72,11 +85,15 @@ tracing.workspace = true
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json", "registry", "tracing-log"] } # workaround for https://github.com/tokio-rs/tracing/issues/2927
 util.workspace = true
 uuid.workspace = true
+url.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 agent = { workspace = true, features = ["test-support"] }
 async-trait.workspace = true
 async-channel.workspace = true
+bech32.workspace = true
+credentials_provider.workspace = true
 
 buffer_diff.workspace = true
 call = { workspace = true, features = ["test-support"] }
@@ -97,7 +114,9 @@ extension.workspace = true
 file_finder.workspace = true
 fs = { workspace = true, features = ["test-support"] }
 git = { workspace = true, features = ["test-support"] }
+git_credential_nostr = { path = "../../tools/git_credential_nostr" }
 git_hosting_providers.workspace = true
+git_sign_nostr = { path = "../../tools/git_sign_nostr" }
 git_ui = { workspace = true, features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }
 gpui_tokio.workspace = true
@@ -107,20 +126,26 @@ language = { workspace = true, features = ["test-support"] }
 language_model = { workspace = true, features = ["test-support"] }
 livekit_client =  { workspace = true, features = ["test-support"] }
 lsp = { workspace = true, features = ["test-support"] }
+media = { workspace = true, features = ["collaboration"] }
 menu.workspace = true
 multi_buffer = { workspace = true, features = ["test-support"] }
 node_runtime.workspace = true
-notifications = { workspace = true, features = ["test-support"] }
+nostr.workspace = true
+notifications = { workspace = true, features = ["multiplayer-tools", "test-support"] }
+pair_relay.workspace = true
 pretty_assertions.workspace = true
 project = { workspace = true, features = ["test-support"] }
 prompt_store.workspace = true
+push_gateway.workspace = true
 recent_projects = { workspace = true, features = ["test-support"] }
 release_channel.workspace = true
 remote = { workspace = true, features = ["test-support"] }
 remote_server.workspace = true
 rpc = { workspace = true, features = ["test-support"] }
-sea-orm = { version = "=1.1.10", features = ["sqlx-sqlite"] }
+search.workspace = true
+sea-orm = { version = "=1.1.10", features = ["mock", "sqlx-sqlite"] }
 serde_json.workspace = true
+secp256k1.workspace = true
 session = { workspace = true, features = ["test-support"] }
 settings = { workspace = true, features = ["test-support"] }
 smol.workspace = true
@@ -135,4 +160,5 @@ util.workspace = true
 workspace = { workspace = true, features = ["test-support"] }
 worktree = { workspace = true, features = ["test-support"] }
 zed_actions.workspace = true
+zed_credentials_provider = { workspace = true, features = ["multiplayer-tools"] }
 zlog.workspace = true

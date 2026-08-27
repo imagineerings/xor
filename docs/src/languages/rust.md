@@ -11,6 +11,59 @@ Rust support is available natively in Zed.
 - Language Server: [rust-lang/rust-analyzer](https://github.com/rust-lang/rust-analyzer)
 - Debug Adapter: [CodeLLDB](https://github.com/vadimcn/codelldb) (primary), [GDB](https://sourceware.org/gdb/) (secondary, not available on Apple silicon)
 
+## Cargo workspace tools
+
+Zed distributions built with the `rust-tools` capability include a dockable **Cargo** panel and a dockable **Tests** panel. This capability is additive: disabling it removes these panels and their Cargo-specific actions, but does not make all existing Rust language support, grammars, rust-analyzer integration, or language tasks optional.
+
+The Cargo panel discovers every visible `Cargo.toml` through the authoritative project host. It supports virtual workspaces, standalone packages, multiple Cargo roots, and local, SSH/remote-server, multiplayer, WSL, and development-container projects where those project modes are otherwise supported. The tree shows:
+
+- workspace members and their manifests;
+- library, binary, example, test, benchmark, and build-script targets;
+- package-defined features separately from features enabled in the resolved workspace;
+- direct normal, development, build, optional, renamed, target-specific, path, registry, Git, and workspace-inherited dependencies; and
+- declared profiles and toolchain files, the host compiler, Cargo's unresolved default target, and the active Cargo preset.
+
+Dependencies are intentionally direct-only. The panel does not recursively render Cargo's resolved transitive graph, so dependency cycles cannot create an unbounded tree. Open a package to navigate to its `Cargo.toml`, or a target to navigate to its source file. Refresh, Expand All, and Collapse All are always explicit panel operations; relevant manifest, lockfile, toolchain, and Rust-source changes also trigger debounced background refreshes.
+
+Cargo workspace projection is certified with a hermetic 1,000-package model gate and a 10,000-visible-row foreground gate. Metadata parsing/model conversion runs off the GPUI foreground thread; tree reconciliation is bounded to 250 ms in the deterministic debug test, and rendering consumes only the requested visible range.
+
+### Cargo presets and actions
+
+Cargo presets are versioned settings under `cargo.presets`. User settings provide defaults, trusted project settings may override entries by ID, and an invalid entry is isolated without disabling other presets. A preset can select a Cargo subcommand, package or workspace scope, target, profile, features, target triple, structured arguments and environment, working directory, and ordinary task presentation. The selected preset and safe package/target selection are restored per workspace; environment values and result history are never stored in workspace panel state.
+
+Build, Check, Run, Test, Bench, Doc, Clippy, Fmt, Clean, and the offline locked dependency Tree action compile the selected Cargo node and preset into an ordinary Zed task. Clean requires a second explicit invocation because it removes build artifacts. Debug compiles into an ordinary DAP scenario using the Cargo locator and CodeLLDB. Cargo metadata discovery never becomes a second build or test process runner. Existing task terminals, history, cancellation, rerun behavior, `tasks.json`, `debug.json`, and DAP remain authoritative.
+
+Run with Coverage uses an existing `cargo-llvm-cov` installation on the project host. It runs an ordinary Cargo task, declares a bounded project-relative JSON artifact, and publishes language-neutral gutter and summary facts only after the task succeeds and the authoritative host validates the report. Zed does not install the collector, fetch dependencies, parse terminal output, or fall back to a client-local report. If the collector is missing, install it deliberately on the project host and invoke the action again.
+
+External profiling remains task-first. A configured external profiler may wrap a compiled Cargo preset and declare one bounded SVG, HTML, or file artifact for Zed to open after success. Zed does not yet ship a native profile collector or viewer.
+
+The Tests panel discovers Rust unit, integration, binary-harness, example-harness, benchmark, ignored, and doctest cases using bounded structured output on the project host. Run, cancel, rerun-failed, terminal reveal, source navigation, and supported debug actions route through the same Tasks and DAP systems. Doctest debugging is currently unavailable and is reported as an action-specific reason rather than silently running another command.
+
+Cargo metadata and test discovery require a trusted project and an available Cargo toolchain on the authoritative host. They run offline and do not install tools, fetch dependencies, or fall back to a client-local filesystem. Partial failures retain safe stale results where possible. A disconnected host or feature/protocol mismatch produces a stable actionable state until the connection or build capability changes.
+
+### Scope and roadmap
+
+The shipped workspace is limited to the Cargo dashboard, presets, contextual Tasks/DAP actions, structured task results, and Rust test exploration described above.
+
+- **Next:** refine active-configuration ergonomics and broaden fixture-backed test protocol compatibility when stable Rust tooling exposes it safely.
+- **Available as bounded integrations:** direct dependency provenance, explicit external coverage collection, and declared external profiling artifacts.
+- **Later:** a native profiling model/viewer only after its collector and platform evidence gate is approved.
+- **External:** Cargo, rustc, rust-analyzer, and debug-adapter behavior remains owned by those tools and protocols.
+- **Rejected for this workspace:** terminal-output scraping, automatic `cargo-nextest` installation, a second Rust semantic index, a universal build-system model, and a public provider API.
+- **Out of scope:** manifest or dependency mutation, automatic network activity, vulnerability/license auditing, call hierarchy, and making every existing Rust language component conditional on `rust-tools`.
+
+### Environment certification harness
+
+Maintainers can run the hermetic matrix coordinator from a Zed checkout:
+
+```sh
+./script/test-rust-tools-environments --matrix --offline
+```
+
+The local cell builds and exercises discovery, run, ignored tests, cancellation, and stale-generation behavior without dependencies or network access. SSH, WSL, development-container, and multiplayer rows are reported as unavailable until their documented environment variables or evidence file are supplied. An `observed` row proves that the fixture ran in that environment; it is not a substitute for the production Zed transport checklist. Release certification must run the Cargo and Tests panels through the actual project mode, verify that execution occurs on the authoritative host, disconnect/reconnect during discovery, cancel a running test, and debug a supported case. Set `ZED_RUST_TOOLS_REQUIRE_PHYSICAL=1` only in a physical certification job; it makes every unavailable or merely observed row fail.
+
+Manual screen-reader certification is tracked in `.agents/specs/rust-workspace/rust-tools-platform/accessibility-evidence.md`. Automated role/name/state and keyboard-navigation tests do not by themselves certify macOS VoiceOver or Windows NVDA.
+
 <!--
 TBD: Polish Rust docs. Zed has strong Rust support, and the docs should reflect that clearly.
 TBD: Users may not know what inlayHints, don't start there.
@@ -160,7 +213,7 @@ If disabled with `checkOnSave: false` (see the example of the server configurati
 ## More server configuration
 
 <!--
-TBD: Is it possible to specify RUSTFLAGS? https://github.com/zed-industries/zed/issues/14334
+TBD: Is it possible to specify RUSTFLAGS? https://github.com/simtropolis/zed/issues/14334
 -->
 
 The Rust-analyzer [manual](https://rust-analyzer.github.io/book/) describes various features and configuration options for the rust-analyzer language server.

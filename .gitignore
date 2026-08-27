@@ -7,7 +7,10 @@
 **/.direnv
 *.wasm
 *.xcodeproj
+!mobile/ios/Zed.xcodeproj
+!mobile/ios/Zed.xcodeproj/**
 .DS_Store
+._*
 .blob_store
 .build
 .claude/settings.local.json
@@ -58,5 +61,7 @@ crates/docs_preprocessor/actions.json
 
 # NixOS integration test state
 .nixos-test-history
+projects/
+mobile-dev/
 
 .local*

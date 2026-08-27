@@ -47,4 +47,4 @@ gh workflow run bump_zed_version.yml \
 
 echo ""
 echo "Workflow triggered. Monitor progress at:"
-echo "  https://github.com/zed-industries/zed/actions/workflows/bump_zed_version.yml"
+echo "  https://github.com/simtropolis/zed/actions/workflows/bump_zed_version.yml"

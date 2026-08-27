@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "identity": "dpmpp_3m_sde_gpu",
+  "feature_id": "COMFY-MODEL-0175",
+  "source_ordinal": 24,
+  "rng_contract_id": "COMFY-RNG-DED616CC3432",
+  "placement": "native-input-device",
+  "canonical_fixture_path": "crates/comfy_test_support/fixtures/samplers/dpmpp_3m_sde_comfy_model_0174/trajectory.json",
+  "canonical_fixture_sha256": "ca23afa198cc4cd4fd2c473327bcbcc4fe64c05a383fac4b8cd0b88af1fd362e",
+  "source": {
+    "sampling_path": "projects/comfy/ComfyUI/comfy/k_diffusion/sampling.py",
+    "sampling_sha256": "cc5f944efd85c566484c3999beb74e8c19c894f2a50ca574d090c3a46ac6bd06",
+    "samplers_path": "projects/comfy/ComfyUI/comfy/samplers.py",
+    "samplers_sha256": "d882256ae9baa1d23f1367ab2ec3b021fdc15fe39ce4cb49ea2c1ee10026a649",
+    "catalog_path": ".agents/specs/comfy-parity/catalogs/backend-models.csv",
+    "catalog_sha256": "c3aef7d751586a15fe6add4991e106558e1e7c112fe4267b2ab1d343d9551a8d",
+    "equation_lines": [882, 884, 889, 890, 891, 894, 895, 896, 897, 899, 900, 902, 903, 904, 905, 906, 908, 910, 911, 912, 914, 916, 918, 920, 921, 922, 923, 924, 925, 926, 927, 928, 929, 930, 931, 932, 933, 934, 936, 937, 939, 940, 941, 944, 945, 946, 947, 948, 949, 950, 951],
+    "registry_line": 972,
+    "catalog_line": 176
+  }
+}

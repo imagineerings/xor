@@ -38,6 +38,7 @@ use crate::{
 };
 use buffer_diff::{DiffHunkStatus, DiffHunkStatusKind};
 use collections::{BTreeMap, HashMap, HashSet};
+#[cfg(feature = "agentic")]
 use feature_flags::{DiffReviewFeatureFlag, FeatureFlagAppExt as _};
 use git::{Oid, blame::BlameEntry, commit::ParsedCommitMessage};
 use gpui::{
@@ -517,12 +518,15 @@ impl EditorElement {
         register_action(editor, window, Editor::expand_all_diff_hunks);
         register_action(editor, window, Editor::collapse_all_diff_hunks);
         register_action(editor, window, Editor::toggle_all_diff_hunks);
-        register_action(editor, window, Editor::toggle_review_comments_expanded);
-        register_action(editor, window, Editor::submit_diff_review_comment_action);
-        register_action(editor, window, Editor::edit_review_comment);
-        register_action(editor, window, Editor::delete_review_comment);
-        register_action(editor, window, Editor::confirm_edit_review_comment_action);
-        register_action(editor, window, Editor::cancel_edit_review_comment_action);
+        #[cfg(feature = "agentic")]
+        {
+            register_action(editor, window, Editor::toggle_review_comments_expanded);
+            register_action(editor, window, Editor::submit_diff_review_comment_action);
+            register_action(editor, window, Editor::edit_review_comment);
+            register_action(editor, window, Editor::delete_review_comment);
+            register_action(editor, window, Editor::confirm_edit_review_comment_action);
+            register_action(editor, window, Editor::cancel_edit_review_comment_action);
+        }
         register_action(editor, window, Editor::go_to_previous_change);
         register_action(editor, window, Editor::go_to_next_change);
         register_action(editor, window, Editor::go_to_prev_reference);
@@ -2534,6 +2538,7 @@ impl EditorElement {
         })
     }
 
+    #[cfg(feature = "agentic")]
     fn should_render_diff_review_button(
         &self,
         range: Range<DisplayRow>,
@@ -5434,6 +5439,7 @@ impl EditorElement {
                 test_indicator.paint(window, cx);
             }
 
+            #[cfg(feature = "agentic")]
             if let Some(diff_review_button) = layout.diff_review_button.as_mut() {
                 diff_review_button.paint(window, cx);
             }
@@ -8263,7 +8269,9 @@ impl Element for EditorElement {
                         hollow_background: colors.editor_diff_hunk_deleted_hollow_background,
                         hollow_border: colors.editor_diff_hunk_deleted_hollow_border,
                     };
+                    #[cfg(feature = "agentic")]
                     let drag_highlight_color = colors.editor_active_line_background;
+                    #[cfg(feature = "agentic")]
                     let drag_border_color = colors.border_focused;
 
                     for (ix, row_info) in row_infos.iter().enumerate() {
@@ -8308,7 +8316,7 @@ impl Element for EditorElement {
                             .or_insert(background);
                     }
 
-                    // Add diff review drag selection highlight to text area
+                    #[cfg(feature = "agentic")]
                     if let Some(drag_state) = &self.editor.read(cx).diff_review_drag_state {
                         let range = drag_state.row_range(&snapshot.display_snapshot);
                         let start_row = range.start().0;
@@ -9157,12 +9165,15 @@ impl Element for EditorElement {
                         );
                     }
 
+                    #[cfg(feature = "agentic")]
                     let git_gutter_width = Self::gutter_strip_width(line_height, cx)
                         + gutter_dimensions
                             .git_blame_entries_width
                             .unwrap_or_default();
+                    #[cfg(feature = "agentic")]
                     let available_width = gutter_dimensions.left_padding - git_gutter_width;
 
+                    #[cfg(feature = "agentic")]
                     let max_line_number_length = self
                         .editor
                         .read(cx)
@@ -9173,6 +9184,7 @@ impl Element for EditorElement {
                         .ilog10()
                         + 1;
 
+                    #[cfg(feature = "agentic")]
                     let diff_review_button = self
                         .should_render_diff_review_button(
                             start_row..end_row,
@@ -9446,6 +9458,7 @@ impl Element for EditorElement {
                         test_indicators,
                         bookmarks,
                         breakpoints,
+                        #[cfg(feature = "agentic")]
                         diff_review_button,
                         crease_toggles,
                         crease_trailers,
@@ -9661,6 +9674,7 @@ pub struct EditorLayout {
     test_indicators: Vec<AnyElement>,
     bookmarks: Vec<AnyElement>,
     breakpoints: Vec<AnyElement>,
+    #[cfg(feature = "agentic")]
     diff_review_button: Option<AnyElement>,
     crease_toggles: Vec<Option<AnyElement>>,
     expand_toggles: Vec<Option<(AnyElement, gpui::Point<Pixels>)>>,

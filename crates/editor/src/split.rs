@@ -5,7 +5,6 @@ use std::{
 
 use buffer_diff::{BufferDiff, BufferDiffSnapshot, DiffHunkStatus};
 use collections::HashMap;
-
 use fs::Fs;
 use gpui::{
     Action, AnyElement, Entity, EventEmitter, Focusable, Font, Pixels, Subscription, WeakEntity,
@@ -42,7 +41,9 @@ use crate::{
     actions::{DisableBreakpoint, EditLogBreakpoint, EnableBreakpoint, ToggleBreakpoint},
     display_map::Companion,
 };
-use zed_actions::{OpenSettingsAt, assistant::InlineAssist};
+use zed_actions::OpenSettingsAt;
+#[cfg(feature = "agentic")]
+use zed_actions::assistant::InlineAssist;
 
 pub(crate) fn patches_for_lhs_range(
     rhs_snapshot: &MultiBufferSnapshot,
@@ -1145,6 +1146,7 @@ impl SplittableEditor {
         }
     }
 
+    #[cfg(feature = "agentic")]
     fn intercept_inline_assist(
         &mut self,
         _: &InlineAssist,
@@ -2330,7 +2332,7 @@ impl Render for SplittableEditor {
         let this = cx.entity().downgrade();
         let last_width = self.last_width;
 
-        div()
+        let element = div()
             .id("splittable-editor")
             .on_action(cx.listener(Self::toggle_split))
             .on_action(cx.listener(Self::activate_pane_left))
@@ -2338,8 +2340,10 @@ impl Render for SplittableEditor {
             .on_action(cx.listener(Self::intercept_toggle_breakpoint))
             .on_action(cx.listener(Self::intercept_enable_breakpoint))
             .on_action(cx.listener(Self::intercept_disable_breakpoint))
-            .on_action(cx.listener(Self::intercept_edit_log_breakpoint))
-            .on_action(cx.listener(Self::intercept_inline_assist))
+            .on_action(cx.listener(Self::intercept_edit_log_breakpoint));
+        #[cfg(feature = "agentic")]
+        let element = element.on_action(cx.listener(Self::intercept_inline_assist));
+        element
             .capture_action(cx.listener(Self::toggle_soft_wrap))
             .size_full()
             .child(inner)

@@ -1,0 +1,106 @@
+# Implementation Plan: Comfy Diffusion and World Model Runtime
+
+## Overview
+
+Implement Comfy model-execution semantics after model catalogs and graph validation exist. Start with metadata and validation, then add sampling request construction, conditioning/latent/patch semantics, world-model runner profiles, worker bridging, and compatibility fixtures.
+
+## Gates
+
+- Start gate: G0 spec consistency, G3 shared world-model foundations, G4 worker safety, G5 graph safety, G7 dependency review for native/heavy runtimes, and G8 Comfy harness alignment, G9 Zed coverage are satisfied.
+- Validation gate: sampler registry tests, sampling request tests, conditioning tests, latent/VAE tests, patch-order tests, mock worker tests, and compatibility fixture snapshots pass.
+- Handoff gate: unsupported samplers, schedulers, model families, and Zed divergences are visible in machine-readable catalogs.
+- Completion gate: no local diffusion or world-model execution can start without model-family validation, worker capability checks, and provenance wiring.
+
+## Dependency Waves
+
+- Global wave: W3 Comfy execution core.
+- Local Wave 1: Tasks 1-2 define execution capabilities and sampling request construction.
+- Local Wave 2: Tasks 3-5 implement conditioning, latent/VAE, and model patch semantics.
+- Local Wave 3: Tasks 6-8 add world-model runner profiles, worker bridging, and compatibility fixtures.
+
+## Tasks
+
+- [ ] 1. Implement execution capability registry
+  - Add native Zed sampler, scheduler, guidance, latent, VAE, patch, model-family, and divergence capability records without passing capability lookup through to ComfyUI.
+  - _Requirements: 1.2, 4.1, 4.2, 4.3, 4.4, 6.3_
+  - _Writes: crates/world_model/src/comfy_execution_registry.rs, crates/world_model/src/comfy_execution_registry_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+  - _Depends on: none_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+- [ ] 2. Implement sampling run request builder
+  - Convert KSampler, advanced sampler, custom sampler, and sampling helper node inputs into native Zed validated sampling requests with deterministic metadata.
+  - _Requirements: 1.1, 1.2, 1.3, 1.4_
+  - _Writes: crates/world_model/src/comfy_sampling.rs, crates/world_model/src/comfy_sampling_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+  - _Depends on: 1_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+- [ ] 3. Implement conditioning runtime semantics
+  - Preserve text, vision, pooled, attention, area, mask, range, inpaint, ControlNet, GLIGEN, style, unCLIP, IP-adapter, reference, pose, depth, segmentation, and camera/control metadata as native Zed conditioning bundles and validation records rather than Comfy pass-through payloads.
+  - _Requirements: 2.1, 2.2, 2.3, 2.4_
+  - _Writes: crates/world_model/src/comfy_conditioning.rs, crates/world_model/src/comfy_conditioning_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+  - _Depends on: 2_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+- [ ] 4. Implement latent and VAE runtime semantics
+  - Add native Zed latent format validation, VAE encode/decode/tiled/temporal/inpaint metadata, mask handling, compression metadata, and mismatch diagnostics rather than forwarding latent or VAE behavior to Comfy.
+  - _Requirements: 3.1, 3.4_
+  - _Writes: crates/world_model/src/comfy_latents.rs, crates/world_model/src/comfy_vae.rs, crates/world_model/src/comfy_latents_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+  - _Depends on: 3_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+- [ ] 5. Implement model component and patch pipeline
+  - Compose loader outputs and apply LoRA, hypernetwork, ControlNet, GLIGEN, model patch, model merge, and edit-model records as native Zed component and patch plans in deterministic order with provenance.
+  - _Requirements: 3.2, 3.3, 3.4_
+  - _Writes: crates/world_model/src/comfy_model_components.rs, crates/world_model/src/comfy_model_patches.rs, crates/world_model/src/comfy_model_patches_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+  - _Depends on: 4_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+- [ ] 6. Add diffusion and world-model runner profiles
+  - Define native Zed runner profiles for supported image diffusion, video/world-model, audio, 3D, geometry, depth, segmentation, and detection families with explicit unsupported diagnostics.
+  - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - _Writes: crates/world_model/src/comfy_runner_profiles.rs, crates/world_model/src/comfy_world_model_profiles.rs, crates/world_model/src/comfy_runner_profiles_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+  - _Depends on: 5_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+- [ ] 7. Implement worker execution adapter
+  - Send validated sampling requests through native Zed worker boundaries with capability checks, progress, previews, cancellation, terminal state mapping, output collection, and provenance updates.
+  - _Requirements: 5.1, 5.2, 5.3, 5.4_
+  - _Writes: crates/world_model/src/comfy_worker_execution.rs, crates/world_model/src/comfy_worker_execution_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+  - _Depends on: 6_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+- [ ] 8. Add model execution compatibility fixtures
+  - Add native Zed fixture snapshots for text-to-image, image-to-image, inpaint, ControlNet, LoRA, VAE, sampler/scheduler, and video/world-model workflows using mock runners where production weights are unavailable.
+  - _Requirements: 6.1, 6.2, 6.3_
+  - _Writes: crates/world_model/fixtures/comfy/model_execution_manifest.json, crates/world_model/tests/comfy_model_execution.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+  - _Depends on: 7_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+- [ ] 9. Materialize remaining diffusion and world-model coverage backlog
+  - Convert 200 planned coverage records in diffusion-world-model-runtime into native Zed implementation, delegation, unsupported, or divergent outcomes without ComfyUI pass-through.
+  - Coverage IDs: all diffusion-world-model-runtime backlog records in `crates/world_model/fixtures/comfy/coverage_ledger.json` now marked `Implemented` with `crates/world_model/fixtures/comfy/diffusion_world_model_backlog.json` evidence; representative IDs: corenode:projects_comfy_nodes_py:CheckpointLoader, corenode:projects_comfy_nodes_py:CheckpointLoaderSimple, corenode:projects_comfy_nodes_py:ConditioningAverage, corenode:projects_comfy_nodes_py:ConditioningCombine, corenode:projects_comfy_nodes_py:ConditioningConcat, corenode:projects_comfy_nodes_py:ConditioningMultiply, corenode:projects_comfy_nodes_py:ConditioningSetArea, corenode:projects_comfy_nodes_py:ConditioningSetAreaPercentage.
+  - Native Zed writes: crates/world_model/src/comfy_execution_registry.rs, crates/world_model/src/world_model.rs, crates/world_model/tests/comfy_model_execution.rs, crates/world_model/tests/comfy_compat_suite.rs, crates/world_model/fixtures/comfy/coverage_ledger.json, crates/world_model/fixtures/comfy/diffusion_world_model_backlog.json.
+  - Validation: `cargo test -p world_model --test comfy_model_execution`.
+  - Parity evidence: Mark records implemented only with native Zed sampler, conditioning, latent/VAE, model patch, mock-runner, or worker evidence.
+  - _CoverageTask: coverage-backlog-diffusion-world-model-runtime_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+  - _Requirements: 9.1, 9.2, 9.3, 9.4_
+  - _Writes: crates/world_model/src/comfy_execution_registry.rs, crates/world_model/src/world_model.rs, crates/world_model/tests/comfy_model_execution.rs, crates/world_model/tests/comfy_compat_suite.rs, crates/world_model/fixtures/comfy/coverage_ledger.json, crates/world_model/fixtures/comfy/diffusion_world_model_backlog.json
+  - _Depends on: 8_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-diffusion-world-model-runtime_
+
+## Notes
+
+- Graph scheduling, cache policy, and node ordering stay in `comfy-graph-node-runtime/`.
+- Model folder discovery, family metadata, memory policy, device policy, precision, and quantization stay in `comfy-model-memory-runtime/`.
+- Python environments, worker launch, package setup, GPU diagnostics, and large downloads stay in `model-serving-packaging/`.
+- Media preview and artifact display stay in `rendering-media/`; asset indexing stays in `comfy-asset-library/`.

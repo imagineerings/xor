@@ -18,7 +18,21 @@ name = "integration"
 required-features = ["test-support"]
 path = "tests/integration/project_tests.rs"
 
+[[bench]]
+name = "cargo_workspace"
+harness = false
+required-features = ["cargo-workspace"]
+
+[[bench]]
+name = "structured_execution"
+harness = false
+required-features = ["structured-execution"]
+
 [features]
+cargo-workspace = ["dep:cargo_metadata"]
+structured-execution = []
+rust-tests = ["cargo-workspace", "structured-execution"]
+rust-coverage = ["structured-execution"]
 test-support = [
     "buffer_diff/test-support",
     "client/test-support",
@@ -42,8 +56,10 @@ async-trait.workspace = true
 base64.workspace = true
 buffer_diff.workspace = true
 circular-buffer.workspace = true
+cargo_metadata = { workspace = true, optional = true }
 client.workspace = true
 clock.workspace = true
+collaboration_domain.workspace = true
 collections.workspace = true
 context_server.workspace = true
 credentials_provider.workspace = true
@@ -109,6 +125,7 @@ ztracing.workspace = true
 
 [dev-dependencies]
 client = { workspace = true, features = ["test-support"] }
+criterion.workspace = true
 encoding_rs.workspace = true
 collections = { workspace = true, features = ["test-support"] }
 context_server = { workspace = true, features = ["test-support"] }

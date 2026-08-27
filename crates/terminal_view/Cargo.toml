@@ -9,6 +9,8 @@ license = "GPL-3.0-or-later"
 workspace = true
 
 [features]
+default = []
+agentic = ["editor/agentic", "zed_actions/agentic"]
 test-support = ["editor/test-support", "gpui/test-support"]
 
 [lib]

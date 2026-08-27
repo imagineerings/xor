@@ -15,7 +15,7 @@ DATETIME_FORMAT: str = "%B %d, %Y %I:%M %p"
 ISSUES_PER_SECTION: int = 50
 ISSUES_TO_FETCH: int = 100
 
-REPO_OWNER = "zed-industries"
+REPO_OWNER = "simtropolis"
 REPO_NAME = "zed"
 GITHUB_API_BASE_URL = "https://api.github.com"
 
@@ -160,7 +160,7 @@ def create_issue_text(section_to_issues: dict[str, list[dict[str, Any]]]) -> str
     lines.append("\n---\n")
     lines.append(
         "*For details on how this issue is generated, "
-        "[see the script](https://github.com/zed-industries/zed/blob/main/script/update_top_ranking_issues/main.py)*"
+        "[see the script](https://github.com/simtropolis/zed/blob/main/script/update_top_ranking_issues/main.py)*"
     )
 
     return "\n".join(lines)

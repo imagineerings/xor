@@ -1,7 +1,7 @@
 use std::{
     ffi::OsStr,
     os::windows::ffi::OsStrExt,
-    path::Path,
+    path::{Path, PathBuf},
     sync::LazyLock,
     time::{Duration, Instant},
 };
@@ -27,10 +27,11 @@ pub(crate) struct Job {
 }
 
 impl Job {
-    pub fn mkdir(name: &'static Path) -> Self {
+    pub fn mkdir(name: PathBuf) -> Self {
+        let rollback_name = name.clone();
         Job {
             apply: Box::new(move |app_dir| {
-                let dir = app_dir.join(name);
+                let dir = app_dir.join(&rollback_name);
                 std::fs::create_dir_all(&dir)
                     .context(format!("Failed to create directory {}", dir.display()))
             }),
@@ -42,11 +43,12 @@ impl Job {
         }
     }
 
-    pub fn mkdir_if_exists(name: &'static Path, check: &'static Path) -> Self {
+    pub fn mkdir_if_exists(name: PathBuf, check: PathBuf) -> Self {
+        let rollback_name = name.clone();
         Job {
             apply: Box::new(move |app_dir| {
-                let dir = app_dir.join(name);
-                let check = app_dir.join(check);
+                let dir = app_dir.join(&name);
+                let check = app_dir.join(&check);
 
                 if check.exists() {
                     std::fs::create_dir_all(&dir)
@@ -55,7 +57,7 @@ impl Job {
                 Ok(())
             }),
             rollback: Box::new(move |app_dir| {
-                let dir = app_dir.join(name);
+                let dir = app_dir.join(&rollback_name);
 
                 if dir.exists() {
                     std::fs::remove_dir_all(&dir)
@@ -67,11 +69,13 @@ impl Job {
         }
     }
 
-    pub fn move_file(filename: &'static Path, new_filename: &'static Path) -> Self {
+    pub fn move_file(filename: PathBuf, new_filename: PathBuf) -> Self {
+        let rollback_filename = filename.clone();
+        let rollback_new_filename = new_filename.clone();
         Job {
             apply: Box::new(move |app_dir| {
-                let old_file = app_dir.join(filename);
-                let new_file = app_dir.join(new_filename);
+                let old_file = app_dir.join(&filename);
+                let new_file = app_dir.join(&new_filename);
                 log::info!(
                     "Moving file: {}->{}",
                     old_file.display(),
@@ -82,8 +86,8 @@ impl Job {
                     .context(format!("Failed to move file {}", old_file.display()))
             }),
             rollback: Box::new(move |app_dir| {
-                let old_file = app_dir.join(filename);
-                let new_file = app_dir.join(new_filename);
+                let old_file = app_dir.join(&rollback_filename);
+                let new_file = app_dir.join(&rollback_new_filename);
                 log::info!(
                     "Rolling back file move: {}->{}",
                     old_file.display(),
@@ -99,11 +103,13 @@ impl Job {
         }
     }
 
-    pub fn move_if_exists(filename: &'static Path, new_filename: &'static Path) -> Self {
+    pub fn move_if_exists(filename: PathBuf, new_filename: PathBuf) -> Self {
+        let rollback_filename = filename.clone();
+        let rollback_new_filename = new_filename.clone();
         Job {
             apply: Box::new(move |app_dir| {
-                let old_file = app_dir.join(filename);
-                let new_file = app_dir.join(new_filename);
+                let old_file = app_dir.join(&filename);
+                let new_file = app_dir.join(&new_filename);
 
                 if old_file.exists() {
                     log::info!(
@@ -119,8 +125,8 @@ impl Job {
                 Ok(())
             }),
             rollback: Box::new(move |app_dir| {
-                let old_file = app_dir.join(filename);
-                let new_file = app_dir.join(new_filename);
+                let old_file = app_dir.join(&rollback_filename);
+                let new_file = app_dir.join(&rollback_new_filename);
 
                 if new_file.exists() {
                     log::info!(
@@ -141,10 +147,11 @@ impl Job {
         }
     }
 
-    pub fn rmdir_nofail(filename: &'static Path) -> Self {
+    pub fn rmdir_nofail(filename: PathBuf) -> Self {
+        let rollback_filename = filename.clone();
         Job {
             apply: Box::new(move |app_dir| {
-                let filename = app_dir.join(filename);
+                let filename = app_dir.join(&filename);
                 log::info!("Removing file: {}", filename.display());
                 if let Err(e) = std::fs::remove_dir_all(&filename) {
                     log::warn!("Failed to remove directory: {}", e);
@@ -153,7 +160,7 @@ impl Job {
                 Ok(())
             }),
             rollback: Box::new(move |app_dir| {
-                let filename = app_dir.join(filename);
+                let filename = app_dir.join(&rollback_filename);
                 anyhow::bail!(
                     "Delete operations cannot be rolled back, file: {}",
                     filename.display()
@@ -165,17 +172,20 @@ impl Job {
 
 #[cfg(not(test))]
 pub(crate) static JOBS: LazyLock<[Job; 22]> = LazyLock::new(|| {
-    fn p(value: &str) -> &Path {
-        Path::new(value)
+    fn p(value: impl AsRef<Path>) -> PathBuf {
+        value.as_ref().to_path_buf()
     }
+    let executable = format!("{}.exe", product_flavor::EXECUTABLE_NAME);
+    let cli_executable = format!("bin\\{}.exe", product_flavor::EXECUTABLE_NAME);
+    let cli_launcher = format!("bin\\{}", product_flavor::EXECUTABLE_NAME);
     [
         // Move old files
         // Not deleting because installing new files can fail
         Job::mkdir(p("old")),
-        Job::move_file(p("Zed.exe"), p("old\\Zed.exe")),
+        Job::move_file(p(&executable), p(format!("old\\{executable}"))),
         Job::mkdir(p("old\\bin")),
-        Job::move_file(p("bin\\Zed.exe"), p("old\\bin\\Zed.exe")),
-        Job::move_file(p("bin\\zed"), p("old\\bin\\zed")),
+        Job::move_file(p(&cli_executable), p(format!("old\\{cli_executable}"))),
+        Job::move_file(p(&cli_launcher), p(format!("old\\{cli_launcher}"))),
         //
         // TODO: remove after a few weeks once everyone is on the new version and this file never exists
         Job::move_if_exists(p("OpenConsole.exe"), p("old\\OpenConsole.exe")),
@@ -189,9 +199,9 @@ pub(crate) static JOBS: LazyLock<[Job; 22]> = LazyLock::new(|| {
         //
         Job::move_file(p("conpty.dll"), p("old\\conpty.dll")),
         // Copy new files
-        Job::move_file(p("install\\Zed.exe"), p("Zed.exe")),
-        Job::move_file(p("install\\bin\\Zed.exe"), p("bin\\Zed.exe")),
-        Job::move_file(p("install\\bin\\zed"), p("bin\\zed")),
+        Job::move_file(p(format!("install\\{executable}")), p(&executable)),
+        Job::move_file(p(format!("install\\{cli_executable}")), p(&cli_executable)),
+        Job::move_file(p(format!("install\\{cli_launcher}")), p(&cli_launcher)),
         //
         Job::mkdir_if_exists(p("x64"), p("install\\x64")),
         Job::mkdir_if_exists(p("arm64"), p("install\\arm64")),
@@ -215,8 +225,8 @@ pub(crate) static JOBS: LazyLock<[Job; 22]> = LazyLock::new(|| {
 
 #[cfg(test)]
 pub(crate) static JOBS: LazyLock<[Job; 9]> = LazyLock::new(|| {
-    fn p(value: &str) -> &Path {
-        Path::new(value)
+    fn p(value: &str) -> PathBuf {
+        PathBuf::from(value)
     }
     [
         Job {
@@ -279,9 +289,9 @@ pub(crate) static JOBS: LazyLock<[Job; 9]> = LazyLock::new(|| {
 fn release_file_handles(app_dir: &Path) -> Result<()> {
     // Files that commonly get locked by Explorer or other processes
     let files_to_release = [
-        app_dir.join("Zed.exe"),
-        app_dir.join("bin\\Zed.exe"),
-        app_dir.join("bin\\zed"),
+        app_dir.join(format!("{}.exe", product_flavor::EXECUTABLE_NAME)),
+        app_dir.join(format!("bin\\{}.exe", product_flavor::EXECUTABLE_NAME)),
+        app_dir.join(format!("bin\\{}", product_flavor::EXECUTABLE_NAME)),
         app_dir.join("conpty.dll"),
     ];
 
@@ -428,7 +438,16 @@ pub(crate) fn perform_update(app_dir: &Path, hwnd: Option<isize>, launch: bool) 
 
     if launch {
         #[allow(clippy::disallowed_methods, reason = "doesn't run in the main binary")]
-        let _ = std::process::Command::new(app_dir.join("Zed.exe")).spawn();
+        if let Err(error) = std::process::Command::new(
+            app_dir.join(format!("{}.exe", product_flavor::EXECUTABLE_NAME)),
+        )
+        .spawn()
+        {
+            log::error!(
+                "failed to relaunch {}: {error}",
+                product_flavor::DISPLAY_NAME
+            );
+        }
     }
     log::info!("Update completed successfully");
     Ok(())

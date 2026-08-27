@@ -47,6 +47,9 @@ use crate::{
     WorkspaceId,
     path_list::{PathList, SerializedPathList},
     persistence::model::RemoteConnectionKind,
+    workspace_presentation::{
+        deserialize_workspace_presentation, serialize_workspace_presentation,
+    },
 };
 
 use model::{
@@ -185,6 +188,24 @@ impl Column for SerializedWindowBounds {
 
 const DEFAULT_WINDOW_BOUNDS_KEY: &str = "default_window_bounds";
 
+pub fn workspace_scoped_state_key(
+    namespace: &str,
+    database_id: Option<WorkspaceId>,
+    session_id: Option<&str>,
+) -> Option<String> {
+    if namespace.trim().is_empty() {
+        return None;
+    }
+    database_id
+        .map(i64::from)
+        .map(|identifier| format!("{namespace}-workspace-{identifier}"))
+        .or_else(|| {
+            session_id
+                .filter(|identifier| !identifier.is_empty())
+                .map(|identifier| format!("{namespace}-session-{identifier}"))
+        })
+}
+
 pub fn read_default_window_bounds(kvp: &KeyValueStore) -> Option<(Uuid, WindowBounds)> {
     let json_str = kvp
         .read_kvp(DEFAULT_WINDOW_BOUNDS_KEY)
@@ -206,6 +227,35 @@ pub async fn write_default_window_bounds(
     kvp.write_kvp(DEFAULT_WINDOW_BOUNDS_KEY.to_string(), json_str)
         .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod cargo_preset_persistence_tests {
+    use super::workspace_scoped_state_key;
+    use crate::WorkspaceId;
+
+    #[test]
+    fn cargo_preset_persistence_keys_are_workspace_scoped_and_secret_free() {
+        let first = workspace_scoped_state_key(
+            "cargo-preset-state-v1",
+            Some(WorkspaceId::from_i64(7)),
+            Some("ignored-session"),
+        );
+        let second = workspace_scoped_state_key(
+            "cargo-preset-state-v1",
+            Some(WorkspaceId::from_i64(8)),
+            None,
+        );
+        let session =
+            workspace_scoped_state_key("cargo-preset-state-v1", None, Some("remote-session"));
+        assert_eq!(first.as_deref(), Some("cargo-preset-state-v1-workspace-7"));
+        assert_ne!(first, second);
+        assert_eq!(
+            session.as_deref(),
+            Some("cargo-preset-state-v1-session-remote-session")
+        );
+        assert!(workspace_scoped_state_key("", Some(WorkspaceId::from_i64(1)), None).is_none());
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1051,6 +1101,10 @@ impl Domain for WorkspaceDb {
         sql!(
             ALTER TABLE bookmarks ADD COLUMN label TEXT NOT NULL DEFAULT "";
         ),
+        sql!(
+            ALTER TABLE workspaces ADD COLUMN workspace_presentation TEXT NOT NULL DEFAULT "editor"
+                CHECK(workspace_presentation IN ("editor", "collaborative"));
+        ),
     ];
 
     // Allow recovering from bad migration that was initially shipped to nightly
@@ -1107,7 +1161,7 @@ impl WorkspaceDb {
             identity_paths_order,
             window_bounds,
             display,
-            centered_layout,
+            presentation_state,
             docks,
             window_id,
         ): (
@@ -1118,7 +1172,7 @@ impl WorkspaceDb {
             Option<String>,
             Option<SerializedWindowBounds>,
             Option<Uuid>,
-            Option<bool>,
+            (Option<bool>, String),
             DockStructure,
             Option<u64>,
         ) = self
@@ -1136,6 +1190,7 @@ impl WorkspaceDb {
                     window_height,
                     display,
                     centered_layout,
+                    workspace_presentation,
                     left_dock_visible,
                     left_dock_active_panel,
                     left_dock_zoom,
@@ -1162,6 +1217,8 @@ impl WorkspaceDb {
             .warn_on_err()
             .flatten()?;
 
+        let (centered_layout, workspace_presentation) = presentation_state;
+
         let paths = PathList::deserialize(&SerializedPathList {
             paths,
             order: paths_order,
@@ -1172,6 +1229,13 @@ impl WorkspaceDb {
                 order: identity_paths_order.unwrap_or_default(),
             })
         });
+        let workspace_presentation = deserialize_workspace_presentation(&workspace_presentation)
+            .unwrap_or_else(|| {
+                log::error!(
+                    "Workspace {workspace_id:?} has an invalid persisted presentation; falling back to Editor"
+                );
+                crate::WorkspacePresentation::Editor
+            });
 
         let remote_connection_options = if let Some(remote_connection_id) = remote_connection_id {
             self.remote_connection(remote_connection_id)
@@ -1195,6 +1259,7 @@ impl WorkspaceDb {
                 .log_err()?,
             window_bounds,
             centered_layout: centered_layout.unwrap_or(false),
+            workspace_presentation,
             display,
             docks,
             session_id: None,
@@ -1217,7 +1282,7 @@ impl WorkspaceDb {
             identity_paths_order,
             window_bounds,
             display,
-            centered_layout,
+            presentation_state,
             docks,
             window_id,
             remote_connection_id,
@@ -1228,7 +1293,7 @@ impl WorkspaceDb {
             Option<String>,
             Option<SerializedWindowBounds>,
             Option<Uuid>,
-            Option<bool>,
+            (Option<bool>, String),
             DockStructure,
             Option<u64>,
             Option<i32>,
@@ -1246,6 +1311,7 @@ impl WorkspaceDb {
                     window_height,
                     display,
                     centered_layout,
+                    workspace_presentation,
                     left_dock_visible,
                     left_dock_active_panel,
                     left_dock_zoom,
@@ -1265,6 +1331,8 @@ impl WorkspaceDb {
             .warn_on_err()
             .flatten()?;
 
+        let (centered_layout, workspace_presentation) = presentation_state;
+
         let paths = PathList::deserialize(&SerializedPathList {
             paths,
             order: paths_order,
@@ -1275,6 +1343,13 @@ impl WorkspaceDb {
                 order: identity_paths_order.unwrap_or_default(),
             })
         });
+        let workspace_presentation = deserialize_workspace_presentation(&workspace_presentation)
+            .unwrap_or_else(|| {
+                log::error!(
+                    "Workspace {workspace_id:?} has an invalid persisted presentation; falling back to Editor"
+                );
+                crate::WorkspacePresentation::Editor
+            });
 
         let remote_connection_id = remote_connection_id.map(|id| RemoteConnectionId(id as u64));
         let remote_connection_options = if let Some(remote_connection_id) = remote_connection_id {
@@ -1299,6 +1374,7 @@ impl WorkspaceDb {
                 .log_err()?,
             window_bounds,
             centered_layout: centered_layout.unwrap_or(false),
+            workspace_presentation,
             display,
             docks,
             session_id: None,
@@ -1443,7 +1519,7 @@ impl WorkspaceDb {
                     && relative_worktree_path != String::default()
                 {
                     ToolchainScope::Subproject(
-                        Arc::from(worktree_root_path.as_ref()),
+                        Arc::from(Path::new(&worktree_root_path)),
                         relative_path.into(),
                     )
                 } else {
@@ -1586,6 +1662,7 @@ impl WorkspaceDb {
                         identity_paths,
                         identity_paths_order,
                         remote_connection_id,
+                        workspace_presentation,
                         left_dock_visible,
                         left_dock_active_panel,
                         left_dock_zoom,
@@ -1599,7 +1676,7 @@ impl WorkspaceDb {
                         window_id,
                         timestamp
                     )
-                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, CURRENT_TIMESTAMP)
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, CURRENT_TIMESTAMP)
                     ON CONFLICT DO
                     UPDATE SET
                         paths = ?2,
@@ -1607,17 +1684,18 @@ impl WorkspaceDb {
                         identity_paths = ?4,
                         identity_paths_order = ?5,
                         remote_connection_id = ?6,
-                        left_dock_visible = ?7,
-                        left_dock_active_panel = ?8,
-                        left_dock_zoom = ?9,
-                        right_dock_visible = ?10,
-                        right_dock_active_panel = ?11,
-                        right_dock_zoom = ?12,
-                        bottom_dock_visible = ?13,
-                        bottom_dock_active_panel = ?14,
-                        bottom_dock_zoom = ?15,
-                        session_id = ?16,
-                        window_id = ?17,
+                        workspace_presentation = ?7,
+                        left_dock_visible = ?8,
+                        left_dock_active_panel = ?9,
+                        left_dock_zoom = ?10,
+                        right_dock_visible = ?11,
+                        right_dock_active_panel = ?12,
+                        right_dock_zoom = ?13,
+                        bottom_dock_visible = ?14,
+                        bottom_dock_active_panel = ?15,
+                        bottom_dock_zoom = ?16,
+                        session_id = ?17,
+                        window_id = ?18,
                         timestamp = CURRENT_TIMESTAMP
                 );
                 let mut prepared_query = conn.exec_bound(query)?;
@@ -1628,6 +1706,7 @@ impl WorkspaceDb {
                     identity_paths.as_ref().map(|paths| paths.paths.clone()),
                     identity_paths.as_ref().map(|paths| paths.order.clone()),
                     remote_connection_id,
+                    serialize_workspace_presentation(&workspace.workspace_presentation),
                     workspace.docks,
                     workspace.session_id,
                     workspace.window_id,
@@ -2496,7 +2575,7 @@ impl WorkspaceDb {
                                 language_name: LanguageName::new(&language),
                                 as_json: serde_json::Value::from_str(&json).ok()?,
                             },
-                           Arc::from(worktree_root_path.as_ref()),
+                            Arc::from(Path::new(&worktree_root_path)),
                             RelPath::from_unix_str(&relative_worktree_path).log_err()?.into(),
                         ))
                     },
@@ -2918,6 +2997,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             bookmarks: Default::default(),
             breakpoints: {
                 let mut map = collections::BTreeMap::default();
@@ -3075,6 +3155,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             bookmarks: Default::default(),
             breakpoints: {
                 let mut map = collections::BTreeMap::default();
@@ -3125,6 +3206,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             bookmarks: Default::default(),
             breakpoints: collections::BTreeMap::default(),
             session_id: None,
@@ -3225,6 +3307,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             bookmarks: Default::default(),
             breakpoints: Default::default(),
             session_id: None,
@@ -3242,6 +3325,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             bookmarks: Default::default(),
             breakpoints: Default::default(),
             session_id: None,
@@ -3353,6 +3437,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: None,
             window_id: Some(999),
             user_toolchains: Default::default(),
@@ -3369,6 +3454,51 @@ mod tests {
 
         let round_trip_workspace = db.workspace_for_roots(&["/tmp", "/tmp2"]);
         assert_eq!(workspace, round_trip_workspace.unwrap());
+    }
+
+    #[gpui::test]
+    async fn workspace_presentation_restart_preserves_project_identity() {
+        let db = WorkspaceDb::open_test_db("workspace_presentation_restart").await;
+        let project_paths = PathList::new(&["/workspace/repository", "/workspace/tools"]);
+        let identity_paths = PathList::new(&["/workspace/repository"]);
+        let mut workspace = SerializedWorkspace {
+            id: WorkspaceId(42),
+            location: SerializedWorkspaceLocation::Local,
+            paths: project_paths.clone(),
+            identity_paths: Some(identity_paths.clone()),
+            center_group: Default::default(),
+            window_bounds: Default::default(),
+            centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
+            display: Default::default(),
+            docks: Default::default(),
+            session_id: Some("workspace-presentation-session".to_owned()),
+            bookmarks: Default::default(),
+            breakpoints: Default::default(),
+            user_toolchains: Default::default(),
+            window_id: Some(7),
+        };
+
+        for presentation in [
+            crate::WorkspacePresentation::Editor,
+            crate::WorkspacePresentation::Collaborative,
+        ] {
+            workspace.workspace_presentation = presentation;
+            db.save_workspace(workspace.clone()).await;
+
+            for restored in [
+                db.workspace_for_id(workspace.id)
+                    .expect("workspace should restore by database ID"),
+                db.workspace_for_roots(project_paths.paths())
+                    .expect("workspace should restore by canonical project paths"),
+            ] {
+                assert_eq!(restored.workspace_presentation, presentation);
+                assert_eq!(restored.id, workspace.id);
+                assert_eq!(restored.location, workspace.location);
+                assert_eq!(restored.paths, project_paths);
+                assert_eq!(restored.identity_paths, Some(identity_paths.clone()));
+            }
+        }
     }
 
     #[gpui::test]
@@ -3389,6 +3519,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: None,
             window_id: Some(1),
             user_toolchains: Default::default(),
@@ -3404,6 +3535,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             bookmarks: Default::default(),
             breakpoints: Default::default(),
             session_id: None,
@@ -3450,6 +3582,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: None,
             window_id: Some(3),
             user_toolchains: Default::default(),
@@ -3488,6 +3621,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             bookmarks: Default::default(),
             breakpoints: Default::default(),
             session_id: Some("session-id-1".to_owned()),
@@ -3505,6 +3639,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             bookmarks: Default::default(),
             breakpoints: Default::default(),
             session_id: Some("session-id-1".to_owned()),
@@ -3522,6 +3657,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             bookmarks: Default::default(),
             breakpoints: Default::default(),
             session_id: Some("session-id-2".to_owned()),
@@ -3539,6 +3675,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             bookmarks: Default::default(),
             breakpoints: Default::default(),
             session_id: None,
@@ -3567,6 +3704,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             bookmarks: Default::default(),
             breakpoints: Default::default(),
             session_id: Some("session-id-2".to_owned()),
@@ -3586,6 +3724,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: Some("session-id-3".to_owned()),
             window_id: Some(60),
             user_toolchains: Default::default(),
@@ -3645,6 +3784,7 @@ mod tests {
             bookmarks: Default::default(),
             breakpoints: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: None,
             window_id: None,
             user_toolchains: Default::default(),
@@ -3686,6 +3826,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: Some("one-session".to_owned()),
             bookmarks: Default::default(),
             breakpoints: Default::default(),
@@ -3787,6 +3928,7 @@ mod tests {
             bookmarks: Default::default(),
             breakpoints: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: session_id.map(|s| s.to_owned()),
             window_id: Some(id),
             user_toolchains: Default::default(),
@@ -3811,6 +3953,7 @@ mod tests {
             bookmarks: Default::default(),
             breakpoints: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: None,
             window_id: Some(id),
             user_toolchains: Default::default(),
@@ -4067,6 +4210,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: Some("one-session".to_owned()),
             bookmarks: Default::default(),
             breakpoints: Default::default(),
@@ -4432,6 +4576,7 @@ mod tests {
             bookmarks: Default::default(),
             breakpoints: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: None,
             window_id: None,
             user_toolchains: Default::default(),
@@ -4508,6 +4653,7 @@ mod tests {
                 display: Default::default(),
                 docks: Default::default(),
                 centered_layout: false,
+                workspace_presentation: crate::WorkspacePresentation::Editor,
                 session_id: Some("test-session".to_owned()),
                 bookmarks: Default::default(),
                 breakpoints: Default::default(),
@@ -4795,6 +4941,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: Some(session_id.clone()),
             bookmarks: Default::default(),
             breakpoints: Default::default(),
@@ -4892,6 +5039,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: Some(session_id.to_owned()),
             bookmarks: Default::default(),
             breakpoints: Default::default(),
@@ -4910,6 +5058,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: Some(session_id.to_owned()),
             bookmarks: Default::default(),
             breakpoints: Default::default(),
@@ -4990,6 +5139,7 @@ mod tests {
             display: Default::default(),
             docks: Default::default(),
             centered_layout: false,
+            workspace_presentation: crate::WorkspacePresentation::Editor,
             session_id: Some(session_id.clone()),
             bookmarks: Default::default(),
             breakpoints: Default::default(),

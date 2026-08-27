@@ -1,11 +1,33 @@
+pub mod admin;
 pub mod api;
+pub mod audit;
 pub mod auth;
+pub mod collaboration_command;
+pub mod collaboration_config;
+pub mod compatibility;
 pub mod db;
+pub mod deletion;
 pub mod entities;
 pub mod env;
 pub mod executor;
+pub mod freshness;
+pub mod git;
+pub mod huddle;
+pub mod identity;
+pub mod jobs;
+pub mod media;
+pub mod messages;
+pub mod migration;
+pub mod nostr;
+pub mod presence;
+pub mod pubsub;
+pub mod push;
+pub mod retention;
 pub mod rpc;
+pub mod search;
 pub mod services;
+pub mod tenant_admission;
+pub mod workflows;
 
 use anyhow::Context as _;
 use aws_config::{BehaviorVersion, Region};
@@ -137,6 +159,7 @@ pub struct Config {
     pub zed_environment: Arc<str>,
     pub zed_cloud_internal_api_key: String,
     pub zed_client_checksum_seed: Option<String>,
+    pub collaboration_redis_url: Option<String>,
 }
 
 impl Config {
@@ -184,6 +207,7 @@ impl Config {
             kinesis_access_key: None,
             kinesis_secret_key: None,
             kinesis_stream: None,
+            collaboration_redis_url: None,
         }
     }
 }
@@ -224,6 +248,11 @@ impl AppState {
         db_options.max_connections(config.database_max_connections);
         let mut db = Database::new(db_options).await?;
         db.initialize_notification_kinds().await?;
+        db.run_on_database_runtime(messages::channel_admission::bootstrap_canonical_channels(
+            &db,
+        ))
+        .await
+        .context("failed to project authorized channels into collaboration authority")?;
 
         let livekit_client = if let Some(((server, key), secret)) = config
             .livekit_server

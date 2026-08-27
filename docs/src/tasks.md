@@ -7,6 +7,12 @@ description: Run and rerun shell commands from Zed with task definitions. Suppor
 
 Zed supports ways to spawn (and rerun) commands using its integrated [terminal](./terminal.md) to output the results. These commands can read a limited subset of Zed state (such as a path to the file currently being edited or selected text).
 
+Language-specific workspace tools may compile contextual actions into these same task templates. For example, the Rust **Cargo** and **Tests** panels resolve Build, Check, Run, Test, Bench, and test-case actions into ordinary structured `cargo` arguments, then use the existing task scheduler and terminal. They do not launch a parallel Cargo runner or parse terminal text for structured results. Task save policy, terminal reveal, history, cancellation, and rerun behavior therefore remain consistent with tasks started from the task picker or `tasks.json`.
+
+Cargo presets are not a replacement for `tasks.json`. They provide Cargo-node selection and configuration for the Cargo panel, while `tasks.json` remains the general user-authored command format.
+
+Structured results are bounded to 10,000 nodes. Repository performance gates reduce and page that complete model off the foreground thread, then require Tests-panel tree reconciliation and a 25-row visible-range projection to complete within a 250 ms foreground budget. GPUI executor timers drive the corresponding UI test so the scheduler observes every asynchronous transition.
+
 ```json [tasks]
 [
   {
@@ -76,6 +82,37 @@ Tasks can be defined:
 
 - in the global `tasks.json` file; such tasks are available in all Zed projects you work on. This file is usually located in `~/.config/zed/tasks.json`. You can edit them by using the {#action zed::OpenTasks} action.
 - in the worktree-specific (local) `.zed/tasks.json` file; such tasks are available only when working on a project with that worktree included. You can edit worktree-specific tasks by using the {#action zed::OpenProjectTasks} action.
+
+### Opening a declared task artifact
+
+A task that produces a file can declare one `artifact`. Zed attempts to open it only after the task exits successfully. The path must be relative to the task working directory, resolve to a visible project file, and stay within the declared size limit. Zed does not infer artifact paths from terminal output.
+
+This is useful for user-installed profiling tools that emit SVG or HTML. Zed does not install, download, or select a profiler; the command and arguments remain an ordinary explicit task and execute on the authoritative project host.
+
+```json [tasks]
+[
+  {
+    "label": "Profile app with my profiler",
+    "command": "my-profiler",
+    "args": [
+      "record",
+      "--output",
+      "target/profile.svg",
+      "cargo",
+      "run",
+      "--package",
+      "app"
+    ],
+    "artifact": {
+      "path": "target/profile.svg",
+      "kind": "svg",
+      "max_bytes": 8388608
+    }
+  }
+]
+```
+
+Supported artifact kinds are `svg`, `html`, `file`, and `data`. Data artifacts must be JSON and are validated for a feature to consume after success rather than opened automatically. `max_bytes` defaults to 32 MiB and cannot exceed that limit. Absolute paths, parent traversal, URLs, missing files, directories, private/non-visible paths, and oversized files are rejected. Remote tasks generate and consume or open the artifact through the remote project; there is no client-local fallback.
 - on the fly with [oneshot tasks](#oneshot-tasks). These tasks are project-specific and do not persist across sessions.
 - by language extension.
 
