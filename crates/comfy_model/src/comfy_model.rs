@@ -224,8 +224,10 @@ pub use cogvideox_family::{
     configuration_for_probe as cogvideox_configuration_for_probe,
 };
 pub use conditioning_resources::{
-    FLUX_REDUX_SOURCE_SHA256, NativeStyleModelCheckpoint, NativeStyleModelError,
-    NativeStyleModelResource, STYLE_ADAPTER_SOURCE_SHA256, STYLE_MODEL_NODES_SOURCE_SHA256,
+    FLUX_REDUX_SOURCE_SHA256, NativePhotoMakerCheckpoint, NativePhotoMakerCheckpointEntry,
+    NativePhotoMakerError, NativePhotoMakerResource, NativeStyleModelCheckpoint,
+    NativeStyleModelError, NativeStyleModelResource, PHOTOMAKER_CLIP_VISION_SOURCE_SHA256,
+    PHOTOMAKER_SOURCE_SHA256, STYLE_ADAPTER_SOURCE_SHA256, STYLE_MODEL_NODES_SOURCE_SHA256,
     STYLE_MODEL_OPS_SOURCE_SHA256, STYLE_MODEL_SD_SOURCE_SHA256,
 };
 pub use cosmos_family::{

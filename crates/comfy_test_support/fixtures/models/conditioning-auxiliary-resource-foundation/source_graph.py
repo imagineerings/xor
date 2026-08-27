@@ -13,6 +13,17 @@ REDUX_INPUT = 4
 REDUX_HIDDEN = 12
 REDUX_OUTPUT = 6
 INPUT_TOKENS = 2
+PHOTO_HIDDEN = 4
+PHOTO_INTERMEDIATE = 8
+PHOTO_HEADS = 2
+PHOTO_LAYERS = 24
+PHOTO_IMAGE = 4
+PHOTO_PATCH = 2
+PHOTO_PROJECTION = 3
+PHOTO_EXTRA_PROJECTION = 5
+PHOTO_PROMPT = PHOTO_PROJECTION + PHOTO_EXTRA_PROJECTION
+PHOTO_SEQUENCE = 4
+PHOTO_IMAGES = 2
 
 
 def f32(value):
@@ -159,6 +170,87 @@ def redux_manifest():
         ("redux_down.weight", [REDUX_OUTPUT, REDUX_HIDDEN]),
         ("redux_down.bias", [REDUX_OUTPUT]),
     ]
+
+
+def photomaker_manifest():
+    positions = (PHOTO_IMAGE // PHOTO_PATCH) ** 2 + 1
+    definitions = [
+        ("vision_model.embeddings.class_embedding", [PHOTO_HIDDEN]),
+        ("vision_model.embeddings.patch_embedding.weight",
+         [PHOTO_HIDDEN, 3, PHOTO_PATCH, PHOTO_PATCH]),
+        ("vision_model.embeddings.position_embedding.weight", [positions, PHOTO_HIDDEN]),
+        ("vision_model.pre_layrnorm.weight", [PHOTO_HIDDEN]),
+        ("vision_model.pre_layrnorm.bias", [PHOTO_HIDDEN]),
+    ]
+    for layer in range(PHOTO_LAYERS):
+        prefix = f"vision_model.encoder.layers.{layer}"
+        definitions.extend([
+            (f"{prefix}.layer_norm1.weight", [PHOTO_HIDDEN]),
+            (f"{prefix}.layer_norm1.bias", [PHOTO_HIDDEN]),
+            (f"{prefix}.self_attn.q_proj.weight", [PHOTO_HIDDEN, PHOTO_HIDDEN]),
+            (f"{prefix}.self_attn.q_proj.bias", [PHOTO_HIDDEN]),
+            (f"{prefix}.self_attn.k_proj.weight", [PHOTO_HIDDEN, PHOTO_HIDDEN]),
+            (f"{prefix}.self_attn.k_proj.bias", [PHOTO_HIDDEN]),
+            (f"{prefix}.self_attn.v_proj.weight", [PHOTO_HIDDEN, PHOTO_HIDDEN]),
+            (f"{prefix}.self_attn.v_proj.bias", [PHOTO_HIDDEN]),
+            (f"{prefix}.self_attn.out_proj.weight", [PHOTO_HIDDEN, PHOTO_HIDDEN]),
+            (f"{prefix}.self_attn.out_proj.bias", [PHOTO_HIDDEN]),
+            (f"{prefix}.layer_norm2.weight", [PHOTO_HIDDEN]),
+            (f"{prefix}.layer_norm2.bias", [PHOTO_HIDDEN]),
+            (f"{prefix}.mlp.fc1.weight", [PHOTO_INTERMEDIATE, PHOTO_HIDDEN]),
+            (f"{prefix}.mlp.fc1.bias", [PHOTO_INTERMEDIATE]),
+            (f"{prefix}.mlp.fc2.weight", [PHOTO_HIDDEN, PHOTO_INTERMEDIATE]),
+            (f"{prefix}.mlp.fc2.bias", [PHOTO_HIDDEN]),
+        ])
+    definitions.extend([
+        ("vision_model.post_layernorm.weight", [PHOTO_HIDDEN]),
+        ("vision_model.post_layernorm.bias", [PHOTO_HIDDEN]),
+        ("visual_projection.weight", [PHOTO_PROJECTION, PHOTO_HIDDEN]),
+        ("visual_projection_2.weight", [PHOTO_EXTRA_PROJECTION, PHOTO_HIDDEN]),
+    ])
+    for prefix, width in [
+        ("fuse_module.mlp1", PHOTO_PROMPT * 2),
+        ("fuse_module.mlp2", PHOTO_PROMPT),
+    ]:
+        definitions.extend([
+            (f"{prefix}.layernorm.weight", [width]),
+            (f"{prefix}.layernorm.bias", [width]),
+            (f"{prefix}.fc1.weight", [PHOTO_PROMPT, width]),
+            (f"{prefix}.fc1.bias", [PHOTO_PROMPT]),
+            (f"{prefix}.fc2.weight", [PHOTO_PROMPT, PHOTO_PROMPT]),
+            (f"{prefix}.fc2.bias", [PHOTO_PROMPT]),
+        ])
+    definitions.extend([
+        ("fuse_module.layer_norm.weight", [PHOTO_PROMPT]),
+        ("fuse_module.layer_norm.bias", [PHOTO_PROMPT]),
+    ])
+    assert len(definitions) == 407
+    return definitions
+
+
+def photomaker_value(state_index, value_index, key, shape):
+    if key == "vision_model.embeddings.class_embedding":
+        return fmul(value_index - 1.5, 0.25)
+    if key == "vision_model.embeddings.patch_embedding.weight" or key == \
+            "vision_model.embeddings.position_embedding.weight":
+        return f32(0.0)
+    if any(marker in key for marker in ["layer_norm", "layrnorm", "layernorm"]):
+        return f32(1.0 if key.endswith(".weight") else 0.0)
+    if ".self_attn." in key or (".mlp." in key and key.startswith("vision_model")):
+        return f32(0.0)
+    lane = ((state_index * 17 + value_index * 11) % 23) - 11
+    return fmul(lane, 0.015625 if key.endswith(".weight") else 0.0078125)
+
+
+def photomaker_state(dtype):
+    state = []
+    for state_index, (key, shape) in enumerate(photomaker_manifest()):
+        raw = [
+            storage_bits(photomaker_value(state_index, index, key, shape), dtype)
+            for index in range(product(shape))
+        ]
+        state.append({"key": key, "shape": shape, "storage_bits": raw})
+    return state
 
 
 def fixture_value(profile, state_index, value_index, key, shape):
@@ -348,6 +440,222 @@ def execute_redux(state, input_data):
                   REDUX_OUTPUT, state["redux_down.bias"])
 
 
+def gelu(value):
+    return fmul(fmul(0.5, value), fadd(1.0, f32(math.erf(f32(value) / math.sqrt(2.0)))))
+
+
+def canonical_erf_approximation(value):
+    sign = -1.0 if value < 0.0 else 1.0
+    absolute = abs(f32(value))
+    t = fdiv(1.0, fadd(1.0, fmul(0.3275911, absolute)))
+    polynomial = fadd(fmul(1.0614054, t), -1.4531521)
+    polynomial = fadd(fmul(polynomial, t), 1.4214138)
+    polynomial = fadd(fmul(polynomial, t), -0.28449672)
+    polynomial = fadd(fmul(polynomial, t), 0.2548296)
+    polynomial = fmul(polynomial, t)
+    exponential = f32(math.exp(fmul(-absolute, absolute)))
+    return fmul(sign, fadd(1.0, -fmul(polynomial, exponential)))
+
+
+def canonical_gelu(value):
+    scaled = fmul(value, from_bits(0x3F3504F3))
+    return fmul(fmul(0.5, value), fadd(1.0, canonical_erf_approximation(scaled)))
+
+
+def ordered_float_bits(value):
+    raw = bits(value)
+    return (~raw & 0xFFFFFFFF) if raw & 0x80000000 else raw | 0x80000000
+
+
+def max_ulp_distance(left, right):
+    return max(
+        abs(ordered_float_bits(a) - ordered_float_bits(b))
+        for a, b in zip(left, right)
+    )
+
+
+def photomaker_inputs():
+    image = [
+        fmul(((index * 7) % 19) - 9, 0.03125)
+        for index in range(PHOTO_IMAGES * 3 * PHOTO_IMAGE * PHOTO_IMAGE)
+    ]
+    prompt = []
+    for index in range(PHOTO_SEQUENCE * PHOTO_PROMPT):
+        prompt.append(from_bits(0x80000000) if index == 0 else
+                      fmul(((index * 13) % 29) - 14, 0.015625))
+    return image, prompt, [False, True, False, True]
+
+
+def execute_photomaker(state, activation=gelu):
+    _, prompt, mask = photomaker_inputs()
+    pooled = state["vision_model.embeddings.class_embedding"][:]
+    pooled = layer_norm(
+        pooled,
+        PHOTO_HIDDEN,
+        state["vision_model.pre_layrnorm.weight"],
+        state["vision_model.pre_layrnorm.bias"],
+    )
+    pooled = layer_norm(
+        pooled,
+        PHOTO_HIDDEN,
+        state["vision_model.post_layernorm.weight"],
+        state["vision_model.post_layernorm.bias"],
+    )
+    pooled = pooled * PHOTO_IMAGES
+    first_projection = linear(
+        pooled,
+        PHOTO_IMAGES,
+        PHOTO_HIDDEN,
+        state["visual_projection.weight"],
+        PHOTO_PROJECTION,
+        None,
+    )
+    second_projection = linear(
+        pooled,
+        PHOTO_IMAGES,
+        PHOTO_HIDDEN,
+        state["visual_projection_2.weight"],
+        PHOTO_EXTRA_PROJECTION,
+        None,
+    )
+    identity = []
+    for row in range(PHOTO_IMAGES):
+        identity.extend(first_projection[row * PHOTO_PROJECTION:(row + 1) * PHOTO_PROJECTION])
+        identity.extend(second_projection[
+            row * PHOTO_EXTRA_PROJECTION:(row + 1) * PHOTO_EXTRA_PROJECTION
+        ])
+    positions = [index for index, selected in enumerate(mask) if selected]
+    prompt_rows = []
+    for position in positions:
+        prompt_rows.extend(prompt[position * PHOTO_PROMPT:(position + 1) * PHOTO_PROMPT])
+    stacked = []
+    for row in range(PHOTO_IMAGES):
+        stacked.extend(prompt_rows[row * PHOTO_PROMPT:(row + 1) * PHOTO_PROMPT])
+        stacked.extend(identity[row * PHOTO_PROMPT:(row + 1) * PHOTO_PROMPT])
+    normalized = layer_norm(
+        stacked,
+        PHOTO_PROMPT * 2,
+        state["fuse_module.mlp1.layernorm.weight"],
+        state["fuse_module.mlp1.layernorm.bias"],
+    )
+    expanded = linear(
+        normalized,
+        PHOTO_IMAGES,
+        PHOTO_PROMPT * 2,
+        state["fuse_module.mlp1.fc1.weight"],
+        PHOTO_PROMPT,
+        state["fuse_module.mlp1.fc1.bias"],
+    )
+    activated = [activation(value) for value in expanded]
+    fused = linear(
+        activated,
+        PHOTO_IMAGES,
+        PHOTO_PROMPT,
+        state["fuse_module.mlp1.fc2.weight"],
+        PHOTO_PROMPT,
+        state["fuse_module.mlp1.fc2.bias"],
+    )
+    fused = add(fused, prompt_rows)
+    normalized = layer_norm(
+        fused,
+        PHOTO_PROMPT,
+        state["fuse_module.mlp2.layernorm.weight"],
+        state["fuse_module.mlp2.layernorm.bias"],
+    )
+    expanded = linear(
+        normalized,
+        PHOTO_IMAGES,
+        PHOTO_PROMPT,
+        state["fuse_module.mlp2.fc1.weight"],
+        PHOTO_PROMPT,
+        state["fuse_module.mlp2.fc1.bias"],
+    )
+    activated = [activation(value) for value in expanded]
+    residual = linear(
+        activated,
+        PHOTO_IMAGES,
+        PHOTO_PROMPT,
+        state["fuse_module.mlp2.fc2.weight"],
+        PHOTO_PROMPT,
+        state["fuse_module.mlp2.fc2.bias"],
+    )
+    fused = add(fused, residual)
+    fused = layer_norm(
+        fused,
+        PHOTO_PROMPT,
+        state["fuse_module.layer_norm.weight"],
+        state["fuse_module.layer_norm.bias"],
+    )
+    output = prompt[:]
+    for row, position in enumerate(positions):
+        output[position * PHOTO_PROMPT:(position + 1) * PHOTO_PROMPT] = \
+            fused[row * PHOTO_PROMPT:(row + 1) * PHOTO_PROMPT]
+    return {
+        "pooled": pooled,
+        "first_projection": first_projection,
+        "second_projection": second_projection,
+        "identity": identity,
+        "output": output,
+    }
+
+
+def photomaker_profile_oracle():
+    image, prompt, mask = photomaker_inputs()
+    cases = {}
+    for dtype in ["float32", "float16", "bfloat16"]:
+        state = photomaker_state(dtype)
+        projected = projected_state(state, dtype)
+        phases = execute_photomaker(projected)
+        canonical_phases = execute_photomaker(projected, canonical_gelu)
+        output_ulp_bound = max_ulp_distance(
+            phases["output"], canonical_phases["output"]
+        )
+        cases[dtype] = {
+            "state": state,
+            "source_identity_sha256": state_identity(state, dtype),
+            "projected_identity_sha256": state_identity(state, dtype, projected=True),
+            "pooled_bits": [bits(value) for value in phases["pooled"]],
+            "first_projection_bits": [bits(value) for value in phases["first_projection"]],
+            "second_projection_bits": [bits(value) for value in phases["second_projection"]],
+            "identity_bits": [bits(value) for value in phases["identity"]],
+            "output_shape": [1, PHOTO_SEQUENCE, PHOTO_PROMPT],
+            "output_bits": [bits(value) for value in phases["output"]],
+            "canonical_output_bits": [bits(value) for value in canonical_phases["output"]],
+            "output_ulp_bound": output_ulp_bound,
+            "output_ulp_rejected_distance": output_ulp_bound + 1,
+        }
+    return {
+        "image_shape": [1, PHOTO_IMAGES, 3, PHOTO_IMAGE, PHOTO_IMAGE],
+        "image_bits": [bits(value) for value in image],
+        "prompt_shape": [1, PHOTO_SEQUENCE, PHOTO_PROMPT],
+        "prompt_bits": [bits(value) for value in prompt],
+        "mask_shape": [1, PHOTO_SEQUENCE],
+        "mask": mask,
+        "mask_positions": [index for index, selected in enumerate(mask) if selected],
+        "dtypes": cases,
+    }
+
+
+def photomaker_mutation(name, key, index, delta):
+    state = photomaker_state("float32")
+    entry = next(candidate for candidate in state if candidate["key"] == key)
+    entry["storage_bits"][index] = bits(fadd(from_bits(entry["storage_bits"][index]), delta))
+    phases = execute_photomaker(projected_state(state, "float32"))
+    canonical_phases = execute_photomaker(projected_state(state, "float32"), canonical_gelu)
+    output_ulp_bound = max_ulp_distance(phases["output"], canonical_phases["output"])
+    return {
+        "profile": "photomaker",
+        "key": key,
+        "index": index,
+        "delta_bits": bits(delta),
+        "source_identity_sha256": state_identity(state, "float32"),
+        "output_bits": [bits(value) for value in phases["output"]],
+        "canonical_output_bits": [bits(value) for value in canonical_phases["output"]],
+        "output_ulp_bound": output_ulp_bound,
+        "output_ulp_rejected_distance": output_ulp_bound + 1,
+    }
+
+
 def state_identity(state, dtype, projected=False):
     digest = hashlib.sha256()
     digest.update(b"conditioning-auxiliary-state-v1\0")
@@ -475,23 +783,43 @@ def build_oracle():
         "redux_up": mutation_oracle("redux", "redux_up", "redux_up.bias", 2, 0.25),
         "redux_down": mutation_oracle("redux", "redux_down", "redux_down.weight", 9, 0.125),
     }
+    photomaker_mutations = {
+        "photomaker_extra_projection": photomaker_mutation(
+            "photomaker_extra_projection", "visual_projection_2.weight", 3, 0.125),
+        "photomaker_mlp1": photomaker_mutation(
+            "photomaker_mlp1", "fuse_module.mlp1.fc1.weight", 11, 0.125),
+        "photomaker_mlp2": photomaker_mutation(
+            "photomaker_mlp2", "fuse_module.mlp2.fc2.bias", 2, 0.125),
+    }
     return {
         "format": "conditioning-auxiliary-resource-foundation-v1",
         "reduced_profiles_are_source_exact": False,
         "source_dimensions": {
             "style": {"width": 1024, "context": 768, "heads": 8, "layers": 3, "tokens": 8, "state_count": 42},
             "redux": {"input": 1152, "hidden": 12288, "output": 4096, "state_count": 4},
+            "photomaker": {"hidden": 1024, "intermediate": 4096, "heads": 16,
+                           "layers": 24, "image": 224, "patch": 14,
+                           "projection": 768, "extra_projection": 1280,
+                           "prompt": 2048, "state_count": 407},
         },
         "reduced_dimensions": {
             "style": {"width": STYLE_WIDTH, "context": STYLE_CONTEXT, "heads": STYLE_HEADS,
                       "layers": STYLE_LAYERS, "tokens": STYLE_TOKENS, "state_count": 42},
             "redux": {"input": REDUX_INPUT, "hidden": REDUX_HIDDEN, "output": REDUX_OUTPUT,
                       "state_count": 4},
+            "photomaker": {"hidden": PHOTO_HIDDEN, "intermediate": PHOTO_INTERMEDIATE,
+                           "heads": PHOTO_HEADS, "layers": PHOTO_LAYERS,
+                           "image": PHOTO_IMAGE, "patch": PHOTO_PATCH,
+                           "projection": PHOTO_PROJECTION,
+                           "extra_projection": PHOTO_EXTRA_PROJECTION,
+                           "prompt": PHOTO_PROMPT, "state_count": 407},
         },
         "style": profile_oracle("style"),
         "redux": profile_oracle("redux"),
+        "photomaker": photomaker_profile_oracle(),
         "attention_discriminator": attention_discriminator_oracle(),
         "mutations": mutations,
+        "photomaker_mutations": photomaker_mutations,
         "discriminators": {
             "signed_zero_input_bits": 0x80000000,
             "signed_zero_after_add_bits": bits(fadd(from_bits(0x80000000), 0.0)),

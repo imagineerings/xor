@@ -16,6 +16,9 @@ SOURCES = {
     "projects/comfy/ComfyUI/comfy/ops.py": "9d8a4ec8357a9bfcd98dddbf06fcc2a0244643a392aacbe0970d945462c86a42",
     "projects/comfy/ComfyUI/comfy/t2i_adapter/adapter.py": "efc52cc85f941e11b509c0339e8950a6680d031b09bec36736d8834b9ccfa1af",
     "projects/comfy/ComfyUI/comfy/ldm/flux/redux.py": "3b7abf43e15fc7b9613a64e701635f943351fa47f5036d87427ea672f93c7952",
+    "projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py": "c7e86d4684d2884eda20250bd7122e31a8aaf7bfa003245ad0e0431a9ef1957e",
+    "projects/comfy/ComfyUI/comfy/clip_model.py": "08be993d86c3b494b58305fb868638b4b525bbe40abead89e9c94da021716845",
+    "projects/comfy/ComfyUI/comfy/clip_vision.py": "8e3cc5d5d257b52d120885ba7427ff3fdf56129a485fdadac3b6215ae2c67b20",
 }
 
 
@@ -53,11 +56,12 @@ def documents():
         "oracle_sha256": oracle_sha256,
         "generator_sha256": generator_sha256,
         "source_graph_sha256": source_graph_sha256,
-        "profiles": ["style", "redux"],
+        "profiles": ["style", "redux", "photomaker"],
         "storage_dtypes": ["float32", "float16", "bfloat16"],
         "style_state_count": 42,
         "redux_state_count": 4,
-        "mutations": sorted(oracle["mutations"]),
+        "photomaker_state_count": 407,
+        "mutations": sorted([*oracle["mutations"], *oracle["photomaker_mutations"]]),
         "reduced_profiles_are_source_exact": False,
     }
     provenance = {
@@ -78,7 +82,14 @@ def documents():
             "softmax an exact uniform four-token disposition; V, output projection, MLP, "
             "QuickGELU, final projection, and both Redux linears remain live. A separate batch-two "
             "case activates asymmetric Q and K projections in both heads of every layer to "
-            "discriminate fused splitting, scale, softmax, head grouping, and batch/sequence order."
+            "discriminate fused splitting, scale, softmax, head grouping, and batch/sequence order. "
+            "The PhotoMaker profile retains the exact 407-key source order while reducing tensor "
+            "dimensions, consumes the canonical CLIP pooled post-layer-normalization state, and "
+            "executes both projection branches, noncontiguous mask pairing, both residual MLPs, "
+            "final normalization, and row-major scatter. Source torch GELU is evaluated with the "
+            "standard-library erf equation; the fixture separately evaluates the canonical Rust "
+            "f32 erf approximation over every admitted reduced value and records the exact maximum "
+            "downstream output ULP distance plus a max-plus-one rejection discriminator."
         ),
         "pinned_sources": SOURCES,
     }

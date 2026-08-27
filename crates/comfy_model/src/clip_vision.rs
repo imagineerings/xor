@@ -215,13 +215,6 @@ pub struct NativeClipVisionExecutionSession {
 #[derive(Debug)]
 pub(crate) struct NativeClipVisionCheckedForward {
     pub(crate) output: ClipVisionOutput,
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the Task395 PhotoMaker adapter consumes the checked pooled hidden state"
-        )
-    )]
     pub(crate) pooled_hidden: Tensor,
 }
 

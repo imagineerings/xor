@@ -1,9 +1,11 @@
 use comfy_model::{
-    ClipVisionOutput, FLUX_REDUX_SOURCE_SHA256, MappedModelWeights, NativeModelPayload,
-    NativeStyleModelCheckpoint, NativeStyleModelError, NativeStyleModelResource, PatchGraph,
-    PatchPayload, PatchTensor, PatchValueTransform, STYLE_ADAPTER_SOURCE_SHA256,
-    STYLE_MODEL_NODES_SOURCE_SHA256, STYLE_MODEL_OPS_SOURCE_SHA256, STYLE_MODEL_SD_SOURCE_SHA256,
-    SemanticPatchOperation,
+    CLIP_VISION_SOURCE_SHA256, ClipVisionOutput, FLUX_REDUX_SOURCE_SHA256, MappedModelWeights,
+    NativeModelPayload, NativePhotoMakerCheckpoint, NativePhotoMakerCheckpointEntry,
+    NativePhotoMakerError, NativePhotoMakerResource, NativeStyleModelCheckpoint,
+    NativeStyleModelError, NativeStyleModelResource, PHOTOMAKER_CLIP_VISION_SOURCE_SHA256,
+    PHOTOMAKER_SOURCE_SHA256, PatchGraph, PatchPayload, PatchTensor, PatchValueTransform,
+    STYLE_ADAPTER_SOURCE_SHA256, STYLE_MODEL_NODES_SOURCE_SHA256, STYLE_MODEL_OPS_SOURCE_SHA256,
+    STYLE_MODEL_SD_SOURCE_SHA256, SemanticPatchOperation,
     conditioning::{
         ConditioningConstant, ConditioningControlReference, ConditioningEntry,
         ConditioningEntryOptions, ConditioningHookReference, ConditioningIdentity,
@@ -1525,6 +1527,34 @@ struct StyleProfileFixture {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+struct PhotoMakerDtypeFixture {
+    state: Vec<StyleStateFixture>,
+    source_identity_sha256: String,
+    projected_identity_sha256: String,
+    pooled_bits: Vec<u32>,
+    first_projection_bits: Vec<u32>,
+    second_projection_bits: Vec<u32>,
+    identity_bits: Vec<u32>,
+    output_shape: Vec<u64>,
+    output_bits: Vec<u32>,
+    canonical_output_bits: Vec<u32>,
+    output_ulp_bound: u32,
+    output_ulp_rejected_distance: u32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct PhotoMakerProfileFixture {
+    image_shape: Vec<u64>,
+    image_bits: Vec<u32>,
+    prompt_shape: Vec<u64>,
+    prompt_bits: Vec<u32>,
+    mask_shape: Vec<u64>,
+    mask: Vec<bool>,
+    mask_positions: Vec<usize>,
+    dtypes: BTreeMap<String, PhotoMakerDtypeFixture>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 struct StyleMutationFixture {
     profile: String,
     key: String,
@@ -1532,6 +1562,18 @@ struct StyleMutationFixture {
     delta_bits: u32,
     source_identity_sha256: String,
     output_bits: Vec<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct PhotoMakerMutationFixture {
+    key: String,
+    index: usize,
+    delta_bits: u32,
+    source_identity_sha256: String,
+    output_bits: Vec<u32>,
+    canonical_output_bits: Vec<u32>,
+    output_ulp_bound: u32,
+    output_ulp_rejected_distance: u32,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1578,8 +1620,10 @@ struct StyleModelOracle {
     reduced_dimensions: serde_json::Value,
     style: StyleProfileFixture,
     redux: StyleProfileFixture,
+    photomaker: PhotoMakerProfileFixture,
     attention_discriminator: StyleAttentionDiscriminatorFixture,
     mutations: BTreeMap<String, StyleMutationFixture>,
+    photomaker_mutations: BTreeMap<String, PhotoMakerMutationFixture>,
     discriminators: StyleDiscriminators,
     pinned_sources: BTreeMap<String, String>,
     generator_sha256: String,
@@ -1673,6 +1717,30 @@ fn upload_style_state(
     backend: &CpuBackend,
     context: &ExecutionContext<'_>,
     fixture: &StyleDtypeFixture,
+    dtype_name: &str,
+) -> Result<Vec<(String, Tensor)>, Box<dyn Error>> {
+    let dtype = fixture_dtype(dtype_name)?;
+    let mut state = Vec::new();
+    state.try_reserve_exact(fixture.state.len())?;
+    for entry in &fixture.state {
+        let descriptor = TensorDescriptor::contiguous(
+            entry.shape.clone(),
+            dtype,
+            DeviceId::CPU,
+            context.stream,
+        )?;
+        let (tensor, event) =
+            backend.upload_bytes(descriptor, &storage_bytes(entry, dtype)?, context)?;
+        backend.wait_event(event, context)?;
+        state.push((entry.key.clone(), tensor));
+    }
+    Ok(state)
+}
+
+fn upload_photomaker_state(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    fixture: &PhotoMakerDtypeFixture,
     dtype_name: &str,
 ) -> Result<Vec<(String, Tensor)>, Box<dyn Error>> {
     let dtype = fixture_dtype(dtype_name)?;
@@ -1796,6 +1864,169 @@ fn assert_style_payload_cross_role_denial(payload: &NativeModelPayload) {
     assert!(payload.background_removal_resource().is_none());
     assert!(payload.depth_anything_3_resource().is_none());
     assert!(payload.moge_resource().is_none());
+    assert!(payload.photomaker_resource().is_none());
+}
+
+fn assert_photomaker_payload_cross_role_denial(payload: &NativeModelPayload) {
+    assert!(payload.model().is_none());
+    assert!(payload.native_family_model_resource().is_none());
+    assert!(payload.clip().is_none());
+    assert!(payload.vae().is_none());
+    assert!(payload.structured_vae().is_none());
+    assert!(payload.audio_encoder_resource().is_none());
+    assert!(payload.optical_flow_resource().is_none());
+    assert!(payload.clip_vision_resource().is_none());
+    assert!(payload.decoder_clip_resource().is_none());
+    assert!(payload.qwen_multimodal_resource().is_none());
+    assert!(payload.gemma_multimodal_resource().is_none());
+    assert!(payload.native_clip_resource().is_none());
+    assert!(payload.sdpose_model_resource().is_none());
+    assert!(payload.frame_interpolation_resource().is_none());
+    assert!(payload.latent_upscale_model_resource().is_none());
+    assert!(payload.background_removal_resource().is_none());
+    assert!(payload.depth_anything_3_resource().is_none());
+    assert!(payload.moge_resource().is_none());
+    assert!(payload.style_model_resource().is_none());
+}
+
+fn photomaker_artifact_sha256() -> String {
+    format!("{:x}", Sha256::digest("task395:photomaker:reduced-v1"))
+}
+
+fn photomaker_checkpoint(
+    state: Vec<(String, Tensor)>,
+    nested: bool,
+    memory_budget_bytes: u64,
+) -> NativePhotoMakerCheckpoint {
+    let ordered_entries = if nested {
+        vec![NativePhotoMakerCheckpointEntry::Mapping {
+            key: "id_encoder".to_owned(),
+            ordered_state: state,
+        }]
+    } else {
+        state
+            .into_iter()
+            .map(|(key, tensor)| NativePhotoMakerCheckpointEntry::Tensor { key, tensor })
+            .collect()
+    };
+    NativePhotoMakerCheckpoint {
+        artifact_sha256: photomaker_artifact_sha256(),
+        ordered_entries,
+        memory_budget_bytes,
+    }
+}
+
+fn photomaker_inputs(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    fixture: &PhotoMakerProfileFixture,
+) -> Result<(Tensor, Tensor, Tensor), Box<dyn Error>> {
+    let image = tensor_from_f32(
+        backend,
+        &fixture.image_shape,
+        &fixture
+            .image_bits
+            .iter()
+            .map(|value| f32::from_bits(*value))
+            .collect::<Vec<_>>(),
+        context,
+    )?;
+    let prompt = tensor_from_f32(
+        backend,
+        &fixture.prompt_shape,
+        &fixture
+            .prompt_bits
+            .iter()
+            .map(|value| f32::from_bits(*value))
+            .collect::<Vec<_>>(),
+        context,
+    )?;
+    let descriptor = TensorDescriptor::contiguous(
+        fixture.mask_shape.clone(),
+        DType::Bool,
+        DeviceId::CPU,
+        context.stream,
+    )?;
+    let bytes = fixture
+        .mask
+        .iter()
+        .map(|value| u8::from(*value))
+        .collect::<Vec<_>>();
+    let (mask, event) = backend.upload_bytes(descriptor, &bytes, context)?;
+    backend.wait_event(event, context)?;
+    Ok((image, prompt, mask))
+}
+
+fn assert_photomaker_reconstruction(
+    reconstructed: &NativePhotoMakerCheckpoint,
+    original: &[(String, Tensor)],
+    nested: bool,
+) -> Result<(), Box<dyn Error>> {
+    let actual = if nested {
+        let [NativePhotoMakerCheckpointEntry::Mapping { key, ordered_state }] =
+            reconstructed.ordered_entries.as_slice()
+        else {
+            return Err("PhotoMaker nested reconstruction lost its sole wrapper".into());
+        };
+        assert_eq!(key, "id_encoder");
+        ordered_state.clone()
+    } else {
+        reconstructed
+            .ordered_entries
+            .iter()
+            .map(|entry| match entry {
+                NativePhotoMakerCheckpointEntry::Tensor { key, tensor } => {
+                    Ok((key.clone(), tensor.clone()))
+                }
+                NativePhotoMakerCheckpointEntry::Mapping { .. } => {
+                    Err("flat PhotoMaker reconstruction gained a wrapper")
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?
+    };
+    assert_eq!(actual.len(), original.len());
+    for ((actual_key, actual), (expected_key, expected)) in actual.iter().zip(original) {
+        assert_eq!(actual_key, expected_key);
+        assert_eq!(actual.descriptor(), expected.descriptor());
+        assert_eq!(actual.storage_id(), expected.storage_id());
+        assert_eq!(actual.contiguous_bytes()?, expected.contiguous_bytes()?);
+    }
+    Ok(())
+}
+
+fn photomaker_ordered_f32_bits(bits: u32) -> u32 {
+    if bits & 0x8000_0000 == 0 {
+        bits | 0x8000_0000
+    } else {
+        !bits
+    }
+}
+
+fn photomaker_ulp_distance(left: u32, right: u32) -> u32 {
+    photomaker_ordered_f32_bits(left).abs_diff(photomaker_ordered_f32_bits(right))
+}
+
+fn assert_photomaker_output_bound(
+    actual: &[u32],
+    expected: &[u32],
+    canonical: &[u32],
+    bound: u32,
+    rejected_distance: u32,
+) {
+    assert_eq!(actual.len(), expected.len());
+    assert_eq!(canonical.len(), expected.len());
+    assert_eq!(actual, canonical);
+    let canonical_source_max = canonical
+        .iter()
+        .zip(expected)
+        .map(|(left, right)| photomaker_ulp_distance(*left, *right))
+        .max()
+        .unwrap_or(0);
+    assert_eq!(canonical_source_max, bound);
+    assert_eq!(rejected_distance, bound + 1);
+    let baseline = 0x3f00_0000;
+    assert!(photomaker_ulp_distance(baseline, baseline + bound) <= bound);
+    assert!(photomaker_ulp_distance(baseline, baseline + rejected_distance) > bound);
 }
 
 #[test]
@@ -1808,6 +2039,7 @@ fn conditioning_auxiliary_fixture_integrity() -> Result<(), Box<dyn Error>> {
     assert!(!oracle.reduced_profiles_are_source_exact);
     assert_eq!(oracle.style.dtypes["float32"].state.len(), 42);
     assert_eq!(oracle.redux.dtypes["float32"].state.len(), 4);
+    assert_eq!(oracle.photomaker.dtypes["float32"].state.len(), 407);
     assert_eq!(
         oracle.style.dtypes["float32"].state[0].key,
         "style_embedding"
@@ -1832,6 +2064,20 @@ fn conditioning_auxiliary_fixture_integrity() -> Result<(), Box<dyn Error>> {
     assert_eq!(oracle.source_dimensions["redux"]["hidden"], 12288);
     assert_eq!(oracle.reduced_dimensions["style"]["width"], 8);
     assert_eq!(oracle.reduced_dimensions["redux"]["hidden"], 12);
+    assert_eq!(oracle.source_dimensions["photomaker"]["hidden"], 1024);
+    assert_eq!(oracle.source_dimensions["photomaker"]["state_count"], 407);
+    assert_eq!(oracle.reduced_dimensions["photomaker"]["hidden"], 4);
+    assert_eq!(oracle.reduced_dimensions["photomaker"]["prompt"], 8);
+    assert_eq!(oracle.photomaker.mask_positions, [1, 3]);
+    assert_eq!(oracle.photomaker.image_shape, [1, 2, 3, 4, 4]);
+    assert_eq!(oracle.photomaker.prompt_shape, [1, 4, 8]);
+    for fixture in oracle.photomaker.dtypes.values() {
+        assert!(fixture.output_ulp_bound > 0);
+        assert_eq!(
+            fixture.output_ulp_rejected_distance,
+            fixture.output_ulp_bound + 1
+        );
+    }
     assert_eq!(oracle.attention_discriminator.input_shape, [2, 2, 8]);
     assert_eq!(oracle.attention_discriminator.output_shape, [2, 2, 6]);
     assert_eq!(oracle.attention_discriminator.state_modifications.len(), 36);
@@ -1893,6 +2139,18 @@ fn conditioning_auxiliary_fixture_integrity() -> Result<(), Box<dyn Error>> {
     assert_eq!(
         oracle.pinned_sources["projects/comfy/ComfyUI/comfy/ldm/flux/redux.py"],
         FLUX_REDUX_SOURCE_SHA256
+    );
+    assert_eq!(
+        oracle.pinned_sources["projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py"],
+        PHOTOMAKER_SOURCE_SHA256
+    );
+    assert_eq!(
+        oracle.pinned_sources["projects/comfy/ComfyUI/comfy/clip_model.py"],
+        CLIP_VISION_SOURCE_SHA256
+    );
+    assert_eq!(
+        oracle.pinned_sources["projects/comfy/ComfyUI/comfy/clip_vision.py"],
+        PHOTOMAKER_CLIP_VISION_SOURCE_SHA256
     );
     Ok(())
 }
@@ -2329,6 +2587,419 @@ fn style_model_resource() -> Result<(), Box<dyn Error>> {
         Err(NativeStyleModelError::InvalidCheckpoint(error)) if error.contains("construction stream")
     ));
     assert_eq!(foreign_workspace.in_use_bytes(), 0);
+    assert_eq!(workspace.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn photomaker_resource() -> Result<(), Box<dyn Error>> {
+    let oracle = style_model_oracle()?;
+    let fixture = &oracle.photomaker;
+    let cancellation = CancellationToken::default();
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(MEMORY_LIMIT)?;
+    let workspace = authority.authorize_workspace(MEMORY_LIMIT)?;
+    let context = backend.execution_context(StreamId::DEFAULT, workspace.clone(), &cancellation);
+    let (image, prompt, mask) = photomaker_inputs(&backend, &context, fixture)?;
+    let image_before = image.contiguous_bytes()?.to_vec();
+    let prompt_before = prompt.contiguous_bytes()?.to_vec();
+    let mask_before = mask.contiguous_bytes()?.to_vec();
+
+    for (dtype_index, dtype_name) in ["float32", "float16", "bfloat16"].iter().enumerate() {
+        let expected = &fixture.dtypes[*dtype_name];
+        assert_eq!(
+            expected.source_identity_sha256,
+            fixture_state_identity(&expected.state, dtype_name, false)?
+        );
+        assert_eq!(
+            expected.projected_identity_sha256,
+            fixture_state_identity(&expected.state, dtype_name, true)?
+        );
+        assert_eq!(expected.pooled_bits.len(), 8);
+        assert_eq!(
+            expected.identity_bits.len(),
+            expected.first_projection_bits.len() + expected.second_projection_bits.len()
+        );
+        let original = upload_photomaker_state(&backend, &context, expected, dtype_name)?;
+        let nested = dtype_index != 0;
+        let resource = Arc::new(
+            NativePhotoMakerResource::from_reduced_fixture(
+                &backend,
+                photomaker_checkpoint(original.clone(), nested, STYLE_MODEL_FIXTURE_MEMORY),
+                &context,
+            )
+            .map_err(|error| {
+                format!(
+                    "PhotoMaker {dtype_name} construction failed with budget {STYLE_MODEL_FIXTURE_MEMORY}: {error}"
+                )
+            })?,
+        );
+        assert!(!resource.is_source_exact_profile());
+        assert_eq!(resource.source_dtype(), fixture_dtype(dtype_name)?);
+        resource.validate(&cancellation)?;
+        let reconstructed = resource
+            .reconstruct_checkpoint(&cancellation)
+            .map_err(|error| {
+                format!(
+                    "PhotoMaker {dtype_name} reconstruction failed with budget {STYLE_MODEL_FIXTURE_MEMORY}: {error}"
+                )
+            })?;
+        assert_photomaker_reconstruction(&reconstructed, &original, nested)?;
+        let output = resource
+            .fuse_conditioning(&backend, &image, &prompt, &mask, &context)
+            .map_err(|error| {
+                format!(
+                    "PhotoMaker {dtype_name} invocation failed with budget {STYLE_MODEL_FIXTURE_MEMORY}: {error}"
+                )
+            })?;
+        assert_eq!(output.descriptor().shape(), expected.output_shape);
+        let actual_bits = tensor_to_f32(&backend, &output, &context)?
+            .iter()
+            .map(|value| value.to_bits())
+            .collect::<Vec<_>>();
+        assert_photomaker_output_bound(
+            &actual_bits,
+            &expected.output_bits,
+            &expected.canonical_output_bits,
+            expected.output_ulp_bound,
+            expected.output_ulp_rejected_distance,
+        );
+        for row in [0_usize, 2] {
+            let start = row * 8;
+            assert_eq!(
+                &actual_bits[start..start + 8],
+                &fixture.prompt_bits[start..start + 8]
+            );
+        }
+        let payload = NativeModelPayload::photomaker_test_fixture(resource.clone(), &cancellation)?;
+        assert_eq!(
+            payload.identity().role(),
+            comfy_model::NativeModelResourceRole::Photomaker
+        );
+        assert!(Arc::ptr_eq(
+            payload
+                .photomaker_resource()
+                .ok_or("PHOTOMAKER payload accessor is missing")?,
+            &resource
+        ));
+        assert!(payload.style_model_resource().is_none());
+        assert_photomaker_payload_cross_role_denial(&payload);
+        payload.validate()?;
+        assert!(NativeModelPayload::photomaker(resource, &cancellation).is_err());
+    }
+    assert_eq!(image.contiguous_bytes()?, image_before);
+    assert_eq!(prompt.contiguous_bytes()?, prompt_before);
+    assert_eq!(mask.contiguous_bytes()?, mask_before);
+
+    let baseline = &fixture.dtypes["float32"];
+    for (mutation_name, mutation) in &oracle.photomaker_mutations {
+        let mut mutated = baseline.clone();
+        let entry = mutated
+            .state
+            .iter_mut()
+            .find(|entry| entry.key == mutation.key)
+            .ok_or("PhotoMaker mutation key is missing")?;
+        let value = entry
+            .storage_bits
+            .get_mut(mutation.index)
+            .ok_or("PhotoMaker mutation index is missing")?;
+        *value = (f32::from_bits(*value) + f32::from_bits(mutation.delta_bits)).to_bits();
+        assert_eq!(
+            mutation.source_identity_sha256,
+            fixture_state_identity(&mutated.state, "float32", false)?
+        );
+        let resource = NativePhotoMakerResource::from_reduced_fixture(
+            &backend,
+            photomaker_checkpoint(
+                upload_photomaker_state(&backend, &context, &mutated, "float32")?,
+                false,
+                STYLE_MODEL_FIXTURE_MEMORY,
+            ),
+            &context,
+        )
+        .map_err(|error| {
+            format!(
+                "PhotoMaker mutation {} construction failed with budget {STYLE_MODEL_FIXTURE_MEMORY}: {error}",
+                mutation_name
+            )
+        })?;
+        let output = resource
+            .fuse_conditioning(&backend, &image, &prompt, &mask, &context)
+            .map_err(|error| {
+                format!(
+                    "PhotoMaker mutation {} invocation failed with budget {STYLE_MODEL_FIXTURE_MEMORY}: {error}",
+                    mutation_name
+                )
+            })?;
+        let actual = tensor_to_f32(&backend, &output, &context)?
+            .iter()
+            .map(|value| value.to_bits())
+            .collect::<Vec<_>>();
+        assert_photomaker_output_bound(
+            &actual,
+            &mutation.output_bits,
+            &mutation.canonical_output_bits,
+            mutation.output_ulp_bound,
+            mutation.output_ulp_rejected_distance,
+        );
+        assert_ne!(actual, baseline.canonical_output_bits);
+    }
+
+    let baseline_state = upload_photomaker_state(&backend, &context, baseline, "float32")?;
+    let raw_out_of_memory = NativePhotoMakerResource::from_reduced_fixture(
+        &backend,
+        photomaker_checkpoint(baseline_state.clone(), false, 1),
+        &context,
+    );
+    let raw_required = match raw_out_of_memory {
+        Err(NativePhotoMakerError::OutOfMemory {
+            required,
+            budget: 1,
+        }) => required,
+        result => {
+            return Err(format!("expected PhotoMaker construction OOM, got {result:?}").into());
+        }
+    };
+    assert!(matches!(
+        NativePhotoMakerResource::from_reduced_fixture(
+            &backend,
+            photomaker_checkpoint(
+                baseline_state.clone(),
+                false,
+                raw_required - 1,
+            ),
+            &context,
+        ),
+        Err(NativePhotoMakerError::OutOfMemory { required, budget })
+            if required == raw_required && budget == raw_required - 1
+    ));
+    let mut admitted_budget = raw_required;
+    let constrained = loop {
+        match NativePhotoMakerResource::from_reduced_fixture(
+            &backend,
+            photomaker_checkpoint(baseline_state.clone(), false, admitted_budget),
+            &context,
+        ) {
+            Ok(resource) => break resource,
+            Err(NativePhotoMakerError::OutOfMemory { required, budget })
+                if budget == admitted_budget && required > admitted_budget =>
+            {
+                admitted_budget = required;
+            }
+            result => {
+                return Err(format!(
+                    "PhotoMaker bounded construction admission failed with budget {admitted_budget}: {result:?}"
+                )
+                .into());
+            }
+        }
+    };
+    assert!(matches!(
+        constrained.fuse_conditioning(&backend, &image, &prompt, &mask, &context),
+        Err(NativePhotoMakerError::OutOfMemory { required, budget })
+            if required > budget && budget == admitted_budget
+    ));
+
+    let mut misordered = baseline_state.clone();
+    misordered.swap(0, 1);
+    assert!(matches!(
+        NativePhotoMakerResource::from_reduced_fixture(
+            &backend,
+            photomaker_checkpoint(misordered, false, STYLE_MODEL_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativePhotoMakerError::UnexpectedState(_))
+    ));
+    let mut aliased = baseline_state.clone();
+    let alias_source = aliased
+        .iter()
+        .find(|(key, _)| key == "vision_model.pre_layrnorm.weight")
+        .map(|(_, tensor)| tensor.clone())
+        .ok_or("PhotoMaker alias source is missing")?;
+    let alias_target = aliased
+        .iter_mut()
+        .find(|(key, _)| key == "vision_model.pre_layrnorm.bias")
+        .ok_or("PhotoMaker alias target is missing")?;
+    assert_eq!(alias_source.descriptor(), alias_target.1.descriptor());
+    alias_target.1 = alias_source;
+    let alias_result = NativePhotoMakerResource::from_reduced_fixture(
+        &backend,
+        photomaker_checkpoint(aliased, false, STYLE_MODEL_FIXTURE_MEMORY),
+        &context,
+    );
+    match alias_result {
+        Err(NativePhotoMakerError::InvalidCheckpoint(error)) if error.contains("aliases") => {}
+        result => {
+            return Err(format!(
+                "expected PhotoMaker source-storage alias rejection after matching-shape schema admission, got {result:?}"
+            )
+            .into());
+        }
+    }
+    let wrong_wrapper = NativePhotoMakerCheckpoint {
+        artifact_sha256: photomaker_artifact_sha256(),
+        ordered_entries: vec![NativePhotoMakerCheckpointEntry::Mapping {
+            key: "model".to_owned(),
+            ordered_state: baseline_state.clone(),
+        }],
+        memory_budget_bytes: STYLE_MODEL_FIXTURE_MEMORY,
+    };
+    assert!(matches!(
+        NativePhotoMakerResource::from_reduced_fixture(&backend, wrong_wrapper, &context),
+        Err(NativePhotoMakerError::InvalidCheckpoint(error)) if error.contains("id_encoder")
+    ));
+    let mixed_wrapper = NativePhotoMakerCheckpoint {
+        artifact_sha256: photomaker_artifact_sha256(),
+        ordered_entries: vec![
+            NativePhotoMakerCheckpointEntry::Tensor {
+                key: baseline_state[0].0.clone(),
+                tensor: baseline_state[0].1.clone(),
+            },
+            NativePhotoMakerCheckpointEntry::Mapping {
+                key: "id_encoder".to_owned(),
+                ordered_state: baseline_state.clone(),
+            },
+        ],
+        memory_budget_bytes: STYLE_MODEL_FIXTURE_MEMORY,
+    };
+    assert!(matches!(
+        NativePhotoMakerResource::from_reduced_fixture(&backend, mixed_wrapper, &context),
+        Err(NativePhotoMakerError::InvalidCheckpoint(_))
+    ));
+    let mut inner_extra = baseline_state.clone();
+    inner_extra.push(baseline_state[0].clone());
+    assert!(matches!(
+        NativePhotoMakerResource::from_reduced_fixture(
+            &backend,
+            photomaker_checkpoint(inner_extra, true, STYLE_MODEL_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativePhotoMakerError::UnexpectedState(_))
+    ));
+    let uppercase = NativePhotoMakerCheckpoint {
+        artifact_sha256: "A".repeat(64),
+        ordered_entries: baseline_state
+            .iter()
+            .cloned()
+            .map(|(key, tensor)| NativePhotoMakerCheckpointEntry::Tensor { key, tensor })
+            .collect(),
+        memory_budget_bytes: STYLE_MODEL_FIXTURE_MEMORY,
+    };
+    assert!(matches!(
+        NativePhotoMakerResource::from_reduced_fixture(&backend, uppercase, &context),
+        Err(NativePhotoMakerError::InvalidCheckpoint(error)) if error.contains("lowercase")
+    ));
+
+    let mut malformed_shape = baseline_state.clone();
+    malformed_shape[0].1 = tensor_from_f32(&backend, &[1, 4], &[0.0; 4], &context)?;
+    assert!(matches!(
+        NativePhotoMakerResource::from_reduced_fixture(
+            &backend,
+            photomaker_checkpoint(malformed_shape, false, STYLE_MODEL_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativePhotoMakerError::StateShape { .. })
+    ));
+    let mut malformed_dtype = baseline_state.clone();
+    let bool_descriptor =
+        TensorDescriptor::contiguous(vec![4], DType::Bool, DeviceId::CPU, context.stream)?;
+    let (bool_state, event) = backend.upload_bytes(bool_descriptor, &[0; 4], &context)?;
+    backend.wait_event(event, &context)?;
+    malformed_dtype[0].1 = bool_state;
+    assert!(matches!(
+        NativePhotoMakerResource::from_reduced_fixture(
+            &backend,
+            photomaker_checkpoint(malformed_dtype, false, STYLE_MODEL_FIXTURE_MEMORY),
+            &context,
+        ),
+        Err(NativePhotoMakerError::StateShape { .. })
+    ));
+
+    let resource = NativePhotoMakerResource::from_reduced_fixture(
+        &backend,
+        photomaker_checkpoint(baseline_state.clone(), false, STYLE_MODEL_FIXTURE_MEMORY),
+        &context,
+    )?;
+    let nested_resource = NativePhotoMakerResource::from_reduced_fixture(
+        &backend,
+        photomaker_checkpoint(baseline_state.clone(), true, STYLE_MODEL_FIXTURE_MEMORY),
+        &context,
+    )?;
+    assert_ne!(
+        resource.semantic_digest_sha256(),
+        nested_resource.semantic_digest_sha256()
+    );
+    let short_mask_descriptor =
+        TensorDescriptor::contiguous(vec![1, 4], DType::Bool, DeviceId::CPU, context.stream)?;
+    let (short_mask, event) =
+        backend.upload_bytes(short_mask_descriptor, &[0, 1, 0, 0], &context)?;
+    backend.wait_event(event, &context)?;
+    assert!(matches!(
+        resource.fuse_conditioning(&backend, &image, &prompt, &short_mask, &context),
+        Err(NativePhotoMakerError::InvalidInput(error)) if error.contains("true entries")
+    ));
+    let batch_two_image = tensor_from_f32(&backend, &[2, 1, 3, 4, 4], &[0.0; 96], &context)?;
+    assert!(matches!(
+        resource.fuse_conditioning(&backend, &batch_two_image, &prompt, &mask, &context),
+        Err(NativePhotoMakerError::InvalidInput(error)) if error.contains("[1, N")
+    ));
+    let narrow_prompt = tensor_from_f32(&backend, &[1, 4, 7], &[0.0; 28], &context)?;
+    assert!(matches!(
+        resource.fuse_conditioning(&backend, &image, &narrow_prompt, &mask, &context),
+        Err(NativePhotoMakerError::InvalidInput(error)) if error.contains("projection_width")
+    ));
+    let float_mask = tensor_from_f32(&backend, &[1, 4], &[0.0, 1.0, 0.0, 1.0], &context)?;
+    assert!(matches!(
+        resource.fuse_conditioning(&backend, &image, &prompt, &float_mask, &context),
+        Err(NativePhotoMakerError::InvalidInput(error)) if error.contains("class token mask")
+    ));
+    let nonfinite_image = tensor_from_f32(
+        &backend,
+        &fixture.image_shape,
+        &vec![f32::NAN; fixture.image_bits.len()],
+        &context,
+    )?;
+    assert!(matches!(
+        resource.fuse_conditioning(&backend, &nonfinite_image, &prompt, &mask, &context),
+        Err(NativePhotoMakerError::InvalidInput(error)) if error.contains("non-finite")
+    ));
+    let foreign_workspace = authority.authorize_workspace(MEMORY_LIMIT)?;
+    let foreign_context =
+        backend.execution_context(StreamId::new(9), foreign_workspace.clone(), &cancellation);
+    let (foreign_image, foreign_prompt, foreign_mask) =
+        photomaker_inputs(&backend, &foreign_context, fixture)?;
+    assert!(matches!(
+        resource.fuse_conditioning(
+            &backend,
+            &foreign_image,
+            &foreign_prompt,
+            &foreign_mask,
+            &context,
+        ),
+        Err(NativePhotoMakerError::InvalidInput(error)) if error.contains("execution stream")
+    ));
+    assert_eq!(foreign_workspace.in_use_bytes(), 0);
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_workspace = authority.authorize_workspace(MEMORY_LIMIT)?;
+    let cancelled_context =
+        backend.execution_context(StreamId::DEFAULT, cancelled_workspace.clone(), &cancelled);
+    assert!(matches!(
+        NativePhotoMakerResource::from_reduced_fixture(
+            &backend,
+            photomaker_checkpoint(baseline_state, false, STYLE_MODEL_FIXTURE_MEMORY),
+            &cancelled_context,
+        ),
+        Err(NativePhotoMakerError::Cancelled)
+    ));
+    assert!(matches!(
+        resource.reconstruct_checkpoint(&cancelled),
+        Err(NativePhotoMakerError::Cancelled)
+    ));
+    assert!(matches!(
+        resource.fuse_conditioning(&backend, &image, &prompt, &mask, &cancelled_context),
+        Err(NativePhotoMakerError::Cancelled)
+    ));
+    assert_eq!(cancelled_workspace.in_use_bytes(), 0);
     assert_eq!(workspace.in_use_bytes(), 0);
     Ok(())
 }

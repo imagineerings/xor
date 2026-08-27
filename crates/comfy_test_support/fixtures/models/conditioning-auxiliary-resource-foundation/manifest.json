@@ -1,7 +1,10 @@
 {
   "format": "conditioning-auxiliary-resource-foundation-manifest-v1",
-  "generator_sha256": "a5bd373083f4e7e15eb24d0c0890e096d9a0038422a435df6d237a02cfae51b1",
+  "generator_sha256": "b6b7760132197e66e1badf1f0145c5bf65229a26f8bdd5829fb1262fbc784924",
   "mutations": [
+    "photomaker_extra_projection",
+    "photomaker_mlp1",
+    "photomaker_mlp2",
     "redux_down",
     "redux_up",
     "style_embedding",
@@ -10,14 +13,16 @@
     "style_value_projection"
   ],
   "oracle_domain": "conditioning-auxiliary-resource-foundation-v1",
-  "oracle_sha256": "dea7383e960b5b1e3b556b2eccc933263295736fa154426e81622249aed5a8fa",
+  "oracle_sha256": "c4192d774cb6eec3fe47cfabda5ef1a4fbde7c7b4da131ecb35b0c8565b5e9f4",
+  "photomaker_state_count": 407,
   "profiles": [
     "style",
-    "redux"
+    "redux",
+    "photomaker"
   ],
   "reduced_profiles_are_source_exact": false,
   "redux_state_count": 4,
-  "source_graph_sha256": "79a3d30c383cf348aa075ff3273866d56419d8a4b7fe031b7be35d0176bb4c32",
+  "source_graph_sha256": "0be83ef5781e06fc70552c92272a50c937784a322c346b9cef7f1fa41f69c9be",
   "storage_dtypes": [
     "float32",
     "float16",
