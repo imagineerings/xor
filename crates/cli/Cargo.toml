@@ -16,6 +16,11 @@ doctest = false
 name = "cli"
 path = "src/main.rs"
 
+[[test]]
+name = "moderation_administration"
+path = "tests/moderation_administration.rs"
+required-features = ["multiplayer-tools"]
+
 [features]
 no-bundled-uninstall = []
 multiplayer-tools = [

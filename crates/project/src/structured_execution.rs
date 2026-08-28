@@ -1014,14 +1014,22 @@ pub fn snapshot_page_to_proto(
             .diagnostic
             .as_deref()
             .map(|value| bounded_text(value, MAX_DIAGNOSTIC_BYTES)),
-        current_run: provider
-            .current_run
-            .as_ref()
-            .map(|run| run_to_proto(run, &nodes)),
-        last_complete_run: provider
-            .last_complete_run
-            .as_ref()
-            .map(|run| run_to_proto(run, &nodes)),
+        current_run: if page_start == 0 {
+            provider
+                .current_run
+                .as_ref()
+                .map(|run| run_to_proto(run, &nodes))
+        } else {
+            None
+        },
+        last_complete_run: if page_start == 0 {
+            provider
+                .last_complete_run
+                .as_ref()
+                .map(|run| run_to_proto(run, &nodes))
+        } else {
+            None
+        },
     })
 }
 
@@ -1891,5 +1899,44 @@ mod tests {
         assert!(!encoded.contains("project_env"));
         assert!(!encoded.contains("/Users/"));
         assert!(!encoded.contains("terminal_bytes"));
+    }
+
+    #[test]
+    fn structured_execution_proto_includes_run_metadata_only_on_the_first_page() {
+        let mut state = StructuredExecutionState::new(4);
+        let provider = fake_provider(2);
+        let provider_id = provider.provider_id.clone();
+        let run = StructuredRun::new(
+            StructuredRunId("run".to_string()),
+            DiscoveryGeneration(2),
+            vec![StructuredNodeId("case-a".to_string())],
+        );
+        state
+            .apply_discovery(4, provider, None)
+            .expect("fixture should apply");
+        state
+            .begin_run(4, &provider_id, run)
+            .expect("fixture run should begin");
+        state
+            .set_run_phase(
+                4,
+                &provider_id,
+                &StructuredRunId("run".to_string()),
+                StructuredRunPhase::Completed,
+                None,
+            )
+            .expect("fixture run should complete");
+
+        let first_page =
+            snapshot_page_to_proto(&state, &provider_id, DiscoveryGeneration(2), 0, 1, None)
+                .expect("first page should serialize");
+        let continuation_page =
+            snapshot_page_to_proto(&state, &provider_id, DiscoveryGeneration(2), 1, 1, None)
+                .expect("continuation page should serialize");
+
+        assert!(first_page.current_run.is_some());
+        assert!(first_page.last_complete_run.is_some());
+        assert!(continuation_page.current_run.is_none());
+        assert!(continuation_page.last_complete_run.is_none());
     }
 }
