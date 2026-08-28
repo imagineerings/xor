@@ -12680,7 +12680,7 @@ mod tests {
         let fixture = binding_fixture(None, MissingCodecDescriptor::None)?;
         let loaded =
             load_video_codec_projection(&fixture.load_projection, &CancellationToken::default())?;
-        let (symbols, versions) = bind_video_codec_projection_with_check(
+        let (_symbols, versions) = bind_video_codec_projection_with_check(
             &loaded,
             &fixture.binding_projection,
             || Ok(()),
@@ -12690,7 +12690,6 @@ mod tests {
         assert_eq!(versions.avutil(), abi::FFMPEG_7_1_AVUTIL_VERSION);
         assert_eq!(versions.swresample(), abi::FFMPEG_7_1_SWRESAMPLE_VERSION);
         assert_eq!(versions.swscale(), abi::FFMPEG_7_1_SWSCALE_VERSION);
-        drop(symbols);
         drop(loaded);
         assert_eq!(
             close_order()?,
@@ -12804,7 +12803,6 @@ mod tests {
         )?;
         let (encoder, decoder) = admit_ltxv_h264_with_check(&symbols, &loaded, || Ok(()))?;
         assert_ne!(encoder, decoder);
-        drop(symbols);
         drop(loaded);
         assert_eq!(
             close_order()?,
@@ -12846,7 +12844,6 @@ mod tests {
                     Err(NativeVideoCodecLtxvAdmissionError::MissingH264Decoder)
                 ));
             }
-            drop(symbols);
             drop(loaded);
             assert_eq!(
                 close_order()?,
@@ -12881,7 +12878,6 @@ mod tests {
             admit_ltxv_h264_with_check(&symbols, &loaded, || Ok(())),
             Err(NativeVideoCodecLtxvAdmissionError::EncoderProviderMismatch)
         ));
-        drop(symbols);
         drop(loaded);
         assert_eq!(
             close_order()?,
@@ -12920,7 +12916,6 @@ mod tests {
                 }),
                 Err(NativeVideoCodecLtxvAdmissionError::Cancelled)
             ));
-            drop(symbols);
             drop(loaded);
             assert_eq!(
                 close_order()?,
@@ -12937,7 +12932,6 @@ mod tests {
             || Ok(()),
         )?;
         admit_ltxv_h264_with_check(&symbols, &loaded, || Ok(()))?;
-        drop(symbols);
         drop(loaded);
         assert_eq!(
             close_order()?,
@@ -12974,7 +12968,6 @@ mod tests {
         .into_iter()
         .collect::<BTreeSet<_>>();
         assert_eq!(pointers.len(), 6);
-        drop(symbols);
         drop(loaded);
         assert_eq!(
             close_order()?,
@@ -13042,7 +13035,6 @@ mod tests {
                         if decoder == missing_identity
                 ));
             }
-            drop(symbols);
             drop(loaded);
             assert_eq!(
                 close_order()?,
@@ -13077,7 +13069,6 @@ mod tests {
             admit_video_suite_with_check(&symbols, &loaded, || Ok(())),
             Err(NativeVideoCodecSuiteAdmissionError::DescriptorProviderMismatch { codec: "aac" })
         ));
-        drop(symbols);
         drop(loaded);
         assert_eq!(
             close_order()?,
@@ -13116,7 +13107,6 @@ mod tests {
                 }),
                 Err(NativeVideoCodecSuiteAdmissionError::Cancelled)
             ));
-            drop(symbols);
             drop(loaded);
             assert_eq!(
                 close_order()?,
@@ -13133,7 +13123,6 @@ mod tests {
             || Ok(()),
         )?;
         admit_video_suite_with_check(&symbols, &loaded, || Ok(()))?;
-        drop(symbols);
         drop(loaded);
         assert_eq!(
             close_order()?,
