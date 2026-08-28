@@ -605,6 +605,22 @@ mod tests {
         assert!(shared_clippy_commands.contains(&"cargo fmt --all -- --check"));
         assert!(shared_clippy_commands.contains(&"./script/clippy"));
         let workspace_test_commands = run_commands(job(&parsed, "workspace_tests"));
+        let workspace_disk_cleanup = workspace_test_commands
+            .iter()
+            .position(|command| {
+                command.contains("sudo swapoff -a")
+                    && command.contains("/opt/hostedtoolcache")
+                    && command.contains("/usr/local/share/boost")
+                    && command.contains("/mnt/swapfile")
+            })
+            .expect("workspace tests should reclaim unused runner disk");
+        let workspace_nextest = workspace_test_commands
+            .iter()
+            .position(|command| {
+                *command == "cargo nextest run --workspace --no-fail-fast --no-tests=warn"
+            })
+            .expect("workspace nextest command");
+        assert!(workspace_disk_cleanup < workspace_nextest);
         assert!(workspace_test_commands.iter().any(|command| {
             *command == "cargo nextest run --workspace --no-fail-fast --no-tests=warn"
         }));
@@ -674,6 +690,7 @@ mod tests {
         assert_eq!(workflow.matches("cargo fmt --all -- --check").count(), 1);
         assert_eq!(workflow.matches("run: ./script/clippy").count(), 1);
         assert_eq!(workflow.matches("cargo nextest run --workspace").count(), 1);
+        assert_eq!(workflow.matches("/opt/hostedtoolcache").count(), 1);
         assert_eq!(
             workflow
                 .matches("--bench cargo_workspace -- --noplot")

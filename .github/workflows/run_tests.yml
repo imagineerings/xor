@@ -54,7 +54,9 @@ jobs:
         clean: false
     - name: steps::free_linux_disk_space
       run: |
-        sudo rm -rf -- /usr/local/lib/android /opt/ghc /usr/local/.ghcup /usr/share/dotnet
+        sudo swapoff -a
+        sudo rm -rf -- /usr/local/lib/android /opt/ghc /usr/local/.ghcup /usr/share/dotnet /usr/local/share/boost /opt/hostedtoolcache
+        sudo rm -f -- /mnt/swapfile
         df -h /
     - name: steps::setup_cargo_config
       run: |
