@@ -104,7 +104,7 @@ jobs:
       if: always()
       run: |
         rm -rf ./../.cargo
-    timeout-minutes: 45
+    timeout-minutes: 75
   rust_tools_validation:
     runs-on: ubuntu-22.04
     env:

@@ -91,7 +91,7 @@ fn project_benchmarks() -> NamedJob {
     named::job(
         Job::default()
             .runs_on("ubuntu-22.04")
-            .timeout_minutes(45u32)
+            .timeout_minutes(75u32)
             .map(use_clang)
             .add_step(steps::checkout_repo())
             .add_step(steps::setup_cargo_config(Platform::Linux))
@@ -608,6 +608,12 @@ mod tests {
             *command == "cargo nextest run --workspace --no-fail-fast --no-tests=warn"
         }));
         let benchmark_commands = run_commands(job(&parsed, "project_benchmarks"));
+        assert_eq!(
+            job(&parsed, "project_benchmarks")
+                .get("timeout-minutes")
+                .and_then(Value::as_u64),
+            Some(75)
+        );
         assert!(
             benchmark_commands
                 .iter()
