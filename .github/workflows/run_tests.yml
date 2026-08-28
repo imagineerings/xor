@@ -122,6 +122,8 @@ jobs:
     - name: steps::setup_linux
       run: ./script/linux
     - name: run_tests::rust_tools_validation
+      run: cargo fetch --locked
+    - name: run_tests::rust_tools_validation
       run: ./script/test-rust-tools-environments --matrix --offline
     - name: steps::cleanup_cargo_config
       if: always()

@@ -115,6 +115,7 @@ fn rust_tools_validation() -> NamedJob {
             .add_step(steps::checkout_repo())
             .add_step(steps::setup_cargo_config(Platform::Linux))
             .add_step(steps::setup_linux())
+            .add_step(named::bash("cargo fetch --locked"))
             .add_step(named::bash(
                 "./script/test-rust-tools-environments --matrix --offline",
             ))
@@ -618,9 +619,17 @@ mod tests {
                 .any(|command| command.contains("--bench structured_execution -- --noplot"))
         );
         let rust_tools_commands = run_commands(job(&parsed, "rust_tools_validation"));
-        assert!(rust_tools_commands.iter().any(|command| {
-            *command == "./script/test-rust-tools-environments --matrix --offline"
-        }));
+        let rust_tools_fetch = rust_tools_commands
+            .iter()
+            .position(|command| *command == "cargo fetch --locked")
+            .expect("rust-tools dependencies should be fetched on the fresh runner");
+        let rust_tools_offline_validation = rust_tools_commands
+            .iter()
+            .position(|command| {
+                *command == "./script/test-rust-tools-environments --matrix --offline"
+            })
+            .expect("rust-tools offline validation should be generated");
+        assert!(rust_tools_fetch < rust_tools_offline_validation);
 
         assert_eq!(workflow.matches("runs-on:").count(), 7);
         assert!(workflow.contains("runs-on: ubuntu-22.04"));
