@@ -49,18 +49,24 @@ jobs:
     - name: run_tests::shared_validation
       run: ./script/clippy
     - name: run_tests::shared_validation
+      run: cargo clean --release
+    - name: run_tests::shared_validation
       run: cargo nextest run --workspace --no-fail-fast --no-tests=warn
+    - name: run_tests::shared_validation
+      run: cargo clean
     - name: run_tests::shared_validation
       run: cargo bench -p project --features cargo-workspace --bench cargo_workspace -- --noplot
     - name: run_tests::shared_validation
       run: cargo bench -p project --features structured-execution --bench structured_execution -- --noplot
+    - name: run_tests::shared_validation
+      run: cargo clean --release
     - name: run_tests::shared_validation
       run: ./script/test-rust-tools-environments --matrix --offline
     - name: steps::cleanup_cargo_config
       if: always()
       run: |
         rm -rf ./../.cargo
-    timeout-minutes: 90
+    timeout-minutes: 120
   comfy_backend_validation:
     runs-on: ${{ matrix.runner }}
     strategy:

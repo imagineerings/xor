@@ -44,7 +44,7 @@ fn shared_validation() -> NamedJob {
     named::job(
         Job::default()
             .runs_on("ubuntu-22.04")
-            .timeout_minutes(90u32)
+            .timeout_minutes(120u32)
             .map(use_clang)
             .add_step(steps::checkout_repo())
             .add_step(steps::setup_cargo_config(Platform::Linux))
@@ -53,15 +53,18 @@ fn shared_validation() -> NamedJob {
             .add_step(steps::cargo_install_nextest())
             .add_step(steps::cargo_fmt())
             .add_step(named::bash("./script/clippy"))
+            .add_step(named::bash("cargo clean --release"))
             .add_step(named::bash(
                 "cargo nextest run --workspace --no-fail-fast --no-tests=warn",
             ))
+            .add_step(named::bash("cargo clean"))
             .add_step(named::bash(
                 "cargo bench -p project --features cargo-workspace --bench cargo_workspace -- --noplot",
             ))
             .add_step(named::bash(
                 "cargo bench -p project --features structured-execution --bench structured_execution -- --noplot",
             ))
+            .add_step(named::bash("cargo clean --release"))
             .add_step(named::bash(
                 "./script/test-rust-tools-environments --matrix --offline",
             ))
@@ -486,6 +489,38 @@ mod tests {
         assert!(windows_long_paths < windows_backend_clippy);
         assert!(workflow.contains("needs:\n    - shared_validation"));
         assert!(workflow.contains("cancel-in-progress: true"));
+        assert!(workflow.contains("timeout-minutes: 120"));
+
+        let clippy = workflow
+            .find("./script/clippy")
+            .expect("shared Clippy step");
+        let release_cleanups = workflow
+            .match_indices("cargo clean --release")
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        assert_eq!(release_cleanups.len(), 2);
+        let nextest = workflow
+            .find("cargo nextest run --workspace")
+            .expect("shared nextest step");
+        let debug_cleanup = workflow
+            .find("run: cargo clean\n")
+            .expect("post-nextest cleanup step");
+        let first_benchmark = workflow
+            .find("--bench cargo_workspace")
+            .expect("first shared benchmark");
+        let second_benchmark = workflow
+            .find("--bench structured_execution")
+            .expect("second shared benchmark");
+        let rust_tools = workflow
+            .find("test-rust-tools-environments --matrix --offline")
+            .expect("Rust tools matrix");
+        assert!(clippy < release_cleanups[0]);
+        assert!(release_cleanups[0] < nextest);
+        assert!(nextest < debug_cleanup);
+        assert!(debug_cleanup < first_benchmark);
+        assert!(first_benchmark < second_benchmark);
+        assert!(second_benchmark < release_cleanups[1]);
+        assert!(release_cleanups[1] < rust_tools);
 
         for forbidden in [
             "repository_owner",
