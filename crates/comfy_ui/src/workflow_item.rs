@@ -320,7 +320,7 @@ impl GraphWorkspaceItem {
         self.execution_run_mode
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "test-support"))]
     pub(crate) fn execution_queue_available(&self, cx: &App) -> bool {
         self.execution_queue_unavailable_reason(cx).is_none()
     }
@@ -458,7 +458,7 @@ impl GraphWorkspaceItem {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "test-support"))]
     pub(crate) fn queue_overlay_attempt_ids_for_test(
         &self,
         cx: &App,
@@ -692,12 +692,12 @@ impl GraphWorkspaceItem {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "test-support"))]
     pub(crate) fn control_focus_handle_count(&self) -> usize {
         self.control_focus_handles.len()
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "test-support"))]
     pub(crate) fn contains_control_focus_handle(&self, identifier: &str) -> bool {
         self.control_focus_handles.contains_key(identifier)
     }
