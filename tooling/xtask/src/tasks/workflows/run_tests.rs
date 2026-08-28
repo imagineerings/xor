@@ -73,6 +73,7 @@ fn workspace_tests() -> NamedJob {
         Job::default()
             .runs_on("ubuntu-22.04")
             .timeout_minutes(75u32)
+            .add_env(("CARGO_PROFILE_TEST_DEBUG", 0))
             .map(use_clang)
             .add_step(steps::checkout_repo())
             .add_step(steps::free_linux_disk_space())
@@ -607,6 +608,25 @@ mod tests {
         assert!(workspace_test_commands.iter().any(|command| {
             *command == "cargo nextest run --workspace --no-fail-fast --no-tests=warn"
         }));
+        assert_eq!(
+            job(&parsed, "workspace_tests")
+                .get("env")
+                .and_then(|environment| environment.get("CARGO_PROFILE_TEST_DEBUG"))
+                .and_then(Value::as_str),
+            Some("0")
+        );
+        for worker_name in [
+            "shared_clippy",
+            "project_benchmarks",
+            "rust_tools_validation",
+        ] {
+            assert!(
+                job(&parsed, worker_name)
+                    .get("env")
+                    .and_then(|environment| environment.get("CARGO_PROFILE_TEST_DEBUG"))
+                    .is_none()
+            );
+        }
         let benchmark_commands = run_commands(job(&parsed, "project_benchmarks"));
         assert_eq!(
             job(&parsed, "project_benchmarks")

@@ -44,6 +44,7 @@ jobs:
   workspace_tests:
     runs-on: ubuntu-22.04
     env:
+      CARGO_PROFILE_TEST_DEBUG: '0'
       CC: clang
       CXX: clang++
     steps:
