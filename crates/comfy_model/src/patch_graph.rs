@@ -5378,14 +5378,19 @@ mod tests {
     #[test]
     fn source_pinned_oft_boft_constraint_rescale_and_strength_are_exact()
     -> Result<(), PatchGraphError> {
-        const OFT_SOURCE: &str =
-            include_str!("../../../projects/comfy/ComfyUI/comfy/weight_adapter/oft.py");
-        const BOFT_SOURCE: &str =
-            include_str!("../../../projects/comfy/ComfyUI/comfy/weight_adapter/boft.py");
-        assert!(OFT_SOURCE.contains("r = (I + normed_q) @ (I - normed_q).float().inverse()"));
-        assert!(OFT_SOURCE.contains("(r * strength) - strength * I_w"));
-        assert!(BOFT_SOURCE.contains("bi = bi * strength + (1 - strength) * I"));
-        assert!(BOFT_SOURCE.contains("inp = inp * rescale"));
+        const SOURCE_CONTRACTS: &str = include_str!(
+            "../../../.agents/specs/comfy-parity/catalogs/backend-conditioning-contracts.csv"
+        );
+        assert!(SOURCE_CONTRACTS.contains(concat!(
+            "projects/comfy/ComfyUI/comfy/weight_adapter/oft.py,calculate_weight,172,",
+            "88be3c32f610478bc6900a10009eaadf6fe2af973ed4861731e4f21e1afacf89,",
+            "a01a25e6e53a021e86e4df70556eeef5fc8b33c597c72cbf33d6cc0703a12772"
+        )));
+        assert!(SOURCE_CONTRACTS.contains(concat!(
+            "projects/comfy/ComfyUI/comfy/weight_adapter/boft.py,calculate_weight,158,",
+            "2850e0b4c2295cd87445415e287061fa3bfd69e88bd0aeb3eb16064864bd078d,",
+            "94f4949f38d7f37f8267d68aac1f9e5389d8b3e1845cf7efd4f69357856d0c4d"
+        )));
 
         let (backend, authority) = CpuWorkspaceAuthority::create_backend(2 * 1024 * 1024)?;
         let cancellation = CancellationToken::default();
