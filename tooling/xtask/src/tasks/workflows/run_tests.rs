@@ -96,6 +96,10 @@ fn comfy_backend_validation() -> NamedJob {
             )
             .add_step(steps::checkout_repo())
             .add_step(
+                steps::enable_windows_long_paths()
+                    .if_condition(Expression::new("matrix.platform == 'windows'")),
+            )
+            .add_step(
                 steps::setup_cargo_config(Platform::Linux)
                     .if_condition(Expression::new("matrix.platform == 'linux'")),
             )
@@ -467,6 +471,19 @@ mod tests {
         assert!(workflow.contains("-p comfy_backend_xpu"));
         assert_eq!(workflow.matches("--all-targets --all-features").count(), 3);
         assert_eq!(workflow.matches("-- --deny warnings").count(), 3);
+        assert_eq!(
+            workflow
+                .matches("git config --global core.longpaths true")
+                .count(),
+            1
+        );
+        let windows_long_paths = workflow
+            .find("git config --global core.longpaths true")
+            .expect("Windows long-path setup should be generated");
+        let windows_backend_clippy = workflow
+            .find("-p comfy_backend_cuda -p comfy_backend_directml")
+            .expect("Windows backend Clippy command should be generated");
+        assert!(windows_long_paths < windows_backend_clippy);
         assert!(workflow.contains("needs:\n    - shared_validation"));
         assert!(workflow.contains("cancel-in-progress: true"));
 

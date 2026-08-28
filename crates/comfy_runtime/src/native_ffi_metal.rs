@@ -367,6 +367,7 @@ fn metal_device_identity_matches(
         && unified_memory == expected.unified_memory
 }
 
+#[cfg(any(test, target_os = "macos"))]
 fn parse_macos_major_version(bytes: &[u8]) -> Result<u32, ()> {
     if bytes.is_empty() || bytes.len() > 32 || !bytes.is_ascii() {
         return Err(());
@@ -387,6 +388,7 @@ fn parse_macos_major_version(bytes: &[u8]) -> Result<u32, ()> {
     major.parse().map_err(|_| ())
 }
 
+#[cfg(any(test, target_os = "macos"))]
 fn validate_macos_version_observation(status: i32, length: usize, bytes: &[u8]) -> Result<(), ()> {
     if status != 0 || length == 0 || length > bytes.len() {
         return Err(());
@@ -399,6 +401,7 @@ fn validate_macos_version_observation(status: i32, length: usize, bytes: &[u8]) 
     Ok(())
 }
 
+#[cfg(any(test, target_os = "macos"))]
 fn validate_host_memory_observation(status: i32, length: usize, value: u64) -> Result<u64, ()> {
     if status != 0 || length != std::mem::size_of::<u64>() || value == 0 {
         return Err(());
