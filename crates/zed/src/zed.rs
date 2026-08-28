@@ -4867,7 +4867,7 @@ mod tests {
                         workspace::collaborative_participants::CollaborativeExecutionLocation::Local,
                 },
             ),
-            ..unknown_view_data.clone()
+            ..unknown_view_data
         };
         *current_view_data.borrow_mut() = updated_view_data.clone();
         cx.update(|_, cx| {

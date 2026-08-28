@@ -1,5 +1,5 @@
 use gh_workflow::{
-    Container, Event, Job, Port, PullRequest, Push, Run, Step, Strategy, Use, Workflow,
+    Container, Event, Expression, Job, Port, PullRequest, Push, Run, Step, Strategy, Use, Workflow,
     WorkflowDispatch,
 };
 use indexmap::IndexMap;
@@ -22,6 +22,7 @@ use super::{
 
 pub(crate) fn run_tests() -> Workflow {
     let validation = shared_validation();
+    let comfy_backend_validation = comfy_backend_validation();
     let product_smoke = product_smoke(&validation);
 
     named::workflow()
@@ -35,6 +36,7 @@ pub(crate) fn run_tests() -> Workflow {
         .add_env(("RUST_BACKTRACE", 1))
         .add_env(("CARGO_INCREMENTAL", 0))
         .add_job(validation.name, validation.job)
+        .add_job(comfy_backend_validation.name, comfy_backend_validation.job)
         .add_job(product_smoke.name, product_smoke.job)
 }
 
@@ -64,6 +66,77 @@ fn shared_validation() -> NamedJob {
                 "./script/test-rust-tools-environments --matrix --offline",
             ))
             .add_step(steps::cleanup_cargo_config(Platform::Linux)),
+    )
+}
+
+fn comfy_backend_validation() -> NamedJob {
+    let include = vec![
+        json!({
+            "platform": "linux",
+            "runner": "ubuntu-22.04",
+        }),
+        json!({
+            "platform": "macos",
+            "runner": "macos-15",
+        }),
+        json!({
+            "platform": "windows",
+            "runner": "windows-2022",
+        }),
+    ];
+
+    named::job(
+        Job::default()
+            .runs_on("${{ matrix.runner }}")
+            .timeout_minutes(60u32)
+            .strategy(
+                Strategy::default()
+                    .fail_fast(false)
+                    .matrix(json!({ "include": include })),
+            )
+            .add_step(steps::checkout_repo())
+            .add_step(
+                steps::setup_cargo_config(Platform::Linux)
+                    .if_condition(Expression::new("matrix.platform == 'linux'")),
+            )
+            .add_step(
+                steps::setup_cargo_config(Platform::Mac)
+                    .if_condition(Expression::new("matrix.platform == 'macos'")),
+            )
+            .add_step(
+                steps::setup_cargo_config(Platform::Windows)
+                    .if_condition(Expression::new("matrix.platform == 'windows'")),
+            )
+            .add_step(
+                named::bash(
+                    "cargo clippy --release --all-targets --all-features -p comfy_backend_corex -p comfy_backend_cuda -p comfy_backend_directml -p comfy_backend_metal -p comfy_backend_mlu -p comfy_backend_npu -p comfy_backend_rocm -p comfy_backend_xpu -- --deny warnings",
+                )
+                .if_condition(Expression::new("matrix.platform == 'linux'")),
+            )
+            .add_step(
+                named::bash(
+                    "cargo clippy --release --all-targets --all-features -p comfy_backend_metal -- --deny warnings",
+                )
+                .if_condition(Expression::new("matrix.platform == 'macos'")),
+            )
+            .add_step(
+                named::pwsh(
+                    "cargo clippy --release --all-targets --all-features -p comfy_backend_cuda -p comfy_backend_directml -- --deny warnings",
+                )
+                .if_condition(Expression::new("matrix.platform == 'windows'")),
+            )
+            .add_step(
+                steps::cleanup_cargo_config(Platform::Linux)
+                    .if_condition(Expression::new("always() && matrix.platform == 'linux'")),
+            )
+            .add_step(
+                steps::cleanup_cargo_config(Platform::Mac)
+                    .if_condition(Expression::new("always() && matrix.platform == 'macos'")),
+            )
+            .add_step(
+                steps::cleanup_cargo_config(Platform::Windows)
+                    .if_condition(Expression::new("always() && matrix.platform == 'windows'")),
+            ),
     )
 }
 
@@ -370,8 +443,10 @@ mod tests {
             .to_string()
             .map_err(|error| anyhow::anyhow!("failed to serialize CI workflow: {error:?}"))?;
 
-        assert_eq!(workflow.matches("runs-on:").count(), 2);
+        assert_eq!(workflow.matches("runs-on:").count(), 3);
         assert!(workflow.contains("runs-on: ubuntu-22.04"));
+        assert!(workflow.contains("runner: macos-15"));
+        assert!(workflow.contains("runner: windows-2022"));
         assert!(workflow.contains("workflow_dispatch: {}"));
         assert!(workflow.contains("cargo fmt --all -- --check"));
         assert!(workflow.contains("./script/clippy"));
@@ -382,6 +457,16 @@ mod tests {
         assert!(workflow.contains("application_features: agentic-tools,rust-tools"));
         assert!(workflow.contains("remote_features: rust-tools"));
         assert!(workflow.contains("cargo xtask bundle --product"));
+        assert!(workflow.contains("-p comfy_backend_corex"));
+        assert!(workflow.contains("-p comfy_backend_cuda"));
+        assert!(workflow.contains("-p comfy_backend_directml"));
+        assert!(workflow.contains("-p comfy_backend_metal"));
+        assert!(workflow.contains("-p comfy_backend_mlu"));
+        assert!(workflow.contains("-p comfy_backend_npu"));
+        assert!(workflow.contains("-p comfy_backend_rocm"));
+        assert!(workflow.contains("-p comfy_backend_xpu"));
+        assert_eq!(workflow.matches("--all-targets --all-features").count(), 3);
+        assert_eq!(workflow.matches("-- --deny warnings").count(), 3);
         assert!(workflow.contains("needs:\n    - shared_validation"));
         assert!(workflow.contains("cancel-in-progress: true"));
 

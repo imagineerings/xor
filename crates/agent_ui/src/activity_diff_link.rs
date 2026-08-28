@@ -1,7 +1,6 @@
 use std::{collections::HashMap, error::Error, fmt, ops::Range};
 
 use action_log::ActionLog;
-use git_ui::project_diff::ProjectDiff;
 use gpui::{Entity, EntityId};
 use language::Point;
 use project::ProjectPath;
@@ -15,8 +14,11 @@ pub struct ActivityDiffSourceIdentity {
 }
 
 impl ActivityDiffSourceIdentity {
-    pub fn new(action_log: &Entity<ActionLog>, project_diff: &Entity<ProjectDiff>) -> Self {
-        Self::from_entity_ids(action_log.entity_id(), project_diff.entity_id())
+    pub fn new<DiffOwner: 'static>(
+        action_log: &Entity<ActionLog>,
+        diff_owner: &Entity<DiffOwner>,
+    ) -> Self {
+        Self::from_entity_ids(action_log.entity_id(), diff_owner.entity_id())
     }
 
     fn from_entity_ids(action_log_id: EntityId, project_diff_id: EntityId) -> Self {
@@ -117,8 +119,11 @@ pub struct ActivityDiffIndex {
 }
 
 impl ActivityDiffIndex {
-    pub fn new(action_log: &Entity<ActionLog>, project_diff: &Entity<ProjectDiff>) -> Self {
-        Self::for_sources(ActivityDiffSourceIdentity::new(action_log, project_diff))
+    pub fn new<DiffOwner: 'static>(
+        action_log: &Entity<ActionLog>,
+        diff_owner: &Entity<DiffOwner>,
+    ) -> Self {
+        Self::for_sources(ActivityDiffSourceIdentity::new(action_log, diff_owner))
     }
 
     fn for_sources(sources: ActivityDiffSourceIdentity) -> Self {
@@ -188,8 +193,11 @@ pub struct ActivityDiffLinkResolver {
 }
 
 impl ActivityDiffLinkResolver {
-    pub fn new(action_log: &Entity<ActionLog>, project_diff: &Entity<ProjectDiff>) -> Self {
-        Self::for_sources(ActivityDiffSourceIdentity::new(action_log, project_diff))
+    pub fn new<DiffOwner: 'static>(
+        action_log: &Entity<ActionLog>,
+        diff_owner: &Entity<DiffOwner>,
+    ) -> Self {
+        Self::for_sources(ActivityDiffSourceIdentity::new(action_log, diff_owner))
     }
 
     fn for_sources(sources: ActivityDiffSourceIdentity) -> Self {

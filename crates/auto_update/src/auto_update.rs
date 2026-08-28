@@ -1420,9 +1420,18 @@ mod tests {
         )?;
         assert_eq!(url.host_str(), Some("updates.example.test"));
         assert_eq!(url.path(), "/releases/rust/stable/latest/asset");
+        let query_pairs = url
+            .query_pairs()
+            .map(|(key, value)| (key.into_owned(), value.into_owned()))
+            .collect::<Vec<_>>();
+
         assert_eq!(
-            url.query_pairs().collect::<Vec<_>>(),
-            [("asset", "rust"), ("os", "macos"), ("arch", "aarch64")]
+            query_pairs,
+            vec![
+                ("asset".to_owned(), "rust".to_owned()),
+                ("os".to_owned(), "macos".to_owned()),
+                ("arch".to_owned(), "aarch64".to_owned()),
+            ]
         );
         Ok(())
     }

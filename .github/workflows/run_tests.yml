@@ -61,6 +61,63 @@ jobs:
       run: |
         rm -rf ./../.cargo
     timeout-minutes: 90
+  comfy_backend_validation:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+        - platform: linux
+          runner: ubuntu-22.04
+        - platform: macos
+          runner: macos-15
+        - platform: windows
+          runner: windows-2022
+      fail-fast: false
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      with:
+        clean: false
+    - name: steps::setup_cargo_config
+      if: matrix.platform == 'linux'
+      run: |
+        mkdir -p ./../.cargo
+        cp ./.cargo/ci-config.toml ./../.cargo/config.toml
+    - name: steps::setup_cargo_config
+      if: matrix.platform == 'macos'
+      run: |
+        mkdir -p ./../.cargo
+        cp ./.cargo/ci-config.toml ./../.cargo/config.toml
+    - name: steps::setup_cargo_config
+      if: matrix.platform == 'windows'
+      run: |
+        New-Item -ItemType Directory -Path "./../.cargo" -Force
+        Copy-Item -Path "./.cargo/ci-config.toml" -Destination "./../.cargo/config.toml"
+      shell: pwsh
+    - name: run_tests::comfy_backend_validation
+      if: matrix.platform == 'linux'
+      run: cargo clippy --release --all-targets --all-features -p comfy_backend_corex -p comfy_backend_cuda -p comfy_backend_directml -p comfy_backend_metal -p comfy_backend_mlu -p comfy_backend_npu -p comfy_backend_rocm -p comfy_backend_xpu -- --deny warnings
+    - name: run_tests::comfy_backend_validation
+      if: matrix.platform == 'macos'
+      run: cargo clippy --release --all-targets --all-features -p comfy_backend_metal -- --deny warnings
+    - name: run_tests::comfy_backend_validation
+      if: matrix.platform == 'windows'
+      run: cargo clippy --release --all-targets --all-features -p comfy_backend_cuda -p comfy_backend_directml -- --deny warnings
+      shell: pwsh
+    - name: steps::cleanup_cargo_config
+      if: always() && matrix.platform == 'linux'
+      run: |
+        rm -rf ./../.cargo
+    - name: steps::cleanup_cargo_config
+      if: always() && matrix.platform == 'macos'
+      run: |
+        rm -rf ./../.cargo
+    - name: steps::cleanup_cargo_config
+      if: always() && matrix.platform == 'windows'
+      run: |
+        Remove-Item -Recurse -Path "./../.cargo" -Force -ErrorAction SilentlyContinue
+      shell: pwsh
+    timeout-minutes: 60
   product_smoke:
     needs:
     - shared_validation

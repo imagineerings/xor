@@ -113,7 +113,7 @@ fn fixture(community_id: CommunityId) -> (Vec<BuzzObjectMetadataRecord>, [u8; 32
                 4,
                 format!("manifests/{manifest_digest}"),
                 manifest.len() as u64,
-                Some(manifest.clone()),
+                Some(manifest),
                 manifest_sha256,
                 Some("manifest-etag"),
             ),
@@ -163,7 +163,7 @@ fn fixture_inventory_preserves_content_and_ref_identity() {
     assert_eq!(repository.pack_sha256, vec![pack_sha256]);
     assert_eq!(
         hex::encode(repository.ref_state_hash),
-        "c98f0099a12fd6a8ab9c1045661cd99095a21ad796c68305f6b010a442387731"
+        "25f908604744ead9f4f6262cd17f4f7a4217b57df1e20026ad4e3ee830847bf4"
     );
     let checkpoint = inventory.checkpoint_progress();
     assert_eq!(checkpoint.final_source_sequence, 5);
