@@ -21,7 +21,16 @@ use super::{
 };
 
 pub(crate) fn run_tests() -> Workflow {
-    let validation = shared_validation();
+    let shared_clippy = shared_clippy();
+    let workspace_tests = workspace_tests();
+    let project_benchmarks = project_benchmarks();
+    let rust_tools_validation = rust_tools_validation();
+    let validation = shared_validation(&[
+        &shared_clippy,
+        &workspace_tests,
+        &project_benchmarks,
+        &rust_tools_validation,
+    ]);
     let comfy_backend_validation = comfy_backend_validation();
     let product_smoke = product_smoke(&validation);
 
@@ -35,16 +44,35 @@ pub(crate) fn run_tests() -> Workflow {
         .add_env(("CARGO_TERM_COLOR", "always"))
         .add_env(("RUST_BACKTRACE", 1))
         .add_env(("CARGO_INCREMENTAL", 0))
+        .add_job(shared_clippy.name, shared_clippy.job)
+        .add_job(workspace_tests.name, workspace_tests.job)
+        .add_job(project_benchmarks.name, project_benchmarks.job)
+        .add_job(rust_tools_validation.name, rust_tools_validation.job)
         .add_job(validation.name, validation.job)
         .add_job(comfy_backend_validation.name, comfy_backend_validation.job)
         .add_job(product_smoke.name, product_smoke.job)
 }
 
-fn shared_validation() -> NamedJob {
+fn shared_clippy() -> NamedJob {
     named::job(
         Job::default()
             .runs_on("ubuntu-22.04")
-            .timeout_minutes(120u32)
+            .timeout_minutes(60u32)
+            .map(use_clang)
+            .add_step(steps::checkout_repo())
+            .add_step(steps::setup_cargo_config(Platform::Linux))
+            .add_step(steps::setup_linux())
+            .add_step(steps::cargo_fmt())
+            .add_step(named::bash("./script/clippy"))
+            .add_step(steps::cleanup_cargo_config(Platform::Linux)),
+    )
+}
+
+fn workspace_tests() -> NamedJob {
+    named::job(
+        Job::default()
+            .runs_on("ubuntu-22.04")
+            .timeout_minutes(75u32)
             .map(use_clang)
             .add_step(steps::checkout_repo())
             .add_step(steps::free_linux_disk_space())
@@ -52,24 +80,78 @@ fn shared_validation() -> NamedJob {
             .map(steps::install_linux_dependencies)
             .add_step(steps::setup_node())
             .add_step(steps::cargo_install_nextest())
-            .add_step(steps::cargo_fmt())
-            .add_step(named::bash("./script/clippy"))
-            .add_step(named::bash("cargo clean --release"))
             .add_step(named::bash(
                 "cargo nextest run --workspace --no-fail-fast --no-tests=warn",
             ))
-            .add_step(named::bash("cargo clean"))
+            .add_step(steps::cleanup_cargo_config(Platform::Linux)),
+    )
+}
+
+fn project_benchmarks() -> NamedJob {
+    named::job(
+        Job::default()
+            .runs_on("ubuntu-22.04")
+            .timeout_minutes(45u32)
+            .map(use_clang)
+            .add_step(steps::checkout_repo())
+            .add_step(steps::setup_cargo_config(Platform::Linux))
+            .add_step(steps::setup_linux())
             .add_step(named::bash(
                 "cargo bench -p project --features cargo-workspace --bench cargo_workspace -- --noplot",
             ))
             .add_step(named::bash(
                 "cargo bench -p project --features structured-execution --bench structured_execution -- --noplot",
             ))
-            .add_step(named::bash("cargo clean --release"))
+            .add_step(steps::cleanup_cargo_config(Platform::Linux)),
+    )
+}
+
+fn rust_tools_validation() -> NamedJob {
+    named::job(
+        Job::default()
+            .runs_on("ubuntu-22.04")
+            .timeout_minutes(45u32)
+            .map(use_clang)
+            .add_step(steps::checkout_repo())
+            .add_step(steps::setup_cargo_config(Platform::Linux))
+            .add_step(steps::setup_linux())
             .add_step(named::bash(
                 "./script/test-rust-tools-environments --matrix --offline",
             ))
             .add_step(steps::cleanup_cargo_config(Platform::Linux)),
+    )
+}
+
+fn shared_validation(workers: &[&NamedJob]) -> NamedJob {
+    let worker_names = workers
+        .iter()
+        .map(|worker| worker.name.clone())
+        .collect::<Vec<_>>();
+    let check_results = workers.iter().fold(
+        named::bash(indoc::indoc! {r#"
+            exit_code=0
+            for result in "$SHARED_CLIPPY_RESULT" "$WORKSPACE_TESTS_RESULT" "$PROJECT_BENCHMARKS_RESULT" "$RUST_TOOLS_VALIDATION_RESULT"; do
+                if [[ "$result" != "success" ]]; then
+                    exit_code=1
+                fi
+            done
+            exit "$exit_code"
+        "#}),
+        |step, worker| {
+            step.add_env((
+                format!("{}_RESULT", worker.name.to_uppercase()),
+                format!("${{{{ needs.{}.result }}}}", worker.name),
+            ))
+        },
+    );
+
+    named::job(
+        Job::default()
+            .needs(worker_names)
+            .cond(Expression::new("${{ always() }}"))
+            .runs_on("ubuntu-22.04")
+            .timeout_minutes(5u32)
+            .add_step(check_results),
     )
 }
 
@@ -444,14 +526,103 @@ fn run_platform_tests_impl(platform: Platform, filter_packages: bool, harden: bo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_yaml::Value;
+
+    fn job<'a>(workflow: &'a Value, name: &str) -> &'a Value {
+        workflow
+            .get("jobs")
+            .and_then(|jobs| jobs.get(name))
+            .unwrap_or_else(|| panic!("missing {name} job"))
+    }
+
+    fn run_commands(job: &Value) -> Vec<&str> {
+        job.get("steps")
+            .and_then(Value::as_sequence)
+            .expect("job steps")
+            .iter()
+            .filter_map(|step| step.get("run").and_then(Value::as_str))
+            .collect()
+    }
+
+    fn needs(job: &Value) -> Vec<&str> {
+        job.get("needs")
+            .and_then(Value::as_sequence)
+            .map(|needs| needs.iter().filter_map(Value::as_str).collect())
+            .unwrap_or_default()
+    }
 
     #[test]
     fn rust_product_ci_has_shared_validation_and_one_smoke_row() -> anyhow::Result<()> {
         let workflow = run_tests()
             .to_string()
             .map_err(|error| anyhow::anyhow!("failed to serialize CI workflow: {error:?}"))?;
+        let parsed: Value = serde_yaml::from_str(&workflow)?;
 
-        assert_eq!(workflow.matches("runs-on:").count(), 3);
+        let worker_names = [
+            "shared_clippy",
+            "workspace_tests",
+            "project_benchmarks",
+            "rust_tools_validation",
+        ];
+        for worker_name in worker_names {
+            assert!(needs(job(&parsed, worker_name)).is_empty());
+        }
+
+        let shared_validation = job(&parsed, "shared_validation");
+        assert_eq!(needs(shared_validation), worker_names);
+        assert_eq!(
+            shared_validation.get("if").and_then(Value::as_str),
+            Some("${{ always() }}")
+        );
+        let aggregator_commands = run_commands(shared_validation);
+        assert_eq!(aggregator_commands.len(), 1);
+        assert!(aggregator_commands[0].contains("[[ \"$result\" != \"success\" ]]"));
+        assert!(aggregator_commands[0].contains("exit \"$exit_code\""));
+        let aggregator_steps = shared_validation
+            .get("steps")
+            .and_then(Value::as_sequence)
+            .expect("aggregator steps");
+        assert_eq!(aggregator_steps.len(), 1);
+        let aggregator_env = aggregator_steps[0]
+            .get("env")
+            .expect("aggregator result environment");
+        for worker_name in worker_names {
+            let environment_name = format!("{}_RESULT", worker_name.to_uppercase());
+            let expected_result = format!("${{{{ needs.{worker_name}.result }}}}");
+            assert_eq!(
+                aggregator_env
+                    .get(&environment_name)
+                    .and_then(Value::as_str),
+                Some(expected_result.as_str())
+            );
+        }
+
+        assert_eq!(needs(job(&parsed, "product_smoke")), ["shared_validation"]);
+
+        let shared_clippy_commands = run_commands(job(&parsed, "shared_clippy"));
+        assert!(shared_clippy_commands.contains(&"cargo fmt --all -- --check"));
+        assert!(shared_clippy_commands.contains(&"./script/clippy"));
+        let workspace_test_commands = run_commands(job(&parsed, "workspace_tests"));
+        assert!(workspace_test_commands.iter().any(|command| {
+            *command == "cargo nextest run --workspace --no-fail-fast --no-tests=warn"
+        }));
+        let benchmark_commands = run_commands(job(&parsed, "project_benchmarks"));
+        assert!(
+            benchmark_commands
+                .iter()
+                .any(|command| command.contains("--bench cargo_workspace -- --noplot"))
+        );
+        assert!(
+            benchmark_commands
+                .iter()
+                .any(|command| command.contains("--bench structured_execution -- --noplot"))
+        );
+        let rust_tools_commands = run_commands(job(&parsed, "rust_tools_validation"));
+        assert!(rust_tools_commands.iter().any(|command| {
+            *command == "./script/test-rust-tools-environments --matrix --offline"
+        }));
+
+        assert_eq!(workflow.matches("runs-on:").count(), 7);
         assert!(workflow.contains("runs-on: ubuntu-22.04"));
         assert!(workflow.contains("runner: macos-15"));
         assert!(workflow.contains("runner: windows-2022"));
@@ -465,6 +636,27 @@ mod tests {
         assert!(workflow.contains("application_features: agentic-tools,rust-tools"));
         assert!(workflow.contains("remote_features: rust-tools"));
         assert!(workflow.contains("cargo xtask bundle --product"));
+        assert_eq!(workflow.matches("cargo fmt --all -- --check").count(), 1);
+        assert_eq!(workflow.matches("run: ./script/clippy").count(), 1);
+        assert_eq!(workflow.matches("cargo nextest run --workspace").count(), 1);
+        assert_eq!(
+            workflow
+                .matches("--bench cargo_workspace -- --noplot")
+                .count(),
+            1
+        );
+        assert_eq!(
+            workflow
+                .matches("--bench structured_execution -- --noplot")
+                .count(),
+            1
+        );
+        assert_eq!(
+            workflow
+                .matches("test-rust-tools-environments --matrix --offline")
+                .count(),
+            1
+        );
         assert!(workflow.contains("-p comfy_backend_corex"));
         assert!(workflow.contains("-p comfy_backend_cuda"));
         assert!(workflow.contains("-p comfy_backend_directml"));
@@ -488,44 +680,8 @@ mod tests {
             .find("-p comfy_backend_cuda -p comfy_backend_directml")
             .expect("Windows backend Clippy command should be generated");
         assert!(windows_long_paths < windows_backend_clippy);
-        assert!(workflow.contains("needs:\n    - shared_validation"));
         assert!(workflow.contains("cancel-in-progress: true"));
-        assert!(workflow.contains("timeout-minutes: 120"));
-
-        let free_disk_space = workflow
-            .find("sudo rm -rf -- /usr/local/lib/android")
-            .expect("Linux runner disk cleanup step");
-        let clippy = workflow
-            .find("./script/clippy")
-            .expect("shared Clippy step");
-        let release_cleanups = workflow
-            .match_indices("cargo clean --release")
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        assert_eq!(release_cleanups.len(), 2);
-        let nextest = workflow
-            .find("cargo nextest run --workspace")
-            .expect("shared nextest step");
-        let debug_cleanup = workflow
-            .find("run: cargo clean\n")
-            .expect("post-nextest cleanup step");
-        let first_benchmark = workflow
-            .find("--bench cargo_workspace")
-            .expect("first shared benchmark");
-        let second_benchmark = workflow
-            .find("--bench structured_execution")
-            .expect("second shared benchmark");
-        let rust_tools = workflow
-            .find("test-rust-tools-environments --matrix --offline")
-            .expect("Rust tools matrix");
-        assert!(free_disk_space < clippy);
-        assert!(clippy < release_cleanups[0]);
-        assert!(release_cleanups[0] < nextest);
-        assert!(nextest < debug_cleanup);
-        assert!(debug_cleanup < first_benchmark);
-        assert!(first_benchmark < second_benchmark);
-        assert!(second_benchmark < release_cleanups[1]);
-        assert!(release_cleanups[1] < rust_tools);
+        assert!(!workflow.contains("cargo clean"));
 
         for forbidden in [
             "repository_owner",

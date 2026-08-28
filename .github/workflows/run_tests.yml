@@ -16,7 +16,32 @@ on:
 permissions:
   contents: read
 jobs:
-  shared_validation:
+  shared_clippy:
+    runs-on: ubuntu-22.04
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      with:
+        clean: false
+    - name: steps::setup_cargo_config
+      run: |
+        mkdir -p ./../.cargo
+        cp ./.cargo/ci-config.toml ./../.cargo/config.toml
+    - name: steps::setup_linux
+      run: ./script/linux
+    - name: steps::cargo_fmt
+      run: cargo fmt --all -- --check
+    - name: run_tests::shared_clippy
+      run: ./script/clippy
+    - name: steps::cleanup_cargo_config
+      if: always()
+      run: |
+        rm -rf ./../.cargo
+    timeout-minutes: 60
+  workspace_tests:
     runs-on: ubuntu-22.04
     env:
       CC: clang
@@ -48,29 +73,85 @@ jobs:
       uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9
       with:
         tool: nextest
-    - name: steps::cargo_fmt
-      run: cargo fmt --all -- --check
-    - name: run_tests::shared_validation
-      run: ./script/clippy
-    - name: run_tests::shared_validation
-      run: cargo clean --release
-    - name: run_tests::shared_validation
+    - name: run_tests::workspace_tests
       run: cargo nextest run --workspace --no-fail-fast --no-tests=warn
-    - name: run_tests::shared_validation
-      run: cargo clean
-    - name: run_tests::shared_validation
+    - name: steps::cleanup_cargo_config
+      if: always()
+      run: |
+        rm -rf ./../.cargo
+    timeout-minutes: 75
+  project_benchmarks:
+    runs-on: ubuntu-22.04
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      with:
+        clean: false
+    - name: steps::setup_cargo_config
+      run: |
+        mkdir -p ./../.cargo
+        cp ./.cargo/ci-config.toml ./../.cargo/config.toml
+    - name: steps::setup_linux
+      run: ./script/linux
+    - name: run_tests::project_benchmarks
       run: cargo bench -p project --features cargo-workspace --bench cargo_workspace -- --noplot
-    - name: run_tests::shared_validation
+    - name: run_tests::project_benchmarks
       run: cargo bench -p project --features structured-execution --bench structured_execution -- --noplot
-    - name: run_tests::shared_validation
-      run: cargo clean --release
-    - name: run_tests::shared_validation
+    - name: steps::cleanup_cargo_config
+      if: always()
+      run: |
+        rm -rf ./../.cargo
+    timeout-minutes: 45
+  rust_tools_validation:
+    runs-on: ubuntu-22.04
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      with:
+        clean: false
+    - name: steps::setup_cargo_config
+      run: |
+        mkdir -p ./../.cargo
+        cp ./.cargo/ci-config.toml ./../.cargo/config.toml
+    - name: steps::setup_linux
+      run: ./script/linux
+    - name: run_tests::rust_tools_validation
       run: ./script/test-rust-tools-environments --matrix --offline
     - name: steps::cleanup_cargo_config
       if: always()
       run: |
         rm -rf ./../.cargo
-    timeout-minutes: 120
+    timeout-minutes: 45
+  shared_validation:
+    needs:
+    - shared_clippy
+    - workspace_tests
+    - project_benchmarks
+    - rust_tools_validation
+    if: ${{ always() }}
+    runs-on: ubuntu-22.04
+    steps:
+    - name: run_tests::shared_validation
+      run: |
+        exit_code=0
+        for result in "$SHARED_CLIPPY_RESULT" "$WORKSPACE_TESTS_RESULT" "$PROJECT_BENCHMARKS_RESULT" "$RUST_TOOLS_VALIDATION_RESULT"; do
+            if [[ "$result" != "success" ]]; then
+                exit_code=1
+            fi
+        done
+        exit "$exit_code"
+      env:
+        SHARED_CLIPPY_RESULT: ${{ needs.shared_clippy.result }}
+        WORKSPACE_TESTS_RESULT: ${{ needs.workspace_tests.result }}
+        PROJECT_BENCHMARKS_RESULT: ${{ needs.project_benchmarks.result }}
+        RUST_TOOLS_VALIDATION_RESULT: ${{ needs.rust_tools_validation.result }}
+    timeout-minutes: 5
   comfy_backend_validation:
     runs-on: ${{ matrix.runner }}
     strategy:
