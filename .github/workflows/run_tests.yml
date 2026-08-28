@@ -26,6 +26,10 @@ jobs:
       uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
       with:
         clean: false
+    - name: steps::free_linux_disk_space
+      run: |
+        sudo rm -rf -- /usr/local/lib/android /opt/ghc /usr/local/.ghcup /usr/share/dotnet
+        df -h /
     - name: steps::setup_cargo_config
       run: |
         mkdir -p ./../.cargo

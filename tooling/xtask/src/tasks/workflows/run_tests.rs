@@ -47,6 +47,7 @@ fn shared_validation() -> NamedJob {
             .timeout_minutes(120u32)
             .map(use_clang)
             .add_step(steps::checkout_repo())
+            .add_step(steps::free_linux_disk_space())
             .add_step(steps::setup_cargo_config(Platform::Linux))
             .map(steps::install_linux_dependencies)
             .add_step(steps::setup_node())
@@ -491,6 +492,9 @@ mod tests {
         assert!(workflow.contains("cancel-in-progress: true"));
         assert!(workflow.contains("timeout-minutes: 120"));
 
+        let free_disk_space = workflow
+            .find("sudo rm -rf -- /usr/local/lib/android")
+            .expect("Linux runner disk cleanup step");
         let clippy = workflow
             .find("./script/clippy")
             .expect("shared Clippy step");
@@ -514,6 +518,7 @@ mod tests {
         let rust_tools = workflow
             .find("test-rust-tools-environments --matrix --offline")
             .expect("Rust tools matrix");
+        assert!(free_disk_space < clippy);
         assert!(clippy < release_cleanups[0]);
         assert!(release_cleanups[0] < nextest);
         assert!(nextest < debug_cleanup);

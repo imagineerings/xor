@@ -229,6 +229,13 @@ pub fn enable_windows_long_paths() -> Step<Run> {
     named::pwsh("git config --global core.longpaths true")
 }
 
+pub fn free_linux_disk_space() -> Step<Run> {
+    named::bash(indoc::indoc! {r#"
+        sudo rm -rf -- /usr/local/lib/android /opt/ghc /usr/local/.ghcup /usr/share/dotnet
+        df -h /
+    "#})
+}
+
 pub fn cleanup_cargo_config(platform: Platform) -> Step<Run> {
     let step = match platform {
         Platform::Windows => named::pwsh(indoc::indoc! {r#"
