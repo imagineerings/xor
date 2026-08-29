@@ -611,6 +611,9 @@ mod tests {
                 command.contains("sudo swapoff -a")
                     && command.contains("/opt/hostedtoolcache")
                     && command.contains("/usr/local/share/boost")
+                    && command.contains("/usr/share/swift")
+                    && command.contains("/opt/az")
+                    && command.contains("/usr/share/miniconda")
                     && command.contains("/mnt/swapfile")
             })
             .expect("workspace tests should reclaim unused runner disk");

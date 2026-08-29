@@ -232,7 +232,19 @@ pub fn enable_windows_long_paths() -> Step<Run> {
 pub fn free_linux_disk_space() -> Step<Run> {
     named::bash(indoc::indoc! {r#"
         sudo swapoff -a
-        sudo rm -rf -- /usr/local/lib/android /opt/ghc /usr/local/.ghcup /usr/share/dotnet /usr/local/share/boost /opt/hostedtoolcache
+        sudo rm -rf -- \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /usr/share/dotnet \
+            /usr/local/share/boost \
+            /opt/hostedtoolcache \
+            /usr/share/swift \
+            /opt/az \
+            /opt/microsoft \
+            /usr/share/miniconda \
+            /usr/local/share/powershell \
+            /usr/local/share/chromium
         sudo rm -f -- /mnt/swapfile
         df -h /
     "#})
