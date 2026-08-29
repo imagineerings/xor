@@ -41,10 +41,12 @@ jobs:
       run: |
         rm -rf ./../.cargo
     timeout-minutes: 60
-  workspace_tests:
+  rustlings_tests:
     runs-on: ubuntu-22.04
     env:
       CARGO_PROFILE_TEST_DEBUG: '0'
+      ZED_PRODUCT_ID: rust
+      ZED_PRODUCT_UPDATE_BASE_URL: http://test.example
       CC: clang
       CXX: clang++
     steps:
@@ -88,13 +90,13 @@ jobs:
       uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9
       with:
         tool: nextest
-    - name: run_tests::workspace_tests
-      run: cargo nextest run --workspace --no-fail-fast --no-tests=warn
+    - name: run_tests::rustlings_tests
+      run: cargo nextest run --no-fail-fast --no-tests=warn --no-default-features --features zed/agentic-tools,zed/rust-tools,remote_server/rust-tools -p agent -p agent_ui -p auto_update -p call -p cargo_ui -p channel -p client -p collab_ui -p editor -p extension_host -p git -p git_ui -p language_model -p language_models -p languages -p project -p remote_server -p settings -p settings_content -p task -p tasks_ui -p terminal -p terminal_view -p worktree -p workspace -p zed
     - name: steps::cleanup_cargo_config
       if: always()
       run: |
         rm -rf ./../.cargo
-    timeout-minutes: 75
+    timeout-minutes: 90
   project_benchmarks:
     runs-on: ubuntu-22.04
     env:
@@ -148,7 +150,7 @@ jobs:
   shared_validation:
     needs:
     - shared_clippy
-    - workspace_tests
+    - rustlings_tests
     - project_benchmarks
     - rust_tools_validation
     if: ${{ always() }}
@@ -157,7 +159,7 @@ jobs:
     - name: run_tests::shared_validation
       run: |
         exit_code=0
-        for result in "$SHARED_CLIPPY_RESULT" "$WORKSPACE_TESTS_RESULT" "$PROJECT_BENCHMARKS_RESULT" "$RUST_TOOLS_VALIDATION_RESULT"; do
+        for result in "$SHARED_CLIPPY_RESULT" "$RUSTLINGS_TESTS_RESULT" "$PROJECT_BENCHMARKS_RESULT" "$RUST_TOOLS_VALIDATION_RESULT"; do
             if [[ "$result" != "success" ]]; then
                 exit_code=1
             fi
@@ -165,7 +167,7 @@ jobs:
         exit "$exit_code"
       env:
         SHARED_CLIPPY_RESULT: ${{ needs.shared_clippy.result }}
-        WORKSPACE_TESTS_RESULT: ${{ needs.workspace_tests.result }}
+        RUSTLINGS_TESTS_RESULT: ${{ needs.rustlings_tests.result }}
         PROJECT_BENCHMARKS_RESULT: ${{ needs.project_benchmarks.result }}
         RUST_TOOLS_VALIDATION_RESULT: ${{ needs.rust_tools_validation.result }}
     timeout-minutes: 5

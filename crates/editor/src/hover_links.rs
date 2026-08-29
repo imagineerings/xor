@@ -1078,8 +1078,39 @@ mod tests {
     use std::str::FromStr;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use util::{assert_set_eq, path};
+    use util::{
+        assert_set_eq, path,
+        rel_path::{RelPath, rel_path},
+    };
     use workspace::item::Item;
+
+    async fn wait_for_hovered_link(cx: &mut EditorLspTestContext) {
+        let task = cx.update_editor(|editor, _, _| {
+            editor
+                .hovered_link_state
+                .as_mut()
+                .and_then(|state| state.task.take())
+        });
+        task.expect("hovered link task should be active").await;
+        cx.run_until_parked();
+    }
+
+    async fn refresh_worktree_path(cx: &mut EditorLspTestContext, path: &'static RelPath) {
+        let mut refresh = cx.update_workspace(|workspace, _, cx| {
+            let project = workspace.project();
+            let worktree = project
+                .read(cx)
+                .worktrees(cx)
+                .next()
+                .expect("test worktree should exist");
+            worktree
+                .read(cx)
+                .as_local()
+                .expect("test worktree should be local")
+                .manually_refresh_entries_for_paths(vec![path.into()])
+        });
+        refresh.next().await;
+    }
 
     #[test]
     fn test_document_link_target_to_hover_link_file_uri_with_fragment() {
@@ -2349,6 +2380,7 @@ Sentence ending file2.rs.
                     .to_vec(),
             )
             .await;
+        refresh_worktree_path(&mut cx, rel_path("dir/file2.rs")).await;
 
         // file2.rs:5:3 should be highlighted and clickable
         cx.set_state(indoc! {"
@@ -2360,6 +2392,7 @@ Sentence ending file2.rs.
         "});
 
         cx.simulate_mouse_move(screen_coord, None, Modifiers::secondary_key());
+        wait_for_hovered_link(&mut cx).await;
         cx.assert_editor_text_highlights(
             HighlightKey::HoveredLinkState,
             indoc! {"
@@ -2425,6 +2458,7 @@ Sentence ending file2.rs.
                     .to_vec(),
             )
             .await;
+        refresh_worktree_path(&mut cx, rel_path("dir/file2.rs")).await;
 
         // file2.rs:3 should be highlighted and clickable
         cx.set_state(indoc! {"
@@ -2436,6 +2470,7 @@ Sentence ending file2.rs.
         "});
 
         cx.simulate_mouse_move(screen_coord, None, Modifiers::secondary_key());
+        wait_for_hovered_link(&mut cx).await;
         cx.assert_editor_text_highlights(
             HighlightKey::HoveredLinkState,
             indoc! {"
@@ -2482,6 +2517,7 @@ Sentence ending file2.rs.
                 "line 1\nline 2\nline 3\n".as_bytes().to_vec(),
             )
             .await;
+        refresh_worktree_path(&mut cx, rel_path("dir/file2.rs")).await;
 
         // file2.rs:2:in should resolve to file2.rs line 2 (like Ruby backtraces)
         cx.set_state(indoc! {"
@@ -2493,6 +2529,7 @@ Sentence ending file2.rs.
         "});
 
         cx.simulate_mouse_move(screen_coord, None, Modifiers::secondary_key());
+        wait_for_hovered_link(&mut cx).await;
         cx.assert_editor_text_highlights(
             HighlightKey::HoveredLinkState,
             indoc! {"
@@ -2540,6 +2577,7 @@ Sentence ending file2.rs.
                     .to_vec(),
             )
             .await;
+        refresh_worktree_path(&mut cx, rel_path("dir/file2.rs")).await;
 
         // Markdown link [text](file2.rs:3:2) should highlight only the inner link,
         // not the surrounding markdown syntax.
@@ -2552,6 +2590,7 @@ Sentence ending file2.rs.
         "});
 
         cx.simulate_mouse_move(screen_coord, None, Modifiers::secondary_key());
+        wait_for_hovered_link(&mut cx).await;
         cx.assert_editor_text_highlights(
             HighlightKey::HoveredLinkState,
             indoc! {"

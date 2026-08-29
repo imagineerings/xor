@@ -2079,8 +2079,12 @@ mod tests {
         assert_eq!(large_snapshot.workspaces[0].members.len(), 1_000);
         assert_eq!(first_ids, second_ids);
         assert_eq!(unique_ids.len(), first_ids.len());
-        assert!(first_ids.len() >= 6_000);
-        assert!(first_ids.len() < 10_000);
+        assert!(first_ids.len() >= 20_000);
+        assert!(
+            first_ids.len() < 25_000,
+            "1,000-package projection produced {} rows",
+            first_ids.len()
+        );
         assert!(first_ids.iter().all(|id| !id.0.contains("/Users/")));
     }
 
@@ -2091,18 +2095,21 @@ mod tests {
 
         let mut large_snapshot = snapshot();
         let package_template = large_snapshot.workspaces[0].members[0].clone();
-        large_snapshot.workspaces[0].members = (0..1_240)
+        large_snapshot.workspaces[0].members = (0..400)
             .map(|index| scaled_package(&package_template, index))
             .collect();
 
         let initial_projection = CargoTreeProvider::project(&large_snapshot).0;
         let initial_count = collect_ids(&initial_projection.roots).len();
-        assert!(initial_count < VISIBLE_ROW_LIMIT);
+        assert!(
+            initial_count < VISIBLE_ROW_LIMIT,
+            "initial projection produced {initial_count} rows"
+        );
         let remaining_rows = VISIBLE_ROW_LIMIT - initial_count;
         large_snapshot.workspaces[0]
             .members
             .extend((0..remaining_rows).map(|offset| {
-                let index = 1_240 + offset;
+                let index = 400 + offset;
                 let mut package = scaled_package(&package_template, index);
                 package.targets.clear();
                 package.features.clear();

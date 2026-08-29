@@ -1468,18 +1468,29 @@ mod tests {
             let clock = Arc::new(FakeSystemClock::new());
             let release_available = Arc::clone(&release_available);
             let dmg_rx = Arc::new(parking_lot::Mutex::new(Some(dmg_rx)));
+            let release_path = format!(
+                "/releases/{}/stable/latest/asset",
+                product_flavor::UPDATE_NAMESPACE
+            );
             let fake_client_http = FakeHttpClient::create(move |req| {
                 let release_available = release_available.load(atomic::Ordering::Relaxed);
                 let dmg_rx = dmg_rx.clone();
+                let release_path = release_path.clone();
                 async move {
-                if req.uri().path() == "/releases/stable/latest/asset" {
+                if req.uri().path() == release_path {
                     if release_available {
                         return Ok(Response::builder().status(200).body(
-                            r#"{"version":"0.100.1","url":"https://test.example/new-download"}"#.into()
+                            format!(
+                                r#"{{"product_id":"{}","version":"0.100.1","url":"https://test.example/new-download"}}"#,
+                                product_flavor::ID
+                            ).into()
                         ).unwrap());
                     } else {
                         return Ok(Response::builder().status(200).body(
-                            r#"{"version":"0.100.0","url":"https://test.example/old-download"}"#.into()
+                            format!(
+                                r#"{{"product_id":"{}","version":"0.100.0","url":"https://test.example/old-download"}}"#,
+                                product_flavor::ID
+                            ).into()
                         ).unwrap());
                     }
                 } else if req.uri().path() == "/new-download" {

@@ -1174,6 +1174,7 @@ pub struct AgentPanel {
     _project_subscription: Subscription,
     zoomed: bool,
     pending_serialization: Option<Task<Result<()>>>,
+    pending_last_used_agent_persistence: Option<Task<()>>,
     new_user_onboarding: Entity<AgentPanelOnboarding>,
     new_user_onboarding_upsell_dismissed: AtomicBool,
     selected_agent: Agent,
@@ -1551,6 +1552,9 @@ impl AgentPanel {
 
         cx.on_release(|this, cx| {
             this.dismiss_all_terminal_notifications(cx);
+            if let Some(task) = this.pending_last_used_agent_persistence.take() {
+                task.detach();
+            }
         })
         .detach();
 
@@ -1577,6 +1581,7 @@ impl AgentPanel {
             _project_subscription,
             zoomed: false,
             pending_serialization: None,
+            pending_last_used_agent_persistence: None,
             new_user_onboarding: onboarding,
             thread_store,
             selected_agent: Agent::default(),
@@ -1927,13 +1932,16 @@ impl AgentPanel {
             self.serialize(cx);
         }
 
-        cx.background_spawn({
+        let previous_persistence = self.pending_last_used_agent_persistence.take();
+        self.pending_last_used_agent_persistence = Some(cx.background_spawn({
             let kvp = KeyValueStore::global(cx);
             async move {
+                if let Some(previous_persistence) = previous_persistence {
+                    previous_persistence.await;
+                }
                 write_global_last_used_agent(kvp, agent).await;
             }
-        })
-        .detach();
+        }));
     }
 
     /// Sets the panel's selected agent without opening the panel or focusing

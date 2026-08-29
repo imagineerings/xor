@@ -8534,6 +8534,13 @@ mod tests {
                 "bedrock",
                 "branches",
                 "buffer_search",
+                "call_hierarchy",
+                #[cfg(feature = "rust-tools")]
+                "cargo_actions",
+                #[cfg(feature = "rust-tools")]
+                "cargo_panel",
+                #[cfg(feature = "rust-tools")]
+                "cargo_preset_editor",
                 "channel_modal",
                 "cli",
                 "client",
@@ -8608,6 +8615,8 @@ mod tests {
                 "task",
                 "terminal",
                 "terminal_panel",
+                #[cfg(feature = "rust-tools")]
+                "test_explorer",
                 "text_finder",
                 "theme",
                 "theme_selector",

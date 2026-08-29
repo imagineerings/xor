@@ -35,7 +35,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn workspace_presentation_setting_defaults_to_editor() {
+    fn workspace_presentation_setting_uses_implicit_editor_default() {
         assert_eq!(
             WorkspacePresentation::default(),
             WorkspacePresentation::Editor
@@ -44,10 +44,7 @@ mod tests {
         let defaults: settings::UserSettingsContent =
             settings::parse_json_with_comments(&settings::default_settings())
                 .expect("default settings should parse");
-        assert_eq!(
-            defaults.content.workspace.workspace_presentation,
-            Some(WorkspacePresentation::Editor)
-        );
+        assert_eq!(defaults.content.workspace.workspace_presentation, None);
     }
 
     #[test]

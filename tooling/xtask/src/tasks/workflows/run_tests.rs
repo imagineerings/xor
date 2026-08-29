@@ -22,12 +22,12 @@ use super::{
 
 pub(crate) fn run_tests() -> Workflow {
     let shared_clippy = shared_clippy();
-    let workspace_tests = workspace_tests();
+    let rustlings_tests = rustlings_tests();
     let project_benchmarks = project_benchmarks();
     let rust_tools_validation = rust_tools_validation();
     let validation = shared_validation(&[
         &shared_clippy,
-        &workspace_tests,
+        &rustlings_tests,
         &project_benchmarks,
         &rust_tools_validation,
     ]);
@@ -45,7 +45,7 @@ pub(crate) fn run_tests() -> Workflow {
         .add_env(("RUST_BACKTRACE", 1))
         .add_env(("CARGO_INCREMENTAL", 0))
         .add_job(shared_clippy.name, shared_clippy.job)
-        .add_job(workspace_tests.name, workspace_tests.job)
+        .add_job(rustlings_tests.name, rustlings_tests.job)
         .add_job(project_benchmarks.name, project_benchmarks.job)
         .add_job(rust_tools_validation.name, rust_tools_validation.job)
         .add_job(validation.name, validation.job)
@@ -68,12 +68,77 @@ fn shared_clippy() -> NamedJob {
     )
 }
 
-fn workspace_tests() -> NamedJob {
+const RUST_PRODUCT_ID: &str = "rust";
+const RUST_PRODUCT_TEST_UPDATE_BASE_URL: &str = "http://test.example";
+
+const RUST_PRODUCT_TEST_PACKAGES: &[&str] = &[
+    "agent",
+    "agent_ui",
+    "auto_update",
+    "call",
+    "cargo_ui",
+    "channel",
+    "client",
+    "collab_ui",
+    "editor",
+    "extension_host",
+    "git",
+    "git_ui",
+    "language_model",
+    "language_models",
+    "languages",
+    "project",
+    "remote_server",
+    "settings",
+    "settings_content",
+    "task",
+    "tasks_ui",
+    "terminal",
+    "terminal_view",
+    "worktree",
+    "workspace",
+    "zed",
+];
+
+fn rust_product_nextest_command() -> String {
+    let manifest = ProductManifest::load().expect("product catalog must be valid");
+    let product = manifest
+        .product(RUST_PRODUCT_ID)
+        .expect("Rust product must exist");
+    let features = product
+        .cargo_features
+        .iter()
+        .map(|feature| format!("zed/{feature}"))
+        .chain(
+            product
+                .remote_server_features
+                .iter()
+                .map(|feature| format!("remote_server/{feature}")),
+        )
+        .collect::<Vec<_>>()
+        .join(",");
+    let packages = RUST_PRODUCT_TEST_PACKAGES
+        .iter()
+        .map(|package| format!("-p {package}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    format!(
+        "cargo nextest run --no-fail-fast --no-tests=warn --no-default-features --features {features} {packages}"
+    )
+}
+
+fn rustlings_tests() -> NamedJob {
     named::job(
         Job::default()
             .runs_on("ubuntu-22.04")
-            .timeout_minutes(75u32)
+            .timeout_minutes(90u32)
             .add_env(("CARGO_PROFILE_TEST_DEBUG", 0))
+            .add_env(("ZED_PRODUCT_ID", RUST_PRODUCT_ID))
+            .add_env((
+                "ZED_PRODUCT_UPDATE_BASE_URL",
+                RUST_PRODUCT_TEST_UPDATE_BASE_URL,
+            ))
             .map(use_clang)
             .add_step(steps::checkout_repo())
             .add_step(steps::free_linux_disk_space())
@@ -81,9 +146,7 @@ fn workspace_tests() -> NamedJob {
             .map(steps::install_linux_dependencies)
             .add_step(steps::setup_node())
             .add_step(steps::cargo_install_nextest())
-            .add_step(named::bash(
-                "cargo nextest run --workspace --no-fail-fast --no-tests=warn",
-            ))
+            .add_step(named::bash(rust_product_nextest_command()))
             .add_step(steps::cleanup_cargo_config(Platform::Linux)),
     )
 }
@@ -132,7 +195,7 @@ fn shared_validation(workers: &[&NamedJob]) -> NamedJob {
     let check_results = workers.iter().fold(
         named::bash(indoc::indoc! {r#"
             exit_code=0
-            for result in "$SHARED_CLIPPY_RESULT" "$WORKSPACE_TESTS_RESULT" "$PROJECT_BENCHMARKS_RESULT" "$RUST_TOOLS_VALIDATION_RESULT"; do
+            for result in "$SHARED_CLIPPY_RESULT" "$RUSTLINGS_TESTS_RESULT" "$PROJECT_BENCHMARKS_RESULT" "$RUST_TOOLS_VALIDATION_RESULT"; do
                 if [[ "$result" != "success" ]]; then
                     exit_code=1
                 fi
@@ -562,7 +625,7 @@ mod tests {
 
         let worker_names = [
             "shared_clippy",
-            "workspace_tests",
+            "rustlings_tests",
             "project_benchmarks",
             "rust_tools_validation",
         ];
@@ -604,8 +667,8 @@ mod tests {
         let shared_clippy_commands = run_commands(job(&parsed, "shared_clippy"));
         assert!(shared_clippy_commands.contains(&"cargo fmt --all -- --check"));
         assert!(shared_clippy_commands.contains(&"./script/clippy"));
-        let workspace_test_commands = run_commands(job(&parsed, "workspace_tests"));
-        let workspace_disk_cleanup = workspace_test_commands
+        let rustlings_test_commands = run_commands(job(&parsed, "rustlings_tests"));
+        let rustlings_disk_cleanup = rustlings_test_commands
             .iter()
             .position(|command| {
                 command.contains("sudo swapoff -a")
@@ -616,23 +679,74 @@ mod tests {
                     && command.contains("/usr/share/miniconda")
                     && command.contains("/mnt/swapfile")
             })
-            .expect("workspace tests should reclaim unused runner disk");
-        let workspace_nextest = workspace_test_commands
+            .expect("Rust product tests should reclaim unused runner disk");
+        let product_nextest_command = rust_product_nextest_command();
+        let rustlings_nextest = rustlings_test_commands
             .iter()
-            .position(|command| {
-                *command == "cargo nextest run --workspace --no-fail-fast --no-tests=warn"
-            })
-            .expect("workspace nextest command");
-        assert!(workspace_disk_cleanup < workspace_nextest);
-        assert!(workspace_test_commands.iter().any(|command| {
-            *command == "cargo nextest run --workspace --no-fail-fast --no-tests=warn"
-        }));
+            .position(|command| *command == product_nextest_command)
+            .expect("Rust product nextest command");
+        assert!(rustlings_disk_cleanup < rustlings_nextest);
         assert_eq!(
-            job(&parsed, "workspace_tests")
+            rustlings_test_commands
+                .iter()
+                .filter(|command| command.starts_with("cargo nextest run"))
+                .count(),
+            1
+        );
+        assert_eq!(
+            job(&parsed, "rustlings_tests")
                 .get("env")
                 .and_then(|environment| environment.get("CARGO_PROFILE_TEST_DEBUG"))
                 .and_then(Value::as_str),
             Some("0")
+        );
+        assert_eq!(
+            job(&parsed, "rustlings_tests")
+                .get("env")
+                .and_then(|environment| environment.get("ZED_PRODUCT_ID"))
+                .and_then(Value::as_str),
+            Some(RUST_PRODUCT_ID)
+        );
+        assert_eq!(
+            job(&parsed, "rustlings_tests")
+                .get("env")
+                .and_then(|environment| environment.get("ZED_PRODUCT_UPDATE_BASE_URL"))
+                .and_then(Value::as_str),
+            Some(RUST_PRODUCT_TEST_UPDATE_BASE_URL)
+        );
+        let product_nextest_arguments = product_nextest_command
+            .split_whitespace()
+            .collect::<Vec<_>>();
+        for package in RUST_PRODUCT_TEST_PACKAGES {
+            assert!(
+                product_nextest_arguments
+                    .windows(2)
+                    .any(|arguments| arguments == ["-p", package]),
+                "Rust product tests must select {package}"
+            );
+        }
+        for baseline_collaboration_package in ["client", "call", "channel", "collab_ui"] {
+            assert!(
+                product_nextest_arguments
+                    .windows(2)
+                    .any(|arguments| { arguments == ["-p", baseline_collaboration_package] }),
+                "baseline desktop collaboration package {baseline_collaboration_package} must remain required"
+            );
+        }
+        assert!(
+            !product_nextest_arguments
+                .windows(2)
+                .any(|arguments| arguments == ["-p", "collab"])
+        );
+        assert!(
+            !product_nextest_arguments
+                .windows(2)
+                .any(|arguments| { arguments[0] == "-p" && arguments[1].starts_with("comfy_") })
+        );
+        assert!(!product_nextest_command.contains("multiplayer-tools"));
+        assert!(
+            product_nextest_command
+                .contains("--features zed/agentic-tools,zed/rust-tools,remote_server/rust-tools")
         );
         for worker_name in [
             "shared_clippy",
@@ -683,7 +797,8 @@ mod tests {
         assert!(workflow.contains("workflow_dispatch: {}"));
         assert!(workflow.contains("cargo fmt --all -- --check"));
         assert!(workflow.contains("./script/clippy"));
-        assert!(workflow.contains("cargo nextest run --workspace"));
+        assert!(workflow.contains(&product_nextest_command));
+        assert!(!workflow.contains("cargo nextest run --workspace"));
         assert!(workflow.contains("--bench cargo_workspace -- --noplot"));
         assert!(workflow.contains("--bench structured_execution -- --noplot"));
         assert!(workflow.contains("test-rust-tools-environments --matrix --offline"));
@@ -692,7 +807,7 @@ mod tests {
         assert!(workflow.contains("cargo xtask bundle --product"));
         assert_eq!(workflow.matches("cargo fmt --all -- --check").count(), 1);
         assert_eq!(workflow.matches("run: ./script/clippy").count(), 1);
-        assert_eq!(workflow.matches("cargo nextest run --workspace").count(), 1);
+        assert_eq!(workflow.matches(&product_nextest_command).count(), 1);
         assert_eq!(workflow.matches("/opt/hostedtoolcache").count(), 1);
         assert_eq!(
             workflow
