@@ -2,7 +2,7 @@ use gh_workflow::{Container, Event, Job, Port, PullRequest, Push, Workflow, Work
 
 use crate::tasks::workflows::{
     runners::Platform,
-    steps::{self, CommonPermissionSets, FluentBuilder, named},
+    steps::{self, CommonPermissionSets, FluentBuilder, named, use_clang},
     vars,
 };
 
@@ -50,6 +50,7 @@ pub(crate) fn hosted_collab_tests() -> Workflow {
                     "COLLAB_TEST_DATABASE_URL",
                     "postgres://postgres@localhost/postgres",
                 ))
+                .map(use_clang)
                 .add_service(
                     "postgres",
                     Container::new("postgres:15@sha256:1b92e7a80c021647bf70f5d3eb66066a998e4f5cf43c07bb9dc9f729782cf88e")
@@ -96,6 +97,8 @@ mod tests {
         assert!(workflow.contains("postgres://postgres@localhost/postgres"));
         assert!(workflow.contains("5432:5432"));
         assert!(workflow.contains("--health-cmd pg_isready"));
+        assert!(workflow.contains("CC: clang"));
+        assert!(workflow.contains("CXX: clang++"));
         assert!(!workflow.contains("repository_owner"));
         assert!(!workflow.contains("namespace-profile"));
         assert!(!workflow.contains("multiplayer-tools"));
