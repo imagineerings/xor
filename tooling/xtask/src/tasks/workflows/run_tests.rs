@@ -1,5 +1,5 @@
 use gh_workflow::{
-    Container, Event, Job, Port, PullRequest, Push, Run, Step, Strategy, Use, Workflow,
+    Container, Event, Expression, Job, Port, PullRequest, Push, Run, Step, Strategy, Use, Workflow,
     WorkflowDispatch,
 };
 use indexmap::IndexMap;
@@ -21,7 +21,17 @@ use super::{
 };
 
 pub(crate) fn run_tests() -> Workflow {
-    let validation = shared_validation();
+    let shared_clippy = shared_clippy();
+    let rustlings_tests = rustlings_tests();
+    let project_benchmarks = project_benchmarks();
+    let rust_tools_validation = rust_tools_validation();
+    let validation = shared_validation(&[
+        &shared_clippy,
+        &rustlings_tests,
+        &project_benchmarks,
+        &rust_tools_validation,
+    ]);
+    let comfy_backend_validation = comfy_backend_validation();
     let product_smoke = product_smoke(&validation);
 
     named::workflow()
@@ -34,36 +44,254 @@ pub(crate) fn run_tests() -> Workflow {
         .add_env(("CARGO_TERM_COLOR", "always"))
         .add_env(("RUST_BACKTRACE", 1))
         .add_env(("CARGO_INCREMENTAL", 0))
+        .add_job(shared_clippy.name, shared_clippy.job)
+        .add_job(rustlings_tests.name, rustlings_tests.job)
+        .add_job(project_benchmarks.name, project_benchmarks.job)
+        .add_job(rust_tools_validation.name, rust_tools_validation.job)
         .add_job(validation.name, validation.job)
+        .add_job(comfy_backend_validation.name, comfy_backend_validation.job)
         .add_job(product_smoke.name, product_smoke.job)
 }
 
-fn shared_validation() -> NamedJob {
+fn shared_clippy() -> NamedJob {
+    named::job(
+        Job::default()
+            .runs_on("ubuntu-22.04")
+            .timeout_minutes(60u32)
+            .map(use_clang)
+            .add_step(steps::checkout_repo())
+            .add_step(steps::setup_cargo_config(Platform::Linux))
+            .add_step(steps::setup_linux())
+            .add_step(steps::cargo_fmt())
+            .add_step(named::bash("./script/clippy"))
+            .add_step(steps::cleanup_cargo_config(Platform::Linux)),
+    )
+}
+
+const RUST_PRODUCT_ID: &str = "rust";
+const RUST_PRODUCT_TEST_UPDATE_BASE_URL: &str = "http://test.example";
+
+const RUST_PRODUCT_TEST_PACKAGES: &[&str] = &[
+    "agent",
+    "agent_ui",
+    "auto_update",
+    "call",
+    "cargo_ui",
+    "channel",
+    "client",
+    "collab_ui",
+    "editor",
+    "extension_host",
+    "git",
+    "git_ui",
+    "language_model",
+    "language_models",
+    "languages",
+    "project",
+    "remote_server",
+    "settings",
+    "settings_content",
+    "task",
+    "tasks_ui",
+    "terminal",
+    "terminal_view",
+    "worktree",
+    "workspace",
+    "zed",
+];
+
+fn rust_product_nextest_command() -> String {
+    let manifest = ProductManifest::load().expect("product catalog must be valid");
+    let product = manifest
+        .product(RUST_PRODUCT_ID)
+        .expect("Rust product must exist");
+    let features = product
+        .cargo_features
+        .iter()
+        .map(|feature| format!("zed/{feature}"))
+        .chain(
+            product
+                .remote_server_features
+                .iter()
+                .map(|feature| format!("remote_server/{feature}")),
+        )
+        .collect::<Vec<_>>()
+        .join(",");
+    let packages = RUST_PRODUCT_TEST_PACKAGES
+        .iter()
+        .map(|package| format!("-p {package}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    format!(
+        "cargo nextest run --no-fail-fast --no-tests=warn --no-default-features --features {features} {packages}"
+    )
+}
+
+fn rustlings_tests() -> NamedJob {
     named::job(
         Job::default()
             .runs_on("ubuntu-22.04")
             .timeout_minutes(90u32)
+            .add_env(("CARGO_PROFILE_TEST_DEBUG", 0))
+            .add_env(("ZED_PRODUCT_ID", RUST_PRODUCT_ID))
+            .add_env((
+                "ZED_PRODUCT_UPDATE_BASE_URL",
+                RUST_PRODUCT_TEST_UPDATE_BASE_URL,
+            ))
             .map(use_clang)
             .add_step(steps::checkout_repo())
+            .add_step(steps::free_linux_disk_space())
             .add_step(steps::setup_cargo_config(Platform::Linux))
             .map(steps::install_linux_dependencies)
             .add_step(steps::setup_node())
             .add_step(steps::cargo_install_nextest())
-            .add_step(steps::cargo_fmt())
-            .add_step(named::bash("./script/clippy"))
-            .add_step(named::bash(
-                "cargo nextest run --workspace --no-fail-fast --no-tests=warn",
-            ))
+            .add_step(named::bash(rust_product_nextest_command()))
+            .add_step(steps::cleanup_cargo_config(Platform::Linux)),
+    )
+}
+
+fn project_benchmarks() -> NamedJob {
+    named::job(
+        Job::default()
+            .runs_on("ubuntu-22.04")
+            .timeout_minutes(75u32)
+            .map(use_clang)
+            .add_step(steps::checkout_repo())
+            .add_step(steps::setup_cargo_config(Platform::Linux))
+            .add_step(steps::setup_linux())
             .add_step(named::bash(
                 "cargo bench -p project --features cargo-workspace --bench cargo_workspace -- --noplot",
             ))
             .add_step(named::bash(
                 "cargo bench -p project --features structured-execution --bench structured_execution -- --noplot",
             ))
+            .add_step(steps::cleanup_cargo_config(Platform::Linux)),
+    )
+}
+
+fn rust_tools_validation() -> NamedJob {
+    named::job(
+        Job::default()
+            .runs_on("ubuntu-22.04")
+            .timeout_minutes(45u32)
+            .map(use_clang)
+            .add_step(steps::checkout_repo())
+            .add_step(steps::setup_cargo_config(Platform::Linux))
+            .add_step(steps::setup_linux())
+            .add_step(named::bash("cargo fetch --locked"))
             .add_step(named::bash(
                 "./script/test-rust-tools-environments --matrix --offline",
             ))
             .add_step(steps::cleanup_cargo_config(Platform::Linux)),
+    )
+}
+
+fn shared_validation(workers: &[&NamedJob]) -> NamedJob {
+    let worker_names = workers
+        .iter()
+        .map(|worker| worker.name.clone())
+        .collect::<Vec<_>>();
+    let check_results = workers.iter().fold(
+        named::bash(indoc::indoc! {r#"
+            exit_code=0
+            for result in "$SHARED_CLIPPY_RESULT" "$RUSTLINGS_TESTS_RESULT" "$PROJECT_BENCHMARKS_RESULT" "$RUST_TOOLS_VALIDATION_RESULT"; do
+                if [[ "$result" != "success" ]]; then
+                    exit_code=1
+                fi
+            done
+            exit "$exit_code"
+        "#}),
+        |step, worker| {
+            step.add_env((
+                format!("{}_RESULT", worker.name.to_uppercase()),
+                format!("${{{{ needs.{}.result }}}}", worker.name),
+            ))
+        },
+    );
+
+    named::job(
+        Job::default()
+            .needs(worker_names)
+            .cond(Expression::new("${{ always() }}"))
+            .runs_on("ubuntu-22.04")
+            .timeout_minutes(5u32)
+            .add_step(check_results),
+    )
+}
+
+fn comfy_backend_validation() -> NamedJob {
+    let include = vec![
+        json!({
+            "platform": "linux",
+            "runner": "ubuntu-22.04",
+        }),
+        json!({
+            "platform": "macos",
+            "runner": "macos-15",
+        }),
+        json!({
+            "platform": "windows",
+            "runner": "windows-2022",
+        }),
+    ];
+
+    named::job(
+        Job::default()
+            .runs_on("${{ matrix.runner }}")
+            .timeout_minutes(60u32)
+            .strategy(
+                Strategy::default()
+                    .fail_fast(false)
+                    .matrix(json!({ "include": include })),
+            )
+            .add_step(steps::checkout_repo())
+            .add_step(
+                steps::enable_windows_long_paths()
+                    .if_condition(Expression::new("matrix.platform == 'windows'")),
+            )
+            .add_step(
+                steps::setup_cargo_config(Platform::Linux)
+                    .if_condition(Expression::new("matrix.platform == 'linux'")),
+            )
+            .add_step(
+                steps::setup_cargo_config(Platform::Mac)
+                    .if_condition(Expression::new("matrix.platform == 'macos'")),
+            )
+            .add_step(
+                steps::setup_cargo_config(Platform::Windows)
+                    .if_condition(Expression::new("matrix.platform == 'windows'")),
+            )
+            .add_step(
+                named::bash(
+                    "cargo clippy --release --all-targets --all-features -p comfy_backend_corex -p comfy_backend_cuda -p comfy_backend_directml -p comfy_backend_metal -p comfy_backend_mlu -p comfy_backend_npu -p comfy_backend_rocm -p comfy_backend_xpu -- --deny warnings",
+                )
+                .if_condition(Expression::new("matrix.platform == 'linux'")),
+            )
+            .add_step(
+                named::bash(
+                    "cargo clippy --release --all-targets --all-features -p comfy_backend_metal -- --deny warnings",
+                )
+                .if_condition(Expression::new("matrix.platform == 'macos'")),
+            )
+            .add_step(
+                named::pwsh(
+                    "cargo clippy --release --all-targets --all-features -p comfy_backend_cuda -p comfy_backend_directml -- --deny warnings",
+                )
+                .if_condition(Expression::new("matrix.platform == 'windows'")),
+            )
+            .add_step(
+                steps::cleanup_cargo_config(Platform::Linux)
+                    .if_condition(Expression::new("always() && matrix.platform == 'linux'")),
+            )
+            .add_step(
+                steps::cleanup_cargo_config(Platform::Mac)
+                    .if_condition(Expression::new("always() && matrix.platform == 'macos'")),
+            )
+            .add_step(
+                steps::cleanup_cargo_config(Platform::Windows)
+                    .if_condition(Expression::new("always() && matrix.platform == 'windows'")),
+            ),
     )
 }
 
@@ -363,27 +591,267 @@ fn run_platform_tests_impl(platform: Platform, filter_packages: bool, harden: bo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_yaml::Value;
+
+    fn job<'a>(workflow: &'a Value, name: &str) -> &'a Value {
+        workflow
+            .get("jobs")
+            .and_then(|jobs| jobs.get(name))
+            .unwrap_or_else(|| panic!("missing {name} job"))
+    }
+
+    fn run_commands(job: &Value) -> Vec<&str> {
+        job.get("steps")
+            .and_then(Value::as_sequence)
+            .expect("job steps")
+            .iter()
+            .filter_map(|step| step.get("run").and_then(Value::as_str))
+            .collect()
+    }
+
+    fn needs(job: &Value) -> Vec<&str> {
+        job.get("needs")
+            .and_then(Value::as_sequence)
+            .map(|needs| needs.iter().filter_map(Value::as_str).collect())
+            .unwrap_or_default()
+    }
 
     #[test]
     fn rust_product_ci_has_shared_validation_and_one_smoke_row() -> anyhow::Result<()> {
         let workflow = run_tests()
             .to_string()
             .map_err(|error| anyhow::anyhow!("failed to serialize CI workflow: {error:?}"))?;
+        let parsed: Value = serde_yaml::from_str(&workflow)?;
 
-        assert_eq!(workflow.matches("runs-on:").count(), 2);
+        let worker_names = [
+            "shared_clippy",
+            "rustlings_tests",
+            "project_benchmarks",
+            "rust_tools_validation",
+        ];
+        for worker_name in worker_names {
+            assert!(needs(job(&parsed, worker_name)).is_empty());
+        }
+
+        let shared_validation = job(&parsed, "shared_validation");
+        assert_eq!(needs(shared_validation), worker_names);
+        assert_eq!(
+            shared_validation.get("if").and_then(Value::as_str),
+            Some("${{ always() }}")
+        );
+        let aggregator_commands = run_commands(shared_validation);
+        assert_eq!(aggregator_commands.len(), 1);
+        assert!(aggregator_commands[0].contains("[[ \"$result\" != \"success\" ]]"));
+        assert!(aggregator_commands[0].contains("exit \"$exit_code\""));
+        let aggregator_steps = shared_validation
+            .get("steps")
+            .and_then(Value::as_sequence)
+            .expect("aggregator steps");
+        assert_eq!(aggregator_steps.len(), 1);
+        let aggregator_env = aggregator_steps[0]
+            .get("env")
+            .expect("aggregator result environment");
+        for worker_name in worker_names {
+            let environment_name = format!("{}_RESULT", worker_name.to_uppercase());
+            let expected_result = format!("${{{{ needs.{worker_name}.result }}}}");
+            assert_eq!(
+                aggregator_env
+                    .get(&environment_name)
+                    .and_then(Value::as_str),
+                Some(expected_result.as_str())
+            );
+        }
+
+        assert_eq!(needs(job(&parsed, "product_smoke")), ["shared_validation"]);
+
+        let shared_clippy_commands = run_commands(job(&parsed, "shared_clippy"));
+        assert!(shared_clippy_commands.contains(&"cargo fmt --all -- --check"));
+        assert!(shared_clippy_commands.contains(&"./script/clippy"));
+        let rustlings_test_commands = run_commands(job(&parsed, "rustlings_tests"));
+        let rustlings_disk_cleanup = rustlings_test_commands
+            .iter()
+            .position(|command| {
+                command.contains("sudo swapoff -a")
+                    && command.contains("/opt/hostedtoolcache")
+                    && command.contains("/usr/local/share/boost")
+                    && command.contains("/usr/share/swift")
+                    && command.contains("/opt/az")
+                    && command.contains("/usr/share/miniconda")
+                    && command.contains("/mnt/swapfile")
+            })
+            .expect("Rust product tests should reclaim unused runner disk");
+        let product_nextest_command = rust_product_nextest_command();
+        let rustlings_nextest = rustlings_test_commands
+            .iter()
+            .position(|command| *command == product_nextest_command)
+            .expect("Rust product nextest command");
+        assert!(rustlings_disk_cleanup < rustlings_nextest);
+        assert_eq!(
+            rustlings_test_commands
+                .iter()
+                .filter(|command| command.starts_with("cargo nextest run"))
+                .count(),
+            1
+        );
+        assert_eq!(
+            job(&parsed, "rustlings_tests")
+                .get("env")
+                .and_then(|environment| environment.get("CARGO_PROFILE_TEST_DEBUG"))
+                .and_then(Value::as_str),
+            Some("0")
+        );
+        assert_eq!(
+            job(&parsed, "rustlings_tests")
+                .get("env")
+                .and_then(|environment| environment.get("ZED_PRODUCT_ID"))
+                .and_then(Value::as_str),
+            Some(RUST_PRODUCT_ID)
+        );
+        assert_eq!(
+            job(&parsed, "rustlings_tests")
+                .get("env")
+                .and_then(|environment| environment.get("ZED_PRODUCT_UPDATE_BASE_URL"))
+                .and_then(Value::as_str),
+            Some(RUST_PRODUCT_TEST_UPDATE_BASE_URL)
+        );
+        let product_nextest_arguments = product_nextest_command
+            .split_whitespace()
+            .collect::<Vec<_>>();
+        for package in RUST_PRODUCT_TEST_PACKAGES {
+            assert!(
+                product_nextest_arguments
+                    .windows(2)
+                    .any(|arguments| arguments == ["-p", package]),
+                "Rust product tests must select {package}"
+            );
+        }
+        for baseline_collaboration_package in ["client", "call", "channel", "collab_ui"] {
+            assert!(
+                product_nextest_arguments
+                    .windows(2)
+                    .any(|arguments| { arguments == ["-p", baseline_collaboration_package] }),
+                "baseline desktop collaboration package {baseline_collaboration_package} must remain required"
+            );
+        }
+        assert!(
+            !product_nextest_arguments
+                .windows(2)
+                .any(|arguments| arguments == ["-p", "collab"])
+        );
+        assert!(
+            !product_nextest_arguments
+                .windows(2)
+                .any(|arguments| { arguments[0] == "-p" && arguments[1].starts_with("comfy_") })
+        );
+        assert!(!product_nextest_command.contains("multiplayer-tools"));
+        assert!(
+            product_nextest_command
+                .contains("--features zed/agentic-tools,zed/rust-tools,remote_server/rust-tools")
+        );
+        for worker_name in [
+            "shared_clippy",
+            "project_benchmarks",
+            "rust_tools_validation",
+        ] {
+            assert!(
+                job(&parsed, worker_name)
+                    .get("env")
+                    .and_then(|environment| environment.get("CARGO_PROFILE_TEST_DEBUG"))
+                    .is_none()
+            );
+        }
+        let benchmark_commands = run_commands(job(&parsed, "project_benchmarks"));
+        assert_eq!(
+            job(&parsed, "project_benchmarks")
+                .get("timeout-minutes")
+                .and_then(Value::as_u64),
+            Some(75)
+        );
+        assert!(
+            benchmark_commands
+                .iter()
+                .any(|command| command.contains("--bench cargo_workspace -- --noplot"))
+        );
+        assert!(
+            benchmark_commands
+                .iter()
+                .any(|command| command.contains("--bench structured_execution -- --noplot"))
+        );
+        let rust_tools_commands = run_commands(job(&parsed, "rust_tools_validation"));
+        let rust_tools_fetch = rust_tools_commands
+            .iter()
+            .position(|command| *command == "cargo fetch --locked")
+            .expect("rust-tools dependencies should be fetched on the fresh runner");
+        let rust_tools_offline_validation = rust_tools_commands
+            .iter()
+            .position(|command| {
+                *command == "./script/test-rust-tools-environments --matrix --offline"
+            })
+            .expect("rust-tools offline validation should be generated");
+        assert!(rust_tools_fetch < rust_tools_offline_validation);
+
+        assert_eq!(workflow.matches("runs-on:").count(), 7);
         assert!(workflow.contains("runs-on: ubuntu-22.04"));
+        assert!(workflow.contains("runner: macos-15"));
+        assert!(workflow.contains("runner: windows-2022"));
         assert!(workflow.contains("workflow_dispatch: {}"));
         assert!(workflow.contains("cargo fmt --all -- --check"));
         assert!(workflow.contains("./script/clippy"));
-        assert!(workflow.contains("cargo nextest run --workspace"));
+        assert!(workflow.contains(&product_nextest_command));
+        assert!(!workflow.contains("cargo nextest run --workspace"));
         assert!(workflow.contains("--bench cargo_workspace -- --noplot"));
         assert!(workflow.contains("--bench structured_execution -- --noplot"));
         assert!(workflow.contains("test-rust-tools-environments --matrix --offline"));
         assert!(workflow.contains("application_features: agentic-tools,rust-tools"));
         assert!(workflow.contains("remote_features: rust-tools"));
         assert!(workflow.contains("cargo xtask bundle --product"));
-        assert!(workflow.contains("needs:\n    - shared_validation"));
+        assert_eq!(workflow.matches("cargo fmt --all -- --check").count(), 1);
+        assert_eq!(workflow.matches("run: ./script/clippy").count(), 1);
+        assert_eq!(workflow.matches(&product_nextest_command).count(), 1);
+        assert_eq!(workflow.matches("/opt/hostedtoolcache").count(), 1);
+        assert_eq!(
+            workflow
+                .matches("--bench cargo_workspace -- --noplot")
+                .count(),
+            1
+        );
+        assert_eq!(
+            workflow
+                .matches("--bench structured_execution -- --noplot")
+                .count(),
+            1
+        );
+        assert_eq!(
+            workflow
+                .matches("test-rust-tools-environments --matrix --offline")
+                .count(),
+            1
+        );
+        assert!(workflow.contains("-p comfy_backend_corex"));
+        assert!(workflow.contains("-p comfy_backend_cuda"));
+        assert!(workflow.contains("-p comfy_backend_directml"));
+        assert!(workflow.contains("-p comfy_backend_metal"));
+        assert!(workflow.contains("-p comfy_backend_mlu"));
+        assert!(workflow.contains("-p comfy_backend_npu"));
+        assert!(workflow.contains("-p comfy_backend_rocm"));
+        assert!(workflow.contains("-p comfy_backend_xpu"));
+        assert_eq!(workflow.matches("--all-targets --all-features").count(), 3);
+        assert_eq!(workflow.matches("-- --deny warnings").count(), 3);
+        assert_eq!(
+            workflow
+                .matches("git config --global core.longpaths true")
+                .count(),
+            1
+        );
+        let windows_long_paths = workflow
+            .find("git config --global core.longpaths true")
+            .expect("Windows long-path setup should be generated");
+        let windows_backend_clippy = workflow
+            .find("-p comfy_backend_cuda -p comfy_backend_directml")
+            .expect("Windows backend Clippy command should be generated");
+        assert!(windows_long_paths < windows_backend_clippy);
         assert!(workflow.contains("cancel-in-progress: true"));
+        assert!(!workflow.contains("cargo clean"));
 
         for forbidden in [
             "repository_owner",

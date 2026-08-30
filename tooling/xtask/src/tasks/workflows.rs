@@ -21,6 +21,7 @@ mod extension_bump;
 mod extension_tests;
 mod extension_workflow_rollout;
 mod extensions;
+mod hosted_collab_tests;
 mod nix_build;
 mod publish_extension_cli;
 mod release_nightly;
@@ -216,6 +217,7 @@ fn workflow_files() -> impl IntoIterator<Item = WorkflowFile> {
         WorkflowFile::zed(extension_auto_bump::extension_auto_bump),
         WorkflowFile::zed(extension_tests::extension_tests),
         WorkflowFile::zed(extension_workflow_rollout::extension_workflow_rollout),
+        WorkflowFile::zed(hosted_collab_tests::hosted_collab_tests),
         WorkflowFile::zed(nix_build::nix_build),
         WorkflowFile::zed(publish_extension_cli::publish_extension_cli),
         WorkflowFile::zed(release::release),
@@ -334,7 +336,10 @@ mod tests {
         active_workflow_files.sort();
         archived_workflow_files.sort();
 
-        assert_eq!(active_workflow_files, ["release.yml", "run_tests.yml"]);
+        assert_eq!(
+            active_workflow_files,
+            ["hosted_collab_tests.yml", "release.yml", "run_tests.yml"]
+        );
         assert_eq!(archived_workflow_files.len(), ARCHIVED_ZED_WORKFLOWS.len());
         for workflow_name in ARCHIVED_ZED_WORKFLOWS {
             assert!(archived_workflow_files.contains(&format!("{workflow_name}.yml")));

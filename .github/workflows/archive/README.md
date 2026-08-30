@@ -5,6 +5,7 @@ Workflows placed in this directory are intentionally inactive. GitHub Actions on
 The migration retains only these active workflows:
 
 - `../run_tests.yml` for pull request, push, and merge-queue validation.
+- `../hosted_collab_tests.yml` for manual and path-triggered PostgreSQL-backed hosted Collab validation.
 - `../release.yml` for release builds and publication to GitHub Releases.
 
 ## Archived workflow inventory
@@ -65,7 +66,7 @@ The migration retains only these active workflows:
 
 ## Regenerating workflows
 
-Run `cargo xtask workflows` from the repository root to regenerate active workflows. The generator excludes its archived Zed workflows, so it writes only `run_tests.yml` and `release.yml` to the active Zed workflow directory. It does not overwrite archived copies in this directory. Extension-repository workflow outputs under `extensions/workflows/` are unaffected.
+Run `cargo xtask workflows` from the repository root to regenerate active workflows. The generator excludes its archived Zed workflows, so it writes only `run_tests.yml`, `hosted_collab_tests.yml`, and `release.yml` to the active Zed workflow directory. It does not overwrite archived copies in this directory. Extension-repository workflow outputs under `extensions/workflows/` are unaffected.
 
 The exclusion list is `ARCHIVED_ZED_WORKFLOWS` in `tooling/xtask/src/tasks/workflows.rs`. When an archived generated workflow is intentionally restored, remove its name from that list in the same change. Otherwise regeneration will remove the active generated file and skip recreating it.
 

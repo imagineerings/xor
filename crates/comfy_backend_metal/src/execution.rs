@@ -1,11 +1,7 @@
 use crate::MetalExecutionAbi;
-#[cfg(any(
-    test,
-    feature = "test-support",
-    all(
-        target_os = "macos",
-        any(target_arch = "aarch64", target_arch = "x86_64")
-    )
+#[cfg(all(
+    target_os = "macos",
+    any(target_arch = "aarch64", target_arch = "x86_64")
 ))]
 use crate::{
     MAXIMUM_COMMAND_BUFFERS_PER_STREAM, METAL_ADD_F16_FUNCTION, METAL_ADD_F32_FUNCTION,
@@ -24,7 +20,6 @@ use thiserror::Error;
 static NEXT_RUNTIME_IDENTITY: AtomicU64 = AtomicU64::new(1);
 #[cfg(any(
     test,
-    feature = "test-support",
     all(
         target_os = "macos",
         any(target_arch = "aarch64", target_arch = "x86_64")
@@ -877,7 +872,6 @@ fn bind_execution_contract(contract: &MetalExecutionAbi) -> Result<(), MetalExec
 
 #[cfg(any(
     test,
-    feature = "test-support",
     all(
         target_os = "macos",
         any(target_arch = "aarch64", target_arch = "x86_64")

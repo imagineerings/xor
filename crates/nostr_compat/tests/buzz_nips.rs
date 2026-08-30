@@ -20,10 +20,14 @@ const WIRE_TRACES: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../.agents/specs/collaborative-workspace/fixtures/protocol/wire-traces.json"
 ));
+const PROTOCOL_CATALOG: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../.agents/specs/collaborative-workspace/catalogs/protocol.csv"
+));
 
 struct NipFixture {
     id: &'static str,
-    document: &'static str,
+    document_file: &'static str,
     codec_source: &'static str,
     golden_test: &'static str,
     malformed_test: &'static str,
@@ -33,11 +37,7 @@ macro_rules! nip_fixture {
     ($id:literal, $file:literal, $source:expr, $golden:literal, $malformed:literal) => {
         NipFixture {
             id: $id,
-            document: include_str!(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../projects/buzz/docs/nips/",
-                $file
-            )),
+            document_file: $file,
             codec_source: $source,
             golden_test: $golden,
             malformed_test: $malformed,
@@ -198,13 +198,15 @@ fn buzz_nips_catalog_registers_every_document_and_vector_pair() {
     assert_eq!(registered, expected);
 
     for fixture in NIP_FIXTURES {
+        let document_prefix = format!(
+            "DOC-{}-MD,custom_nip_document,{},,{},projects/buzz/docs/nips/{},",
+            fixture.id, fixture.document_file, fixture.id, fixture.document_file
+        );
         assert!(
-            fixture
-                .document
+            PROTOCOL_CATALOG
                 .lines()
-                .take(10)
-                .any(|line| line.contains(fixture.id)),
-            "{} document has the wrong title",
+                .any(|line| line.starts_with(&document_prefix)),
+            "{} has no pinned protocol document entry",
             fixture.id
         );
         for (class, test_name) in [

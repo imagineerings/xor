@@ -515,7 +515,7 @@ fn interoperability_checker_rejects_missing_or_divergent_observations() {
         .events
         .clone();
     let mut missing = InteropTrace {
-        canonical_events: events.clone(),
+        canonical_events: events,
         observations: vec![InteropObservation::TransportReady],
     };
     assert_eq!(

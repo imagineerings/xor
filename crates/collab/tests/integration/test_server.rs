@@ -179,6 +179,43 @@ impl TestServer {
         self.server.reset(epoch);
     }
 
+    pub async fn create_user(&mut self, name: &str) -> UserId {
+        if let Ok(Some(user)) = self
+            .app_state
+            .user_service
+            .get_user_by_github_login(name)
+            .await
+        {
+            return user.id;
+        }
+
+        let github_user_id = self.next_github_user_id;
+        self.next_github_user_id += 1;
+        let persisted_user = self
+            .app_state
+            .db
+            .create_user(false)
+            .await
+            .expect("persist test user");
+        let user_id = self
+            .app_state
+            .user_service
+            .as_fake()
+            .create_user(
+                persisted_user.user_id,
+                &format!("{name}@example.com"),
+                None,
+                false,
+                NewUserParams {
+                    github_login: name.into(),
+                    github_user_id,
+                },
+            )
+            .await;
+        assert_eq!(persisted_user.user_id, user_id);
+        user_id
+    }
+
     pub async fn create_client(&mut self, cx: &mut TestAppContext, name: &str) -> TestClient {
         const ACCESS_TOKEN: &str = "the-token";
 
@@ -196,42 +233,7 @@ impl TestServer {
 
         let clock = Arc::new(FakeSystemClock::new());
 
-        let (user_id, created) = if let Ok(Some(user)) = self
-            .app_state
-            .user_service
-            .get_user_by_github_login(name)
-            .await
-        {
-            (user.id, false)
-        } else {
-            let github_user_id = self.next_github_user_id;
-            self.next_github_user_id += 1;
-            (
-                self.app_state
-                    .user_service
-                    .as_fake()
-                    .create_user(
-                        &format!("{name}@example.com"),
-                        None,
-                        false,
-                        NewUserParams {
-                            github_login: name.into(),
-                            github_user_id,
-                        },
-                    )
-                    .await,
-                true,
-            )
-        };
-        if created {
-            let persisted_user = self
-                .app_state
-                .db
-                .create_user(false)
-                .await
-                .expect("persist test user");
-            assert_eq!(persisted_user.user_id, user_id);
-        }
+        let user_id = self.create_user(name).await;
 
         let http = FakeHttpClient::create({
             let name = name.to_string();

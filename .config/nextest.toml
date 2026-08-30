@@ -8,11 +8,16 @@ sequential-db-tests = { max-threads = 1 }
 filter = 'package(db)'
 test-group = 'sequential-db-tests'
 
+[[profile.default.overrides]]
+filter = 'package(zed)'
+test-group = 'sequential-db-tests'
+
 # Run slowest tests first.
 #
 [[profile.default.overrides]]
 filter = 'package(worktree) and test(test_random_worktree_changes)'
 priority = 100
+slow-timeout = { period = "300s", terminate-after = 1 }
 
 [[profile.default.overrides]]
 filter = 'package(collab) and (test(random_project_collaboration_tests) or test(random_channel_buffer_tests) or test(test_contact_requests) or test(test_basic_following))'
@@ -24,7 +29,7 @@ priority = 99
 
 # Extended timeouts for tests that were timing out at 60s
 [[profile.default.overrides]]
-filter = 'test(test_rainbow_bracket_highlights) or test(test_wrapped_invisibles_drawing) or test(test_basic_following) or test(test_random_diagnostics_blocks)'
+filter = 'test(test_rainbow_bracket_highlights) or test(test_wrapped_invisibles_drawing) or test(test_basic_following) or test(test_peers_following_each_other) or test(test_random_diagnostics_blocks)'
 slow-timeout = { period = "300s", terminate-after = 1 }
 
 [[profile.default.overrides]]

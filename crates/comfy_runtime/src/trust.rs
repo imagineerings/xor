@@ -7814,7 +7814,7 @@ mod tests {
             ));
         }
 
-        let mut duplicate = valid.clone();
+        let mut duplicate = valid;
         let identity = duplicate
             .symbol_identities
             .get("avcodec_version")

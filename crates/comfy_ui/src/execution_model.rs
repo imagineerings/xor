@@ -1,4 +1,4 @@
-#[cfg(test)]
+#[cfg(all(test, feature = "test-support"))]
 use comfy_runtime::compile_generated_native_prompt;
 use comfy_runtime::{
     AssetAvailability, AssetIdentity, AssetNamespace, AssetService, AttemptEvent, AttemptId,
@@ -933,7 +933,7 @@ impl ExecutionPlanProvider for NativeGeneratedPlanProvider {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "test-support"))]
 pub(crate) fn compile_generated_native_workflow(
     workflow_bytes: &[u8],
     selected_output_nodes: &BTreeSet<NodeId>,

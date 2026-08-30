@@ -117,7 +117,7 @@ pub(crate) const EXECUTION_REQUEST_TRACKING_CAPACITY: usize = 256;
 pub(crate) const EXECUTION_ATTEMPT_TRACKING_CAPACITY: usize = 1_024;
 pub(crate) const EXECUTION_NOTIFICATION_FIFO_CAPACITY: usize = 32;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "test-support"))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct ExecutionSurfaceBoundedCountsForTest {
     pub observed_attempt_states: usize,
@@ -543,7 +543,7 @@ impl ExecutionSurfaceRuntimeState {
             + usize::from(self.coalesced_notification_count > 0)
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "test-support"))]
     pub(crate) fn bounded_counts_for_test(&self) -> ExecutionSurfaceBoundedCountsForTest {
         ExecutionSurfaceBoundedCountsForTest {
             observed_attempt_states: self.observed_attempt_states.len(),
@@ -1379,14 +1379,14 @@ fn effective_memory_label(backend: &comfy_runtime::EffectiveNativeBackendState) 
     )
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "test-support"))]
 pub(crate) fn effective_device_label_for_test(
     backend: &comfy_runtime::EffectiveNativeBackendState,
 ) -> String {
     effective_device_label(backend)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "test-support"))]
 pub(crate) fn effective_memory_label_for_test(
     backend: &comfy_runtime::EffectiveNativeBackendState,
 ) -> String {

@@ -732,6 +732,7 @@ fn main() {
                 app_state.languages.clone(),
                 is_new_install,
                 false,
+                true,
                 cx,
             );
             zed::watch_user_agents_md(app_state.fs.clone(), cx);

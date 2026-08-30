@@ -217,7 +217,7 @@ fn run_visual_tests(project_path: PathBuf, update_baseline: bool) -> Result<()> 
             cx.http_client()
                 .as_fake()
                 .replace_handler(|old_handler, request| async move {
-                    if request.uri().to_string() == "https://visual-test.invalid/avatar.png" {
+                    if request.uri() == "https://visual-test.invalid/avatar.png" {
                         return Ok(http_client::Response::builder()
                             .status(200)
                             .body(http_client::AsyncBody::from(EMBEDDED_TEST_IMAGE.to_vec()))
@@ -270,6 +270,7 @@ fn run_visual_tests(project_path: PathBuf, update_baseline: bool) -> Result<()> 
             prompt_builder,
             app_state.languages.clone(),
             true,
+            false,
             false,
             cx,
         );
@@ -1154,9 +1155,9 @@ impl WorkspaceSession {
         println!("  Extended collaborative timeline: {prompt}");
     }
 
-    let worktree_paths = project::WorktreePaths::from_folder_paths(&workspace::PathList::new(&[
-        project_path.clone(),
-    ]));
+    let worktree_paths = project::WorktreePaths::from_folder_paths(&workspace::PathList::new(
+        std::slice::from_ref(&project_path),
+    ));
     let metadata = [
         "Trace workspace synchronization",
         "Audit Rust toolchain onboarding",

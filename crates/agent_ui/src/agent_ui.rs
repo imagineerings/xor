@@ -611,6 +611,7 @@ pub fn init(
     language_registry: Arc<LanguageRegistry>,
     is_new_install: bool,
     is_eval: bool,
+    run_startup_migrations: bool,
     cx: &mut App,
 ) {
     agent::ThreadStore::init_global(cx);
@@ -723,21 +724,21 @@ pub fn init(
     })
     .detach();
 
-    // Kick off the one-time migration of non-Default Rules to global
-    // Skills. Test builds keep the old feature-flag deferral because
-    // server flags are never received in `gpui::test` contexts, avoiding
-    // sqlite worker activity that can race with the deterministic scheduler.
-    #[cfg(any(test, feature = "test-support"))]
-    {
-        let fs = fs.clone();
-        cx.on_flags_ready(move |_, cx| {
+    // Deterministic and visual test hosts disable this startup side effect because its
+    // database worker is intentionally outside GPUI's deterministic scheduler.
+    if run_startup_migrations {
+        #[cfg(any(test, feature = "test-support"))]
+        {
+            let fs = fs.clone();
+            cx.on_flags_ready(move |_, cx| {
+                rules_to_skills_migration::migrate_rules_to_skills_if_needed(fs.clone(), cx);
+            })
+            .detach();
+        }
+        #[cfg(not(any(test, feature = "test-support")))]
+        {
             rules_to_skills_migration::migrate_rules_to_skills_if_needed(fs.clone(), cx);
-        })
-        .detach();
-    }
-    #[cfg(not(any(test, feature = "test-support")))]
-    {
-        rules_to_skills_migration::migrate_rules_to_skills_if_needed(fs.clone(), cx);
+        }
     }
 
     maybe_backfill_editor_layout(fs, is_new_install, cx);
