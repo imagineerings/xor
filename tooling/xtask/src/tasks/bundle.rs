@@ -365,9 +365,7 @@ mod tests {
         let script =
             std::fs::read_to_string(workspace_root().join("script/generate-licenses.ps1"))?;
         assert!(script.contains("[System.IO.Path]::GetTempPath()"));
-        assert!(
-            script.contains("cargo install \"cargo-about@$CARGO_ABOUT_VERSION\" --target-dir")
-        );
+        assert!(script.contains("cargo install \"cargo-about@$CARGO_ABOUT_VERSION\" --target-dir"));
         Ok(())
     }
 }
