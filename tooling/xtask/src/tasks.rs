@@ -5,6 +5,7 @@ pub mod licenses;
 pub mod package_conformity;
 pub mod products;
 pub mod publish_gpui;
+pub mod release_version;
 pub mod sandbox_tests;
 pub mod setup_webrtc;
 pub mod web_examples;
