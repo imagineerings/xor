@@ -121,6 +121,8 @@ jobs:
       if: matrix.platform == 'linux'
       run: cargo xtask bundle --product "$PRODUCT_ID" --platform "$PLATFORM" --target "$TARGET"
       env:
+        CC: clang-18
+        CXX: clang++-18
         PRODUCT_ID: ${{ matrix.product }}
         PLATFORM: ${{ matrix.platform }}
         TARGET: ${{ matrix.target }}
