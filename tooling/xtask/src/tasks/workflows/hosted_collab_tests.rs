@@ -50,7 +50,6 @@ pub(crate) fn hosted_collab_tests() -> Workflow {
                     "COLLAB_TEST_DATABASE_URL",
                     "postgres://postgres@localhost/postgres",
                 ))
-                .add_env(("USE_POSTGRES", "true"))
                 .map(use_clang)
                 .add_service(
                     "postgres",
@@ -96,7 +95,7 @@ mod tests {
         assert!(workflow.contains("POSTGRES_HOST_AUTH_METHOD: trust"));
         assert!(workflow.contains("COLLAB_TEST_DATABASE_URL"));
         assert!(workflow.contains("postgres://postgres@localhost/postgres"));
-        assert!(workflow.contains("USE_POSTGRES: 'true'"));
+        assert!(!workflow.contains("USE_POSTGRES"));
         assert!(workflow.contains("5432:5432"));
         assert!(workflow.contains("--health-cmd pg_isready"));
         assert!(workflow.contains("CC: clang"));

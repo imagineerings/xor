@@ -271,6 +271,7 @@ fn run_visual_tests(project_path: PathBuf, update_baseline: bool) -> Result<()> 
             app_state.languages.clone(),
             true,
             false,
+            false,
             cx,
         );
         settings_ui::init(cx);

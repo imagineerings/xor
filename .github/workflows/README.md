@@ -20,7 +20,7 @@ ZED_PRODUCT_ID=rust cargo nextest run --no-default-features \
 
 ### Hosted Collab server
 
-The `collab` package is the hosted collaboration server. Its `collab_tests` integration target requires the `test-support` feature and PostgreSQL. The generated `hosted_collab_tests` workflow provides PostgreSQL 15, sets `USE_POSTGRES=true` so the shared integration server uses it, and runs manually or whenever hosted collaboration paths change:
+The `collab` package is the hosted collaboration server. Its `collab_tests` integration target requires the `test-support` feature and contains both portable tests using their intended default backend and tests that explicitly select PostgreSQL. The generated `hosted_collab_tests` workflow provides PostgreSQL 15 through `COLLAB_TEST_DATABASE_URL` without globally overriding the backend selected by each test, and runs manually or whenever hosted collaboration paths change:
 
 ```sh
 cargo nextest run --package collab --features test-support --test collab_tests \

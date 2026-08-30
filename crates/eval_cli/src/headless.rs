@@ -130,6 +130,7 @@ pub fn init(cx: &mut App) -> Arc<AgentCliAppState> {
         languages.clone(),
         true,
         true,
+        true,
         cx,
     );
 

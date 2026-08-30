@@ -8855,6 +8855,7 @@ mod tests {
                     app_state.languages.clone(),
                     true,
                     false,
+                    false,
                     cx,
                 );
             }
