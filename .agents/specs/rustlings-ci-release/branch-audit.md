@@ -26,6 +26,8 @@ All branches share `e9c18ee76fdb859de401165c3a180527a89f09b2` (root README). Tha
 
 ## Evidence and limitations
 
+The reconciliation also runs the existing Cargo-workspace and structured-execution benchmark configurations as parallel isolated matrix rows. Both exact commands, features, and optimized profiles are preserved, with the complete matrix required by strict aggregation. This removes the previous sequential benchmark critical path without weakening coverage.
+
 All five branch tips passed ordinary CI, but the corresponding release attempts did not establish successful native packaging. The [final release attempt](https://github.com/simtropolis/made/actions/runs/33320838111) failed on absent Linux `clang-18` and Windows extended-length compiler paths. Those failure boundaries are corrected; native release success must still be observed in automatic post-merge runs. No release is manually dispatched as part of this work.
 
 Preserve `main`, `dev`, `rustlings`, all tags, and every local branch. Preserve any codex branch if fresh inspection reveals valuable unmerged work, a new unresolved decision, or active relevant PR work. The table records cleanup eligibility and recovery SHAs, not a claim that deletion has already happened.

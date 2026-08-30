@@ -162,16 +162,24 @@ fn project_benchmarks() -> NamedJob {
         Job::default()
             .runs_on("ubuntu-22.04")
             .timeout_minutes(75u32)
+            .strategy(Strategy::default().fail_fast(false).matrix(json!({
+                "include": [
+                    { "benchmark": "cargo_workspace" },
+                    { "benchmark": "structured_execution" },
+                ],
+            })))
             .map(use_clang)
             .add_step(steps::checkout_repo())
             .add_step(steps::setup_cargo_config(Platform::Linux))
             .add_step(steps::setup_linux())
-            .add_step(named::bash(
-                "cargo bench -p project --features cargo-workspace --bench cargo_workspace -- --noplot",
-            ))
-            .add_step(named::bash(
-                "cargo bench -p project --features structured-execution --bench structured_execution -- --noplot",
-            ))
+            .add_step(
+                named::bash("cargo bench -p project --features cargo-workspace --bench cargo_workspace -- --noplot")
+                    .if_condition(Expression::new("matrix.benchmark == 'cargo_workspace'")),
+            )
+            .add_step(
+                named::bash("cargo bench -p project --features structured-execution --bench structured_execution -- --noplot")
+                    .if_condition(Expression::new("matrix.benchmark == 'structured_execution'")),
+            )
             .add_step(steps::cleanup_cargo_config(Platform::Linux)),
     )
 }
@@ -793,6 +801,42 @@ mod tests {
             );
         }
         let benchmark_commands = run_commands(job(&parsed, "project_benchmarks"));
+        let benchmark_strategy = job(&parsed, "project_benchmarks")
+            .get("strategy")
+            .expect("benchmark matrix strategy");
+        assert_eq!(
+            benchmark_strategy.get("fail-fast").and_then(Value::as_bool),
+            Some(false)
+        );
+        assert_eq!(
+            benchmark_strategy
+                .get("matrix")
+                .and_then(|matrix| matrix.get("include")),
+            Some(&serde_yaml::to_value(json!([
+                { "benchmark": "cargo_workspace" },
+                { "benchmark": "structured_execution" },
+            ]))?)
+        );
+        let benchmark_steps = job(&parsed, "project_benchmarks")
+            .get("steps")
+            .and_then(Value::as_sequence)
+            .expect("benchmark steps");
+        for (feature, benchmark) in [
+            ("cargo-workspace", "cargo_workspace"),
+            ("structured-execution", "structured_execution"),
+        ] {
+            let command = format!(
+                "cargo bench -p project --features {feature} --bench {benchmark} -- --noplot"
+            );
+            let step = benchmark_steps
+                .iter()
+                .find(|step| step.get("run").and_then(Value::as_str) == Some(command.as_str()))
+                .expect("isolated benchmark command");
+            assert_eq!(
+                step.get("if").and_then(Value::as_str),
+                Some(format!("matrix.benchmark == '{benchmark}'").as_str())
+            );
+        }
         assert_eq!(
             job(&parsed, "project_benchmarks")
                 .get("timeout-minutes")

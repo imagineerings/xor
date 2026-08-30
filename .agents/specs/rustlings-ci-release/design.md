@@ -27,6 +27,14 @@ The user explicitly approved automatic releases and automatic tags after the ini
 - Integration: Keep exactly one generator/products/bundle-plan validation worker in `shared_validation`; derive explicit result checks from the same worker list and keep `product_smoke` dependent on the aggregate.
 - Rationale: Generator validation needs no Linux desktop dependency installation. Removing that setup reduces CI time while preserving all validation, shipped-product tests, benchmarks, and backend coverage.
 
+### Parallel isolated benchmark configurations
+
+<!-- impl: tooling/xtask/src/tasks/workflows/run_tests.rs#project_benchmarks -->
+
+- Responsibility: Reduce the CI critical path without changing benchmark coverage or feature configurations.
+- Integration: Expand `project_benchmarks` into two standard hosted-runner matrix rows, retaining `cargo-workspace` with `cargo_workspace` and `structured-execution` with `structured_execution`. Disable fail-fast so both configurations finish; `shared_validation` requires the complete matrix result.
+- Rationale: The preceding successful main run spent 37m51s in sequential benchmarks before the 11m24s product smoke job could start. Parallel isolated runners preserve the same commands and optimization profile at the cost of one additional runner; combining feature flags or weakening coverage is unnecessary.
+
 ### Separate hosted Collab and Comfy coverage
 
 - Responsibility: Preserve collaboration and accelerator-backend coverage outside the Rust-product package list.
@@ -77,7 +85,7 @@ The user explicitly approved automatic releases and automatic tags after the ini
 | 1.5 | Separate hosted Collab and Comfy coverage | Hosted workflow generator test and YAML inspection |
 | 1.6, 1.7 | Separate hosted Collab and Comfy coverage | Comfy matrix assertions and forbidden-reference scans |
 | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.9 | Automatic release and tag policy; generator and catalog ownership | Release/version tests, matrix/artifact/permission inspection, bundle dry runs |
-| 2.10 | CI worker and strict aggregation graph | One lightweight validation worker, no desktop setup, all original worker coverage retained |
+| 2.10 | CI worker and strict aggregation graph; parallel isolated benchmark configurations | One lightweight validation worker, no desktop setup, exact benchmark matrix rows, all original worker coverage retained |
 | 2.8 | Linux compiler selection; Windows release hardening | Generated environment assertions and Windows bundle regression tests |
 | 3.1, 3.2, 3.3, 3.4 | Generator and catalog ownership | Product check, generated metadata comparison, platform bundle-plan dry runs |
 | 4.1, 4.2, 4.3, 4.4 | Generator and catalog ownership | Workflow generation, check-workflows, full xtask tests |

@@ -132,6 +132,15 @@ First establish stable Rustlings package naming, then replace the active CI and 
     - _Validation: exact tree comparisons, branch/PR inventory, fresh inspected remote tips, and a recorded expected-SHA deletion safeguard; actual cleanup follows the external landing gate_
     - _Evidence: Refreshed all origin branches; all five codex tips exactly match their merged main squash trees, and PRs 6–10 are merged with no open codex PRs. Full recovery SHAs, dependencies, semantic adaptations, and conditional deletion rationales are recorded in branch-audit.md._
 
+  - [x] 3.4. Parallelize isolated benchmark configurations without reducing coverage
+    - Keep both benchmark targets, exact feature configurations, and optimized profiles while running them on separate hosted-runner matrix rows.
+    - _Requirements: 1.1, 1.3, 1.4, 2.10, 4.1, 4.3, 4.4_
+    - _Depends on: 3.2_
+    - _Reads: tooling/xtask/src/tasks/workflows/run_tests.rs, crates/project/Cargo.toml_
+    - _Writes: tooling/xtask/src/tasks/workflows/run_tests.rs, .github/workflows/run_tests.yml_
+    - _Validation: focused/full xtask tests, generated matrix and strict barrier inspection, workflow freshness, formatting, focused/full Clippy_
+    - _Evidence: All 28 xtask tests, workflow regeneration/checks, product check, formatting, focused/full warning-denied Clippy, and parsed YAML inspection passed. Both exact feature/benchmark pairs are separate matrix rows with fail-fast disabled; the complete matrix remains required by shared_validation._
+
 ## Authorized external landing and cleanup
 
 After committing the local reconciliation, require PR #11 checks to pass and verify its merge before deleting any eligible remote branch. Immediately before each deletion, recheck the remote tip and relevant open PRs and use the exact recorded SHA as a deletion lease. Preserve changed tips for re-audit. Report merge/check evidence and actual deletion results separately; do not manually dispatch releases, alter protections, or delete main/dev/rustlings, tags, or local branches.

@@ -52,7 +52,7 @@ The Rust product shares a large Zed workspace, but its CI and releases must rema
 7. **2.7** IF signing credentials are absent, THEN the platform bundle plan SHALL retain unsigned or ad-hoc output; no credentials SHALL be embedded in repository data or generated YAML.
 8. **2.8** THE Linux and Windows bundle environments SHALL select native compilers that exist on their hosted runners and SHALL avoid passing unsupported extended-length output paths to MSVC build scripts.
 9. **2.9** WHEN all platform builds succeed for an automatically selected main commit, THEN THE publisher SHALL create the next semantic `rust-vX.Y.Z` tag and release automatically; reruns SHALL reuse an existing matching commit tag, and stale or conflicting release decisions SHALL fail before publication.
-10. **2.10** THE CI SHALL retain concurrent focused workers, one generator-validation worker without unrelated platform setup, and strict result aggregation without duplicate validation jobs.
+10. **2.10** THE CI SHALL retain concurrent focused workers, one generator-validation worker without unrelated platform setup, parallel isolated Cargo-workspace and structured-execution benchmark configurations, and strict result aggregation requiring every matrix row without duplicate validation jobs.
 
 ### Requirement 3: Centralized product and packaging identity
 
