@@ -359,4 +359,13 @@ mod tests {
         assert_ne!(channel_windows_installer_id(stable, "preview")?, stable);
         Ok(())
     }
+
+    #[test]
+    fn windows_license_tool_uses_an_isolated_short_target_directory() -> Result<()> {
+        let script =
+            std::fs::read_to_string(workspace_root().join("script/generate-licenses.ps1"))?;
+        assert!(script.contains("[System.IO.Path]::GetTempPath()"));
+        assert!(script.contains("cargo install \"cargo-about@$CARGO_ABOUT_VERSION\" --target-dir"));
+        Ok(())
+    }
 }
