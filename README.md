@@ -12,8 +12,8 @@ and the editor, terminal, Git, debugger, extension, remote-development, and
 collaboration foundations inherited from Zed.
 
 Made is under active development. This repository is currently source-first;
-release automation publishes Copper artifacts from `rust-v*` tags when a
-release is cut.
+after required CI succeeds on `main`, release automation publishes Copper
+artifacts for the exact commit that passed the test workflow.
 
 ## What is implemented
 
@@ -163,6 +163,46 @@ cargo xtask products --check
 cargo xtask workflows
 cargo xtask check-workflows
 ```
+
+## Releases
+
+Copper is currently the only enabled release product. A successful
+[`run_tests`](./.github/workflows/run_tests.yml) run on `main` starts the
+generated [`release`](./.github/workflows/release.yml) workflow for that exact
+tested commit. The workflow builds all three supported bundles before it
+creates an annotated `rust-vX.Y.Z` tag and a GitHub Release named
+`Copper X.Y.Z`; a failed or incomplete build publishes neither.
+
+With no existing `rust-v*` tag, the first automatic release uses the version in
+`crates/zed/Cargo.toml`. Later automatic releases increment the latest release's
+patch version. To request a manual minor or major release from `main`:
+
+```sh
+gh workflow run release.yml --ref main -f bump=minor
+gh workflow run release.yml --ref main -f bump=major
+```
+
+Manual recovery can select an exact stable version and commit on `main`:
+
+```sh
+gh workflow run release.yml --ref main \
+  -f bump=patch \
+  -f version=<X.Y.Z> \
+  -f commit_sha=<FULL_COMMIT_SHA>
+```
+
+Release operations are serialized. A rerun reuses an existing tag when it
+already points to the selected commit and updates or completes the associated
+release; it never moves a conflicting tag. Manually pushed `rust-v*` tags
+remain supported when they identify a commit contained in `main`.
+
+Release signing uses the bundle command's `auto` policy. Complete macOS or
+Windows credential sets produce signed artifacts; otherwise macOS uses ad-hoc
+signing and Windows remains unsigned rather than failing the release. The
+required secret names are listed in
+[Product Flavors](./docs/src/development/product-flavors.md#signing), and
+release-operation details are in the
+[workflow documentation](./.github/workflows/README.md#copper-releases).
 
 Use `./script/clippy`, not `cargo clippy` directly. Add focused tests for the
 crate you change and preserve the intentional internal Zed terminology. Read

@@ -79,7 +79,9 @@ fn audit_phase_one_consumers() -> Result<()> {
     );
     ensure!(
         release.contains("cargo xtask bundle --product")
-            && release.contains("needs:\n    - product_builds")
+            && release.contains("needs:\n    - prepare_release\n    - product_builds")
+            && release.contains("workflow_run:")
+            && release.contains("github.event.workflow_run.conclusion == 'success'")
             && release.matches("contents: write").count() == 1,
         "release workflow is missing product bundling, all-build fan-in, or minimal permissions"
     );
