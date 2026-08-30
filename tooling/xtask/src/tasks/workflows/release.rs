@@ -180,6 +180,8 @@ fn product_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
             .add_step(
                 named::bash("cargo xtask bundle --product \"$PRODUCT_ID\" --platform \"$PLATFORM\" --target \"$TARGET\"")
                     .if_condition(Expression::new("matrix.platform == 'linux'"))
+                    .add_env(("CC", "clang-18"))
+                    .add_env(("CXX", "clang++-18"))
                     .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
                     .add_env(("PLATFORM", "${{ matrix.platform }}"))
                     .add_env(("TARGET", "${{ matrix.target }}")),
@@ -378,6 +380,8 @@ mod release_workflow_tests {
         assert!(yaml.contains("if-no-files-found: error"));
         assert!(yaml.contains("Expected exactly 3 Copper artifacts"));
         assert!(yaml.contains("git config --global core.longpaths true"));
+        assert!(yaml.contains("CC: clang-18"));
+        assert!(yaml.contains("CXX: clang++-18"));
         assert!(yaml.contains("git tag -a"));
         assert!(yaml.contains("--draft"));
         assert!(yaml.contains("contents: write"));

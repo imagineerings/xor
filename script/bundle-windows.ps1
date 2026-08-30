@@ -77,6 +77,13 @@ $visualStudioShell = Join-Path $visualStudioPath "Common7\Tools\Launch-VsDevShel
 if (-not (Test-Path $visualStudioShell -PathType Leaf)) {
     throw "Visual Studio developer shell was not found at $visualStudioShell"
 }
+$visualStudioCmake = Join-Path $visualStudioPath "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+if (-not (Test-Path $visualStudioCmake -PathType Leaf)) {
+    throw "Visual Studio CMake was not found at $visualStudioCmake"
+}
+# wasmtime-c-api-impl must use a native Windows CMake. An MSYS CMake from Git's
+# PATH interprets absolute Windows output paths incorrectly and leaves wasm.h missing.
+$env:CMAKE = $visualStudioCmake
 Push-Location
 & $visualStudioShell -Arch (Get-VSArch -Arch $Architecture) -HostArch (Get-VSArch -Arch $OSArchitecture)
 Pop-Location

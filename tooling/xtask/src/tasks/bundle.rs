@@ -368,4 +368,12 @@ mod tests {
         assert!(script.contains("cargo install \"cargo-about@$CARGO_ABOUT_VERSION\" --target-dir"));
         Ok(())
     }
+
+    #[test]
+    fn windows_bundle_uses_visual_studio_cmake() -> Result<()> {
+        let script = std::fs::read_to_string(workspace_root().join("script/bundle-windows.ps1"))?;
+        assert!(script.contains("CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe"));
+        assert!(script.contains("$env:CMAKE = $visualStudioCmake"));
+        Ok(())
+    }
 }
