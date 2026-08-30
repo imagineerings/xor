@@ -65,7 +65,7 @@ Maintainers need one declarative product catalog that can produce independently 
 
 #### Acceptance criteria
 
-1. **3.1** WHEN the Phase 1 Rust flavor is built, THEN the `zed` package SHALL be built with exactly the catalog-selected `multiplayer-tools` and `rust-tools` features, agentic support SHALL remain enabled transitively through `multiplayer-tools`, and its remote server SHALL receive only the corresponding Rust tooling feature.
+1. **3.1** WHEN the Phase 1 Rust flavor is built, THEN the `zed` package SHALL be built with exactly the catalog-selected `agentic-tools` and `rust-tools` features, and its remote server SHALL receive only the corresponding `rust-tools` feature.
 2. **3.2** WHEN a product starts with a fresh product namespace, THEN it SHALL apply the catalog's product-default settings, extensions, and language-server ordering below user and project overrides.
 3. **3.3** IF a user removes, disables, or overrides a product default, THEN a later launch or catalog revision SHALL NOT silently restore that default; failed default-extension installation SHALL be visible and retryable.
 4. **3.4** WHEN toolchain onboarding runs, THEN it SHALL report detected and missing product toolchains and offer explicit guidance or user-approved actions without silently installing or modifying system toolchains.

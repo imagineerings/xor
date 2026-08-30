@@ -97,6 +97,10 @@ fn product_builds() -> NamedJob {
             .timeout_minutes(120u32)
             .strategy(Strategy::default().fail_fast(false).matrix(json!({ "include": include })))
             .add_step(steps::checkout_repo().with_ref(PRODUCT_RELEASE_REF))
+            .add_step(
+                steps::enable_windows_long_paths()
+                    .if_condition(Expression::new("matrix.platform == 'windows'")),
+            )
             .add_step(resolve_version)
             .add_step(
                 named::bash("./script/linux && ./script/download-wasi-sdk")
@@ -107,7 +111,9 @@ fn product_builds() -> NamedJob {
                     .if_condition(Expression::new("matrix.platform == 'linux'"))
                     .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
                     .add_env(("PLATFORM", "${{ matrix.platform }}"))
-                    .add_env(("TARGET", "${{ matrix.target }}")),
+                    .add_env(("TARGET", "${{ matrix.target }}"))
+                    .add_env(("CC", "clang"))
+                    .add_env(("CXX", "clang++")),
             )
             .add_step(
                 named::bash("cargo xtask bundle --product \"$PRODUCT_ID\" --platform macos --target \"$TARGET\"")
@@ -362,6 +368,9 @@ mod tests {
         assert!(workflow.contains("target: x86_64-unknown-linux-gnu"));
         assert!(workflow.contains("target: aarch64-apple-darwin"));
         assert!(workflow.contains("target: x86_64-pc-windows-msvc"));
+        assert!(workflow.contains("git config --global core.longpaths true"));
+        assert!(workflow.contains("CC: clang"));
+        assert!(workflow.contains("CXX: clang++"));
         assert!(workflow.contains("needs:\n    - product_builds"));
         assert_eq!(workflow.matches("contents: write").count(), 1);
         let rust = ProductManifest::load()?

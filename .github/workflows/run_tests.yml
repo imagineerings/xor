@@ -147,29 +147,60 @@ jobs:
       run: |
         rm -rf ./../.cargo
     timeout-minutes: 45
+  release_pipeline_validation:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      with:
+        clean: false
+    - name: steps::setup_cargo_config
+      run: |
+        mkdir -p ./../.cargo
+        cp ./.cargo/ci-config.toml ./../.cargo/config.toml
+    - name: steps::setup_linux
+      run: ./script/linux
+    - name: run_tests::release_pipeline_validation
+      run: |
+        cargo test -p xtask
+        cargo xtask workflows
+        git diff --exit-code
+        cargo xtask check-workflows
+        cargo xtask products --check
+        cargo xtask bundle --product rust \
+          --platform linux \
+          --target x86_64-unknown-linux-gnu \
+          --dry-run
+    - name: steps::cleanup_cargo_config
+      if: always()
+      run: |
+        rm -rf ./../.cargo
+    timeout-minutes: 30
   shared_validation:
     needs:
     - shared_clippy
     - rustlings_tests
     - project_benchmarks
     - rust_tools_validation
+    - release_pipeline_validation
     if: ${{ always() }}
     runs-on: ubuntu-22.04
     steps:
     - name: run_tests::shared_validation
       run: |
         exit_code=0
-        for result in "$SHARED_CLIPPY_RESULT" "$RUSTLINGS_TESTS_RESULT" "$PROJECT_BENCHMARKS_RESULT" "$RUST_TOOLS_VALIDATION_RESULT"; do
-            if [[ "$result" != "success" ]]; then
-                exit_code=1
-            fi
-        done
+        if [[ "${SHARED_CLIPPY_RESULT}" != "success" ]]; then exit_code=1; fi
+        if [[ "${RUSTLINGS_TESTS_RESULT}" != "success" ]]; then exit_code=1; fi
+        if [[ "${PROJECT_BENCHMARKS_RESULT}" != "success" ]]; then exit_code=1; fi
+        if [[ "${RUST_TOOLS_VALIDATION_RESULT}" != "success" ]]; then exit_code=1; fi
+        if [[ "${RELEASE_PIPELINE_VALIDATION_RESULT}" != "success" ]]; then exit_code=1; fi
         exit "$exit_code"
       env:
         SHARED_CLIPPY_RESULT: ${{ needs.shared_clippy.result }}
         RUSTLINGS_TESTS_RESULT: ${{ needs.rustlings_tests.result }}
         PROJECT_BENCHMARKS_RESULT: ${{ needs.project_benchmarks.result }}
         RUST_TOOLS_VALIDATION_RESULT: ${{ needs.rust_tools_validation.result }}
+        RELEASE_PIPELINE_VALIDATION_RESULT: ${{ needs.release_pipeline_validation.result }}
     timeout-minutes: 5
   comfy_backend_validation:
     runs-on: ${{ matrix.runner }}

@@ -29,7 +29,8 @@ try {
 
 if ($needsInstall) {
     Write-Host "Installing cargo-about@$CARGO_ABOUT_VERSION..."
-    cargo install "cargo-about@$CARGO_ABOUT_VERSION"
+    $cargoAboutTargetDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "zed-cargo-about-$CARGO_ABOUT_VERSION"
+    cargo install "cargo-about@$CARGO_ABOUT_VERSION" --target-dir $cargoAboutTargetDirectory
 }
 
 Write-Host "Generating cargo licenses"

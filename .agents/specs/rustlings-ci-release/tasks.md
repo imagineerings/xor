@@ -54,3 +54,52 @@ First establish stable Rustlings package naming, then replace the active CI and 
     - _Writes: tooling/xtask/src/tasks/workflows.rs, tooling/xtask/src/tasks/workflows/deploy_docs.rs, tooling/xtask/src/tasks/workflows/steps.rs, tooling/xtask/src/tasks/workflows/vars.rs_
     - _Validation: run focused xtask clippy with warnings denied and regenerate every workflow successfully_
     - _Evidence: `./script/clippy --no-all-features --package xtask` passed with warnings denied, and `cargo xtask workflows` regenerated all configured workflows successfully._
+
+### Milestone 2: Evidence-based pipeline reconciliation
+
+- [x] 2. Reconcile remote CI and release work with the catalog-driven pipeline
+  - [x] 2.1. Audit and disposition every related remote `codex/*` branch
+    - Inspect unique commits, resulting diffs, overlap, dependencies, GitHub checks, and actual release-job outcomes.
+    - Record equivalent/superseding commit trees and reject unrelated README changes or unapproved release-policy expansion.
+    - _Requirements: 5.1, 5.2, 5.3, 5.4_
+    - _Depends on: none_
+    - _Reads: origin/codex/*, tooling/xtask/src/tasks/workflows/, .github/workflows/, products/flavors.toml_
+    - _Writes: .agents/specs/rustlings-ci-release/tasks.md_
+    - _Validation: compare every related branch to rustlings with git log/diff and inspect GitHub check and release-run evidence_
+    - _Evidence: Compared all five remote `codex/*` branches and their unique commits/files to `rustlings`; verified duplicate commit trees, ordinary CI results, and each automatic release attempt. The final Linux run failed on absent `clang-18`, and the final Windows run failed when MSVC received an extended-length absolute product target path._
+  - [x] 2.2. Add concurrent release-pipeline validation without changing release policy
+    - Reuse the existing strict aggregation result check and preserve the Rust-product test package boundary.
+    - Keep hosted Collab and Comfy backend validation separate and intact.
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 4.1, 4.4_
+    - _Depends on: 2.1_
+    - _Reads: tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/hosted_collab_tests.rs_
+    - _Writes: tooling/xtask/src/tasks/workflows/run_tests.rs_
+    - _Validation: run focused run_tests and hosted_collab_tests generator tests and inspect strict dependencies/features_
+    - _Evidence: Added the independent generator/products/bundle-plan worker to the strict aggregation dependency set. Focused and full xtask tests passed; generated YAML retains the shipped-product package boundary, separate hosted Collab workflow, complete Comfy matrix, and `product_smoke` dependency on the strict barrier._
+  - [x] 2.3. Reconcile release generator hardening with hosted-runner toolchains
+    - Enable Windows Git long paths and select the available unversioned Clang toolchain for Linux bundles.
+    - Preserve the tag/manual trigger, catalog matrix, minimal permissions, optional signing, and all-build publish barrier.
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 4.1, 4.4_
+    - _Depends on: 2.1_
+    - _Reads: tooling/xtask/src/tasks/workflows/release.rs, tooling/xtask/src/tasks/workflows/steps.rs_
+    - _Writes: tooling/xtask/src/tasks/workflows/release.rs_
+    - _Validation: run focused release generator tests and inspect generated Linux/Windows steps, permissions, matrix, and fan-in_
+    - _Evidence: Generated release tests and YAML inspection confirm tag/manual triggers, three standard hosted runners, optional signing inputs, Windows long paths, unversioned Linux Clang, one write-permission publish job, and the complete matrix fan-in._
+  - [x] 2.4. Harden Windows product bundling at the demonstrated failure boundaries
+    - Isolate cargo-about installation, use Visual Studio CMake, accept the required Blue Oak license, and keep MSVC build paths repository-relative.
+    - Preserve the catalog-owned output path and internal Zed package names.
+    - _Requirements: 2.2, 2.3, 2.7, 2.8, 3.1, 3.3, 3.4, 5.3, 5.4_
+    - _Depends on: 2.1_
+    - _Reads: tooling/xtask/src/tasks/bundle.rs, script/bundle-windows.ps1, script/generate-licenses.ps1, script/licenses/zed-licenses.toml_
+    - _Writes: tooling/xtask/src/tasks/bundle.rs, script/bundle-windows.ps1, script/generate-licenses.ps1, script/licenses/zed-licenses.toml_
+    - _Validation: run xtask bundle tests, Windows bundle dry-run regression assertions, and inspect resolved output and compiler paths_
+    - _Evidence: Focused regression tests passed for the relative Windows target path, temporary cargo-about target, and Visual Studio CMake selection. The Windows product dry run resolves `target/products/rust`; native Windows execution remains a generated CI responsibility because PowerShell/MSVC are unavailable on the macOS host._
+  - [x] 2.5. Regenerate and validate product and workflow artifacts
+    - Confirm the Rust catalog and generated metadata retain exactly `agentic-tools,rust-tools` plus remote `rust-tools`.
+    - Regenerate workflow YAML from the reconciled generators and run the full requested quality gate.
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 4.4_
+    - _Depends on: 2.2, 2.3, 2.4_
+    - _Reads: products/flavors.toml, crates/product_flavor/generated_product.rs, tooling/xtask/src/tasks/workflows/, script/bundle-linux, script/bundle-mac, script/bundle-windows.ps1_
+    - _Writes: .github/workflows/run_tests.yml, .github/workflows/release.yml, .github/workflows/hosted_collab_tests.yml, .agents/specs/rustlings-ci-release/tasks.md_
+    - _Validation: run the canonical spec validator, cargo fmt, focused and full xtask tests, products check, workflow generation/checks, bundle dry runs, exact Rust release check, focused and full Clippy, YAML inspection, and git diff checks_
+    - _Evidence: On 2026-08-30, both canonical spec validations, `cargo fmt --all -- --check`, focused and full `cargo test -p xtask`, `cargo xtask products --check`, workflow regeneration/checks, Ruby YAML parsing and manual YAML inspection, Linux/macOS shell syntax, three bundle dry runs, the exact release-profile Rust product check, focused/full warning-denied Clippy, and diff checks passed._

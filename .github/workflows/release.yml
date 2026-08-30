@@ -47,6 +47,10 @@ jobs:
       with:
         clean: false
         ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: steps::enable_windows_long_paths
+      if: matrix.platform == 'windows'
+      run: git config --global core.longpaths true
+      shell: pwsh
     - name: release::product_builds
       run: |
         if [[ "$TAG" != rust-v* ]]; then
@@ -66,6 +70,8 @@ jobs:
         PRODUCT_ID: ${{ matrix.product }}
         PLATFORM: ${{ matrix.platform }}
         TARGET: ${{ matrix.target }}
+        CC: clang
+        CXX: clang++
     - name: release::product_builds
       if: matrix.platform == 'macos'
       run: cargo xtask bundle --product "$PRODUCT_ID" --platform macos --target "$TARGET"

@@ -3,7 +3,11 @@
     reason = "the synchronous xtask must wait for the selected platform bundler"
 )]
 
-use std::{env, process::Command};
+use std::{
+    env,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use anyhow::{Context as _, Result, bail, ensure};
 use clap::{Parser, ValueEnum};
@@ -114,7 +118,7 @@ pub fn run(args: BundleArgs) -> Result<()> {
         extension,
     )?;
     let root = workspace_root();
-    let target_dir = root.join("target/products").join(&product.id);
+    let target_dir = product_target_dir(platform, &root, &product.id);
     let display_name = channel_display_name(&product.display_name, &args.channel);
     let bundle_identifier = channel_identifier(&product.bundle_identifier, &args.channel, ".");
     let data_namespace = channel_identifier(&product.data_namespace, &args.channel, "-");
@@ -185,13 +189,27 @@ pub fn run(args: BundleArgs) -> Result<()> {
         .status()
         .context("failed to start platform bundler")?;
     ensure!(status.success(), "platform bundler failed with {status}");
-    let artifact_path = target_dir.join("release").join(&artifact_name);
+    let artifact_root = if target_dir.is_absolute() {
+        target_dir
+    } else {
+        root.join(target_dir)
+    };
+    let artifact_path = artifact_root.join("release").join(&artifact_name);
     ensure!(
         artifact_path.is_file(),
         "platform bundler did not produce expected artifact {}",
         artifact_path.display()
     );
     Ok(())
+}
+
+fn product_target_dir(platform: Platform, root: &Path, product_id: &str) -> PathBuf {
+    let relative = Path::new("target/products").join(product_id);
+    if platform == Platform::Windows {
+        relative
+    } else {
+        root.join(relative)
+    }
 }
 
 fn platform_command(platform: Platform, target: &str) -> Result<Command> {
@@ -337,6 +355,36 @@ mod tests {
         assert!(validate_target(Platform::Macos, "aarch64-apple-darwin").is_ok());
         assert!(validate_target(Platform::Windows, "x86_64-pc-windows-msvc").is_ok());
         assert!(validate_target(Platform::Linux, "aarch64-unknown-linux-gnu").is_err());
+    }
+
+    #[test]
+    fn windows_target_directory_is_relative_for_msvc_tools() {
+        let root = Path::new("/workspace");
+        assert_eq!(
+            product_target_dir(Platform::Windows, root, "rust"),
+            PathBuf::from("target/products/rust")
+        );
+        assert_eq!(
+            product_target_dir(Platform::Linux, root, "rust"),
+            root.join("target/products/rust")
+        );
+    }
+
+    #[test]
+    fn windows_license_tool_uses_an_isolated_short_target_directory() -> Result<()> {
+        let script =
+            std::fs::read_to_string(workspace_root().join("script/generate-licenses.ps1"))?;
+        assert!(script.contains("[System.IO.Path]::GetTempPath()"));
+        assert!(script.contains("cargo install \"cargo-about@$CARGO_ABOUT_VERSION\" --target-dir"));
+        Ok(())
+    }
+
+    #[test]
+    fn windows_bundle_uses_visual_studio_cmake() -> Result<()> {
+        let script = std::fs::read_to_string(workspace_root().join("script/bundle-windows.ps1"))?;
+        assert!(script.contains("CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe"));
+        assert!(script.contains("$env:CMAKE = $visualStudioCMake"));
+        Ok(())
     }
 
     #[test]

@@ -72,9 +72,12 @@ The validator enforces uniqueness across IDs, bundle identifiers, URL schemes, e
 
 The following names are deliberately temporary. Technical identities use flavor IDs rather than these names.
 
+<!-- impl: products/flavors.toml -->
+<!-- impl: crates/product_flavor/generated_product.rs -->
+
 | ID | Status in Phase 1 | Temporary display/executable | Technical identity | Planned focus |
 | --- | --- | --- | --- | --- |
-| `rust` | enabled | Copper / `copper` | `dev.ideflavors.rust`, `ide-rust`, `ide-rust` data, `rust` updates | `multiplayer-tools`, `rust-tools` (with agentic transitively enabled), built-in Rust and rust-analyzer, rustup onboarding, Rust engineer profile |
+| `rust` | enabled | Copper / `copper` | `dev.ideflavors.rust`, `ide-rust`, `ide-rust` data, `rust` updates | `agentic-tools`, `rust-tools`, built-in Rust and rust-analyzer, rustup onboarding, Rust engineer profile |
 | `jvm` | planned | Orbit / `orbit` | `dev.ideflavors.jvm`, `ide-jvm`, `ide-jvm` data, `jvm` updates | future `agentic`, `jvm-tools`, Java/Kotlin extensions and language servers, JDK/build-tool onboarding |
 | `game` | planned | Forge / `forge` | `dev.ideflavors.game`, `ide-game`, `ide-game` data, `game` updates | future `agentic`, `game-tools`, C#/engine extensions and language servers, .NET/engine onboarding |
 
@@ -260,7 +263,7 @@ Implement and validate the `game-tools` boundary, C#/engine extension and langua
 - Unit-test product-aware path functions using injected platform roots rather than mutating process-global home directories.
 - Test URL generation/parsing, registered scheme selection, Linux/macOS socket paths, Windows mutex/pipe IDs, CLI detection, and update metadata rejection for at least two synthetic products and two channels.
 - Test product-default precedence against user/project settings, extension disposition lifecycle, Rust toolchain detection states, and product-instruction ordering relative to personal/project rules.
-- Snapshot `cargo xtask bundle --product rust --dry-run` for every supported target and assert application `multiplayer-tools,rust-tools`, remote `rust-tools`, product-specific target directories, output names, and signing policy.
+- Snapshot `cargo xtask bundle --product rust --dry-run` for every supported target and assert application `agentic-tools,rust-tools`, remote `rust-tools`, product-specific target directories, output names, and signing policy.
 - Run platform packaging smoke jobs that inspect desktop metadata/tar contents, macOS plist/application/DMG metadata, and Windows Inno/installer metadata without requiring signing credentials.
 - Regenerate workflows and assert one shared validation job, only enabled-product smoke rows, the expected product/platform release rows, product-scoped artifacts, minimal permissions, and publish fan-in.
 - Add a coexistence acceptance run that installs or stages Zed plus two synthetic flavor packages against temporary roots and verifies disjoint paths, URL handlers, process identities, and updater metadata.

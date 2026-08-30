@@ -25,11 +25,13 @@ pub(crate) fn run_tests() -> Workflow {
     let rustlings_tests = rustlings_tests();
     let project_benchmarks = project_benchmarks();
     let rust_tools_validation = rust_tools_validation();
+    let release_pipeline_validation = release_pipeline_validation();
     let validation = shared_validation(&[
         &shared_clippy,
         &rustlings_tests,
         &project_benchmarks,
         &rust_tools_validation,
+        &release_pipeline_validation,
     ]);
     let comfy_backend_validation = comfy_backend_validation();
     let product_smoke = product_smoke(&validation);
@@ -48,6 +50,10 @@ pub(crate) fn run_tests() -> Workflow {
         .add_job(rustlings_tests.name, rustlings_tests.job)
         .add_job(project_benchmarks.name, project_benchmarks.job)
         .add_job(rust_tools_validation.name, rust_tools_validation.job)
+        .add_job(
+            release_pipeline_validation.name,
+            release_pipeline_validation.job,
+        )
         .add_job(validation.name, validation.job)
         .add_job(comfy_backend_validation.name, comfy_backend_validation.job)
         .add_job(product_smoke.name, product_smoke.job)
@@ -187,28 +193,50 @@ fn rust_tools_validation() -> NamedJob {
     )
 }
 
+fn release_pipeline_validation() -> NamedJob {
+    named::job(
+        Job::default()
+            .runs_on("ubuntu-22.04")
+            .timeout_minutes(30u32)
+            .add_step(steps::checkout_repo())
+            .add_step(steps::setup_cargo_config(Platform::Linux))
+            .add_step(steps::setup_linux())
+            .add_step(named::bash(indoc::indoc! {r#"
+                cargo test -p xtask
+                cargo xtask workflows
+                git diff --exit-code
+                cargo xtask check-workflows
+                cargo xtask products --check
+                cargo xtask bundle --product rust \
+                  --platform linux \
+                  --target x86_64-unknown-linux-gnu \
+                  --dry-run
+            "#}))
+            .add_step(steps::cleanup_cargo_config(Platform::Linux)),
+    )
+}
+
 fn shared_validation(workers: &[&NamedJob]) -> NamedJob {
     let worker_names = workers
         .iter()
         .map(|worker| worker.name.clone())
         .collect::<Vec<_>>();
-    let check_results = workers.iter().fold(
-        named::bash(indoc::indoc! {r#"
-            exit_code=0
-            for result in "$SHARED_CLIPPY_RESULT" "$RUSTLINGS_TESTS_RESULT" "$PROJECT_BENCHMARKS_RESULT" "$RUST_TOOLS_VALIDATION_RESULT"; do
-                if [[ "$result" != "success" ]]; then
-                    exit_code=1
-                fi
-            done
-            exit "$exit_code"
-        "#}),
-        |step, worker| {
+    let mut check_results_script = String::from("exit_code=0\n");
+    for worker in workers {
+        check_results_script.push_str(&format!(
+            "if [[ \"${{{}_RESULT}}\" != \"success\" ]]; then exit_code=1; fi\n",
+            worker.name.to_uppercase()
+        ));
+    }
+    check_results_script.push_str("exit \"$exit_code\"\n");
+    let check_results = workers
+        .iter()
+        .fold(named::bash(check_results_script), |step, worker| {
             step.add_env((
                 format!("{}_RESULT", worker.name.to_uppercase()),
                 format!("${{{{ needs.{}.result }}}}", worker.name),
             ))
-        },
-    );
+        });
 
     named::job(
         Job::default()
@@ -628,6 +656,7 @@ mod tests {
             "rustlings_tests",
             "project_benchmarks",
             "rust_tools_validation",
+            "release_pipeline_validation",
         ];
         for worker_name in worker_names {
             assert!(needs(job(&parsed, worker_name)).is_empty());
@@ -641,7 +670,6 @@ mod tests {
         );
         let aggregator_commands = run_commands(shared_validation);
         assert_eq!(aggregator_commands.len(), 1);
-        assert!(aggregator_commands[0].contains("[[ \"$result\" != \"success\" ]]"));
         assert!(aggregator_commands[0].contains("exit \"$exit_code\""));
         let aggregator_steps = shared_validation
             .get("steps")
@@ -659,6 +687,10 @@ mod tests {
                     .get(&environment_name)
                     .and_then(Value::as_str),
                 Some(expected_result.as_str())
+            );
+            assert!(
+                aggregator_commands[0]
+                    .contains(&format!("[[ \"${{{environment_name}}}\" != \"success\" ]]"))
             );
         }
 
@@ -752,6 +784,7 @@ mod tests {
             "shared_clippy",
             "project_benchmarks",
             "rust_tools_validation",
+            "release_pipeline_validation",
         ] {
             assert!(
                 job(&parsed, worker_name)
@@ -790,7 +823,26 @@ mod tests {
             .expect("rust-tools offline validation should be generated");
         assert!(rust_tools_fetch < rust_tools_offline_validation);
 
-        assert_eq!(workflow.matches("runs-on:").count(), 7);
+        let release_validation_commands = run_commands(job(&parsed, "release_pipeline_validation"));
+        let release_validation = release_validation_commands
+            .iter()
+            .find(|command| command.contains("cargo test -p xtask"))
+            .expect("release pipeline validation command");
+        for required_command in [
+            "cargo xtask workflows",
+            "git diff --exit-code",
+            "cargo xtask check-workflows",
+            "cargo xtask products --check",
+            "cargo xtask bundle --product rust",
+            "--dry-run",
+        ] {
+            assert!(
+                release_validation.contains(required_command),
+                "release validation must run {required_command}"
+            );
+        }
+
+        assert_eq!(workflow.matches("runs-on:").count(), 8);
         assert!(workflow.contains("runs-on: ubuntu-22.04"));
         assert!(workflow.contains("runner: macos-15"));
         assert!(workflow.contains("runner: windows-2022"));

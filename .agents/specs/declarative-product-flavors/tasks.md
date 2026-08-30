@@ -309,6 +309,15 @@ Phase 1 establishes the catalog and typed identity boundary, migrates only the R
     - _Writes: .agents/specs/declarative-product-flavors/tasks.md_
     - _Validation: run the canonical spec validator, `cargo xtask products --check`, focused product tests, `cargo xtask workflows`, `cargo xtask check-workflows`, `cargo fmt --all -- --check`, `./script/clippy` for changed packages, relevant nextest suites, all available platform package checks, and `git diff --check`; record evidence without enabling future products_
     - _Evidence: Catalog/workflow checks, exact application and remote release checks, product/release-channel/settings/xtask focused tests, focused clippy, formatting, Prettier, Bash syntax, icon inspection, three dry plans, and diff checks passed on 2026-08-25. Windows native packaging remains a generated CI gate because local MSVC/PowerShell tools are unavailable._
+  - [x] 6.6. Reconcile the Rust feature contract and hosted-runner bundle boundaries
+    - Replace the superseded transitive multiplayer feature contract with explicit `agentic-tools,rust-tools` application features and remote `rust-tools`.
+    - Keep the catalog-owned product output while avoiding unsupported compiler/path forms in Linux and Windows release builds.
+    - _Requirements: 3.1, 4.1, 4.2, 4.3, 5.2, 5.3, 5.5, 6.2_
+    - _Depends on: 6.5_
+    - _Reads: products/flavors.toml, tooling/xtask/src/tasks/bundle.rs, tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/release.rs_
+    - _Writes: tooling/xtask/src/tasks/bundle.rs, tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/release.rs, .github/workflows/run_tests.yml, .github/workflows/release.yml_
+    - _Validation: run product checks, workflow generation and validation, all platform bundle dry runs, the exact Rust release check, and focused xtask tests_
+    - _Evidence: On 2026-08-30, catalog/generated-source checks, workflow regeneration/validation, all three product bundle dry runs, the exact Rust release check, focused/full xtask tests, focused/full warning-denied Clippy, formatting, and canonical spec validation passed. The Windows plan now uses repository-relative product output; native PowerShell/MSVC execution remains delegated to the generated Windows runner._
 
 ### Milestone 6: Future JVM flavor
 
