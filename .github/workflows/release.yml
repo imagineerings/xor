@@ -110,6 +110,10 @@ jobs:
       with:
         clean: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: steps::enable_windows_long_paths
+      if: matrix.platform == 'windows'
+      run: git config --global core.longpaths true
+      shell: pwsh
     - name: release::product_builds
       if: matrix.platform == 'linux'
       run: ./script/linux && ./script/download-wasi-sdk
