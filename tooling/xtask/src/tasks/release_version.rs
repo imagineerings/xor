@@ -75,6 +75,10 @@ pub fn run(args: ReleaseVersionArgs) -> Result<()> {
     Ok(())
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "This synchronous git check runs only in the xtask CLI"
+)]
 fn ensure_commit_is_on_main(commit_sha: &str) -> Result<()> {
     let status = Command::new("git")
         .args(["merge-base", "--is-ancestor", commit_sha, "origin/main"])
@@ -198,6 +202,10 @@ fn resolve_release(
     })
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "This synchronous git check runs only in the xtask CLI"
+)]
 fn git_is_ancestor(ancestor: &str, descendant: &str) -> Result<bool> {
     let status = Command::new("git")
         .args(["merge-base", "--is-ancestor", ancestor, descendant])
@@ -262,6 +270,10 @@ fn validate_stable_version(version: &Version) -> Result<()> {
     Ok(())
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "This synchronous git command runs only in the xtask CLI"
+)]
 fn git_output<I, S>(args: I) -> Result<String>
 where
     I: IntoIterator<Item = S>,
