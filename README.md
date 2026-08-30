@@ -1,49 +1,211 @@
-# Zed
+# Made
 
-[![Zed](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/simtropolis/zed/main/assets/badge/v0.json)](https://zed.dev)
-[![CI](https://github.com/simtropolis/zed/actions/workflows/run_tests.yml/badge.svg)](https://github.com/simtropolis/zed/actions/workflows/run_tests.yml)
+[![CI](https://github.com/simtropolis/made/actions/workflows/run_tests.yml/badge.svg)](https://github.com/simtropolis/made/actions/workflows/run_tests.yml)
 
-Welcome to Zed, an open platform for agentic software development. A set of high-performance, multiplayer code editors designed specifically for your main programming language and related technology stack.
+**Made** stands for **Multiplayer Agentic Development Environment**. It is a
+Rust workspace for building focused development environments from a shared,
+Zed-derived editor platform.
 
----
+The currently enabled product is **Copper**, a Rust-focused desktop environment
+with native agent workflows, Rust and `rust-analyzer` defaults, Cargo tooling,
+and the editor, terminal, Git, debugger, extension, remote-development, and
+collaboration foundations inherited from Zed.
 
-### Installation
+Made is under active development. This repository is currently source-first;
+release automation publishes Copper artifacts from `rust-v*` tags when a
+release is cut.
 
-On macOS, Linux, and Windows you can [download Zed directly](https://zed.dev/download) or install Zed via your local package manager ([macOS](https://zed.dev/docs/installation#macos)/[Linux](https://zed.dev/docs/linux#installing-via-a-package-manager)/[Windows](https://zed.dev/docs/windows#package-managers)).
+## What is implemented
 
-Other platforms are not yet available:
+| Area | Current state |
+| --- | --- |
+| Copper (`rust`) | Enabled for Linux x86_64, macOS ARM64, and Windows x86_64 |
+| Editor platform | GPU-accelerated GPUI editor with LSP, Tree-sitter, terminal, Git, debugger, remote development, and WASM extensions |
+| Agentic development | Enabled in Copper through the native agent, ACP, skills, prompt, and language-model crates |
+| Rust development | Built-in Rust support, `rust-analyzer`, Rust toolchain onboarding, a Cargo panel, Cargo actions, test exploration, and a Rust-focused agent profile |
+| Multiplayer workspace | Implemented behind the opt-in `multiplayer-tools` feature; it is not part of the default Copper release profile |
+| Native visual workflows | Comfy-compatible runtime, UI, plugin, model, tensor, worker, and backend crates exist behind opt-in features; they are not part of the current Copper release profile |
+| Orbit (`jvm`) and Forge (`game`) | Catalogued as planned products and deliberately rejected by the build tooling |
 
-- Web ([tracking discussion](https://github.com/simtropolis/zed/discussions/26195))
+Internal crate names and project-local `.zed` configuration paths remain
+unchanged intentionally. Copper has separate application, data, URL-scheme,
+updater, and remote-server identities defined by the product catalog.
 
-### Developing Zed
+## Repository layout
 
-- [Building Zed for macOS](./docs/src/development/macos.md)
-- [Building Zed for Linux](./docs/src/development/linux.md)
-- [Building Zed for Windows](./docs/src/development/windows.md)
+| Path | Purpose |
+| --- | --- |
+| `products/flavors.toml` | Product catalog and enabled/planned product definitions |
+| `crates/zed` | Desktop application entry point and feature composition |
+| `crates/product_flavor` | Generated compile-time product identity |
+| `crates/gpui`, `crates/editor`, `crates/project`, `crates/workspace` | Core UI and editor platform |
+| `crates/agent*`, `crates/acp_*`, `crates/language_model*` | Agent runtime, ACP integration, skills, prompts, and model providers |
+| `crates/cargo_ui`, `crates/tasks_ui` | Copper's Cargo and Rust test workflows |
+| `crates/collaboration_*`, `crates/nostr_compat`, `services/` | Multiplayer workflow, compatibility, relay, and gateway components |
+| `crates/comfy_*` | Opt-in native visual workflow runtime and accelerator backends |
+| `tooling/xtask`, `script/`, `.github/workflows/` | Generation, validation, packaging, and CI automation |
+| `docs/` | mdBook user and development documentation |
+| `.agents/specs/` | Design and implementation records; these are not proof that unfinished features ship |
 
-### Contributing
+## Prerequisites
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for ways you can contribute to Zed.
+- Git.
+- [Rustup](https://rustup.rs/). The repository pins Rust `1.97.1` in
+  [`rust-toolchain.toml`](./rust-toolchain.toml); rustup selects it
+  automatically.
+- Platform build dependencies:
+  - [macOS](./docs/src/development/macos.md): Xcode, Xcode command-line tools,
+    and CMake.
+  - [Linux](./docs/src/development/linux.md): run `./script/linux` to install
+    the distribution-specific native dependencies.
+  - [Windows](./docs/src/development/windows.md): MSVC C++ build tools,
+    Spectre-mitigated libraries, a Windows SDK, and CMake.
 
-Also... we're hiring! Check out our [jobs](https://zed.dev/jobs) page for open roles.
+The supported Copper bundle targets are `x86_64-unknown-linux-gnu`,
+`aarch64-apple-darwin`, and `x86_64-pc-windows-msvc`.
 
-### Licensing
+## Build and run Copper
 
-Zed source code is licensed primarily under GPL-3.0-or-later, with Apache-2.0 components where marked.
+Clone the repository:
 
-License information for third party dependencies must be correctly provided for CI to pass.
+```sh
+git clone https://github.com/simtropolis/made.git
+cd made
+```
 
-We use [`cargo-about`](https://github.com/EmbarkStudios/cargo-about) to automatically comply with open source licenses. If CI is failing, check the following:
+On Linux, install the native dependencies before building:
 
-- Is it showing a `no license specified` error for a crate you've created? If so, add `publish = false` under `[package]` in your crate's Cargo.toml.
-- Is the error `failed to satisfy license requirements` for a dependency? If so, first determine what license the project has and whether this system is sufficient to comply with this license's requirements. If you're unsure, ask a lawyer. Once you've verified that this system is acceptable add the license's SPDX identifier to the `accepted` array in `script/licenses/zed-licenses.toml`.
-- Is `cargo-about` unable to find the license for a dependency? If so, add a clarification field at the end of `script/licenses/zed-licenses.toml`, as specified in the [cargo-about book](https://embarkstudios.github.io/cargo-about/cli/generate/config.html#crate-configuration).
+```sh
+./script/linux
+```
 
-## Sponsorship
+Run the exact enabled Copper feature set:
 
-Zed is developed by **Simtropolis, Inc.**, a for-profit company.
+```sh
+cargo run -p zed --no-default-features --features agentic-tools,rust-tools
+```
 
-If you’d like to financially support the project, you can do so via GitHub Sponsors.
-Sponsorships go directly to Simtropolis and are used as general company revenue.
-There are no perks or entitlements associated with sponsorship.
+The `rust` product is the development default, so `ZED_PRODUCT_ID` does not
+need to be set for this command. Cargo's internal package and binary remain
+named `zed`; the running application's product identity is Copper.
 
+To compile a release build without packaging it:
+
+```sh
+cargo build --release -p zed --no-default-features --features agentic-tools,rust-tools
+```
+
+To inspect the product-aware Linux bundle plan without compiling:
+
+```sh
+cargo xtask bundle --product rust \
+  --platform linux \
+  --target x86_64-unknown-linux-gnu \
+  --dry-run
+```
+
+To build a bundle for the current host, use the product-aware entry point:
+
+```sh
+cargo xtask bundle --product rust
+```
+
+See [Product Flavors](./docs/src/development/product-flavors.md) for target,
+signing, update, and identity details.
+
+### Opt-in multiplayer build
+
+The full Made multiplayer workspace is not enabled in the default Copper
+release manifest. To run it explicitly:
+
+```sh
+cargo run -p zed --no-default-features --features multiplayer-tools,rust-tools
+```
+
+Use the repository's profile checks when changing this boundary:
+
+```sh
+script/check-multiplayer-tools --quick
+```
+
+See [Multiplayer Build Profiles](./docs/src/development/multiplayer-tools.md)
+for the feature boundary and release-equivalent checks.
+
+## Validation and development
+
+Run these checks from the repository root:
+
+```sh
+# Check formatting without modifying files
+cargo fmt --all -- --check
+
+# Run the repository lint entry point
+./script/clippy
+
+# Verify generated product metadata
+cargo xtask products --check
+
+# Run a focused crate test suite
+cargo test -p product_flavor
+```
+
+The required CI suite uses `cargo-nextest` with an explicit package and feature
+matrix rather than treating every deferred or infrastructure-dependent test as
+a passing product gate. See the [workflow scope](./.github/workflows/README.md)
+and [`run_tests.yml`](./.github/workflows/run_tests.yml) for the current commands.
+
+When changing product or workflow definitions, regenerate and verify their
+checked-in outputs:
+
+```sh
+cargo xtask products
+cargo xtask products --check
+cargo xtask workflows
+cargo xtask check-workflows
+```
+
+Use `./script/clippy`, not `cargo clippy` directly. Add focused tests for the
+crate you change and preserve the intentional internal Zed terminology. Read
+[`AGENTS.md`](./AGENTS.md) and [`CONTRIBUTING.md`](./CONTRIBUTING.md) before
+submitting a change.
+
+## Configuration
+
+No environment variables are required for a local Copper debug build.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `ZED_PRODUCT_ID` | No | Compile-time product selection. Defaults to `rust`; `jvm` and `game` currently fail because they are planned. |
+| `ZED_RELEASE_CHANNEL` | No | Selects `dev`, `nightly`, `preview`, or `stable`. Defaults to `crates/zed/RELEASE_CHANNEL`, currently `stable`. |
+| `ZED_PRODUCT_UPDATE_BASE_URL` | No | Enables the product updater for non-development builds. Without it, Copper's updater remains disabled. |
+| `RELEASE_VERSION` | Packaging only | Sets the version used in product artifact names; local dry runs default to `dev`. |
+
+Signing credentials are needed only for signed release bundles. Keep them in
+the environment or CI secrets; the complete macOS and Windows variable lists
+are documented in [Product Flavors](./docs/src/development/product-flavors.md#signing).
+
+## Current limitations
+
+- Copper is the only enabled product. Orbit and Forge are future catalog
+  entries, not runnable applications.
+- The default Copper release includes `agentic-tools` and `rust-tools`, but not
+  `multiplayer-tools` or `comfy`.
+- The Comfy runtime and backend crates are being developed and validated, but
+  the runtime/evidence suite is not yet a Copper product gate.
+- The application updater has no production service unless a build supplies
+  `ZED_PRODUCT_UPDATE_BASE_URL`.
+- Copper's marketing name and `dev.ideflavors.*` bundle identity are explicitly
+  provisional.
+- Some detailed documentation and contribution material still uses upstream
+  Zed terminology. Treat source, manifests, and generated workflows as the
+  authority when they disagree.
+
+## Licensing
+
+The source is primarily licensed under
+[`GPL-3.0-or-later`](./LICENSE-GPL), with
+[`Apache-2.0`](./LICENSE-APACHE) components where marked. Third-party license
+metadata is validated with `cargo-about`; see the repository license files and
+[`CONTRIBUTING.md`](./CONTRIBUTING.md) for contribution requirements.
+
+Made is developed by **Simtropolis, Inc.**
