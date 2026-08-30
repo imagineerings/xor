@@ -26,6 +26,8 @@ enum CliCommand {
     Products(tasks::products::ProductsArgs),
     /// Publishes GPUI and its dependencies to crates.io.
     PublishGpui(tasks::publish_gpui::PublishGpuiArgs),
+    /// Resolves and validates the next Copper release version.
+    ReleaseVersion(tasks::release_version::ReleaseVersionArgs),
     /// Runs the Linux Bubblewrap sandboxing NixOS VM tests.
     SandboxTests(tasks::sandbox_tests::SandboxTestsArgs),
     /// Runs the Windows WSL Bubblewrap sandbox behavior tests.
@@ -51,6 +53,7 @@ fn main() -> Result<()> {
         }
         CliCommand::Products(args) => tasks::products::run(args),
         CliCommand::PublishGpui(args) => tasks::publish_gpui::run_publish_gpui(args),
+        CliCommand::ReleaseVersion(args) => tasks::release_version::run(args),
         CliCommand::SandboxTests(args) => tasks::sandbox_tests::run_sandbox_tests(args),
         CliCommand::WslSandboxTests(args) => tasks::wsl_sandbox_tests::run_wsl_sandbox_tests(args),
         CliCommand::SetupWebrtc(args) => tasks::setup_webrtc::run_setup_webrtc(args),

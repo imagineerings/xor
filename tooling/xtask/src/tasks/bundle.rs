@@ -371,23 +371,6 @@ mod tests {
     }
 
     #[test]
-    fn windows_license_tool_uses_an_isolated_short_target_directory() -> Result<()> {
-        let script =
-            std::fs::read_to_string(workspace_root().join("script/generate-licenses.ps1"))?;
-        assert!(script.contains("[System.IO.Path]::GetTempPath()"));
-        assert!(script.contains("cargo install \"cargo-about@$CARGO_ABOUT_VERSION\" --target-dir"));
-        Ok(())
-    }
-
-    #[test]
-    fn windows_bundle_uses_visual_studio_cmake() -> Result<()> {
-        let script = std::fs::read_to_string(workspace_root().join("script/bundle-windows.ps1"))?;
-        assert!(script.contains("CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe"));
-        assert!(script.contains("$env:CMAKE = $visualStudioCMake"));
-        Ok(())
-    }
-
-    #[test]
     fn channel_identity_matches_runtime_derivation() -> Result<()> {
         assert_eq!(channel_display_name("Product", "stable"), "Product");
         assert_eq!(
@@ -405,6 +388,23 @@ mod tests {
         let stable = "{6D7C1287-4A0E-5F5F-BE2C-8066A31F8761}";
         assert_eq!(channel_windows_installer_id(stable, "stable")?, stable);
         assert_ne!(channel_windows_installer_id(stable, "preview")?, stable);
+        Ok(())
+    }
+
+    #[test]
+    fn windows_license_tool_uses_an_isolated_short_target_directory() -> Result<()> {
+        let script =
+            std::fs::read_to_string(workspace_root().join("script/generate-licenses.ps1"))?;
+        assert!(script.contains("[System.IO.Path]::GetTempPath()"));
+        assert!(script.contains("cargo install \"cargo-about@$CARGO_ABOUT_VERSION\" --target-dir"));
+        Ok(())
+    }
+
+    #[test]
+    fn windows_bundle_uses_visual_studio_cmake() -> Result<()> {
+        let script = std::fs::read_to_string(workspace_root().join("script/bundle-windows.ps1"))?;
+        assert!(script.contains("CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe"));
+        assert!(script.contains("$env:CMAKE = $visualStudioCmake"));
         Ok(())
     }
 }

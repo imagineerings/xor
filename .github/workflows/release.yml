@@ -10,15 +10,78 @@ on:
     - rust-v*
   workflow_dispatch:
     inputs:
-      tag:
-        description: Existing rust-v* tag to publish when the workflow is run manually
-        required: true
+      bump:
+        description: 'Version component for a manual release: patch, minor, or major'
         type: string
+        default: patch
+      version:
+        description: Optional exact X.Y.Z version for manual recovery
+        type: string
+        default: ''
+      commit_sha:
+        description: Optional commit SHA on main; defaults to the selected main commit
+        type: string
+        default: ''
+  workflow_run:
+    types:
+    - completed
+    workflows:
+    - run_tests
+    branches:
+    - main
 permissions:
   contents: read
 jobs:
+  prepare_release:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      with:
+        clean: false
+        fetch-depth: 0
+        fetch-tags: true
+        ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event_name == 'workflow_dispatch' && inputs.commit_sha || github.sha) }}
+    - id: resolve-release
+      name: release::prepare_release
+      run: |
+        git fetch --force origin main --tags
+
+        ARGS=(release-version --commit "$COMMIT_SHA" --bump "$BUMP")
+        if [[ -n "$EXPLICIT_VERSION" ]]; then
+            ARGS+=(--explicit-version "$EXPLICIT_VERSION")
+        fi
+        if [[ -n "$EXISTING_TAG" ]]; then
+            ARGS+=(--existing-tag "$EXISTING_TAG")
+        fi
+        DECISION="$(cargo xtask "${ARGS[@]}")"
+        jq -e '.commit_sha and .version and .tag' <<<"$DECISION" >/dev/null
+        {
+            echo "commit_sha=$(jq -r '.commit_sha' <<<"$DECISION")"
+            echo "version=$(jq -r '.version' <<<"$DECISION")"
+            echo "tag=$(jq -r '.tag' <<<"$DECISION")"
+        } >> "$GITHUB_OUTPUT"
+      env:
+        COMMIT_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event_name == 'workflow_dispatch' && inputs.commit_sha || github.sha) }}
+        BUMP: ${{ github.event_name == 'workflow_dispatch' && inputs.bump || 'patch' }}
+        EXPLICIT_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
+        EXISTING_TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
+    outputs:
+      commit_sha: ${{ steps.resolve-release.outputs.commit_sha }}
+      version: ${{ steps.resolve-release.outputs.version }}
+      tag: ${{ steps.resolve-release.outputs.tag }}
+    timeout-minutes: 15
   product_builds:
+    needs:
+    - prepare_release
     runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    env:
+      RELEASE_VERSION: ${{ needs.prepare_release.outputs.version }}
     strategy:
       matrix:
         include:
@@ -46,20 +109,11 @@ jobs:
       uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
       with:
         clean: false
-        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: steps::enable_windows_long_paths
       if: matrix.platform == 'windows'
       run: git config --global core.longpaths true
       shell: pwsh
-    - name: release::product_builds
-      run: |
-        if [[ "$TAG" != rust-v* ]]; then
-            echo "Release tag must start with rust-v: $TAG" >&2
-            exit 1
-        fi
-        echo "RELEASE_VERSION=${TAG#rust-v}" >> "$GITHUB_ENV"
-      env:
-        TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     - name: release::product_builds
       if: matrix.platform == 'linux'
       run: ./script/linux && ./script/download-wasi-sdk
@@ -109,25 +163,46 @@ jobs:
     timeout-minutes: 120
   publish_product:
     needs:
+    - prepare_release
     - product_builds
     runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      with:
+        clean: false
+        fetch-depth: 0
+        fetch-tags: true
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: release::publish_product
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       with:
         path: release-artifacts
     - name: release::publish_product
       run: |
-        if [[ "$TAG" != rust-v* ]]; then
-            echo "Release tag must start with rust-v: $TAG" >&2
+        git fetch --force origin main --tags
+
+        ARGS=(release-version --commit "$COMMIT_SHA" --bump "$BUMP")
+        if [[ -n "$EXPLICIT_VERSION" ]]; then
+            ARGS+=(--explicit-version "$EXPLICIT_VERSION")
+        fi
+        if [[ -n "$EXISTING_TAG" ]]; then
+            ARGS+=(--existing-tag "$EXISTING_TAG")
+        fi
+        DECISION="$(cargo xtask "${ARGS[@]}")"
+        ACTUAL_COMMIT="$(jq -r '.commit_sha' <<<"$DECISION")"
+        ACTUAL_VERSION="$(jq -r '.version' <<<"$DECISION")"
+        ACTUAL_TAG="$(jq -r '.tag' <<<"$DECISION")"
+        if [[ "$ACTUAL_COMMIT" != "$COMMIT_SHA" || "$ACTUAL_VERSION" != "$VERSION" || "$ACTUAL_TAG" != "$TAG" ]]; then
+            echo "Release state changed while artifacts were building; refusing stale publication" >&2
             exit 1
         fi
 
-        mapfile -t FILES < <(find release-artifacts -type f)
+        mapfile -t FILES < <(find release-artifacts -type f -print | sort)
         if [[ ${#FILES[@]} -ne 3 ]]; then
-            echo "Expected exactly three Rust product artifacts, found ${#FILES[@]}" >&2
+            echo "Expected exactly 3 Copper artifacts, found ${#FILES[@]}" >&2
             exit 1
         fi
         PATTERNS=(
@@ -142,20 +217,51 @@ jobs:
                 exit 1
             fi
         done
-        TITLE="Copper ${TAG#rust-}"
-        if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TITLE"
-            gh release upload "$TAG" "${FILES[@]}" --clobber
+        if git show-ref --verify --quiet "refs/tags/$TAG"; then
+            TAG_COMMIT="$(git rev-parse "$TAG^{commit}")"
+            if [[ "$TAG_COMMIT" != "$COMMIT_SHA" ]]; then
+                echo "Existing tag $TAG points to $TAG_COMMIT, not $COMMIT_SHA" >&2
+                exit 1
+            fi
         else
-            gh release create "$TAG" "${FILES[@]}" --title "$TITLE" --generate-notes --verify-tag
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" "$COMMIT_SHA" -m "Copper $VERSION"
+            git push origin "refs/tags/$TAG"
         fi
+
+        TITLE="Copper $VERSION"
+        if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --draft --title "$TITLE" --generate-notes --verify-tag
+        fi
+
+        mapfile -t REMOTE_NAMES < <(gh release view "$TAG" --json assets --jq '.assets[].name' | sort)
+        for FILE in "${FILES[@]}"; do
+            NAME="$(basename "$FILE")"
+            if ! printf '%s\n' "${REMOTE_NAMES[@]}" | grep -Fxq "$NAME"; then
+                gh release upload "$TAG" "$FILE"
+            fi
+        done
+
+        mapfile -t EXPECTED_NAMES < <(printf '%s\n' "${FILES[@]}" | xargs -n1 basename | sort)
+        mapfile -t REMOTE_NAMES < <(gh release view "$TAG" --json assets --jq '.assets[].name' | sort)
+        if ! diff -u <(printf '%s\n' "${EXPECTED_NAMES[@]}") <(printf '%s\n' "${REMOTE_NAMES[@]}") ; then
+            echo "GitHub Release assets do not exactly match the validated Copper artifacts" >&2
+            exit 1
+        fi
+        gh release edit "$TAG" --title "$TITLE" --draft=false
       env:
-        TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
+        VERSION: ${{ needs.prepare_release.outputs.version }}
+        TAG: ${{ needs.prepare_release.outputs.tag }}
+        BUMP: ${{ github.event_name == 'workflow_dispatch' && inputs.bump || 'patch' }}
+        EXPLICIT_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
+        EXISTING_TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     timeout-minutes: 15
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.ref_name == 'main' && github.sha || 'anysha' }}
-  cancel-in-progress: true
+  group: copper-release
+  cancel-in-progress: false
 defaults:
   run:
     shell: bash -euxo pipefail {0}

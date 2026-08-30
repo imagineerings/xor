@@ -18,8 +18,8 @@ The Rust product shares a large Zed workspace, but its CI and releases must rema
 
 - Merging remote `codex/*` branches wholesale.
 - Renaming internal Zed crates, modules, packages, protocols, or project-local `.zed` paths.
-- Requiring signing credentials, publishing a live release during implementation, merging the pull request, or deleting remote branches.
-- Automatically publishing a release after every successful `run_tests` workflow unless that release policy is separately approved and coordinated with all required workflows.
+- Requiring signing credentials, manually deploying a release during implementation, or deleting remote branches.
+- Removing coverage to reduce CI duration.
 
 ## Requirements
 
@@ -43,7 +43,7 @@ The Rust product shares a large Zed workspace, but its CI and releases must rema
 
 #### Acceptance criteria
 
-1. **2.1** WHEN a `rust-v*` tag or manual dispatch starts the release workflow, THEN THE workflow SHALL build Linux x86_64, macOS ARM64, and Windows x86_64 bundles on matching standard GitHub-hosted runners.
+1. **2.1** WHEN main push CI succeeds, a `rust-v*` tag is pushed, or a manual recovery dispatch starts the release workflow, THEN THE workflow SHALL build Linux x86_64, macOS ARM64, and Windows x86_64 bundles on matching standard GitHub-hosted runners.
 2. **2.2** EVERY platform bundler SHALL receive exactly the catalog-selected application features `agentic-tools,rust-tools` and remote-server feature `rust-tools` through `cargo xtask bundle --product rust`.
 3. **2.3** THE platform matrix, product identity, installer names, and release artifact names SHALL derive from the validated Rust product catalog and generated product metadata.
 4. **2.4** THE publishing job SHALL depend on the complete platform matrix, validate one artifact per supported target, and SHALL NOT run successfully after any failed or cancelled platform build.
@@ -51,6 +51,8 @@ The Rust product shares a large Zed workspace, but its CI and releases must rema
 6. **2.6** THE release workflow SHALL NOT require an organization-owner guard, Namespace or self-hosted runner, external cache, Slack, Sentry, compliance service, hard-coded external repository, or unrelated organization secret.
 7. **2.7** IF signing credentials are absent, THEN the platform bundle plan SHALL retain unsigned or ad-hoc output; no credentials SHALL be embedded in repository data or generated YAML.
 8. **2.8** THE Linux and Windows bundle environments SHALL select native compilers that exist on their hosted runners and SHALL avoid passing unsupported extended-length output paths to MSVC build scripts.
+9. **2.9** WHEN all platform builds succeed for an automatically selected main commit, THEN THE publisher SHALL create the next semantic `rust-vX.Y.Z` tag and release automatically; reruns SHALL reuse an existing matching commit tag, and stale or conflicting release decisions SHALL fail before publication.
+10. **2.10** THE CI SHALL retain concurrent focused workers, one generator-validation worker without unrelated platform setup, and strict result aggregation without duplicate validation jobs.
 
 ### Requirement 3: Centralized product and packaging identity
 
@@ -84,6 +86,7 @@ The Rust product shares a large Zed workspace, but its CI and releases must rema
 2. **5.2** WHEN multiple commits or branches produce the same tree, THEN THE audit SHALL identify the superseding form instead of integrating duplicate histories.
 3. **5.3** IF a remote change passes ordinary CI but its release job still fails, THEN THE integration SHALL either correct the demonstrated failure semantically or reject the change with the observed reason.
 4. **5.4** THE integration SHALL preserve unrelated Rustlings, Comfy, multiplayer, and upstream Zed behavior and SHALL leave unrelated local work untouched.
+5. **5.5** AFTER the reconciled PR is validated and merged, THE cleanup SHALL delete only semantically integrated, superseded, or obsolete remote `codex/*` branches with a recorded full tip SHA, associated PR, rationale, and exact-SHA safeguard; branches with valuable unmerged work or active relevant PRs SHALL remain.
 
 ## Constraints
 

@@ -2,14 +2,14 @@
 
 ## Overview
 
-Retain the current catalog-driven Rust product pipeline and selectively import only the useful hardening from the remote `codex/*` release line. Shared CI remains a parallel worker graph with a strict aggregation job, product smoke remains downstream of that barrier, hosted Collab remains a separate PostgreSQL workflow, and Comfy backend validation remains a separate cross-platform matrix. Releases remain tag/manual driven and expand the enabled Rust product across Linux x86_64, macOS ARM64, and Windows x86_64 before a single write-permission publishing job.
+Retain the current catalog-driven Rust product pipeline and reconcile main's automatic release implementation with the audited platform hardening. Shared CI remains a parallel worker graph with a strict aggregation job, product smoke remains downstream of that barrier, hosted Collab remains a separate PostgreSQL workflow, and Comfy backend validation remains a separate cross-platform matrix. Successful main push CI automatically prepares a semantic release, builds Linux x86_64, macOS ARM64, and Windows x86_64, then creates the tag and publishes through the single write-permission job.
 
-The remote automatic-release implementation is not imported: it attempts publication after `run_tests` alone even though hosted Collab is a separate workflow and the repository has no configured required checks. Actual automatic release runs also failed on every platform sequence inspected. Its useful generator-freshness checks are retained as a concurrent CI worker without changing release policy.
+The user explicitly approved automatic releases and automatic tags after the initial audit. Main's semantic-version selection, serialized release execution, stale-decision guard, tag reuse, and draft-asset verification are retained. Audited Linux compiler and Windows output-path corrections address demonstrated bundle failures. Hosted Collab remains its separate path-scoped workflow; automatic release eligibility is the successful main-push `run_tests` workflow, including product smoke and all Comfy matrix rows.
 
 ## Existing context
 
 - `products/flavors.toml` already selects exactly `agentic-tools,rust-tools` for the Rust application and `rust-tools` for `remote_server`; `crates/product_flavor/generated_product.rs` is the generated runtime copy.
-- `tooling/xtask/src/tasks/workflows/run_tests.rs` already owns four parallel shared workers, a strict `always()` aggregation job, catalog-driven `product_smoke`, and the three-platform Comfy backend matrix.
+- `tooling/xtask/src/tasks/workflows/run_tests.rs` owns five parallel shared workers, a strict `always()` aggregation job, catalog-driven `product_smoke`, and the three-platform Comfy backend matrix.
 - `tooling/xtask/src/tasks/workflows/hosted_collab_tests.rs` owns the separate PostgreSQL-backed Collab workflow.
 - `tooling/xtask/src/tasks/workflows/release.rs` already owns a catalog-generated three-platform matrix followed by `publish_product` with the only `contents: write` permission.
 - `tooling/xtask/src/tasks/bundle.rs` supplies every platform script with resolved product metadata and an isolated product output directory.
@@ -20,12 +20,12 @@ The remote automatic-release implementation is not imported: it attempts publica
 
 ### CI worker and strict aggregation graph
 
-<!-- impl: tooling/xtask/src/tasks/workflows/run_tests.rs#release_pipeline_validation -->
+<!-- impl: tooling/xtask/src/tasks/workflows/run_tests.rs#release_automation_validation -->
 <!-- impl: tooling/xtask/src/tasks/workflows/run_tests.rs#shared_validation -->
 
 - Responsibility: Keep formatting/clippy, Rust-product tests, project benchmarks, Rust-tool environment tests, and release-pipeline generator validation concurrent.
-- Integration: Add the generator/products/bundle-plan validation worker to the existing `shared_validation` dependency list; retain explicit result checking for every worker and keep `product_smoke` dependent on the aggregate.
-- Rationale: Generator freshness is useful remote work, while renaming the shipped-product test job or testing the whole workspace would add churn or cost without coverage benefit.
+- Integration: Keep exactly one generator/products/bundle-plan validation worker in `shared_validation`; derive explicit result checks from the same worker list and keep `product_smoke` dependent on the aggregate.
+- Rationale: Generator validation needs no Linux desktop dependency installation. Removing that setup reduces CI time while preserving all validation, shipped-product tests, benchmarks, and backend coverage.
 
 ### Separate hosted Collab and Comfy coverage
 
@@ -33,15 +33,16 @@ The remote automatic-release implementation is not imported: it attempts publica
 - Integration: Keep `hosted_collab_tests.yml` path-scoped with its PostgreSQL service, and leave the Linux/macOS/Windows Comfy matrix unchanged.
 - Rationale: These systems have platform/service requirements that do not belong in the Rust-product nextest command or its strict shared aggregation barrier.
 
-### Tag/manual release policy
+### Automatic release and tag policy
 
 <!-- impl: tooling/xtask/src/tasks/workflows/release.rs#release -->
 <!-- impl: tooling/xtask/src/tasks/workflows/release.rs#product_builds -->
 <!-- impl: tooling/xtask/src/tasks/workflows/release.rs#publish_product -->
+<!-- impl: tooling/xtask/src/tasks/release_version.rs#resolve_release -->
 
-- Responsibility: Build and publish an explicitly selected `rust-v*` release without partial artifacts.
-- Integration: Preserve the current tag/manual triggers, catalog matrix, per-platform `cargo xtask bundle` calls, upload validation, and publish fan-in.
-- Rationale: Automatic publication after only `run_tests` is a materially different policy, is not coordinated with the separate hosted-Collab workflow, and has no branch-protection required-check gate in the current repository.
+- Responsibility: Automatically select the next semantic version after successful main push CI, build all artifacts, then create the tag and publish without partial releases.
+- Integration: Preserve main's `workflow_run` trigger, tag-push/manual recovery paths, read-only preparation, serialized release group, catalog matrix, exact commit checkout, stale-decision revalidation, tag reuse, and draft asset verification.
+- Rationale: Automatic tags are explicitly requested. Tag creation belongs after every platform build, not during preparation; repeated runs reuse the same commit tag and competing version decisions fail closed.
 
 ### Linux compiler selection
 
@@ -75,13 +76,17 @@ The remote automatic-release implementation is not imported: it attempts publica
 | 1.1, 1.2, 1.3, 1.4 | CI worker and strict aggregation graph | Generator tests and generated dependency inspection |
 | 1.5 | Separate hosted Collab and Comfy coverage | Hosted workflow generator test and YAML inspection |
 | 1.6, 1.7 | Separate hosted Collab and Comfy coverage | Comfy matrix assertions and forbidden-reference scans |
-| 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7 | Tag/manual release policy; generator and catalog ownership | Release generator tests, matrix/artifact/permission inspection, bundle dry runs |
+| 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.9 | Automatic release and tag policy; generator and catalog ownership | Release/version tests, matrix/artifact/permission inspection, bundle dry runs |
+| 2.10 | CI worker and strict aggregation graph | One lightweight validation worker, no desktop setup, all original worker coverage retained |
 | 2.8 | Linux compiler selection; Windows release hardening | Generated environment assertions and Windows bundle regression tests |
 | 3.1, 3.2, 3.3, 3.4 | Generator and catalog ownership | Product check, generated metadata comparison, platform bundle-plan dry runs |
 | 4.1, 4.2, 4.3, 4.4 | Generator and catalog ownership | Workflow generation, check-workflows, full xtask tests |
 | 5.1, 5.2, 5.3, 5.4 | Evidence-based audit and selective implementation | Git diff/commit inspection, GitHub check/run evidence, focused final diff review |
+| 5.5 | Guarded post-merge cleanup | Committed branch-audit record, fresh remote/PR inspection, exact-SHA deletion leases |
 
 ## Testing strategy
+
+<!-- impl: .agents/specs/rustlings-ci-release/branch-audit.md -->
 
 - Validate this spec in canonical mode before and after implementation.
 - Run focused workflow-generator and bundle regression tests, then full `cargo test -p xtask`.

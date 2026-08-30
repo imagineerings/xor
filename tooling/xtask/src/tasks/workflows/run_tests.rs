@@ -22,16 +22,16 @@ use super::{
 
 pub(crate) fn run_tests() -> Workflow {
     let shared_clippy = shared_clippy();
-    let rustlings_tests = rustlings_tests();
+    let copper_tests = copper_tests();
     let project_benchmarks = project_benchmarks();
     let rust_tools_validation = rust_tools_validation();
-    let release_pipeline_validation = release_pipeline_validation();
+    let release_automation_validation = release_automation_validation();
     let validation = shared_validation(&[
         &shared_clippy,
-        &rustlings_tests,
+        &copper_tests,
         &project_benchmarks,
         &rust_tools_validation,
-        &release_pipeline_validation,
+        &release_automation_validation,
     ]);
     let comfy_backend_validation = comfy_backend_validation();
     let product_smoke = product_smoke(&validation);
@@ -47,12 +47,12 @@ pub(crate) fn run_tests() -> Workflow {
         .add_env(("RUST_BACKTRACE", 1))
         .add_env(("CARGO_INCREMENTAL", 0))
         .add_job(shared_clippy.name, shared_clippy.job)
-        .add_job(rustlings_tests.name, rustlings_tests.job)
+        .add_job(copper_tests.name, copper_tests.job)
         .add_job(project_benchmarks.name, project_benchmarks.job)
         .add_job(rust_tools_validation.name, rust_tools_validation.job)
         .add_job(
-            release_pipeline_validation.name,
-            release_pipeline_validation.job,
+            release_automation_validation.name,
+            release_automation_validation.job,
         )
         .add_job(validation.name, validation.job)
         .add_job(comfy_backend_validation.name, comfy_backend_validation.job)
@@ -134,7 +134,7 @@ fn rust_product_nextest_command() -> String {
     )
 }
 
-fn rustlings_tests() -> NamedJob {
+fn copper_tests() -> NamedJob {
     named::job(
         Job::default()
             .runs_on("ubuntu-22.04")
@@ -193,14 +193,13 @@ fn rust_tools_validation() -> NamedJob {
     )
 }
 
-fn release_pipeline_validation() -> NamedJob {
+fn release_automation_validation() -> NamedJob {
     named::job(
         Job::default()
             .runs_on("ubuntu-22.04")
             .timeout_minutes(30u32)
             .add_step(steps::checkout_repo())
             .add_step(steps::setup_cargo_config(Platform::Linux))
-            .add_step(steps::setup_linux())
             .add_step(named::bash(indoc::indoc! {r#"
                 cargo test -p xtask
                 cargo xtask workflows
@@ -653,10 +652,10 @@ mod tests {
 
         let worker_names = [
             "shared_clippy",
-            "rustlings_tests",
+            "copper_tests",
             "project_benchmarks",
             "rust_tools_validation",
-            "release_pipeline_validation",
+            "release_automation_validation",
         ];
         for worker_name in worker_names {
             assert!(needs(job(&parsed, worker_name)).is_empty());
@@ -699,8 +698,8 @@ mod tests {
         let shared_clippy_commands = run_commands(job(&parsed, "shared_clippy"));
         assert!(shared_clippy_commands.contains(&"cargo fmt --all -- --check"));
         assert!(shared_clippy_commands.contains(&"./script/clippy"));
-        let rustlings_test_commands = run_commands(job(&parsed, "rustlings_tests"));
-        let rustlings_disk_cleanup = rustlings_test_commands
+        let copper_test_commands = run_commands(job(&parsed, "copper_tests"));
+        let copper_disk_cleanup = copper_test_commands
             .iter()
             .position(|command| {
                 command.contains("sudo swapoff -a")
@@ -713,34 +712,34 @@ mod tests {
             })
             .expect("Rust product tests should reclaim unused runner disk");
         let product_nextest_command = rust_product_nextest_command();
-        let rustlings_nextest = rustlings_test_commands
+        let copper_nextest = copper_test_commands
             .iter()
             .position(|command| *command == product_nextest_command)
             .expect("Rust product nextest command");
-        assert!(rustlings_disk_cleanup < rustlings_nextest);
+        assert!(copper_disk_cleanup < copper_nextest);
         assert_eq!(
-            rustlings_test_commands
+            copper_test_commands
                 .iter()
                 .filter(|command| command.starts_with("cargo nextest run"))
                 .count(),
             1
         );
         assert_eq!(
-            job(&parsed, "rustlings_tests")
+            job(&parsed, "copper_tests")
                 .get("env")
                 .and_then(|environment| environment.get("CARGO_PROFILE_TEST_DEBUG"))
                 .and_then(Value::as_str),
             Some("0")
         );
         assert_eq!(
-            job(&parsed, "rustlings_tests")
+            job(&parsed, "copper_tests")
                 .get("env")
                 .and_then(|environment| environment.get("ZED_PRODUCT_ID"))
                 .and_then(Value::as_str),
             Some(RUST_PRODUCT_ID)
         );
         assert_eq!(
-            job(&parsed, "rustlings_tests")
+            job(&parsed, "copper_tests")
                 .get("env")
                 .and_then(|environment| environment.get("ZED_PRODUCT_UPDATE_BASE_URL"))
                 .and_then(Value::as_str),
@@ -784,7 +783,7 @@ mod tests {
             "shared_clippy",
             "project_benchmarks",
             "rust_tools_validation",
-            "release_pipeline_validation",
+            "release_automation_validation",
         ] {
             assert!(
                 job(&parsed, worker_name)
@@ -823,7 +822,14 @@ mod tests {
             .expect("rust-tools offline validation should be generated");
         assert!(rust_tools_fetch < rust_tools_offline_validation);
 
-        let release_validation_commands = run_commands(job(&parsed, "release_pipeline_validation"));
+        let release_validation_commands =
+            run_commands(job(&parsed, "release_automation_validation"));
+        assert_eq!(release_validation_commands.len(), 3);
+        assert!(
+            !release_validation_commands
+                .iter()
+                .any(|command| command.contains("./script/linux"))
+        );
         let release_validation = release_validation_commands
             .iter()
             .find(|command| command.contains("cargo test -p xtask"))

@@ -103,3 +103,35 @@ First establish stable Rustlings package naming, then replace the active CI and 
     - _Writes: .github/workflows/run_tests.yml, .github/workflows/release.yml, .github/workflows/hosted_collab_tests.yml, .agents/specs/rustlings-ci-release/tasks.md_
     - _Validation: run the canonical spec validator, cargo fmt, focused and full xtask tests, products check, workflow generation/checks, bundle dry runs, exact Rust release check, focused and full Clippy, YAML inspection, and git diff checks_
     - _Evidence: On 2026-08-30, both canonical spec validations, `cargo fmt --all -- --check`, focused and full `cargo test -p xtask`, `cargo xtask products --check`, workflow regeneration/checks, Ruby YAML parsing and manual YAML inspection, Linux/macOS shell syntax, three bundle dry runs, the exact release-profile Rust product check, focused/full warning-denied Clippy, and diff checks passed._
+
+### Milestone 3: Approved automatic release reconciliation
+
+- [x] 3. Reconcile main with automatic releases and efficient CI
+  - [x] 3.1. Preserve automatic semantic tags and audited bundle fixes
+    - Resolve generator and packaging conflicts semantically, retaining main's automatic release preparation/publication and the audited hosted-runner corrections.
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.4, 5.4_
+    - _Depends on: 2.5_
+    - _Reads: tooling/xtask/src/tasks/release_version.rs, tooling/xtask/src/tasks/workflows/release.rs, tooling/xtask/src/tasks/bundle.rs_
+    - _Writes: tooling/xtask/src/tasks/workflows/release.rs, tooling/xtask/src/tasks/bundle.rs, script/bundle-windows.ps1, script/generate-licenses.ps1_
+    - _Validation: release/version/bundle tests, exact product release check, three bundle plans, focused and full Clippy_
+    - _Evidence: All 28 xtask tests, all three bundle plans, the exact Rust product release check, focused warning-denied xtask Clippy, and full workspace Clippy passed. Automatic tag/version/retry behavior is retained; native cross-platform release execution remains an automatic post-merge check, not a locally dispatched operation._
+  - [x] 3.2. Reconcile concurrent validation and regenerate workflows
+    - Retain one lightweight generator validation worker and all existing product, collaboration, benchmark, Rust-tools, and Comfy coverage.
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 2.10, 4.1, 4.2, 4.3, 4.4_
+    - _Depends on: 3.1_
+    - _Reads: tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/hosted_collab_tests.rs_
+    - _Writes: tooling/xtask/src/tasks/workflows/run_tests.rs, .github/workflows/run_tests.yml, .github/workflows/release.yml_
+    - _Validation: full xtask tests, product check, workflow generation/freshness, formatting, and YAML inspection; PR CI is the external landing gate below_
+    - _Evidence: Full xtask tests, catalog check, workflow generation/checks, formatting, Bash syntax, and YAML parsing passed. Executed the generated strict barrier with all-success and each worker individually failed/cancelled/skipped; only all-success passed. The single generator-validation worker no longer installs desktop Linux dependencies._
+  - [x] 3.3. Record complete branch dispositions and guarded cleanup eligibility
+    - Preserve branches with valuable unmerged work or relevant open PRs; perform authorized remote cleanup only after the reconciled PR is merged.
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+    - _Depends on: 3.2_
+    - _Reads: origin/codex/*, origin/main, .agents/specs/rustlings-ci-release/branch-audit.md_
+    - _Writes: .agents/specs/rustlings-ci-release/branch-audit.md_
+    - _Validation: exact tree comparisons, branch/PR inventory, fresh inspected remote tips, and a recorded expected-SHA deletion safeguard; actual cleanup follows the external landing gate_
+    - _Evidence: Refreshed all origin branches; all five codex tips exactly match their merged main squash trees, and PRs 6–10 are merged with no open codex PRs. Full recovery SHAs, dependencies, semantic adaptations, and conditional deletion rationales are recorded in branch-audit.md._
+
+## Authorized external landing and cleanup
+
+After committing the local reconciliation, require PR #11 checks to pass and verify its merge before deleting any eligible remote branch. Immediately before each deletion, recheck the remote tip and relevant open PRs and use the exact recorded SHA as a deletion lease. Preserve changed tips for re-audit. Report merge/check evidence and actual deletion results separately; do not manually dispatch releases, alter protections, or delete main/dev/rustlings, tags, or local branches.
