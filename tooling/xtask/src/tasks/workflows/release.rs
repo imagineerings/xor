@@ -170,6 +170,10 @@ fn product_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
             .strategy(Strategy::default().fail_fast(false).matrix(json!({ "include": include })))
             .add_step(steps::checkout_repo().with_ref(prepared.commit_sha.to_string()))
             .add_step(
+                steps::enable_windows_long_paths()
+                    .if_condition(Expression::new("matrix.platform == 'windows'")),
+            )
+            .add_step(
                 named::bash("./script/linux && ./script/download-wasi-sdk")
                     .if_condition(Expression::new("matrix.platform == 'linux'")),
             )
@@ -373,6 +377,7 @@ mod release_workflow_tests {
         assert!(yaml.contains("needs:\n    - prepare_release\n    - product_builds"));
         assert!(yaml.contains("if-no-files-found: error"));
         assert!(yaml.contains("Expected exactly 3 Copper artifacts"));
+        assert!(yaml.contains("git config --global core.longpaths true"));
         assert!(yaml.contains("git tag -a"));
         assert!(yaml.contains("--draft"));
         assert!(yaml.contains("contents: write"));
