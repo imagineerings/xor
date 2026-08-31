@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import os
+from pathlib import Path
+import plistlib
+import subprocess
+import tempfile
+
+
+def run(arguments, **kwargs):
+    try:
+        return subprocess.run(arguments, check=True, text=True, timeout=180, **kwargs)
+    except subprocess.CalledProcessError as error:
+        if error.stdout:
+            print(error.stdout, flush=True)
+        if error.stderr:
+            print(error.stderr, flush=True)
+        raise
+
+
+def check_launch(cli, editor, plan, version):
+    output = run([str(cli), "--version"], capture_output=True).stdout.strip()
+    print(output, flush=True)
+    if not output.startswith(f"{plan['display_name']} {version} "):
+        raise RuntimeError(f"Unexpected packaged CLI version: {output}")
+    run([str(editor), "--help"], capture_output=True)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--product", required=True)
+    parser.add_argument("--platform", choices=["linux", "macos", "windows"], required=True)
+    parser.add_argument("--target", required=True)
+    arguments = parser.parse_args()
+    version = os.environ["RELEASE_VERSION"]
+    output = run(
+        ["cargo", "xtask", "bundle", "--product", arguments.product,
+         "--platform", arguments.platform, "--target", arguments.target, "--dry-run"],
+        capture_output=True,
+    )
+    plan = json.loads(output.stdout)
+    artifact = (Path(plan["target_dir"]) / "release" / plan["artifact_name"]).resolve(strict=True)
+    executable = plan["executable_name"]
+
+    with tempfile.TemporaryDirectory(prefix="product-bundle-smoke-") as directory:
+        directory = Path(directory)
+        if arguments.platform == "linux":
+            run(["tar", "-xzf", str(artifact), "-C", str(directory)])
+            application = directory / f"{executable}.app"
+            desktop = application / "share/applications" / f"{plan['bundle_identifier']}.desktop"
+            contents = desktop.read_text()
+            for entry in [f"Name={plan['display_name']}", f"Exec={executable} %U"]:
+                if entry not in contents.splitlines():
+                    raise RuntimeError(f"Missing desktop metadata: {entry}")
+            check_launch(application / "bin" / executable,
+                         application / "libexec" / f"{executable}-editor", plan, version)
+        elif arguments.platform == "macos":
+            mount = directory / "mounted"
+            mount.mkdir()
+            run(["hdiutil", "attach", "-readonly", "-nobrowse", "-mountpoint", str(mount),
+                 str(artifact)], input="Y\n", capture_output=True)
+            try:
+                application = directory / f"{plan['display_name']}.app"
+                run(["ditto", str(mount / application.name), str(application)])
+            finally:
+                run(["hdiutil", "detach", str(mount)])
+            with (application / "Contents/Info.plist").open("rb") as file:
+                metadata = plistlib.load(file)
+            for key, expected in {
+                "CFBundleName": plan["display_name"],
+                "CFBundleIdentifier": plan["bundle_identifier"],
+                "CFBundleExecutable": executable,
+                "CFBundleShortVersionString": version,
+                "CFBundleVersion": version,
+            }.items():
+                if metadata.get(key) != expected:
+                    raise RuntimeError(f"Unexpected {key}: {metadata.get(key)}")
+            run(["codesign", "--verify", "--deep", "--strict", str(application)])
+            check_launch(application / "Contents/MacOS/cli",
+                         application / "Contents/MacOS" / executable, plan, version)
+        else:
+            application = directory / "installed"
+            install_log = directory / "install.log"
+            try:
+                run([str(artifact), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-",
+                     "/TASKS=", f"/DIR={application}", f"/LOG={install_log}"])
+                check_launch(application / "bin" / f"{executable}.exe",
+                             application / f"{executable}.exe", plan, version)
+                if not (application / "tools/auto_update_helper.exe").is_file():
+                    raise RuntimeError("Installed updater is missing")
+            finally:
+                if install_log.is_file():
+                    print(install_log.read_text(encoding="utf-8-sig", errors="replace"), flush=True)
+                uninstaller = application / "unins000.exe"
+                if uninstaller.is_file():
+                    run([str(uninstaller), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"])
+
+    print(f"Verified {artifact.name}: packaged metadata, CLI version, and editor help startup", flush=True)
+
+
+if __name__ == "__main__":
+    main()

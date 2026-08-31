@@ -101,7 +101,11 @@ impl AppVersion {
         let mut version: Version = if let Ok(from_env) = env::var("ZED_APP_VERSION") {
             from_env.parse().expect("invalid ZED_APP_VERSION")
         } else {
-            pkg_version.parse().expect("invalid version in Cargo.toml")
+            option_env!("RELEASE_VERSION")
+                .filter(|version| *version != "dev")
+                .unwrap_or(pkg_version)
+                .parse()
+                .expect("invalid release version")
         };
         let mut pre = String::from(RELEASE_CHANNEL.dev_name());
 

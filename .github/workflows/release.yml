@@ -158,6 +158,20 @@ jobs:
         TIMESTAMP_DIGEST: ${{ secrets.TIMESTAMP_DIGEST }}
         TIMESTAMP_SERVER: ${{ secrets.TIMESTAMP_SERVER }}
     - name: release::product_builds
+      if: matrix.platform != 'windows'
+      run: python3 script/smoke-product-bundle --product "$PRODUCT_ID" --platform "$PLATFORM" --target "$TARGET"
+      env:
+        PRODUCT_ID: ${{ matrix.product }}
+        PLATFORM: ${{ matrix.platform }}
+        TARGET: ${{ matrix.target }}
+    - name: release::product_builds
+      if: matrix.platform == 'windows'
+      run: python script/smoke-product-bundle --product $env:PRODUCT_ID --platform windows --target $env:TARGET
+      shell: pwsh
+      env:
+        PRODUCT_ID: ${{ matrix.product }}
+        TARGET: ${{ matrix.target }}
+    - name: release::product_builds
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: ${{ matrix.artifact }}

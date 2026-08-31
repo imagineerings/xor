@@ -154,7 +154,7 @@ After committing the local reconciliation, require PR #11 checks to pass and ver
     - _Requirements: 1.8, 2.1, 2.2, 2.4, 2.5, 2.7, 2.9, 3.5, 4.1_
     - _Depends on: 3.4_
     - _Reads: products/flavors.toml, tooling/xtask/src/tasks/bundle.rs, crates/auto_update_helper/src/updater.rs_
-    - _Writes: crates/auto_update_helper/src/updater.rs, crates/windows_resources/src/windows_resources.rs, script/bundle-mac, script/bundle-windows.ps1, tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/release.rs, .github/workflows/run_tests.yml, .github/workflows/release.yml_
+    - _Writes: crates/auto_update_helper/src/updater.rs, crates/windows_resources/src/windows_resources.rs, crates/cli/src/main.rs, crates/release_channel/src/lib.rs, script/smoke-product-bundle, script/bundle-mac, script/bundle-windows.ps1, tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/release.rs, .github/workflows/run_tests.yml, .github/workflows/release.yml_
     - _Validation: formatting, xtask tests, workflow freshness, product catalog check, targeted Clippy, native Windows CI, macOS build-script/plist checks, all three release bundles, automatic tag and published asset inspection_
 
 The 2026-08-31 release-repair request separately authorizes scoped commits, pushes, PRs, merging after checks pass, and release reruns through successful publication. It supersedes the earlier restriction on manually dispatching releases for this repair only. Existing tags and published assets must not be moved, deleted, or overwritten; unrelated branch cleanup is postponed.

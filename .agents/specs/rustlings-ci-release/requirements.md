@@ -67,7 +67,7 @@ The Rust product shares a large Zed workspace, but its CI and releases must rema
 3. **3.3** THE Linux, macOS, and Windows bundlers SHALL consume the resolved product plan while retaining internal `zed`, `cli`, `remote_server`, and updater package names.
 4. **3.4** THE final Linux, macOS, and Windows artifact filenames SHALL match the Rust catalog artifact template and supported target architecture.
 
-5. **3.5** THE macOS plist and Windows executable resources SHALL use the selected release version and resolved product identity; native bundlers SHALL reject metadata mismatches before upload.
+5. **3.5** THE macOS plist, Windows executable resources, packaged CLI, and application version SHALL use the selected release version and resolved product identity; native jobs SHALL reject metadata mismatches and failed installed CLI/editor-help smoke checks before upload.
 
 ### Requirement 4: Generated workflow integrity
 
