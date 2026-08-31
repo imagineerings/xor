@@ -164,7 +164,7 @@ fn product_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
         Job::default()
             .needs([prepare.name.clone()])
             .runs_on("${{ matrix.runner }}")
-            .timeout_minutes(120u32)
+            .timeout_minutes(240u32)
             .permissions(Permissions::default().contents(Level::Read))
             .add_env(("RELEASE_VERSION", prepared.version.to_string()))
             .strategy(Strategy::default().fail_fast(false).matrix(json!({ "include": include })))
