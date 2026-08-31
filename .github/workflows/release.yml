@@ -180,7 +180,7 @@ jobs:
     - name: release::product_builds
       if: always() && matrix.platform == 'macos'
       run: df -h . && du -sh target
-    timeout-minutes: 120
+    timeout-minutes: 240
   publish_product:
     needs:
     - prepare_release

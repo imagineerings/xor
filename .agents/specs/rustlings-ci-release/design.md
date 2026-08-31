@@ -81,6 +81,14 @@ The user explicitly approved automatic releases and automatic tags after the ini
 - Artifact verification: Before upload, each native job runs `script/smoke-product-bundle` using the resolved catalog plan. Linux extracts its archive; macOS mounts/copies its DMG and verifies plist/signature metadata; Windows silently installs and uninstalls its installer. Each runs the installed CLI version and editor help startup. This does not certify a graphical session. The macOS CLI uses catalog branding, and application version loading honors the compiled release version before falling back to the crate version.
 - Rationale: Run 33374877495 failed in Windows-only code that Linux tests cannot compile. Its macOS job also reported executable and archive I/O failures; the release generator records architecture, toolchain, and disk usage to distinguish runner failures from source defects without suppressing errors or changing the build profile.
 
+### Complete native build time allowance
+
+<!-- impl: tooling/xtask/src/tasks/workflows/release.rs#product_builds -->
+
+- Responsibility: Let the complete cold native build finish on standard hosted runners without changing optimization, features, signing, or validation coverage.
+- Integration: Give the native product matrix a bounded 240-minute job timeout; retain the 15-minute preparation and publishing deadlines and the complete matrix publish barrier.
+- Evidence: The fresh macOS retry in job 99470946614 compiled the application successfully in 105m 56s after about 13 minutes of setup, then the 120-minute job deadline killed the separate remote-server build. The initial executable/archive I/O failure did not recur. The extra time is for the already-required remote-server build, packaging, and artifact smoke checks, not a reduced build profile.
+
 ### Generator and catalog ownership
 
 <!-- impl: products/flavors.toml -->
