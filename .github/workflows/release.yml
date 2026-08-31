@@ -110,6 +110,9 @@ jobs:
       with:
         clean: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::product_builds
+      if: matrix.platform == 'macos'
+      run: uname -m && rustc -vV && df -h . && xcode-select -p
     - name: steps::enable_windows_long_paths
       if: matrix.platform == 'windows'
       run: git config --global core.longpaths true
@@ -160,6 +163,9 @@ jobs:
         name: ${{ matrix.artifact }}
         path: ${{ matrix.artifact_path }}
         if-no-files-found: error
+    - name: release::product_builds
+      if: always() && matrix.platform == 'macos'
+      run: df -h . && du -sh target
     timeout-minutes: 120
   publish_product:
     needs:

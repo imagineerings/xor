@@ -189,6 +189,7 @@ jobs:
     - project_benchmarks
     - rust_tools_validation
     - release_automation_validation
+    - windows_updater_tests
     if: ${{ always() }}
     runs-on: ubuntu-22.04
     steps:
@@ -200,6 +201,7 @@ jobs:
         if [[ "${PROJECT_BENCHMARKS_RESULT}" != "success" ]]; then exit_code=1; fi
         if [[ "${RUST_TOOLS_VALIDATION_RESULT}" != "success" ]]; then exit_code=1; fi
         if [[ "${RELEASE_AUTOMATION_VALIDATION_RESULT}" != "success" ]]; then exit_code=1; fi
+        if [[ "${WINDOWS_UPDATER_TESTS_RESULT}" != "success" ]]; then exit_code=1; fi
         exit "$exit_code"
       env:
         SHARED_CLIPPY_RESULT: ${{ needs.shared_clippy.result }}
@@ -207,7 +209,34 @@ jobs:
         PROJECT_BENCHMARKS_RESULT: ${{ needs.project_benchmarks.result }}
         RUST_TOOLS_VALIDATION_RESULT: ${{ needs.rust_tools_validation.result }}
         RELEASE_AUTOMATION_VALIDATION_RESULT: ${{ needs.release_automation_validation.result }}
+        WINDOWS_UPDATER_TESTS_RESULT: ${{ needs.windows_updater_tests.result }}
     timeout-minutes: 5
+  windows_updater_tests:
+    runs-on: windows-2022
+    env:
+      RELEASE_VERSION: 1.2.3
+      ZED_PRODUCT_DISPLAY_NAME: Copper
+      ZED_PRODUCT_ICON_SET: ${{ github.workspace }}/assets/product_flavors/rust
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      with:
+        clean: false
+    - name: steps::enable_windows_long_paths
+      run: git config --global core.longpaths true
+      shell: pwsh
+    - name: run_tests::windows_updater_tests
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $PSNativeCommandUseErrorActionPreference = $true
+        cargo test --locked -p auto_update_helper
+        cargo build --locked -p auto_update_helper
+        $metadata = (Get-Item target/debug/auto_update_helper.exe).VersionInfo
+        if ($metadata.ProductName -ne $env:ZED_PRODUCT_DISPLAY_NAME -or $metadata.FileVersion -ne $env:RELEASE_VERSION) {
+            throw "Updater product metadata does not match the resolved release environment"
+        }
+      shell: pwsh
+    timeout-minutes: 15
   comfy_backend_validation:
     runs-on: ${{ matrix.runner }}
     strategy:

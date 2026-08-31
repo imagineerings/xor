@@ -9,7 +9,7 @@ The user explicitly approved automatic releases and automatic tags after the ini
 ## Existing context
 
 - `products/flavors.toml` already selects exactly `agentic-tools,rust-tools` for the Rust application and `rust-tools` for `remote_server`; `crates/product_flavor/generated_product.rs` is the generated runtime copy.
-- `tooling/xtask/src/tasks/workflows/run_tests.rs` owns five parallel shared workers, a strict `always()` aggregation job, catalog-driven `product_smoke`, and the three-platform Comfy backend matrix.
+- `tooling/xtask/src/tasks/workflows/run_tests.rs` owns six parallel shared workers, a strict `always()` aggregation job, catalog-driven `product_smoke`, and the three-platform Comfy backend matrix.
 - `tooling/xtask/src/tasks/workflows/hosted_collab_tests.rs` owns the separate PostgreSQL-backed Collab workflow.
 - `tooling/xtask/src/tasks/workflows/release.rs` already owns a catalog-generated three-platform matrix followed by `publish_product` with the only `contents: write` permission.
 - `tooling/xtask/src/tasks/bundle.rs` supplies every platform script with resolved product metadata and an isolated product output directory.
@@ -23,7 +23,7 @@ The user explicitly approved automatic releases and automatic tags after the ini
 <!-- impl: tooling/xtask/src/tasks/workflows/run_tests.rs#release_automation_validation -->
 <!-- impl: tooling/xtask/src/tasks/workflows/run_tests.rs#shared_validation -->
 
-- Responsibility: Keep formatting/clippy, Rust-product tests, project benchmarks, Rust-tool environment tests, and release-pipeline generator validation concurrent.
+- Responsibility: Keep formatting/clippy, Rust-product tests, project benchmarks, Rust-tool environment tests, release-pipeline generator validation, and native Windows updater tests concurrent.
 - Integration: Keep exactly one generator/products/bundle-plan validation worker in `shared_validation`; derive explicit result checks from the same worker list and keep `product_smoke` dependent on the aggregate.
 - Rationale: Generator validation needs no Linux desktop dependency installation. Removing that setup reduces CI time while preserving all validation, shipped-product tests, benchmarks, and backend coverage.
 
@@ -68,6 +68,18 @@ The user explicitly approved automatic releases and automatic tags after the ini
 - Integration: Enable Git long paths before bundling, isolate `cargo-about` installation from the product target, accept the demonstrated BlueOak-1.0.0 dependency license, select Visual Studio's native CMake, and pass the product target directory to Windows bundling as a repository-relative path.
 - Rationale: The relative `CARGO_TARGET_DIR` still resolves to the same isolated `target/products/<id>` output and upload path, but prevents Cargo build scripts from forwarding unsupported `\\?\` file arguments to `cl.exe`.
 
+### Native updater and release metadata validation
+
+<!-- impl: tooling/xtask/src/tasks/workflows/run_tests.rs#windows_updater_tests -->
+<!-- impl: crates/auto_update_helper/src/updater.rs#Job::mkdir -->
+<!-- impl: crates/windows_resources/src/windows_resources.rs#compile -->
+<!-- impl: script/bundle-mac -->
+<!-- impl: script/bundle-windows.ps1 -->
+
+- Responsibility: Catch Windows-only updater compilation/rollback regressions before release and preserve the selected product identity and version inside native bundles.
+- Integration: A required Windows worker runs updater tests and checks the compiled helper's resource metadata against a synthetic release version and catalog identity. Directory rollback borrows its captured path so jobs remain reusable. Windows resource compilation consumes the bundle plan's display name, icon set, and release version with existing development fallbacks. macOS sets both plist version keys from `RELEASE_VERSION` before signing; native bundlers assert metadata before packaging.
+- Rationale: Run 33374877495 failed in Windows-only code that Linux tests cannot compile. Its macOS job also reported executable and archive I/O failures; the release generator records architecture, toolchain, and disk usage to distinguish runner failures from source defects without suppressing errors or changing the build profile.
+
 ### Generator and catalog ownership
 
 <!-- impl: products/flavors.toml -->
@@ -86,6 +98,7 @@ The user explicitly approved automatic releases and automatic tags after the ini
 | 1.6, 1.7 | Separate hosted Collab and Comfy coverage | Comfy matrix assertions and forbidden-reference scans |
 | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.9 | Automatic release and tag policy; generator and catalog ownership | Release/version tests, matrix/artifact/permission inspection, bundle dry runs |
 | 2.10 | CI worker and strict aggregation graph; parallel isolated benchmark configurations | One lightweight validation worker, no desktop setup, exact benchmark matrix rows, all original worker coverage retained |
+| 1.8, 3.5 | Native updater and release metadata validation | Windows updater tests, compiled resource check, plist assertions |
 | 2.8 | Linux compiler selection; Windows release hardening | Generated environment assertions and Windows bundle regression tests |
 | 3.1, 3.2, 3.3, 3.4 | Generator and catalog ownership | Product check, generated metadata comparison, platform bundle-plan dry runs |
 | 4.1, 4.2, 4.3, 4.4 | Generator and catalog ownership | Workflow generation, check-workflows, full xtask tests |

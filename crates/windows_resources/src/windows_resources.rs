@@ -19,9 +19,8 @@ fn git_sha() -> Option<String> {
         .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-fn product_version() -> String {
+fn product_version(version: &str) -> String {
     let commit_sha = git_sha();
-    let pkg_version = std::env::var("CARGO_PKG_VERSION").unwrap_or_default();
     let channel = std::env::var("RELEASE_CHANNEL").unwrap_or_else(|_| "dev".into());
     let build_id = std::env::var("GITHUB_RUN_NUMBER").ok();
 
@@ -35,21 +34,37 @@ fn product_version() -> String {
         metadata.push_str(sha);
     }
 
-    format!("{pkg_version}+{metadata}")
+    format!("{version}+{metadata}")
 }
 
 const ICON_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../zed/resources/windows");
 const MANIFEST_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/resources/manifest.xml");
 
 pub fn compile(manifest: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let channel = option_env!("RELEASE_CHANNEL").unwrap_or("dev");
-    let (icon_filename, product_name) = match channel {
+    for variable in [
+        "RELEASE_CHANNEL",
+        "RELEASE_VERSION",
+        "ZED_PRODUCT_DISPLAY_NAME",
+        "ZED_PRODUCT_ICON_SET",
+        "ZED_COMMIT_SHA",
+        "GITHUB_RUN_NUMBER",
+    ] {
+        println!("cargo:rerun-if-env-changed={variable}");
+    }
+    let channel = std::env::var("RELEASE_CHANNEL").unwrap_or_else(|_| "dev".into());
+    let (icon_filename, product_name) = match channel.as_str() {
         "stable" => ("app-icon.ico", "Zed"),
         "preview" => ("app-icon-preview.ico", "Zed Preview"),
         "nightly" => ("app-icon-nightly.ico", "Zed Nightly"),
         _ => ("app-icon-dev.ico", "Zed Dev"),
     };
-    let icon = std::path::PathBuf::from(ICON_DIR).join(icon_filename);
+    let product_name =
+        std::env::var("ZED_PRODUCT_DISPLAY_NAME").unwrap_or_else(|_| product_name.to_owned());
+    let icon = match std::env::var_os("ZED_PRODUCT_ICON_SET") {
+        Some(directory) => std::path::PathBuf::from(directory).join("app-icon.ico"),
+        None => std::path::PathBuf::from(ICON_DIR).join(icon_filename),
+    };
+    println!("cargo:rerun-if-changed={}", icon.display());
     let icon_escaped = icon.to_string_lossy().replace('\\', "\\\\");
 
     let manifest_line = if manifest {
@@ -59,8 +74,9 @@ pub fn compile(manifest: bool) -> Result<(), Box<dyn std::error::Error>> {
         String::new()
     };
 
-    let pkg_version = std::env::var("CARGO_PKG_VERSION").unwrap_or_default();
-    let product_version = product_version();
+    let pkg_version =
+        std::env::var("RELEASE_VERSION").or_else(|_| std::env::var("CARGO_PKG_VERSION"))?;
+    let product_version = product_version(&pkg_version);
     let mut version_parts = pkg_version
         .split('.')
         .map(|part| part.parse::<u16>().unwrap_or(0))
@@ -117,9 +133,7 @@ END
         }
     }
 
-    embed_resource::compile(&rc_path, embed_resource::NONE)
-        .manifest_optional()
-        .unwrap();
+    embed_resource::compile(&rc_path, embed_resource::NONE).manifest_optional()?;
 
     Ok(())
 }

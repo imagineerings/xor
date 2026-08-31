@@ -170,6 +170,10 @@ fn product_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
             .strategy(Strategy::default().fail_fast(false).matrix(json!({ "include": include })))
             .add_step(steps::checkout_repo().with_ref(prepared.commit_sha.to_string()))
             .add_step(
+                named::bash("uname -m && rustc -vV && df -h . && xcode-select -p")
+                    .if_condition(Expression::new("matrix.platform == 'macos'")),
+            )
+            .add_step(
                 steps::enable_windows_long_paths()
                     .if_condition(Expression::new("matrix.platform == 'windows'")),
             )
@@ -216,6 +220,10 @@ fn product_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
             .add_step(
                 steps::upload_artifact("${{ matrix.artifact }}", "${{ matrix.artifact_path }}")
                     .if_no_files_found(IfNoFilesFound::Error),
+            )
+            .add_step(
+                named::bash("df -h . && du -sh target")
+                    .if_condition(Expression::new("always() && matrix.platform == 'macos'")),
             ),
     )
 }

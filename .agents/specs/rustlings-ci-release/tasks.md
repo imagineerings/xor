@@ -144,3 +144,17 @@ First establish stable Rustlings package naming, then replace the active CI and 
 ## Authorized external landing and cleanup
 
 After committing the local reconciliation, require PR #11 checks to pass and verify its merge before deleting any eligible remote branch. Immediately before each deletion, recheck the remote tip and relevant open PRs and use the exact recorded SHA as a deletion lease. Preserve changed tips for re-audit. Report merge/check evidence and actual deletion results separately; do not manually dispatch releases, alter protections, or delete main/dev/rustlings, tags, or local branches.
+
+
+### Milestone 4: Repair and verify the first native release
+
+- [ ] 4. Repair demonstrated native failures and verify publication
+  - [ ] 4.1. Fix reusable updater rollback and native release metadata
+    - Add native Windows updater tests to the required CI graph; propagate resolved product/version metadata into Windows resources and macOS plists; retain optional signing and collect macOS runner diagnostics.
+    - _Requirements: 1.8, 2.1, 2.2, 2.4, 2.5, 2.7, 2.9, 3.5, 4.1_
+    - _Depends on: 3.4_
+    - _Reads: products/flavors.toml, tooling/xtask/src/tasks/bundle.rs, crates/auto_update_helper/src/updater.rs_
+    - _Writes: crates/auto_update_helper/src/updater.rs, crates/windows_resources/src/windows_resources.rs, script/bundle-mac, script/bundle-windows.ps1, tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/release.rs, .github/workflows/run_tests.yml, .github/workflows/release.yml_
+    - _Validation: formatting, xtask tests, workflow freshness, product catalog check, targeted Clippy, native Windows CI, macOS build-script/plist checks, all three release bundles, automatic tag and published asset inspection_
+
+The 2026-08-31 release-repair request separately authorizes scoped commits, pushes, PRs, merging after checks pass, and release reruns through successful publication. It supersedes the earlier restriction on manually dispatching releases for this repair only. Existing tags and published assets must not be moved, deleted, or overwritten; unrelated branch cleanup is postponed.
