@@ -37,6 +37,8 @@ The Rust product shares a large Zed workspace, but its CI and releases must rema
 6. **1.6** THE Linux, macOS, and Windows Comfy backend validation rows SHALL remain intact and independent of Rust-product smoke validation.
 7. **1.7** THE active CI SHALL NOT require an organization-owner guard, Namespace or self-hosted runner, external cache, Slack, Sentry, or unrelated organization secret.
 
+8. **1.8** THE strict shared validation SHALL include native Windows updater tests, reusable directory rollback coverage, and a compiled resource metadata check.
+
 ### Requirement 2: Catalog-driven cross-platform release
 
 **User story:** As a release maintainer, I want one generated product matrix with a strict publish barrier, so that every Copper release contains the supported Rust-product bundles and no partial release is published.
@@ -64,6 +66,8 @@ The Rust product shares a large Zed workspace, but its CI and releases must rema
 2. **3.2** THE generated Rust product metadata SHALL match `products/flavors.toml` and SHALL NOT be hand-edited.
 3. **3.3** THE Linux, macOS, and Windows bundlers SHALL consume the resolved product plan while retaining internal `zed`, `cli`, `remote_server`, and updater package names.
 4. **3.4** THE final Linux, macOS, and Windows artifact filenames SHALL match the Rust catalog artifact template and supported target architecture.
+
+5. **3.5** THE macOS plist, Windows executable resources, packaged CLI, and application version SHALL use the selected release version and resolved product identity; native jobs SHALL reject metadata mismatches and failed installed CLI/editor-help smoke checks before upload.
 
 ### Requirement 4: Generated workflow integrity
 

@@ -170,6 +170,10 @@ fn product_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
             .strategy(Strategy::default().fail_fast(false).matrix(json!({ "include": include })))
             .add_step(steps::checkout_repo().with_ref(prepared.commit_sha.to_string()))
             .add_step(
+                named::bash("uname -m && rustc -vV && df -h . && xcode-select -p")
+                    .if_condition(Expression::new("matrix.platform == 'macos'")),
+            )
+            .add_step(
                 steps::enable_windows_long_paths()
                     .if_condition(Expression::new("matrix.platform == 'windows'")),
             )
@@ -214,8 +218,25 @@ fn product_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
                     .add_env(("TIMESTAMP_SERVER", "${{ secrets.TIMESTAMP_SERVER }}")),
             )
             .add_step(
+                named::bash("python3 script/smoke-product-bundle --product \"$PRODUCT_ID\" --platform \"$PLATFORM\" --target \"$TARGET\"")
+                    .if_condition(Expression::new("matrix.platform != 'windows'"))
+                    .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
+                    .add_env(("PLATFORM", "${{ matrix.platform }}"))
+                    .add_env(("TARGET", "${{ matrix.target }}")),
+            )
+            .add_step(
+                named::pwsh("python script/smoke-product-bundle --product $env:PRODUCT_ID --platform windows --target $env:TARGET")
+                    .if_condition(Expression::new("matrix.platform == 'windows'"))
+                    .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
+                    .add_env(("TARGET", "${{ matrix.target }}")),
+            )
+            .add_step(
                 steps::upload_artifact("${{ matrix.artifact }}", "${{ matrix.artifact_path }}")
                     .if_no_files_found(IfNoFilesFound::Error),
+            )
+            .add_step(
+                named::bash("df -h . && du -sh target")
+                    .if_condition(Expression::new("always() && matrix.platform == 'macos'")),
             ),
     )
 }
@@ -379,6 +400,13 @@ mod release_workflow_tests {
         assert!(yaml.contains("cancel-in-progress: false"));
         assert!(yaml.contains("needs:\n    - prepare_release\n    - product_builds"));
         assert!(yaml.contains("if-no-files-found: error"));
+        let smoke = yaml
+            .find("script/smoke-product-bundle")
+            .expect("native bundle smoke check");
+        let upload = yaml
+            .find("uses: actions/upload-artifact")
+            .expect("bundle upload");
+        assert!(smoke < upload);
         assert!(yaml.contains("Expected exactly 3 Copper artifacts"));
         assert!(yaml.contains("git config --global core.longpaths true"));
         assert!(yaml.contains("CC: clang\n"));

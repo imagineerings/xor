@@ -31,12 +31,12 @@ impl Job {
         let rollback_name = name.clone();
         Job {
             apply: Box::new(move |app_dir| {
-                let dir = app_dir.join(&rollback_name);
+                let dir = app_dir.join(&name);
                 std::fs::create_dir_all(&dir)
                     .context(format!("Failed to create directory {}", dir.display()))
             }),
             rollback: Box::new(move |app_dir| {
-                let dir = app_dir.join(name);
+                let dir = app_dir.join(&rollback_name);
                 std::fs::remove_dir_all(&dir)
                     .context(format!("Failed to remove directory {}", dir.display()))
             }),
@@ -455,7 +455,20 @@ pub(crate) fn perform_update(app_dir: &Path, hwnd: Option<isize>, launch: bool) 
 
 #[cfg(test)]
 mod test {
-    use super::perform_update;
+    use super::{Job, perform_update};
+
+    #[test]
+    fn test_directory_job_can_be_reapplied_after_rollback() -> anyhow::Result<()> {
+        let app_dir = tempfile::tempdir()?;
+        let job = Job::mkdir("old/bin".into());
+        for _ in 0..2 {
+            (job.apply)(app_dir.path())?;
+            assert!(app_dir.path().join("old/bin").is_dir());
+            (job.rollback)(app_dir.path())?;
+            assert!(!app_dir.path().join("old/bin").exists());
+        }
+        Ok(())
+    }
 
     #[test]
     fn test_perform_update() {

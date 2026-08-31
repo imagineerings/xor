@@ -179,6 +179,12 @@ function BuildProductBinaries {
         $applicationFeatures = (($env:ZED_PRODUCT_APP_FEATURES -split ',') | ForEach-Object { "zed/$_" }) -join ','
         cargo build --release --package zed --package cli --package auto_update_helper --no-default-features --features $applicationFeatures --target $target
     }
+    foreach ($binary in @('zed.exe', 'cli.exe', 'auto_update_helper.exe')) {
+        $metadata = (Get-Item "$CargoOutDir\$binary").VersionInfo
+        if ($metadata.ProductName -ne $env:ZED_PRODUCT_DISPLAY_NAME -or $metadata.FileVersion -ne $env:RELEASE_VERSION) {
+            throw "Product metadata mismatch in ${binary}: $($metadata.ProductName) $($metadata.FileVersion)"
+        }
+    }
     Copy-Item -Path "$CargoOutDir\zed.exe" -Destination "$innoDir\$env:ZED_PRODUCT_EXECUTABLE.exe" -Force
     Copy-Item -Path "$CargoOutDir\cli.exe" -Destination "$innoDir\cli.exe" -Force
     if ($Comfy) {

@@ -26,12 +26,14 @@ pub(crate) fn run_tests() -> Workflow {
     let project_benchmarks = project_benchmarks();
     let rust_tools_validation = rust_tools_validation();
     let release_automation_validation = release_automation_validation();
+    let windows_updater_tests = windows_updater_tests();
     let validation = shared_validation(&[
         &shared_clippy,
         &copper_tests,
         &project_benchmarks,
         &rust_tools_validation,
         &release_automation_validation,
+        &windows_updater_tests,
     ]);
     let comfy_backend_validation = comfy_backend_validation();
     let product_smoke = product_smoke(&validation);
@@ -55,6 +57,7 @@ pub(crate) fn run_tests() -> Workflow {
             release_automation_validation.job,
         )
         .add_job(validation.name, validation.job)
+        .add_job(windows_updater_tests.name, windows_updater_tests.job)
         .add_job(comfy_backend_validation.name, comfy_backend_validation.job)
         .add_job(product_smoke.name, product_smoke.job)
 }
@@ -220,6 +223,33 @@ fn release_automation_validation() -> NamedJob {
                   --dry-run
             "#}))
             .add_step(steps::cleanup_cargo_config(Platform::Linux)),
+    )
+}
+
+fn windows_updater_tests() -> NamedJob {
+    let manifest = ProductManifest::load().expect("product catalog must be valid");
+    let product = manifest
+        .product(RUST_PRODUCT_ID)
+        .expect("Rust product must exist");
+    named::job(
+        Job::default()
+            .runs_on("windows-2022")
+            .timeout_minutes(15u32)
+            .add_env(("RELEASE_VERSION", "1.2.3"))
+            .add_env(("ZED_PRODUCT_DISPLAY_NAME", product.display_name.clone()))
+            .add_env(("ZED_PRODUCT_ICON_SET", format!("${{{{ github.workspace }}}}/{}", product.icon_set)))
+            .add_step(steps::checkout_repo())
+            .add_step(steps::enable_windows_long_paths())
+            .add_step(named::pwsh(indoc::indoc! {r#"
+                $ErrorActionPreference = 'Stop'
+                $PSNativeCommandUseErrorActionPreference = $true
+                cargo test --locked -p auto_update_helper
+                cargo build --locked -p auto_update_helper
+                $metadata = (Get-Item target/debug/auto_update_helper.exe).VersionInfo
+                if ($metadata.ProductName -ne $env:ZED_PRODUCT_DISPLAY_NAME -or $metadata.FileVersion -ne $env:RELEASE_VERSION) {
+                    throw "Updater product metadata does not match the resolved release environment"
+                }
+            "#})),
     )
 }
 
@@ -664,6 +694,7 @@ mod tests {
             "project_benchmarks",
             "rust_tools_validation",
             "release_automation_validation",
+            "windows_updater_tests",
         ];
         for worker_name in worker_names {
             assert!(needs(job(&parsed, worker_name)).is_empty());
@@ -892,7 +923,17 @@ mod tests {
             );
         }
 
-        assert_eq!(workflow.matches("runs-on:").count(), 8);
+        assert_eq!(workflow.matches("runs-on:").count(), 9);
+        let updater = job(&parsed, "windows_updater_tests");
+        assert_eq!(
+            updater.get("runs-on").and_then(Value::as_str),
+            Some("windows-2022")
+        );
+        assert!(
+            run_commands(updater)
+                .iter()
+                .any(|command| command.contains("cargo test --locked -p auto_update_helper"))
+        );
         assert!(workflow.contains("runs-on: ubuntu-22.04"));
         assert!(workflow.contains("runner: macos-15"));
         assert!(workflow.contains("runner: windows-2022"));
@@ -943,7 +984,7 @@ mod tests {
             workflow
                 .matches("git config --global core.longpaths true")
                 .count(),
-            1
+            2
         );
         let windows_long_paths = workflow
             .find("git config --global core.longpaths true")

@@ -173,6 +173,8 @@ mv "${app_path}/Contents/MacOS/zed" "${app_path}/Contents/MacOS/${ZED_PRODUCT_EX
 /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${ZED_PRODUCT_DISPLAY_NAME}" "${plist}"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${ZED_PRODUCT_BUNDLE_ID}" "${plist}"
 /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable ${ZED_PRODUCT_EXECUTABLE}" "${plist}"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${RELEASE_VERSION}" "${plist}"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${RELEASE_VERSION}" "${plist}"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" "${plist}" || true
 /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "${plist}"
 /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "${plist}"
@@ -183,6 +185,8 @@ cp "${ZED_PRODUCT_ICON_SET}/app-icon.png" "${app_path}/Contents/Resources/produc
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "${plist}")" == "${ZED_PRODUCT_DISPLAY_NAME}" ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "${plist}")" == "${ZED_PRODUCT_BUNDLE_ID}" ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "${plist}")" == "${ZED_PRODUCT_EXECUTABLE}" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${plist}")" == "${RELEASE_VERSION}" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "${plist}")" == "${RELEASE_VERSION}" ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "${plist}")" == "${ZED_PRODUCT_URL_SCHEME}" ]]
 
 # DocumentTypes.plist references CFBundleTypeIconFile "Document", so the bundle must contain Document.icns.
@@ -347,7 +351,7 @@ function sign_app_binaries() {
 
         if [[ $can_code_sign = true ]]; then
             echo "Notarizing DMG with Apple"
-            /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "$(pwd)/${dmg_file_path}" -v
+            /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${dmg_file_path}" -v
             echo "$APPLE_NOTARIZATION_KEY" > "$notarization_key_file"
             "${xcode_bin_dir_path}/notarytool" submit --wait --key "$notarization_key_file" --key-id "$APPLE_NOTARIZATION_KEY_ID" --issuer "$APPLE_NOTARIZATION_ISSUER_ID" "${dmg_file_path}"
             rm "$notarization_key_file"
