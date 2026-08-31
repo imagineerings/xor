@@ -88,6 +88,10 @@ def main():
                      "/TASKS=", f"/DIR={application}", f"/LOG={install_log}"])
                 check_launch(application / "bin" / f"{executable}.exe",
                              application / f"{executable}.exe", plan, version)
+                output = run([str(application / f"{executable}.exe"), "--foreground",
+                              "--system-specs", "--user-data-dir", str(directory / "data")],
+                             capture_output=True).stdout
+                print(output, flush=True)
                 if not (application / "tools/auto_update_helper.exe").is_file():
                     raise RuntimeError("Installed updater is missing")
             finally:
