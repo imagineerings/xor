@@ -54,3 +54,93 @@ First establish stable Rustlings package naming, then replace the active CI and 
     - _Writes: tooling/xtask/src/tasks/workflows.rs, tooling/xtask/src/tasks/workflows/deploy_docs.rs, tooling/xtask/src/tasks/workflows/steps.rs, tooling/xtask/src/tasks/workflows/vars.rs_
     - _Validation: run focused xtask clippy with warnings denied and regenerate every workflow successfully_
     - _Evidence: `./script/clippy --no-all-features --package xtask` passed with warnings denied, and `cargo xtask workflows` regenerated all configured workflows successfully._
+
+### Milestone 2: Evidence-based pipeline reconciliation
+
+- [x] 2. Reconcile remote CI and release work with the catalog-driven pipeline
+  - [x] 2.1. Audit and disposition every related remote `codex/*` branch
+    - Inspect unique commits, resulting diffs, overlap, dependencies, GitHub checks, and actual release-job outcomes.
+    - Record equivalent/superseding commit trees and reject unrelated README changes or unapproved release-policy expansion.
+    - _Requirements: 5.1, 5.2, 5.3, 5.4_
+    - _Depends on: none_
+    - _Reads: origin/codex/*, tooling/xtask/src/tasks/workflows/, .github/workflows/, products/flavors.toml_
+    - _Writes: .agents/specs/rustlings-ci-release/tasks.md_
+    - _Validation: compare every related branch to rustlings with git log/diff and inspect GitHub check and release-run evidence_
+    - _Evidence: Compared all five remote `codex/*` branches and their unique commits/files to `rustlings`; verified duplicate commit trees, ordinary CI results, and each automatic release attempt. The final Linux run failed on absent `clang-18`, and the final Windows run failed when MSVC received an extended-length absolute product target path._
+  - [x] 2.2. Add concurrent release-pipeline validation without changing release policy
+    - Reuse the existing strict aggregation result check and preserve the Rust-product test package boundary.
+    - Keep hosted Collab and Comfy backend validation separate and intact.
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 4.1, 4.4_
+    - _Depends on: 2.1_
+    - _Reads: tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/hosted_collab_tests.rs_
+    - _Writes: tooling/xtask/src/tasks/workflows/run_tests.rs_
+    - _Validation: run focused run_tests and hosted_collab_tests generator tests and inspect strict dependencies/features_
+    - _Evidence: Added the independent generator/products/bundle-plan worker to the strict aggregation dependency set. Focused and full xtask tests passed; generated YAML retains the shipped-product package boundary, separate hosted Collab workflow, complete Comfy matrix, and `product_smoke` dependency on the strict barrier._
+  - [x] 2.3. Reconcile release generator hardening with hosted-runner toolchains
+    - Enable Windows Git long paths and select the available unversioned Clang toolchain for Linux bundles.
+    - Preserve the tag/manual trigger, catalog matrix, minimal permissions, optional signing, and all-build publish barrier.
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 4.1, 4.4_
+    - _Depends on: 2.1_
+    - _Reads: tooling/xtask/src/tasks/workflows/release.rs, tooling/xtask/src/tasks/workflows/steps.rs_
+    - _Writes: tooling/xtask/src/tasks/workflows/release.rs_
+    - _Validation: run focused release generator tests and inspect generated Linux/Windows steps, permissions, matrix, and fan-in_
+    - _Evidence: Generated release tests and YAML inspection confirm tag/manual triggers, three standard hosted runners, optional signing inputs, Windows long paths, unversioned Linux Clang, one write-permission publish job, and the complete matrix fan-in._
+  - [x] 2.4. Harden Windows product bundling at the demonstrated failure boundaries
+    - Isolate cargo-about installation, use Visual Studio CMake, accept the required Blue Oak license, and keep MSVC build paths repository-relative.
+    - Preserve the catalog-owned output path and internal Zed package names.
+    - _Requirements: 2.2, 2.3, 2.7, 2.8, 3.1, 3.3, 3.4, 5.3, 5.4_
+    - _Depends on: 2.1_
+    - _Reads: tooling/xtask/src/tasks/bundle.rs, script/bundle-windows.ps1, script/generate-licenses.ps1, script/licenses/zed-licenses.toml_
+    - _Writes: tooling/xtask/src/tasks/bundle.rs, script/bundle-windows.ps1, script/generate-licenses.ps1, script/licenses/zed-licenses.toml_
+    - _Validation: run xtask bundle tests, Windows bundle dry-run regression assertions, and inspect resolved output and compiler paths_
+    - _Evidence: Focused regression tests passed for the relative Windows target path, temporary cargo-about target, and Visual Studio CMake selection. The Windows product dry run resolves `target/products/rust`; native Windows execution remains a generated CI responsibility because PowerShell/MSVC are unavailable on the macOS host._
+  - [x] 2.5. Regenerate and validate product and workflow artifacts
+    - Confirm the Rust catalog and generated metadata retain exactly `agentic-tools,rust-tools` plus remote `rust-tools`.
+    - Regenerate workflow YAML from the reconciled generators and run the full requested quality gate.
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 4.4_
+    - _Depends on: 2.2, 2.3, 2.4_
+    - _Reads: products/flavors.toml, crates/product_flavor/generated_product.rs, tooling/xtask/src/tasks/workflows/, script/bundle-linux, script/bundle-mac, script/bundle-windows.ps1_
+    - _Writes: .github/workflows/run_tests.yml, .github/workflows/release.yml, .github/workflows/hosted_collab_tests.yml, .agents/specs/rustlings-ci-release/tasks.md_
+    - _Validation: run the canonical spec validator, cargo fmt, focused and full xtask tests, products check, workflow generation/checks, bundle dry runs, exact Rust release check, focused and full Clippy, YAML inspection, and git diff checks_
+    - _Evidence: On 2026-08-30, both canonical spec validations, `cargo fmt --all -- --check`, focused and full `cargo test -p xtask`, `cargo xtask products --check`, workflow regeneration/checks, Ruby YAML parsing and manual YAML inspection, Linux/macOS shell syntax, three bundle dry runs, the exact release-profile Rust product check, focused/full warning-denied Clippy, and diff checks passed._
+
+### Milestone 3: Approved automatic release reconciliation
+
+- [x] 3. Reconcile main with automatic releases and efficient CI
+  - [x] 3.1. Preserve automatic semantic tags and audited bundle fixes
+    - Resolve generator and packaging conflicts semantically, retaining main's automatic release preparation/publication and the audited hosted-runner corrections.
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.4, 5.4_
+    - _Depends on: 2.5_
+    - _Reads: tooling/xtask/src/tasks/release_version.rs, tooling/xtask/src/tasks/workflows/release.rs, tooling/xtask/src/tasks/bundle.rs_
+    - _Writes: tooling/xtask/src/tasks/workflows/release.rs, tooling/xtask/src/tasks/bundle.rs, script/bundle-windows.ps1, script/generate-licenses.ps1_
+    - _Validation: release/version/bundle tests, exact product release check, three bundle plans, focused and full Clippy_
+    - _Evidence: All 28 xtask tests, all three bundle plans, the exact Rust product release check, focused warning-denied xtask Clippy, and full workspace Clippy passed. Automatic tag/version/retry behavior is retained; native cross-platform release execution remains an automatic post-merge check, not a locally dispatched operation._
+  - [x] 3.2. Reconcile concurrent validation and regenerate workflows
+    - Retain one lightweight generator validation worker and all existing product, collaboration, benchmark, Rust-tools, and Comfy coverage.
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 2.10, 4.1, 4.2, 4.3, 4.4_
+    - _Depends on: 3.1_
+    - _Reads: tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/hosted_collab_tests.rs_
+    - _Writes: tooling/xtask/src/tasks/workflows/run_tests.rs, .github/workflows/run_tests.yml, .github/workflows/release.yml_
+    - _Validation: full xtask tests, product check, workflow generation/freshness, formatting, and YAML inspection; PR CI is the external landing gate below_
+    - _Evidence: Full xtask tests, catalog check, workflow generation/checks, formatting, Bash syntax, and YAML parsing passed. Executed the generated strict barrier with all-success and each worker individually failed/cancelled/skipped; only all-success passed. The single generator-validation worker no longer installs desktop Linux dependencies._
+  - [x] 3.3. Record complete branch dispositions and guarded cleanup eligibility
+    - Preserve branches with valuable unmerged work or relevant open PRs; perform authorized remote cleanup only after the reconciled PR is merged.
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+    - _Depends on: 3.2_
+    - _Reads: origin/codex/*, origin/main, .agents/specs/rustlings-ci-release/branch-audit.md_
+    - _Writes: .agents/specs/rustlings-ci-release/branch-audit.md_
+    - _Validation: exact tree comparisons, branch/PR inventory, fresh inspected remote tips, and a recorded expected-SHA deletion safeguard; actual cleanup follows the external landing gate_
+    - _Evidence: Refreshed all origin branches; all five codex tips exactly match their merged main squash trees, and PRs 6–10 are merged with no open codex PRs. Full recovery SHAs, dependencies, semantic adaptations, and conditional deletion rationales are recorded in branch-audit.md._
+
+  - [x] 3.4. Parallelize isolated benchmark configurations without reducing coverage
+    - Keep both benchmark targets, exact feature configurations, and optimized profiles while running them on separate hosted-runner matrix rows.
+    - _Requirements: 1.1, 1.3, 1.4, 2.10, 4.1, 4.3, 4.4_
+    - _Depends on: 3.2_
+    - _Reads: tooling/xtask/src/tasks/workflows/run_tests.rs, crates/project/Cargo.toml_
+    - _Writes: tooling/xtask/src/tasks/workflows/run_tests.rs, .github/workflows/run_tests.yml_
+    - _Validation: focused/full xtask tests, generated matrix and strict barrier inspection, workflow freshness, formatting, focused/full Clippy_
+    - _Evidence: All 28 xtask tests, workflow regeneration/checks, product check, formatting, focused/full warning-denied Clippy, and parsed YAML inspection passed. Both exact feature/benchmark pairs are separate matrix rows with fail-fast disabled; the complete matrix remains required by shared_validation._
+
+## Authorized external landing and cleanup
+
+After committing the local reconciliation, require PR #11 checks to pass and verify its merge before deleting any eligible remote branch. Immediately before each deletion, recheck the remote tip and relevant open PRs and use the exact recorded SHA as a deletion lease. Preserve changed tips for re-audit. Report merge/check evidence and actual deletion results separately; do not manually dispatch releases, alter protections, or delete main/dev/rustlings, tags, or local branches.

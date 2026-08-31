@@ -162,16 +162,24 @@ fn project_benchmarks() -> NamedJob {
         Job::default()
             .runs_on("ubuntu-22.04")
             .timeout_minutes(75u32)
+            .strategy(Strategy::default().fail_fast(false).matrix(json!({
+                "include": [
+                    { "benchmark": "cargo_workspace" },
+                    { "benchmark": "structured_execution" },
+                ],
+            })))
             .map(use_clang)
             .add_step(steps::checkout_repo())
             .add_step(steps::setup_cargo_config(Platform::Linux))
             .add_step(steps::setup_linux())
-            .add_step(named::bash(
-                "cargo bench -p project --features cargo-workspace --bench cargo_workspace -- --noplot",
-            ))
-            .add_step(named::bash(
-                "cargo bench -p project --features structured-execution --bench structured_execution -- --noplot",
-            ))
+            .add_step(
+                named::bash("cargo bench -p project --features cargo-workspace --bench cargo_workspace -- --noplot")
+                    .if_condition(Expression::new("matrix.benchmark == 'cargo_workspace'")),
+            )
+            .add_step(
+                named::bash("cargo bench -p project --features structured-execution --bench structured_execution -- --noplot")
+                    .if_condition(Expression::new("matrix.benchmark == 'structured_execution'")),
+            )
             .add_step(steps::cleanup_cargo_config(Platform::Linux)),
     )
 }
@@ -200,7 +208,6 @@ fn release_automation_validation() -> NamedJob {
             .timeout_minutes(30u32)
             .add_step(steps::checkout_repo())
             .add_step(steps::setup_cargo_config(Platform::Linux))
-            .add_step(steps::setup_linux())
             .add_step(named::bash(indoc::indoc! {r#"
                 cargo test -p xtask
                 cargo xtask workflows
@@ -221,23 +228,22 @@ fn shared_validation(workers: &[&NamedJob]) -> NamedJob {
         .iter()
         .map(|worker| worker.name.clone())
         .collect::<Vec<_>>();
-    let check_results = workers.iter().fold(
-        named::bash(indoc::indoc! {r#"
-            exit_code=0
-            for result in "$SHARED_CLIPPY_RESULT" "$COPPER_TESTS_RESULT" "$PROJECT_BENCHMARKS_RESULT" "$RUST_TOOLS_VALIDATION_RESULT" "$RELEASE_AUTOMATION_VALIDATION_RESULT"; do
-                if [[ "$result" != "success" ]]; then
-                    exit_code=1
-                fi
-            done
-            exit "$exit_code"
-        "#}),
-        |step, worker| {
+    let mut check_results_script = String::from("exit_code=0\n");
+    for worker in workers {
+        check_results_script.push_str(&format!(
+            "if [[ \"${{{}_RESULT}}\" != \"success\" ]]; then exit_code=1; fi\n",
+            worker.name.to_uppercase()
+        ));
+    }
+    check_results_script.push_str("exit \"$exit_code\"\n");
+    let check_results = workers
+        .iter()
+        .fold(named::bash(check_results_script), |step, worker| {
             step.add_env((
                 format!("{}_RESULT", worker.name.to_uppercase()),
                 format!("${{{{ needs.{}.result }}}}", worker.name),
             ))
-        },
-    );
+        });
 
     named::job(
         Job::default()
@@ -671,7 +677,6 @@ mod tests {
         );
         let aggregator_commands = run_commands(shared_validation);
         assert_eq!(aggregator_commands.len(), 1);
-        assert!(aggregator_commands[0].contains("[[ \"$result\" != \"success\" ]]"));
         assert!(aggregator_commands[0].contains("exit \"$exit_code\""));
         let aggregator_steps = shared_validation
             .get("steps")
@@ -689,6 +694,10 @@ mod tests {
                     .get(&environment_name)
                     .and_then(Value::as_str),
                 Some(expected_result.as_str())
+            );
+            assert!(
+                aggregator_commands[0]
+                    .contains(&format!("[[ \"${{{environment_name}}}\" != \"success\" ]]"))
             );
         }
 
@@ -782,6 +791,7 @@ mod tests {
             "shared_clippy",
             "project_benchmarks",
             "rust_tools_validation",
+            "release_automation_validation",
         ] {
             assert!(
                 job(&parsed, worker_name)
@@ -791,6 +801,42 @@ mod tests {
             );
         }
         let benchmark_commands = run_commands(job(&parsed, "project_benchmarks"));
+        let benchmark_strategy = job(&parsed, "project_benchmarks")
+            .get("strategy")
+            .expect("benchmark matrix strategy");
+        assert_eq!(
+            benchmark_strategy.get("fail-fast").and_then(Value::as_bool),
+            Some(false)
+        );
+        assert_eq!(
+            benchmark_strategy
+                .get("matrix")
+                .and_then(|matrix| matrix.get("include")),
+            Some(&serde_yaml::to_value(json!([
+                { "benchmark": "cargo_workspace" },
+                { "benchmark": "structured_execution" },
+            ]))?)
+        );
+        let benchmark_steps = job(&parsed, "project_benchmarks")
+            .get("steps")
+            .and_then(Value::as_sequence)
+            .expect("benchmark steps");
+        for (feature, benchmark) in [
+            ("cargo-workspace", "cargo_workspace"),
+            ("structured-execution", "structured_execution"),
+        ] {
+            let command = format!(
+                "cargo bench -p project --features {feature} --bench {benchmark} -- --noplot"
+            );
+            let step = benchmark_steps
+                .iter()
+                .find(|step| step.get("run").and_then(Value::as_str) == Some(command.as_str()))
+                .expect("isolated benchmark command");
+            assert_eq!(
+                step.get("if").and_then(Value::as_str),
+                Some(format!("matrix.benchmark == '{benchmark}'").as_str())
+            );
+        }
         assert_eq!(
             job(&parsed, "project_benchmarks")
                 .get("timeout-minutes")
@@ -822,12 +868,17 @@ mod tests {
 
         let release_validation_commands =
             run_commands(job(&parsed, "release_automation_validation"));
-        assert_eq!(release_validation_commands.len(), 4);
+        assert_eq!(release_validation_commands.len(), 3);
+        assert!(
+            !release_validation_commands
+                .iter()
+                .any(|command| command.contains("./script/linux"))
+        );
         let release_validation = release_validation_commands
             .iter()
             .find(|command| command.contains("cargo test -p xtask"))
-            .expect("release automation validation command");
-        for command in [
+            .expect("release pipeline validation command");
+        for required_command in [
             "cargo xtask workflows",
             "git diff --exit-code",
             "cargo xtask check-workflows",
@@ -835,7 +886,10 @@ mod tests {
             "cargo xtask bundle --product rust",
             "--dry-run",
         ] {
-            assert!(release_validation.contains(command));
+            assert!(
+                release_validation.contains(required_command),
+                "release validation must run {required_command}"
+            );
         }
 
         assert_eq!(workflow.matches("runs-on:").count(), 8);

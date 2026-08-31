@@ -29,12 +29,10 @@ try {
 
 if ($needsInstall) {
     Write-Host "Installing cargo-about@$CARGO_ABOUT_VERSION..."
-    # The product bundler sets CARGO_TARGET_DIR to an absolute Windows path.
-    # Cargo can represent that path with an extended-length prefix, which MSVC
-    # does not accept for cargo-about's native mimalloc sources. Keep this
-    # bootstrap build in a short, isolated temporary target directory.
-    $cargoAboutTargetDir = Join-Path ([System.IO.Path]::GetTempPath()) "cargo-about-target"
-    cargo install "cargo-about@$CARGO_ABOUT_VERSION" --target-dir $cargoAboutTargetDir
+    # Keep native cargo-about dependencies separate from the product build and
+    # avoid inheriting an absolute extended-length CARGO_TARGET_DIR from callers.
+    $cargoAboutTargetDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "zed-cargo-about-$CARGO_ABOUT_VERSION"
+    cargo install "cargo-about@$CARGO_ABOUT_VERSION" --target-dir $cargoAboutTargetDirectory
 }
 
 Write-Host "Generating cargo licenses"

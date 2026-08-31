@@ -60,7 +60,7 @@ const RELEASE_BUMP: &str =
 const RELEASE_EXPLICIT_VERSION: &str =
     "${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}";
 const RELEASE_EXISTING_TAG: &str = "${{ github.event_name == 'push' && github.ref_name || '' }}";
-const AUTOMATIC_RELEASE_GUARD: &str = "github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository)";
+const AUTOMATIC_RELEASE_GUARD: &str = "github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository)";
 
 struct PreparedRelease {
     commit_sha: JobOutput,
@@ -180,11 +180,11 @@ fn product_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
             .add_step(
                 named::bash("cargo xtask bundle --product \"$PRODUCT_ID\" --platform \"$PLATFORM\" --target \"$TARGET\"")
                     .if_condition(Expression::new("matrix.platform == 'linux'"))
-                    .add_env(("CC", "clang-18"))
-                    .add_env(("CXX", "clang++-18"))
                     .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
                     .add_env(("PLATFORM", "${{ matrix.platform }}"))
-                    .add_env(("TARGET", "${{ matrix.target }}")),
+                    .add_env(("TARGET", "${{ matrix.target }}"))
+                    .add_env(("CC", "clang"))
+                    .add_env(("CXX", "clang++")),
             )
             .add_step(
                 named::bash("cargo xtask bundle --product \"$PRODUCT_ID\" --platform macos --target \"$TARGET\"")
@@ -350,6 +350,7 @@ mod release_workflow_tests {
         assert!(yaml.contains("- completed"));
         assert!(yaml.contains("- main"));
         assert!(yaml.contains("github.event.workflow_run.conclusion == 'success'"));
+        assert!(yaml.contains("github.event.workflow_run.event == 'push'"));
         assert!(yaml.contains("github.event.workflow_run.head_branch == 'main'"));
         assert!(
             yaml.contains(
@@ -380,8 +381,8 @@ mod release_workflow_tests {
         assert!(yaml.contains("if-no-files-found: error"));
         assert!(yaml.contains("Expected exactly 3 Copper artifacts"));
         assert!(yaml.contains("git config --global core.longpaths true"));
-        assert!(yaml.contains("CC: clang-18"));
-        assert!(yaml.contains("CXX: clang++-18"));
+        assert!(yaml.contains("CC: clang\n"));
+        assert!(yaml.contains("CXX: clang++\n"));
         assert!(yaml.contains("git tag -a"));
         assert!(yaml.contains("--draft"));
         assert!(yaml.contains("contents: write"));
@@ -553,6 +554,9 @@ mod tests {
         assert!(workflow.contains("target: x86_64-unknown-linux-gnu"));
         assert!(workflow.contains("target: aarch64-apple-darwin"));
         assert!(workflow.contains("target: x86_64-pc-windows-msvc"));
+        assert!(workflow.contains("git config --global core.longpaths true"));
+        assert!(workflow.contains("CC: clang"));
+        assert!(workflow.contains("CXX: clang++"));
         assert!(workflow.contains("needs:\n    - prepare_release\n    - product_builds"));
         assert_eq!(workflow.matches("contents: write").count(), 1);
         let rust = ProductManifest::load()?

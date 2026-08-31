@@ -102,6 +102,12 @@ jobs:
     env:
       CC: clang
       CXX: clang++
+    strategy:
+      matrix:
+        include:
+        - benchmark: cargo_workspace
+        - benchmark: structured_execution
+      fail-fast: false
     steps:
     - name: steps::checkout_repo
       uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
@@ -114,8 +120,10 @@ jobs:
     - name: steps::setup_linux
       run: ./script/linux
     - name: run_tests::project_benchmarks
+      if: matrix.benchmark == 'cargo_workspace'
       run: cargo bench -p project --features cargo-workspace --bench cargo_workspace -- --noplot
     - name: run_tests::project_benchmarks
+      if: matrix.benchmark == 'structured_execution'
       run: cargo bench -p project --features structured-execution --bench structured_execution -- --noplot
     - name: steps::cleanup_cargo_config
       if: always()
@@ -158,8 +166,6 @@ jobs:
       run: |
         mkdir -p ./../.cargo
         cp ./.cargo/ci-config.toml ./../.cargo/config.toml
-    - name: steps::setup_linux
-      run: ./script/linux
     - name: run_tests::release_automation_validation
       run: |
         cargo test -p xtask
@@ -189,11 +195,11 @@ jobs:
     - name: run_tests::shared_validation
       run: |
         exit_code=0
-        for result in "$SHARED_CLIPPY_RESULT" "$COPPER_TESTS_RESULT" "$PROJECT_BENCHMARKS_RESULT" "$RUST_TOOLS_VALIDATION_RESULT" "$RELEASE_AUTOMATION_VALIDATION_RESULT"; do
-            if [[ "$result" != "success" ]]; then
-                exit_code=1
-            fi
-        done
+        if [[ "${SHARED_CLIPPY_RESULT}" != "success" ]]; then exit_code=1; fi
+        if [[ "${COPPER_TESTS_RESULT}" != "success" ]]; then exit_code=1; fi
+        if [[ "${PROJECT_BENCHMARKS_RESULT}" != "success" ]]; then exit_code=1; fi
+        if [[ "${RUST_TOOLS_VALIDATION_RESULT}" != "success" ]]; then exit_code=1; fi
+        if [[ "${RELEASE_AUTOMATION_VALIDATION_RESULT}" != "success" ]]; then exit_code=1; fi
         exit "$exit_code"
       env:
         SHARED_CLIPPY_RESULT: ${{ needs.shared_clippy.result }}

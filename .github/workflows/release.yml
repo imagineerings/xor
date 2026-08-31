@@ -33,7 +33,7 @@ permissions:
   contents: read
 jobs:
   prepare_release:
-    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository)
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -121,11 +121,11 @@ jobs:
       if: matrix.platform == 'linux'
       run: cargo xtask bundle --product "$PRODUCT_ID" --platform "$PLATFORM" --target "$TARGET"
       env:
-        CC: clang-18
-        CXX: clang++-18
         PRODUCT_ID: ${{ matrix.product }}
         PLATFORM: ${{ matrix.platform }}
         TARGET: ${{ matrix.target }}
+        CC: clang
+        CXX: clang++
     - name: release::product_builds
       if: matrix.platform == 'macos'
       run: cargo xtask bundle --product "$PRODUCT_ID" --platform macos --target "$TARGET"
