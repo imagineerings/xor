@@ -157,8 +157,15 @@ fi
 
 echo "Creating application bundle"
 pushd crates/zed
-app_path=$(cargo bundle ${build_flag} --no-default-features --features "${ZED_PRODUCT_APP_FEATURES}" --target "$target_triple" | xargs)
+app_path=$(
+    cargo bundle ${build_flag} --format osx --no-default-features --features "${ZED_PRODUCT_APP_FEATURES}" --target "$target_triple" |
+        sed -n 's/^[[:space:]]*\(.*\.app\)$/\1/p'
+)
 popd
+if [[ -z "${app_path}" || "${app_path}" == *$'\n'* || ! -d "${app_path}" ]]; then
+    echo "Expected cargo-bundle to produce exactly one macOS application bundle, got: ${app_path}" >&2
+    exit 1
+fi
 echo "Bundled ${app_path}"
 
 product_app_path="$(dirname "${app_path}")/${ZED_PRODUCT_DISPLAY_NAME}.app"

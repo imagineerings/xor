@@ -204,13 +204,13 @@ fn main() {
     #[cfg(unix)]
     util::prevent_root_execution();
 
-    #[cfg(all(not(debug_assertions), target_os = "windows", feature = "comfy"))]
+    #[cfg(all(not(debug_assertions), target_os = "windows"))]
     unsafe {
         use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
 
-        let needs_console = std::env::args_os()
-            .skip(1)
-            .any(|argument| argument == "comfy" || argument == "--foreground");
+        let needs_console = std::env::args_os().skip(1).any(|argument| {
+            argument == "--foreground" || (cfg!(feature = "comfy") && argument == "comfy")
+        });
         if needs_console {
             let _attachment_result = AttachConsole(ATTACH_PARENT_PROCESS);
         }
@@ -1778,7 +1778,7 @@ struct Args {
 
     /// Run zed in the foreground, only used on Windows, to match the behavior on macOS.
     #[arg(long)]
-    #[cfg(all(target_os = "windows", feature = "comfy"))]
+    #[cfg(target_os = "windows")]
     #[arg(hide = true)]
     foreground: bool,
 
