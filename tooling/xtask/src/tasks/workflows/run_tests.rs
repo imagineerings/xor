@@ -255,27 +255,28 @@ fn windows_updater_tests() -> NamedJob {
                 }
 
                 $innoSetupPath = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-                $appIdLines = @(
+                $installerResourceLines = @(
                     Get-Content crates/zed/resources/windows/zed.iss |
-                        Where-Object { $_ -match '^AppId=' }
+                        Where-Object { $_ -match '^(AppId|SetupIconFile)=' }
                 )
-                if ($appIdLines.Count -ne 1) {
-                    throw "Expected exactly one AppId directive in the Windows installer template"
+                if ($installerResourceLines.Count -ne 2) {
+                    throw "Expected the AppId and SetupIconFile directives in the Windows installer template"
                 }
-                $fixtureDirectory = Join-Path $env:RUNNER_TEMP 'inno-app-id-validation'
+                $fixtureDirectory = Join-Path $env:RUNNER_TEMP 'inno-installer-resource-validation'
                 New-Item -ItemType Directory -Path $fixtureDirectory -Force | Out-Null
-                $fixturePath = Join-Path $fixtureDirectory 'installer-id.iss'
+                $fixturePath = Join-Path $fixtureDirectory 'installer-resources.iss'
+                $productIconPath = Join-Path $env:ZED_PRODUCT_ICON_SET 'app-icon.ico'
                 @(
                     '[Setup]'
-                    $appIdLines[0]
+                    $installerResourceLines
                     'AppName=Installer Identity Validation'
                     'AppVersion=1.0.0'
                     'DefaultDirName={tmp}\InstallerIdentityValidation'
                     'Uninstallable=no'
                 ) | Set-Content -Path $fixturePath -Encoding utf8
-                & $innoSetupPath '/O-' "/DAppId=$env:ZED_PRODUCT_WINDOWS_INSTALLER_ID" $fixturePath
+                & $innoSetupPath '/O-' "/DAppId=$env:ZED_PRODUCT_WINDOWS_INSTALLER_ID" "/DProductIconFile=$productIconPath" $fixturePath
                 if ($LASTEXITCODE -ne 0) {
-                    throw "Inno Setup rejected the catalog-derived installer ID"
+                    throw "Inno Setup rejected the catalog-derived installer identity or icon"
                 }
             "#})),
     )
@@ -963,7 +964,8 @@ mod tests {
                 .any(|command| command.contains("cargo test --locked -p auto_update_helper"))
         );
         assert!(run_commands(updater).iter().any(|command| {
-            command.contains("Inno Setup rejected the catalog-derived installer ID")
+            command.contains("Inno Setup rejected the catalog-derived installer identity or icon")
+                && command.contains("SetupIconFile")
         }));
         assert!(workflow.contains("runs-on: ubuntu-22.04"));
         assert!(workflow.contains("runner: macos-15"));
