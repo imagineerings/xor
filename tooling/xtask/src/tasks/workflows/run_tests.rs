@@ -247,7 +247,7 @@ fn windows_updater_tests() -> NamedJob {
             .add_step(named::pwsh(indoc::indoc! {r#"
                 $ErrorActionPreference = 'Stop'
                 $PSNativeCommandUseErrorActionPreference = $true
-                cargo test --locked -p auto_update_helper
+                cargo test --locked -p auto_update_helper -p xtask
                 cargo build --locked -p auto_update_helper
                 $metadata = (Get-Item target/debug/auto_update_helper.exe).VersionInfo
                 if ($metadata.ProductName -ne $env:ZED_PRODUCT_DISPLAY_NAME -or $metadata.FileVersion -ne $env:RELEASE_VERSION) {

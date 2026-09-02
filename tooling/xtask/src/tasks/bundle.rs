@@ -167,7 +167,11 @@ pub fn run(args: BundleArgs) -> Result<()> {
     command.env("ZED_PRODUCT_DATA_NAMESPACE", data_namespace);
     command.env("ZED_PRODUCT_UPDATE_NAMESPACE", &product.update_namespace);
     command.env("ZED_PRODUCT_WINDOWS_INSTALLER_ID", windows_installer_id);
-    command.env("ZED_PRODUCT_ICON_SET", root.join(&product.icon_set));
+    let product_icon_set = root.join(&product.icon_set);
+    command.env(
+        "ZED_PRODUCT_ICON_SET",
+        external_tool_path(&product_icon_set),
+    );
     command.env("ZED_PRODUCT_APP_FEATURES", product.cargo_features.join(","));
     command.env(
         "ZED_PRODUCT_REMOTE_FEATURES",
@@ -210,6 +214,10 @@ fn product_target_dir(platform: Platform, root: &Path, product_id: &str) -> Path
     } else {
         root.join(relative)
     }
+}
+
+fn external_tool_path(path: &Path) -> &Path {
+    dunce::simplified(path)
 }
 
 fn platform_command(platform: Platform, target: &str) -> Result<Command> {
@@ -368,6 +376,20 @@ mod tests {
             product_target_dir(Platform::Linux, root, "rust"),
             root.join("target/products/rust")
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_external_tool_paths_are_not_verbatim() {
+        assert_eq!(
+            external_tool_path(Path::new(r"\\?\C:\workspace\icon.ico")),
+            Path::new(r"C:\workspace\icon.ico")
+        );
+
+        let product_icon_path = workspace_root().join("assets/product_flavors/rust/app-icon.ico");
+        let product_icon = external_tool_path(&product_icon_path);
+        assert!(product_icon.is_file());
+        assert!(!product_icon.to_string_lossy().starts_with(r"\\?\"));
     }
 
     #[test]

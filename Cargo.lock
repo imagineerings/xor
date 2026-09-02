@@ -24544,6 +24544,7 @@ dependencies = [
  "cargo_toml",
  "clap",
  "compliance",
+ "dunce",
  "gh-workflow",
  "indexmap 2.14.0",
  "indoc",
