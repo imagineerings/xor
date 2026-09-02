@@ -216,6 +216,7 @@ jobs:
     env:
       RELEASE_VERSION: 1.2.3
       ZED_PRODUCT_DISPLAY_NAME: Copper
+      ZED_PRODUCT_WINDOWS_INSTALLER_ID: '{6D7C1287-4A0E-5F5F-BE2C-8066A31F8761}'
       ZED_PRODUCT_ICON_SET: ${{ github.workspace }}/assets/product_flavors/rust
     steps:
     - name: steps::checkout_repo
@@ -234,6 +235,30 @@ jobs:
         $metadata = (Get-Item target/debug/auto_update_helper.exe).VersionInfo
         if ($metadata.ProductName -ne $env:ZED_PRODUCT_DISPLAY_NAME -or $metadata.FileVersion -ne $env:RELEASE_VERSION) {
             throw "Updater product metadata does not match the resolved release environment"
+        }
+
+        $innoSetupPath = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+        $appIdLines = @(
+            Get-Content crates/zed/resources/windows/zed.iss |
+                Where-Object { $_ -match '^AppId=' }
+        )
+        if ($appIdLines.Count -ne 1) {
+            throw "Expected exactly one AppId directive in the Windows installer template"
+        }
+        $fixtureDirectory = Join-Path $env:RUNNER_TEMP 'inno-app-id-validation'
+        New-Item -ItemType Directory -Path $fixtureDirectory -Force | Out-Null
+        $fixturePath = Join-Path $fixtureDirectory 'installer-id.iss'
+        @(
+            '[Setup]'
+            $appIdLines[0]
+            'AppName=Installer Identity Validation'
+            'AppVersion=1.0.0'
+            'DefaultDirName={tmp}\InstallerIdentityValidation'
+            'Uninstallable=no'
+        ) | Set-Content -Path $fixturePath -Encoding utf8
+        & $innoSetupPath '/O-' "/DAppId=$env:ZED_PRODUCT_WINDOWS_INSTALLER_ID" $fixturePath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup rejected the catalog-derived installer ID"
         }
       shell: pwsh
     timeout-minutes: 15
