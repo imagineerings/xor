@@ -153,7 +153,6 @@ function PrepareForBundle {
     }
     New-Item -Path "$innoDir" -ItemType Directory -Force
     Copy-Item -Path "$env:ZED_WORKSPACE\crates\zed\resources\windows\*" -Destination "$innoDir" -Recurse -Force
-    Copy-Item -Path "$env:ZED_PRODUCT_ICON_SET\app-icon.ico" -Destination "$innoDir\product-app-icon.ico" -Force
     New-Item -Path "$innoDir\make_appx" -ItemType Directory -Force
     New-Item -Path "$innoDir\appx" -ItemType Directory -Force
     New-Item -Path "$innoDir\bin" -ItemType Directory -Force
@@ -286,7 +285,10 @@ function BuildInstaller {
         throw "Can't bundle installer for unsupported channel $channel."
     }
     $appId = $env:ZED_PRODUCT_WINDOWS_INSTALLER_ID
-    $appIconName = "product-app-icon"
+    $appIconSource = Join-Path $env:ZED_PRODUCT_ICON_SET "app-icon.ico"
+    if (-not (Test-Path $appIconSource -PathType Leaf)) {
+        throw "Product installer icon does not exist: $appIconSource"
+    }
     $appName = $env:ZED_PRODUCT_DISPLAY_NAME
     $appDisplayName = $appName
     $appSetupName = [System.IO.Path]::GetFileNameWithoutExtension($env:ZED_PRODUCT_ARTIFACT_NAME)
@@ -303,7 +305,7 @@ function BuildInstaller {
 
     $definitions = @{
         "AppId"          = $appId
-        "AppIconName"    = $appIconName
+        "ProductIconFile" = $appIconSource
         "OutputDir"      = "$CargoTargetDir\release"
         "AppSetupName"   = $appSetupName
         "AppName"        = $appName
