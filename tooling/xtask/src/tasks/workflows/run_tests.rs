@@ -237,6 +237,10 @@ fn windows_updater_tests() -> NamedJob {
             .timeout_minutes(15u32)
             .add_env(("RELEASE_VERSION", "1.2.3"))
             .add_env(("ZED_PRODUCT_DISPLAY_NAME", product.display_name.clone()))
+            .add_env((
+                "ZED_PRODUCT_WINDOWS_INSTALLER_ID",
+                product.windows_installer_id.clone(),
+            ))
             .add_env(("ZED_PRODUCT_ICON_SET", format!("${{{{ github.workspace }}}}/{}", product.icon_set)))
             .add_step(steps::checkout_repo())
             .add_step(steps::enable_windows_long_paths())
@@ -248,6 +252,30 @@ fn windows_updater_tests() -> NamedJob {
                 $metadata = (Get-Item target/debug/auto_update_helper.exe).VersionInfo
                 if ($metadata.ProductName -ne $env:ZED_PRODUCT_DISPLAY_NAME -or $metadata.FileVersion -ne $env:RELEASE_VERSION) {
                     throw "Updater product metadata does not match the resolved release environment"
+                }
+
+                $innoSetupPath = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+                $appIdLines = @(
+                    Get-Content crates/zed/resources/windows/zed.iss |
+                        Where-Object { $_ -match '^AppId=' }
+                )
+                if ($appIdLines.Count -ne 1) {
+                    throw "Expected exactly one AppId directive in the Windows installer template"
+                }
+                $fixtureDirectory = Join-Path $env:RUNNER_TEMP 'inno-app-id-validation'
+                New-Item -ItemType Directory -Path $fixtureDirectory -Force | Out-Null
+                $fixturePath = Join-Path $fixtureDirectory 'installer-id.iss'
+                @(
+                    '[Setup]'
+                    $appIdLines[0]
+                    'AppName=Installer Identity Validation'
+                    'AppVersion=1.0.0'
+                    'DefaultDirName={tmp}\InstallerIdentityValidation'
+                    'Uninstallable=no'
+                ) | Set-Content -Path $fixturePath -Encoding utf8
+                & $innoSetupPath '/O-' "/DAppId=$env:ZED_PRODUCT_WINDOWS_INSTALLER_ID" $fixturePath
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Inno Setup rejected the catalog-derived installer ID"
                 }
             "#})),
     )
@@ -934,6 +962,9 @@ mod tests {
                 .iter()
                 .any(|command| command.contains("cargo test --locked -p auto_update_helper"))
         );
+        assert!(run_commands(updater).iter().any(|command| {
+            command.contains("Inno Setup rejected the catalog-derived installer ID")
+        }));
         assert!(workflow.contains("runs-on: ubuntu-22.04"));
         assert!(workflow.contains("runner: macos-15"));
         assert!(workflow.contains("runner: windows-2022"));

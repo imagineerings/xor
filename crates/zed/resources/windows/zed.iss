@@ -1,5 +1,5 @@
 [Setup]
-AppId={#AppId}
+AppId={{#AppId}
 AppName={#AppName}
 AppVerName={#AppDisplayName}
 AppPublisher=IDE Flavors
