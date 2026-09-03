@@ -169,6 +169,15 @@ fn product_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
             .add_env(("RELEASE_VERSION", prepared.version.to_string()))
             .strategy(Strategy::default().fail_fast(false).matrix(json!({ "include": include })))
             .add_step(steps::checkout_repo().with_ref(prepared.commit_sha.to_string()))
+            .add_step(steps::cache_release_sccache())
+            .add_step(
+                steps::setup_release_sccache(runners::Platform::Linux)
+                    .if_condition(Expression::new("matrix.platform != 'windows'")),
+            )
+            .add_step(
+                steps::setup_release_sccache(runners::Platform::Windows)
+                    .if_condition(Expression::new("matrix.platform == 'windows'")),
+            )
             .add_step(
                 named::bash("uname -m && rustc -vV && df -h . && xcode-select -p")
                     .if_condition(Expression::new("matrix.platform == 'macos'")),
@@ -233,6 +242,14 @@ fn product_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
             .add_step(
                 steps::upload_artifact("${{ matrix.artifact }}", "${{ matrix.artifact_path }}")
                     .if_no_files_found(IfNoFilesFound::Error),
+            )
+            .add_step(
+                steps::finalize_release_sccache(runners::Platform::Linux)
+                    .if_condition(Expression::new("always() && matrix.platform != 'windows'")),
+            )
+            .add_step(
+                steps::finalize_release_sccache(runners::Platform::Windows)
+                    .if_condition(Expression::new("always() && matrix.platform == 'windows'")),
             )
             .add_step(
                 named::bash("df -h . && du -sh target")
@@ -411,6 +428,12 @@ mod release_workflow_tests {
         assert!(yaml.contains("git config --global core.longpaths true"));
         assert!(yaml.contains("CC: clang\n"));
         assert!(yaml.contains("CXX: clang++\n"));
+        assert!(yaml.contains("uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830"));
+        assert!(yaml.contains("release-sccache-${{ runner.os }}-${{ matrix.target }}"));
+        assert!(yaml.contains("SCCACHE_LOCAL_CACHE_DIR: ${{ runner.temp }}/release-sccache"));
+        assert!(yaml.contains("SCCACHE_CACHE_SIZE: 3G"));
+        assert!(yaml.contains("sccache --show-stats"));
+        assert!(yaml.contains("sccache --stop-server"));
         assert!(yaml.contains("git tag -a"));
         assert!(yaml.contains("--draft"));
         assert!(yaml.contains("contents: write"));

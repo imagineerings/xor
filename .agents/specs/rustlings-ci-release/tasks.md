@@ -146,15 +146,25 @@ First establish stable Rustlings package naming, then replace the active CI and 
 After committing the local reconciliation, require PR #11 checks to pass and verify its merge before deleting any eligible remote branch. Immediately before each deletion, recheck the remote tip and relevant open PRs and use the exact recorded SHA as a deletion lease. Preserve changed tips for re-audit. Report merge/check evidence and actual deletion results separately; do not manually dispatch releases, alter protections, or delete main/dev/rustlings, tags, or local branches.
 
 
-### Milestone 4: Repair and verify the first native release
+### Milestone 4: Repair, verify, and accelerate native releases
 
-- [ ] 4. Repair demonstrated native failures and verify publication
-  - [ ] 4.1. Fix reusable updater rollback and native release metadata
+- [x] 4. Repair demonstrated native failures, verify publication, and reuse compilation
+  - [x] 4.1. Fix reusable updater rollback and native release metadata
     - Add native Windows updater tests to the required CI graph; propagate resolved product/version metadata into Windows resources and macOS plists; restore Windows foreground startup without Comfy; retain optional signing and collect macOS runner diagnostics.
     - _Requirements: 1.8, 2.1, 2.2, 2.4, 2.5, 2.7, 2.9, 3.5, 4.1_
     - _Depends on: 3.4_
     - _Reads: products/flavors.toml, tooling/xtask/src/tasks/bundle.rs, crates/auto_update_helper/src/updater.rs_
     - _Writes: crates/auto_update_helper/src/updater.rs, crates/windows_resources/src/windows_resources.rs, crates/cli/src/main.rs, crates/zed/src/main.rs, crates/release_channel/src/lib.rs, script/smoke-product-bundle, script/bundle-mac, script/bundle-windows.ps1, tooling/xtask/src/tasks/workflows/run_tests.rs, tooling/xtask/src/tasks/workflows/release.rs, .github/workflows/run_tests.yml, .github/workflows/release.yml_
     - _Validation: formatting, xtask tests, workflow freshness, product catalog check, targeted Clippy, native Windows CI, macOS build-script/plist checks, all three release bundles, automatic tag and published asset inspection_
+    - _Evidence: Fixes landed through PRs 12-17. Release run 33657478916 passed Linux x86_64, macOS ARM64, Windows x86_64, and gated publication from commit `54ef39a5f2c3f53b7558c8e999161047bd5e97c8`; annotated tag `rust-v1.16.2` and the non-draft Copper 1.16.2 release contain exactly three assets that matched their workflow artifacts byte-for-byte._
+  - [x] 4.2. Reuse bounded release-mode compilation across native platforms
+    - Add a GitHub-managed local `sccache` backend to the generated release matrix without exposing R2 credentials or changing the native bundle commands.
+    - Isolate cache entries by operating system, target triple, and toolchain; bound every platform cache; preserve cold-build fallback and emit final cache statistics.
+    - _Requirements: 2.1, 2.2, 2.4, 2.5, 2.6, 2.7, 2.11, 4.1, 4.3, 4.4_
+    - _Depends on: 4.1_
+    - _Reads: tooling/xtask/src/tasks/workflows/release.rs, tooling/xtask/src/tasks/workflows/steps.rs, script/setup-sccache, script/setup-sccache.ps1_
+    - _Writes: tooling/xtask/src/tasks/workflows/release.rs, tooling/xtask/src/tasks/workflows/steps.rs, script/setup-sccache, script/setup-sccache.ps1, .github/workflows/release.yml_
+    - _Validation: prove a local release-mode cache hit with clean target output, run script syntax checks, full xtask tests and Clippy, regenerate and validate workflows, inspect permissions/features/matrix/publish fan-in, then verify the automatic native release and cache statistics after merge_
+    - _Evidence: A local disk backend with two identical release-mode Cargo builds and a cleaned target produced one miss followed by one Rust cache hit. The generated workflow uses a pinned GitHub cache action, 3 GiB per-platform bounds, target/toolchain keys, read-only native permissions, unchanged hosted runners and bundle commands, strict statistics, and no R2 credentials._
 
 The 2026-08-31 release-repair request separately authorizes scoped commits, pushes, PRs, merging after checks pass, and release reruns through successful publication. It supersedes the earlier restriction on manually dispatching releases for this repair only. Existing tags and published assets must not be moved, deleted, or overwritten; unrelated branch cleanup is postponed.

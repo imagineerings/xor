@@ -2,12 +2,12 @@
 $ErrorActionPreference = "Stop"
 
 $SCCACHE_VERSION = "v0.16.0"
-$SCCACHE_DIR = "./target/sccache"
+$SCCACHE_BIN_DIR = "./target/sccache"
 
 function Install-Sccache {
-    New-Item -ItemType Directory -Path $SCCACHE_DIR -Force | Out-Null
+    New-Item -ItemType Directory -Path $SCCACHE_BIN_DIR -Force | Out-Null
 
-    $sccachePath = Join-Path $SCCACHE_DIR "sccache.exe"
+    $sccachePath = Join-Path $SCCACHE_BIN_DIR "sccache.exe"
     $expectedVersion = "sccache $($SCCACHE_VERSION.Substring(1))"
     $installedVersion = $null
     if (Test-Path $sccachePath) {
@@ -62,7 +62,7 @@ function Install-Sccache {
         }
     }
 
-    $absolutePath = (Resolve-Path $SCCACHE_DIR).Path
+    $absolutePath = (Resolve-Path $SCCACHE_BIN_DIR).Path
     if ($env:GITHUB_PATH) {
         $absolutePath | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
     }
@@ -86,8 +86,8 @@ function Install-Sccache {
 }
 
 function Configure-Sccache {
-    if (-not $env:R2_ACCOUNT_ID) {
-        Write-Host "R2_ACCOUNT_ID not set, skipping sccache configuration"
+    if (-not $env:R2_ACCOUNT_ID -and -not $env:SCCACHE_LOCAL_CACHE_DIR) {
+        Write-Host "No remote or local cache backend configured, skipping sccache configuration"
         return
     }
 
@@ -99,41 +99,56 @@ function Configure-Sccache {
         exit 1
     }
 
-    Write-Host "Configuring sccache with Cloudflare R2..."
-
-    $bucket = if ($env:SCCACHE_BUCKET) { $env:SCCACHE_BUCKET } else { "sccache-zed" }
-    $keyPrefix = if ($env:SCCACHE_KEY_PREFIX) { $env:SCCACHE_KEY_PREFIX } else { "sccache/" }
     $baseDir = if ($env:GITHUB_WORKSPACE) { $env:GITHUB_WORKSPACE } else { (Get-Location).Path }
 
     # Use the absolute path to sccache binary for RUSTC_WRAPPER to avoid
     # any PATH race conditions between GITHUB_PATH and GITHUB_ENV
     $sccacheBin = (Get-Command sccache).Source
 
-    # Set in current process
-    $env:SCCACHE_ENDPOINT = "https://$($env:R2_ACCOUNT_ID).r2.cloudflarestorage.com"
-    $env:SCCACHE_BUCKET = $bucket
-    $env:SCCACHE_REGION = "auto"
-    $env:SCCACHE_S3_KEY_PREFIX = $keyPrefix
     $env:SCCACHE_BASEDIRS = $baseDir
-    $env:AWS_ACCESS_KEY_ID = $env:R2_ACCESS_KEY_ID
-    $env:AWS_SECRET_ACCESS_KEY = $env:R2_SECRET_ACCESS_KEY
     $env:RUSTC_WRAPPER = $sccacheBin
 
-    # Also write to GITHUB_ENV for subsequent steps
-    if ($env:GITHUB_ENV) {
-        @(
-            "SCCACHE_ENDPOINT=$($env:SCCACHE_ENDPOINT)"
-            "SCCACHE_BUCKET=$($env:SCCACHE_BUCKET)"
-            "SCCACHE_REGION=$($env:SCCACHE_REGION)"
-            "SCCACHE_S3_KEY_PREFIX=$($env:SCCACHE_S3_KEY_PREFIX)"
-            "SCCACHE_BASEDIRS=$($env:SCCACHE_BASEDIRS)"
-            "AWS_ACCESS_KEY_ID=$($env:AWS_ACCESS_KEY_ID)"
-            "AWS_SECRET_ACCESS_KEY=$($env:AWS_SECRET_ACCESS_KEY)"
-            "RUSTC_WRAPPER=$($env:RUSTC_WRAPPER)"
-        ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+    if ($env:R2_ACCOUNT_ID) {
+        Write-Host "Configuring sccache with Cloudflare R2..."
+        $env:SCCACHE_ENDPOINT = "https://$($env:R2_ACCOUNT_ID).r2.cloudflarestorage.com"
+        $env:SCCACHE_BUCKET = if ($env:SCCACHE_BUCKET) { $env:SCCACHE_BUCKET } else { "sccache-zed" }
+        $env:SCCACHE_REGION = "auto"
+        $env:SCCACHE_S3_KEY_PREFIX = if ($env:SCCACHE_KEY_PREFIX) { $env:SCCACHE_KEY_PREFIX } else { "sccache/" }
+        $env:AWS_ACCESS_KEY_ID = $env:R2_ACCESS_KEY_ID
+        $env:AWS_SECRET_ACCESS_KEY = $env:R2_SECRET_ACCESS_KEY
+        Write-Host "✓ sccache configured with Cloudflare R2 (bucket: $($env:SCCACHE_BUCKET))"
+    }
+    else {
+        Write-Host "Configuring sccache with a local disk cache..."
+        New-Item -ItemType Directory -Path $env:SCCACHE_LOCAL_CACHE_DIR -Force | Out-Null
+        $env:SCCACHE_DIR = $env:SCCACHE_LOCAL_CACHE_DIR
+        $env:SCCACHE_CACHE_SIZE = if ($env:SCCACHE_CACHE_SIZE) { $env:SCCACHE_CACHE_SIZE } else { "3G" }
+        Write-Host "✓ sccache configured with local cache: $($env:SCCACHE_DIR)"
     }
 
-    Write-Host "✓ sccache configured with Cloudflare R2 (bucket: $bucket)"
+    if ($env:GITHUB_ENV) {
+        $settings = @(
+            "SCCACHE_BASEDIRS=$($env:SCCACHE_BASEDIRS)"
+            "RUSTC_WRAPPER=$($env:RUSTC_WRAPPER)"
+        )
+        if ($env:R2_ACCOUNT_ID) {
+            $settings += @(
+                "SCCACHE_ENDPOINT=$($env:SCCACHE_ENDPOINT)"
+                "SCCACHE_BUCKET=$($env:SCCACHE_BUCKET)"
+                "SCCACHE_REGION=$($env:SCCACHE_REGION)"
+                "SCCACHE_S3_KEY_PREFIX=$($env:SCCACHE_S3_KEY_PREFIX)"
+                "AWS_ACCESS_KEY_ID=$($env:AWS_ACCESS_KEY_ID)"
+                "AWS_SECRET_ACCESS_KEY=$($env:AWS_SECRET_ACCESS_KEY)"
+            )
+        }
+        else {
+            $settings += @(
+                "SCCACHE_DIR=$($env:SCCACHE_DIR)"
+                "SCCACHE_CACHE_SIZE=$($env:SCCACHE_CACHE_SIZE)"
+            )
+        }
+        $settings | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+    }
 }
 
 function Show-Config {
@@ -146,6 +161,8 @@ function Show-Config {
     Write-Host "SCCACHE_REGION: $($env:SCCACHE_REGION ?? '<not set>')"
     Write-Host "SCCACHE_S3_KEY_PREFIX: $($env:SCCACHE_S3_KEY_PREFIX ?? '<not set>')"
     Write-Host "SCCACHE_BASEDIRS: $($env:SCCACHE_BASEDIRS ?? '<not set>')"
+    Write-Host "SCCACHE_DIR: $($env:SCCACHE_DIR ?? '<not set>')"
+    Write-Host "SCCACHE_CACHE_SIZE: $($env:SCCACHE_CACHE_SIZE ?? '<not set>')"
 
     if ($env:AWS_ACCESS_KEY_ID) {
         Write-Host "AWS_ACCESS_KEY_ID: <set>"

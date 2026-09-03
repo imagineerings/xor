@@ -110,6 +110,25 @@ jobs:
       with:
         clean: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: steps::cache_release_sccache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+      with:
+        path: ${{ runner.temp }}/release-sccache
+        key: release-sccache-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('rust-toolchain.toml') }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: release-sccache-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('rust-toolchain.toml') }}-
+    - name: steps::setup_release_sccache
+      if: matrix.platform != 'windows'
+      run: ./script/setup-sccache
+      env:
+        SCCACHE_LOCAL_CACHE_DIR: ${{ runner.temp }}/release-sccache
+        SCCACHE_CACHE_SIZE: 3G
+    - name: steps::setup_release_sccache
+      if: matrix.platform == 'windows'
+      run: ./script/setup-sccache.ps1
+      shell: pwsh
+      env:
+        SCCACHE_LOCAL_CACHE_DIR: ${{ runner.temp }}/release-sccache
+        SCCACHE_CACHE_SIZE: 3G
     - name: release::product_builds
       if: matrix.platform == 'macos'
       run: uname -m && rustc -vV && df -h . && xcode-select -p
@@ -177,6 +196,21 @@ jobs:
         name: ${{ matrix.artifact }}
         path: ${{ matrix.artifact_path }}
         if-no-files-found: error
+    - name: steps::finalize_release_sccache
+      if: always() && matrix.platform != 'windows'
+      run: |
+        if command -v sccache >/dev/null 2>&1; then
+            sccache --show-stats
+            sccache --stop-server
+        fi
+    - name: steps::finalize_release_sccache
+      if: always() && matrix.platform == 'windows'
+      run: |
+        if ($env:RUSTC_WRAPPER) {
+            & $env:RUSTC_WRAPPER --show-stats
+            & $env:RUSTC_WRAPPER --stop-server
+        }
+      shell: pwsh
     - name: release::product_builds
       if: always() && matrix.platform == 'macos'
       run: df -h . && du -sh target
