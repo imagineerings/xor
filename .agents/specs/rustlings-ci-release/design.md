@@ -89,6 +89,17 @@ The user explicitly approved automatic releases and automatic tags after the ini
 - Integration: Give the native product matrix a bounded 240-minute job timeout; retain the 15-minute preparation and publishing deadlines and the complete matrix publish barrier.
 - Evidence: The fresh macOS retry in job 99470946614 compiled the application successfully in 105m 56s after about 13 minutes of setup, then the 120-minute job deadline killed the separate remote-server build. The initial executable/archive I/O failure did not recur. The extra time is for the already-required remote-server build, packaging, and artifact smoke checks, not a reduced build profile.
 
+### Bounded native compiler caching
+
+<!-- impl: tooling/xtask/src/tasks/workflows/release.rs#product_builds -->
+<!-- impl: tooling/xtask/src/tasks/workflows/steps.rs#cache_release_sccache -->
+<!-- impl: script/setup-sccache -->
+<!-- impl: script/setup-sccache.ps1 -->
+
+- Responsibility: Reuse unchanged release-mode Rust compilation across automatic releases without caching the complete product target directory or exposing private cache credentials.
+- Integration: Each generated platform row restores a 3 GiB local `sccache` directory through the pinned GitHub cache action. Keys isolate the runner operating system, target triple, Rust toolchain, workflow run, and retry attempt; restore prefixes reuse the newest compatible cache. The existing setup scripts retain their R2 backend for current CI consumers and select the local backend only when the release generator supplies it. Cache statistics and server shutdown run after bundle validation and upload.
+- Rationale: The successful `rust-v1.16.2` run spent 89 minutes in the Linux bundle command, 147 minutes on Windows, and 189 minutes on macOS, while checkout, smoke, and upload steps took under one minute each. The macOS target directory reached 28 GiB, so caching the full target would transfer large linked outputs. Compiler-level caching keeps a bounded set of content-addressed compilation results and a cache miss still performs the unchanged cold build.
+
 ### Generator and catalog ownership
 
 <!-- impl: products/flavors.toml -->
@@ -107,6 +118,7 @@ The user explicitly approved automatic releases and automatic tags after the ini
 | 1.6, 1.7 | Separate hosted Collab and Comfy coverage | Comfy matrix assertions and forbidden-reference scans |
 | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.9 | Automatic release and tag policy; generator and catalog ownership | Release/version tests, matrix/artifact/permission inspection, bundle dry runs |
 | 2.10 | CI worker and strict aggregation graph; parallel isolated benchmark configurations | One lightweight validation worker, no desktop setup, exact benchmark matrix rows, all original worker coverage retained |
+| 2.11 | Bounded native compiler caching | Generated cache keys/backend environment, cache statistics, local release-mode hit probe, and native release runs |
 | 1.8, 3.5 | Native updater and release metadata validation | Windows updater tests, compiled resource check, plist assertions |
 | 2.8 | Linux compiler selection; Windows release hardening | Generated environment assertions and Windows bundle regression tests |
 | 3.1, 3.2, 3.3, 3.4 | Generator and catalog ownership | Product check, generated metadata comparison, platform bundle-plan dry runs |

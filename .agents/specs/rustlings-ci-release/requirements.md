@@ -50,11 +50,12 @@ The Rust product shares a large Zed workspace, but its CI and releases must rema
 3. **2.3** THE platform matrix, product identity, installer names, and release artifact names SHALL derive from the validated Rust product catalog and generated product metadata.
 4. **2.4** THE publishing job SHALL depend on the complete platform matrix, validate one artifact per supported target, and SHALL NOT run successfully after any failed or cancelled platform build.
 5. **2.5** THE workflow SHALL use read-only permissions by default and grant `contents: write` only to the publishing job.
-6. **2.6** THE release workflow SHALL NOT require an organization-owner guard, Namespace or self-hosted runner, external cache, Slack, Sentry, compliance service, hard-coded external repository, or unrelated organization secret.
+6. **2.6** THE release workflow SHALL NOT require an organization-owner guard, Namespace or self-hosted runner, private or third-party cache service, Slack, Sentry, compliance service, hard-coded external repository, or unrelated organization secret; a missing GitHub-managed cache SHALL fall back to a complete cold build.
 7. **2.7** IF signing credentials are absent, THEN the platform bundle plan SHALL retain unsigned or ad-hoc output; no credentials SHALL be embedded in repository data or generated YAML.
 8. **2.8** THE Linux and Windows bundle environments SHALL select native compilers that exist on their hosted runners and SHALL avoid passing unsupported extended-length output paths to MSVC build scripts.
 9. **2.9** WHEN all platform builds succeed for an automatically selected main commit, THEN THE publisher SHALL create the next semantic `rust-vX.Y.Z` tag and release automatically; reruns SHALL reuse an existing matching commit tag, and stale or conflicting release decisions SHALL fail before publication.
 10. **2.10** THE CI SHALL retain concurrent focused workers, one generator-validation worker without unrelated platform setup, parallel isolated Cargo-workspace and structured-execution benchmark configurations, and strict result aggregation requiring every matrix row without duplicate validation jobs.
+11. **2.11** THE generated native release matrix SHALL reuse a bounded compiler cache isolated by runner operating system, target triple, and Rust toolchain while preserving the release profile, exact product features, native smoke tests, and complete publish barrier.
 
 ### Requirement 3: Centralized product and packaging identity
 
