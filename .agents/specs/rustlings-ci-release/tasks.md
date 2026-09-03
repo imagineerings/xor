@@ -166,5 +166,14 @@ After committing the local reconciliation, require PR #11 checks to pass and ver
     - _Writes: tooling/xtask/src/tasks/workflows/release.rs, tooling/xtask/src/tasks/workflows/steps.rs, script/setup-sccache, script/setup-sccache.ps1, .github/workflows/release.yml_
     - _Validation: prove a local release-mode cache hit with clean target output, run script syntax checks, full xtask tests and Clippy, regenerate and validate workflows, inspect permissions/features/matrix/publish fan-in, then verify the automatic native release and cache statistics after merge_
     - _Evidence: A local disk backend with two identical release-mode Cargo builds and a cleaned target produced one miss followed by one Rust cache hit. The generated workflow uses a pinned GitHub cache action, 3 GiB per-platform bounds, target/toolchain keys, read-only native permissions, unchanged hosted runners and bundle commands, strict statistics, and no R2 credentials._
+  - [x] 4.3. Keep the release cache daemon alive during long crate compilations
+    - Disable the local release cache daemon's idle timeout in the workflow generator and persist the setting across steps in both setup scripts.
+    - Keep cache statistics and shutdown strict so a cache failure remains visible, and leave existing R2-backed CI behavior unchanged.
+    - _Requirements: 2.6, 2.11, 4.1, 4.3, 4.4_
+    - _Depends on: 4.2_
+    - _Reads: tooling/xtask/src/tasks/workflows/steps.rs, script/setup-sccache, script/setup-sccache.ps1_
+    - _Writes: tooling/xtask/src/tasks/workflows/steps.rs, script/setup-sccache, script/setup-sccache.ps1, .github/workflows/release.yml_
+    - _Validation: regenerate and validate workflows, run script syntax checks and xtask tests, and verify a Windows hosted release bundle outlives the prior ten-minute single-crate boundary_
+    - _Evidence: Release run 33736625225 began the Windows `project` crate at 11:34:59 and lost the sccache server at 11:45:24 with Windows socket error 10054; upstream documents a ten-minute daemon idle timeout and `SCCACHE_IDLE_TIMEOUT=0` as the persistent-server setting._
 
 The 2026-08-31 release-repair request separately authorizes scoped commits, pushes, PRs, merging after checks pass, and release reruns through successful publication. It supersedes the earlier restriction on manually dispatching releases for this repair only. Existing tags and published assets must not be moved, deleted, or overwritten; unrelated branch cleanup is postponed.

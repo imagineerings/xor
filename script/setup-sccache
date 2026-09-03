@@ -99,6 +99,7 @@ configure_sccache() {
         mkdir -p "${SCCACHE_LOCAL_CACHE_DIR}"
         export SCCACHE_DIR="${SCCACHE_LOCAL_CACHE_DIR}"
         export SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-3G}"
+        export SCCACHE_IDLE_TIMEOUT="${SCCACHE_IDLE_TIMEOUT:-0}"
         echo "✓ sccache configured with local cache: ${SCCACHE_DIR}"
     fi
 
@@ -116,6 +117,7 @@ configure_sccache() {
             else
                 echo "SCCACHE_DIR=${SCCACHE_DIR}"
                 echo "SCCACHE_CACHE_SIZE=${SCCACHE_CACHE_SIZE}"
+                echo "SCCACHE_IDLE_TIMEOUT=${SCCACHE_IDLE_TIMEOUT}"
             fi
         } >> "$GITHUB_ENV"
     fi
@@ -131,6 +133,7 @@ show_config() {
     echo "SCCACHE_S3_KEY_PREFIX: ${SCCACHE_S3_KEY_PREFIX:-<not set>}"
     echo "SCCACHE_DIR: ${SCCACHE_DIR:-<not set>}"
     echo "SCCACHE_CACHE_SIZE: ${SCCACHE_CACHE_SIZE:-<not set>}"
+    echo "SCCACHE_IDLE_TIMEOUT: ${SCCACHE_IDLE_TIMEOUT:-<not set>}"
     echo "SCCACHE_BASEDIRS: ${SCCACHE_BASEDIRS:-<not set>}"
     if [[ -n "${AWS_ACCESS_KEY_ID:-}" ]]; then
         echo "AWS_ACCESS_KEY_ID: <set, length=${#AWS_ACCESS_KEY_ID}>"

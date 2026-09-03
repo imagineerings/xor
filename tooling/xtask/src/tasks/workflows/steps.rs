@@ -330,6 +330,7 @@ pub fn setup_release_sccache(platform: Platform) -> Step<Run> {
     };
     step.add_env(("SCCACHE_LOCAL_CACHE_DIR", RELEASE_SCCACHE_CACHE_DIR))
         .add_env(("SCCACHE_CACHE_SIZE", "3G"))
+        .add_env(("SCCACHE_IDLE_TIMEOUT", "0"))
 }
 
 pub fn finalize_release_sccache(platform: Platform) -> Step<Run> {

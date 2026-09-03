@@ -432,6 +432,7 @@ mod release_workflow_tests {
         assert!(yaml.contains("release-sccache-${{ runner.os }}-${{ matrix.target }}"));
         assert!(yaml.contains("SCCACHE_LOCAL_CACHE_DIR: ${{ runner.temp }}/release-sccache"));
         assert!(yaml.contains("SCCACHE_CACHE_SIZE: 3G"));
+        assert!(yaml.contains("SCCACHE_IDLE_TIMEOUT: '0'"));
         assert!(yaml.contains("sccache --show-stats"));
         assert!(yaml.contains("sccache --stop-server"));
         assert!(yaml.contains("git tag -a"));

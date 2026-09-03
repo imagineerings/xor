@@ -122,6 +122,7 @@ jobs:
       env:
         SCCACHE_LOCAL_CACHE_DIR: ${{ runner.temp }}/release-sccache
         SCCACHE_CACHE_SIZE: 3G
+        SCCACHE_IDLE_TIMEOUT: '0'
     - name: steps::setup_release_sccache
       if: matrix.platform == 'windows'
       run: ./script/setup-sccache.ps1
@@ -129,6 +130,7 @@ jobs:
       env:
         SCCACHE_LOCAL_CACHE_DIR: ${{ runner.temp }}/release-sccache
         SCCACHE_CACHE_SIZE: 3G
+        SCCACHE_IDLE_TIMEOUT: '0'
     - name: release::product_builds
       if: matrix.platform == 'macos'
       run: uname -m && rustc -vV && df -h . && xcode-select -p

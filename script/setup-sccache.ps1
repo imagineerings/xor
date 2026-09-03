@@ -123,6 +123,7 @@ function Configure-Sccache {
         New-Item -ItemType Directory -Path $env:SCCACHE_LOCAL_CACHE_DIR -Force | Out-Null
         $env:SCCACHE_DIR = $env:SCCACHE_LOCAL_CACHE_DIR
         $env:SCCACHE_CACHE_SIZE = if ($env:SCCACHE_CACHE_SIZE) { $env:SCCACHE_CACHE_SIZE } else { "3G" }
+        $env:SCCACHE_IDLE_TIMEOUT = if ($env:SCCACHE_IDLE_TIMEOUT) { $env:SCCACHE_IDLE_TIMEOUT } else { "0" }
         Write-Host "✓ sccache configured with local cache: $($env:SCCACHE_DIR)"
     }
 
@@ -145,6 +146,7 @@ function Configure-Sccache {
             $settings += @(
                 "SCCACHE_DIR=$($env:SCCACHE_DIR)"
                 "SCCACHE_CACHE_SIZE=$($env:SCCACHE_CACHE_SIZE)"
+                "SCCACHE_IDLE_TIMEOUT=$($env:SCCACHE_IDLE_TIMEOUT)"
             )
         }
         $settings | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -163,6 +165,7 @@ function Show-Config {
     Write-Host "SCCACHE_BASEDIRS: $($env:SCCACHE_BASEDIRS ?? '<not set>')"
     Write-Host "SCCACHE_DIR: $($env:SCCACHE_DIR ?? '<not set>')"
     Write-Host "SCCACHE_CACHE_SIZE: $($env:SCCACHE_CACHE_SIZE ?? '<not set>')"
+    Write-Host "SCCACHE_IDLE_TIMEOUT: $($env:SCCACHE_IDLE_TIMEOUT ?? '<not set>')"
 
     if ($env:AWS_ACCESS_KEY_ID) {
         Write-Host "AWS_ACCESS_KEY_ID: <set>"
