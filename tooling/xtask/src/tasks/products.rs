@@ -78,7 +78,8 @@ fn audit_phase_one_consumers() -> Result<()> {
         "CI workflow is missing the exact Rust product feature row"
     );
     ensure!(
-        release.contains("cargo xtask bundle --product")
+        release.contains("export ZED_BUNDLE_PHASE=package")
+            && !release.contains("cargo xtask bundle --phase")
             && release.contains("needs:\n    - prepare_release\n    - product_builds")
             && release.contains("workflow_run:")
             && release.contains("github.event.workflow_run.conclusion == 'success'")

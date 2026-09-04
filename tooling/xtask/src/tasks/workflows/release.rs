@@ -3,7 +3,7 @@ use gh_workflow::{
     Workflow, WorkflowDispatch, WorkflowRun, WorkflowRunType,
 };
 use indoc::formatdoc;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::product_manifest::ProductManifest;
 
@@ -32,7 +32,16 @@ pub(crate) fn release() -> Workflow {
         .add_input(version.name, version.input())
         .add_input(commit_sha.name, commit_sha.input());
     let (prepare, prepared) = prepare_release();
-    let build = product_builds(&prepare, &prepared);
+    let licenses = release_licenses(&prepare, &prepared);
+    let applications = application_builds(&prepare, &prepared, &licenses);
+    let remote_servers = remote_server_builds(&prepare, &prepared);
+    let build = product_builds(
+        &prepare,
+        &prepared,
+        &licenses,
+        &applications,
+        &remote_servers,
+    );
     let publish = publish_product(&prepare, &prepared, &build);
 
     named::workflow()
@@ -50,6 +59,9 @@ pub(crate) fn release() -> Workflow {
         .add_env(("CARGO_TERM_COLOR", "always"))
         .add_env(("RUST_BACKTRACE", "1"))
         .add_job(prepare.name, prepare.job)
+        .add_job(licenses.name, licenses.job)
+        .add_job(applications.name, applications.job)
+        .add_job(remote_servers.name, remote_servers.job)
         .add_job(build.name, build.job)
         .add_job(publish.name, publish.job)
 }
@@ -122,34 +134,78 @@ fn prepare_release() -> (NamedJob, PreparedRelease) {
     (job, outputs)
 }
 
-fn product_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
+fn product_matrix() -> Vec<Value> {
     let manifest = ProductManifest::load().expect("product catalog must be valid");
     let mut include = Vec::new();
     for product in manifest.enabled_products() {
+        let application_features = product.cargo_features.join(",");
+        let remote_features = product.remote_server_features.join(",");
         for target in &product.targets {
             let row = match target.as_str() {
                 "linux-x86_64" => json!({
                     "product": product.id,
+                    "display_name": product.display_name,
+                    "executable_name": product.executable_name,
+                    "bundle_identifier": product.bundle_identifier,
+                    "url_scheme": product.url_scheme,
+                    "icon_set": product.icon_set,
+                    "data_namespace": product.data_namespace,
+                    "update_namespace": product.update_namespace,
+                    "windows_installer_id": product.windows_installer_id,
                     "platform": "linux",
                     "runner": "ubuntu-22.04",
                     "target": "x86_64-unknown-linux-gnu",
+                    "remote_target": "x86_64-unknown-linux-musl",
+                    "application_features": application_features,
+                    "remote_features": remote_features,
+                    "application_artifact": format!("{}-application-linux-x86_64", product.id),
+                    "remote_artifact": format!("{}-remote-server-linux-x86_64", product.id),
                     "artifact": format!("{}-linux-x86_64", product.id),
+                    "artifact_suffix": "linux-x86_64.tar.gz",
                     "artifact_path": format!("target/products/{}/release/{}-*-linux-x86_64.tar.gz", product.id, product.id),
                 }),
                 "macos-aarch64" => json!({
                     "product": product.id,
+                    "display_name": product.display_name,
+                    "executable_name": product.executable_name,
+                    "bundle_identifier": product.bundle_identifier,
+                    "url_scheme": product.url_scheme,
+                    "icon_set": product.icon_set,
+                    "data_namespace": product.data_namespace,
+                    "update_namespace": product.update_namespace,
+                    "windows_installer_id": product.windows_installer_id,
                     "platform": "macos",
                     "runner": "macos-15",
                     "target": "aarch64-apple-darwin",
+                    "remote_target": "aarch64-apple-darwin",
+                    "application_features": application_features,
+                    "remote_features": remote_features,
+                    "application_artifact": format!("{}-application-macos-aarch64", product.id),
+                    "remote_artifact": format!("{}-remote-server-macos-aarch64", product.id),
                     "artifact": format!("{}-macos-aarch64", product.id),
+                    "artifact_suffix": "macos-aarch64.dmg",
                     "artifact_path": format!("target/products/{}/release/{}-*-macos-aarch64.dmg", product.id, product.id),
                 }),
                 "windows-x86_64" => json!({
                     "product": product.id,
+                    "display_name": product.display_name,
+                    "executable_name": product.executable_name,
+                    "bundle_identifier": product.bundle_identifier,
+                    "url_scheme": product.url_scheme,
+                    "icon_set": product.icon_set,
+                    "data_namespace": product.data_namespace,
+                    "update_namespace": product.update_namespace,
+                    "windows_installer_id": product.windows_installer_id,
                     "platform": "windows",
                     "runner": "windows-2022",
                     "target": "x86_64-pc-windows-msvc",
+                    "remote_target": "x86_64-pc-windows-msvc",
+                    "application_features": application_features,
+                    "remote_features": remote_features,
+                    "application_artifact": format!("{}-application-windows-x86_64", product.id),
+                    "remote_artifact": format!("{}-remote-server-windows-x86_64", product.id),
                     "artifact": format!("{}-windows-x86_64", product.id),
+                    "artifact_suffix": "windows-x86_64.exe",
                     "artifact_path": format!("target/products/{}/release/{}-*-windows-x86_64.exe", product.id, product.id),
                 }),
                 unsupported => {
@@ -159,103 +215,490 @@ fn product_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
             include.push(row);
         }
     }
+    include
+}
+
+fn release_cache_environment(job: Job) -> Job {
+    job.add_env(("SCCACHE_GHA_ENABLED", "on"))
+        .add_env(("SCCACHE_IDLE_TIMEOUT", "0"))
+        .add_env(("RUSTC_WRAPPER", "sccache"))
+}
+
+fn release_bundle_environment(job: Job) -> Job {
+    job.add_env(("CARGO_TARGET_DIR", "target/products/${{ matrix.product }}"))
+        .add_env(("ZED_PRODUCT_ID", "${{ matrix.product }}"))
+        .add_env(("ZED_PRODUCT_DISPLAY_NAME", "${{ matrix.display_name }}"))
+        .add_env(("ZED_PRODUCT_EXECUTABLE", "${{ matrix.executable_name }}"))
+        .add_env(("ZED_PRODUCT_BUNDLE_ID", "${{ matrix.bundle_identifier }}"))
+        .add_env(("ZED_PRODUCT_URL_SCHEME", "${{ matrix.url_scheme }}"))
+        .add_env(("ZED_PRODUCT_ICON_SET", "${{ matrix.icon_set }}"))
+        .add_env(("ZED_PRODUCT_DATA_NAMESPACE", "${{ matrix.data_namespace }}"))
+        .add_env((
+            "ZED_PRODUCT_UPDATE_NAMESPACE",
+            "${{ matrix.update_namespace }}",
+        ))
+        .add_env((
+            "ZED_PRODUCT_WINDOWS_INSTALLER_ID",
+            "${{ matrix.windows_installer_id }}",
+        ))
+        .add_env((
+            "ZED_PRODUCT_APP_FEATURES",
+            "${{ matrix.application_features }}",
+        ))
+        .add_env((
+            "ZED_PRODUCT_REMOTE_FEATURES",
+            "${{ matrix.remote_features }}",
+        ))
+        .add_env(("ZED_RELEASE_CHANNEL", "stable"))
+}
+
+fn configure_release_cache_namespace(target: &str) -> Step<Run> {
+    named::bash(indoc::indoc! {r#"
+        TOOLCHAIN_HASH="$(git hash-object rust-toolchain.toml)"
+        echo "SCCACHE_GHA_VERSION=release-v2-${RUNNER_OS}-${CACHE_TARGET}-${TOOLCHAIN_HASH}" >> "$GITHUB_ENV"
+    "#})
+    .add_env(("CACHE_TARGET", target))
+}
+
+fn release_licenses(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
+    let stage = named::bash(indoc::indoc! {r#"
+        script/generate-licenses
+        mkdir -p release-licenses
+        cp assets/licenses.md release-licenses/licenses.md
+        CARGO_LOCK_HASH="$(git hash-object Cargo.lock)"
+        LICENSES_HASH="$(git hash-object release-licenses/licenses.md)"
+        jq -n \
+            --arg commit_sha "$COMMIT_SHA" \
+            --arg cargo_lock_hash "$CARGO_LOCK_HASH" \
+            --arg licenses_hash "$LICENSES_HASH" \
+            '{commit_sha: $commit_sha, cargo_lock_hash: $cargo_lock_hash, licenses_hash: $licenses_hash}' \
+            > release-licenses/metadata.json
+    "#})
+    .add_env(("COMMIT_SHA", prepared.commit_sha.to_string()));
 
     named::job(
         Job::default()
             .needs([prepare.name.clone()])
-            .runs_on("${{ matrix.runner }}")
-            .timeout_minutes(240u32)
+            .runs_on("ubuntu-22.04")
+            .timeout_minutes(20u32)
             .permissions(Permissions::default().contents(Level::Read))
-            .add_env(("RELEASE_VERSION", prepared.version.to_string()))
-            .strategy(Strategy::default().fail_fast(false).matrix(json!({ "include": include })))
             .add_step(steps::checkout_repo().with_ref(prepared.commit_sha.to_string()))
-            .add_step(steps::cache_release_sccache())
+            .add_step(steps::install_cargo_about())
+            .add_step(stage)
             .add_step(
-                steps::setup_release_sccache(runners::Platform::Linux)
-                    .if_condition(Expression::new("matrix.platform != 'windows'")),
-            )
-            .add_step(
-                steps::setup_release_sccache(runners::Platform::Windows)
-                    .if_condition(Expression::new("matrix.platform == 'windows'")),
-            )
-            .add_step(
-                named::bash("uname -m && rustc -vV && df -h . && xcode-select -p")
-                    .if_condition(Expression::new("matrix.platform == 'macos'")),
-            )
-            .add_step(
-                steps::enable_windows_long_paths()
-                    .if_condition(Expression::new("matrix.platform == 'windows'")),
-            )
-            .add_step(
-                named::bash("./script/linux && ./script/download-wasi-sdk")
-                    .if_condition(Expression::new("matrix.platform == 'linux'")),
-            )
-            .add_step(
-                named::bash("cargo xtask bundle --product \"$PRODUCT_ID\" --platform \"$PLATFORM\" --target \"$TARGET\"")
-                    .if_condition(Expression::new("matrix.platform == 'linux'"))
-                    .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
-                    .add_env(("PLATFORM", "${{ matrix.platform }}"))
-                    .add_env(("TARGET", "${{ matrix.target }}"))
-                    .add_env(("CC", "clang"))
-                    .add_env(("CXX", "clang++")),
-            )
-            .add_step(
-                named::bash("cargo xtask bundle --product \"$PRODUCT_ID\" --platform macos --target \"$TARGET\"")
-                    .if_condition(Expression::new("matrix.platform == 'macos'"))
-                    .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
-                    .add_env(("TARGET", "${{ matrix.target }}"))
-                    .add_env(("MACOS_SIGNING_IDENTITY", "${{ secrets.MACOS_SIGNING_IDENTITY }}"))
-                    .add_env(("MACOS_CERTIFICATE", "${{ secrets.MACOS_CERTIFICATE }}"))
-                    .add_env(("MACOS_CERTIFICATE_PASSWORD", "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}"))
-                    .add_env(("APPLE_NOTARIZATION_KEY", "${{ secrets.APPLE_NOTARIZATION_KEY }}"))
-                    .add_env(("APPLE_NOTARIZATION_KEY_ID", "${{ secrets.APPLE_NOTARIZATION_KEY_ID }}"))
-                    .add_env(("APPLE_NOTARIZATION_ISSUER_ID", "${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}")),
-            )
-            .add_step(
-                named::pwsh("cargo xtask bundle --product $env:PRODUCT_ID --platform windows --target $env:TARGET")
-                    .if_condition(Expression::new("matrix.platform == 'windows'"))
-                    .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
-                    .add_env(("TARGET", "${{ matrix.target }}"))
-                    .add_env(("AZURE_TENANT_ID", "${{ secrets.AZURE_TENANT_ID }}"))
-                    .add_env(("AZURE_CLIENT_ID", "${{ secrets.AZURE_CLIENT_ID }}"))
-                    .add_env(("AZURE_CLIENT_SECRET", "${{ secrets.AZURE_CLIENT_SECRET }}"))
-                    .add_env(("ACCOUNT_NAME", "${{ secrets.ACCOUNT_NAME }}"))
-                    .add_env(("CERT_PROFILE_NAME", "${{ secrets.CERT_PROFILE_NAME }}"))
-                    .add_env(("ENDPOINT", "${{ secrets.ENDPOINT }}"))
-                    .add_env(("FILE_DIGEST", "${{ secrets.FILE_DIGEST }}"))
-                    .add_env(("TIMESTAMP_DIGEST", "${{ secrets.TIMESTAMP_DIGEST }}"))
-                    .add_env(("TIMESTAMP_SERVER", "${{ secrets.TIMESTAMP_SERVER }}")),
-            )
-            .add_step(
-                named::bash("python3 script/smoke-product-bundle --product \"$PRODUCT_ID\" --platform \"$PLATFORM\" --target \"$TARGET\"")
-                    .if_condition(Expression::new("matrix.platform != 'windows'"))
-                    .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
-                    .add_env(("PLATFORM", "${{ matrix.platform }}"))
-                    .add_env(("TARGET", "${{ matrix.target }}")),
-            )
-            .add_step(
-                named::pwsh("python script/smoke-product-bundle --product $env:PRODUCT_ID --platform windows --target $env:TARGET")
-                    .if_condition(Expression::new("matrix.platform == 'windows'"))
-                    .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
-                    .add_env(("TARGET", "${{ matrix.target }}")),
-            )
-            .add_step(
-                steps::upload_artifact("${{ matrix.artifact }}", "${{ matrix.artifact_path }}")
+                steps::upload_artifact("release-licenses", "release-licenses")
                     .if_no_files_found(IfNoFilesFound::Error),
-            )
-            .add_step(
-                steps::finalize_release_sccache(runners::Platform::Linux)
-                    .if_condition(Expression::new("always() && matrix.platform != 'windows'")),
-            )
-            .add_step(
-                steps::finalize_release_sccache(runners::Platform::Windows)
-                    .if_condition(Expression::new("always() && matrix.platform == 'windows'")),
-            )
-            .add_step(
-                named::bash("df -h . && du -sh target")
-                    .if_condition(Expression::new("always() && matrix.platform == 'macos'")),
             ),
     )
+}
+
+fn verify_release_licenses() -> Step<Run> {
+    named::bash(indoc::indoc! {r#"
+        test -s release-licenses/licenses.md
+        test -s release-licenses/metadata.json
+        CARGO_LOCK_HASH="$(git hash-object Cargo.lock)"
+        LICENSES_HASH="$(git hash-object release-licenses/licenses.md)"
+        jq -e \
+            --arg commit_sha "$COMMIT_SHA" \
+            --arg cargo_lock_hash "$CARGO_LOCK_HASH" \
+            --arg licenses_hash "$LICENSES_HASH" \
+            '.commit_sha == $commit_sha and .cargo_lock_hash == $cargo_lock_hash and .licenses_hash == $licenses_hash' \
+            release-licenses/metadata.json >/dev/null
+        cp release-licenses/licenses.md assets/licenses.md
+    "#})
+    .add_env(("COMMIT_SHA", "${{ needs.prepare_release.outputs.commit_sha }}"))
+}
+
+fn application_builds(
+    prepare: &NamedJob,
+    prepared: &PreparedRelease,
+    licenses: &NamedJob,
+) -> NamedJob {
+    let job = Job::default()
+        .needs([prepare.name.clone(), licenses.name.clone()])
+        .runs_on("${{ matrix.runner }}")
+        .timeout_minutes(180u32)
+        .permissions(Permissions::default().contents(Level::Read))
+        .add_env(("RELEASE_VERSION", prepared.version.to_string()))
+        .strategy(
+            Strategy::default()
+                .fail_fast(false)
+                .matrix(json!({ "include": product_matrix() })),
+        )
+        .add_step(steps::checkout_repo().with_ref(prepared.commit_sha.to_string()))
+        .add_step(
+            steps::download_artifact()
+                .artifact_name("release-licenses")
+                .path("release-licenses"),
+        )
+        .add_step(verify_release_licenses())
+        .add_step(configure_release_cache_namespace("${{ matrix.target }}"))
+        .add_step(steps::setup_release_sccache())
+        .add_step(
+            steps::enable_windows_long_paths()
+                .if_condition(Expression::new("matrix.platform == 'windows'")),
+        )
+        .add_step(
+            named::bash("./script/linux && ./script/download-wasi-sdk")
+                .if_condition(Expression::new("matrix.platform == 'linux'")),
+        )
+        .add_step(
+            named::bash(indoc::indoc! {r#"
+                export ZED_PRODUCT_ARTIFACT_NAME="${ZED_PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+                export ZED_BUNDLE_PHASE=application
+                script/bundle-linux
+            "#})
+                .if_condition(Expression::new("matrix.platform == 'linux'"))
+                .add_env(("ARTIFACT_SUFFIX", "${{ matrix.artifact_suffix }}"))
+                .add_env(("ZED_PREGENERATED_LICENSES", "1"))
+                .add_env(("CC", "clang"))
+                .add_env(("CXX", "clang++")),
+        )
+        .add_step(
+            named::bash(indoc::indoc! {r#"
+                export ZED_PRODUCT_ARTIFACT_NAME="${ZED_PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+                export ZED_BUNDLE_PHASE=application
+                script/bundle-mac "$TARGET"
+            "#})
+                .if_condition(Expression::new("matrix.platform == 'macos'"))
+                .add_env(("ARTIFACT_SUFFIX", "${{ matrix.artifact_suffix }}"))
+                .add_env(("TARGET", "${{ matrix.target }}"))
+                .add_env(("ZED_PREGENERATED_LICENSES", "1")),
+        )
+        .add_step(
+            named::pwsh(indoc::indoc! {r#"
+                $env:ZED_PRODUCT_ARTIFACT_NAME = "$env:ZED_PRODUCT_ID-$env:RELEASE_VERSION-$env:ARTIFACT_SUFFIX"
+                $env:ZED_BUNDLE_PHASE = "application"
+                script/bundle-windows.ps1 -Architecture x86_64
+            "#})
+                .if_condition(Expression::new("matrix.platform == 'windows'"))
+                .add_env(("ARTIFACT_SUFFIX", "${{ matrix.artifact_suffix }}"))
+                .add_env(("ZED_PREGENERATED_LICENSES", "1")),
+        )
+        .add_step(
+            named::bash(indoc::indoc! {r#"
+                SOURCE="target/products/${PRODUCT_ID}/${TARGET}/release"
+                mkdir -p release-application
+                cp "$SOURCE/zed" "$SOURCE/cli" release-application/
+                jq -n --arg commit_sha "$COMMIT_SHA" --arg target "$TARGET" --arg features "$FEATURES" \
+                    '{commit_sha: $commit_sha, target: $target, features: $features}' > release-application/metadata.json
+            "#})
+            .if_condition(Expression::new("matrix.platform != 'windows'"))
+            .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
+            .add_env(("TARGET", "${{ matrix.target }}"))
+            .add_env(("FEATURES", "${{ matrix.application_features }}"))
+            .add_env(("COMMIT_SHA", prepared.commit_sha.to_string())),
+        )
+        .add_step(
+            named::pwsh(indoc::indoc! {r#"
+                $source = "target/products/$env:PRODUCT_ID/$env:TARGET/release"
+                New-Item -ItemType Directory -Path release-application -Force | Out-Null
+                Copy-Item "$source/zed.exe", "$source/cli.exe", "$source/auto_update_helper.exe", "$source/zed.pdb", "$source/cli.pdb", "$source/auto_update_helper.pdb" -Destination release-application
+                @{
+                    commit_sha = $env:COMMIT_SHA
+                    target = $env:TARGET
+                    features = $env:FEATURES
+                } | ConvertTo-Json | Set-Content release-application/metadata.json
+            "#})
+            .if_condition(Expression::new("matrix.platform == 'windows'"))
+            .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
+            .add_env(("TARGET", "${{ matrix.target }}"))
+            .add_env(("FEATURES", "${{ matrix.application_features }}"))
+            .add_env(("COMMIT_SHA", prepared.commit_sha.to_string())),
+        )
+        .add_step(
+            steps::upload_artifact("${{ matrix.application_artifact }}", "release-application")
+                .if_no_files_found(IfNoFilesFound::Error),
+        )
+        .add_step(
+            steps::finalize_release_sccache(runners::Platform::Linux)
+                .if_condition(Expression::new("always() && matrix.platform != 'windows'")),
+        )
+        .add_step(
+            steps::finalize_release_sccache(runners::Platform::Windows)
+                .if_condition(Expression::new("always() && matrix.platform == 'windows'")),
+        );
+    named::job(release_bundle_environment(release_cache_environment(job)))
+}
+
+fn remote_server_builds(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
+    let job = Job::default()
+        .needs([prepare.name.clone()])
+        .runs_on("${{ matrix.runner }}")
+        .timeout_minutes(120u32)
+        .permissions(Permissions::default().contents(Level::Read))
+        .add_env(("RELEASE_VERSION", prepared.version.to_string()))
+        .strategy(
+            Strategy::default()
+                .fail_fast(false)
+                .matrix(json!({ "include": product_matrix() })),
+        )
+        .add_step(steps::checkout_repo().with_ref(prepared.commit_sha.to_string()))
+        .add_step(configure_release_cache_namespace(
+            "${{ matrix.remote_target }}",
+        ))
+        .add_step(steps::setup_release_sccache())
+        .add_step(
+            steps::enable_windows_long_paths()
+                .if_condition(Expression::new("matrix.platform == 'windows'")),
+        )
+        .add_step(
+            named::bash("./script/linux && ./script/download-wasi-sdk")
+                .if_condition(Expression::new("matrix.platform == 'linux'")),
+        )
+        .add_step(
+            named::bash(indoc::indoc! {r#"
+                export ZED_PRODUCT_ARTIFACT_NAME="${ZED_PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+                export ZED_BUNDLE_PHASE=remote-server
+                script/bundle-linux
+            "#})
+                .if_condition(Expression::new("matrix.platform == 'linux'"))
+                .add_env(("ARTIFACT_SUFFIX", "${{ matrix.artifact_suffix }}"))
+                .add_env(("CC", "clang"))
+                .add_env(("CXX", "clang++")),
+        )
+        .add_step(
+            named::bash(indoc::indoc! {r#"
+                export ZED_PRODUCT_ARTIFACT_NAME="${ZED_PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+                export ZED_BUNDLE_PHASE=remote-server
+                script/bundle-mac "$TARGET"
+            "#})
+                .if_condition(Expression::new("matrix.platform == 'macos'"))
+                .add_env(("ARTIFACT_SUFFIX", "${{ matrix.artifact_suffix }}"))
+                .add_env(("TARGET", "${{ matrix.target }}")),
+        )
+        .add_step(
+            named::pwsh(indoc::indoc! {r#"
+                $env:ZED_PRODUCT_ARTIFACT_NAME = "$env:ZED_PRODUCT_ID-$env:RELEASE_VERSION-$env:ARTIFACT_SUFFIX"
+                $env:ZED_BUNDLE_PHASE = "remote-server"
+                script/bundle-windows.ps1 -Architecture x86_64
+            "#})
+                .if_condition(Expression::new("matrix.platform == 'windows'"))
+                .add_env(("ARTIFACT_SUFFIX", "${{ matrix.artifact_suffix }}")),
+        )
+        .add_step(
+            named::bash(indoc::indoc! {r#"
+                SOURCE="target/products/${PRODUCT_ID}/${REMOTE_TARGET}/release"
+                mkdir -p release-remote-server
+                cp "$SOURCE/remote_server" release-remote-server/
+                jq -n --arg commit_sha "$COMMIT_SHA" --arg target "$REMOTE_TARGET" --arg features "$FEATURES" \
+                    '{commit_sha: $commit_sha, target: $target, features: $features}' > release-remote-server/metadata.json
+            "#})
+            .if_condition(Expression::new("matrix.platform != 'windows'"))
+            .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
+            .add_env(("REMOTE_TARGET", "${{ matrix.remote_target }}"))
+            .add_env(("FEATURES", "${{ matrix.remote_features }}"))
+            .add_env(("COMMIT_SHA", prepared.commit_sha.to_string())),
+        )
+        .add_step(
+            named::pwsh(indoc::indoc! {r#"
+                $source = "target/products/$env:PRODUCT_ID/$env:REMOTE_TARGET/release"
+                New-Item -ItemType Directory -Path release-remote-server -Force | Out-Null
+                Copy-Item "$source/remote_server.exe", "$source/remote_server.pdb" -Destination release-remote-server
+                @{
+                    commit_sha = $env:COMMIT_SHA
+                    target = $env:REMOTE_TARGET
+                    features = $env:FEATURES
+                } | ConvertTo-Json | Set-Content release-remote-server/metadata.json
+            "#})
+            .if_condition(Expression::new("matrix.platform == 'windows'"))
+            .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
+            .add_env(("REMOTE_TARGET", "${{ matrix.remote_target }}"))
+            .add_env(("FEATURES", "${{ matrix.remote_features }}"))
+            .add_env(("COMMIT_SHA", prepared.commit_sha.to_string())),
+        )
+        .add_step(
+            steps::upload_artifact("${{ matrix.remote_artifact }}", "release-remote-server")
+                .if_no_files_found(IfNoFilesFound::Error),
+        )
+        .add_step(
+            steps::finalize_release_sccache(runners::Platform::Linux)
+                .if_condition(Expression::new("always() && matrix.platform != 'windows'")),
+        )
+        .add_step(
+            steps::finalize_release_sccache(runners::Platform::Windows)
+                .if_condition(Expression::new("always() && matrix.platform == 'windows'")),
+        );
+    named::job(release_bundle_environment(release_cache_environment(job)))
+}
+
+fn product_builds(
+    prepare: &NamedJob,
+    prepared: &PreparedRelease,
+    licenses: &NamedJob,
+    applications: &NamedJob,
+    remote_servers: &NamedJob,
+) -> NamedJob {
+    let job = Job::default()
+        .needs([
+            prepare.name.clone(),
+            licenses.name.clone(),
+            applications.name.clone(),
+            remote_servers.name.clone(),
+        ])
+        .runs_on("${{ matrix.runner }}")
+        .timeout_minutes(90u32)
+        .permissions(Permissions::default().contents(Level::Read))
+        .add_env(("RELEASE_VERSION", prepared.version.to_string()))
+        .strategy(
+            Strategy::default()
+                .fail_fast(false)
+                .matrix(json!({ "include": product_matrix() })),
+        )
+        .add_step(steps::checkout_repo().with_ref(prepared.commit_sha.to_string()))
+        .add_step(
+            steps::download_artifact()
+                .artifact_name("release-licenses")
+                .path("release-licenses"),
+        )
+        .add_step(
+            steps::download_artifact()
+                .artifact_name("${{ matrix.application_artifact }}")
+                .path("release-application"),
+        )
+        .add_step(
+            steps::download_artifact()
+                .artifact_name("${{ matrix.remote_artifact }}")
+                .path("release-remote-server"),
+        )
+        .add_step(verify_release_licenses())
+        .add_step(
+            named::bash(indoc::indoc! {r#"
+                jq -e --arg commit_sha "$COMMIT_SHA" --arg target "$TARGET" --arg features "$APPLICATION_FEATURES" \
+                    '.commit_sha == $commit_sha and .target == $target and .features == $features' \
+                    release-application/metadata.json >/dev/null
+                jq -e --arg commit_sha "$COMMIT_SHA" --arg target "$REMOTE_TARGET" --arg features "$REMOTE_FEATURES" \
+                    '.commit_sha == $commit_sha and .target == $target and .features == $features' \
+                    release-remote-server/metadata.json >/dev/null
+                APPLICATION_DEST="target/products/${PRODUCT_ID}/${TARGET}/release"
+                REMOTE_DEST="target/products/${PRODUCT_ID}/${REMOTE_TARGET}/release"
+                mkdir -p "$APPLICATION_DEST" "$REMOTE_DEST"
+                cp release-application/zed release-application/cli "$APPLICATION_DEST/"
+                cp release-remote-server/remote_server "$REMOTE_DEST/"
+                chmod +x "$APPLICATION_DEST/zed" "$APPLICATION_DEST/cli" "$REMOTE_DEST/remote_server"
+            "#})
+            .if_condition(Expression::new("matrix.platform != 'windows'"))
+            .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
+            .add_env(("TARGET", "${{ matrix.target }}"))
+            .add_env(("REMOTE_TARGET", "${{ matrix.remote_target }}"))
+            .add_env(("APPLICATION_FEATURES", "${{ matrix.application_features }}"))
+            .add_env(("REMOTE_FEATURES", "${{ matrix.remote_features }}"))
+            .add_env(("COMMIT_SHA", prepared.commit_sha.to_string())),
+        )
+        .add_step(
+            named::pwsh(indoc::indoc! {r#"
+                $applicationMetadata = Get-Content release-application/metadata.json | ConvertFrom-Json
+                $remoteMetadata = Get-Content release-remote-server/metadata.json | ConvertFrom-Json
+                if ($applicationMetadata.commit_sha -ne $env:COMMIT_SHA -or $applicationMetadata.target -ne $env:TARGET -or $applicationMetadata.features -ne $env:APPLICATION_FEATURES) {
+                    throw "Application artifact metadata does not match the release plan"
+                }
+                if ($remoteMetadata.commit_sha -ne $env:COMMIT_SHA -or $remoteMetadata.target -ne $env:REMOTE_TARGET -or $remoteMetadata.features -ne $env:REMOTE_FEATURES) {
+                    throw "Remote-server artifact metadata does not match the release plan"
+                }
+                $applicationDest = "target/products/$env:PRODUCT_ID/$env:TARGET/release"
+                $remoteDest = "target/products/$env:PRODUCT_ID/$env:REMOTE_TARGET/release"
+                New-Item -ItemType Directory -Path $applicationDest, $remoteDest -Force | Out-Null
+                Copy-Item release-application/zed.exe, release-application/cli.exe, release-application/auto_update_helper.exe, release-application/zed.pdb, release-application/cli.pdb, release-application/auto_update_helper.pdb -Destination $applicationDest
+                Copy-Item release-remote-server/remote_server.exe, release-remote-server/remote_server.pdb -Destination $remoteDest
+            "#})
+            .if_condition(Expression::new("matrix.platform == 'windows'"))
+            .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
+            .add_env(("TARGET", "${{ matrix.target }}"))
+            .add_env(("REMOTE_TARGET", "${{ matrix.remote_target }}"))
+            .add_env(("APPLICATION_FEATURES", "${{ matrix.application_features }}"))
+            .add_env(("REMOTE_FEATURES", "${{ matrix.remote_features }}"))
+            .add_env(("COMMIT_SHA", prepared.commit_sha.to_string()))
+        )
+        .add_step(configure_release_cache_namespace("${{ matrix.target }}"))
+        .add_step(steps::setup_release_sccache())
+        .add_step(
+            named::bash("uname -m && rustc -vV && df -h . && xcode-select -p")
+                .if_condition(Expression::new("matrix.platform == 'macos'")),
+        )
+        .add_step(
+            steps::enable_windows_long_paths()
+                .if_condition(Expression::new("matrix.platform == 'windows'")),
+        )
+        .add_step(
+            named::bash("./script/linux && ./script/download-wasi-sdk")
+                .if_condition(Expression::new("matrix.platform == 'linux'")),
+        )
+        .add_step(
+            named::bash(indoc::indoc! {r#"
+                export ZED_PRODUCT_ARTIFACT_NAME="${ZED_PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+                export ZED_BUNDLE_PHASE=package
+                script/bundle-linux
+            "#})
+                .if_condition(Expression::new("matrix.platform == 'linux'"))
+                .add_env(("ARTIFACT_SUFFIX", "${{ matrix.artifact_suffix }}"))
+                .add_env(("CC", "clang"))
+                .add_env(("CXX", "clang++")),
+        )
+        .add_step(
+            named::bash(indoc::indoc! {r#"
+                export ZED_PRODUCT_ARTIFACT_NAME="${ZED_PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+                export ZED_BUNDLE_PHASE=package
+                script/bundle-mac "$TARGET"
+            "#})
+                .if_condition(Expression::new("matrix.platform == 'macos'"))
+                .add_env(("ARTIFACT_SUFFIX", "${{ matrix.artifact_suffix }}"))
+                .add_env(("TARGET", "${{ matrix.target }}"))
+                .add_env(("MACOS_SIGNING_IDENTITY", "${{ secrets.MACOS_SIGNING_IDENTITY }}"))
+                .add_env(("MACOS_CERTIFICATE", "${{ secrets.MACOS_CERTIFICATE }}"))
+                .add_env(("MACOS_CERTIFICATE_PASSWORD", "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}"))
+                .add_env(("APPLE_NOTARIZATION_KEY", "${{ secrets.APPLE_NOTARIZATION_KEY }}"))
+                .add_env(("APPLE_NOTARIZATION_KEY_ID", "${{ secrets.APPLE_NOTARIZATION_KEY_ID }}"))
+                .add_env(("APPLE_NOTARIZATION_ISSUER_ID", "${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}")),
+        )
+        .add_step(
+            named::pwsh(indoc::indoc! {r#"
+                $env:ZED_PRODUCT_ARTIFACT_NAME = "$env:ZED_PRODUCT_ID-$env:RELEASE_VERSION-$env:ARTIFACT_SUFFIX"
+                $env:ZED_BUNDLE_PHASE = "package"
+                script/bundle-windows.ps1 -Architecture x86_64
+            "#})
+                .if_condition(Expression::new("matrix.platform == 'windows'"))
+                .add_env(("ARTIFACT_SUFFIX", "${{ matrix.artifact_suffix }}"))
+                .add_env(("AZURE_TENANT_ID", "${{ secrets.AZURE_TENANT_ID }}"))
+                .add_env(("AZURE_CLIENT_ID", "${{ secrets.AZURE_CLIENT_ID }}"))
+                .add_env(("AZURE_CLIENT_SECRET", "${{ secrets.AZURE_CLIENT_SECRET }}"))
+                .add_env(("ACCOUNT_NAME", "${{ secrets.ACCOUNT_NAME }}"))
+                .add_env(("CERT_PROFILE_NAME", "${{ secrets.CERT_PROFILE_NAME }}"))
+                .add_env(("ENDPOINT", "${{ secrets.ENDPOINT }}"))
+                .add_env(("FILE_DIGEST", "${{ secrets.FILE_DIGEST }}"))
+                .add_env(("TIMESTAMP_DIGEST", "${{ secrets.TIMESTAMP_DIGEST }}"))
+                .add_env(("TIMESTAMP_SERVER", "${{ secrets.TIMESTAMP_SERVER }}")),
+        )
+        .add_step(
+            named::bash("python3 script/smoke-product-bundle --product \"$PRODUCT_ID\" --platform \"$PLATFORM\" --target \"$TARGET\"")
+                .if_condition(Expression::new("matrix.platform != 'windows'"))
+                .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
+                .add_env(("PLATFORM", "${{ matrix.platform }}"))
+                .add_env(("TARGET", "${{ matrix.target }}")),
+        )
+        .add_step(
+            named::pwsh("python script/smoke-product-bundle --product $env:PRODUCT_ID --platform windows --target $env:TARGET")
+                .if_condition(Expression::new("matrix.platform == 'windows'"))
+                .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
+                .add_env(("TARGET", "${{ matrix.target }}")),
+        )
+        .add_step(
+            steps::upload_artifact("${{ matrix.artifact }}", "${{ matrix.artifact_path }}")
+                .if_no_files_found(IfNoFilesFound::Error),
+        )
+        .add_step(
+            steps::finalize_release_sccache(runners::Platform::Linux)
+                .if_condition(Expression::new("always() && matrix.platform != 'windows'")),
+        )
+        .add_step(
+            steps::finalize_release_sccache(runners::Platform::Windows)
+                .if_condition(Expression::new("always() && matrix.platform == 'windows'")),
+        )
+        .add_step(
+            named::bash("df -h . && du -sh target")
+                .if_condition(Expression::new("always() && matrix.platform == 'macos'")),
+        );
+
+    named::job(release_bundle_environment(release_cache_environment(job)))
 }
 
 fn publish_product(prepare: &NamedJob, prepared: &PreparedRelease, build: &NamedJob) -> NamedJob {
@@ -353,21 +796,31 @@ fn publish_product(prepare: &NamedJob, prepared: &PreparedRelease, build: &Named
     .add_env(("EXISTING_TAG", RELEASE_EXISTING_TAG))
     .add_env(("GH_TOKEN", vars::GITHUB_TOKEN));
 
-    named::job(
-        Job::default()
-            .needs([prepare.name.clone(), build.name.clone()])
-            .runs_on("ubuntu-22.04")
-            .timeout_minutes(15u32)
-            .permissions(Permissions::default().contents(Level::Write))
-            .add_step(
-                steps::checkout_repo()
-                    .with_ref(prepared.commit_sha.to_string())
-                    .with_full_history()
-                    .with_fetch_tags(),
-            )
-            .add_step(steps::download_artifact().path("release-artifacts"))
-            .add_step(publish),
-    )
+    let mut job = Job::default()
+        .needs([prepare.name.clone(), build.name.clone()])
+        .runs_on("ubuntu-22.04")
+        .timeout_minutes(15u32)
+        .permissions(Permissions::default().contents(Level::Write))
+        .add_step(
+            steps::checkout_repo()
+                .with_ref(prepared.commit_sha.to_string())
+                .with_full_history()
+                .with_fetch_tags(),
+        );
+    for target in &product.targets {
+        let artifact = match target.as_str() {
+            "linux-x86_64" => "rust-linux-x86_64",
+            "macos-aarch64" => "rust-macos-aarch64",
+            "windows-x86_64" => "rust-windows-x86_64",
+            unsupported => panic!("validated catalog contains unsupported target {unsupported}"),
+        };
+        job = job.add_step(
+            steps::download_artifact()
+                .artifact_name(artifact)
+                .path("release-artifacts"),
+        );
+    }
+    named::job(job.add_step(publish))
 }
 
 #[cfg(test)]
@@ -421,20 +874,34 @@ mod release_workflow_tests {
             .find("script/smoke-product-bundle")
             .expect("native bundle smoke check");
         let upload = yaml
-            .find("uses: actions/upload-artifact")
+            .rfind("uses: actions/upload-artifact")
             .expect("bundle upload");
         assert!(smoke < upload);
         assert!(yaml.contains("Expected exactly 3 Copper artifacts"));
         assert!(yaml.contains("git config --global core.longpaths true"));
         assert!(yaml.contains("CC: clang\n"));
         assert!(yaml.contains("CXX: clang++\n"));
-        assert!(yaml.contains("uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830"));
-        assert!(yaml.contains("release-sccache-${{ runner.os }}-${{ matrix.target }}"));
-        assert!(yaml.contains("SCCACHE_LOCAL_CACHE_DIR: ${{ runner.temp }}/release-sccache"));
-        assert!(yaml.contains("SCCACHE_CACHE_SIZE: 3G"));
+        assert!(yaml.contains(
+            "uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba"
+        ));
+        assert!(yaml.contains("SCCACHE_GHA_ENABLED: on"));
+        assert!(yaml.contains("SCCACHE_GHA_VERSION=release-v2-"));
+        assert!(yaml.contains("CACHE_TARGET: ${{ matrix.remote_target }}"));
         assert!(yaml.contains("SCCACHE_IDLE_TIMEOUT: '0'"));
+        assert!(!yaml.contains("SCCACHE_LOCAL_CACHE_DIR"));
+        assert!(!yaml.contains("uses: actions/cache@"));
         assert!(yaml.contains("sccache --show-stats"));
         assert!(yaml.contains("sccache --stop-server"));
+        assert!(yaml.contains("cargo-about@0.8.2"));
+        assert!(yaml.contains("fallback: none"));
+        assert!(yaml.contains("export ZED_BUNDLE_PHASE=application"));
+        assert!(yaml.contains("export ZED_BUNDLE_PHASE=remote-server"));
+        assert!(yaml.contains("export ZED_BUNDLE_PHASE=package"));
+        assert!(yaml.contains("script/bundle-windows.ps1 -Architecture x86_64"));
+        assert!(!yaml.contains("cargo xtask bundle --phase"));
+        assert!(yaml.contains(
+            "needs:\n    - prepare_release\n    - release_licenses\n    - application_builds\n    - remote_server_builds"
+        ));
         assert!(yaml.contains("git tag -a"));
         assert!(yaml.contains("--draft"));
         assert!(yaml.contains("contents: write"));
@@ -597,11 +1064,12 @@ mod tests {
             .to_string()
             .map_err(|error| anyhow::anyhow!("failed to serialize release workflow: {error:?}"))?;
 
-        assert_eq!(workflow.matches("runs-on:").count(), 3);
+        assert_eq!(workflow.matches("runs-on:").count(), 6);
         assert!(workflow.contains("runner: ubuntu-22.04"));
         assert!(workflow.contains("runner: macos-15"));
         assert!(workflow.contains("runner: windows-2022"));
-        assert!(workflow.contains("cargo xtask bundle --product"));
+        assert!(workflow.contains("export ZED_BUNDLE_PHASE=package"));
+        assert!(!workflow.contains("cargo xtask bundle --phase"));
         assert!(workflow.contains("product: rust"));
         assert!(workflow.contains("target: x86_64-unknown-linux-gnu"));
         assert!(workflow.contains("target: aarch64-apple-darwin"));

@@ -13,7 +13,7 @@ pub(crate) fn use_clang(job: Job) -> Job {
 }
 
 const SCCACHE_R2_BUCKET: &str = "sccache-zed";
-const RELEASE_SCCACHE_CACHE_DIR: &str = "${{ runner.temp }}/release-sccache";
+const RELEASE_SCCACHE_ACTION_SHA: &str = "fc920bf0ec8de6ee65d409111f7ec508035751ba"; // v0.0.11
 
 pub(crate) const BASH_SHELL: &str = "bash -euxo pipefail {0}";
 // https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepsshell
@@ -198,6 +198,10 @@ pub fn install_cargo_edit() -> Step<Use> {
     taiki_install_action("cargo-edit")
 }
 
+pub fn install_cargo_about() -> Step<Use> {
+    taiki_install_action("cargo-about@0.8.2").add_with(("fallback", "none"))
+}
+
 pub fn taiki_install_action(tool: &str) -> Step<Use> {
     Step::new(named::function_name(1))
         .uses(
@@ -303,49 +307,43 @@ pub fn setup_sccache(platform: Platform) -> Step<Run> {
         .add_env(("SCCACHE_BUCKET", SCCACHE_R2_BUCKET))
 }
 
-pub fn cache_release_sccache() -> Step<Use> {
+pub fn setup_release_sccache() -> Step<Use> {
     named::uses(
-        "actions",
-        "cache",
-        "0057852bfaa89a56745cba8c7296529d2fc39830",
+        "mozilla-actions",
+        "sccache-action",
+        RELEASE_SCCACHE_ACTION_SHA,
     )
-    .with(
-        Input::default()
-            .add("path", RELEASE_SCCACHE_CACHE_DIR)
-            .add(
-                "key",
-                "release-sccache-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('rust-toolchain.toml') }}-${{ github.run_id }}-${{ github.run_attempt }}",
-            )
-            .add(
-                "restore-keys",
-                "release-sccache-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('rust-toolchain.toml') }}-",
-            ),
-    )
-}
-
-pub fn setup_release_sccache(platform: Platform) -> Step<Run> {
-    let step = match platform {
-        Platform::Windows => named::pwsh("./script/setup-sccache.ps1"),
-        Platform::Linux | Platform::Mac => named::bash("./script/setup-sccache"),
-    };
-    step.add_env(("SCCACHE_LOCAL_CACHE_DIR", RELEASE_SCCACHE_CACHE_DIR))
-        .add_env(("SCCACHE_CACHE_SIZE", "3G"))
-        .add_env(("SCCACHE_IDLE_TIMEOUT", "0"))
+    .add_with(("version", "v0.16.0"))
+    .add_with(("disable_annotations", "true"))
 }
 
 pub fn finalize_release_sccache(platform: Platform) -> Step<Run> {
     match platform {
         Platform::Windows => named::pwsh(indoc::indoc! {r#"
-            if ($env:RUSTC_WRAPPER) {
-                & $env:RUSTC_WRAPPER --show-stats
-                & $env:RUSTC_WRAPPER --stop-server
+            $stats = (& sccache --show-stats | Out-String)
+            if ($LASTEXITCODE -ne 0) {
+                throw "sccache --show-stats failed with exit code $LASTEXITCODE"
+            }
+            Write-Host $stats
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ('### sccache: {0} / {1}' -f $env:RUNNER_OS, $env:SCCACHE_GHA_VERSION)
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ''
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```text'
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $stats
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
+            & sccache --stop-server
+            if ($LASTEXITCODE -ne 0) {
+                throw "sccache --stop-server failed with exit code $LASTEXITCODE"
             }
         "#}),
         Platform::Linux | Platform::Mac => named::bash(indoc::indoc! {r#"
-            if command -v sccache >/dev/null 2>&1; then
-                sccache --show-stats
-                sccache --stop-server
-            fi
+            STATS="$(sccache --show-stats)"
+            printf '%s\n' "$STATS"
+            {
+                printf '### sccache: %s / %s\n\n```text\n' "$RUNNER_OS" "$SCCACHE_GHA_VERSION"
+                printf '%s\n' "$STATS"
+                printf '```\n'
+            } >> "$GITHUB_STEP_SUMMARY"
+            sccache --stop-server
         "#}),
     }
 }

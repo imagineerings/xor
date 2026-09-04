@@ -105,11 +105,14 @@ for variable_name in "${required_product_variables[@]}"; do
     fi
 done
 cargo_target_dir="${CARGO_TARGET_DIR:-target}"
-
-cargo_bundle_version=$(cargo bundle --version 2>/dev/null || echo "")
-if [ "$cargo_bundle_version" != "cargo-bundle 0.11.0" ]; then
-    cargo install cargo-bundle --version 0.11.0 --locked
-fi
+bundle_phase="${ZED_BUNDLE_PHASE:-all}"
+case "$bundle_phase" in
+    all|application|remote-server|package) ;;
+    *)
+        echo "Unsupported bundle phase: $bundle_phase" >&2
+        exit 1
+        ;;
+esac
 
 # Deal with versions of macOS that don't include libstdc++ headers
 export CXXFLAGS="-stdlib=libc++"
@@ -131,28 +134,61 @@ else
     exit 1
 fi
 
-# Generate the licenses first, so they can be baked into the binaries
-script/generate-licenses
-
-rustup target add $target_triple
-
-echo "Compiling zed binaries"
-if [[ "$comfy" = true ]]; then
-    zed_build_features="zed/comfy,zed/metal,comfy_worker/metal"
-    if [[ "$rust_tools" = true ]]; then
-        zed_build_features="${zed_build_features},zed/rust-tools"
+if [[ "$bundle_phase" == "all" || "$bundle_phase" == "application" ]]; then
+    if [[ -n "${ZED_PREGENERATED_LICENSES:-}" ]]; then
+        test -s assets/licenses.md
+    else
+        script/generate-licenses
     fi
-    cargo build ${build_flag} --package zed --package cli --package comfy_worker --features "${zed_build_features}" --target $target_triple
-else
-    application_features=$(printf 'zed/%s,' ${ZED_PRODUCT_APP_FEATURES//,/ } | sed 's/,$//')
-    cargo build ${build_flag} --package zed --package cli --no-default-features --features "${application_features}" --target "$target_triple"
+fi
+
+if [[ "$bundle_phase" != "package" ]]; then
+    rustup target add "$target_triple"
+fi
+
+if [[ "$bundle_phase" == "all" || "$bundle_phase" == "application" ]]; then
+    echo "Compiling zed binaries"
+    if [[ "$comfy" = true ]]; then
+        zed_build_features="zed/comfy,zed/metal,comfy_worker/metal"
+        if [[ "$rust_tools" = true ]]; then
+            zed_build_features="${zed_build_features},zed/rust-tools"
+        fi
+        cargo build ${build_flag} --package zed --package cli --package comfy_worker --features "${zed_build_features}" --target "$target_triple"
+    else
+        application_features=$(printf 'zed/%s,' ${ZED_PRODUCT_APP_FEATURES//,/ } | sed 's/,$//')
+        cargo build ${build_flag} --package zed --package cli --no-default-features --features "${application_features}" --target "$target_triple"
+    fi
 fi
 # Build remote_server in separate invocation to prevent feature unification from other crates
 # from influencing dynamic libraries required by it.
-if [[ -n "${ZED_PRODUCT_REMOTE_FEATURES}" ]]; then
-    cargo build ${build_flag} --package remote_server --no-default-features --features "${ZED_PRODUCT_REMOTE_FEATURES}" --target "$target_triple"
-else
-    cargo build ${build_flag} --package remote_server --no-default-features --target "$target_triple"
+if [[ "$bundle_phase" == "all" || "$bundle_phase" == "remote-server" ]]; then
+    if [[ -n "${ZED_PRODUCT_REMOTE_FEATURES}" ]]; then
+        cargo build ${build_flag} --package remote_server --no-default-features --features "${ZED_PRODUCT_REMOTE_FEATURES}" --target "$target_triple"
+    else
+        cargo build ${build_flag} --package remote_server --no-default-features --target "$target_triple"
+    fi
+fi
+
+if [[ "$bundle_phase" == "application" ]]; then
+    test -x "${cargo_target_dir}/${target_triple}/${target_dir}/zed"
+    test -x "${cargo_target_dir}/${target_triple}/${target_dir}/cli"
+    exit 0
+elif [[ "$bundle_phase" == "remote-server" ]]; then
+    test -x "${cargo_target_dir}/${target_triple}/${target_dir}/remote_server"
+    exit 0
+fi
+
+test -s assets/licenses.md
+test -x "${cargo_target_dir}/${target_triple}/${target_dir}/zed"
+test -x "${cargo_target_dir}/${target_triple}/${target_dir}/cli"
+test -x "${cargo_target_dir}/${target_triple}/${target_dir}/remote_server"
+
+cargo_bundle_version=$(cargo bundle --version 2>/dev/null || echo "")
+if [ "$cargo_bundle_version" != "cargo-bundle 0.11.0" ]; then
+    cargo install cargo-bundle --version 0.11.0 --locked
+fi
+if [[ "$bundle_phase" == "package" ]]; then
+    export CARGO_BUNDLE_SKIP_BUILD=true
 fi
 
 echo "Creating application bundle"

@@ -110,6 +110,10 @@ $channel = if ($env:ZED_RELEASE_CHANNEL) {
 }
 $env:ZED_RELEASE_CHANNEL = $channel
 $env:RELEASE_CHANNEL = $channel
+$bundlePhase = if ($env:ZED_BUNDLE_PHASE) { $env:ZED_BUNDLE_PHASE } else { "all" }
+if (@('all', 'application', 'remote-server', 'package') -notcontains $bundlePhase) {
+    throw "Unsupported bundle phase: $bundlePhase"
+}
 
 function CheckEnvironmentVariables {
     if($env:CI) {
@@ -158,11 +162,20 @@ function PrepareForBundle {
     New-Item -Path "$innoDir\bin" -ItemType Directory -Force
     New-Item -Path "$innoDir\tools" -ItemType Directory -Force
 
-    rustup target add $target
+    if ($bundlePhase -ne 'package') {
+        rustup target add $target
+    }
 }
 
 function GenerateLicenses {
-    . $PSScriptRoot/generate-licenses.ps1
+    if ($env:ZED_PREGENERATED_LICENSES) {
+        if (-not (Test-Path "assets/licenses.md" -PathType Leaf)) {
+            throw "The pre-generated license artifact is missing"
+        }
+    }
+    else {
+        . $PSScriptRoot/generate-licenses.ps1
+    }
 }
 
 function BuildProductBinaries {
@@ -184,6 +197,9 @@ function BuildProductBinaries {
             throw "Product metadata mismatch in ${binary}: $($metadata.ProductName) $($metadata.FileVersion)"
         }
     }
+}
+
+function StageProductBinaries {
     Copy-Item -Path "$CargoOutDir\zed.exe" -Destination "$innoDir\$env:ZED_PRODUCT_EXECUTABLE.exe" -Force
     Copy-Item -Path "$CargoOutDir\cli.exe" -Destination "$innoDir\cli.exe" -Force
     if ($Comfy) {
@@ -201,7 +217,9 @@ function BuildRemoteServer {
         cargo build --release --package remote_server --no-default-features --target $target
     }
 
-    # Create zipped remote server binary
+}
+
+function PackageRemoteServer {
     $remoteServerSrc = (Resolve-Path "$CargoOutDir\remote_server.exe").Path
 
     if ($canCodeSign) {
@@ -362,9 +380,37 @@ $debugArchive = "$CargoOutDir\$env:ZED_PRODUCT_ID-$env:RELEASE_VERSION-$env:ZED_
 
 CheckEnvironmentVariables
 PrepareForBundle
-GenerateLicenses
-BuildProductBinaries
-BuildRemoteServer
+if ($bundlePhase -eq 'all' -or $bundlePhase -eq 'application') {
+    GenerateLicenses
+    BuildProductBinaries
+}
+if ($bundlePhase -eq 'all' -or $bundlePhase -eq 'remote-server') {
+    BuildRemoteServer
+}
+if ($bundlePhase -eq 'application') {
+    foreach ($binary in @('zed.exe', 'cli.exe', 'auto_update_helper.exe')) {
+        if (-not (Test-Path "$CargoOutDir\$binary" -PathType Leaf)) {
+            throw "Application build did not produce $binary"
+        }
+    }
+    exit 0
+}
+if ($bundlePhase -eq 'remote-server') {
+    if (-not (Test-Path "$CargoOutDir\remote_server.exe" -PathType Leaf)) {
+        throw "Remote-server build did not produce remote_server.exe"
+    }
+    exit 0
+}
+if (-not (Test-Path "assets/licenses.md" -PathType Leaf)) {
+    throw "The generated license file is missing"
+}
+foreach ($binary in @('zed.exe', 'cli.exe', 'auto_update_helper.exe', 'remote_server.exe')) {
+    if (-not (Test-Path "$CargoOutDir\$binary" -PathType Leaf)) {
+        throw "Packaging input is missing $binary"
+    }
+}
+PackageRemoteServer
+StageProductBinaries
 SignZedAndItsFriends
 ZipProductDebugSymbols
 DownloadAMDGpuServices
