@@ -74,34 +74,132 @@ jobs:
       version: ${{ steps.resolve-release.outputs.version }}
       tag: ${{ steps.resolve-release.outputs.tag }}
     timeout-minutes: 15
-  product_builds:
+  release_licenses:
     needs:
     - prepare_release
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      with:
+        clean: false
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: steps::install_cargo_about
+      uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9
+      with:
+        tool: cargo-about@0.8.2
+        fallback: none
+    - name: release::release_licenses
+      run: |
+        script/generate-licenses
+        mkdir -p release-licenses
+        cp assets/licenses.md release-licenses/licenses.md
+        CARGO_LOCK_HASH="$(git hash-object Cargo.lock)"
+        LICENSES_HASH="$(git hash-object release-licenses/licenses.md)"
+        jq -n \
+            --arg commit_sha "$COMMIT_SHA" \
+            --arg cargo_lock_hash "$CARGO_LOCK_HASH" \
+            --arg licenses_hash "$LICENSES_HASH" \
+            '{commit_sha: $commit_sha, cargo_lock_hash: $cargo_lock_hash, licenses_hash: $licenses_hash}' \
+            > release-licenses/metadata.json
+      env:
+        COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::release_licenses
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: release-licenses
+        path: release-licenses
+        if-no-files-found: error
+    timeout-minutes: 20
+  application_builds:
+    needs:
+    - prepare_release
+    - release_licenses
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
     env:
       RELEASE_VERSION: ${{ needs.prepare_release.outputs.version }}
+      SCCACHE_GHA_ENABLED: on
+      SCCACHE_IDLE_TIMEOUT: '0'
+      RUSTC_WRAPPER: sccache
+      CARGO_TARGET_DIR: target/products/${{ matrix.product }}
+      ZED_PRODUCT_ID: ${{ matrix.product }}
+      ZED_PRODUCT_DISPLAY_NAME: ${{ matrix.display_name }}
+      ZED_PRODUCT_EXECUTABLE: ${{ matrix.executable_name }}
+      ZED_PRODUCT_BUNDLE_ID: ${{ matrix.bundle_identifier }}
+      ZED_PRODUCT_URL_SCHEME: ${{ matrix.url_scheme }}
+      ZED_PRODUCT_ICON_SET: ${{ matrix.icon_set }}
+      ZED_PRODUCT_DATA_NAMESPACE: ${{ matrix.data_namespace }}
+      ZED_PRODUCT_UPDATE_NAMESPACE: ${{ matrix.update_namespace }}
+      ZED_PRODUCT_WINDOWS_INSTALLER_ID: ${{ matrix.windows_installer_id }}
+      ZED_PRODUCT_APP_FEATURES: ${{ matrix.application_features }}
+      ZED_PRODUCT_REMOTE_FEATURES: ${{ matrix.remote_features }}
+      ZED_RELEASE_CHANNEL: stable
     strategy:
       matrix:
         include:
         - product: rust
+          display_name: Copper
+          executable_name: copper
+          bundle_identifier: dev.ideflavors.rust
+          url_scheme: ide-rust
+          icon_set: assets/product_flavors/rust
+          data_namespace: ide-rust
+          update_namespace: rust
+          windows_installer_id: '{6D7C1287-4A0E-5F5F-BE2C-8066A31F8761}'
           platform: linux
           runner: ubuntu-22.04
           target: x86_64-unknown-linux-gnu
+          remote_target: x86_64-unknown-linux-musl
+          application_features: agentic-tools,rust-tools
+          remote_features: rust-tools
+          application_artifact: rust-application-linux-x86_64
+          remote_artifact: rust-remote-server-linux-x86_64
           artifact: rust-linux-x86_64
+          artifact_suffix: linux-x86_64.tar.gz
           artifact_path: target/products/rust/release/rust-*-linux-x86_64.tar.gz
         - product: rust
+          display_name: Copper
+          executable_name: copper
+          bundle_identifier: dev.ideflavors.rust
+          url_scheme: ide-rust
+          icon_set: assets/product_flavors/rust
+          data_namespace: ide-rust
+          update_namespace: rust
+          windows_installer_id: '{6D7C1287-4A0E-5F5F-BE2C-8066A31F8761}'
           platform: macos
           runner: macos-15
           target: aarch64-apple-darwin
+          remote_target: aarch64-apple-darwin
+          application_features: agentic-tools,rust-tools
+          remote_features: rust-tools
+          application_artifact: rust-application-macos-aarch64
+          remote_artifact: rust-remote-server-macos-aarch64
           artifact: rust-macos-aarch64
+          artifact_suffix: macos-aarch64.dmg
           artifact_path: target/products/rust/release/rust-*-macos-aarch64.dmg
         - product: rust
+          display_name: Copper
+          executable_name: copper
+          bundle_identifier: dev.ideflavors.rust
+          url_scheme: ide-rust
+          icon_set: assets/product_flavors/rust
+          data_namespace: ide-rust
+          update_namespace: rust
+          windows_installer_id: '{6D7C1287-4A0E-5F5F-BE2C-8066A31F8761}'
           platform: windows
           runner: windows-2022
           target: x86_64-pc-windows-msvc
+          remote_target: x86_64-pc-windows-msvc
+          application_features: agentic-tools,rust-tools
+          remote_features: rust-tools
+          application_artifact: rust-application-windows-x86_64
+          remote_artifact: rust-remote-server-windows-x86_64
           artifact: rust-windows-x86_64
+          artifact_suffix: windows-x86_64.exe
           artifact_path: target/products/rust/release/rust-*-windows-x86_64.exe
       fail-fast: false
     steps:
@@ -110,27 +208,531 @@ jobs:
       with:
         clean: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
-    - name: steps::cache_release_sccache
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+    - name: release::application_builds
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       with:
-        path: ${{ runner.temp }}/release-sccache
-        key: release-sccache-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('rust-toolchain.toml') }}-${{ github.run_id }}-${{ github.run_attempt }}
-        restore-keys: release-sccache-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('rust-toolchain.toml') }}-
-    - name: steps::setup_release_sccache
-      if: matrix.platform != 'windows'
-      run: ./script/setup-sccache
+        name: release-licenses
+        path: release-licenses
+    - name: release::verify_release_licenses
+      run: |
+        test -s release-licenses/licenses.md
+        test -s release-licenses/metadata.json
+        CARGO_LOCK_HASH="$(git hash-object Cargo.lock)"
+        LICENSES_HASH="$(git hash-object release-licenses/licenses.md)"
+        jq -e \
+            --arg commit_sha "$COMMIT_SHA" \
+            --arg cargo_lock_hash "$CARGO_LOCK_HASH" \
+            --arg licenses_hash "$LICENSES_HASH" \
+            '.commit_sha == $commit_sha and .cargo_lock_hash == $cargo_lock_hash and .licenses_hash == $licenses_hash' \
+            release-licenses/metadata.json >/dev/null
+        cp release-licenses/licenses.md assets/licenses.md
       env:
-        SCCACHE_LOCAL_CACHE_DIR: ${{ runner.temp }}/release-sccache
-        SCCACHE_CACHE_SIZE: 3G
-        SCCACHE_IDLE_TIMEOUT: '0'
+        COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::configure_release_cache_namespace
+      run: |
+        TOOLCHAIN_HASH="$(git hash-object rust-toolchain.toml)"
+        echo "SCCACHE_GHA_VERSION=release-v2-${RUNNER_OS}-${CACHE_TARGET}-${TOOLCHAIN_HASH}" >> "$GITHUB_ENV"
+      env:
+        CACHE_TARGET: ${{ matrix.target }}
     - name: steps::setup_release_sccache
+      uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+      with:
+        version: v0.16.0
+        disable_annotations: 'true'
+    - name: steps::enable_windows_long_paths
       if: matrix.platform == 'windows'
-      run: ./script/setup-sccache.ps1
+      run: git config --global core.longpaths true
+      shell: pwsh
+    - name: release::application_builds
+      if: matrix.platform == 'linux'
+      run: ./script/linux && ./script/download-wasi-sdk
+    - name: release::application_builds
+      if: matrix.platform == 'linux'
+      run: |
+        export ZED_PRODUCT_ARTIFACT_NAME="${ZED_PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+        export ZED_BUNDLE_PHASE=application
+        script/bundle-linux
+      env:
+        ARTIFACT_SUFFIX: ${{ matrix.artifact_suffix }}
+        ZED_PREGENERATED_LICENSES: '1'
+        CC: clang
+        CXX: clang++
+    - name: release::application_builds
+      if: matrix.platform == 'macos'
+      run: |
+        export ZED_PRODUCT_ARTIFACT_NAME="${ZED_PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+        export ZED_BUNDLE_PHASE=application
+        script/bundle-mac "$TARGET"
+      env:
+        ARTIFACT_SUFFIX: ${{ matrix.artifact_suffix }}
+        TARGET: ${{ matrix.target }}
+        ZED_PREGENERATED_LICENSES: '1'
+    - name: release::application_builds
+      if: matrix.platform == 'windows'
+      run: |
+        $env:ZED_PRODUCT_ARTIFACT_NAME = "$env:ZED_PRODUCT_ID-$env:RELEASE_VERSION-$env:ARTIFACT_SUFFIX"
+        $env:ZED_BUNDLE_PHASE = "application"
+        script/bundle-windows.ps1 -Architecture x86_64
       shell: pwsh
       env:
-        SCCACHE_LOCAL_CACHE_DIR: ${{ runner.temp }}/release-sccache
-        SCCACHE_CACHE_SIZE: 3G
-        SCCACHE_IDLE_TIMEOUT: '0'
+        ARTIFACT_SUFFIX: ${{ matrix.artifact_suffix }}
+        ZED_PREGENERATED_LICENSES: '1'
+    - name: release::application_builds
+      if: matrix.platform != 'windows'
+      run: |
+        SOURCE="target/products/${PRODUCT_ID}/${TARGET}/release"
+        mkdir -p release-application
+        cp "$SOURCE/zed" "$SOURCE/cli" release-application/
+        jq -n --arg commit_sha "$COMMIT_SHA" --arg target "$TARGET" --arg features "$FEATURES" \
+            '{commit_sha: $commit_sha, target: $target, features: $features}' > release-application/metadata.json
+      env:
+        PRODUCT_ID: ${{ matrix.product }}
+        TARGET: ${{ matrix.target }}
+        FEATURES: ${{ matrix.application_features }}
+        COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::application_builds
+      if: matrix.platform == 'windows'
+      run: |
+        $source = "target/products/$env:PRODUCT_ID/$env:TARGET/release"
+        New-Item -ItemType Directory -Path release-application -Force | Out-Null
+        Copy-Item "$source/zed.exe", "$source/cli.exe", "$source/auto_update_helper.exe", "$source/zed.pdb", "$source/cli.pdb", "$source/auto_update_helper.pdb" -Destination release-application
+        @{
+            commit_sha = $env:COMMIT_SHA
+            target = $env:TARGET
+            features = $env:FEATURES
+        } | ConvertTo-Json | Set-Content release-application/metadata.json
+      shell: pwsh
+      env:
+        PRODUCT_ID: ${{ matrix.product }}
+        TARGET: ${{ matrix.target }}
+        FEATURES: ${{ matrix.application_features }}
+        COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::application_builds
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: ${{ matrix.application_artifact }}
+        path: release-application
+        if-no-files-found: error
+    - name: steps::finalize_release_sccache
+      if: always() && matrix.platform != 'windows'
+      run: |
+        STATS="$(sccache --show-stats)"
+        printf '%s\n' "$STATS"
+        {
+            printf '### sccache: %s / %s\n\n```text\n' "$RUNNER_OS" "$SCCACHE_GHA_VERSION"
+            printf '%s\n' "$STATS"
+            printf '```\n'
+        } >> "$GITHUB_STEP_SUMMARY"
+        sccache --stop-server
+    - name: steps::finalize_release_sccache
+      if: always() && matrix.platform == 'windows'
+      run: |
+        $stats = (& sccache --show-stats | Out-String)
+        if ($LASTEXITCODE -ne 0) {
+            throw "sccache --show-stats failed with exit code $LASTEXITCODE"
+        }
+        Write-Host $stats
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ('### sccache: {0} / {1}' -f $env:RUNNER_OS, $env:SCCACHE_GHA_VERSION)
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ''
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```text'
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $stats
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
+        & sccache --stop-server
+        if ($LASTEXITCODE -ne 0) {
+            throw "sccache --stop-server failed with exit code $LASTEXITCODE"
+        }
+      shell: pwsh
+    timeout-minutes: 180
+  remote_server_builds:
+    needs:
+    - prepare_release
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    env:
+      RELEASE_VERSION: ${{ needs.prepare_release.outputs.version }}
+      SCCACHE_GHA_ENABLED: on
+      SCCACHE_IDLE_TIMEOUT: '0'
+      RUSTC_WRAPPER: sccache
+      CARGO_TARGET_DIR: target/products/${{ matrix.product }}
+      ZED_PRODUCT_ID: ${{ matrix.product }}
+      ZED_PRODUCT_DISPLAY_NAME: ${{ matrix.display_name }}
+      ZED_PRODUCT_EXECUTABLE: ${{ matrix.executable_name }}
+      ZED_PRODUCT_BUNDLE_ID: ${{ matrix.bundle_identifier }}
+      ZED_PRODUCT_URL_SCHEME: ${{ matrix.url_scheme }}
+      ZED_PRODUCT_ICON_SET: ${{ matrix.icon_set }}
+      ZED_PRODUCT_DATA_NAMESPACE: ${{ matrix.data_namespace }}
+      ZED_PRODUCT_UPDATE_NAMESPACE: ${{ matrix.update_namespace }}
+      ZED_PRODUCT_WINDOWS_INSTALLER_ID: ${{ matrix.windows_installer_id }}
+      ZED_PRODUCT_APP_FEATURES: ${{ matrix.application_features }}
+      ZED_PRODUCT_REMOTE_FEATURES: ${{ matrix.remote_features }}
+      ZED_RELEASE_CHANNEL: stable
+    strategy:
+      matrix:
+        include:
+        - product: rust
+          display_name: Copper
+          executable_name: copper
+          bundle_identifier: dev.ideflavors.rust
+          url_scheme: ide-rust
+          icon_set: assets/product_flavors/rust
+          data_namespace: ide-rust
+          update_namespace: rust
+          windows_installer_id: '{6D7C1287-4A0E-5F5F-BE2C-8066A31F8761}'
+          platform: linux
+          runner: ubuntu-22.04
+          target: x86_64-unknown-linux-gnu
+          remote_target: x86_64-unknown-linux-musl
+          application_features: agentic-tools,rust-tools
+          remote_features: rust-tools
+          application_artifact: rust-application-linux-x86_64
+          remote_artifact: rust-remote-server-linux-x86_64
+          artifact: rust-linux-x86_64
+          artifact_suffix: linux-x86_64.tar.gz
+          artifact_path: target/products/rust/release/rust-*-linux-x86_64.tar.gz
+        - product: rust
+          display_name: Copper
+          executable_name: copper
+          bundle_identifier: dev.ideflavors.rust
+          url_scheme: ide-rust
+          icon_set: assets/product_flavors/rust
+          data_namespace: ide-rust
+          update_namespace: rust
+          windows_installer_id: '{6D7C1287-4A0E-5F5F-BE2C-8066A31F8761}'
+          platform: macos
+          runner: macos-15
+          target: aarch64-apple-darwin
+          remote_target: aarch64-apple-darwin
+          application_features: agentic-tools,rust-tools
+          remote_features: rust-tools
+          application_artifact: rust-application-macos-aarch64
+          remote_artifact: rust-remote-server-macos-aarch64
+          artifact: rust-macos-aarch64
+          artifact_suffix: macos-aarch64.dmg
+          artifact_path: target/products/rust/release/rust-*-macos-aarch64.dmg
+        - product: rust
+          display_name: Copper
+          executable_name: copper
+          bundle_identifier: dev.ideflavors.rust
+          url_scheme: ide-rust
+          icon_set: assets/product_flavors/rust
+          data_namespace: ide-rust
+          update_namespace: rust
+          windows_installer_id: '{6D7C1287-4A0E-5F5F-BE2C-8066A31F8761}'
+          platform: windows
+          runner: windows-2022
+          target: x86_64-pc-windows-msvc
+          remote_target: x86_64-pc-windows-msvc
+          application_features: agentic-tools,rust-tools
+          remote_features: rust-tools
+          application_artifact: rust-application-windows-x86_64
+          remote_artifact: rust-remote-server-windows-x86_64
+          artifact: rust-windows-x86_64
+          artifact_suffix: windows-x86_64.exe
+          artifact_path: target/products/rust/release/rust-*-windows-x86_64.exe
+      fail-fast: false
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      with:
+        clean: false
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::configure_release_cache_namespace
+      run: |
+        TOOLCHAIN_HASH="$(git hash-object rust-toolchain.toml)"
+        echo "SCCACHE_GHA_VERSION=release-v2-${RUNNER_OS}-${CACHE_TARGET}-${TOOLCHAIN_HASH}" >> "$GITHUB_ENV"
+      env:
+        CACHE_TARGET: ${{ matrix.remote_target }}
+    - name: steps::setup_release_sccache
+      uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+      with:
+        version: v0.16.0
+        disable_annotations: 'true'
+    - name: steps::enable_windows_long_paths
+      if: matrix.platform == 'windows'
+      run: git config --global core.longpaths true
+      shell: pwsh
+    - name: release::remote_server_builds
+      if: matrix.platform == 'linux'
+      run: ./script/linux && ./script/download-wasi-sdk
+    - name: release::remote_server_builds
+      if: matrix.platform == 'linux'
+      run: |
+        export ZED_PRODUCT_ARTIFACT_NAME="${ZED_PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+        export ZED_BUNDLE_PHASE=remote-server
+        script/bundle-linux
+      env:
+        ARTIFACT_SUFFIX: ${{ matrix.artifact_suffix }}
+        CC: clang
+        CXX: clang++
+    - name: release::remote_server_builds
+      if: matrix.platform == 'macos'
+      run: |
+        export ZED_PRODUCT_ARTIFACT_NAME="${ZED_PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+        export ZED_BUNDLE_PHASE=remote-server
+        script/bundle-mac "$TARGET"
+      env:
+        ARTIFACT_SUFFIX: ${{ matrix.artifact_suffix }}
+        TARGET: ${{ matrix.target }}
+    - name: release::remote_server_builds
+      if: matrix.platform == 'windows'
+      run: |
+        $env:ZED_PRODUCT_ARTIFACT_NAME = "$env:ZED_PRODUCT_ID-$env:RELEASE_VERSION-$env:ARTIFACT_SUFFIX"
+        $env:ZED_BUNDLE_PHASE = "remote-server"
+        script/bundle-windows.ps1 -Architecture x86_64
+      shell: pwsh
+      env:
+        ARTIFACT_SUFFIX: ${{ matrix.artifact_suffix }}
+    - name: release::remote_server_builds
+      if: matrix.platform != 'windows'
+      run: |
+        SOURCE="target/products/${PRODUCT_ID}/${REMOTE_TARGET}/release"
+        mkdir -p release-remote-server
+        cp "$SOURCE/remote_server" release-remote-server/
+        jq -n --arg commit_sha "$COMMIT_SHA" --arg target "$REMOTE_TARGET" --arg features "$FEATURES" \
+            '{commit_sha: $commit_sha, target: $target, features: $features}' > release-remote-server/metadata.json
+      env:
+        PRODUCT_ID: ${{ matrix.product }}
+        REMOTE_TARGET: ${{ matrix.remote_target }}
+        FEATURES: ${{ matrix.remote_features }}
+        COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::remote_server_builds
+      if: matrix.platform == 'windows'
+      run: |
+        $source = "target/products/$env:PRODUCT_ID/$env:REMOTE_TARGET/release"
+        New-Item -ItemType Directory -Path release-remote-server -Force | Out-Null
+        Copy-Item "$source/remote_server.exe", "$source/remote_server.pdb" -Destination release-remote-server
+        @{
+            commit_sha = $env:COMMIT_SHA
+            target = $env:REMOTE_TARGET
+            features = $env:FEATURES
+        } | ConvertTo-Json | Set-Content release-remote-server/metadata.json
+      shell: pwsh
+      env:
+        PRODUCT_ID: ${{ matrix.product }}
+        REMOTE_TARGET: ${{ matrix.remote_target }}
+        FEATURES: ${{ matrix.remote_features }}
+        COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::remote_server_builds
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: ${{ matrix.remote_artifact }}
+        path: release-remote-server
+        if-no-files-found: error
+    - name: steps::finalize_release_sccache
+      if: always() && matrix.platform != 'windows'
+      run: |
+        STATS="$(sccache --show-stats)"
+        printf '%s\n' "$STATS"
+        {
+            printf '### sccache: %s / %s\n\n```text\n' "$RUNNER_OS" "$SCCACHE_GHA_VERSION"
+            printf '%s\n' "$STATS"
+            printf '```\n'
+        } >> "$GITHUB_STEP_SUMMARY"
+        sccache --stop-server
+    - name: steps::finalize_release_sccache
+      if: always() && matrix.platform == 'windows'
+      run: |
+        $stats = (& sccache --show-stats | Out-String)
+        if ($LASTEXITCODE -ne 0) {
+            throw "sccache --show-stats failed with exit code $LASTEXITCODE"
+        }
+        Write-Host $stats
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ('### sccache: {0} / {1}' -f $env:RUNNER_OS, $env:SCCACHE_GHA_VERSION)
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ''
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```text'
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $stats
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
+        & sccache --stop-server
+        if ($LASTEXITCODE -ne 0) {
+            throw "sccache --stop-server failed with exit code $LASTEXITCODE"
+        }
+      shell: pwsh
+    timeout-minutes: 120
+  product_builds:
+    needs:
+    - prepare_release
+    - release_licenses
+    - application_builds
+    - remote_server_builds
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    env:
+      RELEASE_VERSION: ${{ needs.prepare_release.outputs.version }}
+      SCCACHE_GHA_ENABLED: on
+      SCCACHE_IDLE_TIMEOUT: '0'
+      RUSTC_WRAPPER: sccache
+      CARGO_TARGET_DIR: target/products/${{ matrix.product }}
+      ZED_PRODUCT_ID: ${{ matrix.product }}
+      ZED_PRODUCT_DISPLAY_NAME: ${{ matrix.display_name }}
+      ZED_PRODUCT_EXECUTABLE: ${{ matrix.executable_name }}
+      ZED_PRODUCT_BUNDLE_ID: ${{ matrix.bundle_identifier }}
+      ZED_PRODUCT_URL_SCHEME: ${{ matrix.url_scheme }}
+      ZED_PRODUCT_ICON_SET: ${{ matrix.icon_set }}
+      ZED_PRODUCT_DATA_NAMESPACE: ${{ matrix.data_namespace }}
+      ZED_PRODUCT_UPDATE_NAMESPACE: ${{ matrix.update_namespace }}
+      ZED_PRODUCT_WINDOWS_INSTALLER_ID: ${{ matrix.windows_installer_id }}
+      ZED_PRODUCT_APP_FEATURES: ${{ matrix.application_features }}
+      ZED_PRODUCT_REMOTE_FEATURES: ${{ matrix.remote_features }}
+      ZED_RELEASE_CHANNEL: stable
+    strategy:
+      matrix:
+        include:
+        - product: rust
+          display_name: Copper
+          executable_name: copper
+          bundle_identifier: dev.ideflavors.rust
+          url_scheme: ide-rust
+          icon_set: assets/product_flavors/rust
+          data_namespace: ide-rust
+          update_namespace: rust
+          windows_installer_id: '{6D7C1287-4A0E-5F5F-BE2C-8066A31F8761}'
+          platform: linux
+          runner: ubuntu-22.04
+          target: x86_64-unknown-linux-gnu
+          remote_target: x86_64-unknown-linux-musl
+          application_features: agentic-tools,rust-tools
+          remote_features: rust-tools
+          application_artifact: rust-application-linux-x86_64
+          remote_artifact: rust-remote-server-linux-x86_64
+          artifact: rust-linux-x86_64
+          artifact_suffix: linux-x86_64.tar.gz
+          artifact_path: target/products/rust/release/rust-*-linux-x86_64.tar.gz
+        - product: rust
+          display_name: Copper
+          executable_name: copper
+          bundle_identifier: dev.ideflavors.rust
+          url_scheme: ide-rust
+          icon_set: assets/product_flavors/rust
+          data_namespace: ide-rust
+          update_namespace: rust
+          windows_installer_id: '{6D7C1287-4A0E-5F5F-BE2C-8066A31F8761}'
+          platform: macos
+          runner: macos-15
+          target: aarch64-apple-darwin
+          remote_target: aarch64-apple-darwin
+          application_features: agentic-tools,rust-tools
+          remote_features: rust-tools
+          application_artifact: rust-application-macos-aarch64
+          remote_artifact: rust-remote-server-macos-aarch64
+          artifact: rust-macos-aarch64
+          artifact_suffix: macos-aarch64.dmg
+          artifact_path: target/products/rust/release/rust-*-macos-aarch64.dmg
+        - product: rust
+          display_name: Copper
+          executable_name: copper
+          bundle_identifier: dev.ideflavors.rust
+          url_scheme: ide-rust
+          icon_set: assets/product_flavors/rust
+          data_namespace: ide-rust
+          update_namespace: rust
+          windows_installer_id: '{6D7C1287-4A0E-5F5F-BE2C-8066A31F8761}'
+          platform: windows
+          runner: windows-2022
+          target: x86_64-pc-windows-msvc
+          remote_target: x86_64-pc-windows-msvc
+          application_features: agentic-tools,rust-tools
+          remote_features: rust-tools
+          application_artifact: rust-application-windows-x86_64
+          remote_artifact: rust-remote-server-windows-x86_64
+          artifact: rust-windows-x86_64
+          artifact_suffix: windows-x86_64.exe
+          artifact_path: target/products/rust/release/rust-*-windows-x86_64.exe
+      fail-fast: false
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      with:
+        clean: false
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::product_builds
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: release-licenses
+        path: release-licenses
+    - name: release::product_builds
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: ${{ matrix.application_artifact }}
+        path: release-application
+    - name: release::product_builds
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: ${{ matrix.remote_artifact }}
+        path: release-remote-server
+    - name: release::verify_release_licenses
+      run: |
+        test -s release-licenses/licenses.md
+        test -s release-licenses/metadata.json
+        CARGO_LOCK_HASH="$(git hash-object Cargo.lock)"
+        LICENSES_HASH="$(git hash-object release-licenses/licenses.md)"
+        jq -e \
+            --arg commit_sha "$COMMIT_SHA" \
+            --arg cargo_lock_hash "$CARGO_LOCK_HASH" \
+            --arg licenses_hash "$LICENSES_HASH" \
+            '.commit_sha == $commit_sha and .cargo_lock_hash == $cargo_lock_hash and .licenses_hash == $licenses_hash' \
+            release-licenses/metadata.json >/dev/null
+        cp release-licenses/licenses.md assets/licenses.md
+      env:
+        COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::product_builds
+      if: matrix.platform != 'windows'
+      run: |
+        jq -e --arg commit_sha "$COMMIT_SHA" --arg target "$TARGET" --arg features "$APPLICATION_FEATURES" \
+            '.commit_sha == $commit_sha and .target == $target and .features == $features' \
+            release-application/metadata.json >/dev/null
+        jq -e --arg commit_sha "$COMMIT_SHA" --arg target "$REMOTE_TARGET" --arg features "$REMOTE_FEATURES" \
+            '.commit_sha == $commit_sha and .target == $target and .features == $features' \
+            release-remote-server/metadata.json >/dev/null
+        APPLICATION_DEST="target/products/${PRODUCT_ID}/${TARGET}/release"
+        REMOTE_DEST="target/products/${PRODUCT_ID}/${REMOTE_TARGET}/release"
+        mkdir -p "$APPLICATION_DEST" "$REMOTE_DEST"
+        cp release-application/zed release-application/cli "$APPLICATION_DEST/"
+        cp release-remote-server/remote_server "$REMOTE_DEST/"
+        chmod +x "$APPLICATION_DEST/zed" "$APPLICATION_DEST/cli" "$REMOTE_DEST/remote_server"
+      env:
+        PRODUCT_ID: ${{ matrix.product }}
+        TARGET: ${{ matrix.target }}
+        REMOTE_TARGET: ${{ matrix.remote_target }}
+        APPLICATION_FEATURES: ${{ matrix.application_features }}
+        REMOTE_FEATURES: ${{ matrix.remote_features }}
+        COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::product_builds
+      if: matrix.platform == 'windows'
+      run: |
+        $applicationMetadata = Get-Content release-application/metadata.json | ConvertFrom-Json
+        $remoteMetadata = Get-Content release-remote-server/metadata.json | ConvertFrom-Json
+        if ($applicationMetadata.commit_sha -ne $env:COMMIT_SHA -or $applicationMetadata.target -ne $env:TARGET -or $applicationMetadata.features -ne $env:APPLICATION_FEATURES) {
+            throw "Application artifact metadata does not match the release plan"
+        }
+        if ($remoteMetadata.commit_sha -ne $env:COMMIT_SHA -or $remoteMetadata.target -ne $env:REMOTE_TARGET -or $remoteMetadata.features -ne $env:REMOTE_FEATURES) {
+            throw "Remote-server artifact metadata does not match the release plan"
+        }
+        $applicationDest = "target/products/$env:PRODUCT_ID/$env:TARGET/release"
+        $remoteDest = "target/products/$env:PRODUCT_ID/$env:REMOTE_TARGET/release"
+        New-Item -ItemType Directory -Path $applicationDest, $remoteDest -Force | Out-Null
+        Copy-Item release-application/zed.exe, release-application/cli.exe, release-application/auto_update_helper.exe, release-application/zed.pdb, release-application/cli.pdb, release-application/auto_update_helper.pdb -Destination $applicationDest
+        Copy-Item release-remote-server/remote_server.exe, release-remote-server/remote_server.pdb -Destination $remoteDest
+      shell: pwsh
+      env:
+        PRODUCT_ID: ${{ matrix.product }}
+        TARGET: ${{ matrix.target }}
+        REMOTE_TARGET: ${{ matrix.remote_target }}
+        APPLICATION_FEATURES: ${{ matrix.application_features }}
+        REMOTE_FEATURES: ${{ matrix.remote_features }}
+        COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::configure_release_cache_namespace
+      run: |
+        TOOLCHAIN_HASH="$(git hash-object rust-toolchain.toml)"
+        echo "SCCACHE_GHA_VERSION=release-v2-${RUNNER_OS}-${CACHE_TARGET}-${TOOLCHAIN_HASH}" >> "$GITHUB_ENV"
+      env:
+        CACHE_TARGET: ${{ matrix.target }}
+    - name: steps::setup_release_sccache
+      uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+      with:
+        version: v0.16.0
+        disable_annotations: 'true'
     - name: release::product_builds
       if: matrix.platform == 'macos'
       run: uname -m && rustc -vV && df -h . && xcode-select -p
@@ -143,18 +745,22 @@ jobs:
       run: ./script/linux && ./script/download-wasi-sdk
     - name: release::product_builds
       if: matrix.platform == 'linux'
-      run: cargo xtask bundle --product "$PRODUCT_ID" --platform "$PLATFORM" --target "$TARGET"
+      run: |
+        export ZED_PRODUCT_ARTIFACT_NAME="${ZED_PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+        export ZED_BUNDLE_PHASE=package
+        script/bundle-linux
       env:
-        PRODUCT_ID: ${{ matrix.product }}
-        PLATFORM: ${{ matrix.platform }}
-        TARGET: ${{ matrix.target }}
+        ARTIFACT_SUFFIX: ${{ matrix.artifact_suffix }}
         CC: clang
         CXX: clang++
     - name: release::product_builds
       if: matrix.platform == 'macos'
-      run: cargo xtask bundle --product "$PRODUCT_ID" --platform macos --target "$TARGET"
+      run: |
+        export ZED_PRODUCT_ARTIFACT_NAME="${ZED_PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+        export ZED_BUNDLE_PHASE=package
+        script/bundle-mac "$TARGET"
       env:
-        PRODUCT_ID: ${{ matrix.product }}
+        ARTIFACT_SUFFIX: ${{ matrix.artifact_suffix }}
         TARGET: ${{ matrix.target }}
         MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
@@ -164,11 +770,13 @@ jobs:
         APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
     - name: release::product_builds
       if: matrix.platform == 'windows'
-      run: cargo xtask bundle --product $env:PRODUCT_ID --platform windows --target $env:TARGET
+      run: |
+        $env:ZED_PRODUCT_ARTIFACT_NAME = "$env:ZED_PRODUCT_ID-$env:RELEASE_VERSION-$env:ARTIFACT_SUFFIX"
+        $env:ZED_BUNDLE_PHASE = "package"
+        script/bundle-windows.ps1 -Architecture x86_64
       shell: pwsh
       env:
-        PRODUCT_ID: ${{ matrix.product }}
-        TARGET: ${{ matrix.target }}
+        ARTIFACT_SUFFIX: ${{ matrix.artifact_suffix }}
         AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -201,22 +809,36 @@ jobs:
     - name: steps::finalize_release_sccache
       if: always() && matrix.platform != 'windows'
       run: |
-        if command -v sccache >/dev/null 2>&1; then
-            sccache --show-stats
-            sccache --stop-server
-        fi
+        STATS="$(sccache --show-stats)"
+        printf '%s\n' "$STATS"
+        {
+            printf '### sccache: %s / %s\n\n```text\n' "$RUNNER_OS" "$SCCACHE_GHA_VERSION"
+            printf '%s\n' "$STATS"
+            printf '```\n'
+        } >> "$GITHUB_STEP_SUMMARY"
+        sccache --stop-server
     - name: steps::finalize_release_sccache
       if: always() && matrix.platform == 'windows'
       run: |
-        if ($env:RUSTC_WRAPPER) {
-            & $env:RUSTC_WRAPPER --show-stats
-            & $env:RUSTC_WRAPPER --stop-server
+        $stats = (& sccache --show-stats | Out-String)
+        if ($LASTEXITCODE -ne 0) {
+            throw "sccache --show-stats failed with exit code $LASTEXITCODE"
+        }
+        Write-Host $stats
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ('### sccache: {0} / {1}' -f $env:RUNNER_OS, $env:SCCACHE_GHA_VERSION)
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ''
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```text'
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $stats
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
+        & sccache --stop-server
+        if ($LASTEXITCODE -ne 0) {
+            throw "sccache --stop-server failed with exit code $LASTEXITCODE"
         }
       shell: pwsh
     - name: release::product_builds
       if: always() && matrix.platform == 'macos'
       run: df -h . && du -sh target
-    timeout-minutes: 240
+    timeout-minutes: 90
   publish_product:
     needs:
     - prepare_release
@@ -235,6 +857,17 @@ jobs:
     - name: release::publish_product
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       with:
+        name: rust-linux-x86_64
+        path: release-artifacts
+    - name: release::publish_product
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: rust-macos-aarch64
+        path: release-artifacts
+    - name: release::publish_product
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: rust-windows-x86_64
         path: release-artifacts
     - name: release::publish_product
       run: |

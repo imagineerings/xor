@@ -97,6 +97,14 @@ done
 
 channel="${ZED_RELEASE_CHANNEL:-$(<crates/zed/RELEASE_CHANNEL)}"
 target_dir="${CARGO_TARGET_DIR:-target}"
+bundle_phase="${ZED_BUNDLE_PHASE:-all}"
+case "$bundle_phase" in
+    all|application|remote-server|package) ;;
+    *)
+        echo "Unsupported bundle phase: $bundle_phase" >&2
+        exit 1
+        ;;
+esac
 
 version="${RELEASE_VERSION:-$(script/get-crate-version zed)}"
 # Set RELEASE_VERSION so it's compiled into GPUI and it knows about the version.
@@ -114,10 +122,15 @@ if command -v rustup >/dev/null 2>&1; then
     rustup_installed=true
 fi
 
-# Generate the licenses first, so they can be baked into the binaries
-script/generate-licenses
+if [[ "$bundle_phase" == "all" || "$bundle_phase" == "application" ]]; then
+    if [[ -n "${ZED_PREGENERATED_LICENSES:-}" ]]; then
+        test -s assets/licenses.md
+    else
+        script/generate-licenses
+    fi
+fi
 
-if "$rustup_installed"; then
+if "$rustup_installed" && [[ "$bundle_phase" == "all" || "$bundle_phase" == "remote-server" ]]; then
     rustup target add "$remote_server_triple"
 fi
 
@@ -133,28 +146,46 @@ if [[ "$(uname -m)" == "aarch64" ]]; then
 else
     export RUSTFLAGS="${RUSTFLAGS:-} -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
 fi
-if [[ "$comfy" = true ]]; then
-    zed_build_features="zed/comfy,zed/cuda,zed/rocm,zed/mlu,zed/npu,zed/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu"
-    if [[ "$rust_tools" = true ]]; then
-        zed_build_features="${zed_build_features},zed/rust-tools"
+if [[ "$bundle_phase" == "all" || "$bundle_phase" == "application" ]]; then
+    if [[ "$comfy" = true ]]; then
+        zed_build_features="zed/comfy,zed/cuda,zed/rocm,zed/mlu,zed/npu,zed/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu"
+        if [[ "$rust_tools" = true ]]; then
+            zed_build_features="${zed_build_features},zed/rust-tools"
+        fi
+        cargo build --release --target "${target_triple}" --package zed --package cli --package comfy_worker --features "${zed_build_features}"
+    else
+        application_features=$(printf 'zed/%s,' ${ZED_PRODUCT_APP_FEATURES//,/ } | sed 's/,$//')
+        cargo build --release --target "${target_triple}" --package zed --package cli --no-default-features --features "${application_features}"
     fi
-    cargo build --release --target "${target_triple}" --package zed --package cli --package comfy_worker --features "${zed_build_features}"
-else
-    application_features=$(printf 'zed/%s,' ${ZED_PRODUCT_APP_FEATURES//,/ } | sed 's/,$//')
-    cargo build --release --target "${target_triple}" --package zed --package cli --no-default-features --features "${application_features}"
 fi
 # Build remote_server in separate invocation to prevent feature unification from other crates
 # from influencing dynamic libraries required by it.
-if [[ "$remote_server_triple" == "$musl_triple" ]]; then
-    export RUSTFLAGS="${RUSTFLAGS:-} -C target-feature=+crt-static"
-    musl_cc_var="CC_$(echo "$remote_server_triple" | tr '-' '_')"
-    export "$musl_cc_var"=musl-gcc
+if [[ "$bundle_phase" == "all" || "$bundle_phase" == "remote-server" ]]; then
+    if [[ "$remote_server_triple" == "$musl_triple" ]]; then
+        export RUSTFLAGS="${RUSTFLAGS:-} -C target-feature=+crt-static"
+        musl_cc_var="CC_$(echo "$remote_server_triple" | tr '-' '_')"
+        export "$musl_cc_var"=musl-gcc
+    fi
+    if [[ -n "${ZED_PRODUCT_REMOTE_FEATURES}" ]]; then
+        cargo build --release --target "${remote_server_triple}" --package remote_server --no-default-features --features "${ZED_PRODUCT_REMOTE_FEATURES}"
+    else
+        cargo build --release --target "${remote_server_triple}" --package remote_server --no-default-features
+    fi
 fi
-if [[ -n "${ZED_PRODUCT_REMOTE_FEATURES}" ]]; then
-    cargo build --release --target "${remote_server_triple}" --package remote_server --no-default-features --features "${ZED_PRODUCT_REMOTE_FEATURES}"
-else
-    cargo build --release --target "${remote_server_triple}" --package remote_server --no-default-features
+
+if [[ "$bundle_phase" == "application" ]]; then
+    test -x "${target_dir}/${target_triple}/release/zed"
+    test -x "${target_dir}/${target_triple}/release/cli"
+    exit 0
+elif [[ "$bundle_phase" == "remote-server" ]]; then
+    test -x "${target_dir}/${remote_server_triple}/release/remote_server"
+    exit 0
 fi
+
+test -s assets/licenses.md
+test -x "${target_dir}/${target_triple}/release/zed"
+test -x "${target_dir}/${target_triple}/release/cli"
+test -x "${target_dir}/${remote_server_triple}/release/remote_server"
 
 # Strip debug symbols before packaging.
 # We use llvm-objcopy because GNU objcopy on older distros (e.g. Ubuntu 20.04)

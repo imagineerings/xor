@@ -31,6 +31,15 @@ pub enum SigningPolicy {
     Required,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub enum BundlePhase {
+    All,
+    Application,
+    RemoteServer,
+    Package,
+}
+
 #[derive(Clone, Debug, Parser)]
 pub struct BundleArgs {
     /// Stable product ID from products/flavors.toml.
@@ -48,6 +57,9 @@ pub struct BundleArgs {
     /// Production signing behavior.
     #[arg(long, value_enum, default_value = "auto")]
     signing: SigningPolicy,
+    /// Release build phase. The generated release workflow uses this to compile components in parallel.
+    #[arg(long, value_enum, default_value = "all")]
+    phase: BundlePhase,
     /// Validate and print the resolved plan without building.
     #[arg(long)]
     dry_run: bool,
@@ -72,6 +84,7 @@ struct BundlePlan<'a> {
     target_dir: String,
     artifact_name: String,
     signing: SigningPolicy,
+    phase: BundlePhase,
     signing_credentials_available: bool,
 }
 
@@ -150,6 +163,7 @@ pub fn run(args: BundleArgs) -> Result<()> {
         target_dir: target_dir.display().to_string(),
         artifact_name: artifact_name.clone(),
         signing: args.signing,
+        phase: args.phase,
         signing_credentials_available: credentials_available,
     };
     if args.dry_run {
@@ -183,6 +197,15 @@ pub fn run(args: BundleArgs) -> Result<()> {
         "ZED_PRODUCT_SIGNING",
         format!("{:?}", args.signing).to_lowercase(),
     );
+    command.env(
+        "ZED_BUNDLE_PHASE",
+        match args.phase {
+            BundlePhase::All => "all",
+            BundlePhase::Application => "application",
+            BundlePhase::RemoteServer => "remote-server",
+            BundlePhase::Package => "package",
+        },
+    );
     command.env("ZED_RELEASE_CHANNEL", &args.channel);
     command.env("CARGO_TARGET_DIR", &target_dir);
     if args.signing == SigningPolicy::Off {
@@ -193,17 +216,19 @@ pub fn run(args: BundleArgs) -> Result<()> {
         .status()
         .context("failed to start platform bundler")?;
     ensure!(status.success(), "platform bundler failed with {status}");
-    let artifact_root = if target_dir.is_absolute() {
-        target_dir
-    } else {
-        root.join(target_dir)
-    };
-    let artifact_path = artifact_root.join("release").join(&artifact_name);
-    ensure!(
-        artifact_path.is_file(),
-        "platform bundler did not produce expected artifact {}",
-        artifact_path.display()
-    );
+    if matches!(args.phase, BundlePhase::All | BundlePhase::Package) {
+        let artifact_root = if target_dir.is_absolute() {
+            target_dir
+        } else {
+            root.join(target_dir)
+        };
+        let artifact_path = artifact_root.join("release").join(&artifact_name);
+        ensure!(
+            artifact_path.is_file(),
+            "platform bundler did not produce expected artifact {}",
+            artifact_path.display()
+        );
+    }
     Ok(())
 }
 
