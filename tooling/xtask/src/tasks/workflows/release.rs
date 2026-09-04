@@ -107,6 +107,9 @@ fn prepare_release() -> (NamedJob, PreparedRelease) {
     let commit_sha = StepOutput::new(&resolve, "commit_sha");
     let version = StepOutput::new(&resolve, "version");
     let tag = StepOutput::new(&resolve, "tag");
+    let generate_bundle_plans = generate_release_bundle_plans()
+        .add_env(("COMMIT_SHA", commit_sha.to_string()))
+        .add_env(("RELEASE_VERSION", version.to_string()));
     let job = named::job(
         Job::default()
             .cond(Expression::new(AUTOMATIC_RELEASE_GUARD))
@@ -120,6 +123,11 @@ fn prepare_release() -> (NamedJob, PreparedRelease) {
                     .with_fetch_tags(),
             )
             .add_step(resolve)
+            .add_step(generate_bundle_plans)
+            .add_step(
+                steps::upload_artifact("release-bundle-plans", "release-bundle-plans")
+                    .if_no_files_found(IfNoFilesFound::Error),
+            )
             .outputs([
                 (commit_sha.name.to_owned(), commit_sha.to_string()),
                 (version.name.to_owned(), version.to_string()),
@@ -160,6 +168,7 @@ fn product_matrix() -> Vec<Value> {
                     "remote_features": remote_features,
                     "application_artifact": format!("{}-application-linux-x86_64", product.id),
                     "remote_artifact": format!("{}-remote-server-linux-x86_64", product.id),
+                    "plan_file": format!("{}-linux-x86_64.json", product.id),
                     "artifact": format!("{}-linux-x86_64", product.id),
                     "artifact_suffix": "linux-x86_64.tar.gz",
                     "artifact_path": format!("target/products/{}/release/{}-*-linux-x86_64.tar.gz", product.id, product.id),
@@ -182,6 +191,7 @@ fn product_matrix() -> Vec<Value> {
                     "remote_features": remote_features,
                     "application_artifact": format!("{}-application-macos-aarch64", product.id),
                     "remote_artifact": format!("{}-remote-server-macos-aarch64", product.id),
+                    "plan_file": format!("{}-macos-aarch64.json", product.id),
                     "artifact": format!("{}-macos-aarch64", product.id),
                     "artifact_suffix": "macos-aarch64.dmg",
                     "artifact_path": format!("target/products/{}/release/{}-*-macos-aarch64.dmg", product.id, product.id),
@@ -204,6 +214,7 @@ fn product_matrix() -> Vec<Value> {
                     "remote_features": remote_features,
                     "application_artifact": format!("{}-application-windows-x86_64", product.id),
                     "remote_artifact": format!("{}-remote-server-windows-x86_64", product.id),
+                    "plan_file": format!("{}-windows-x86_64.json", product.id),
                     "artifact": format!("{}-windows-x86_64", product.id),
                     "artifact_suffix": "windows-x86_64.exe",
                     "artifact_path": format!("target/products/{}/release/{}-*-windows-x86_64.exe", product.id, product.id),
@@ -216,6 +227,20 @@ fn product_matrix() -> Vec<Value> {
         }
     }
     include
+}
+
+fn generate_release_bundle_plans() -> Step<Run> {
+    let mut command = String::from("mkdir -p release-bundle-plans\n");
+    for row in product_matrix() {
+        let product = row["product"].as_str().expect("product is a string");
+        let platform = row["platform"].as_str().expect("platform is a string");
+        let target = row["target"].as_str().expect("target is a string");
+        let plan_file = row["plan_file"].as_str().expect("plan file is a string");
+        command.push_str(&format!(
+            "target/debug/xtask bundle --product {product} --platform {platform} --target {target} --dry-run \\\n    | jq --arg commit_sha \"$COMMIT_SHA\" '. + {{commit_sha: $commit_sha}}' > release-bundle-plans/{plan_file}\n"
+        ));
+    }
+    named::bash(command)
 }
 
 fn release_cache_environment(job: Job) -> Job {
@@ -253,6 +278,19 @@ fn release_bundle_environment(job: Job) -> Job {
             "${{ matrix.remote_features }}",
         ))
         .add_env(("ZED_RELEASE_CHANNEL", "stable"))
+}
+
+fn cache_macos_cargo_bundle() -> Step<Use> {
+    named::uses(
+        "actions",
+        "cache",
+        "0057852bfaa89a56745cba8c7296529d2fc39830", // v4.3.0
+    )
+    .add_with(("path", "~/.cargo/bin/cargo-bundle"))
+    .add_with((
+        "key",
+        "release-tool-v1-cargo-bundle-0.11.0-${{ runner.os }}-${{ runner.arch }}",
+    ))
 }
 
 fn configure_release_cache_namespace(target: &str) -> Step<Run> {
@@ -570,6 +608,11 @@ fn product_builds(
         )
         .add_step(
             steps::download_artifact()
+                .artifact_name("release-bundle-plans")
+                .path("release-bundle-plans"),
+        )
+        .add_step(
+            steps::download_artifact()
                 .artifact_name("${{ matrix.application_artifact }}")
                 .path("release-application"),
         )
@@ -626,8 +669,10 @@ fn product_builds(
             .add_env(("REMOTE_FEATURES", "${{ matrix.remote_features }}"))
             .add_env(("COMMIT_SHA", prepared.commit_sha.to_string()))
         )
-        .add_step(configure_release_cache_namespace("${{ matrix.target }}"))
-        .add_step(steps::setup_release_sccache())
+        .add_step(
+            cache_macos_cargo_bundle()
+                .if_condition(Expression::new("matrix.platform == 'macos'")),
+        )
         .add_step(
             named::bash("uname -m && rustc -vV && df -h . && xcode-select -p")
                 .if_condition(Expression::new("matrix.platform == 'macos'")),
@@ -686,28 +731,56 @@ fn product_builds(
                 .add_env(("TIMESTAMP_SERVER", "${{ secrets.TIMESTAMP_SERVER }}")),
         )
         .add_step(
-            named::bash("python3 script/smoke-product-bundle --product \"$PRODUCT_ID\" --platform \"$PLATFORM\" --target \"$TARGET\"")
+            named::bash(indoc::indoc! {r#"
+                export ZED_PRODUCT_ARTIFACT_NAME="${PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+                python3 script/smoke-product-bundle \
+                    --product "$PRODUCT_ID" \
+                    --platform "$PLATFORM" \
+                    --target "$TARGET" \
+                    --plan "release-bundle-plans/$PLAN_FILE" \
+                    --commit-sha "$COMMIT_SHA"
+            "#})
                 .if_condition(Expression::new("matrix.platform != 'windows'"))
                 .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
                 .add_env(("PLATFORM", "${{ matrix.platform }}"))
-                .add_env(("TARGET", "${{ matrix.target }}")),
+                .add_env(("TARGET", "${{ matrix.target }}"))
+                .add_env(("PLAN_FILE", "${{ matrix.plan_file }}"))
+                .add_env(("ARTIFACT_SUFFIX", "${{ matrix.artifact_suffix }}"))
+                .add_env(("COMMIT_SHA", prepared.commit_sha.to_string())),
         )
         .add_step(
-            named::pwsh("python script/smoke-product-bundle --product $env:PRODUCT_ID --platform windows --target $env:TARGET")
+            named::pwsh(indoc::indoc! {r#"
+                $env:ZED_PRODUCT_ARTIFACT_NAME = "$env:PRODUCT_ID-$env:RELEASE_VERSION-$env:ARTIFACT_SUFFIX"
+                python script/smoke-product-bundle `
+                    --product $env:PRODUCT_ID `
+                    --platform windows `
+                    --target $env:TARGET `
+                    --plan "release-bundle-plans/$env:PLAN_FILE" `
+                    --commit-sha $env:COMMIT_SHA
+            "#})
                 .if_condition(Expression::new("matrix.platform == 'windows'"))
                 .add_env(("PRODUCT_ID", "${{ matrix.product }}"))
-                .add_env(("TARGET", "${{ matrix.target }}")),
+                .add_env(("TARGET", "${{ matrix.target }}"))
+                .add_env(("PLAN_FILE", "${{ matrix.plan_file }}"))
+                .add_env(("ARTIFACT_SUFFIX", "${{ matrix.artifact_suffix }}"))
+                .add_env(("COMMIT_SHA", prepared.commit_sha.to_string())),
         )
         .add_step(
             steps::upload_artifact("${{ matrix.artifact }}", "${{ matrix.artifact_path }}")
                 .if_no_files_found(IfNoFilesFound::Error),
         )
         .add_step(
-            steps::finalize_release_sccache(runners::Platform::Linux)
+            named::bash(indoc::indoc! {r#"
+                printf '### sccache: package-only job\n\nNo Rust compilation ran; this job consumed commit-bound application, remote-server, license, and bundle-plan artifacts. Cache requests: 0.\n' >> "$GITHUB_STEP_SUMMARY"
+            "#})
                 .if_condition(Expression::new("always() && matrix.platform != 'windows'")),
         )
         .add_step(
-            steps::finalize_release_sccache(runners::Platform::Windows)
+            named::pwsh(indoc::indoc! {r#"
+                Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '### sccache: package-only job'
+                Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ''
+                Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value 'No Rust compilation ran; this job consumed commit-bound application, remote-server, license, and bundle-plan artifacts. Cache requests: 0.'
+            "#})
                 .if_condition(Expression::new("always() && matrix.platform == 'windows'")),
         )
         .add_step(
@@ -715,7 +788,7 @@ fn product_builds(
                 .if_condition(Expression::new("always() && matrix.platform == 'macos'")),
         );
 
-    named::job(release_bundle_environment(release_cache_environment(job)))
+    named::job(release_bundle_environment(job))
 }
 
 fn publish_product(prepare: &NamedJob, prepared: &PreparedRelease, build: &NamedJob) -> NamedJob {
@@ -906,9 +979,21 @@ mod release_workflow_tests {
         assert!(yaml.contains("CACHE_TARGET: ${{ matrix.remote_target }}"));
         assert!(yaml.contains("SCCACHE_IDLE_TIMEOUT: '0'"));
         assert!(!yaml.contains("SCCACHE_LOCAL_CACHE_DIR"));
-        assert!(!yaml.contains("uses: actions/cache@"));
+        assert_eq!(yaml.matches("uses: actions/cache@").count(), 1);
+        assert!(yaml.contains("path: ~/.cargo/bin/cargo-bundle"));
+        assert!(yaml.contains(
+            "key: release-tool-v1-cargo-bundle-0.11.0-${{ runner.os }}-${{ runner.arch }}"
+        ));
         assert!(yaml.contains("sccache --show-stats"));
         assert!(yaml.contains("sccache --stop-server"));
+        assert!(yaml.contains("name: release-bundle-plans"));
+        assert!(yaml.contains("target/debug/xtask bundle --product rust --platform linux"));
+        assert!(yaml.contains("target/debug/xtask bundle --product rust --platform macos"));
+        assert!(yaml.contains("target/debug/xtask bundle --product rust --platform windows"));
+        assert!(yaml.contains("'. + {commit_sha: $commit_sha}'"));
+        assert!(yaml.contains("--plan \"release-bundle-plans/$PLAN_FILE\""));
+        assert!(yaml.contains("--commit-sha \"$COMMIT_SHA\""));
+        assert!(!yaml.contains("cargo xtask bundle --product $env:PRODUCT_ID"));
         assert!(yaml.contains("cargo-about@0.8.2"));
         assert!(yaml.contains("fallback: none"));
         assert!(yaml.contains("sha256sum \"$1\""));
@@ -932,6 +1017,18 @@ mod release_workflow_tests {
         assert!(yaml.contains("git tag -a"));
         assert!(yaml.contains("--draft"));
         assert!(yaml.contains("contents: write"));
+
+        let package_job = yaml
+            .split_once("  product_builds:\n")
+            .expect("package job")
+            .1
+            .split_once("  publish_product:\n")
+            .expect("publisher after package job")
+            .0;
+        assert!(!package_job.contains("mozilla-actions/sccache-action"));
+        assert!(!package_job.contains("RUSTC_WRAPPER"));
+        assert!(!package_job.contains("sccache --show-stats"));
+        assert!(package_job.contains("Cache requests: 0."));
     }
 }
 

@@ -69,6 +69,24 @@ jobs:
         BUMP: ${{ github.event_name == 'workflow_dispatch' && inputs.bump || 'patch' }}
         EXPLICIT_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
         EXISTING_TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
+    - name: release::generate_release_bundle_plans
+      run: |
+        mkdir -p release-bundle-plans
+        target/debug/xtask bundle --product rust --platform linux --target x86_64-unknown-linux-gnu --dry-run \
+            | jq --arg commit_sha "$COMMIT_SHA" '. + {commit_sha: $commit_sha}' > release-bundle-plans/rust-linux-x86_64.json
+        target/debug/xtask bundle --product rust --platform macos --target aarch64-apple-darwin --dry-run \
+            | jq --arg commit_sha "$COMMIT_SHA" '. + {commit_sha: $commit_sha}' > release-bundle-plans/rust-macos-aarch64.json
+        target/debug/xtask bundle --product rust --platform windows --target x86_64-pc-windows-msvc --dry-run \
+            | jq --arg commit_sha "$COMMIT_SHA" '. + {commit_sha: $commit_sha}' > release-bundle-plans/rust-windows-x86_64.json
+      env:
+        COMMIT_SHA: ${{ steps.resolve-release.outputs.commit_sha }}
+        RELEASE_VERSION: ${{ steps.resolve-release.outputs.version }}
+    - name: release::prepare_release
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: release-bundle-plans
+        path: release-bundle-plans
+        if-no-files-found: error
     outputs:
       commit_sha: ${{ steps.resolve-release.outputs.commit_sha }}
       version: ${{ steps.resolve-release.outputs.version }}
@@ -163,6 +181,7 @@ jobs:
           remote_features: rust-tools
           application_artifact: rust-application-linux-x86_64
           remote_artifact: rust-remote-server-linux-x86_64
+          plan_file: rust-linux-x86_64.json
           artifact: rust-linux-x86_64
           artifact_suffix: linux-x86_64.tar.gz
           artifact_path: target/products/rust/release/rust-*-linux-x86_64.tar.gz
@@ -183,6 +202,7 @@ jobs:
           remote_features: rust-tools
           application_artifact: rust-application-macos-aarch64
           remote_artifact: rust-remote-server-macos-aarch64
+          plan_file: rust-macos-aarch64.json
           artifact: rust-macos-aarch64
           artifact_suffix: macos-aarch64.dmg
           artifact_path: target/products/rust/release/rust-*-macos-aarch64.dmg
@@ -203,6 +223,7 @@ jobs:
           remote_features: rust-tools
           application_artifact: rust-application-windows-x86_64
           remote_artifact: rust-remote-server-windows-x86_64
+          plan_file: rust-windows-x86_64.json
           artifact: rust-windows-x86_64
           artifact_suffix: windows-x86_64.exe
           artifact_path: target/products/rust/release/rust-*-windows-x86_64.exe
@@ -401,6 +422,7 @@ jobs:
           remote_features: rust-tools
           application_artifact: rust-application-linux-x86_64
           remote_artifact: rust-remote-server-linux-x86_64
+          plan_file: rust-linux-x86_64.json
           artifact: rust-linux-x86_64
           artifact_suffix: linux-x86_64.tar.gz
           artifact_path: target/products/rust/release/rust-*-linux-x86_64.tar.gz
@@ -421,6 +443,7 @@ jobs:
           remote_features: rust-tools
           application_artifact: rust-application-macos-aarch64
           remote_artifact: rust-remote-server-macos-aarch64
+          plan_file: rust-macos-aarch64.json
           artifact: rust-macos-aarch64
           artifact_suffix: macos-aarch64.dmg
           artifact_path: target/products/rust/release/rust-*-macos-aarch64.dmg
@@ -441,6 +464,7 @@ jobs:
           remote_features: rust-tools
           application_artifact: rust-application-windows-x86_64
           remote_artifact: rust-remote-server-windows-x86_64
+          plan_file: rust-windows-x86_64.json
           artifact: rust-windows-x86_64
           artifact_suffix: windows-x86_64.exe
           artifact_path: target/products/rust/release/rust-*-windows-x86_64.exe
@@ -574,9 +598,6 @@ jobs:
       contents: read
     env:
       RELEASE_VERSION: ${{ needs.prepare_release.outputs.version }}
-      SCCACHE_GHA_ENABLED: on
-      SCCACHE_IDLE_TIMEOUT: '0'
-      RUSTC_WRAPPER: sccache
       CARGO_TARGET_DIR: target/products/${{ matrix.product }}
       ZED_PRODUCT_ID: ${{ matrix.product }}
       ZED_PRODUCT_DISPLAY_NAME: ${{ matrix.display_name }}
@@ -610,6 +631,7 @@ jobs:
           remote_features: rust-tools
           application_artifact: rust-application-linux-x86_64
           remote_artifact: rust-remote-server-linux-x86_64
+          plan_file: rust-linux-x86_64.json
           artifact: rust-linux-x86_64
           artifact_suffix: linux-x86_64.tar.gz
           artifact_path: target/products/rust/release/rust-*-linux-x86_64.tar.gz
@@ -630,6 +652,7 @@ jobs:
           remote_features: rust-tools
           application_artifact: rust-application-macos-aarch64
           remote_artifact: rust-remote-server-macos-aarch64
+          plan_file: rust-macos-aarch64.json
           artifact: rust-macos-aarch64
           artifact_suffix: macos-aarch64.dmg
           artifact_path: target/products/rust/release/rust-*-macos-aarch64.dmg
@@ -650,6 +673,7 @@ jobs:
           remote_features: rust-tools
           application_artifact: rust-application-windows-x86_64
           remote_artifact: rust-remote-server-windows-x86_64
+          plan_file: rust-windows-x86_64.json
           artifact: rust-windows-x86_64
           artifact_suffix: windows-x86_64.exe
           artifact_path: target/products/rust/release/rust-*-windows-x86_64.exe
@@ -665,6 +689,11 @@ jobs:
       with:
         name: release-licenses
         path: release-licenses
+    - name: release::product_builds
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: release-bundle-plans
+        path: release-bundle-plans
     - name: release::product_builds
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       with:
@@ -745,17 +774,12 @@ jobs:
         APPLICATION_FEATURES: ${{ matrix.application_features }}
         REMOTE_FEATURES: ${{ matrix.remote_features }}
         COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
-    - name: release::configure_release_cache_namespace
-      run: |
-        TOOLCHAIN_HASH="$(git hash-object rust-toolchain.toml)"
-        echo "SCCACHE_GHA_VERSION=release-v2-${RUNNER_OS}-${CACHE_TARGET}-${TOOLCHAIN_HASH}" >> "$GITHUB_ENV"
-      env:
-        CACHE_TARGET: ${{ matrix.target }}
-    - name: steps::setup_release_sccache
-      uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+    - name: release::cache_macos_cargo_bundle
+      if: matrix.platform == 'macos'
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
       with:
-        version: v0.16.0
-        disable_annotations: 'true'
+        path: ~/.cargo/bin/cargo-bundle
+        key: release-tool-v1-cargo-bundle-0.11.0-${{ runner.os }}-${{ runner.arch }}
     - name: release::product_builds
       if: matrix.platform == 'macos'
       run: uname -m && rustc -vV && df -h . && xcode-select -p
@@ -811,52 +835,54 @@ jobs:
         TIMESTAMP_SERVER: ${{ secrets.TIMESTAMP_SERVER }}
     - name: release::product_builds
       if: matrix.platform != 'windows'
-      run: python3 script/smoke-product-bundle --product "$PRODUCT_ID" --platform "$PLATFORM" --target "$TARGET"
+      run: |
+        export ZED_PRODUCT_ARTIFACT_NAME="${PRODUCT_ID}-${RELEASE_VERSION}-${ARTIFACT_SUFFIX}"
+        python3 script/smoke-product-bundle \
+            --product "$PRODUCT_ID" \
+            --platform "$PLATFORM" \
+            --target "$TARGET" \
+            --plan "release-bundle-plans/$PLAN_FILE" \
+            --commit-sha "$COMMIT_SHA"
       env:
         PRODUCT_ID: ${{ matrix.product }}
         PLATFORM: ${{ matrix.platform }}
         TARGET: ${{ matrix.target }}
+        PLAN_FILE: ${{ matrix.plan_file }}
+        ARTIFACT_SUFFIX: ${{ matrix.artifact_suffix }}
+        COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: release::product_builds
       if: matrix.platform == 'windows'
-      run: python script/smoke-product-bundle --product $env:PRODUCT_ID --platform windows --target $env:TARGET
+      run: |
+        $env:ZED_PRODUCT_ARTIFACT_NAME = "$env:PRODUCT_ID-$env:RELEASE_VERSION-$env:ARTIFACT_SUFFIX"
+        python script/smoke-product-bundle `
+            --product $env:PRODUCT_ID `
+            --platform windows `
+            --target $env:TARGET `
+            --plan "release-bundle-plans/$env:PLAN_FILE" `
+            --commit-sha $env:COMMIT_SHA
       shell: pwsh
       env:
         PRODUCT_ID: ${{ matrix.product }}
         TARGET: ${{ matrix.target }}
+        PLAN_FILE: ${{ matrix.plan_file }}
+        ARTIFACT_SUFFIX: ${{ matrix.artifact_suffix }}
+        COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: release::product_builds
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: ${{ matrix.artifact }}
         path: ${{ matrix.artifact_path }}
         if-no-files-found: error
-    - name: steps::finalize_release_sccache
+    - name: release::product_builds
       if: always() && matrix.platform != 'windows'
       run: |
-        STATS="$(sccache --show-stats)"
-        printf '%s\n' "$STATS"
-        {
-            printf '### sccache: %s / %s\n\n```text\n' "$RUNNER_OS" "$SCCACHE_GHA_VERSION"
-            printf '%s\n' "$STATS"
-            printf '```\n'
-        } >> "$GITHUB_STEP_SUMMARY"
-        sccache --stop-server
-    - name: steps::finalize_release_sccache
+        printf '### sccache: package-only job\n\nNo Rust compilation ran; this job consumed commit-bound application, remote-server, license, and bundle-plan artifacts. Cache requests: 0.\n' >> "$GITHUB_STEP_SUMMARY"
+    - name: release::product_builds
       if: always() && matrix.platform == 'windows'
       run: |
-        $stats = (& sccache --show-stats | Out-String)
-        if ($LASTEXITCODE -ne 0) {
-            throw "sccache --show-stats failed with exit code $LASTEXITCODE"
-        }
-        Write-Host $stats
-        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ('### sccache: {0} / {1}' -f $env:RUNNER_OS, $env:SCCACHE_GHA_VERSION)
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '### sccache: package-only job'
         Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ''
-        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```text'
-        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $stats
-        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
-        & sccache --stop-server
-        if ($LASTEXITCODE -ne 0) {
-            throw "sccache --stop-server failed with exit code $LASTEXITCODE"
-        }
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value 'No Rust compilation ran; this job consumed commit-bound application, remote-server, license, and bundle-plan artifacts. Cache requests: 0.'
       shell: pwsh
     - name: release::product_builds
       if: always() && matrix.platform == 'macos'

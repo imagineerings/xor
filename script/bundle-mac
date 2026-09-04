@@ -105,6 +105,10 @@ for variable_name in "${required_product_variables[@]}"; do
     fi
 done
 cargo_target_dir="${CARGO_TARGET_DIR:-target}"
+if [[ "${cargo_target_dir}" != /* ]]; then
+    cargo_target_dir="${PWD}/${cargo_target_dir}"
+fi
+export CARGO_TARGET_DIR="${cargo_target_dir}"
 bundle_phase="${ZED_BUNDLE_PHASE:-all}"
 case "$bundle_phase" in
     all|application|remote-server|package) ;;
