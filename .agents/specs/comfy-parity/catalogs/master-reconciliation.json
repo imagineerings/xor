@@ -346,8 +346,8 @@
     "current_zed_status": {
       "conflicting": 788,
       "deferred": 2274,
-      "equivalent": 0,
-      "missing": 9957,
+      "equivalent": 71,
+      "missing": 9886,
       "partial": 189,
       "uncertain": 87
     },

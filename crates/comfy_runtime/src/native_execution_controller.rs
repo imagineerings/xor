@@ -2059,7 +2059,7 @@ pub struct NativeModelSourceWorkerBinding {
 }
 
 impl NativeModelSourceWorkerBinding {
-    fn checked(
+    pub(crate) fn checked(
         service_id: Uuid,
         service_generation: u64,
         attempt_generation: u64,
@@ -2096,6 +2096,22 @@ impl NativeModelSourceWorkerBinding {
 
     pub const fn node_generation(self) -> u64 {
         self.node_generation
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn checked_for_test(
+        service_id: Uuid,
+        service_generation: u64,
+        attempt_generation: u64,
+        node_generation: u64,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        Self::checked(
+            service_id,
+            service_generation,
+            attempt_generation,
+            node_generation,
+        )
     }
 }
 
@@ -5399,6 +5415,12 @@ pub struct NativeImageExecutor {
     ltxv_preprocess_service: Option<Arc<dyn NativeLtxvPreprocessService>>,
     webm_encode_service: Option<Arc<dyn NativeWebmEncodeService>>,
     component_h264_mp4_backing_service: Option<Arc<dyn NativeComponentH264Mp4BackingService>>,
+    model_source_transport: Option<(
+        NativeModelSourceWorkerBinding,
+        crate::NativeModelSourceTransport,
+    )>,
+    #[cfg(feature = "test-support")]
+    reduced_fixture_model_resources: bool,
     metadata_enabled: bool,
     diffusion_enabled: bool,
 }
@@ -5448,6 +5470,9 @@ impl NativeImageExecutor {
             ltxv_preprocess_service: None,
             webm_encode_service: None,
             component_h264_mp4_backing_service: None,
+            model_source_transport: None,
+            #[cfg(feature = "test-support")]
+            reduced_fixture_model_resources: false,
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -5481,6 +5506,9 @@ impl NativeImageExecutor {
             ltxv_preprocess_service: None,
             webm_encode_service: None,
             component_h264_mp4_backing_service: None,
+            model_source_transport: None,
+            #[cfg(feature = "test-support")]
+            reduced_fixture_model_resources: false,
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -5513,6 +5541,9 @@ impl NativeImageExecutor {
             ltxv_preprocess_service: None,
             webm_encode_service: None,
             component_h264_mp4_backing_service: None,
+            model_source_transport: None,
+            #[cfg(feature = "test-support")]
+            reduced_fixture_model_resources: false,
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -5550,6 +5581,9 @@ impl NativeImageExecutor {
             ltxv_preprocess_service: None,
             webm_encode_service: None,
             component_h264_mp4_backing_service: None,
+            model_source_transport: None,
+            #[cfg(feature = "test-support")]
+            reduced_fixture_model_resources: false,
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -5584,6 +5618,9 @@ impl NativeImageExecutor {
             ltxv_preprocess_service: None,
             webm_encode_service: None,
             component_h264_mp4_backing_service: None,
+            model_source_transport: None,
+            #[cfg(feature = "test-support")]
+            reduced_fixture_model_resources: false,
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -5623,6 +5660,9 @@ impl NativeImageExecutor {
             ltxv_preprocess_service: None,
             webm_encode_service: None,
             component_h264_mp4_backing_service: None,
+            model_source_transport: None,
+            #[cfg(feature = "test-support")]
+            reduced_fixture_model_resources: false,
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -5676,6 +5716,23 @@ impl NativeImageExecutor {
         service: Arc<dyn NativeComponentH264Mp4BackingService>,
     ) -> Self {
         self.component_h264_mp4_backing_service = Some(service);
+        self
+    }
+
+    pub fn with_model_source_worker(
+        mut self,
+        binding: NativeModelSourceWorkerBinding,
+    ) -> Result<(Self, crate::NativeModelSourceTransportHost), NativeImageRuntimeError> {
+        binding.validate()?;
+        let (transport, host) = crate::NativeModelSourceTransport::channel();
+        self.model_source_transport = Some((binding, transport));
+        Ok((self, host))
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn with_reduced_fixture_model_resources(mut self) -> Self {
+        self.reduced_fixture_model_resources = true;
         self
     }
 
@@ -5799,6 +5856,17 @@ impl NativeImageExecutor {
         .with_backend("cpu")?
         .with_dtype_policy("f32")?
         .with_configuration_token(configuration_token)?;
+        if let Some((binding, transport)) = &self.model_source_transport {
+            engine = engine.with_model_source_transport(
+                *binding,
+                transport.clone(),
+                self.cpu_backend.clone(),
+            )?;
+            #[cfg(feature = "test-support")]
+            if self.reduced_fixture_model_resources {
+                engine = engine.with_reduced_fixture_model_resources();
+            }
+        }
         if let Some(ltxv_preprocess_service) = &self.ltxv_preprocess_service {
             engine = engine.with_ltxv_preprocess_service(ltxv_preprocess_service.clone());
         }

@@ -849,7 +849,10 @@ fn val_ownership_task393_style_model_resource_001() -> Result<(), Box<dyn std::e
     let row = records
         .find(|row| row[concern_column] == "native_style_model_resource")
         .ok_or("STYLE_MODEL ownership catalog row is missing")?;
-    assert_eq!(row[status_column], "authoritative_owner_confirmed");
+    assert_eq!(
+        row[status_column], "authoritative_owner_confirmed",
+        "native model-resource ownership row was not consolidated: {row:?}"
+    );
     assert!(row[competing_column].is_empty());
     assert!(
         row[definitions_column]
@@ -1133,7 +1136,10 @@ fn val_ownership_task398_model_store_stream_source_001() -> Result<(), Box<dyn s
     let row = records
         .find(|row| row[concern_column] == "native_model_verified_stream_source")
         .ok_or("model-store stream-source ownership catalog row is missing")?;
-    assert_eq!(row[status_column], "authoritative_owner_confirmed");
+    assert_eq!(
+        row[status_column], "authoritative_owner_confirmed",
+        "model-source worker bridge row was not consolidated: {row:?}"
+    );
     assert!(row[competing_column].is_empty());
     assert!(
         row[definitions_column].contains("canonical@crates/comfy_model/src/model_store.rs"),
@@ -1149,6 +1155,7 @@ fn val_ownership_task399_model_source_worker_bridge_001() -> Result<(), Box<dyn 
     let root = repository_root()?;
     let protocol = fs::read_to_string(root.join("crates/comfy_types/src/worker_protocol.rs"))?;
     let worker = fs::read_to_string(root.join("crates/comfy_worker/src/comfy_worker.rs"))?;
+    let runtime = fs::read_to_string(root.join("crates/comfy_runtime/src/executor.rs"))?;
     let assets = fs::read_to_string(root.join("crates/comfy_runtime/src/assets.rs"))?;
     let controller =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_execution_controller.rs"))?;
@@ -1173,9 +1180,11 @@ fn val_ownership_task399_model_source_worker_bridge_001() -> Result<(), Box<dyn 
     }
     assert!(protocol.contains("MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES: usize = 512 * 1024"));
     assert!(protocol.contains("pub struct WorkerModelSourceTransportValidator {"));
-    assert!(worker.contains("pub struct WorkerModelSourceTransport {"));
+    assert!(worker.contains("pub struct WorkerModelSourceTransportHost {"));
+    assert!(runtime.contains("pub(crate) struct NativeModelSourceTransport {"));
+    assert!(!runtime.contains("pub struct NativeModelSourceTransport {"));
     assert!(worker.contains("NextWorkerInput::ModelSource(Ok(call))"));
-    assert!(worker.contains(".validate_response(call_id, &response)"));
+    assert!(runtime.contains(".validate_response(call_id, &response)"));
     assert!(assets.contains("fn open_model_source_session("));
     assert!(assets.contains("resolve_source_asset_names("));
     assert!(assets.contains("read_verified_tensor_range("));
@@ -1198,7 +1207,12 @@ fn val_ownership_task399_model_source_worker_bridge_001() -> Result<(), Box<dyn 
         concern["canonical_owner"].as_str(),
         Some("comfy_runtime::assets::NativeAssetResolverRegistry")
     );
-    assert_eq!(concern["definitions"].as_array().map(Vec::len), Some(4));
+    assert_eq!(
+        concern["definitions"].as_array().map(Vec::len),
+        Some(5),
+        "unexpected model-source worker bridge definitions: {}",
+        concern["definitions"]
+    );
     assert!(
         concern["required_mappings"]
             .as_array()
@@ -1235,6 +1249,126 @@ fn val_ownership_task399_model_source_worker_bridge_001() -> Result<(), Box<dyn 
         "unexpected model-source bridge definitions: {}",
         row[definitions_column]
     );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_task400_native_model_resource_service_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let nodes = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
+    let runtime = fs::read_to_string(root.join("crates/comfy_runtime/src/executor.rs"))?;
+    let worker = fs::read_to_string(root.join("crates/comfy_worker/src/comfy_worker.rs"))?;
+
+    assert_eq!(
+        nodes
+            .matches("pub trait NativeModelResourceService: Send + Sync + fmt::Debug")
+            .count(),
+        1
+    );
+    let request = nodes
+        .split_once("pub struct NativeModelResourceRequest {")
+        .and_then(|(_, source)| source.split("pub trait NativeModelResourceService").next())
+        .ok_or("native model-resource request block is missing")?;
+    for forbidden in [
+        "PathBuf",
+        "ArtifactIndex",
+        "ModelStore",
+        "NativeStoredModelPayload",
+        "NativeOpaqueHandle",
+        "memory_budget",
+        "authorization",
+    ] {
+        assert!(
+            !request.contains(forbidden),
+            "native model-resource request exposes forbidden authority {forbidden}"
+        );
+    }
+    assert!(request.contains("source_names: Vec<String>"));
+    assert!(request.contains("MAX_NATIVE_MODEL_SOURCE_NAMES"));
+
+    let service = runtime
+        .split_once("struct RuntimeNativeModelResourceService {")
+        .and_then(|(_, source)| source.split("struct LoadedNativeModelPayload {").next())
+        .ok_or("runtime native model-resource service block is missing")?;
+    assert_eq!(
+        runtime
+            .matches("struct RuntimeNativeModelResourceService {")
+            .count(),
+        1
+    );
+    assert!(!runtime.contains("#[derive(Clone)]\nstruct RuntimeNativeModelResourceService"));
+    for recipe in [
+        "NativeModelResourceRole::StyleModel => \"style_models\"",
+        "NativeModelResourceRole::Photomaker => \"photomaker\"",
+        "NativeModelResourceRole::Gligen => \"gligen\"",
+    ] {
+        assert!(service.contains(recipe), "missing exact recipe {recipe}");
+    }
+    assert!(service.contains("request.source_names().len() != 1"));
+    assert!(service.contains("close_native_model_source_session"));
+    assert!(runtime.contains("WorkerModelSourceOperation::Close"));
+    assert!(runtime.contains("NativeStyleModelResource::from_checkpoint"));
+    assert!(runtime.contains("NativePhotoMakerResource::from_checkpoint"));
+    assert!(runtime.contains("NativeGligenResource::from_checkpoint"));
+    assert!(worker.contains("current.with_model_source_worker(binding)"));
+    assert!(worker.contains("WorkerModelSourceTransportHost { inner: host }"));
+    assert!(runtime.contains("pub(crate) struct NativeModelSourceTransport {"));
+    assert!(!runtime.contains("pub struct NativeModelSourceTransport {"));
+    assert!(!runtime.contains("pub fn with_model_source_transport("));
+    assert!(!runtime.contains("pub trait NativeModelSourceBridge"));
+    assert!(!runtime.contains("pub trait NativeModelSourceBridgeSession"));
+    for forbidden in [
+        "NativeStoredModelPayload",
+        "NativeOpaqueHandle",
+        "NativeCache",
+        "prepare_output",
+        "persist",
+    ] {
+        assert!(
+            !service.contains(forbidden),
+            "runtime model-resource service acquired forbidden authority {forbidden}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy["concerns"]
+        .as_array()
+        .and_then(|concerns| {
+            concerns
+                .iter()
+                .find(|concern| concern["concern"] == "native_model_resource_service")
+        })
+        .ok_or("native model-resource service ownership concern is missing")?;
+    assert_eq!(
+        concern["canonical_owner"].as_str(),
+        Some("comfy_runtime::executor::RuntimeNativeModelResourceService")
+    );
+    assert!(
+        concern["known_open_reasons"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+    );
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let mut records = parse_csv_records(&catalog)?.into_iter();
+    let header = records.next().ok_or("ownership catalog has no header")?;
+    let concern_column = header
+        .iter()
+        .position(|column| column == "concern")
+        .ok_or("ownership catalog has no concern column")?;
+    let status_column = header
+        .iter()
+        .position(|column| column == "current_status")
+        .ok_or("ownership catalog has no current_status column")?;
+    let row = records
+        .find(|row| row[concern_column] == "native_model_resource_service")
+        .ok_or("native model-resource service catalog row is missing")?;
+    assert_eq!(row[status_column], "authoritative_owner_confirmed");
     Ok(())
 }
 

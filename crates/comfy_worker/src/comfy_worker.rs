@@ -2,27 +2,24 @@ use std::{
     collections::BTreeMap,
     future::pending,
     io::{self, Read, Write},
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
-    },
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use comfy_runtime::{
     AttemptEvent, AttemptEventKind, AttemptState, ExecutionEventBus, InputBinding,
     NativeDiffusionProvider, NativeImageExecutor, NativeImageRuntimeError, NativeImageWorkerEvent,
-    NativeImageWorkerPlan, NativeImageWorkerProgress, NativeImageWorkerProgressKind, NativeValue,
+    NativeImageWorkerPlan, NativeImageWorkerProgress, NativeImageWorkerProgressKind,
+    NativeModelSourceTransportCall, NativeModelSourceTransportHost, NativeValue,
     NativeVideoCodecWorkerServices, PluginAuthorizationVerifier, WorkerBackendSelection,
     certify_general_video_codec_package,
 };
 use comfy_tensor::{BackendWorkspaceAuthority, CancellationToken, CpuBackend, DeviceId};
 use comfy_types::{
     BackendUnavailable, DeviceKind, MAX_ENCODED_PREVIEW_BYTES, MAX_WORKER_FRAME_BYTES,
-    WorkerEnvelope, WorkerMessage, WorkerModelSourceContext, WorkerModelSourceError,
-    WorkerModelSourceRequest, WorkerModelSourceResponse, WorkerModelSourceTransportValidator,
-    WorkerPluginExecutionOutcome, WorkerProtocolError, WorkerRegistryDeploymentRejectionReason,
-    decode_worker_frame, encode_worker_frame,
+    WorkerEnvelope, WorkerMessage, WorkerModelSourceError, WorkerModelSourceRequest,
+    WorkerModelSourceResponse, WorkerPluginExecutionOutcome, WorkerProtocolError,
+    WorkerRegistryDeploymentRejectionReason, decode_worker_frame, encode_worker_frame,
 };
 use thiserror::Error;
 
@@ -36,22 +33,18 @@ pub use memory_planner::*;
 pub use supervisor::*;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(2);
-const MODEL_SOURCE_BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 pub struct WorkerModelSourceTransportCall {
-    call_id: u64,
-    request: WorkerModelSourceRequest,
-    validator: Arc<Mutex<WorkerModelSourceTransportValidator>>,
-    response_sender: async_channel::Sender<WorkerModelSourceResponse>,
+    inner: NativeModelSourceTransportCall,
 }
 
 impl WorkerModelSourceTransportCall {
     pub const fn call_id(&self) -> u64 {
-        self.call_id
+        self.inner.call_id()
     }
 
     pub fn request(&self) -> &WorkerModelSourceRequest {
-        &self.request
+        self.inner.request()
     }
 
     pub async fn respond(
@@ -59,148 +52,26 @@ impl WorkerModelSourceTransportCall {
         call_id: u64,
         response: WorkerModelSourceResponse,
     ) -> Result<(), WorkerModelSourceError> {
-        self.validator
-            .lock()
-            .map_err(|_| WorkerModelSourceError::HostFailure)?
-            .validate_response(call_id, &response)?;
-        self.response_sender
-            .send(response)
-            .await
-            .map_err(|_| WorkerModelSourceError::Closed)
+        self.inner.respond(call_id, response).await
     }
 
     pub fn revoke(&self) -> Result<(), WorkerModelSourceError> {
-        self.validator
-            .lock()
-            .map_err(|_| WorkerModelSourceError::HostFailure)?
-            .revoke();
-        Ok(())
+        self.inner.revoke()
     }
 }
 
 pub struct WorkerModelSourceTransportHost {
-    receiver: async_channel::Receiver<WorkerModelSourceTransportCall>,
+    inner: NativeModelSourceTransportHost,
 }
 
 impl WorkerModelSourceTransportHost {
     pub async fn receive(
         &self,
     ) -> Result<WorkerModelSourceTransportCall, async_channel::RecvError> {
-        self.receiver.recv().await
-    }
-}
-
-#[derive(Clone)]
-pub struct WorkerModelSourceTransport {
-    sender: async_channel::Sender<WorkerModelSourceTransportCall>,
-    next_call_id: Arc<AtomicU64>,
-}
-
-impl WorkerModelSourceTransport {
-    pub fn channel() -> (Self, WorkerModelSourceTransportHost) {
-        let (sender, receiver) = async_channel::bounded(1);
-        (
-            Self {
-                sender,
-                next_call_id: Arc::new(AtomicU64::new(1)),
-            },
-            WorkerModelSourceTransportHost { receiver },
-        )
-    }
-
-    pub fn open_session(
-        &self,
-        context: WorkerModelSourceContext,
-    ) -> Result<WorkerModelSourceSession, WorkerModelSourceError> {
-        Ok(WorkerModelSourceSession {
-            transport: self.clone(),
-            validator: Arc::new(Mutex::new(WorkerModelSourceTransportValidator::checked(
-                context,
-            )?)),
-        })
-    }
-}
-
-pub struct WorkerModelSourceSession {
-    transport: WorkerModelSourceTransport,
-    validator: Arc<Mutex<WorkerModelSourceTransportValidator>>,
-}
-
-impl WorkerModelSourceSession {
-    #[allow(
-        clippy::disallowed_methods,
-        reason = "the private worker model loader runs on a blocking native execution thread and must cooperatively poll its capacity-one IPC route"
-    )]
-    pub fn call(
-        &self,
-        request: WorkerModelSourceRequest,
-        cancellation: &CancellationToken,
-    ) -> Result<WorkerModelSourceResponse, WorkerModelSourceError> {
-        cancellation
-            .check()
-            .map_err(|_| WorkerModelSourceError::Cancelled)?;
-        let call_id = self.transport.next_call_id.fetch_add(1, Ordering::Relaxed);
-        if call_id == 0 {
-            self.revoke()?;
-            return Err(WorkerModelSourceError::InvalidOrder);
-        }
-        self.validator
-            .lock()
-            .map_err(|_| WorkerModelSourceError::HostFailure)?
-            .validate_request(call_id, &request)?;
-        let (response_sender, response_receiver) = async_channel::bounded(1);
-        let mut call = WorkerModelSourceTransportCall {
-            call_id,
-            request,
-            validator: self.validator.clone(),
-            response_sender,
-        };
-        loop {
-            if cancellation.is_cancelled() {
-                self.revoke()?;
-                return Err(WorkerModelSourceError::Cancelled);
-            }
-            match self.transport.sender.try_send(call) {
-                Ok(()) => break,
-                Err(async_channel::TrySendError::Full(returned)) => {
-                    call = returned;
-                    smol::block_on(async_io::Timer::after(MODEL_SOURCE_BRIDGE_POLL_INTERVAL));
-                }
-                Err(async_channel::TrySendError::Closed(_)) => {
-                    self.revoke()?;
-                    return Err(WorkerModelSourceError::Closed);
-                }
-            }
-        }
-        loop {
-            if cancellation.is_cancelled() {
-                self.revoke()?;
-                return Err(WorkerModelSourceError::Cancelled);
-            }
-            let received = smol::block_on(smol::future::race(
-                async { Some(response_receiver.recv().await) },
-                async {
-                    async_io::Timer::after(MODEL_SOURCE_BRIDGE_POLL_INTERVAL).await;
-                    None
-                },
-            ));
-            match received {
-                Some(Ok(response)) => return Ok(response),
-                Some(Err(_)) => {
-                    self.revoke()?;
-                    return Err(WorkerModelSourceError::Closed);
-                }
-                None => {}
-            }
-        }
-    }
-
-    fn revoke(&self) -> Result<(), WorkerModelSourceError> {
-        self.validator
-            .lock()
-            .map_err(|_| WorkerModelSourceError::HostFailure)?
-            .revoke();
-        Ok(())
+        self.inner
+            .receive()
+            .await
+            .map(|inner| WorkerModelSourceTransportCall { inner })
     }
 }
 
@@ -1180,7 +1051,7 @@ async fn run_worker_process_with_configuration(
                                 let workspace_authorization =
                                     session.authorize_planned_workspace(planned_workspace)?;
                                 memory.begin()?;
-                                let current = native_image_executor
+                                let mut current = native_image_executor
                                     .as_ref()
                                     .ok_or_else(|| anyhow::anyhow!("native executor unavailable"))?
                                     .clone();
@@ -1188,22 +1059,21 @@ async fn run_worker_process_with_configuration(
                                     anyhow::anyhow!("execute omitted attempt identity")
                                 })?;
                                 let cancellation = CancellationToken::default();
-                                let (model_source_transport, model_sources) =
-                                    if worker_plan.model_source_service.is_some() {
-                                        let (transport, host) =
-                                            WorkerModelSourceTransport::channel();
-                                        (Some(transport), Some(host))
+                                let model_sources =
+                                    if let Some(binding) = worker_plan.model_source_service {
+                                        let (bound, host) =
+                                            current.with_model_source_worker(binding)?;
+                                        current = bound;
+                                        Some(WorkerModelSourceTransportHost { inner: host })
                                     } else {
-                                        (None, None)
+                                        None
                                     };
                                 let event_bus = ExecutionEventBus::new(32)?;
                                 let events = event_bus.subscribe();
                                 let (result_sender, result) = async_channel::bounded(1);
                                 let cancellation_for_job = cancellation.clone();
-                                let model_source_transport_for_job = model_source_transport;
                                 smol::spawn(async move {
                                 let result = smol::unblock(move || {
-                                    let _model_source_transport = model_source_transport_for_job;
                                     current.execute_blocking_with_event_bus_and_configuration(
                                         &worker_plan.plan,
                                         attempt_id,

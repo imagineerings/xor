@@ -11,7 +11,7 @@ path = "src/comfy_runtime.rs"
 [features]
 default = []
 signing-tooling = []
-test-support = ["db/test-support"]
+test-support = ["comfy_model/test-support", "db/test-support"]
 corex = ["dep:comfy_backend_corex"]
 cuda = ["dep:comfy_backend_cuda"]
 directml = ["dep:comfy_backend_directml"]

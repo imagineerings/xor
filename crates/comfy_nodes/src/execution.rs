@@ -6,6 +6,10 @@ use comfy_media::{
     MetadataWritePolicy, NativeVideoBitDepth, NativeVideoCodec, NativeVideoCrf, NativeVideoPayload,
     NativeVideoPixelFormat, PngError, PngLimits, encode_png_frame_with_policy_and_context,
 };
+use comfy_model::{
+    NativeGligenError, NativeModelPayload, NativeModelPayloadError, NativeModelResourceRole,
+    NativePhotoMakerError, NativeStyleModelError,
+};
 use comfy_tensor::{
     CpuBackend, DType, DeviceId, ExecutionContext, ImageTensor, MAX_SHADER_OUTPUTS,
     MAX_SHADER_PASSES, NativeShaderError, NativeShaderExecutor, NativeShaderRequest,
@@ -44,6 +48,9 @@ const MAX_NATIVE_ASSET_FOLDER_CATEGORY_BYTES: usize = 128;
 const MAX_NATIVE_ASSET_NAME_BYTES: usize = 16 * 1024;
 const MAX_NATIVE_ASSET_NAME_SELECTIONS: usize = 3;
 const MAX_NATIVE_ASSET_NAME_LIST_ENTRIES: usize = 100_000;
+const MAX_NATIVE_MODEL_FOLDER_CATEGORY_BYTES: usize = 128;
+const MAX_NATIVE_MODEL_SOURCE_NAME_BYTES: usize = 16 * 1024;
+const MAX_NATIVE_MODEL_SOURCE_NAMES: usize = 4;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -2608,6 +2615,107 @@ pub trait NativeTextGenerationService: Send + Sync + fmt::Debug {
     ) -> Result<NativeTextGenerationServiceOutput, NativeTextGenerationServiceError>;
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeModelResourceRequest {
+    role: NativeModelResourceRole,
+    folder_category: String,
+    source_names: Vec<String>,
+}
+
+impl NativeModelResourceRequest {
+    pub fn checked(
+        role: NativeModelResourceRole,
+        folder_category: impl Into<String>,
+        source_names: Vec<String>,
+    ) -> Result<Self, NativeModelResourceServiceError> {
+        let request = Self {
+            role,
+            folder_category: folder_category.into(),
+            source_names,
+        };
+        request.validate()?;
+        Ok(request)
+    }
+
+    pub const fn role(&self) -> NativeModelResourceRole {
+        self.role
+    }
+
+    pub fn folder_category(&self) -> &str {
+        &self.folder_category
+    }
+
+    pub fn source_names(&self) -> &[String] {
+        &self.source_names
+    }
+
+    pub fn validate(&self) -> Result<(), NativeModelResourceServiceError> {
+        if self.folder_category.is_empty()
+            || self.folder_category.len() > MAX_NATIVE_MODEL_FOLDER_CATEGORY_BYTES
+            || !self
+                .folder_category
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+            || self.source_names.is_empty()
+            || self.source_names.len() > MAX_NATIVE_MODEL_SOURCE_NAMES
+            || self.source_names.iter().collect::<BTreeSet<_>>().len() != self.source_names.len()
+            || self.source_names.iter().any(|name| {
+                name.is_empty()
+                    || name.len() > MAX_NATIVE_MODEL_SOURCE_NAME_BYTES
+                    || name.chars().any(char::is_control)
+                    || name.starts_with('/')
+                    || name.contains(['\\', ':'])
+                    || name
+                        .split('/')
+                        .any(|component| component.is_empty() || matches!(component, "." | ".."))
+            })
+        {
+            return Err(NativeModelResourceServiceError::InvalidRequest);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum NativeModelResourceServiceError {
+    #[error("native model resource service is unavailable")]
+    Unavailable,
+    #[error("native model resource operation was cancelled")]
+    Cancelled,
+    #[error("native model resource request is invalid or unsupported")]
+    InvalidRequest,
+    #[error("native model resource service identity is stale")]
+    StaleIdentity,
+    #[error("native model source is unavailable")]
+    SourceUnavailable,
+    #[error("native model source changed during loading")]
+    SourceChanged,
+    #[error("native model source or response is malformed: {0}")]
+    MalformedSource(&'static str),
+    #[error("native model resource memory limit was exceeded")]
+    OutOfMemory,
+    #[error(transparent)]
+    StyleModel(#[from] NativeStyleModelError),
+    #[error(transparent)]
+    PhotoMaker(#[from] NativePhotoMakerError),
+    #[error(transparent)]
+    Gligen(#[from] NativeGligenError),
+    #[error(transparent)]
+    Payload(#[from] NativeModelPayloadError),
+    #[error(transparent)]
+    Tensor(#[from] TensorError),
+}
+
+pub trait NativeModelResourceService: Send + Sync + fmt::Debug {
+    fn identity(&self) -> &NativeNodeServiceIdentity;
+
+    fn load(
+        &self,
+        context: &NativeNodeContext,
+        request: &NativeModelResourceRequest,
+    ) -> Result<Arc<NativeModelPayload>, NativeModelResourceServiceError>;
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct NativeNodeServices {
     assets: Option<Arc<dyn NativeAssetResolver>>,
@@ -2618,6 +2726,7 @@ pub struct NativeNodeServices {
     webm_encode: Option<Arc<dyn NativeWebmEncodeService>>,
     component_h264_mp4_backing: Option<Arc<dyn NativeComponentH264Mp4BackingService>>,
     text_generation: Option<Arc<dyn NativeTextGenerationService>>,
+    model_resources: Option<Arc<dyn NativeModelResourceService>>,
     provider_execution: Option<NativeProviderExecutionIdentity>,
 }
 
@@ -2674,6 +2783,7 @@ impl NativeNodeServices {
             webm_encode: None,
             component_h264_mp4_backing: None,
             text_generation: None,
+            model_resources: None,
             provider_execution: None,
         })
     }
@@ -2724,6 +2834,17 @@ impl NativeNodeServices {
             return Err(NativeNodeContractError::InvalidNodeServiceIdentity);
         }
         self.text_generation = Some(service);
+        Ok(self)
+    }
+
+    pub fn with_model_resources(
+        mut self,
+        service: Arc<dyn NativeModelResourceService>,
+    ) -> Result<Self, NativeNodeContractError> {
+        if service.identity().service_id().is_nil() {
+            return Err(NativeNodeContractError::InvalidNodeServiceIdentity);
+        }
+        self.model_resources = Some(service);
         Ok(self)
     }
 
@@ -2878,6 +2999,38 @@ impl NativeNodeContext {
             output.generated_token_count,
             request.maximum_new_tokens,
         )
+    }
+
+    pub fn load_native_model_resource(
+        &self,
+        request: &NativeModelResourceRequest,
+    ) -> Result<Arc<NativeModelPayload>, NativeModelResourceServiceError> {
+        self.cancellation
+            .check()
+            .map_err(|_| NativeModelResourceServiceError::Cancelled)?;
+        request.validate()?;
+        let service = self
+            .services
+            .model_resources
+            .as_deref()
+            .ok_or(NativeModelResourceServiceError::Unavailable)?;
+        if !service.identity().matches(self.attempt_id, &self.node_id) {
+            return Err(NativeModelResourceServiceError::StaleIdentity);
+        }
+        let payload = service.load(self, request)?;
+        self.cancellation
+            .check()
+            .map_err(|_| NativeModelResourceServiceError::Cancelled)?;
+        if !service.identity().matches(self.attempt_id, &self.node_id) {
+            return Err(NativeModelResourceServiceError::StaleIdentity);
+        }
+        payload.validate()?;
+        if payload.identity().role() != request.role {
+            return Err(NativeModelResourceServiceError::MalformedSource(
+                "payload role does not match the checked request",
+            ));
+        }
+        Ok(payload)
     }
 
     pub fn execute_shader(
@@ -3106,6 +3259,12 @@ impl NativeNodeContext {
                     .text_generation
                     .as_deref()
                     .map(NativeTextGenerationService::identity),
+            )
+            .chain(
+                self.services
+                    .model_resources
+                    .as_deref()
+                    .map(NativeModelResourceService::identity),
             )
         {
             if !identity.matches(self.attempt_id, &self.node_id) {
@@ -3749,6 +3908,54 @@ mod tests {
                 request.maximum_new_tokens(),
             )
         }
+    }
+
+    #[test]
+    fn native_model_resource_service_request_is_path_free_bounded_and_object_safe()
+    -> Result<(), Box<dyn std::error::Error>> {
+        fn assert_object_safe(_: Option<&dyn NativeModelResourceService>) {}
+
+        assert_object_safe(None);
+        let request = NativeModelResourceRequest::checked(
+            NativeModelResourceRole::StyleModel,
+            "style_models",
+            vec!["nested/style.safetensors".to_owned()],
+        )?;
+        assert_eq!(request.role(), NativeModelResourceRole::StyleModel);
+        assert_eq!(request.folder_category(), "style_models");
+        assert_eq!(request.source_names(), ["nested/style.safetensors"]);
+
+        for names in [
+            Vec::new(),
+            vec!["a".to_owned(), "a".to_owned()],
+            vec![
+                "a".to_owned(),
+                "b".to_owned(),
+                "c".to_owned(),
+                "d".to_owned(),
+                "e".to_owned(),
+            ],
+        ] {
+            assert!(matches!(
+                NativeModelResourceRequest::checked(
+                    NativeModelResourceRole::StyleModel,
+                    "style_models",
+                    names,
+                ),
+                Err(NativeModelResourceServiceError::InvalidRequest)
+            ));
+        }
+        for name in ["../style.safetensors", "/style.safetensors", "C:\\style.pt"] {
+            assert!(matches!(
+                NativeModelResourceRequest::checked(
+                    NativeModelResourceRole::StyleModel,
+                    "style_models",
+                    vec![name.to_owned()],
+                ),
+                Err(NativeModelResourceServiceError::InvalidRequest)
+            ));
+        }
+        Ok(())
     }
 
     #[test]

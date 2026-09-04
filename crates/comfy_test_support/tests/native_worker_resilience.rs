@@ -11,9 +11,10 @@ use std::{
 };
 
 use comfy_runtime::{
-    AssetNamespace, AssetRoots, AssetService, NativeAssetResolverRegistry, PermissionPolicy,
-    RuntimeSupervisor, RuntimeSupervisorError, SupervisorPolicy, WorkerLaunchConfig,
-    authorize_native_api_asset_reader,
+    AssetNamespace, AssetRoots, AssetService, NativeAssetResolverRegistry,
+    NativeModelSourceTestSession, NativeModelSourceTestTransport, NativeModelSourceTransportHost,
+    PermissionPolicy, RuntimeSupervisor, RuntimeSupervisorError, SupervisorPolicy,
+    WorkerLaunchConfig, authorize_native_api_asset_reader,
 };
 use comfy_tensor::{
     CancellationToken, CpuWorkspaceAuthority, DType, DeviceId, StreamId, TensorBackend,
@@ -23,9 +24,6 @@ use comfy_types::{
     AttemptId, MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES, ProfileId, WorkerId, WorkerModelSourceContext,
     WorkerModelSourceError, WorkerModelSourceOperation, WorkerModelSourceRequest,
     WorkerModelSourceResponse, worker_model_source_selection_sha256,
-};
-use comfy_worker::{
-    WorkerModelSourceSession, WorkerModelSourceTransport, WorkerModelSourceTransportHost,
 };
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -38,8 +36,8 @@ mod native_controller;
 const MEMORY_LIMIT_BYTES: u64 = 1024 * 1024 * 1024;
 
 fn bridge_model_source_call(
-    host: &WorkerModelSourceTransportHost,
-    session: &WorkerModelSourceSession,
+    host: &NativeModelSourceTransportHost,
+    session: &NativeModelSourceTestSession,
     registry: &NativeAssetResolverRegistry,
     expected_context: &WorkerModelSourceContext,
     request: WorkerModelSourceRequest,
@@ -67,8 +65,7 @@ fn bridge_model_source_call(
 }
 
 #[test]
-fn model_source_worker_bridge_restarts_without_duplicate_publication() -> Result<(), Box<dyn Error>>
-{
+fn val_recovery_005() -> Result<(), Box<dyn Error>> {
     let directory = tempfile::tempdir()?;
     let profile_id = "model-source-restart";
     let roots = [
@@ -127,7 +124,7 @@ fn model_source_worker_bridge_restarts_without_duplicate_publication() -> Result
         },
     };
     let cancellation = CancellationToken::default();
-    let (transport, host) = WorkerModelSourceTransport::channel();
+    let (transport, host) = NativeModelSourceTestTransport::channel();
 
     let lost_context = context(Uuid::from_u128(0x39923), 1);
     let lost_session = transport.open_session(lost_context.clone())?;
@@ -263,6 +260,12 @@ fn model_source_worker_bridge_restarts_without_duplicate_publication() -> Result
     ));
     registry.retire_attempt(attempt_id);
     Ok(())
+}
+
+#[test]
+fn model_source_worker_bridge_restarts_without_duplicate_publication() -> Result<(), Box<dyn Error>>
+{
+    val_recovery_005()
 }
 
 #[test]

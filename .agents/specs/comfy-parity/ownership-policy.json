@@ -10789,6 +10789,127 @@
       "decision_reason": "NativeModule alone owns unloaded and empty-container construction, registered buffers, ordered child modules, running normalization statistics, exact parameter-shape admission, atomic dense, quantized, weight-normalized, spectral-normalized, or embedding parameter state, parametrization registration/materialization/removal, power-iteration state, transactional prefetch, sequential-child, and multihead-projection visibility, monotonic generations, one-shot cast leases, and immutable retained dense inference that cannot publish lifecycle changes. Task 49 weight normalization, Task 60 spectral normalization, Task 63 module initialization, Tasks 77-78 source module constructors, and Task 401 immutable dense inference delegate directly to that lifecycle. Focused tensor and model components own only their numerical or layout adapter mechanics and cannot create a second generic module state machine. NativeModule composes existing Tensor, DType, quantization, attention, functional-kernel, and resize owners without duplicating their validation or mechanics."
     },
     {
+      "concern": "native_model_resource_service",
+      "canonical_owner": "comfy_runtime::executor::RuntimeNativeModelResourceService",
+      "owner_files": [
+        "crates/comfy_nodes/src/execution.rs",
+        "crates/comfy_runtime/src/executor.rs"
+      ],
+      "owner_symbols": [
+        "RuntimeNativeModelResourceService",
+        "NativeModelResourceService"
+      ],
+      "allowed_adapters": [
+        "NativeModelResourceService is the object-safe path-free node boundary and returns only Arc<NativeModelPayload>",
+        "NativeAssetResolverRegistry, ArtifactIndex, and ModelStore retain source resolution, path, authorization, parsing, verified read, and parse-cache ownership",
+        "NativeModelSourceTransport remains crate-private while NativeImageExecutor creates it internally and returns only the opaque worker host endpoint",
+        "NativeStyleModelResource, NativePhotoMakerResource, and NativeGligenResource remain the sole typed resource constructors for the three initial exact recipes",
+        "ExecutionEngine creates one attempt-and-node-bound opaque service adapter and owns no parser, store, path, grant, handle publication, cache, lifecycle, or persistence authority"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::executor::RuntimeNativeModelResourceService",
+          "role": "canonical",
+          "symbol": "RuntimeNativeModelResourceService",
+          "pattern": "^struct RuntimeNativeModelResourceService \\{"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::execution::NativeModelResourceService",
+          "role": "canonical_interface",
+          "symbol": "NativeModelResourceService",
+          "pattern": "^pub trait NativeModelResourceService: Send \\+ Sync \\+ fmt::Debug \\{"
+        }
+      ],
+      "call_symbols": [
+        "NativeNodeContext::load_native_model_resource",
+        "RuntimeNativeModelResourceService::load",
+        "NativeStyleModelResource::from_checkpoint",
+        "NativePhotoMakerResource::from_checkpoint",
+        "NativeGligenResource::from_checkpoint"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "model-resource-request-is-path-free-bounded-and-role-typed",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "pub struct NativeModelResourceRequest \\{[\\s\\S]*role: NativeModelResourceRole[\\s\\S]*folder_category: String[\\s\\S]*source_names: Vec<String>[\\s\\S]*pub trait NativeModelResourceService"
+        },
+        {
+          "name": "model-resource-context-validates-identity-and-cancellation-around-load",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "pub fn load_native_model_resource[\\s\\S]*service\\.identity\\(\\)\\.matches[\\s\\S]*service\\.load\\(self, request\\)[\\s\\S]*self\\.cancellation[\\s\\S]*service\\.identity\\(\\)\\.matches"
+        },
+        {
+          "name": "model-resource-runtime-dispatches-only-three-initial-exact-recipes",
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "pattern": "NativeModelResourceRole::StyleModel => \"style_models\"[\\s\\S]*NativeModelResourceRole::Photomaker => \"photomaker\"[\\s\\S]*NativeModelResourceRole::Gligen => \"gligen\"[\\s\\S]*request\\.source_names\\(\\)\\.len\\(\\) != 1"
+        },
+        {
+          "name": "model-resource-runtime-streams-verified-tensors-through-one-worker-session",
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "pattern": "transport: NativeModelSourceTransport[\\s\\S]*\\.transport[\\s\\S]*\\.open_session[\\s\\S]*WorkerModelSourceOperation::Close[\\s\\S]*fn load_native_model_resource_from_session[\\s\\S]*WorkerModelSourceOperation::Open[\\s\\S]*fn load_manifest_tensors[\\s\\S]*WorkerModelSourceOperation::Read"
+        },
+        {
+          "name": "model-resource-runtime-delegates-to-existing-typed-owners",
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "pattern": "NativeStyleModelResource::from_checkpoint[\\s\\S]*NativePhotoMakerResource::from_checkpoint[\\s\\S]*NativeGligenResource::from_checkpoint"
+        },
+        {
+          "name": "task400-model-resource-service-ownership-oracle",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "fn val_ownership_task400_native_model_resource_service_001"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-model-resource-service-foundation"
+      ],
+      "production_consumers": [
+        "Task401 native model-resource recipe closure",
+        "Task402 native model-resource handle publication and restart reconstruction"
+      ],
+      "requirements": [
+        "Requirement 6.3",
+        "Requirement 7.2",
+        "Requirement 18.1",
+        "Requirement 26.2",
+        "Requirement 28.2",
+        "Requirement 31.5",
+        "Requirement 34.2",
+        "Requirement 34.6",
+        "Requirement 35.2",
+        "Requirement 37.5",
+        "Requirement 38.3",
+        "Requirement 41.2",
+        "Requirement 44.1",
+        "Requirement 44.3"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The runtime-owned opaque adapter is the sole node-facing model-resource loader service. It validates one exact initial recipe, streams verified tensors through the prerequisite worker bridge, delegates construction once to the existing typed owner, and returns an unstored Arc only; all path, authorization, parsing, store, cache, handle, lifecycle, and persistence authority remains with existing owners."
+    },
+    {
       "concern": "native_model_vae_domain",
       "canonical_owner": "comfy_model::vae",
       "owner_files": [
@@ -11054,6 +11175,7 @@
       "canonical_owner": "comfy_runtime::assets::NativeAssetResolverRegistry",
       "owner_files": [
         "crates/comfy_runtime/src/assets.rs",
+        "crates/comfy_runtime/src/executor.rs",
         "crates/comfy_runtime/src/native_execution_controller.rs",
         "crates/comfy_runtime/src/runtime_supervisor.rs",
         "crates/comfy_types/src/worker_protocol.rs",
@@ -11062,13 +11184,15 @@
       ],
       "owner_symbols": [
         "NativeAssetResolverRegistry",
+        "NativeModelSourceTransport",
         "WorkerModelSourceTransportValidator",
-        "WorkerModelSourceTransport",
+        "NativeModelSourceTransportHost",
         "NativeModelSourceWorkerBinding"
       ],
       "allowed_adapters": [
         "WorkerModelSourceTransportValidator owns the worker-side capacity-one open, read, and close ordering state and validates exact response identity, length, bounds, and digest",
-        "WorkerModelSourceTransport and WorkerSession adapt validated calls to distinct append-only WorkerMessage model-source request and response variants without using provider streaming",
+        "NativeModelSourceTransport owns the crate-private concrete capacity-one validated session used by the runtime loader; NativeImageExecutor creates it internally and exposes only the worker-loop host endpoint",
+        "WorkerSession adapts validated calls to distinct append-only WorkerMessage model-source request and response variants without using provider streaming",
         "RuntimeSupervisor and NativeImageExecutionController transport exact attempt, node, service, session, selection, and call identities between one active worker and the app resolver",
         "NativeAssetResolverRegistry alone resolves source names through AssetService, retains the canonical ModelStore and verified stream sources, and serves bounded revalidated tensor chunks",
         "the worker protocol projects only path-free verified manifest metadata and fixed-size chunks and exposes no authorization grant, ArtifactIndex, ArtifactKey, ModelStore, raw service, file handle, or filesystem path",
@@ -11090,11 +11214,18 @@
           "pattern": "^pub struct WorkerModelSourceTransportValidator \\{"
         },
         {
-          "path": "crates/comfy_worker/src/comfy_worker.rs",
-          "qualified": "comfy_worker::WorkerModelSourceTransport",
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::executor::NativeModelSourceTransport",
           "role": "adapter",
-          "symbol": "WorkerModelSourceTransport",
-          "pattern": "^pub struct WorkerModelSourceTransport \\{"
+          "symbol": "NativeModelSourceTransport",
+          "pattern": "^pub\\(crate\\) struct NativeModelSourceTransport \\{"
+        },
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::executor::NativeModelSourceTransportHost",
+          "role": "adapter",
+          "symbol": "NativeModelSourceTransportHost",
+          "pattern": "^pub struct NativeModelSourceTransportHost \\{"
         },
         {
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
@@ -11128,9 +11259,9 @@
           "pattern": "fn open_model_source_session\\([\\s\\S]*resolve_source_asset_names[\\s\\S]*load_model\\([\\s\\S]*verified_stream_source[\\s\\S]*fn read_model_source_session\\([\\s\\S]*read_verified_tensor_range"
         },
         {
-          "name": "model-source-worker-consumes-validated-responses-without-wildcard",
-          "path": "crates/comfy_worker/src/comfy_worker.rs",
-          "pattern": "(?=[\\s\\S]*NextWorkerInput::ModelSource\\(Ok\\(call\\)\\))(?=[\\s\\S]*session.model_source_request)(?=[\\s\\S]*WorkerMessage::ModelSourceResponse)(?=[\\s\\S]*validate_response)"
+          "name": "model-source-concrete-transport-validates-responses-without-open-injection",
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "pattern": "validate_response[\\s\\S]*pub\\(crate\\) struct NativeModelSourceTransport \\{[\\s\\S]*pub\\(crate\\) fn channel\\(\\)[\\s\\S]*async_channel::bounded\\(1\\)[\\s\\S]*WorkerModelSourceTransportValidator::checked[\\s\\S]*validate_request"
         },
         {
           "name": "model-source-controller-binds-generations-and-revokes-on-loss",
@@ -11140,7 +11271,7 @@
         {
           "name": "model-source-restart-oracle-streams-more-than-execute-frame",
           "path": "crates/comfy_test_support/tests/native_worker_resilience.rs",
-          "pattern": "fn model_source_worker_bridge_restarts_without_duplicate_publication[\\s\\S]*13 \\* 1024 \\* 1024_usize[\\s\\S]*MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES[\\s\\S]*test_replace_model_source_service"
+          "pattern": "fn val_recovery_005[\\s\\S]*13 \\* 1024 \\* 1024_usize[\\s\\S]*MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES[\\s\\S]*test_replace_model_source_service"
         },
         {
           "name": "task399-model-source-worker-bridge-ownership-oracle",

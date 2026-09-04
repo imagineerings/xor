@@ -6,10 +6,16 @@ use crate::{
     validate_native_provider_schemas,
 };
 use chrono::Utc;
+use comfy_model::{
+    NativeGligenCheckpoint, NativeGligenResource, NativeModelPayload, NativeModelResourceRole,
+    NativePhotoMakerCheckpoint, NativePhotoMakerCheckpointEntry, NativePhotoMakerResource,
+    NativeStyleModelCheckpoint, NativeStyleModelResource,
+};
 use comfy_nodes::{
     NativeAssetReference, NativeAssetServiceError, NativeComponentH264Mp4BackingService,
     NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType,
-    NativeLtxvPreprocessService, NativeNodeBindingDisposition, NativeNodeComputeSession,
+    NativeLtxvPreprocessService, NativeModelResourceRequest, NativeModelResourceService,
+    NativeModelResourceServiceError, NativeNodeBindingDisposition, NativeNodeComputeSession,
     NativeNodeContractError, NativeNodeServiceIdentity, NativeNodeServices, NativeOpaqueHandle,
     NativePayloadResidency, NativePreparedEffectKind, NativePreparedEffectService,
     NativeProviderExecutionIdentity, NativeResidentAllocationId, NativeResolvedPayload,
@@ -29,12 +35,17 @@ pub use comfy_nodes::{
 use comfy_nodes::{NativeOutputEffectRequest, NativeOutputNamespace, NativeOutputShape};
 use comfy_plugin_sdk::{CanonicalTypeId, ProviderBindingClaim, ProviderBindingSet};
 use comfy_tensor::{
-    BackendCapabilityMatrix, CpuBackend, NativeShaderExecutor, ScratchReservation, StreamId,
+    BackendCapabilityMatrix, CpuBackend, DType, DeviceId, ExecutionContext, NativeShaderExecutor,
+    ScratchReservation, StreamId, Tensor, TensorBackend, TensorDescriptor,
 };
 #[cfg(test)]
-use comfy_tensor::{CpuWorkspaceAuthority, DeviceId, NativeDeviceProperties};
+use comfy_tensor::{CpuWorkspaceAuthority, NativeDeviceProperties};
 use comfy_types::{
     AttemptId, CancellationToken, DeviceKind, NodeId, ProfileId, PromptId, PromptSubmission,
+    WorkerModelSourceContext, WorkerModelSourceError, WorkerModelSourceManifest,
+    WorkerModelSourceNestedStateDisposition, WorkerModelSourceOperation, WorkerModelSourceRequest,
+    WorkerModelSourceResponse, WorkerModelSourceTransportValidator,
+    worker_model_source_selection_sha256,
 };
 use futures::future::BoxFuture;
 use parking_lot::Mutex;
@@ -45,9 +56,10 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
     sync::{
-        Arc, Weak,
-        atomic::{AtomicU64, Ordering},
+        Arc, Mutex as StdMutex, Weak,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
+    time::Duration,
 };
 use thiserror::Error;
 use uuid::Uuid;
@@ -58,6 +70,849 @@ pub const MAX_NATIVE_COMPILE_OPTIONS: usize = 64;
 pub const MAX_NATIVE_COMPILE_TEXT_BYTES: usize = 4_096;
 pub const MAX_RUNTIME_NATIVE_HANDLES: usize = 1_000_000;
 pub const MAX_RUNTIME_NATIVE_HANDLE_BYTES: usize = 8 * 1024 * 1024 * 1024;
+
+const MODEL_SOURCE_TRANSPORT_POLL_INTERVAL: Duration = Duration::from_millis(10);
+
+#[doc(hidden)]
+pub struct NativeModelSourceTransportCall {
+    call_id: u64,
+    request: WorkerModelSourceRequest,
+    validator: Arc<StdMutex<WorkerModelSourceTransportValidator>>,
+    response_sender: async_channel::Sender<WorkerModelSourceResponse>,
+}
+
+impl NativeModelSourceTransportCall {
+    pub const fn call_id(&self) -> u64 {
+        self.call_id
+    }
+
+    pub fn request(&self) -> &WorkerModelSourceRequest {
+        &self.request
+    }
+
+    pub async fn respond(
+        self,
+        call_id: u64,
+        response: WorkerModelSourceResponse,
+    ) -> Result<(), WorkerModelSourceError> {
+        self.validator
+            .lock()
+            .map_err(|_| WorkerModelSourceError::HostFailure)?
+            .validate_response(call_id, &response)?;
+        self.response_sender
+            .send(response)
+            .await
+            .map_err(|_| WorkerModelSourceError::Closed)
+    }
+
+    pub fn revoke(&self) -> Result<(), WorkerModelSourceError> {
+        self.validator
+            .lock()
+            .map_err(|_| WorkerModelSourceError::HostFailure)?
+            .revoke();
+        Ok(())
+    }
+}
+
+#[doc(hidden)]
+pub struct NativeModelSourceTransportHost {
+    receiver: async_channel::Receiver<NativeModelSourceTransportCall>,
+}
+
+impl NativeModelSourceTransportHost {
+    pub async fn receive(
+        &self,
+    ) -> Result<NativeModelSourceTransportCall, async_channel::RecvError> {
+        self.receiver.recv().await
+    }
+}
+
+#[derive(Clone)]
+#[doc(hidden)]
+pub(crate) struct NativeModelSourceTransport {
+    sender: async_channel::Sender<NativeModelSourceTransportCall>,
+    next_call_id: Arc<AtomicU64>,
+}
+
+impl NativeModelSourceTransport {
+    pub(crate) fn channel() -> (Self, NativeModelSourceTransportHost) {
+        let (sender, receiver) = async_channel::bounded(1);
+        (
+            Self {
+                sender,
+                next_call_id: Arc::new(AtomicU64::new(1)),
+            },
+            NativeModelSourceTransportHost { receiver },
+        )
+    }
+
+    fn open_session(
+        &self,
+        context: WorkerModelSourceContext,
+    ) -> Result<NativeModelSourceTransportSession, WorkerModelSourceError> {
+        Ok(NativeModelSourceTransportSession {
+            transport: self.clone(),
+            validator: Arc::new(StdMutex::new(WorkerModelSourceTransportValidator::checked(
+                context,
+            )?)),
+            next_call_ordinal: AtomicU64::new(1),
+            opened: AtomicBool::new(false),
+        })
+    }
+}
+
+#[doc(hidden)]
+struct NativeModelSourceTransportSession {
+    transport: NativeModelSourceTransport,
+    validator: Arc<StdMutex<WorkerModelSourceTransportValidator>>,
+    next_call_ordinal: AtomicU64,
+    opened: AtomicBool,
+}
+
+impl NativeModelSourceTransportSession {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "the private native model loader runs on a blocking execution thread and cooperatively polls its capacity-one transport"
+    )]
+    fn call(
+        &self,
+        request: WorkerModelSourceRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<WorkerModelSourceResponse, WorkerModelSourceError> {
+        cancellation
+            .check()
+            .map_err(|_| WorkerModelSourceError::Cancelled)?;
+        let call_id = self.transport.next_call_id.fetch_add(1, Ordering::Relaxed);
+        if call_id == 0 {
+            self.revoke()?;
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        self.validator
+            .lock()
+            .map_err(|_| WorkerModelSourceError::HostFailure)?
+            .validate_request(call_id, &request)?;
+        let request_call_ordinal = request.call_ordinal;
+        let request_is_open = matches!(&request.operation, WorkerModelSourceOperation::Open { .. });
+        let (response_sender, response_receiver) = async_channel::bounded(1);
+        let mut call = NativeModelSourceTransportCall {
+            call_id,
+            request,
+            validator: self.validator.clone(),
+            response_sender,
+        };
+        loop {
+            if cancellation.is_cancelled() {
+                self.revoke()?;
+                return Err(WorkerModelSourceError::Cancelled);
+            }
+            match self.transport.sender.try_send(call) {
+                Ok(()) => break,
+                Err(async_channel::TrySendError::Full(returned)) => {
+                    call = returned;
+                    std::thread::sleep(MODEL_SOURCE_TRANSPORT_POLL_INTERVAL);
+                }
+                Err(async_channel::TrySendError::Closed(_)) => {
+                    self.revoke()?;
+                    return Err(WorkerModelSourceError::Closed);
+                }
+            }
+        }
+        loop {
+            if cancellation.is_cancelled() {
+                self.revoke()?;
+                return Err(WorkerModelSourceError::Cancelled);
+            }
+            match response_receiver.try_recv() {
+                Ok(response) => {
+                    let next_call_ordinal = request_call_ordinal
+                        .checked_add(1)
+                        .ok_or(WorkerModelSourceError::InvalidOrder)?;
+                    self.next_call_ordinal
+                        .store(next_call_ordinal, Ordering::Release);
+                    if request_is_open && matches!(&response, WorkerModelSourceResponse::Opened(_))
+                    {
+                        self.opened.store(true, Ordering::Release);
+                    }
+                    if matches!(
+                        &response,
+                        WorkerModelSourceResponse::Closed(_)
+                            | WorkerModelSourceResponse::Rejected { .. }
+                    ) {
+                        self.opened.store(false, Ordering::Release);
+                    }
+                    return Ok(response);
+                }
+                Err(async_channel::TryRecvError::Empty) => {
+                    std::thread::sleep(MODEL_SOURCE_TRANSPORT_POLL_INTERVAL);
+                }
+                Err(async_channel::TryRecvError::Closed) => {
+                    self.revoke()?;
+                    return Err(WorkerModelSourceError::Closed);
+                }
+            }
+        }
+    }
+
+    fn revoke(&self) -> Result<(), WorkerModelSourceError> {
+        self.opened.store(false, Ordering::Release);
+        self.validator
+            .lock()
+            .map_err(|_| WorkerModelSourceError::HostFailure)?
+            .revoke();
+        Ok(())
+    }
+
+    fn has_open_session(&self) -> bool {
+        self.opened.load(Ordering::Acquire)
+    }
+
+    fn next_call_ordinal(&self) -> u64 {
+        self.next_call_ordinal.load(Ordering::Acquire)
+    }
+}
+
+#[cfg(feature = "test-support")]
+#[doc(hidden)]
+pub struct NativeModelSourceTestTransport {
+    inner: NativeModelSourceTransport,
+}
+
+#[cfg(feature = "test-support")]
+impl NativeModelSourceTestTransport {
+    pub fn channel() -> (Self, NativeModelSourceTransportHost) {
+        let (inner, host) = NativeModelSourceTransport::channel();
+        (Self { inner }, host)
+    }
+
+    pub fn open_session(
+        &self,
+        context: WorkerModelSourceContext,
+    ) -> Result<NativeModelSourceTestSession, WorkerModelSourceError> {
+        Ok(NativeModelSourceTestSession {
+            inner: self.inner.open_session(context)?,
+        })
+    }
+}
+
+#[cfg(feature = "test-support")]
+#[doc(hidden)]
+pub struct NativeModelSourceTestSession {
+    inner: NativeModelSourceTransportSession,
+}
+
+#[cfg(feature = "test-support")]
+impl NativeModelSourceTestSession {
+    pub fn call(
+        &self,
+        request: WorkerModelSourceRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<WorkerModelSourceResponse, WorkerModelSourceError> {
+        self.inner.call(request, cancellation)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+enum NativeModelConstructionProfile {
+    #[default]
+    SourceExact,
+    #[cfg(feature = "test-support")]
+    ReducedFixture,
+}
+
+#[derive(Clone)]
+struct NativeModelResourceServiceFactory {
+    binding: crate::NativeModelSourceWorkerBinding,
+    transport: NativeModelSourceTransport,
+    backend: Arc<CpuBackend>,
+    construction_profile: NativeModelConstructionProfile,
+}
+
+impl NativeModelResourceServiceFactory {
+    fn node_service(
+        &self,
+        identity: NativeNodeServiceIdentity,
+    ) -> Arc<dyn NativeModelResourceService> {
+        Arc::new(RuntimeNativeModelResourceService {
+            identity,
+            binding: self.binding,
+            transport: self.transport.clone(),
+            backend: self.backend.clone(),
+            construction_profile: self.construction_profile,
+        })
+    }
+}
+
+struct RuntimeNativeModelResourceService {
+    identity: NativeNodeServiceIdentity,
+    binding: crate::NativeModelSourceWorkerBinding,
+    transport: NativeModelSourceTransport,
+    backend: Arc<CpuBackend>,
+    construction_profile: NativeModelConstructionProfile,
+}
+
+impl fmt::Debug for RuntimeNativeModelResourceService {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RuntimeNativeModelResourceService")
+            .field("identity", &self.identity)
+            .field("binding", &self.binding)
+            .field("construction_profile", &self.construction_profile)
+            .finish_non_exhaustive()
+    }
+}
+
+impl NativeModelResourceService for RuntimeNativeModelResourceService {
+    fn identity(&self) -> &NativeNodeServiceIdentity {
+        &self.identity
+    }
+
+    fn load(
+        &self,
+        context: &NodeContext,
+        request: &NativeModelResourceRequest,
+    ) -> Result<Arc<NativeModelPayload>, NativeModelResourceServiceError> {
+        let expected_category = match request.role() {
+            NativeModelResourceRole::StyleModel => "style_models",
+            NativeModelResourceRole::Photomaker => "photomaker",
+            NativeModelResourceRole::Gligen => "gligen",
+            _ => return Err(NativeModelResourceServiceError::Unavailable),
+        };
+        if request.folder_category() != expected_category || request.source_names().len() != 1 {
+            return Err(NativeModelResourceServiceError::InvalidRequest);
+        }
+        context
+            .cancellation
+            .check()
+            .map_err(|_| NativeModelResourceServiceError::Cancelled)?;
+        let selection_sha256 =
+            worker_model_source_selection_sha256(request.folder_category(), request.source_names())
+                .map_err(map_model_source_error)?;
+        let session_context = WorkerModelSourceContext {
+            session_id: Uuid::new_v4(),
+            attempt_id: context.attempt_id,
+            attempt_generation: self.binding.attempt_generation(),
+            node_id: context.node_id.0.clone(),
+            node_generation: self.binding.node_generation(),
+            service_id: self.binding.service_id(),
+            service_generation: self.binding.service_generation(),
+            ordered_source_identity_sha256: selection_sha256,
+        };
+        let session = self
+            .transport
+            .open_session(session_context.clone())
+            .map_err(map_model_source_error)?;
+        let loaded = load_native_model_resource_from_session(
+            &session,
+            session_context.clone(),
+            request,
+            &self.backend,
+            context,
+            self.construction_profile,
+        );
+        match loaded {
+            Ok(payload) => {
+                close_native_model_source_session(&session, &session_context, context)?;
+                context
+                    .cancellation
+                    .check()
+                    .map_err(|_| NativeModelResourceServiceError::Cancelled)?;
+                Ok(payload.payload)
+            }
+            Err(error) => {
+                close_native_model_source_session(&session, &session_context, context)?;
+                Err(error)
+            }
+        }
+    }
+}
+
+struct LoadedNativeModelPayload {
+    payload: Arc<NativeModelPayload>,
+}
+
+fn close_native_model_source_session(
+    session: &NativeModelSourceTransportSession,
+    session_context: &WorkerModelSourceContext,
+    context: &NodeContext,
+) -> Result<(), NativeModelResourceServiceError> {
+    if !session.has_open_session() {
+        return session.revoke().map_err(map_model_source_error);
+    }
+    let close_ordinal = session.next_call_ordinal();
+    let response = session
+        .call(
+            WorkerModelSourceRequest {
+                context: session_context.clone(),
+                call_ordinal: close_ordinal,
+                operation: WorkerModelSourceOperation::Close,
+            },
+            &context.cancellation,
+        )
+        .map_err(map_model_source_error)?;
+    response.validate().map_err(map_model_source_error)?;
+    match response {
+        WorkerModelSourceResponse::Closed(closed)
+            if closed.session_id == session_context.session_id
+                && closed.call_ordinal == close_ordinal =>
+        {
+            Ok(())
+        }
+        WorkerModelSourceResponse::Rejected { error, .. } => Err(map_model_source_error(error)),
+        _ => Err(NativeModelResourceServiceError::MalformedSource(
+            "close response does not match its request",
+        )),
+    }
+}
+
+fn load_native_model_resource_from_session(
+    session: &NativeModelSourceTransportSession,
+    session_context: WorkerModelSourceContext,
+    request: &NativeModelResourceRequest,
+    backend: &CpuBackend,
+    node_context: &NodeContext,
+    construction_profile: NativeModelConstructionProfile,
+) -> Result<LoadedNativeModelPayload, NativeModelResourceServiceError> {
+    let open = session
+        .call(
+            WorkerModelSourceRequest {
+                context: session_context.clone(),
+                call_ordinal: 1,
+                operation: WorkerModelSourceOperation::Open {
+                    folder_category: request.folder_category().to_owned(),
+                    source_names: request.source_names().to_vec(),
+                },
+            },
+            &node_context.cancellation,
+        )
+        .map_err(map_model_source_error)?;
+    open.validate().map_err(map_model_source_error)?;
+    let opened = match open {
+        WorkerModelSourceResponse::Opened(opened)
+            if opened.session_id == session_context.session_id
+                && opened.call_ordinal == 1
+                && opened.ordered_source_identity_sha256
+                    == session_context.ordered_source_identity_sha256
+                && opened.sources.len() == 1 =>
+        {
+            opened
+        }
+        WorkerModelSourceResponse::Rejected { error, .. } => {
+            return Err(map_model_source_error(error));
+        }
+        _ => {
+            return Err(NativeModelResourceServiceError::MalformedSource(
+                "open response does not match its request",
+            ));
+        }
+    };
+    let manifest =
+        opened
+            .sources
+            .first()
+            .ok_or(NativeModelResourceServiceError::MalformedSource(
+                "opened response omitted its source manifest",
+            ))?;
+    if manifest.source_ordinal != 0
+        || manifest.tensors.is_empty()
+        || opened.maximum_chunk_bytes == 0
+    {
+        return Err(NativeModelResourceServiceError::MalformedSource(
+            "source manifest has an invalid ordinal, tensor set, or chunk bound",
+        ));
+    }
+    if manifest.aggregate_tensor_bytes > node_context.scratch.bytes() {
+        return Err(NativeModelResourceServiceError::OutOfMemory);
+    }
+    let tensor_context = ExecutionContext {
+        stream: StreamId::DEFAULT,
+        scratch: node_context.scratch.clone(),
+        rng_phase: None,
+        cancellation: &node_context.cancellation,
+    };
+    let (ordered_state, _) = load_manifest_tensors(
+        session,
+        &session_context,
+        manifest,
+        opened.maximum_chunk_bytes,
+        backend,
+        &tensor_context,
+    )?;
+    let artifact_sha256 = manifest.model_identity_sha256.as_str().to_owned();
+    let memory_budget_bytes = node_context.scratch.bytes();
+    let payload = match request.role() {
+        NativeModelResourceRole::StyleModel => {
+            let checkpoint = NativeStyleModelCheckpoint {
+                artifact_sha256,
+                ordered_state,
+                memory_budget_bytes,
+            };
+            let resource = match construction_profile {
+                NativeModelConstructionProfile::SourceExact => {
+                    NativeStyleModelResource::from_checkpoint(backend, checkpoint, &tensor_context)?
+                }
+                #[cfg(feature = "test-support")]
+                NativeModelConstructionProfile::ReducedFixture => {
+                    NativeStyleModelResource::from_reduced_fixture(
+                        backend,
+                        checkpoint,
+                        &tensor_context,
+                    )?
+                }
+            };
+            match construction_profile {
+                NativeModelConstructionProfile::SourceExact => {
+                    NativeModelPayload::style_model(Arc::new(resource), &node_context.cancellation)?
+                }
+                #[cfg(feature = "test-support")]
+                NativeModelConstructionProfile::ReducedFixture => {
+                    NativeModelPayload::style_model_test_fixture(
+                        Arc::new(resource),
+                        &node_context.cancellation,
+                    )?
+                }
+            }
+        }
+        NativeModelResourceRole::Photomaker => {
+            let ordered_entries = photomaker_entries(manifest, ordered_state)?;
+            let checkpoint = NativePhotoMakerCheckpoint {
+                artifact_sha256,
+                ordered_entries,
+                memory_budget_bytes,
+            };
+            let resource = match construction_profile {
+                NativeModelConstructionProfile::SourceExact => {
+                    NativePhotoMakerResource::from_checkpoint(backend, checkpoint, &tensor_context)?
+                }
+                #[cfg(feature = "test-support")]
+                NativeModelConstructionProfile::ReducedFixture => {
+                    NativePhotoMakerResource::from_reduced_fixture(
+                        backend,
+                        checkpoint,
+                        &tensor_context,
+                    )?
+                }
+            };
+            match construction_profile {
+                NativeModelConstructionProfile::SourceExact => {
+                    NativeModelPayload::photomaker(Arc::new(resource), &node_context.cancellation)?
+                }
+                #[cfg(feature = "test-support")]
+                NativeModelConstructionProfile::ReducedFixture => {
+                    NativeModelPayload::photomaker_test_fixture(
+                        Arc::new(resource),
+                        &node_context.cancellation,
+                    )?
+                }
+            }
+        }
+        NativeModelResourceRole::Gligen => {
+            let checkpoint = NativeGligenCheckpoint {
+                artifact_sha256,
+                ordered_state,
+                memory_budget_bytes,
+            };
+            let resource = match construction_profile {
+                NativeModelConstructionProfile::SourceExact => {
+                    NativeGligenResource::from_checkpoint(backend, checkpoint, &tensor_context)?
+                }
+                #[cfg(feature = "test-support")]
+                NativeModelConstructionProfile::ReducedFixture => {
+                    NativeGligenResource::from_reduced_fixture(
+                        backend,
+                        checkpoint,
+                        &tensor_context,
+                    )?
+                }
+            };
+            match construction_profile {
+                NativeModelConstructionProfile::SourceExact => {
+                    NativeModelPayload::gligen(Arc::new(resource), &node_context.cancellation)?
+                }
+                #[cfg(feature = "test-support")]
+                NativeModelConstructionProfile::ReducedFixture => {
+                    NativeModelPayload::gligen_test_fixture(
+                        Arc::new(resource),
+                        &node_context.cancellation,
+                    )?
+                }
+            }
+        }
+        _ => return Err(NativeModelResourceServiceError::Unavailable),
+    };
+    Ok(LoadedNativeModelPayload {
+        payload: Arc::new(payload),
+    })
+}
+
+fn load_manifest_tensors(
+    session: &NativeModelSourceTransportSession,
+    session_context: &WorkerModelSourceContext,
+    manifest: &WorkerModelSourceManifest,
+    maximum_chunk_bytes: u32,
+    backend: &CpuBackend,
+    tensor_context: &ExecutionContext<'_>,
+) -> Result<(Vec<(String, Tensor)>, u64), NativeModelResourceServiceError> {
+    let mut ordered_state = Vec::new();
+    ordered_state
+        .try_reserve_exact(manifest.tensors.len())
+        .map_err(|_| NativeModelResourceServiceError::OutOfMemory)?;
+    let mut call_ordinal = 2_u64;
+    for (tensor_index, tensor_manifest) in manifest.tensors.iter().enumerate() {
+        tensor_context
+            .cancellation
+            .check()
+            .map_err(|_| NativeModelResourceServiceError::Cancelled)?;
+        let dtype = model_source_dtype(&tensor_manifest.data_type).ok_or(
+            NativeModelResourceServiceError::MalformedSource("source tensor dtype is unsupported"),
+        )?;
+        let descriptor = TensorDescriptor::contiguous(
+            tensor_manifest.shape.clone(),
+            dtype,
+            DeviceId::CPU,
+            tensor_context.stream,
+        )?;
+        if descriptor.byte_len()? != tensor_manifest.byte_length {
+            return Err(NativeModelResourceServiceError::MalformedSource(
+                "source tensor byte length does not match its descriptor",
+            ));
+        }
+        let (mut tensor, allocation) = backend.allocate(descriptor, tensor_context)?;
+        backend.wait_event(allocation, tensor_context)?;
+        let mut write = tensor.write()?;
+        let destination = write.bytes_mut()?;
+        let mut byte_offset = 0_u64;
+        while byte_offset < tensor_manifest.byte_length {
+            let remaining = tensor_manifest.byte_length - byte_offset;
+            let byte_length = remaining.min(u64::from(maximum_chunk_bytes));
+            let byte_length = u32::try_from(byte_length).map_err(|_| {
+                NativeModelResourceServiceError::MalformedSource(
+                    "source chunk length does not fit the wire protocol",
+                )
+            })?;
+            let tensor_ordinal = u32::try_from(tensor_index).map_err(|_| {
+                NativeModelResourceServiceError::MalformedSource(
+                    "source tensor ordinal does not fit the wire protocol",
+                )
+            })?;
+            let response = session
+                .call(
+                    WorkerModelSourceRequest {
+                        context: session_context.clone(),
+                        call_ordinal,
+                        operation: WorkerModelSourceOperation::Read {
+                            source_ordinal: manifest.source_ordinal,
+                            tensor_ordinal,
+                            byte_offset,
+                            byte_length,
+                        },
+                    },
+                    tensor_context.cancellation,
+                )
+                .map_err(map_model_source_error)?;
+            response.validate().map_err(map_model_source_error)?;
+            let chunk = match response {
+                WorkerModelSourceResponse::Chunk(chunk)
+                    if chunk.session_id == session_context.session_id
+                        && chunk.call_ordinal == call_ordinal
+                        && chunk.source_ordinal == manifest.source_ordinal
+                        && chunk.tensor_ordinal == tensor_ordinal
+                        && chunk.byte_offset == byte_offset
+                        && chunk.bytes.len()
+                            == usize::try_from(byte_length).unwrap_or(usize::MAX) =>
+                {
+                    chunk
+                }
+                WorkerModelSourceResponse::Rejected { error, .. } => {
+                    return Err(map_model_source_error(error));
+                }
+                _ => {
+                    return Err(NativeModelResourceServiceError::MalformedSource(
+                        "source chunk response does not match its request",
+                    ));
+                }
+            };
+            let start = usize::try_from(byte_offset).map_err(|_| {
+                NativeModelResourceServiceError::MalformedSource(
+                    "source chunk offset does not fit address space",
+                )
+            })?;
+            let end = start.checked_add(chunk.bytes.len()).ok_or(
+                NativeModelResourceServiceError::MalformedSource(
+                    "source chunk destination range overflowed",
+                ),
+            )?;
+            let destination = destination.get_mut(start..end).ok_or(
+                NativeModelResourceServiceError::MalformedSource(
+                    "source chunk destination is outside the tensor",
+                ),
+            )?;
+            destination.copy_from_slice(&chunk.bytes);
+            byte_offset = byte_offset.checked_add(u64::from(byte_length)).ok_or(
+                NativeModelResourceServiceError::MalformedSource("source chunk offset overflowed"),
+            )?;
+            call_ordinal = call_ordinal.checked_add(1).ok_or(
+                NativeModelResourceServiceError::MalformedSource("source call ordinal overflowed"),
+            )?;
+        }
+        drop(write);
+        ordered_state.push((tensor_manifest.name.clone(), tensor));
+    }
+    Ok((ordered_state, call_ordinal))
+}
+
+fn photomaker_entries(
+    manifest: &WorkerModelSourceManifest,
+    ordered_state: Vec<(String, Tensor)>,
+) -> Result<Vec<NativePhotoMakerCheckpointEntry>, NativeModelResourceServiceError> {
+    let nested = manifest.artifacts.iter().any(|artifact| {
+        artifact.nested_state_disposition
+            == WorkerModelSourceNestedStateDisposition::NestedStringToParam
+    });
+    if nested {
+        if manifest.artifacts.len() != 1 {
+            return Err(NativeModelResourceServiceError::MalformedSource(
+                "nested PhotoMaker state spans more than one artifact",
+            ));
+        }
+        Ok(vec![NativePhotoMakerCheckpointEntry::Mapping {
+            key: "id_encoder".to_owned(),
+            ordered_state,
+        }])
+    } else {
+        Ok(ordered_state
+            .into_iter()
+            .map(|(key, tensor)| NativePhotoMakerCheckpointEntry::Tensor { key, tensor })
+            .collect())
+    }
+}
+
+fn model_source_dtype(value: &str) -> Option<DType> {
+    Some(match value {
+        "BOOL" | "torch.BoolStorage" => DType::Bool,
+        "U8" | "torch.ByteStorage" => DType::U8,
+        "I8" | "torch.CharStorage" => DType::I8,
+        "I16" | "torch.ShortStorage" => DType::I16,
+        "I32" | "torch.IntStorage" => DType::I32,
+        "I64" | "torch.LongStorage" => DType::I64,
+        "F16" | "torch.HalfStorage" => DType::F16,
+        "BF16" | "torch.BFloat16Storage" => DType::Bf16,
+        "F32" | "torch.FloatStorage" => DType::F32,
+        "F64" | "torch.DoubleStorage" => DType::F64,
+        "C64" | "torch.ComplexFloatStorage" => DType::Complex64,
+        "C128" | "torch.ComplexDoubleStorage" => DType::Complex128,
+        _ => return None,
+    })
+}
+
+fn map_model_source_error(error: WorkerModelSourceError) -> NativeModelResourceServiceError {
+    match error {
+        WorkerModelSourceError::Cancelled => NativeModelResourceServiceError::Cancelled,
+        WorkerModelSourceError::StaleAttempt
+        | WorkerModelSourceError::StaleNode
+        | WorkerModelSourceError::StaleService
+        | WorkerModelSourceError::ForeignSession
+        | WorkerModelSourceError::Late => NativeModelResourceServiceError::StaleIdentity,
+        WorkerModelSourceError::SourceChanged => NativeModelResourceServiceError::SourceChanged,
+        WorkerModelSourceError::HostFailure | WorkerModelSourceError::Closed => {
+            NativeModelResourceServiceError::SourceUnavailable
+        }
+        WorkerModelSourceError::InvalidOrder => NativeModelResourceServiceError::MalformedSource(
+            "model-source transport rejected call order",
+        ),
+        WorkerModelSourceError::Replay => NativeModelResourceServiceError::MalformedSource(
+            "model-source transport rejected a replay",
+        ),
+        WorkerModelSourceError::InvalidSourceSelection => {
+            NativeModelResourceServiceError::MalformedSource(
+                "model-source transport rejected source selection",
+            )
+        }
+        WorkerModelSourceError::InvalidSourceOrdinal => {
+            NativeModelResourceServiceError::MalformedSource(
+                "model-source transport rejected source ordinal",
+            )
+        }
+        WorkerModelSourceError::InvalidTensorOrdinal => {
+            NativeModelResourceServiceError::MalformedSource(
+                "model-source transport rejected tensor ordinal",
+            )
+        }
+        WorkerModelSourceError::RangeLimit => NativeModelResourceServiceError::MalformedSource(
+            "model-source transport rejected byte range",
+        ),
+        WorkerModelSourceError::ChunkLimit => NativeModelResourceServiceError::MalformedSource(
+            "model-source transport rejected chunk length",
+        ),
+        WorkerModelSourceError::DigestMismatch => NativeModelResourceServiceError::MalformedSource(
+            "model-source transport rejected response digest",
+        ),
+    }
+}
+
+#[cfg(feature = "test-support")]
+#[doc(hidden)]
+#[allow(clippy::too_many_arguments)]
+pub fn load_reduced_fixture_native_model_resource_for_test<R>(
+    prompt_id: PromptId,
+    attempt_id: AttemptId,
+    node_id: NodeId,
+    cancellation: CancellationToken,
+    scratch: ScratchReservation,
+    handle_store: Arc<dyn NativeHandleStore>,
+    binding: crate::NativeModelSourceWorkerBinding,
+    backend: Arc<CpuBackend>,
+    request: NativeModelResourceRequest,
+    host_operation: impl FnOnce(NativeModelSourceTransportHost) -> Result<R, WorkerModelSourceError>
+    + Send
+    + 'static,
+) -> Result<
+    (
+        Result<Arc<NativeModelPayload>, NativeModelResourceServiceError>,
+        R,
+    ),
+    NativeModelResourceServiceError,
+>
+where
+    R: Send + 'static,
+{
+    let (transport, host) = NativeModelSourceTransport::channel();
+    let host_thread = std::thread::spawn(move || host_operation(host));
+    let load_result = (|| {
+        let identity =
+            NativeNodeServiceIdentity::checked(Uuid::new_v4(), attempt_id, node_id.clone())
+                .map_err(|_| NativeModelResourceServiceError::StaleIdentity)?;
+        let service = NativeModelResourceServiceFactory {
+            binding,
+            transport,
+            backend,
+            construction_profile: NativeModelConstructionProfile::ReducedFixture,
+        }
+        .node_service(identity);
+        let services = NativeNodeServices::checked(None, None, None)
+            .and_then(|services| services.with_model_resources(service))
+            .map_err(|_| NativeModelResourceServiceError::StaleIdentity)?;
+        let context = NodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            node_id,
+            cancellation,
+            scratch,
+            handle_store,
+            services,
+        )
+        .map_err(|_| NativeModelResourceServiceError::StaleIdentity)?;
+        context.load_native_model_resource(&request)
+    })();
+    let host_result = host_thread
+        .join()
+        .map_err(|_| {
+            NativeModelResourceServiceError::MalformedSource(
+                "model-source test host thread panicked",
+            )
+        })?
+        .map_err(map_model_source_error)?;
+    Ok((load_result, host_result))
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -2230,6 +3085,7 @@ pub struct ExecutionEngine {
     webm_encode_service: Option<Arc<dyn NativeWebmEncodeService>>,
     component_h264_mp4_backing_service: Option<Arc<dyn NativeComponentH264Mp4BackingService>>,
     asset_resolvers: Option<Arc<NativeAssetResolverRegistry>>,
+    model_resource_services: Option<NativeModelResourceServiceFactory>,
     handle_store_generation: NativeHandleStoreGeneration,
 }
 
@@ -2286,6 +3142,7 @@ impl ExecutionEngine {
             webm_encode_service: None,
             component_h264_mp4_backing_service: None,
             asset_resolvers: None,
+            model_resource_services: None,
             handle_store_generation,
         })
     }
@@ -2341,6 +3198,42 @@ impl ExecutionEngine {
         asset_resolvers: Arc<NativeAssetResolverRegistry>,
     ) -> Self {
         self.asset_resolvers = Some(asset_resolvers);
+        self
+    }
+
+    pub(crate) fn with_model_source_transport(
+        mut self,
+        binding: crate::NativeModelSourceWorkerBinding,
+        transport: NativeModelSourceTransport,
+        backend: Arc<CpuBackend>,
+    ) -> Result<Self, ExecutionError> {
+        if binding.service_id().is_nil()
+            || binding.service_generation() == 0
+            || binding.attempt_generation() == 0
+            || binding.node_generation() == 0
+        {
+            return Err(ExecutionError::Cache(
+                "native model-source service binding is invalid".to_owned(),
+            ));
+        }
+        backend
+            .validate_scratch_reservation(&self.scratch)
+            .map_err(|error| ExecutionError::Cache(error.to_string()))?;
+        self.model_resource_services = Some(NativeModelResourceServiceFactory {
+            binding,
+            transport,
+            backend,
+            construction_profile: NativeModelConstructionProfile::SourceExact,
+        });
+        Ok(self)
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn with_reduced_fixture_model_resources(mut self) -> Self {
+        if let Some(factory) = self.model_resource_services.as_mut() {
+            factory.construction_profile = NativeModelConstructionProfile::ReducedFixture;
+        }
         self
     }
 
@@ -2704,6 +3597,11 @@ impl ExecutionEngine {
         let mut services =
             NativeNodeServices::checked(asset_resolver, Some(effect_service.clone()), compute)
                 .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+        if let Some(factory) = &self.model_resource_services {
+            services = services
+                .with_model_resources(factory.node_service(service_identity.clone()))
+                .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+        }
         if matches!(
             node.class_type.as_str(),
             "TextGenerate" | "TextGenerateLTX2Prompt"
@@ -3927,6 +4825,82 @@ pub(crate) mod tests {
     struct FixtureNode {
         class_type: String,
         calls: Arc<AtomicUsize>,
+    }
+
+    #[test]
+    fn native_model_resource_service_rejects_unsupported_recipes_before_transport()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (transport, host) = NativeModelSourceTransport::channel();
+        let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(1 << 20)?;
+        let backend = Arc::new(backend);
+        let attempt_id = AttemptId(Uuid::from_u128(0x4004));
+        let node_id = NodeId("model-resource".to_owned());
+        let identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0x4005),
+            attempt_id,
+            node_id.clone(),
+        )?;
+        let service = NativeModelResourceServiceFactory {
+            binding: crate::NativeModelSourceWorkerBinding::checked(
+                Uuid::from_u128(0x4006),
+                1,
+                1,
+                1,
+            )?,
+            transport,
+            backend,
+            construction_profile: NativeModelConstructionProfile::SourceExact,
+        }
+        .node_service(identity);
+        let services =
+            NativeNodeServices::checked(None, None, None)?.with_model_resources(service)?;
+        let handle_store_generation = NativeHandleStoreGeneration::new()?;
+        let context = NodeContext::new_with_services(
+            PromptId(Uuid::from_u128(0x4007)),
+            attempt_id,
+            node_id,
+            CancellationToken::default(),
+            workspace_authority.authorize_workspace(1 << 20)?,
+            handle_store_generation.handle_store_for_attempt(attempt_id),
+            services,
+        )?;
+        for (request, expected) in [
+            (
+                NativeModelResourceRequest::checked(
+                    NativeModelResourceRole::Model,
+                    "checkpoints",
+                    vec!["model.safetensors".to_owned()],
+                )?,
+                NativeModelResourceServiceError::Unavailable,
+            ),
+            (
+                NativeModelResourceRequest::checked(
+                    NativeModelResourceRole::StyleModel,
+                    "checkpoints",
+                    vec!["style.safetensors".to_owned()],
+                )?,
+                NativeModelResourceServiceError::InvalidRequest,
+            ),
+            (
+                NativeModelResourceRequest::checked(
+                    NativeModelResourceRole::StyleModel,
+                    "style_models",
+                    vec!["one.safetensors".to_owned(), "two.safetensors".to_owned()],
+                )?,
+                NativeModelResourceServiceError::InvalidRequest,
+            ),
+        ] {
+            let error = context
+                .load_native_model_resource(&request)
+                .err()
+                .ok_or("unsupported model-resource recipe unexpectedly loaded")?;
+            assert_eq!(mem::discriminant(&error), mem::discriminant(&expected));
+        }
+        assert!(matches!(
+            host.receiver.try_recv(),
+            Err(async_channel::TryRecvError::Empty)
+        ));
+        Ok(())
     }
 
     struct WorkspaceRecordingNode {

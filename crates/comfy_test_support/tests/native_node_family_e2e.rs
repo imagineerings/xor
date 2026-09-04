@@ -18,18 +18,20 @@ use comfy_model::{
     select_reduced_depth_anything_3_reference_for_fixture,
 };
 use comfy_nodes::{
-    NativePreparedEffectKind, NativeStoredModelPayload, NativeStructuredValue,
-    built_in_source_schema,
+    NativeModelResourceRequest, NativePreparedEffectKind, NativeStoredModelPayload,
+    NativeStructuredValue, built_in_source_schema,
 };
 use comfy_runtime::{
     AttemptState, NATIVE_IMAGE_REGISTRY_VERSION, NativeHandleKind, NativeHandleStoreError,
     NativeHandleStoreGeneration, NativeHandleType, NativeImageWorkerEvent, NativeImageWorkerPlan,
-    NativeInputDescriptor, NativeNodeDescriptor, NativeNodeFailure, NativeNodeFailureKind,
-    NativeNodeOutcome, NativeOpaqueHandle, NativePortCardinality, NativePreparedEffectRequest,
-    NativePrimitive, NativePrimitiveType, NativeStoredPayload, NativeTypeUnion, NativeValue,
-    NativeValueType, RuntimeSupervisor, SupervisorPolicy, WorkerHealth, WorkerLaunchConfig,
-    compile_generated_native_prompt, generated_native_frontend_descriptors,
-    generated_native_node_registry_projection, graph_to_prompt, native_image_registry_projection,
+    NativeInputDescriptor, NativeModelSourceWorkerBinding, NativeNodeDescriptor, NativeNodeFailure,
+    NativeNodeFailureKind, NativeNodeOutcome, NativeOpaqueHandle, NativePortCardinality,
+    NativePreparedEffectRequest, NativePrimitive, NativePrimitiveType, NativeStoredPayload,
+    NativeTypeUnion, NativeValue, NativeValueType, RuntimeSupervisor, SupervisorPolicy,
+    WorkerHealth, WorkerLaunchConfig, compile_generated_native_prompt,
+    generated_native_frontend_descriptors, generated_native_node_registry_projection,
+    graph_to_prompt, load_reduced_fixture_native_model_resource_for_test,
+    native_image_registry_projection,
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, ExecutionContext, ImageTensor,
@@ -46,7 +48,13 @@ use comfy_tensor::{
         pixel_shuffle_nd_tensor_with_context_exact_native,
     },
 };
-use comfy_types::{AttemptId, NodeId, ProfileId, PromptId, WorkerId, WorkerMessage};
+use comfy_types::{
+    AttemptId, NodeId, ProfileId, PromptId, WorkerId, WorkerMessage, WorkerModelSourceArtifact,
+    WorkerModelSourceChunk, WorkerModelSourceClosed, WorkerModelSourceError,
+    WorkerModelSourceFormat, WorkerModelSourceManifest, WorkerModelSourceNestedStateDisposition,
+    WorkerModelSourceOpened, WorkerModelSourceOperation, WorkerModelSourceParserLimits,
+    WorkerModelSourceResponse, WorkerModelSourceTensor, WorkerSha256Digest,
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -3872,4 +3880,315 @@ async fn await_terminal_worker_event(
             return Ok(event);
         }
     }
+}
+
+const MODEL_RESOURCE_SERVICE_ORACLE: &[u8] =
+    include_bytes!("../fixtures/models/conditioning-auxiliary-resource-foundation/oracle.json");
+
+#[derive(Deserialize)]
+struct ModelResourceServiceOracle {
+    style: ModelResourceDtypeProfiles,
+    photomaker: ModelResourceDtypeProfiles,
+    gligen: ModelResourceGligenProfile,
+}
+
+#[derive(Deserialize)]
+struct ModelResourceDtypeProfiles {
+    dtypes: BTreeMap<String, ModelResourceState>,
+}
+
+#[derive(Deserialize)]
+struct ModelResourceState {
+    state: Vec<ModelResourceStateEntry>,
+}
+
+#[derive(Deserialize)]
+struct ModelResourceGligenProfile {
+    state: Vec<ModelResourceStateEntry>,
+}
+
+#[derive(Deserialize)]
+struct ModelResourceStateEntry {
+    key: String,
+    shape: Vec<u64>,
+}
+
+struct ModelResourceFixture {
+    manifest: WorkerModelSourceManifest,
+    tensors: Vec<Vec<u8>>,
+}
+
+fn serve_model_resource_transport(
+    host: comfy_runtime::NativeModelSourceTransportHost,
+    fixtures: Arc<BTreeMap<(String, String), Arc<ModelResourceFixture>>>,
+) -> Result<(usize, usize, usize), WorkerModelSourceError> {
+    let mut active = BTreeMap::<Uuid, Arc<ModelResourceFixture>>::new();
+    let mut open_count = 0;
+    let mut read_count = 0;
+    let mut close_count = 0;
+    while let Ok(call) = smol::block_on(host.receive()) {
+        let request = call.request().clone();
+        let response = match request.operation {
+            WorkerModelSourceOperation::Open {
+                folder_category,
+                source_names,
+            } => {
+                open_count += 1;
+                if request.call_ordinal != 1 || source_names.len() != 1 {
+                    return Err(WorkerModelSourceError::InvalidOrder);
+                }
+                let fixture = fixtures
+                    .get(&(folder_category, source_names[0].clone()))
+                    .cloned()
+                    .ok_or(WorkerModelSourceError::InvalidSourceSelection)?;
+                active.insert(request.context.session_id, fixture.clone());
+                WorkerModelSourceResponse::Opened(WorkerModelSourceOpened::checked(
+                    request.context.session_id,
+                    request.call_ordinal,
+                    request.context.ordered_source_identity_sha256.clone(),
+                    vec![fixture.manifest.clone()],
+                )?)
+            }
+            WorkerModelSourceOperation::Read {
+                source_ordinal,
+                tensor_ordinal,
+                byte_offset,
+                byte_length,
+            } => {
+                read_count += 1;
+                let fixture = active
+                    .get(&request.context.session_id)
+                    .ok_or(WorkerModelSourceError::Closed)?;
+                let tensor = fixture
+                    .tensors
+                    .get(
+                        usize::try_from(tensor_ordinal)
+                            .map_err(|_| WorkerModelSourceError::InvalidTensorOrdinal)?,
+                    )
+                    .ok_or(WorkerModelSourceError::InvalidTensorOrdinal)?;
+                let start =
+                    usize::try_from(byte_offset).map_err(|_| WorkerModelSourceError::RangeLimit)?;
+                let end = start
+                    .checked_add(
+                        usize::try_from(byte_length)
+                            .map_err(|_| WorkerModelSourceError::RangeLimit)?,
+                    )
+                    .ok_or(WorkerModelSourceError::RangeLimit)?;
+                let bytes = tensor
+                    .get(start..end)
+                    .ok_or(WorkerModelSourceError::RangeLimit)?
+                    .to_vec();
+                WorkerModelSourceResponse::Chunk(WorkerModelSourceChunk::checked(
+                    request.context.session_id,
+                    request.call_ordinal,
+                    source_ordinal,
+                    tensor_ordinal,
+                    byte_offset,
+                    bytes,
+                )?)
+            }
+            WorkerModelSourceOperation::Close => {
+                close_count += 1;
+                active
+                    .remove(&request.context.session_id)
+                    .ok_or(WorkerModelSourceError::Closed)?;
+                WorkerModelSourceResponse::Closed(WorkerModelSourceClosed::checked(
+                    request.context.session_id,
+                    request.call_ordinal,
+                )?)
+            }
+        };
+        let call_id = call.call_id();
+        smol::block_on(call.respond(call_id, response))?;
+    }
+    if active.is_empty() {
+        Ok((open_count, read_count, close_count))
+    } else {
+        Err(WorkerModelSourceError::Closed)
+    }
+}
+
+fn model_resource_fixture(
+    category: &str,
+    state: &[ModelResourceStateEntry],
+) -> Result<Arc<ModelResourceFixture>, Box<dyn Error>> {
+    let mut tensors = Vec::new();
+    let mut tensor_manifests = Vec::new();
+    let mut aggregate_tensor_bytes = 0_u64;
+    let mut maximum_tensor_bytes = 0_u64;
+    for entry in state {
+        let element_count = entry.shape.iter().try_fold(1_u64, |count, dimension| {
+            count
+                .checked_mul(*dimension)
+                .ok_or("fixture shape overflow")
+        })?;
+        let byte_length = element_count
+            .checked_mul(DType::F32.byte_width())
+            .ok_or("fixture tensor byte count overflow")?;
+        let byte_offset = aggregate_tensor_bytes;
+        aggregate_tensor_bytes = aggregate_tensor_bytes
+            .checked_add(byte_length)
+            .ok_or("fixture aggregate tensor byte count overflow")?;
+        maximum_tensor_bytes = maximum_tensor_bytes.max(byte_length);
+        tensors.push(vec![0; usize::try_from(byte_length)?]);
+        tensor_manifests.push(WorkerModelSourceTensor {
+            name: entry.key.clone(),
+            data_type: "F32".to_owned(),
+            shape: entry.shape.clone(),
+            artifact_ordinal: 0,
+            byte_offset,
+            byte_length,
+        });
+    }
+    let artifact_sha256 = WorkerSha256Digest::new(format!(
+        "{:x}",
+        Sha256::digest(format!("task400:{category}:artifact"))
+    ))?;
+    let manifest = WorkerModelSourceManifest {
+        source_ordinal: 0,
+        model_identity_sha256: WorkerSha256Digest::new(format!(
+            "{:x}",
+            Sha256::digest(format!("task400:{category}:model"))
+        ))?,
+        artifacts: vec![WorkerModelSourceArtifact {
+            sha256: artifact_sha256,
+            byte_size: aggregate_tensor_bytes,
+            format: WorkerModelSourceFormat::Safetensors,
+            nested_state_disposition: WorkerModelSourceNestedStateDisposition::Flat,
+        }],
+        tensors: tensor_manifests,
+        aggregate_tensor_bytes,
+        maximum_read_bytes: maximum_tensor_bytes.max(512 * 1024),
+        parser_limits: WorkerModelSourceParserLimits {
+            version: 1,
+            manifest_bytes: 1,
+            maximum_depth: 64,
+            maximum_tensors: 10_000,
+            maximum_tensor_bytes: maximum_tensor_bytes.max(512 * 1024),
+            maximum_aggregate_tensor_bytes: aggregate_tensor_bytes.max(512 * 1024),
+            maximum_name_bytes: 16 * 1024,
+            maximum_archive_entries: 10_000,
+            maximum_metadata_values: 10_000,
+        },
+    };
+    Ok(Arc::new(ModelResourceFixture { manifest, tensors }))
+}
+
+#[test]
+fn native_model_resource_service_loads_style_photomaker_and_gligen() -> Result<(), Box<dyn Error>> {
+    let oracle: ModelResourceServiceOracle = serde_json::from_slice(MODEL_RESOURCE_SERVICE_ORACLE)?;
+    let style = oracle
+        .style
+        .dtypes
+        .get("float32")
+        .ok_or("style float32 fixture is missing")?;
+    let photomaker = oracle
+        .photomaker
+        .dtypes
+        .get("float32")
+        .ok_or("PhotoMaker float32 fixture is missing")?;
+    let malformed_style_state = [ModelResourceStateEntry {
+        key: "invalid.weight".to_owned(),
+        shape: vec![1],
+    }];
+    let fixtures = Arc::new(BTreeMap::from([
+        (
+            ("style_models".to_owned(), "style.safetensors".to_owned()),
+            model_resource_fixture("style_models", &style.state)?,
+        ),
+        (
+            ("photomaker".to_owned(), "photo.safetensors".to_owned()),
+            model_resource_fixture("photomaker", &photomaker.state)?,
+        ),
+        (
+            ("gligen".to_owned(), "gligen.safetensors".to_owned()),
+            model_resource_fixture("gligen", &oracle.gligen.state)?,
+        ),
+        (
+            (
+                "style_models".to_owned(),
+                "malformed.safetensors".to_owned(),
+            ),
+            model_resource_fixture("style_models-malformed", &malformed_style_state)?,
+        ),
+    ]));
+    let workspace_bytes = 1024 * 1024 * 1024;
+    let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(workspace_bytes)?;
+    let backend = Arc::new(backend);
+    let attempt_id = AttemptId(Uuid::from_u128(0x4001));
+    let handle_store_generation = NativeHandleStoreGeneration::new()?;
+    let handle_store = handle_store_generation.handle_store_for_attempt(attempt_id);
+    let binding =
+        NativeModelSourceWorkerBinding::checked_for_test(Uuid::from_u128(0x4002), 1, 1, 1)?;
+    let mut open_count = 0;
+    let mut read_count = 0;
+    let mut close_count = 0;
+    for (index, (role, category, source_name)) in [
+        (
+            NativeModelResourceRole::StyleModel,
+            "style_models",
+            "style.safetensors",
+        ),
+        (
+            NativeModelResourceRole::Photomaker,
+            "photomaker",
+            "photo.safetensors",
+        ),
+        (
+            NativeModelResourceRole::Gligen,
+            "gligen",
+            "gligen.safetensors",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let fixtures = fixtures.clone();
+        let (payload, counts) = load_reduced_fixture_native_model_resource_for_test(
+            PromptId(Uuid::from_u128(0x4003)),
+            attempt_id,
+            NodeId(format!("resource-{index}")),
+            CancellationToken::default(),
+            workspace_authority.authorize_workspace(workspace_bytes)?,
+            handle_store.clone(),
+            binding,
+            backend.clone(),
+            NativeModelResourceRequest::checked(role, category, vec![source_name.to_owned()])?,
+            move |host| serve_model_resource_transport(host, fixtures),
+        )
+        .map_err(|error| format!("{role:?} model-resource load failed: {error}"))?;
+        let payload = payload
+            .map_err(|error| format!("{role:?} model-resource construction failed: {error}"))?;
+        assert_eq!(payload.identity().role(), role);
+        open_count += counts.0;
+        read_count += counts.1;
+        close_count += counts.2;
+    }
+    assert_eq!(handle_store_generation.len(), 0);
+    let failure_fixtures = fixtures;
+    let (rejected, counts) = load_reduced_fixture_native_model_resource_for_test(
+        PromptId(Uuid::from_u128(0x4004)),
+        attempt_id,
+        NodeId("resource-invalid".to_owned()),
+        CancellationToken::default(),
+        workspace_authority.authorize_workspace(workspace_bytes)?,
+        handle_store.clone(),
+        binding,
+        backend,
+        NativeModelResourceRequest::checked(
+            NativeModelResourceRole::StyleModel,
+            "style_models",
+            vec!["malformed.safetensors".to_owned()],
+        )?,
+        move |host| serve_model_resource_transport(host, failure_fixtures),
+    )?;
+    assert!(rejected.is_err());
+    assert_eq!(handle_store_generation.len(), 0);
+    open_count += counts.0;
+    read_count += counts.1;
+    close_count += counts.2;
+    assert_eq!(open_count, 4);
+    assert!(read_count >= 4);
+    assert_eq!(close_count, 4);
+    Ok(())
 }
