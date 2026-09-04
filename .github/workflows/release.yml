@@ -93,11 +93,14 @@ jobs:
         fallback: none
     - name: release::release_licenses
       run: |
+        sha256_file() {
+            sha256sum "$1" | awk '{print $1}'
+        }
         script/generate-licenses
         mkdir -p release-licenses
         cp assets/licenses.md release-licenses/licenses.md
-        CARGO_LOCK_HASH="$(git hash-object Cargo.lock)"
-        LICENSES_HASH="$(git hash-object release-licenses/licenses.md)"
+        CARGO_LOCK_HASH="$(sha256_file Cargo.lock)"
+        LICENSES_HASH="$(sha256_file release-licenses/licenses.md)"
         jq -n \
             --arg commit_sha "$COMMIT_SHA" \
             --arg cargo_lock_hash "$CARGO_LOCK_HASH" \
@@ -215,10 +218,17 @@ jobs:
         path: release-licenses
     - name: release::verify_release_licenses
       run: |
+        sha256_file() {
+            if [[ "$RUNNER_OS" == "macOS" ]]; then
+                shasum -a 256 "$1" | awk '{print $1}'
+            else
+                sha256sum "$1" | awk '{print $1}'
+            fi
+        }
         test -s release-licenses/licenses.md
         test -s release-licenses/metadata.json
-        CARGO_LOCK_HASH="$(git hash-object Cargo.lock)"
-        LICENSES_HASH="$(git hash-object release-licenses/licenses.md)"
+        CARGO_LOCK_HASH="$(sha256_file Cargo.lock)"
+        LICENSES_HASH="$(sha256_file release-licenses/licenses.md)"
         jq -e \
             --arg commit_sha "$COMMIT_SHA" \
             --arg cargo_lock_hash "$CARGO_LOCK_HASH" \
@@ -663,10 +673,17 @@ jobs:
         path: release-remote-server
     - name: release::verify_release_licenses
       run: |
+        sha256_file() {
+            if [[ "$RUNNER_OS" == "macOS" ]]; then
+                shasum -a 256 "$1" | awk '{print $1}'
+            else
+                sha256sum "$1" | awk '{print $1}'
+            fi
+        }
         test -s release-licenses/licenses.md
         test -s release-licenses/metadata.json
-        CARGO_LOCK_HASH="$(git hash-object Cargo.lock)"
-        LICENSES_HASH="$(git hash-object release-licenses/licenses.md)"
+        CARGO_LOCK_HASH="$(sha256_file Cargo.lock)"
+        LICENSES_HASH="$(sha256_file release-licenses/licenses.md)"
         jq -e \
             --arg commit_sha "$COMMIT_SHA" \
             --arg cargo_lock_hash "$CARGO_LOCK_HASH" \

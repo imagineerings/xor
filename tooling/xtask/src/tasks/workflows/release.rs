@@ -262,11 +262,14 @@ fn configure_release_cache_namespace(target: &str) -> Step<Run> {
 
 fn release_licenses(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob {
     let stage = named::bash(indoc::indoc! {r#"
+        sha256_file() {
+            sha256sum "$1" | awk '{print $1}'
+        }
         script/generate-licenses
         mkdir -p release-licenses
         cp assets/licenses.md release-licenses/licenses.md
-        CARGO_LOCK_HASH="$(git hash-object Cargo.lock)"
-        LICENSES_HASH="$(git hash-object release-licenses/licenses.md)"
+        CARGO_LOCK_HASH="$(sha256_file Cargo.lock)"
+        LICENSES_HASH="$(sha256_file release-licenses/licenses.md)"
         jq -n \
             --arg commit_sha "$COMMIT_SHA" \
             --arg cargo_lock_hash "$CARGO_LOCK_HASH" \
@@ -294,10 +297,17 @@ fn release_licenses(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob 
 
 fn verify_release_licenses() -> Step<Run> {
     named::bash(indoc::indoc! {r#"
+        sha256_file() {
+            if [[ "$RUNNER_OS" == "macOS" ]]; then
+                shasum -a 256 "$1" | awk '{print $1}'
+            else
+                sha256sum "$1" | awk '{print $1}'
+            fi
+        }
         test -s release-licenses/licenses.md
         test -s release-licenses/metadata.json
-        CARGO_LOCK_HASH="$(git hash-object Cargo.lock)"
-        LICENSES_HASH="$(git hash-object release-licenses/licenses.md)"
+        CARGO_LOCK_HASH="$(sha256_file Cargo.lock)"
+        LICENSES_HASH="$(sha256_file release-licenses/licenses.md)"
         jq -e \
             --arg commit_sha "$COMMIT_SHA" \
             --arg cargo_lock_hash "$CARGO_LOCK_HASH" \
@@ -894,6 +904,9 @@ mod release_workflow_tests {
         assert!(yaml.contains("sccache --stop-server"));
         assert!(yaml.contains("cargo-about@0.8.2"));
         assert!(yaml.contains("fallback: none"));
+        assert!(yaml.contains("sha256sum \"$1\""));
+        assert!(yaml.contains("shasum -a 256 \"$1\""));
+        assert!(!yaml.contains("LICENSES_HASH=\"$(git hash-object"));
         assert!(yaml.contains("export ZED_BUNDLE_PHASE=application"));
         assert!(yaml.contains("export ZED_BUNDLE_PHASE=remote-server"));
         assert!(yaml.contains("export ZED_BUNDLE_PHASE=package"));
