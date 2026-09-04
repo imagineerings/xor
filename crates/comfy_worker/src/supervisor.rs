@@ -464,6 +464,9 @@ impl WorkerSession {
             | WorkerMessage::ProviderV2ProposalFinalization { .. } => {
                 self.handle_provider_v2_response(&envelope)?
             }
+            WorkerMessage::ModelSourceResponse { .. } => {
+                self.handle_model_source_response(&envelope)?
+            }
             WorkerMessage::Cancel { reason } => self.handle_cancel(&envelope, reason)?,
             WorkerMessage::Heartbeat => {
                 vec![self.response_to(&envelope, WorkerMessage::Heartbeat)?]
@@ -479,6 +482,7 @@ impl WorkerSession {
             | WorkerMessage::PluginCapabilityRequest { .. }
             | WorkerMessage::ProviderStreamRequest { .. }
             | WorkerMessage::ProviderV2ProposalFinalizationAck { .. }
+            | WorkerMessage::ModelSourceRequest { .. }
             | WorkerMessage::PluginResult { .. }
             | WorkerMessage::Fatal { .. } => return Err(WorkerSessionError::InvalidDirection),
         };
@@ -854,6 +858,24 @@ impl WorkerSession {
         Ok(Vec::new())
     }
 
+    fn handle_model_source_response(
+        &mut self,
+        envelope: &WorkerEnvelope,
+    ) -> Result<Vec<WorkerEnvelope>, WorkerSessionError> {
+        let (prompt_id, attempt_id) = attempt_identity(envelope)?;
+        let execution = self
+            .execution
+            .as_ref()
+            .ok_or(WorkerSessionError::StaleAttempt)?;
+        if execution.prompt_id != prompt_id || execution.attempt_id != attempt_id {
+            return Err(WorkerSessionError::StaleAttempt);
+        }
+        if execution.kind != ExecutionKind::Native {
+            return Err(WorkerSessionError::InvalidDirection);
+        }
+        Ok(Vec::new())
+    }
+
     fn handle_cancel(
         &mut self,
         envelope: &WorkerEnvelope,
@@ -1014,6 +1036,31 @@ impl WorkerSession {
         self.envelope_from_identity(
             identity,
             WorkerMessage::ProviderStreamRequest { call_id, request },
+        )
+    }
+
+    pub fn model_source_request(
+        &mut self,
+        call_id: u64,
+        request: comfy_types::WorkerModelSourceRequest,
+    ) -> Result<WorkerEnvelope, WorkerSessionError> {
+        let execution = self.execution.ok_or(WorkerSessionError::StaleAttempt)?;
+        if execution.kind != ExecutionKind::Native {
+            return Err(WorkerSessionError::InvalidDirection);
+        }
+        let identity = self
+            .identity
+            .clone()
+            .ok_or(WorkerSessionError::IdentityChanged)?;
+        let identity = SessionIdentity {
+            request_id: execution.request_id,
+            prompt_id: Some(execution.prompt_id),
+            attempt_id: Some(execution.attempt_id),
+            ..identity
+        };
+        self.envelope_from_identity(
+            identity,
+            WorkerMessage::ModelSourceRequest { call_id, request },
         )
     }
 
@@ -2212,6 +2259,93 @@ mod tests {
         assert_eq!(
             ready_session().handle(attempt_envelope(1, response())),
             Err(WorkerSessionError::StaleAttempt)
+        );
+    }
+
+    #[test]
+    fn model_source_worker_message_consumers_are_exhaustive() {
+        let source_names = vec!["fixture.safetensors".to_owned()];
+        let selection =
+            comfy_types::worker_model_source_selection_sha256("checkpoints", &source_names)
+                .expect("bounded source selection");
+        let context = comfy_types::WorkerModelSourceContext {
+            session_id: uuid::Uuid::from_u128(0x39910),
+            attempt_id: AttemptId(Default::default()),
+            attempt_generation: 1,
+            node_id: "loader".to_owned(),
+            node_generation: 1,
+            service_id: uuid::Uuid::from_u128(0x39911),
+            service_generation: 1,
+            ordered_source_identity_sha256: selection,
+        };
+        let request = comfy_types::WorkerModelSourceRequest {
+            context: context.clone(),
+            call_ordinal: 1,
+            operation: comfy_types::WorkerModelSourceOperation::Open {
+                folder_category: "checkpoints".to_owned(),
+                source_names,
+            },
+        };
+        let response = comfy_types::WorkerModelSourceResponse::rejected(
+            context.session_id,
+            1,
+            comfy_types::WorkerModelSourceError::HostFailure,
+        )
+        .expect("bounded model-source response");
+
+        let mut native = ready_session();
+        native
+            .handle(attempt_envelope(
+                1,
+                WorkerMessage::Execute { plan: vec![1] },
+            ))
+            .expect("native execution starts");
+        let outgoing = native
+            .model_source_request(9, request.clone())
+            .expect("native execution may request model bytes");
+        assert!(matches!(
+            outgoing.message,
+            WorkerMessage::ModelSourceRequest { call_id: 9, .. }
+        ));
+        assert!(
+            native
+                .handle(attempt_envelope(
+                    2,
+                    WorkerMessage::ModelSourceResponse {
+                        call_id: 9,
+                        response: response.clone(),
+                    },
+                ))
+                .expect("app response is consumed by the native execution")
+                .is_empty()
+        );
+
+        let mut wrong_direction = ready_session();
+        wrong_direction
+            .handle(attempt_envelope(
+                1,
+                WorkerMessage::Execute { plan: vec![1] },
+            ))
+            .expect("native execution starts");
+        assert_eq!(
+            wrong_direction.handle(attempt_envelope(
+                2,
+                WorkerMessage::ModelSourceRequest {
+                    call_id: 9,
+                    request,
+                },
+            )),
+            Err(WorkerSessionError::InvalidDirection),
+        );
+        assert_eq!(
+            ready_session().handle(attempt_envelope(
+                1,
+                WorkerMessage::ModelSourceResponse {
+                    call_id: 9,
+                    response,
+                },
+            )),
+            Err(WorkerSessionError::StaleAttempt),
         );
     }
 

@@ -9,11 +9,11 @@ use comfy_model::{
     ArtifactAvailability as CanonicalArtifactAvailability,
     ArtifactChangeKind as CanonicalArtifactChangeKind, ArtifactIndex, ArtifactIndexError,
     ArtifactKey, ArtifactRecord as CanonicalArtifactRecord, ArtifactRoot, AudioVaeError,
-    ImageVaeError, LoadedModel, ModelStore, ModelStoreError, NativeStructuredVae, NativeVae,
-    PatchGraphIdentity, StructuredVaeError, VaeArchitectureError, VaeArchitectureRegistry,
-    VaeBoundary, VaeDescriptor, VaeError, VaeExecutionTarget, VaeOperation,
-    VaeStructuredDecodeRequest, VaeStructuredResult, VideoVaeError,
-    validate_native_vae_backend_target,
+    ImageVaeError, LoadedModel, ModelFormat, ModelStore, ModelStoreError,
+    ModelStreamNestedStateDisposition, NativeStructuredVae, NativeVae, PatchGraphIdentity,
+    StructuredVaeError, VaeArchitectureError, VaeArchitectureRegistry, VaeBoundary, VaeDescriptor,
+    VaeError, VaeExecutionTarget, VaeOperation, VaeStructuredDecodeRequest, VaeStructuredResult,
+    VerifiedModelStreamSource, VideoVaeError, validate_native_vae_backend_target,
 };
 use comfy_nodes::{
     NativeAssetNameList, NativeAssetNameListRequest, NativeAssetNameResolution,
@@ -22,6 +22,14 @@ use comfy_nodes::{
     NativeNodeServiceIdentity, NativeResolvedAsset,
 };
 use comfy_tensor::{CancellationToken, CpuBackend, ExecutionContext, Tensor};
+use comfy_types::{
+    WorkerModelSourceArtifact, WorkerModelSourceChunk, WorkerModelSourceClosed,
+    WorkerModelSourceContext, WorkerModelSourceError, WorkerModelSourceFormat,
+    WorkerModelSourceManifest, WorkerModelSourceNestedStateDisposition, WorkerModelSourceOpened,
+    WorkerModelSourceOperation, WorkerModelSourceParserLimits, WorkerModelSourceRequest,
+    WorkerModelSourceResponse, WorkerModelSourceTensor, WorkerSha256Digest,
+    worker_model_source_selection_sha256,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -42,6 +50,7 @@ pub const ASSET_SERVICE_SCHEMA_VERSION: u32 = 2;
 pub const DEFAULT_MAX_ASSET_INDEX_BYTES: usize = 64 * 1024 * 1024;
 pub const DEFAULT_MAX_ASSET_RECORDS: usize = 100_000;
 const ASSET_INDEX_FILENAME: &str = ".zed-asset-index.json";
+const MAX_RETAINED_MODEL_SOURCE_SESSION_IDS: usize = 1_024;
 
 const SOURCE_MODEL_EXTENSIONS: &[&str] = &[
     ".bin",
@@ -807,6 +816,25 @@ pub struct NativeAssetResolverRegistry {
     assets: SharedAssetService,
     authorization: AuthorizedCapabilities,
     references: Mutex<BTreeMap<Uuid, NativeAssetResolutionRecord>>,
+    model_sources: Mutex<NativeModelSourceBridgeState>,
+}
+
+#[derive(Default)]
+struct NativeModelSourceBridgeState {
+    model_store: Option<ModelStore>,
+    used_sessions: BTreeMap<Uuid, comfy_types::AttemptId>,
+    sessions: BTreeMap<Uuid, NativeModelSourceBridgeSession>,
+}
+
+struct NativeModelSourceBridgeSession {
+    context: WorkerModelSourceContext,
+    next_call_ordinal: u64,
+    sources: Vec<NativeModelSourceBridgeEntry>,
+}
+
+struct NativeModelSourceBridgeEntry {
+    _model: Arc<LoadedModel>,
+    source: VerifiedModelStreamSource,
 }
 
 impl std::fmt::Debug for NativeAssetResolverRegistry {
@@ -827,6 +855,7 @@ impl NativeAssetResolverRegistry {
             assets,
             authorization,
             references: Mutex::new(BTreeMap::new()),
+            model_sources: Mutex::new(NativeModelSourceBridgeState::default()),
         })
     }
 
@@ -992,9 +1021,322 @@ impl NativeAssetResolverRegistry {
         NativeAssetNameResolution::checked(request.folder_category().to_owned(), assets)
     }
 
+    pub(crate) fn serve_model_source_request(
+        &self,
+        expected_context: &WorkerModelSourceContext,
+        request: &WorkerModelSourceRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<WorkerModelSourceResponse, WorkerModelSourceError> {
+        let result = self.serve_model_source_request_inner(expected_context, request, cancellation);
+        if result.is_err()
+            && let Ok(mut state) = self.model_sources.lock()
+        {
+            state.sessions.remove(&request.context.session_id);
+        }
+        result
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn test_serve_model_source_request(
+        &self,
+        expected_context: &WorkerModelSourceContext,
+        request: &WorkerModelSourceRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<WorkerModelSourceResponse, WorkerModelSourceError> {
+        self.serve_model_source_request(expected_context, request, cancellation)
+    }
+
+    fn serve_model_source_request_inner(
+        &self,
+        expected_context: &WorkerModelSourceContext,
+        request: &WorkerModelSourceRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<WorkerModelSourceResponse, WorkerModelSourceError> {
+        check_model_source_cancellation(cancellation)?;
+        validate_model_source_host_context(expected_context, &request.context)?;
+        match &request.operation {
+            WorkerModelSourceOperation::Open {
+                folder_category,
+                source_names,
+            } => {
+                self.open_model_source_session(request, folder_category, source_names, cancellation)
+            }
+            WorkerModelSourceOperation::Read {
+                source_ordinal,
+                tensor_ordinal,
+                byte_offset,
+                byte_length,
+            } => self.read_model_source_session(
+                request,
+                *source_ordinal,
+                *tensor_ordinal,
+                *byte_offset,
+                *byte_length,
+                cancellation,
+            ),
+            WorkerModelSourceOperation::Close => {
+                self.close_model_source_session(request, cancellation)
+            }
+        }
+    }
+
+    fn open_model_source_session(
+        &self,
+        request: &WorkerModelSourceRequest,
+        folder_category: &str,
+        source_names: &[String],
+        cancellation: &CancellationToken,
+    ) -> Result<WorkerModelSourceResponse, WorkerModelSourceError> {
+        if request.call_ordinal != 1
+            || worker_model_source_selection_sha256(folder_category, source_names)?
+                != request.context.ordered_source_identity_sha256
+        {
+            return Err(WorkerModelSourceError::InvalidSourceSelection);
+        }
+        let mut state = self
+            .model_sources
+            .lock()
+            .map_err(|_| WorkerModelSourceError::HostFailure)?;
+        if state
+            .used_sessions
+            .contains_key(&request.context.session_id)
+        {
+            return Err(WorkerModelSourceError::Replay);
+        }
+        if state.used_sessions.len() >= MAX_RETAINED_MODEL_SOURCE_SESSION_IDS {
+            return Err(WorkerModelSourceError::HostFailure);
+        }
+        state
+            .used_sessions
+            .insert(request.context.session_id, request.context.attempt_id);
+        if !state.sessions.is_empty() {
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        let mut model_store = state
+            .model_store
+            .take()
+            .map(Ok)
+            .unwrap_or_else(|| ModelStore::new(comfy_model::ParserLimits::default()))
+            .map_err(|_| WorkerModelSourceError::HostFailure)?;
+        let result = (|| {
+            let mut assets = self
+                .assets
+                .lock()
+                .map_err(|_| WorkerModelSourceError::HostFailure)?;
+            let resolved = assets
+                .resolve_source_asset_names(
+                    folder_category,
+                    source_names,
+                    &self.authorization,
+                    cancellation,
+                )
+                .map_err(map_model_source_asset_error)?;
+            if resolved.len() != source_names.len() {
+                return Err(WorkerModelSourceError::InvalidSourceSelection);
+            }
+            let mut entries = Vec::new();
+            entries
+                .try_reserve_exact(resolved.len())
+                .map_err(|_| WorkerModelSourceError::HostFailure)?;
+            let mut manifests = Vec::new();
+            manifests
+                .try_reserve_exact(resolved.len())
+                .map_err(|_| WorkerModelSourceError::HostFailure)?;
+            for (source_ordinal, resolved_source) in resolved.into_iter().enumerate() {
+                check_model_source_cancellation(cancellation)?;
+                let model = assets
+                    .load_model(
+                        &resolved_source.identity,
+                        &mut model_store,
+                        &self.authorization,
+                        cancellation,
+                    )
+                    .map_err(map_model_source_asset_error)?;
+                let source = model_store
+                    .verified_stream_source(&assets.artifact_index, &model, cancellation)
+                    .map_err(map_model_source_store_error)?;
+                manifests.push(project_model_source_manifest(source_ordinal, &source)?);
+                entries.push(NativeModelSourceBridgeEntry {
+                    _model: model,
+                    source,
+                });
+            }
+            check_model_source_cancellation(cancellation)?;
+            Ok((entries, manifests))
+        })();
+        state.model_store = Some(model_store);
+        let (sources, manifests) = result?;
+        let opened = WorkerModelSourceOpened::checked(
+            request.context.session_id,
+            request.call_ordinal,
+            request.context.ordered_source_identity_sha256.clone(),
+            manifests,
+        )?;
+        state.sessions.insert(
+            request.context.session_id,
+            NativeModelSourceBridgeSession {
+                context: request.context.clone(),
+                next_call_ordinal: 2,
+                sources,
+            },
+        );
+        Ok(WorkerModelSourceResponse::Opened(opened))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn read_model_source_session(
+        &self,
+        request: &WorkerModelSourceRequest,
+        source_ordinal: u32,
+        tensor_ordinal: u32,
+        byte_offset: u64,
+        byte_length: u32,
+        cancellation: &CancellationToken,
+    ) -> Result<WorkerModelSourceResponse, WorkerModelSourceError> {
+        let mut state = self
+            .model_sources
+            .lock()
+            .map_err(|_| WorkerModelSourceError::HostFailure)?;
+        let mut session = state
+            .sessions
+            .remove(&request.context.session_id)
+            .ok_or(WorkerModelSourceError::Closed)?;
+        validate_model_source_host_context(&session.context, &request.context)?;
+        if request.call_ordinal < session.next_call_ordinal {
+            return Err(WorkerModelSourceError::Replay);
+        }
+        if request.call_ordinal != session.next_call_ordinal {
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        let source = session
+            .sources
+            .get(
+                usize::try_from(source_ordinal)
+                    .map_err(|_| WorkerModelSourceError::InvalidSourceOrdinal)?,
+            )
+            .ok_or(WorkerModelSourceError::InvalidSourceOrdinal)?;
+        let tensor = source
+            .source
+            .tensors()
+            .get(
+                usize::try_from(tensor_ordinal)
+                    .map_err(|_| WorkerModelSourceError::InvalidTensorOrdinal)?,
+            )
+            .ok_or(WorkerModelSourceError::InvalidTensorOrdinal)?;
+        let byte_length_u64 = u64::from(byte_length);
+        if byte_length == 0
+            || usize::try_from(byte_length).map_or(true, |length| {
+                length > comfy_types::MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES
+            })
+            || byte_offset
+                .checked_add(byte_length_u64)
+                .is_none_or(|end| end > tensor.byte_length())
+        {
+            return Err(WorkerModelSourceError::RangeLimit);
+        }
+        let tensor_name = tensor.name().to_owned();
+        let model_store = state
+            .model_store
+            .take()
+            .ok_or(WorkerModelSourceError::HostFailure)?;
+        let result = (|| {
+            let assets = self
+                .assets
+                .lock()
+                .map_err(|_| WorkerModelSourceError::HostFailure)?;
+            model_store
+                .read_verified_tensor_range(
+                    &assets.artifact_index,
+                    &source.source,
+                    &tensor_name,
+                    byte_offset,
+                    byte_length_u64,
+                    cancellation,
+                )
+                .map_err(map_model_source_store_error)
+        })();
+        state.model_store = Some(model_store);
+        let bytes = result?;
+        check_model_source_cancellation(cancellation)?;
+        let chunk = WorkerModelSourceChunk::checked(
+            request.context.session_id,
+            request.call_ordinal,
+            source_ordinal,
+            tensor_ordinal,
+            byte_offset,
+            bytes,
+        )?;
+        session.next_call_ordinal = session
+            .next_call_ordinal
+            .checked_add(1)
+            .ok_or(WorkerModelSourceError::InvalidOrder)?;
+        state.sessions.insert(request.context.session_id, session);
+        Ok(WorkerModelSourceResponse::Chunk(chunk))
+    }
+
+    fn close_model_source_session(
+        &self,
+        request: &WorkerModelSourceRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<WorkerModelSourceResponse, WorkerModelSourceError> {
+        let mut state = self
+            .model_sources
+            .lock()
+            .map_err(|_| WorkerModelSourceError::HostFailure)?;
+        let session = state
+            .sessions
+            .remove(&request.context.session_id)
+            .ok_or(WorkerModelSourceError::Closed)?;
+        validate_model_source_host_context(&session.context, &request.context)?;
+        if request.call_ordinal < session.next_call_ordinal {
+            return Err(WorkerModelSourceError::Replay);
+        }
+        if request.call_ordinal != session.next_call_ordinal {
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        check_model_source_cancellation(cancellation)?;
+        Ok(WorkerModelSourceResponse::Closed(
+            WorkerModelSourceClosed::checked(request.context.session_id, request.call_ordinal)?,
+        ))
+    }
+
+    pub(crate) fn revoke_model_source_sessions(&self) {
+        if let Ok(mut state) = self.model_sources.lock() {
+            state.sessions.clear();
+        }
+    }
+
+    pub(crate) fn revoke_model_source_session(&self, session_id: Uuid) {
+        if let Ok(mut state) = self.model_sources.lock() {
+            state.sessions.remove(&session_id);
+        }
+    }
+
+    pub(crate) fn replace_model_source_service(&self) {
+        if let Ok(mut state) = self.model_sources.lock() {
+            state.sessions.clear();
+            state.used_sessions.clear();
+        }
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn test_replace_model_source_service(&self) {
+        self.replace_model_source_service();
+    }
+
     pub fn retire_attempt(&self, attempt_id: comfy_types::AttemptId) {
         if let Ok(mut references) = self.references.lock() {
             references.retain(|_, record| record.attempt_id != attempt_id);
+        }
+        if let Ok(mut state) = self.model_sources.lock() {
+            state
+                .sessions
+                .retain(|_, session| session.context.attempt_id != attempt_id);
+            state
+                .used_sessions
+                .retain(|_, retained_attempt_id| *retained_attempt_id != attempt_id);
         }
     }
 
@@ -1017,6 +1359,154 @@ impl PartialEq for NativeAssetResolutionRecord {
             && self.source_type_id == other.source_type_id
             && self.byte_length == other.byte_length
             && self.sha256 == other.sha256
+    }
+}
+
+fn check_model_source_cancellation(
+    cancellation: &CancellationToken,
+) -> Result<(), WorkerModelSourceError> {
+    cancellation
+        .check()
+        .map_err(|_| WorkerModelSourceError::Cancelled)
+}
+
+fn validate_model_source_host_context(
+    expected: &WorkerModelSourceContext,
+    actual: &WorkerModelSourceContext,
+) -> Result<(), WorkerModelSourceError> {
+    if actual.session_id != expected.session_id {
+        return Err(WorkerModelSourceError::ForeignSession);
+    }
+    if actual.attempt_id != expected.attempt_id
+        || actual.attempt_generation != expected.attempt_generation
+    {
+        return Err(WorkerModelSourceError::StaleAttempt);
+    }
+    if actual.node_id != expected.node_id || actual.node_generation != expected.node_generation {
+        return Err(WorkerModelSourceError::StaleNode);
+    }
+    if actual.service_id != expected.service_id
+        || actual.service_generation != expected.service_generation
+    {
+        return Err(WorkerModelSourceError::StaleService);
+    }
+    if actual.ordered_source_identity_sha256 != expected.ordered_source_identity_sha256 {
+        return Err(WorkerModelSourceError::InvalidSourceSelection);
+    }
+    Ok(())
+}
+
+fn project_model_source_manifest(
+    source_ordinal: usize,
+    source: &VerifiedModelStreamSource,
+) -> Result<WorkerModelSourceManifest, WorkerModelSourceError> {
+    let source_ordinal =
+        u32::try_from(source_ordinal).map_err(|_| WorkerModelSourceError::InvalidSourceOrdinal)?;
+    let model_identity_sha256 = WorkerSha256Digest::new(source.model_identity().to_owned())
+        .map_err(|_| WorkerModelSourceError::InvalidSourceSelection)?;
+    let artifacts = source
+        .artifacts()
+        .iter()
+        .map(|artifact| {
+            Ok(WorkerModelSourceArtifact {
+                sha256: WorkerSha256Digest::new(artifact.sha256().to_owned())
+                    .map_err(|_| WorkerModelSourceError::InvalidSourceSelection)?,
+                byte_size: artifact.byte_size(),
+                format: match artifact.format() {
+                    ModelFormat::Safetensors => WorkerModelSourceFormat::Safetensors,
+                    ModelFormat::PytorchArchive => WorkerModelSourceFormat::PytorchArchive,
+                    ModelFormat::Gguf => WorkerModelSourceFormat::Gguf,
+                    ModelFormat::JsonConfig => WorkerModelSourceFormat::JsonConfig,
+                    ModelFormat::JsonTokenizer => WorkerModelSourceFormat::JsonTokenizer,
+                    ModelFormat::YamlConfig => WorkerModelSourceFormat::YamlConfig,
+                    ModelFormat::SentencePiece => WorkerModelSourceFormat::SentencePiece,
+                    ModelFormat::Tiktoken => WorkerModelSourceFormat::Tiktoken,
+                },
+                nested_state_disposition: match artifact.nested_state_disposition() {
+                    ModelStreamNestedStateDisposition::Flat => {
+                        WorkerModelSourceNestedStateDisposition::Flat
+                    }
+                    ModelStreamNestedStateDisposition::NestedStringToParam => {
+                        WorkerModelSourceNestedStateDisposition::NestedStringToParam
+                    }
+                },
+            })
+        })
+        .collect::<Result<Vec<_>, WorkerModelSourceError>>()?;
+    let tensors = source
+        .tensors()
+        .iter()
+        .map(|tensor| {
+            Ok(WorkerModelSourceTensor {
+                name: tensor.name().to_owned(),
+                data_type: tensor.data_type().to_owned(),
+                shape: tensor.shape().to_vec(),
+                artifact_ordinal: u32::try_from(tensor.artifact_ordinal())
+                    .map_err(|_| WorkerModelSourceError::InvalidSourceOrdinal)?,
+                byte_offset: tensor.byte_offset(),
+                byte_length: tensor.byte_length(),
+            })
+        })
+        .collect::<Result<Vec<_>, WorkerModelSourceError>>()?;
+    let limits = source.limits();
+    Ok(WorkerModelSourceManifest {
+        source_ordinal,
+        model_identity_sha256,
+        artifacts,
+        tensors,
+        aggregate_tensor_bytes: source.aggregate_tensor_bytes(),
+        maximum_read_bytes: source.maximum_read_bytes(),
+        parser_limits: WorkerModelSourceParserLimits {
+            version: limits.version,
+            manifest_bytes: limits.manifest_bytes,
+            maximum_depth: limits.maximum_depth,
+            maximum_tensors: limits.maximum_tensors,
+            maximum_tensor_bytes: limits.maximum_tensor_bytes,
+            maximum_aggregate_tensor_bytes: limits.maximum_aggregate_tensor_bytes,
+            maximum_name_bytes: limits.maximum_name_bytes,
+            maximum_archive_entries: limits.maximum_archive_entries,
+            maximum_metadata_values: limits.maximum_metadata_values,
+        },
+    })
+}
+
+fn map_model_source_asset_error(error: AssetError) -> WorkerModelSourceError {
+    match error {
+        AssetError::Cancelled => WorkerModelSourceError::Cancelled,
+        AssetError::PermissionDenied { .. } | AssetError::ProfileMismatch { .. } => {
+            WorkerModelSourceError::StaleService
+        }
+        AssetError::Missing(_)
+        | AssetError::UnknownAsset(_)
+        | AssetError::UnknownSourceAsset { .. }
+        | AssetError::ChangedDuringRead(_) => WorkerModelSourceError::SourceChanged,
+        AssetError::TooLarge { .. } | AssetError::AllocationFailed => {
+            WorkerModelSourceError::RangeLimit
+        }
+        AssetError::Model(error) => map_model_source_store_error(error),
+        _ => WorkerModelSourceError::HostFailure,
+    }
+}
+
+fn map_model_source_store_error(error: ModelStoreError) -> WorkerModelSourceError {
+    match error {
+        ModelStoreError::Cancelled => WorkerModelSourceError::Cancelled,
+        ModelStoreError::UnknownTensor(_) => WorkerModelSourceError::InvalidTensorOrdinal,
+        ModelStoreError::ModelStreamTensorRangeOutOfBounds { .. }
+        | ModelStoreError::Limit(_)
+        | ModelStoreError::Overflow(_)
+        | ModelStoreError::AllocationFailed { .. } => WorkerModelSourceError::RangeLimit,
+        ModelStoreError::Index(_)
+        | ModelStoreError::ArtifactChanged { .. }
+        | ModelStoreError::LoadedArtifactIdentityMismatch { .. }
+        | ModelStoreError::StorageSourceChanged { .. }
+        | ModelStoreError::StorageRangeChanged(_)
+        | ModelStoreError::ModelStreamIo { .. }
+        | ModelStoreError::StaleModelStreamSource => WorkerModelSourceError::SourceChanged,
+        ModelStoreError::ForeignModelHandle | ModelStoreError::ForeignModelStreamSource => {
+            WorkerModelSourceError::StaleService
+        }
+        _ => WorkerModelSourceError::HostFailure,
     }
 }
 

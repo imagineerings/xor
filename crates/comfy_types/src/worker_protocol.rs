@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, num::NonZeroU64};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    num::NonZeroU64,
+};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
@@ -48,6 +51,16 @@ pub const MAX_WORKER_PROVIDER_PENDING_CALLS: usize = 1;
 pub const MAX_WORKER_PROVIDER_ENDPOINT_BYTES: usize = 2_048;
 pub const MAX_WORKER_PROVIDER_SECRET_ID_BYTES: usize = 1_024;
 pub const MAX_WORKER_PROVIDER_FINALIZATION_IDENTITY_BYTES: usize = 64;
+pub const MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES: usize = 512 * 1024;
+pub const MAX_WORKER_MODEL_SOURCE_SELECTIONS: usize = 4;
+pub const MAX_WORKER_MODEL_SOURCE_NAME_BYTES: usize = 4 * 1024;
+pub const MAX_WORKER_MODEL_SOURCE_CATEGORY_BYTES: usize = 128;
+pub const MAX_WORKER_MODEL_SOURCE_NODE_ID_BYTES: usize = 256;
+pub const MAX_WORKER_MODEL_SOURCE_ARTIFACTS: usize = 1_024;
+pub const MAX_WORKER_MODEL_SOURCE_TENSORS: usize = 16_384;
+pub const MAX_WORKER_MODEL_SOURCE_TENSOR_DIMENSIONS: usize = 64;
+pub const MAX_WORKER_MODEL_SOURCE_DTYPE_BYTES: usize = 64;
+pub const MAX_WORKER_MODEL_SOURCE_MANIFEST_WIRE_BYTES: usize = 12 * 1024 * 1024;
 pub const WORKER_OPERATION_SUPPORT_VERSION: u16 = 2;
 pub const LEGACY_WORKER_OPERATION_SUPPORT_VERSION: u16 = 1;
 pub const WORKER_REGISTRY_DIGEST_DOMAIN: &[u8] = b"zed-comfy-worker-registry-v1";
@@ -2773,6 +2786,954 @@ fn valid_http_token_byte(byte: u8) -> bool {
         )
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerModelSourceContext {
+    pub session_id: Uuid,
+    pub attempt_id: AttemptId,
+    pub attempt_generation: u64,
+    pub node_id: String,
+    pub node_generation: u64,
+    pub service_id: Uuid,
+    pub service_generation: u64,
+    pub ordered_source_identity_sha256: WorkerSha256Digest,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerModelSourceOperation {
+    Open {
+        folder_category: String,
+        source_names: Vec<String>,
+    },
+    Read {
+        source_ordinal: u32,
+        tensor_ordinal: u32,
+        byte_offset: u64,
+        byte_length: u32,
+    },
+    Close,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerModelSourceRequest {
+    pub context: WorkerModelSourceContext,
+    pub call_ordinal: u64,
+    pub operation: WorkerModelSourceOperation,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerModelSourceManifest {
+    pub source_ordinal: u32,
+    pub model_identity_sha256: WorkerSha256Digest,
+    pub artifacts: Vec<WorkerModelSourceArtifact>,
+    pub tensors: Vec<WorkerModelSourceTensor>,
+    pub aggregate_tensor_bytes: u64,
+    pub maximum_read_bytes: u64,
+    pub parser_limits: WorkerModelSourceParserLimits,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerModelSourceFormat {
+    Safetensors,
+    PytorchArchive,
+    Gguf,
+    JsonConfig,
+    JsonTokenizer,
+    YamlConfig,
+    SentencePiece,
+    Tiktoken,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerModelSourceNestedStateDisposition {
+    Flat,
+    NestedStringToParam,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerModelSourceArtifact {
+    pub sha256: WorkerSha256Digest,
+    pub byte_size: u64,
+    pub format: WorkerModelSourceFormat,
+    pub nested_state_disposition: WorkerModelSourceNestedStateDisposition,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerModelSourceTensor {
+    pub name: String,
+    pub data_type: String,
+    pub shape: Vec<u64>,
+    pub artifact_ordinal: u32,
+    pub byte_offset: u64,
+    pub byte_length: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerModelSourceParserLimits {
+    pub version: u32,
+    pub manifest_bytes: u64,
+    pub maximum_depth: u32,
+    pub maximum_tensors: u64,
+    pub maximum_tensor_bytes: u64,
+    pub maximum_aggregate_tensor_bytes: u64,
+    pub maximum_name_bytes: u64,
+    pub maximum_archive_entries: u64,
+    pub maximum_metadata_values: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerModelSourceOpened {
+    pub session_id: Uuid,
+    pub call_ordinal: u64,
+    pub ordered_source_identity_sha256: WorkerSha256Digest,
+    pub sources: Vec<WorkerModelSourceManifest>,
+    pub maximum_chunk_bytes: u32,
+    pub response_sha256: WorkerSha256Digest,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerModelSourceChunk {
+    pub session_id: Uuid,
+    pub call_ordinal: u64,
+    pub source_ordinal: u32,
+    pub tensor_ordinal: u32,
+    pub byte_offset: u64,
+    pub bytes: Vec<u8>,
+    pub response_sha256: WorkerSha256Digest,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerModelSourceClosed {
+    pub session_id: Uuid,
+    pub call_ordinal: u64,
+    pub response_sha256: WorkerSha256Digest,
+}
+
+#[derive(Clone, Debug, Error, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerModelSourceError {
+    #[error("model source operation was cancelled")]
+    Cancelled,
+    #[error("model source call order is invalid")]
+    InvalidOrder,
+    #[error("model source call was replayed")]
+    Replay,
+    #[error("model source call is late")]
+    Late,
+    #[error("model source session is foreign")]
+    ForeignSession,
+    #[error("model source attempt identity or generation is stale")]
+    StaleAttempt,
+    #[error("model source node identity or generation is stale")]
+    StaleNode,
+    #[error("model source service identity or generation is stale")]
+    StaleService,
+    #[error("model source selection identity is invalid")]
+    InvalidSourceSelection,
+    #[error("model source ordinal is invalid")]
+    InvalidSourceOrdinal,
+    #[error("model source tensor ordinal is invalid")]
+    InvalidTensorOrdinal,
+    #[error("model source range exceeds its bound")]
+    RangeLimit,
+    #[error("model source chunk exceeds its fixed bound")]
+    ChunkLimit,
+    #[error("model source response digest is invalid")]
+    DigestMismatch,
+    #[error("model source bytes changed")]
+    SourceChanged,
+    #[error("model source session is closed")]
+    Closed,
+    #[error("model source host failed")]
+    HostFailure,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkerModelSourceResponse {
+    Opened(WorkerModelSourceOpened),
+    Chunk(WorkerModelSourceChunk),
+    Closed(WorkerModelSourceClosed),
+    Rejected {
+        session_id: Uuid,
+        call_ordinal: u64,
+        error: WorkerModelSourceError,
+        response_sha256: WorkerSha256Digest,
+    },
+}
+
+impl WorkerModelSourceOpened {
+    pub fn checked(
+        session_id: Uuid,
+        call_ordinal: u64,
+        ordered_source_identity_sha256: WorkerSha256Digest,
+        sources: Vec<WorkerModelSourceManifest>,
+    ) -> Result<Self, WorkerModelSourceError> {
+        let maximum_chunk_bytes = u32::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)
+            .map_err(|_| WorkerModelSourceError::ChunkLimit)?;
+        let response_sha256 = model_source_opened_digest(
+            session_id,
+            call_ordinal,
+            &ordered_source_identity_sha256,
+            &sources,
+            maximum_chunk_bytes,
+        )?;
+        let opened = Self {
+            session_id,
+            call_ordinal,
+            ordered_source_identity_sha256,
+            sources,
+            maximum_chunk_bytes,
+            response_sha256,
+        };
+        opened.validate()?;
+        Ok(opened)
+    }
+
+    pub fn validate(&self) -> Result<(), WorkerModelSourceError> {
+        if self.session_id.is_nil()
+            || self.call_ordinal == 0
+            || self.sources.is_empty()
+            || self.sources.len() > MAX_WORKER_MODEL_SOURCE_SELECTIONS
+            || usize::try_from(self.maximum_chunk_bytes).ok()
+                != Some(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)
+        {
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        let mut manifest_wire_bytes = 0_usize;
+        for (source_ordinal, source) in self.sources.iter().enumerate() {
+            let limits = source.parser_limits;
+            if usize::try_from(source.source_ordinal).ok() != Some(source_ordinal)
+                || source.artifacts.is_empty()
+                || source.artifacts.len() > MAX_WORKER_MODEL_SOURCE_ARTIFACTS
+                || source.tensors.is_empty()
+                || source.tensors.len() > MAX_WORKER_MODEL_SOURCE_TENSORS
+                || source.aggregate_tensor_bytes == 0
+                || source.maximum_read_bytes < u64::from(self.maximum_chunk_bytes)
+                || limits.version == 0
+                || limits.manifest_bytes == 0
+                || limits.maximum_depth == 0
+                || limits.maximum_tensors == 0
+                || limits.maximum_tensor_bytes == 0
+                || limits.maximum_aggregate_tensor_bytes == 0
+                || limits.maximum_name_bytes == 0
+                || limits.maximum_archive_entries == 0
+                || limits.maximum_metadata_values == 0
+                || limits.maximum_tensor_bytes > limits.maximum_aggregate_tensor_bytes
+                || limits.maximum_tensors > limits.maximum_archive_entries
+                || limits.manifest_bytes.checked_mul(8).is_none()
+                || source.maximum_read_bytes > limits.maximum_tensor_bytes
+                || limits.maximum_tensors < u64::try_from(source.tensors.len()).unwrap_or(u64::MAX)
+                || limits.maximum_archive_entries
+                    < u64::try_from(source.artifacts.len()).unwrap_or(u64::MAX)
+            {
+                return Err(WorkerModelSourceError::InvalidSourceSelection);
+            }
+            if source
+                .artifacts
+                .iter()
+                .any(|artifact| artifact.byte_size == 0)
+            {
+                return Err(WorkerModelSourceError::InvalidSourceSelection);
+            }
+            manifest_wire_bytes = manifest_wire_bytes
+                .checked_add(source.artifacts.len().saturating_mul(128))
+                .ok_or(WorkerModelSourceError::InvalidSourceSelection)?;
+            let mut names = BTreeMap::new();
+            let mut ranges = BTreeMap::<u32, Vec<(u64, u64)>>::new();
+            let mut aggregate_tensor_bytes = 0_u64;
+            for tensor in &source.tensors {
+                if tensor.name.is_empty()
+                    || u64::try_from(tensor.name.len()).unwrap_or(u64::MAX)
+                        > limits.maximum_name_bytes
+                    || tensor.data_type.is_empty()
+                    || tensor.name.len() > MAX_WORKER_MODEL_SOURCE_NAME_BYTES
+                    || tensor.data_type.len() > MAX_WORKER_MODEL_SOURCE_DTYPE_BYTES
+                    || u64::try_from(tensor.data_type.len()).unwrap_or(u64::MAX)
+                        > limits.maximum_name_bytes
+                    || tensor.shape.len() > MAX_WORKER_MODEL_SOURCE_TENSOR_DIMENSIONS
+                    || tensor.shape.len()
+                        > usize::try_from(limits.maximum_depth).unwrap_or(usize::MAX)
+                    || usize::try_from(tensor.artifact_ordinal)
+                        .map_or(true, |ordinal| ordinal >= source.artifacts.len())
+                    || tensor.byte_length == 0
+                    || tensor.byte_length > limits.maximum_tensor_bytes
+                    || names.insert(tensor.name.as_str(), ()).is_some()
+                {
+                    return Err(WorkerModelSourceError::InvalidSourceSelection);
+                }
+                manifest_wire_bytes = manifest_wire_bytes
+                    .checked_add(tensor.name.len())
+                    .and_then(|bytes| bytes.checked_add(tensor.data_type.len()))
+                    .and_then(|bytes| {
+                        bytes.checked_add(tensor.shape.len().saturating_mul(size_of::<u64>()))
+                    })
+                    .and_then(|bytes| bytes.checked_add(64))
+                    .ok_or(WorkerModelSourceError::InvalidSourceSelection)?;
+                if manifest_wire_bytes > MAX_WORKER_MODEL_SOURCE_MANIFEST_WIRE_BYTES {
+                    return Err(WorkerModelSourceError::InvalidSourceSelection);
+                }
+                let range_end = tensor
+                    .byte_offset
+                    .checked_add(tensor.byte_length)
+                    .ok_or(WorkerModelSourceError::InvalidSourceSelection)?;
+                let artifact = source
+                    .artifacts
+                    .get(
+                        usize::try_from(tensor.artifact_ordinal)
+                            .map_err(|_| WorkerModelSourceError::InvalidSourceSelection)?,
+                    )
+                    .ok_or(WorkerModelSourceError::InvalidSourceSelection)?;
+                if range_end > artifact.byte_size {
+                    return Err(WorkerModelSourceError::InvalidSourceSelection);
+                }
+                aggregate_tensor_bytes = aggregate_tensor_bytes
+                    .checked_add(tensor.byte_length)
+                    .ok_or(WorkerModelSourceError::InvalidSourceSelection)?;
+                ranges
+                    .entry(tensor.artifact_ordinal)
+                    .or_default()
+                    .push((tensor.byte_offset, range_end));
+            }
+            if aggregate_tensor_bytes != source.aggregate_tensor_bytes
+                || aggregate_tensor_bytes > limits.maximum_aggregate_tensor_bytes
+            {
+                return Err(WorkerModelSourceError::InvalidSourceSelection);
+            }
+            for artifact_ranges in ranges.values_mut() {
+                artifact_ranges.sort_unstable();
+                if artifact_ranges
+                    .windows(2)
+                    .any(|ranges| ranges[0].1 > ranges[1].0)
+                {
+                    return Err(WorkerModelSourceError::InvalidSourceSelection);
+                }
+            }
+        }
+        let expected = model_source_opened_digest(
+            self.session_id,
+            self.call_ordinal,
+            &self.ordered_source_identity_sha256,
+            &self.sources,
+            self.maximum_chunk_bytes,
+        )?;
+        if expected != self.response_sha256 {
+            return Err(WorkerModelSourceError::DigestMismatch);
+        }
+        Ok(())
+    }
+}
+
+impl WorkerModelSourceChunk {
+    pub fn checked(
+        session_id: Uuid,
+        call_ordinal: u64,
+        source_ordinal: u32,
+        tensor_ordinal: u32,
+        byte_offset: u64,
+        bytes: Vec<u8>,
+    ) -> Result<Self, WorkerModelSourceError> {
+        if bytes.is_empty() || bytes.len() > MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES {
+            return Err(WorkerModelSourceError::ChunkLimit);
+        }
+        let response_sha256 = model_source_chunk_digest(
+            session_id,
+            call_ordinal,
+            source_ordinal,
+            tensor_ordinal,
+            byte_offset,
+            &bytes,
+        )?;
+        Ok(Self {
+            session_id,
+            call_ordinal,
+            source_ordinal,
+            tensor_ordinal,
+            byte_offset,
+            bytes,
+            response_sha256,
+        })
+    }
+
+    pub fn validate(&self) -> Result<(), WorkerModelSourceError> {
+        if self.session_id.is_nil() || self.call_ordinal == 0 {
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        if self.bytes.is_empty() || self.bytes.len() > MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES {
+            return Err(WorkerModelSourceError::ChunkLimit);
+        }
+        let expected = model_source_chunk_digest(
+            self.session_id,
+            self.call_ordinal,
+            self.source_ordinal,
+            self.tensor_ordinal,
+            self.byte_offset,
+            &self.bytes,
+        )?;
+        if expected != self.response_sha256 {
+            return Err(WorkerModelSourceError::DigestMismatch);
+        }
+        Ok(())
+    }
+}
+
+impl WorkerModelSourceClosed {
+    pub fn checked(session_id: Uuid, call_ordinal: u64) -> Result<Self, WorkerModelSourceError> {
+        if session_id.is_nil() || call_ordinal == 0 {
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        Ok(Self {
+            session_id,
+            call_ordinal,
+            response_sha256: model_source_closed_digest(session_id, call_ordinal)?,
+        })
+    }
+
+    pub fn validate(&self) -> Result<(), WorkerModelSourceError> {
+        if self.session_id.is_nil() || self.call_ordinal == 0 {
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        if self.response_sha256 != model_source_closed_digest(self.session_id, self.call_ordinal)? {
+            return Err(WorkerModelSourceError::DigestMismatch);
+        }
+        Ok(())
+    }
+}
+
+impl WorkerModelSourceResponse {
+    pub fn rejected(
+        session_id: Uuid,
+        call_ordinal: u64,
+        error: WorkerModelSourceError,
+    ) -> Result<Self, WorkerModelSourceError> {
+        if session_id.is_nil() || call_ordinal == 0 {
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        let response_sha256 = model_source_rejected_digest(session_id, call_ordinal, &error)?;
+        Ok(Self::Rejected {
+            session_id,
+            call_ordinal,
+            error,
+            response_sha256,
+        })
+    }
+
+    pub fn validate(&self) -> Result<(), WorkerModelSourceError> {
+        match self {
+            Self::Opened(opened) => opened.validate(),
+            Self::Chunk(chunk) => chunk.validate(),
+            Self::Closed(closed) => closed.validate(),
+            Self::Rejected {
+                session_id,
+                call_ordinal,
+                error,
+                response_sha256,
+            } => {
+                if session_id.is_nil() || *call_ordinal == 0 {
+                    return Err(WorkerModelSourceError::InvalidOrder);
+                }
+                if *response_sha256
+                    != model_source_rejected_digest(*session_id, *call_ordinal, error)?
+                {
+                    return Err(WorkerModelSourceError::DigestMismatch);
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WorkerModelSourcePendingOperation {
+    Open {
+        source_count: usize,
+    },
+    Read {
+        source_ordinal: u32,
+        tensor_ordinal: u32,
+        byte_offset: u64,
+        byte_length: u32,
+    },
+    Close,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WorkerModelSourceTransportState {
+    Initial,
+    Open,
+    Closed,
+}
+
+#[derive(Debug)]
+pub struct WorkerModelSourceTransportValidator {
+    context: WorkerModelSourceContext,
+    next_call_ordinal: u64,
+    pending: Option<(u64, WorkerModelSourcePendingOperation)>,
+    state: WorkerModelSourceTransportState,
+}
+
+impl WorkerModelSourceTransportValidator {
+    pub fn checked(context: WorkerModelSourceContext) -> Result<Self, WorkerModelSourceError> {
+        validate_model_source_context(&context)?;
+        Ok(Self {
+            context,
+            next_call_ordinal: 1,
+            pending: None,
+            state: WorkerModelSourceTransportState::Initial,
+        })
+    }
+
+    pub fn validate_request(
+        &mut self,
+        call_id: u64,
+        request: &WorkerModelSourceRequest,
+    ) -> Result<(), WorkerModelSourceError> {
+        let result = self.validate_request_inner(call_id, request);
+        if result.is_err() {
+            self.revoke();
+        }
+        result
+    }
+
+    fn validate_request_inner(
+        &mut self,
+        call_id: u64,
+        request: &WorkerModelSourceRequest,
+    ) -> Result<(), WorkerModelSourceError> {
+        if self.state == WorkerModelSourceTransportState::Closed {
+            return Err(WorkerModelSourceError::Closed);
+        }
+        if self.pending.is_some() {
+            self.state = WorkerModelSourceTransportState::Closed;
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        validate_model_source_request_wire(request)?;
+        validate_model_source_context_match(&self.context, &request.context)?;
+        if request.call_ordinal < self.next_call_ordinal {
+            self.state = WorkerModelSourceTransportState::Closed;
+            return Err(WorkerModelSourceError::Replay);
+        }
+        if request.call_ordinal != self.next_call_ordinal || call_id == 0 {
+            self.state = WorkerModelSourceTransportState::Closed;
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        let operation = match request.operation {
+            WorkerModelSourceOperation::Open {
+                ref source_names, ..
+            } if self.state == WorkerModelSourceTransportState::Initial => {
+                WorkerModelSourcePendingOperation::Open {
+                    source_count: source_names.len(),
+                }
+            }
+            WorkerModelSourceOperation::Read {
+                source_ordinal,
+                tensor_ordinal,
+                byte_offset,
+                byte_length,
+            } if self.state == WorkerModelSourceTransportState::Open => {
+                WorkerModelSourcePendingOperation::Read {
+                    source_ordinal,
+                    tensor_ordinal,
+                    byte_offset,
+                    byte_length,
+                }
+            }
+            WorkerModelSourceOperation::Close
+                if self.state == WorkerModelSourceTransportState::Open =>
+            {
+                WorkerModelSourcePendingOperation::Close
+            }
+            _ => {
+                self.state = WorkerModelSourceTransportState::Closed;
+                return Err(WorkerModelSourceError::InvalidOrder);
+            }
+        };
+        self.pending = Some((call_id, operation));
+        Ok(())
+    }
+
+    pub fn validate_response(
+        &mut self,
+        call_id: u64,
+        response: &WorkerModelSourceResponse,
+    ) -> Result<(), WorkerModelSourceError> {
+        let result = self.validate_response_inner(call_id, response);
+        if result.is_err() {
+            self.revoke();
+        }
+        result
+    }
+
+    fn validate_response_inner(
+        &mut self,
+        call_id: u64,
+        response: &WorkerModelSourceResponse,
+    ) -> Result<(), WorkerModelSourceError> {
+        if self.state == WorkerModelSourceTransportState::Closed {
+            return Err(WorkerModelSourceError::Closed);
+        }
+        let Some((pending_call_id, pending_operation)) = self.pending.take() else {
+            self.state = WorkerModelSourceTransportState::Closed;
+            return Err(WorkerModelSourceError::Late);
+        };
+        if call_id != pending_call_id {
+            self.state = WorkerModelSourceTransportState::Closed;
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        response.validate()?;
+        let (session_id, call_ordinal) = model_source_response_identity(response);
+        if session_id != self.context.session_id || call_ordinal != self.next_call_ordinal {
+            self.state = WorkerModelSourceTransportState::Closed;
+            return Err(WorkerModelSourceError::ForeignSession);
+        }
+        if matches!(response, WorkerModelSourceResponse::Rejected { .. }) {
+            self.state = WorkerModelSourceTransportState::Closed;
+            return Ok(());
+        }
+        let matches_operation = match (pending_operation, response) {
+            (
+                WorkerModelSourcePendingOperation::Open { source_count },
+                WorkerModelSourceResponse::Opened(opened),
+            ) => {
+                opened.ordered_source_identity_sha256 == self.context.ordered_source_identity_sha256
+                    && opened.sources.len() == source_count
+            }
+            (
+                WorkerModelSourcePendingOperation::Read {
+                    source_ordinal,
+                    tensor_ordinal,
+                    byte_offset,
+                    byte_length,
+                },
+                WorkerModelSourceResponse::Chunk(chunk),
+            ) => {
+                chunk.source_ordinal == source_ordinal
+                    && chunk.tensor_ordinal == tensor_ordinal
+                    && chunk.byte_offset == byte_offset
+                    && usize::try_from(byte_length).ok() == Some(chunk.bytes.len())
+            }
+            (WorkerModelSourcePendingOperation::Close, WorkerModelSourceResponse::Closed(_)) => {
+                true
+            }
+            _ => false,
+        };
+        if !matches_operation {
+            self.state = WorkerModelSourceTransportState::Closed;
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        self.next_call_ordinal = self
+            .next_call_ordinal
+            .checked_add(1)
+            .ok_or(WorkerModelSourceError::InvalidOrder)?;
+        self.state = match pending_operation {
+            WorkerModelSourcePendingOperation::Open { .. }
+            | WorkerModelSourcePendingOperation::Read { .. } => {
+                WorkerModelSourceTransportState::Open
+            }
+            WorkerModelSourcePendingOperation::Close => WorkerModelSourceTransportState::Closed,
+        };
+        Ok(())
+    }
+
+    pub fn revoke(&mut self) {
+        self.pending = None;
+        self.state = WorkerModelSourceTransportState::Closed;
+    }
+
+    pub const fn is_closed(&self) -> bool {
+        matches!(self.state, WorkerModelSourceTransportState::Closed)
+    }
+}
+
+fn validate_model_source_context(
+    context: &WorkerModelSourceContext,
+) -> Result<(), WorkerModelSourceError> {
+    if context.session_id.is_nil()
+        || context.attempt_generation == 0
+        || context.node_id.is_empty()
+        || context.node_id.len() > MAX_WORKER_MODEL_SOURCE_NODE_ID_BYTES
+        || context.node_id.chars().any(char::is_control)
+        || context.node_generation == 0
+        || context.service_id.is_nil()
+        || context.service_generation == 0
+    {
+        return Err(WorkerModelSourceError::InvalidOrder);
+    }
+    Ok(())
+}
+
+fn validate_model_source_context_match(
+    expected: &WorkerModelSourceContext,
+    actual: &WorkerModelSourceContext,
+) -> Result<(), WorkerModelSourceError> {
+    if actual.session_id != expected.session_id {
+        return Err(WorkerModelSourceError::ForeignSession);
+    }
+    if actual.attempt_id != expected.attempt_id
+        || actual.attempt_generation != expected.attempt_generation
+    {
+        return Err(WorkerModelSourceError::StaleAttempt);
+    }
+    if actual.node_id != expected.node_id || actual.node_generation != expected.node_generation {
+        return Err(WorkerModelSourceError::StaleNode);
+    }
+    if actual.service_id != expected.service_id
+        || actual.service_generation != expected.service_generation
+    {
+        return Err(WorkerModelSourceError::StaleService);
+    }
+    if actual.ordered_source_identity_sha256 != expected.ordered_source_identity_sha256 {
+        return Err(WorkerModelSourceError::InvalidSourceSelection);
+    }
+    Ok(())
+}
+
+fn validate_model_source_request_wire(
+    request: &WorkerModelSourceRequest,
+) -> Result<(), WorkerModelSourceError> {
+    validate_model_source_context(&request.context)?;
+    if request.call_ordinal == 0 {
+        return Err(WorkerModelSourceError::InvalidOrder);
+    }
+    match &request.operation {
+        WorkerModelSourceOperation::Open {
+            folder_category,
+            source_names,
+        } => {
+            if folder_category.is_empty()
+                || folder_category.len() > MAX_WORKER_MODEL_SOURCE_CATEGORY_BYTES
+                || !folder_category
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+                || source_names.is_empty()
+                || source_names.len() > MAX_WORKER_MODEL_SOURCE_SELECTIONS
+                || source_names.iter().collect::<BTreeSet<_>>().len() != source_names.len()
+                || source_names.iter().any(|name| {
+                    name.is_empty()
+                        || name.len() > MAX_WORKER_MODEL_SOURCE_NAME_BYTES
+                        || name.chars().any(char::is_control)
+                        || name.starts_with('/')
+                        || name.contains(['\\', ':'])
+                        || name.split('/').any(|component| {
+                            component.is_empty() || matches!(component, "." | "..")
+                        })
+                })
+            {
+                return Err(WorkerModelSourceError::InvalidSourceSelection);
+            }
+            if worker_model_source_selection_sha256(folder_category, source_names)?
+                != request.context.ordered_source_identity_sha256
+            {
+                return Err(WorkerModelSourceError::InvalidSourceSelection);
+            }
+        }
+        WorkerModelSourceOperation::Read { byte_length, .. } => {
+            if *byte_length == 0
+                || usize::try_from(*byte_length)
+                    .map_or(true, |length| length > MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)
+            {
+                return Err(WorkerModelSourceError::RangeLimit);
+            }
+        }
+        WorkerModelSourceOperation::Close => {}
+    }
+    Ok(())
+}
+
+pub fn worker_model_source_selection_sha256(
+    folder_category: &str,
+    source_names: &[String],
+) -> Result<WorkerSha256Digest, WorkerModelSourceError> {
+    if folder_category.is_empty()
+        || folder_category.len() > MAX_WORKER_MODEL_SOURCE_CATEGORY_BYTES
+        || source_names.is_empty()
+        || source_names.len() > MAX_WORKER_MODEL_SOURCE_SELECTIONS
+    {
+        return Err(WorkerModelSourceError::InvalidSourceSelection);
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(b"zed-comfy-model-source-selection-v1");
+    hasher.update(
+        u64::try_from(folder_category.len())
+            .map_err(|_| WorkerModelSourceError::InvalidSourceSelection)?
+            .to_le_bytes(),
+    );
+    hasher.update(folder_category.as_bytes());
+    hasher.update(
+        u64::try_from(source_names.len())
+            .map_err(|_| WorkerModelSourceError::InvalidSourceSelection)?
+            .to_le_bytes(),
+    );
+    for source_name in source_names {
+        hasher.update(
+            u64::try_from(source_name.len())
+                .map_err(|_| WorkerModelSourceError::InvalidSourceSelection)?
+                .to_le_bytes(),
+        );
+        hasher.update(source_name.as_bytes());
+    }
+    model_source_digest(hasher)
+}
+
+fn model_source_response_identity(response: &WorkerModelSourceResponse) -> (Uuid, u64) {
+    match response {
+        WorkerModelSourceResponse::Opened(opened) => (opened.session_id, opened.call_ordinal),
+        WorkerModelSourceResponse::Chunk(chunk) => (chunk.session_id, chunk.call_ordinal),
+        WorkerModelSourceResponse::Closed(closed) => (closed.session_id, closed.call_ordinal),
+        WorkerModelSourceResponse::Rejected {
+            session_id,
+            call_ordinal,
+            ..
+        } => (*session_id, *call_ordinal),
+    }
+}
+
+fn model_source_digest(hasher: Sha256) -> Result<WorkerSha256Digest, WorkerModelSourceError> {
+    WorkerSha256Digest::new(format!("{:x}", hasher.finalize()))
+        .map_err(|_| WorkerModelSourceError::HostFailure)
+}
+
+fn model_source_opened_digest(
+    session_id: Uuid,
+    call_ordinal: u64,
+    ordered_source_identity_sha256: &WorkerSha256Digest,
+    sources: &[WorkerModelSourceManifest],
+    maximum_chunk_bytes: u32,
+) -> Result<WorkerSha256Digest, WorkerModelSourceError> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"zed-comfy-model-source-opened-v1");
+    hasher.update(session_id.as_bytes());
+    hasher.update(call_ordinal.to_le_bytes());
+    hasher.update(ordered_source_identity_sha256.as_str().as_bytes());
+    hasher.update(maximum_chunk_bytes.to_le_bytes());
+    hasher.update(
+        u64::try_from(sources.len())
+            .map_err(|_| WorkerModelSourceError::HostFailure)?
+            .to_le_bytes(),
+    );
+    for source in sources {
+        hasher.update(source.source_ordinal.to_le_bytes());
+        hasher.update(source.model_identity_sha256.as_str().as_bytes());
+        hasher.update(source.aggregate_tensor_bytes.to_le_bytes());
+        hasher.update(source.maximum_read_bytes.to_le_bytes());
+        hasher.update(source.parser_limits.version.to_le_bytes());
+        hasher.update(source.parser_limits.manifest_bytes.to_le_bytes());
+        hasher.update(source.parser_limits.maximum_depth.to_le_bytes());
+        hasher.update(source.parser_limits.maximum_tensors.to_le_bytes());
+        hasher.update(source.parser_limits.maximum_tensor_bytes.to_le_bytes());
+        hasher.update(
+            source
+                .parser_limits
+                .maximum_aggregate_tensor_bytes
+                .to_le_bytes(),
+        );
+        hasher.update(source.parser_limits.maximum_name_bytes.to_le_bytes());
+        hasher.update(source.parser_limits.maximum_archive_entries.to_le_bytes());
+        hasher.update(source.parser_limits.maximum_metadata_values.to_le_bytes());
+        hasher.update(
+            u64::try_from(source.artifacts.len())
+                .map_err(|_| WorkerModelSourceError::HostFailure)?
+                .to_le_bytes(),
+        );
+        for artifact in &source.artifacts {
+            hasher.update(artifact.sha256.as_str().as_bytes());
+            hasher.update(artifact.byte_size.to_le_bytes());
+            hasher.update([artifact.format as u8]);
+            hasher.update([artifact.nested_state_disposition as u8]);
+        }
+        hasher.update(
+            u64::try_from(source.tensors.len())
+                .map_err(|_| WorkerModelSourceError::HostFailure)?
+                .to_le_bytes(),
+        );
+        for tensor in &source.tensors {
+            hasher.update(
+                u64::try_from(tensor.name.len())
+                    .map_err(|_| WorkerModelSourceError::HostFailure)?
+                    .to_le_bytes(),
+            );
+            hasher.update(tensor.name.as_bytes());
+            hasher.update(
+                u64::try_from(tensor.data_type.len())
+                    .map_err(|_| WorkerModelSourceError::HostFailure)?
+                    .to_le_bytes(),
+            );
+            hasher.update(tensor.data_type.as_bytes());
+            hasher.update(
+                u64::try_from(tensor.shape.len())
+                    .map_err(|_| WorkerModelSourceError::HostFailure)?
+                    .to_le_bytes(),
+            );
+            for dimension in &tensor.shape {
+                hasher.update(dimension.to_le_bytes());
+            }
+            hasher.update(tensor.artifact_ordinal.to_le_bytes());
+            hasher.update(tensor.byte_offset.to_le_bytes());
+            hasher.update(tensor.byte_length.to_le_bytes());
+        }
+    }
+    model_source_digest(hasher)
+}
+
+fn model_source_chunk_digest(
+    session_id: Uuid,
+    call_ordinal: u64,
+    source_ordinal: u32,
+    tensor_ordinal: u32,
+    byte_offset: u64,
+    bytes: &[u8],
+) -> Result<WorkerSha256Digest, WorkerModelSourceError> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"zed-comfy-model-source-chunk-v1");
+    hasher.update(session_id.as_bytes());
+    hasher.update(call_ordinal.to_le_bytes());
+    hasher.update(source_ordinal.to_le_bytes());
+    hasher.update(tensor_ordinal.to_le_bytes());
+    hasher.update(byte_offset.to_le_bytes());
+    hasher.update(
+        u64::try_from(bytes.len())
+            .map_err(|_| WorkerModelSourceError::HostFailure)?
+            .to_le_bytes(),
+    );
+    hasher.update(bytes);
+    model_source_digest(hasher)
+}
+
+fn model_source_closed_digest(
+    session_id: Uuid,
+    call_ordinal: u64,
+) -> Result<WorkerSha256Digest, WorkerModelSourceError> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"zed-comfy-model-source-closed-v1");
+    hasher.update(session_id.as_bytes());
+    hasher.update(call_ordinal.to_le_bytes());
+    model_source_digest(hasher)
+}
+
+fn model_source_rejected_digest(
+    session_id: Uuid,
+    call_ordinal: u64,
+    error: &WorkerModelSourceError,
+) -> Result<WorkerSha256Digest, WorkerModelSourceError> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"zed-comfy-model-source-rejected-v1");
+    hasher.update(session_id.as_bytes());
+    hasher.update(call_ordinal.to_le_bytes());
+    hasher.update(format!("{error:?}").as_bytes());
+    model_source_digest(hasher)
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum WorkerMessage {
     Hello {
@@ -2846,6 +3807,14 @@ pub enum WorkerMessage {
     ProviderV2ProposalFinalizationAck {
         acknowledgement: WorkerProviderV2ProposalFinalizationAck,
     },
+    ModelSourceRequest {
+        call_id: u64,
+        request: WorkerModelSourceRequest,
+    },
+    ModelSourceResponse {
+        call_id: u64,
+        response: WorkerModelSourceResponse,
+    },
 }
 
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -2876,6 +3845,8 @@ pub enum WorkerProtocolError {
     InvalidPluginCapabilityCallId,
     #[error("invalid provider worker stream: {0}")]
     InvalidProviderStream(WorkerProviderStreamError),
+    #[error("invalid model-source worker stream: {0}")]
+    InvalidModelSource(WorkerModelSourceError),
 }
 
 pub fn encode_worker_frame(message: &WorkerEnvelope) -> Result<Vec<u8>, WorkerProtocolError> {
@@ -3023,6 +3994,25 @@ fn validate_message_bounds(message: &WorkerMessage) -> Result<(), WorkerProtocol
         WorkerMessage::ProviderV2ProposalFinalizationAck { acknowledgement } => acknowledgement
             .validate()
             .map_err(WorkerProtocolError::InvalidProviderStream),
+        WorkerMessage::ModelSourceRequest { call_id, request } => {
+            if *call_id == 0 {
+                return Err(WorkerProtocolError::InvalidModelSource(
+                    WorkerModelSourceError::InvalidOrder,
+                ));
+            }
+            validate_model_source_request_wire(request)
+                .map_err(WorkerProtocolError::InvalidModelSource)
+        }
+        WorkerMessage::ModelSourceResponse { call_id, response } => {
+            if *call_id == 0 {
+                return Err(WorkerProtocolError::InvalidModelSource(
+                    WorkerModelSourceError::InvalidOrder,
+                ));
+            }
+            response
+                .validate()
+                .map_err(WorkerProtocolError::InvalidModelSource)
+        }
         _ => Ok(()),
     }
 }

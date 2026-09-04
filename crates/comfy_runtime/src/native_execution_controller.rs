@@ -8,19 +8,20 @@ use crate::{
     ExecutionControlCommandKind, ExecutionController, ExecutionEngine, ExecutionError,
     ExecutionEventBus, ExecutionFailure, ExecutionFailureOrigin, ExecutionOutput,
     ExecutionOutputAvailability, ExecutionPreview, ExecutionReport, InputBinding, InputMode,
-    MAX_PLUGIN_SERVICE_RESPONSE_BYTES, MemoryPolicy, NativeCache, NativeNode, NativeNodeRegistry,
-    NativeProviderInvocationAuthority, NativeProviderInvocationScope, NativeProviderWorkerRequest,
-    NativeProviderWorkerResponse, NodeContext, NodeFailure, NodeFailureKind, NodeOutcome,
-    OutputCommitError, OutputCommitReceipt, OutputCommitter, OutputExecutionScope, OutputMediaKind,
-    OutputProposal, PluginServiceWireFailure, PluginServiceWireRequest,
-    PreflightedProviderRuntimeActivationGrant, PreparedEffect, PreparedEffectRequest,
-    PreparedOutput, ProfileId, PromptCompileError, ProviderManifestAuthorizationV2, ProviderPolicy,
-    ProviderRuntimeActivationGrant, ProviderRuntimeStreamService, RuntimeCachePolicy,
-    RuntimeNodeDescriptor, RuntimeOutputDescriptor, RuntimeSupervisor, RuntimeSupervisorError,
-    SharedAssetService, SharedExecutionPresentationService, SharedOutputCommitter,
-    VerifiedProviderRuntimeReceiptV2, WorkerLaunchConfig, WorkerRegistryDeploymentPlan,
-    WorkflowFormatDocument, authorize_native_input_reader, authorize_native_output_committer,
-    graph_to_prompt,
+    MAX_PLUGIN_SERVICE_RESPONSE_BYTES, MemoryPolicy, NativeAssetResolverRegistry, NativeCache,
+    NativeNode, NativeNodeRegistry, NativeProviderInvocationAuthority,
+    NativeProviderInvocationScope, NativeProviderWorkerRequest, NativeProviderWorkerResponse,
+    NodeContext, NodeFailure, NodeFailureKind, NodeOutcome, OutputCommitError, OutputCommitReceipt,
+    OutputCommitter, OutputExecutionScope, OutputMediaKind, OutputProposal, PermissionPolicy,
+    PluginServiceWireFailure, PluginServiceWireRequest, PreflightedProviderRuntimeActivationGrant,
+    PreparedEffect, PreparedEffectRequest, PreparedOutput, ProfileId, PromptCompileError,
+    ProviderManifestAuthorizationV2, ProviderPolicy, ProviderRuntimeActivationGrant,
+    ProviderRuntimeStreamService, RuntimeCachePolicy, RuntimeNodeDescriptor,
+    RuntimeOutputDescriptor, RuntimeSupervisor, RuntimeSupervisorError, SharedAssetService,
+    SharedExecutionPresentationService, SharedOutputCommitter, VerifiedProviderRuntimeReceiptV2,
+    WorkerLaunchConfig, WorkerRegistryDeploymentPlan, WorkflowFormatDocument,
+    authorize_native_api_asset_reader, authorize_native_input_reader,
+    authorize_native_output_committer, graph_to_prompt,
 };
 use chrono::{Local, Utc};
 #[cfg(test)]
@@ -127,7 +128,8 @@ use comfy_tensor::{
 #[cfg(any(test, feature = "test-support"))]
 use comfy_types::WorkerProviderV2ProposalFinalization;
 use comfy_types::{
-    AttemptId, BackendUnavailable, CancellationError, NodeId, WorkerOutputProposal,
+    AttemptId, BackendUnavailable, CancellationError, NodeId, WorkerModelSourceContext,
+    WorkerModelSourceError, WorkerModelSourceResponse, WorkerOutputProposal,
     WorkerProviderInvocationContext, WorkerProviderStreamError, WorkerProviderStreamHandle,
     WorkerProviderStreamingContract, WorkerSha256Digest,
 };
@@ -2044,6 +2046,57 @@ pub struct NativeImageWorkerPlan {
     pub injected_delay_millis: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_registry: Option<NativeProviderRegistryPin>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_source_service: Option<NativeModelSourceWorkerBinding>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NativeModelSourceWorkerBinding {
+    service_id: Uuid,
+    service_generation: u64,
+    attempt_generation: u64,
+    node_generation: u64,
+}
+
+impl NativeModelSourceWorkerBinding {
+    fn checked(
+        service_id: Uuid,
+        service_generation: u64,
+        attempt_generation: u64,
+        node_generation: u64,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        if service_id.is_nil()
+            || service_generation == 0
+            || attempt_generation == 0
+            || node_generation == 0
+        {
+            return Err(NativeImageRuntimeError::Encoding(
+                "native model-source service binding is invalid".to_owned(),
+            ));
+        }
+        Ok(Self {
+            service_id,
+            service_generation,
+            attempt_generation,
+            node_generation,
+        })
+    }
+
+    pub const fn service_id(self) -> Uuid {
+        self.service_id
+    }
+
+    pub const fn service_generation(self) -> u64 {
+        self.service_generation
+    }
+
+    pub const fn attempt_generation(self) -> u64 {
+        self.attempt_generation
+    }
+
+    pub const fn node_generation(self) -> u64 {
+        self.node_generation
+    }
 }
 
 impl NativeImageWorkerPlan {
@@ -2090,9 +2143,19 @@ impl NativeImageWorkerPlan {
             metadata_enabled,
             injected_delay_millis,
             provider_registry,
+            model_source_service: None,
         };
         value.validate()?;
         Ok(value)
+    }
+
+    fn with_model_source_service(
+        mut self,
+        model_source_service: NativeModelSourceWorkerBinding,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        model_source_service.validate()?;
+        self.model_source_service = Some(model_source_service);
+        Ok(self)
     }
 
     pub fn validate(&self) -> Result<(), NativeImageRuntimeError> {
@@ -2105,6 +2168,9 @@ impl NativeImageWorkerPlan {
                 "native worker provider registry must be derived from the compiled plan".to_owned(),
             ));
         }
+        if let Some(model_source_service) = self.model_source_service {
+            model_source_service.validate()?;
+        }
         validate_worker_input_assets(&self.input_assets)?;
         let expected = required_worker_input_ids(&self.plan)?;
         let actual = self.input_assets.keys().cloned().collect();
@@ -2114,6 +2180,18 @@ impl NativeImageWorkerPlan {
             ));
         }
         Ok(())
+    }
+}
+
+impl NativeModelSourceWorkerBinding {
+    fn validate(self) -> Result<(), NativeImageRuntimeError> {
+        Self::checked(
+            self.service_id,
+            self.service_generation,
+            self.attempt_generation,
+            self.node_generation,
+        )
+        .map(|_| ())
     }
 }
 
@@ -7639,6 +7717,7 @@ impl NativeExecutionController {
         let provider_streams = ProviderRuntimeStreamService::new();
         let provider_bridge_live = Arc::new(AtomicBool::new(true));
         let provider_bridge_attempt = Arc::new(Mutex::new(None));
+        let model_source_service_id = Uuid::new_v4();
         let runner_provider_streams = provider_streams.clone();
         let runner_cleanup_streams = provider_streams.clone();
         let runner_provider_bridge_live = provider_bridge_live.clone();
@@ -7653,6 +7732,7 @@ impl NativeExecutionController {
                     supervisor,
                     runner_provider_streams,
                     runner_provider_bridge_attempt.clone(),
+                    model_source_service_id,
                 ));
                 invalidate_provider_worker_bridge(
                     &runner_provider_bridge_live,
@@ -7827,6 +7907,8 @@ struct ActiveNativeExecution {
     cancellation: CancellationToken,
     compiled_plan_sha256: String,
     provider_node_ids: BTreeSet<String>,
+    node_ids: BTreeSet<String>,
+    model_source_binding: NativeModelSourceWorkerBinding,
     output_proposals: BTreeMap<Uuid, NativeImageOutputProposal>,
     output_proposal_bytes: usize,
 }
@@ -7841,6 +7923,10 @@ struct NativeControllerState {
     output_authorization: AuthorizedCapabilities,
     provider_streams: ProviderRuntimeStreamService,
     provider_bridge_attempt: Arc<Mutex<Option<NativeProviderWorkerBridgeActiveAttempt>>>,
+    model_source_registry: Arc<NativeAssetResolverRegistry>,
+    model_source_service_id: Uuid,
+    model_source_service_generation: u64,
+    next_model_source_attempt_generation: u64,
 }
 
 enum ControllerInput {
@@ -7855,6 +7941,7 @@ async fn run_native_controller(
     supervisor: RuntimeSupervisor,
     provider_streams: ProviderRuntimeStreamService,
     provider_bridge_attempt: Arc<Mutex<Option<NativeProviderWorkerBridgeActiveAttempt>>>,
+    model_source_service_id: Uuid,
 ) -> Result<(), NativeImageRuntimeError> {
     let roots = config.roots()?;
     let output_committer = config.output_committer.clone();
@@ -7862,6 +7949,12 @@ async fn run_native_controller(
         .map_err(|error| NativeImageRuntimeError::Asset(error.to_string()))?;
     let output_authorization = authorize_native_output_committer(&roots.profile_id)
         .map_err(|error| NativeImageRuntimeError::Asset(error.to_string()))?;
+    let model_source_policy = PermissionPolicy::native_runtime_services(&roots.profile_id)
+        .map_err(|error| NativeImageRuntimeError::Asset(error.to_string()))?;
+    let model_source_authorization = authorize_native_api_asset_reader(&model_source_policy)
+        .map_err(|error| NativeImageRuntimeError::Asset(error.to_string()))?;
+    let model_source_registry =
+        NativeAssetResolverRegistry::new(config.assets.clone(), model_source_authorization);
     let mut state = NativeControllerState {
         config,
         event_bus,
@@ -7872,6 +7965,10 @@ async fn run_native_controller(
         output_authorization,
         provider_streams,
         provider_bridge_attempt,
+        model_source_registry,
+        model_source_service_id,
+        model_source_service_generation: 1,
+        next_model_source_attempt_generation: 0,
     };
     state.reconcile_committed_output_receipts().await?;
     loop {
@@ -8021,6 +8118,7 @@ impl NativeControllerState {
         self.abort_provider_sessions();
         if let Some(active) = self.active.take() {
             active.cancellation.cancel();
+            self.model_source_registry.retire_attempt(active.attempt_id);
             self.publish_kind(
                 active.profile_id,
                 active.prompt_id,
@@ -8113,6 +8211,7 @@ impl NativeControllerState {
                     )
                 })?;
                 self.abort_provider_sessions();
+                self.model_source_registry.retire_attempt(active.attempt_id);
                 let kind = {
                     canonical_termination_kind(
                         self.config
@@ -8201,6 +8300,12 @@ impl NativeControllerState {
                     .then_some(node_id.0.clone())
             })
             .collect();
+        let node_ids = lease
+            .plan
+            .nodes
+            .keys()
+            .map(|node_id| node_id.0.clone())
+            .collect::<BTreeSet<_>>();
         if self.supervisor.is_none() {
             match RuntimeSupervisor::start(self.config.worker.clone()).await {
                 Ok(supervisor) => self.supervisor = Some(supervisor),
@@ -8244,6 +8349,20 @@ impl NativeControllerState {
             &self.input_authorization,
             &lease.cancellation,
         )?;
+        self.next_model_source_attempt_generation = self
+            .next_model_source_attempt_generation
+            .checked_add(1)
+            .ok_or_else(|| {
+                NativeImageRuntimeError::Execution(
+                    "native model-source attempt generation overflowed".to_owned(),
+                )
+            })?;
+        let model_source_binding = NativeModelSourceWorkerBinding::checked(
+            self.model_source_service_id,
+            self.model_source_service_generation,
+            self.next_model_source_attempt_generation,
+            1,
+        )?;
         let worker_plan = NativeImageWorkerPlan::new_with_memory_policy(
             lease.plan.clone(),
             input_assets,
@@ -8255,7 +8374,8 @@ impl NativeControllerState {
                 .get("zed_native_delay_millis")
                 .and_then(Value::as_u64)
                 .unwrap_or(0),
-        )?;
+        )?
+        .with_model_source_service(model_source_binding)?;
         let encoded = serde_json::to_vec(&worker_plan)
             .map_err(|error| NativeImageRuntimeError::Encoding(error.to_string()))?;
         let lifecycle_epoch = Arc::new(());
@@ -8276,6 +8396,8 @@ impl NativeControllerState {
             cancellation: lease.cancellation.clone(),
             compiled_plan_sha256,
             provider_node_ids,
+            node_ids,
+            model_source_binding,
             output_proposals: BTreeMap::new(),
             output_proposal_bytes: 0,
         });
@@ -8287,7 +8409,9 @@ impl NativeControllerState {
             AttemptEventKind::Started,
             Some(json!({"effective_native_backend": effective_backend})),
         ) {
-            self.active = None;
+            if let Some(active) = self.active.take() {
+                self.model_source_registry.retire_attempt(active.attempt_id);
+            }
             self.abort_provider_sessions();
             return Err(error);
         }
@@ -8300,7 +8424,9 @@ impl NativeControllerState {
             .execute(lease.prompt_id, lease.attempt_id, encoded)
             .await
         {
-            self.active = None;
+            if let Some(active) = self.active.take() {
+                self.model_source_registry.retire_attempt(active.attempt_id);
+            }
             self.abort_provider_sessions();
             self.publish_terminal_failure(
                 lease.profile_id,
@@ -8363,6 +8489,94 @@ impl NativeControllerState {
         &mut self,
         envelope: comfy_types::WorkerEnvelope,
     ) -> Result<(), NativeImageRuntimeError> {
+        if let comfy_types::WorkerMessage::ModelSourceRequest { call_id, request } =
+            &envelope.message
+        {
+            let active = self.active.as_ref().ok_or_else(|| {
+                NativeImageRuntimeError::WorkerEvent(
+                    "model-source request has no active attempt".to_owned(),
+                )
+            })?;
+            if envelope.prompt_id != Some(active.prompt_id)
+                || envelope.attempt_id != Some(active.attempt_id)
+            {
+                return Err(NativeImageRuntimeError::WorkerEvent(
+                    "model-source request has stale envelope identity".to_owned(),
+                ));
+            }
+            let prompt_id = active.prompt_id;
+            let attempt_id = active.attempt_id;
+            let cancellation = active.cancellation.clone();
+            let binding = active.model_source_binding;
+            let known_node = active.node_ids.contains(&request.context.node_id);
+            let identity_error = if request.context.attempt_id != attempt_id
+                || request.context.attempt_generation != binding.attempt_generation()
+            {
+                Some(WorkerModelSourceError::StaleAttempt)
+            } else if !known_node || request.context.node_generation != binding.node_generation() {
+                Some(WorkerModelSourceError::StaleNode)
+            } else if request.context.service_id != binding.service_id()
+                || request.context.service_generation != binding.service_generation()
+            {
+                Some(WorkerModelSourceError::StaleService)
+            } else {
+                None
+            };
+            let response = if let Some(error) = identity_error {
+                self.model_source_registry
+                    .revoke_model_source_session(request.context.session_id);
+                WorkerModelSourceResponse::rejected(
+                    request.context.session_id,
+                    request.call_ordinal,
+                    error,
+                )
+            } else {
+                let expected_context = WorkerModelSourceContext {
+                    session_id: request.context.session_id,
+                    attempt_id,
+                    attempt_generation: binding.attempt_generation(),
+                    node_id: request.context.node_id.clone(),
+                    node_generation: binding.node_generation(),
+                    service_id: binding.service_id(),
+                    service_generation: binding.service_generation(),
+                    ordered_source_identity_sha256: request
+                        .context
+                        .ordered_source_identity_sha256
+                        .clone(),
+                };
+                self.model_source_registry
+                    .serve_model_source_request(&expected_context, request, &cancellation)
+                    .or_else(|error| {
+                        WorkerModelSourceResponse::rejected(
+                            request.context.session_id,
+                            request.call_ordinal,
+                            error,
+                        )
+                    })
+            }
+            .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
+            if let Err(error) = self
+                .supervisor
+                .as_mut()
+                .ok_or_else(|| {
+                    NativeImageRuntimeError::WorkerEvent(
+                        "model-source response has no worker".to_owned(),
+                    )
+                })?
+                .respond_model_source(
+                    envelope.request_id,
+                    prompt_id,
+                    attempt_id,
+                    *call_id,
+                    response,
+                )
+                .await
+            {
+                self.abort_provider_sessions();
+                return Err(NativeImageRuntimeError::WorkerEvent(error.to_string()));
+            }
+            return Ok(());
+        }
         if let comfy_types::WorkerMessage::PluginCapabilityRequest { call_id, request } =
             &envelope.message
         {
@@ -8647,6 +8861,7 @@ impl NativeControllerState {
                     ProviderSessionCompletionCleanup::Retire => self.retire_provider_sessions(),
                     ProviderSessionCompletionCleanup::Abort => self.abort_provider_sessions(),
                 }
+                self.model_source_registry.retire_attempt(active.attempt_id);
                 self.publish_projection_events(applied);
             }
             NativeImageWorkerEvent::BackendUnavailable { unavailable } => {
@@ -8654,6 +8869,7 @@ impl NativeControllerState {
                 let Some(active) = self.active.take() else {
                     return Ok(());
                 };
+                self.model_source_registry.retire_attempt(active.attempt_id);
                 self.publish_kind(
                     active.profile_id,
                     active.prompt_id,
@@ -8672,6 +8888,7 @@ impl NativeControllerState {
                 let Some(active) = self.active.take() else {
                     return Ok(());
                 };
+                self.model_source_registry.retire_attempt(active.attempt_id);
                 let canonical_termination = canonical_termination_kind(
                     self.config
                         .presentation
@@ -8788,6 +9005,7 @@ impl NativeControllerState {
             &self.provider_streams,
             &self.provider_bridge_attempt,
         );
+        self.model_source_registry.revoke_model_source_sessions();
     }
 
     fn retire_provider_sessions(&mut self) {
@@ -8795,6 +9013,7 @@ impl NativeControllerState {
             &self.provider_streams,
             &self.provider_bridge_attempt,
         );
+        self.model_source_registry.revoke_model_source_sessions();
     }
 
     fn publish_worker_progress(
@@ -8841,8 +9060,18 @@ impl NativeControllerState {
         error: RuntimeSupervisorError,
     ) -> Result<(), NativeImageRuntimeError> {
         self.abort_provider_sessions();
+        self.model_source_service_generation = self
+            .model_source_service_generation
+            .checked_add(1)
+            .ok_or_else(|| {
+                NativeImageRuntimeError::Execution(
+                    "native model-source service generation overflowed".to_owned(),
+                )
+            })?;
+        self.model_source_registry.replace_model_source_service();
         let worker_error = error.to_string();
         if let Some(active) = self.active.take() {
+            self.model_source_registry.retire_attempt(active.attempt_id);
             self.publish_kind(
                 active.profile_id,
                 active.prompt_id,
@@ -9378,6 +9607,8 @@ mod tests {
             cancellation: CancellationToken::default(),
             compiled_plan_sha256: "d".repeat(64),
             provider_node_ids: BTreeSet::new(),
+            node_ids: BTreeSet::new(),
+            model_source_binding: fixture_model_source_binding(),
             output_proposals: BTreeMap::new(),
             output_proposal_bytes: 0,
         };
@@ -12258,6 +12489,7 @@ mod tests {
         let output_committer = config.output_committer.clone();
         let input_authorization = authorize_native_input_reader(&roots.profile_id)?;
         let output_authorization = authorize_native_output_committer(&roots.profile_id)?;
+        let model_source_registry = fixture_model_source_registry(&config, &roots.profile_id)?;
         let mut state = NativeControllerState {
             config,
             event_bus: ExecutionEventBus::new(32)?,
@@ -12268,6 +12500,10 @@ mod tests {
             output_authorization,
             provider_streams: ProviderRuntimeStreamService::new(),
             provider_bridge_attempt: Arc::new(Mutex::new(None)),
+            model_source_registry,
+            model_source_service_id: fixture_model_source_binding().service_id(),
+            model_source_service_generation: 1,
+            next_model_source_attempt_generation: 0,
         };
         let before = presentation.snapshot(profile_id)?;
         smol::block_on(state.apply_command(ExecutionControlCommand {
@@ -12475,6 +12711,7 @@ mod tests {
                 true,
             )?;
             config.output_committer = Arc::new(std::sync::Mutex::new(output_committer));
+            let model_source_registry = fixture_model_source_registry(&config, &roots.profile_id)?;
             let mut state = NativeControllerState {
                 output_committer: config.output_committer.clone(),
                 config,
@@ -12485,6 +12722,10 @@ mod tests {
                 output_authorization: authorization,
                 provider_streams: ProviderRuntimeStreamService::new(),
                 provider_bridge_attempt: Arc::new(Mutex::new(None)),
+                model_source_registry,
+                model_source_service_id: fixture_model_source_binding().service_id(),
+                model_source_service_generation: 1,
+                next_model_source_attempt_generation: 0,
             };
 
             assert!(state.reconcile_committed_output_receipts().await.is_err());
@@ -12595,6 +12836,7 @@ mod tests {
         let output_committer = config.output_committer.clone();
         let input_authorization = authorize_native_input_reader(&roots.profile_id)?;
         let output_authorization = authorize_native_output_committer(&roots.profile_id)?;
+        let model_source_registry = fixture_model_source_registry(&config, &roots.profile_id)?;
         let mut state = NativeControllerState {
             config,
             event_bus,
@@ -12606,6 +12848,8 @@ mod tests {
                 cancellation: lease.cancellation,
                 compiled_plan_sha256: "0".repeat(64),
                 provider_node_ids: BTreeSet::new(),
+                node_ids: BTreeSet::new(),
+                model_source_binding: fixture_model_source_binding(),
                 output_proposals: BTreeMap::new(),
                 output_proposal_bytes: 0,
             }),
@@ -12614,6 +12858,10 @@ mod tests {
             output_authorization,
             provider_streams: ProviderRuntimeStreamService::new(),
             provider_bridge_attempt: Arc::new(Mutex::new(None)),
+            model_source_registry,
+            model_source_service_id: fixture_model_source_binding().service_id(),
+            model_source_service_generation: 1,
+            next_model_source_attempt_generation: 0,
         };
 
         smol::block_on(state.recover_worker(RuntimeSupervisorError::ChannelClosed))?;
@@ -12713,6 +12961,7 @@ mod tests {
         let canonical_cancellation = lease.cancellation.clone();
         let event_bus = ExecutionEventBus::new(8)?;
         let events = event_bus.subscribe();
+        let model_source_registry = fixture_model_source_registry(&config, &roots.profile_id)?;
         let mut state = NativeControllerState {
             output_committer: config.output_committer.clone(),
             config,
@@ -12725,6 +12974,8 @@ mod tests {
                 cancellation: lease.cancellation,
                 compiled_plan_sha256: "0".repeat(64),
                 provider_node_ids: BTreeSet::new(),
+                node_ids: BTreeSet::new(),
+                model_source_binding: fixture_model_source_binding(),
                 output_proposals: BTreeMap::new(),
                 output_proposal_bytes: 0,
             }),
@@ -12732,6 +12983,10 @@ mod tests {
             output_authorization: authorize_native_output_committer(&roots.profile_id)?,
             provider_streams: ProviderRuntimeStreamService::new(),
             provider_bridge_attempt: Arc::new(Mutex::new(None)),
+            model_source_registry,
+            model_source_service_id: fixture_model_source_binding().service_id(),
+            model_source_service_generation: 1,
+            next_model_source_attempt_generation: 0,
         };
         let event = NativeImageWorkerEvent::Failed {
             message: "untrusted worker cancellation observation".to_owned(),
@@ -12802,6 +13057,7 @@ mod tests {
             ),
             true,
         )?;
+        let model_source_registry = fixture_model_source_registry(&config, &roots.profile_id)?;
         let mut state = NativeControllerState {
             output_committer: config.output_committer.clone(),
             input_authorization: authorize_native_input_reader(&roots.profile_id)?,
@@ -12816,11 +13072,17 @@ mod tests {
                 cancellation: CancellationToken::default(),
                 compiled_plan_sha256: "0".repeat(64),
                 provider_node_ids: BTreeSet::from(["ProviderFixture".to_owned()]),
+                node_ids: BTreeSet::from(["ProviderFixture".to_owned()]),
+                model_source_binding: fixture_model_source_binding(),
                 output_proposals: BTreeMap::new(),
                 output_proposal_bytes: 0,
             }),
             provider_streams: ProviderRuntimeStreamService::new(),
             provider_bridge_attempt: Arc::new(Mutex::new(None)),
+            model_source_registry,
+            model_source_service_id: fixture_model_source_binding().service_id(),
+            model_source_service_generation: 1,
+            next_model_source_attempt_generation: 0,
         };
         let envelope = comfy_types::WorkerEnvelope {
             version: comfy_types::WORKER_PROTOCOL_VERSION,
@@ -13100,6 +13362,27 @@ mod tests {
         Ok(Arc::new(std::sync::Mutex::new(crate::AssetService::open(
             roots.clone(),
         )?)))
+    }
+
+    fn fixture_model_source_binding() -> NativeModelSourceWorkerBinding {
+        NativeModelSourceWorkerBinding {
+            service_id: Uuid::from_u128(0x399_001),
+            service_generation: 1,
+            attempt_generation: 1,
+            node_generation: 1,
+        }
+    }
+
+    fn fixture_model_source_registry(
+        config: &NativeExecutionControllerConfig,
+        profile_id: &str,
+    ) -> Result<Arc<NativeAssetResolverRegistry>, Box<dyn std::error::Error>> {
+        let policy = PermissionPolicy::native_runtime_services(profile_id)?;
+        let authorization = authorize_native_api_asset_reader(&policy)?;
+        Ok(NativeAssetResolverRegistry::new(
+            config.assets.clone(),
+            authorization,
+        ))
     }
 
     fn collect_fixture_worker_input_assets(

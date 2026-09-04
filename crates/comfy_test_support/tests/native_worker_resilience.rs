@@ -2,20 +2,31 @@ use std::{
     collections::BTreeMap,
     error::Error,
     fs,
+    io::Write,
     path::{Path, PathBuf},
     process::Stdio,
+    sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
 };
 
 use comfy_runtime::{
+    AssetNamespace, AssetRoots, AssetService, NativeAssetResolverRegistry, PermissionPolicy,
     RuntimeSupervisor, RuntimeSupervisorError, SupervisorPolicy, WorkerLaunchConfig,
+    authorize_native_api_asset_reader,
 };
 use comfy_tensor::{
     CancellationToken, CpuWorkspaceAuthority, DType, DeviceId, StreamId, TensorBackend,
     TensorDescriptor, TensorError,
 };
-use comfy_types::{ProfileId, WorkerId};
+use comfy_types::{
+    AttemptId, MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES, ProfileId, WorkerId, WorkerModelSourceContext,
+    WorkerModelSourceError, WorkerModelSourceOperation, WorkerModelSourceRequest,
+    WorkerModelSourceResponse, worker_model_source_selection_sha256,
+};
+use comfy_worker::{
+    WorkerModelSourceSession, WorkerModelSourceTransport, WorkerModelSourceTransportHost,
+};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use smol::process::{Child, Command};
@@ -25,6 +36,234 @@ use uuid::Uuid;
 mod native_controller;
 
 const MEMORY_LIMIT_BYTES: u64 = 1024 * 1024 * 1024;
+
+fn bridge_model_source_call(
+    host: &WorkerModelSourceTransportHost,
+    session: &WorkerModelSourceSession,
+    registry: &NativeAssetResolverRegistry,
+    expected_context: &WorkerModelSourceContext,
+    request: WorkerModelSourceRequest,
+    cancellation: &CancellationToken,
+) -> Result<WorkerModelSourceResponse, Box<dyn Error>> {
+    thread::scope(|scope| {
+        let worker_call = scope.spawn(|| session.call(request, cancellation));
+        let call = smol::block_on(host.receive())?;
+        let call_id = call.call_id();
+        let response = registry
+            .test_serve_model_source_request(expected_context, call.request(), cancellation)
+            .or_else(|error| {
+                WorkerModelSourceResponse::rejected(
+                    call.request().context.session_id,
+                    call.request().call_ordinal,
+                    error,
+                )
+            })?;
+        smol::block_on(call.respond(call_id, response))?;
+        worker_call
+            .join()
+            .map_err(|_| "model-source worker call panicked")?
+            .map_err(Into::into)
+    })
+}
+
+#[test]
+fn model_source_worker_bridge_restarts_without_duplicate_publication() -> Result<(), Box<dyn Error>>
+{
+    let directory = tempfile::tempdir()?;
+    let profile_id = "model-source-restart";
+    let roots = [
+        AssetNamespace::Input,
+        AssetNamespace::Output,
+        AssetNamespace::Temporary,
+        AssetNamespace::Model,
+        AssetNamespace::Plugin,
+    ]
+    .into_iter()
+    .map(|namespace| {
+        let root = directory.path().join(namespace.locator_type());
+        fs::create_dir_all(&root)?;
+        Ok((namespace, root))
+    })
+    .collect::<Result<Vec<_>, std::io::Error>>()?;
+    let roots = AssetRoots::new(profile_id, roots)?;
+    let model_path = roots
+        .test_root_path(AssetNamespace::Model)?
+        .join("checkpoints/large.safetensors");
+    let model_parent = model_path.parent().ok_or("model parent is unavailable")?;
+    fs::create_dir_all(model_parent)?;
+    let tensor_bytes = 13 * 1024 * 1024_usize;
+    let header = format!(
+        r#"{{"large":{{"dtype":"U8","shape":[{tensor_bytes}],"data_offsets":[0,{tensor_bytes}]}}}}"#
+    );
+    let mut model_file = fs::File::create(&model_path)?;
+    model_file.write_all(&u64::try_from(header.len())?.to_le_bytes())?;
+    model_file.write_all(header.as_bytes())?;
+    model_file.write_all(&vec![0x5a; tensor_bytes])?;
+    model_file.sync_all()?;
+
+    let policy = PermissionPolicy::native_runtime_services(profile_id)?;
+    let authorization = authorize_native_api_asset_reader(&policy)?;
+    let assets = Arc::new(Mutex::new(AssetService::open(roots)?));
+    let registry = NativeAssetResolverRegistry::new(assets, authorization);
+    let attempt_id = AttemptId(Uuid::from_u128(0x39921));
+    let source_names = vec!["large.safetensors".to_owned()];
+    let selection = worker_model_source_selection_sha256("checkpoints", &source_names)?;
+    let context = |session_id, service_generation| WorkerModelSourceContext {
+        session_id,
+        attempt_id,
+        attempt_generation: 1,
+        node_id: "checkpoint-loader".to_owned(),
+        node_generation: 1,
+        service_id: Uuid::from_u128(0x39922),
+        service_generation,
+        ordered_source_identity_sha256: selection.clone(),
+    };
+    let open_request = |context: WorkerModelSourceContext| WorkerModelSourceRequest {
+        context,
+        call_ordinal: 1,
+        operation: WorkerModelSourceOperation::Open {
+            folder_category: "checkpoints".to_owned(),
+            source_names: source_names.clone(),
+        },
+    };
+    let cancellation = CancellationToken::default();
+    let (transport, host) = WorkerModelSourceTransport::channel();
+
+    let lost_context = context(Uuid::from_u128(0x39923), 1);
+    let lost_session = transport.open_session(lost_context.clone())?;
+    let lost_open = open_request(lost_context.clone());
+    let opened = bridge_model_source_call(
+        &host,
+        &lost_session,
+        &registry,
+        &lost_context,
+        lost_open,
+        &cancellation,
+    )?;
+    let WorkerModelSourceResponse::Opened(opened) = opened else {
+        return Err("model-source open did not return a manifest".into());
+    };
+    assert_eq!(opened.sources.len(), 1);
+    assert_eq!(
+        opened.sources[0].aggregate_tensor_bytes,
+        u64::try_from(tensor_bytes)?
+    );
+    assert!(
+        !serde_json::to_vec(&opened)?
+            .windows(directory.path().as_os_str().len())
+            .any(|window| window == directory.path().as_os_str().as_encoded_bytes())
+    );
+    assert!(tensor_bytes > 12 * 1024 * 1024);
+    assert!(
+        serde_json::to_vec(&open_request(lost_context.clone()))?.len()
+            < comfy_types::MAX_WORKER_FRAME_BYTES
+    );
+    let first_read = WorkerModelSourceRequest {
+        context: lost_context.clone(),
+        call_ordinal: 2,
+        operation: WorkerModelSourceOperation::Read {
+            source_ordinal: 0,
+            tensor_ordinal: 0,
+            byte_offset: 0,
+            byte_length: u32::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)?,
+        },
+    };
+    assert!(matches!(
+        bridge_model_source_call(
+            &host,
+            &lost_session,
+            &registry,
+            &lost_context,
+            first_read.clone(),
+            &cancellation,
+        )?,
+        WorkerModelSourceResponse::Chunk(_)
+    ));
+
+    registry.test_replace_model_source_service();
+    let late_read = WorkerModelSourceRequest {
+        call_ordinal: 3,
+        ..first_read
+    };
+    assert!(matches!(
+        bridge_model_source_call(
+            &host,
+            &lost_session,
+            &registry,
+            &lost_context,
+            late_read,
+            &cancellation,
+        )?,
+        WorkerModelSourceResponse::Rejected {
+            error: WorkerModelSourceError::Closed,
+            ..
+        }
+    ));
+
+    let retry_context = context(Uuid::from_u128(0x39924), 2);
+    let retry_session = transport.open_session(retry_context.clone())?;
+    let retry_open = open_request(retry_context.clone());
+    assert!(matches!(
+        bridge_model_source_call(
+            &host,
+            &retry_session,
+            &registry,
+            &retry_context,
+            retry_open,
+            &cancellation,
+        )?,
+        WorkerModelSourceResponse::Opened(_)
+    ));
+    let mut bridged_bytes = 0_usize;
+    let chunk_count = tensor_bytes / MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES;
+    for chunk_index in 0..chunk_count {
+        let request = WorkerModelSourceRequest {
+            context: retry_context.clone(),
+            call_ordinal: u64::try_from(chunk_index)? + 2,
+            operation: WorkerModelSourceOperation::Read {
+                source_ordinal: 0,
+                tensor_ordinal: 0,
+                byte_offset: u64::try_from(chunk_index * MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)?,
+                byte_length: u32::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)?,
+            },
+        };
+        let WorkerModelSourceResponse::Chunk(chunk) = bridge_model_source_call(
+            &host,
+            &retry_session,
+            &registry,
+            &retry_context,
+            request,
+            &cancellation,
+        )?
+        else {
+            return Err("model-source read did not return a chunk".into());
+        };
+        assert_eq!(chunk.bytes, vec![0x5a; MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES]);
+        bridged_bytes = bridged_bytes
+            .checked_add(chunk.bytes.len())
+            .ok_or("bridged byte count overflowed")?;
+    }
+    assert_eq!(bridged_bytes, tensor_bytes);
+    let close_ordinal = u64::try_from(chunk_count)? + 2;
+    let close = WorkerModelSourceRequest {
+        context: retry_context.clone(),
+        call_ordinal: close_ordinal,
+        operation: WorkerModelSourceOperation::Close,
+    };
+    assert!(matches!(
+        bridge_model_source_call(
+            &host,
+            &retry_session,
+            &registry,
+            &retry_context,
+            close,
+            &cancellation,
+        )?,
+        WorkerModelSourceResponse::Closed(_)
+    ));
+    registry.retire_attempt(attempt_id);
+    Ok(())
+}
 
 #[test]
 fn val_recovery_008() -> Result<(), Box<dyn Error>> {

@@ -15,11 +15,11 @@ use comfy_types::{
     MAX_WORKER_COMPONENT_CHUNK_BYTES, MAX_WORKER_FRAME_BYTES,
     MAX_WORKER_PLUGIN_CAPABILITY_PAYLOAD_BYTES, ProfileId, PromptId, RequestId,
     WORKER_PROTOCOL_VERSION, WorkerComponentContent, WorkerEnvelope, WorkerId,
-    WorkerLifecycleEvent, WorkerMessage, WorkerPluginExecutionOutcome, WorkerProviderStreamRequest,
-    WorkerProviderStreamResponse, WorkerProviderStreamTransportValidator,
-    WorkerProviderV2ProposalFinalization, WorkerRegistryDeploymentAck,
-    WorkerRegistryDeploymentBegin, WorkerRegistryDeploymentChunk, WorkerRegistryDeploymentCommit,
-    decode_worker_frame, encode_worker_frame,
+    WorkerLifecycleEvent, WorkerMessage, WorkerModelSourceResponse, WorkerPluginExecutionOutcome,
+    WorkerProviderStreamRequest, WorkerProviderStreamResponse,
+    WorkerProviderStreamTransportValidator, WorkerProviderV2ProposalFinalization,
+    WorkerRegistryDeploymentAck, WorkerRegistryDeploymentBegin, WorkerRegistryDeploymentChunk,
+    WorkerRegistryDeploymentCommit, decode_worker_frame, encode_worker_frame,
 };
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -1461,6 +1461,8 @@ impl From<&WorkerMessage> for RequestKind {
             | WorkerMessage::ProviderStreamResponse { .. }
             | WorkerMessage::ProviderV2ProposalFinalization { .. }
             | WorkerMessage::ProviderV2ProposalFinalizationAck { .. }
+            | WorkerMessage::ModelSourceRequest { .. }
+            | WorkerMessage::ModelSourceResponse { .. }
             | WorkerMessage::PluginResult { .. }
             | WorkerMessage::Heartbeat
             | WorkerMessage::Fatal { .. } => Self::Other,
@@ -1710,6 +1712,7 @@ impl SupervisorShared {
                 self.snapshot.active_prompt_id = None;
                 self.snapshot.active_attempt_id = None;
             }
+            WorkerMessage::ModelSourceRequest { .. } if scope.kind == RequestKind::Execute => {}
             WorkerMessage::RegistryDeploymentAck { .. }
                 if scope.kind == RequestKind::RegistryDeployment => {}
             WorkerMessage::RegistryDeploymentRejected { .. }
@@ -1717,10 +1720,11 @@ impl SupervisorShared {
             WorkerMessage::ProviderStreamRequest { .. }
             | WorkerMessage::ProviderStreamResponse { .. }
             | WorkerMessage::ProviderV2ProposalFinalization { .. }
-            | WorkerMessage::ProviderV2ProposalFinalizationAck { .. } => {
+            | WorkerMessage::ProviderV2ProposalFinalizationAck { .. }
+            | WorkerMessage::ModelSourceRequest { .. }
+            | WorkerMessage::ModelSourceResponse { .. } => {
                 let error = RuntimeSupervisorError::Protocol(
-                    "provider stream routing is unavailable until the canonical bridge is active"
-                        .to_owned(),
+                    "worker stream message has an invalid direction or execution scope".to_owned(),
                 );
                 self.snapshot.health = WorkerHealth::ProtocolIncompatible {
                     reason: error.to_string(),
@@ -2976,6 +2980,23 @@ impl RuntimeSupervisor {
         .await
     }
 
+    pub async fn respond_model_source(
+        &mut self,
+        request_id: RequestId,
+        prompt_id: PromptId,
+        attempt_id: AttemptId,
+        call_id: u64,
+        response: WorkerModelSourceResponse,
+    ) -> Result<(), RuntimeSupervisorError> {
+        self.send_for_existing_request(
+            request_id,
+            Some(prompt_id),
+            Some(attempt_id),
+            WorkerMessage::ModelSourceResponse { call_id, response },
+        )
+        .await
+    }
+
     async fn receive_one(
         &self,
         timeout: Duration,
@@ -3549,12 +3570,15 @@ mod tests {
             let message = envelope(&shared, request_id, 0, message);
             let error = shared
                 .accept(&message)
-                .expect_err("provider streaming is not routed before Task414");
-            assert!(matches!(
-                error,
-                RuntimeSupervisorError::Protocol(message)
-                    if message.contains("canonical bridge")
-            ));
+                .expect_err("provider streaming requires an active canonical bridge");
+            assert!(
+                matches!(
+                    &error,
+                    RuntimeSupervisorError::Protocol(message)
+                        if message.contains("invalid direction or execution scope")
+                ),
+                "unexpected pre-bridge provider-stream rejection: {error:?}"
+            );
             assert!(matches!(
                 shared.snapshot.health,
                 WorkerHealth::ProtocolIncompatible { .. }

@@ -30,11 +30,17 @@ use comfy_runtime::{
 ))]
 use comfy_types::DeviceKind;
 use comfy_types::{
-    ApiPrompt, AttemptId, NodeId, ProfileId, PromptId, PromptNode, PromptSubmission, RequestId,
-    WorkerEnvelope, WorkerId, WorkerMessage, WorkerOutputProposal, WorkerProviderInvocationContext,
-    WorkerProviderStreamHandle, WorkerProviderStreamRequest, WorkerProviderStreamResponse,
-    WorkerProviderV2ProposalFinalization, WorkerProviderV2ProposalFinalizationAck,
-    WorkerSha256Digest,
+    ApiPrompt, AttemptId, MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES, NodeId, ProfileId, PromptId,
+    PromptNode, PromptSubmission, RequestId, WorkerEnvelope, WorkerId, WorkerMessage,
+    WorkerModelSourceArtifact, WorkerModelSourceClosed, WorkerModelSourceContext,
+    WorkerModelSourceError, WorkerModelSourceFormat, WorkerModelSourceManifest,
+    WorkerModelSourceNestedStateDisposition, WorkerModelSourceOpened, WorkerModelSourceOperation,
+    WorkerModelSourceParserLimits, WorkerModelSourceRequest, WorkerModelSourceResponse,
+    WorkerModelSourceTensor, WorkerModelSourceTransportValidator, WorkerOutputProposal,
+    WorkerProviderInvocationContext, WorkerProviderStreamHandle, WorkerProviderStreamRequest,
+    WorkerProviderStreamResponse, WorkerProviderV2ProposalFinalization,
+    WorkerProviderV2ProposalFinalizationAck, WorkerSha256Digest,
+    worker_model_source_selection_sha256,
 };
 use comfy_worker::{FrameError, read_frame};
 use serde_json::json;
@@ -124,6 +130,213 @@ fn provider_v2_finalization_is_append_only_and_legacy_stream_bytes_are_frozen()
         assert_eq!(bytes.first().copied(), Some(expected_discriminant));
         assert_eq!(postcard::from_bytes::<WorkerMessage>(&bytes)?, message);
     }
+    Ok(())
+}
+
+#[test]
+fn model_source_worker_bridge() -> Result<(), Box<dyn std::error::Error>> {
+    let source_names = vec!["large-fixture.safetensors".to_owned()];
+    let selection = worker_model_source_selection_sha256("checkpoints", &source_names)?;
+    let context = WorkerModelSourceContext {
+        session_id: uuid::Uuid::from_u128(0x39901),
+        attempt_id: AttemptId(uuid::Uuid::from_u128(0x39902)),
+        attempt_generation: 3,
+        node_id: "model-loader".to_owned(),
+        node_generation: 5,
+        service_id: uuid::Uuid::from_u128(0x39903),
+        service_generation: 7,
+        ordered_source_identity_sha256: selection.clone(),
+    };
+    let source_bytes = 13 * 1024 * 1024_u64;
+    let manifest = WorkerModelSourceManifest {
+        source_ordinal: 0,
+        model_identity_sha256: WorkerSha256Digest::new("a".repeat(64))?,
+        artifacts: vec![WorkerModelSourceArtifact {
+            sha256: WorkerSha256Digest::new("b".repeat(64))?,
+            byte_size: source_bytes,
+            format: WorkerModelSourceFormat::Safetensors,
+            nested_state_disposition: WorkerModelSourceNestedStateDisposition::Flat,
+        }],
+        tensors: vec![WorkerModelSourceTensor {
+            name: "model.weight".to_owned(),
+            data_type: "F32".to_owned(),
+            shape: vec![source_bytes / 4],
+            artifact_ordinal: 0,
+            byte_offset: 0,
+            byte_length: source_bytes,
+        }],
+        aggregate_tensor_bytes: source_bytes,
+        maximum_read_bytes: source_bytes,
+        parser_limits: WorkerModelSourceParserLimits {
+            version: 1,
+            manifest_bytes: 1024 * 1024,
+            maximum_depth: 16,
+            maximum_tensors: 1024,
+            maximum_tensor_bytes: source_bytes,
+            maximum_aggregate_tensor_bytes: source_bytes,
+            maximum_name_bytes: 4096,
+            maximum_archive_entries: 1024,
+            maximum_metadata_values: 1024,
+        },
+    };
+    let open = WorkerModelSourceRequest {
+        context: context.clone(),
+        call_ordinal: 1,
+        operation: WorkerModelSourceOperation::Open {
+            folder_category: "checkpoints".to_owned(),
+            source_names,
+        },
+    };
+    let opened = WorkerModelSourceResponse::Opened(WorkerModelSourceOpened::checked(
+        context.session_id,
+        1,
+        selection,
+        vec![manifest],
+    )?);
+    let request_message = WorkerMessage::ModelSourceRequest {
+        call_id: 1,
+        request: open.clone(),
+    };
+    let response_message = WorkerMessage::ModelSourceResponse {
+        call_id: 1,
+        response: opened.clone(),
+    };
+    for (message, discriminant) in [(request_message, 24), (response_message, 25)] {
+        let bytes = postcard::to_stdvec(&message)?;
+        assert_eq!(bytes.first().copied(), Some(discriminant));
+        assert_eq!(postcard::from_bytes::<WorkerMessage>(&bytes)?, message);
+        assert!(!bytes.windows(5).any(|window| window == b"/tmp/"));
+    }
+
+    let mut validator = WorkerModelSourceTransportValidator::checked(context.clone())?;
+    validator.validate_request(1, &open)?;
+    validator.validate_response(1, &opened)?;
+    let chunk_count = source_bytes / u64::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)?;
+    for chunk_ordinal in 0..chunk_count {
+        let call_ordinal = chunk_ordinal + 2;
+        let byte_offset = chunk_ordinal * u64::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)?;
+        let request = WorkerModelSourceRequest {
+            context: context.clone(),
+            call_ordinal,
+            operation: WorkerModelSourceOperation::Read {
+                source_ordinal: 0,
+                tensor_ordinal: 0,
+                byte_offset,
+                byte_length: u32::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)?,
+            },
+        };
+        validator.validate_request(call_ordinal, &request)?;
+        let chunk = comfy_types::WorkerModelSourceChunk::checked(
+            context.session_id,
+            call_ordinal,
+            0,
+            0,
+            byte_offset,
+            vec![u8::try_from(chunk_ordinal)?; MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES],
+        )?;
+        validator.validate_response(call_ordinal, &WorkerModelSourceResponse::Chunk(chunk))?;
+    }
+    let close_ordinal = chunk_count + 2;
+    let close = WorkerModelSourceRequest {
+        context: context.clone(),
+        call_ordinal: close_ordinal,
+        operation: WorkerModelSourceOperation::Close,
+    };
+    validator.validate_request(close_ordinal, &close)?;
+    validator.validate_response(
+        close_ordinal,
+        &WorkerModelSourceResponse::Closed(WorkerModelSourceClosed::checked(
+            context.session_id,
+            close_ordinal,
+        )?),
+    )?;
+    assert_eq!(
+        validator.validate_request(
+            close_ordinal + 1,
+            &WorkerModelSourceRequest {
+                context: context.clone(),
+                call_ordinal: close_ordinal + 1,
+                operation: WorkerModelSourceOperation::Close,
+            }
+        ),
+        Err(WorkerModelSourceError::Closed),
+    );
+
+    let mut truncated_validator = WorkerModelSourceTransportValidator::checked(context.clone())?;
+    truncated_validator.validate_request(1, &open)?;
+    truncated_validator.validate_response(1, &opened)?;
+    let read = WorkerModelSourceRequest {
+        context: context.clone(),
+        call_ordinal: 2,
+        operation: WorkerModelSourceOperation::Read {
+            source_ordinal: 0,
+            tensor_ordinal: 0,
+            byte_offset: 0,
+            byte_length: 4,
+        },
+    };
+    truncated_validator.validate_request(2, &read)?;
+    let truncated = comfy_types::WorkerModelSourceChunk::checked(
+        context.session_id,
+        2,
+        0,
+        0,
+        0,
+        vec![1, 2, 3],
+    )?;
+    assert_eq!(
+        truncated_validator.validate_response(2, &WorkerModelSourceResponse::Chunk(truncated)),
+        Err(WorkerModelSourceError::InvalidOrder),
+    );
+    assert!(truncated_validator.is_closed());
+
+    let mut digest_validator = WorkerModelSourceTransportValidator::checked(context.clone())?;
+    digest_validator.validate_request(1, &open)?;
+    let mut forged_opened = opened.clone();
+    if let WorkerModelSourceResponse::Opened(opened) = &mut forged_opened {
+        opened.response_sha256 = WorkerSha256Digest::new("f".repeat(64))?;
+    }
+    assert_eq!(
+        digest_validator.validate_response(1, &forged_opened),
+        Err(WorkerModelSourceError::DigestMismatch),
+    );
+    assert!(digest_validator.is_closed());
+
+    let mut concurrent_validator = WorkerModelSourceTransportValidator::checked(context.clone())?;
+    concurrent_validator.validate_request(1, &open)?;
+    assert_eq!(
+        concurrent_validator.validate_request(1, &open),
+        Err(WorkerModelSourceError::InvalidOrder),
+    );
+    assert!(concurrent_validator.is_closed());
+    assert_eq!(
+        concurrent_validator.validate_response(1, &opened),
+        Err(WorkerModelSourceError::Closed),
+    );
+
+    let mut late_validator = WorkerModelSourceTransportValidator::checked(context.clone())?;
+    assert_eq!(
+        late_validator.validate_response(
+            1,
+            &WorkerModelSourceResponse::rejected(
+                context.session_id,
+                1,
+                WorkerModelSourceError::HostFailure,
+            )?,
+        ),
+        Err(WorkerModelSourceError::Late),
+    );
+
+    let mut oversized = open;
+    oversized.call_ordinal = 1;
+    oversized.operation = WorkerModelSourceOperation::Read {
+        source_ordinal: 0,
+        tensor_ordinal: 0,
+        byte_offset: 0,
+        byte_length: u32::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)? + 1,
+    };
+    let mut oversized_validator = WorkerModelSourceTransportValidator::checked(context)?;
+    assert!(oversized_validator.validate_request(2, &oversized).is_err());
     Ok(())
 }
 

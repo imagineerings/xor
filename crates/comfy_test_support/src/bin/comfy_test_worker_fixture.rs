@@ -117,7 +117,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             WorkerMessage::ExecutePlugin { .. }
             | WorkerMessage::PluginCapabilityResponse { .. }
             | WorkerMessage::ProviderStreamResponse { .. }
-            | WorkerMessage::ProviderV2ProposalFinalization { .. } => {
+            | WorkerMessage::ProviderV2ProposalFinalization { .. }
+            | WorkerMessage::ModelSourceResponse { .. } => {
                 return Err("fixture does not implement the component worker protocol".into());
             }
             WorkerMessage::HelloAck { .. }
@@ -130,6 +131,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             | WorkerMessage::PluginCapabilityRequest { .. }
             | WorkerMessage::ProviderStreamRequest { .. }
             | WorkerMessage::ProviderV2ProposalFinalizationAck { .. }
+            | WorkerMessage::ModelSourceRequest { .. }
             | WorkerMessage::PluginResult { .. }
             | WorkerMessage::Fatal { .. } => {
                 return Err("supervisor sent a worker-only message".into());

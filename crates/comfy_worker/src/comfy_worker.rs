@@ -2,7 +2,10 @@ use std::{
     collections::BTreeMap,
     future::pending,
     io::{self, Read, Write},
-    sync::Arc,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -16,8 +19,10 @@ use comfy_runtime::{
 use comfy_tensor::{BackendWorkspaceAuthority, CancellationToken, CpuBackend, DeviceId};
 use comfy_types::{
     BackendUnavailable, DeviceKind, MAX_ENCODED_PREVIEW_BYTES, MAX_WORKER_FRAME_BYTES,
-    WorkerEnvelope, WorkerMessage, WorkerPluginExecutionOutcome, WorkerProtocolError,
-    WorkerRegistryDeploymentRejectionReason, decode_worker_frame, encode_worker_frame,
+    WorkerEnvelope, WorkerMessage, WorkerModelSourceContext, WorkerModelSourceError,
+    WorkerModelSourceRequest, WorkerModelSourceResponse, WorkerModelSourceTransportValidator,
+    WorkerPluginExecutionOutcome, WorkerProtocolError, WorkerRegistryDeploymentRejectionReason,
+    decode_worker_frame, encode_worker_frame,
 };
 use thiserror::Error;
 
@@ -31,6 +36,173 @@ pub use memory_planner::*;
 pub use supervisor::*;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(2);
+const MODEL_SOURCE_BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(10);
+
+pub struct WorkerModelSourceTransportCall {
+    call_id: u64,
+    request: WorkerModelSourceRequest,
+    validator: Arc<Mutex<WorkerModelSourceTransportValidator>>,
+    response_sender: async_channel::Sender<WorkerModelSourceResponse>,
+}
+
+impl WorkerModelSourceTransportCall {
+    pub const fn call_id(&self) -> u64 {
+        self.call_id
+    }
+
+    pub fn request(&self) -> &WorkerModelSourceRequest {
+        &self.request
+    }
+
+    pub async fn respond(
+        self,
+        call_id: u64,
+        response: WorkerModelSourceResponse,
+    ) -> Result<(), WorkerModelSourceError> {
+        self.validator
+            .lock()
+            .map_err(|_| WorkerModelSourceError::HostFailure)?
+            .validate_response(call_id, &response)?;
+        self.response_sender
+            .send(response)
+            .await
+            .map_err(|_| WorkerModelSourceError::Closed)
+    }
+
+    pub fn revoke(&self) -> Result<(), WorkerModelSourceError> {
+        self.validator
+            .lock()
+            .map_err(|_| WorkerModelSourceError::HostFailure)?
+            .revoke();
+        Ok(())
+    }
+}
+
+pub struct WorkerModelSourceTransportHost {
+    receiver: async_channel::Receiver<WorkerModelSourceTransportCall>,
+}
+
+impl WorkerModelSourceTransportHost {
+    pub async fn receive(
+        &self,
+    ) -> Result<WorkerModelSourceTransportCall, async_channel::RecvError> {
+        self.receiver.recv().await
+    }
+}
+
+#[derive(Clone)]
+pub struct WorkerModelSourceTransport {
+    sender: async_channel::Sender<WorkerModelSourceTransportCall>,
+    next_call_id: Arc<AtomicU64>,
+}
+
+impl WorkerModelSourceTransport {
+    pub fn channel() -> (Self, WorkerModelSourceTransportHost) {
+        let (sender, receiver) = async_channel::bounded(1);
+        (
+            Self {
+                sender,
+                next_call_id: Arc::new(AtomicU64::new(1)),
+            },
+            WorkerModelSourceTransportHost { receiver },
+        )
+    }
+
+    pub fn open_session(
+        &self,
+        context: WorkerModelSourceContext,
+    ) -> Result<WorkerModelSourceSession, WorkerModelSourceError> {
+        Ok(WorkerModelSourceSession {
+            transport: self.clone(),
+            validator: Arc::new(Mutex::new(WorkerModelSourceTransportValidator::checked(
+                context,
+            )?)),
+        })
+    }
+}
+
+pub struct WorkerModelSourceSession {
+    transport: WorkerModelSourceTransport,
+    validator: Arc<Mutex<WorkerModelSourceTransportValidator>>,
+}
+
+impl WorkerModelSourceSession {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "the private worker model loader runs on a blocking native execution thread and must cooperatively poll its capacity-one IPC route"
+    )]
+    pub fn call(
+        &self,
+        request: WorkerModelSourceRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<WorkerModelSourceResponse, WorkerModelSourceError> {
+        cancellation
+            .check()
+            .map_err(|_| WorkerModelSourceError::Cancelled)?;
+        let call_id = self.transport.next_call_id.fetch_add(1, Ordering::Relaxed);
+        if call_id == 0 {
+            self.revoke()?;
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        self.validator
+            .lock()
+            .map_err(|_| WorkerModelSourceError::HostFailure)?
+            .validate_request(call_id, &request)?;
+        let (response_sender, response_receiver) = async_channel::bounded(1);
+        let mut call = WorkerModelSourceTransportCall {
+            call_id,
+            request,
+            validator: self.validator.clone(),
+            response_sender,
+        };
+        loop {
+            if cancellation.is_cancelled() {
+                self.revoke()?;
+                return Err(WorkerModelSourceError::Cancelled);
+            }
+            match self.transport.sender.try_send(call) {
+                Ok(()) => break,
+                Err(async_channel::TrySendError::Full(returned)) => {
+                    call = returned;
+                    smol::block_on(async_io::Timer::after(MODEL_SOURCE_BRIDGE_POLL_INTERVAL));
+                }
+                Err(async_channel::TrySendError::Closed(_)) => {
+                    self.revoke()?;
+                    return Err(WorkerModelSourceError::Closed);
+                }
+            }
+        }
+        loop {
+            if cancellation.is_cancelled() {
+                self.revoke()?;
+                return Err(WorkerModelSourceError::Cancelled);
+            }
+            let received = smol::block_on(smol::future::race(
+                async { Some(response_receiver.recv().await) },
+                async {
+                    async_io::Timer::after(MODEL_SOURCE_BRIDGE_POLL_INTERVAL).await;
+                    None
+                },
+            ));
+            match received {
+                Some(Ok(response)) => return Ok(response),
+                Some(Err(_)) => {
+                    self.revoke()?;
+                    return Err(WorkerModelSourceError::Closed);
+                }
+                None => {}
+            }
+        }
+    }
+
+    fn revoke(&self) -> Result<(), WorkerModelSourceError> {
+        self.validator
+            .lock()
+            .map_err(|_| WorkerModelSourceError::HostFailure)?
+            .revoke();
+        Ok(())
+    }
+}
 
 enum NextWorkerInput {
     Frame(Result<Result<WorkerEnvelope, FrameError>, async_channel::RecvError>),
@@ -48,6 +220,7 @@ enum NextWorkerInput {
     ProviderV2Stream(
         Result<comfy_plugin_host::ProviderV2WorkerStreamCall, async_channel::RecvError>,
     ),
+    ModelSource(Result<WorkerModelSourceTransportCall, async_channel::RecvError>),
     JobEvent(Result<AttemptEvent, async_channel::RecvError>),
 }
 
@@ -64,6 +237,7 @@ struct ActiveExecution {
         Option<async_channel::Receiver<plugin_runtime::WorkerCapabilityBridgeRequest>>,
     provider_v2_streams:
         Option<async_channel::Receiver<comfy_plugin_host::ProviderV2WorkerStreamCall>>,
+    model_sources: Option<WorkerModelSourceTransportHost>,
     events: Option<async_channel::Receiver<AttemptEvent>>,
 }
 
@@ -666,6 +840,7 @@ async fn run_worker_process_with_configuration(
     let mut pending_provider_v2_proposal: Option<
         comfy_plugin_host::ProviderV2WorkerPendingInvocation,
     > = None;
+    let mut pending_model_source: Option<WorkerModelSourceTransportCall> = None;
     'worker: loop {
         let delay = next_heartbeat.saturating_duration_since(Instant::now());
         let next = smol::future::race(
@@ -724,16 +899,28 @@ async fn run_worker_process_with_configuration(
                                         pending().await
                                     }
                                 },
-                                async {
-                                    if let Some(events) = active_execution
-                                        .as_ref()
-                                        .and_then(|active| active.events.as_ref())
-                                    {
-                                        NextWorkerInput::JobEvent(events.recv().await)
-                                    } else {
-                                        pending().await
-                                    }
-                                },
+                                smol::future::race(
+                                    async {
+                                        if let Some(requests) = active_execution
+                                            .as_ref()
+                                            .and_then(|active| active.model_sources.as_ref())
+                                        {
+                                            NextWorkerInput::ModelSource(requests.receive().await)
+                                        } else {
+                                            pending().await
+                                        }
+                                    },
+                                    async {
+                                        if let Some(events) = active_execution
+                                            .as_ref()
+                                            .and_then(|active| active.events.as_ref())
+                                        {
+                                            NextWorkerInput::JobEvent(events.recv().await)
+                                        } else {
+                                            pending().await
+                                        }
+                                    },
+                                ),
                             ),
                         ),
                     ),
@@ -1001,12 +1188,22 @@ async fn run_worker_process_with_configuration(
                                     anyhow::anyhow!("execute omitted attempt identity")
                                 })?;
                                 let cancellation = CancellationToken::default();
+                                let (model_source_transport, model_sources) =
+                                    if worker_plan.model_source_service.is_some() {
+                                        let (transport, host) =
+                                            WorkerModelSourceTransport::channel();
+                                        (Some(transport), Some(host))
+                                    } else {
+                                        (None, None)
+                                    };
                                 let event_bus = ExecutionEventBus::new(32)?;
                                 let events = event_bus.subscribe();
                                 let (result_sender, result) = async_channel::bounded(1);
                                 let cancellation_for_job = cancellation.clone();
+                                let model_source_transport_for_job = model_source_transport;
                                 smol::spawn(async move {
                                 let result = smol::unblock(move || {
+                                    let _model_source_transport = model_source_transport_for_job;
                                     current.execute_blocking_with_event_bus_and_configuration(
                                         &worker_plan.plan,
                                         attempt_id,
@@ -1032,6 +1229,7 @@ async fn run_worker_process_with_configuration(
                                     plugin_result: None,
                                     plugin_capabilities: native_provider_capabilities.clone(),
                                     provider_v2_streams: None,
+                                    model_sources,
                                     events: Some(events),
                                 });
                             }
@@ -1102,6 +1300,7 @@ async fn run_worker_process_with_configuration(
                                     plugin_result: Some(plugin_result),
                                     plugin_capabilities: Some(plugin_capabilities),
                                     provider_v2_streams: Some(provider_v2_streams),
+                                    model_sources: None,
                                     events: None,
                                 });
                             }
@@ -1164,6 +1363,27 @@ async fn run_worker_process_with_configuration(
                                     active_execution = None;
                                 }
                             }
+                            comfy_types::WorkerMessage::ModelSourceResponse {
+                                call_id,
+                                response,
+                            } => {
+                                let pending = pending_model_source.take().ok_or_else(|| {
+                                    if let Some(active) = &active_execution {
+                                        active.cancellation.cancel();
+                                    }
+                                    anyhow::anyhow!(
+                                        "worker received a model-source response without a pending capacity-one call"
+                                    )
+                                })?;
+                                if let Err(error) =
+                                    pending.respond(*call_id, response.clone()).await
+                                {
+                                    if let Some(active) = &active_execution {
+                                        active.cancellation.cancel();
+                                    }
+                                    return Err(anyhow::anyhow!(error.to_string()));
+                                }
+                            }
                             comfy_types::WorkerMessage::Cancel { .. } => {
                                 let active = active_execution.as_mut().ok_or_else(|| {
                                     anyhow::anyhow!("cancellation has no active execution")
@@ -1187,6 +1407,11 @@ async fn run_worker_process_with_configuration(
                                         &mut pending_provider_v2_proposal,
                                         &mut pending_provider_v2_streams,
                                     )?;
+                                if let Some(pending) = pending_model_source.take() {
+                                    pending
+                                        .revoke()
+                                        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+                                }
                                 if cancelled_provider_v2_proposal {
                                     let response = session.complete_plugin_execution(
                                         WorkerPluginExecutionOutcome::Failed(
@@ -1223,15 +1448,40 @@ async fn run_worker_process_with_configuration(
                                         &mut pending_provider_v2_proposal,
                                         &mut pending_provider_v2_streams,
                                     )?;
+                                    if let Some(pending) = pending_model_source.take() {
+                                        pending
+                                            .revoke()
+                                            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+                                    }
                                 } else if pending_provider_v2_proposal.is_some()
                                     || !pending_provider_v2_streams.is_empty()
+                                    || pending_model_source.is_some()
                                 {
                                     return Err(anyhow::anyhow!(
-                                        "worker shutdown found provider-v2 work without an active execution"
+                                        "worker shutdown found bridge work without an active execution"
                                     ));
                                 }
                             }
-                            _ => {}
+                            comfy_types::WorkerMessage::Hello { .. }
+                            | comfy_types::WorkerMessage::HelloAck { .. }
+                            | comfy_types::WorkerMessage::Ready
+                            | comfy_types::WorkerMessage::Event { .. }
+                            | comfy_types::WorkerMessage::OutputProposal { .. }
+                            | comfy_types::WorkerMessage::Heartbeat
+                            | comfy_types::WorkerMessage::Fatal { .. }
+                            | comfy_types::WorkerMessage::Lifecycle { .. }
+                            | comfy_types::WorkerMessage::RegistryDeploymentBegin { .. }
+                            | comfy_types::WorkerMessage::RegistryDeploymentChunk { .. }
+                            | comfy_types::WorkerMessage::RegistryDeploymentCommit { .. }
+                            | comfy_types::WorkerMessage::RegistryDeploymentAck { .. }
+                            | comfy_types::WorkerMessage::RegistryDeploymentRejected { .. }
+                            | comfy_types::WorkerMessage::PluginCapabilityRequest { .. }
+                            | comfy_types::WorkerMessage::PluginResult { .. }
+                            | comfy_types::WorkerMessage::ProviderStreamRequest { .. }
+                            | comfy_types::WorkerMessage::ProviderV2ProposalFinalizationAck {
+                                ..
+                            }
+                            | comfy_types::WorkerMessage::ModelSourceRequest { .. } => {}
                         }
                         if session.is_terminal() {
                             break;
@@ -1259,6 +1509,11 @@ async fn run_worker_process_with_configuration(
                     ));
                 }
                 pending_plugin_capabilities.clear();
+                if pending_model_source.is_some() {
+                    return Err(anyhow::anyhow!(
+                        "native execution finished with a model-source call still pending"
+                    ));
+                }
                 if let Some(active) = &active_execution
                     && let Some(events) = &active.events
                 {
@@ -1408,6 +1663,27 @@ async fn run_worker_process_with_configuration(
             NextWorkerInput::ProviderV2Stream(Err(_)) => {
                 if let Some(active) = &mut active_execution {
                     active.provider_v2_streams = None;
+                }
+            }
+            NextWorkerInput::ModelSource(Ok(call)) => {
+                if pending_model_source.is_some() {
+                    if let Some(active) = &active_execution {
+                        active.cancellation.cancel();
+                    }
+                    call.revoke()
+                        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+                    return Err(anyhow::anyhow!(
+                        "worker model-source capacity-one route received concurrent calls"
+                    ));
+                }
+                let response =
+                    session.model_source_request(call.call_id(), call.request().clone())?;
+                pending_model_source = Some(call);
+                write_frame(&mut stdout, &response)?;
+            }
+            NextWorkerInput::ModelSource(Err(_)) => {
+                if let Some(active) = &mut active_execution {
+                    active.model_sources = None;
                 }
             }
             NextWorkerInput::PluginCapability(Ok(request)) => {

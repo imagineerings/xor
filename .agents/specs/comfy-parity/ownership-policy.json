@@ -11050,6 +11050,151 @@
       "decision_reason": "comfy_model::vae is the single authoritative VAE domain: it owns profile compatibility, persisted identity admission, descriptors, model binding, generic and typed structured execution boundaries, cancellation, and publication. The pinned-source vae_architecture module only recognizes and normalizes source checkpoint forms, then maps them through the canonical ModelStore, latent registry, VAE profile, descriptor, and NativeModule contracts. vae_structured owns only Hunyuan3D and TripoSplat source topology, exact state manifests, and equations; it consumes canonical Tensor handles plus caller workspace, RNG, and cancellation and does not create a 3D media, asset, path, index, plan, retry, queue, cache, persistence, or transaction owner."
     },
     {
+      "concern": "native_model_verified_source_worker_bridge",
+      "canonical_owner": "comfy_runtime::assets::NativeAssetResolverRegistry",
+      "owner_files": [
+        "crates/comfy_runtime/src/assets.rs",
+        "crates/comfy_runtime/src/native_execution_controller.rs",
+        "crates/comfy_runtime/src/runtime_supervisor.rs",
+        "crates/comfy_types/src/worker_protocol.rs",
+        "crates/comfy_worker/src/comfy_worker.rs",
+        "crates/comfy_worker/src/supervisor.rs"
+      ],
+      "owner_symbols": [
+        "NativeAssetResolverRegistry",
+        "WorkerModelSourceTransportValidator",
+        "WorkerModelSourceTransport",
+        "NativeModelSourceWorkerBinding"
+      ],
+      "allowed_adapters": [
+        "WorkerModelSourceTransportValidator owns the worker-side capacity-one open, read, and close ordering state and validates exact response identity, length, bounds, and digest",
+        "WorkerModelSourceTransport and WorkerSession adapt validated calls to distinct append-only WorkerMessage model-source request and response variants without using provider streaming",
+        "RuntimeSupervisor and NativeImageExecutionController transport exact attempt, node, service, session, selection, and call identities between one active worker and the app resolver",
+        "NativeAssetResolverRegistry alone resolves source names through AssetService, retains the canonical ModelStore and verified stream sources, and serves bounded revalidated tensor chunks",
+        "the worker protocol projects only path-free verified manifest metadata and fixed-size chunks and exposes no authorization grant, ArtifactIndex, ArtifactKey, ModelStore, raw service, file handle, or filesystem path",
+        "worker loss, cancellation, shutdown, controller replacement, invalid ordering, stale identity, source change, oversized traffic, and digest failure revoke the exact session before retry"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/assets.rs",
+          "qualified": "comfy_runtime::assets::NativeAssetResolverRegistry",
+          "role": "canonical",
+          "symbol": "NativeAssetResolverRegistry",
+          "pattern": "^pub struct NativeAssetResolverRegistry \\{"
+        },
+        {
+          "path": "crates/comfy_types/src/worker_protocol.rs",
+          "qualified": "comfy_types::worker_protocol::WorkerModelSourceTransportValidator",
+          "role": "wire_adapter",
+          "symbol": "WorkerModelSourceTransportValidator",
+          "pattern": "^pub struct WorkerModelSourceTransportValidator \\{"
+        },
+        {
+          "path": "crates/comfy_worker/src/comfy_worker.rs",
+          "qualified": "comfy_worker::WorkerModelSourceTransport",
+          "role": "adapter",
+          "symbol": "WorkerModelSourceTransport",
+          "pattern": "^pub struct WorkerModelSourceTransport \\{"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "qualified": "comfy_runtime::native_execution_controller::NativeModelSourceWorkerBinding",
+          "role": "boundary_dto",
+          "symbol": "NativeModelSourceWorkerBinding",
+          "pattern": "^pub struct NativeModelSourceWorkerBinding \\{"
+        }
+      ],
+      "call_symbols": [
+        "NativeAssetResolverRegistry::serve_model_source_request",
+        "WorkerModelSourceTransportValidator::validate_request",
+        "WorkerModelSourceTransportValidator::validate_response",
+        "WorkerSession::model_source_request"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "model-source-protocol-is-distinct-capacity-one-and-append-only",
+          "path": "crates/comfy_types/src/worker_protocol.rs",
+          "pattern": "MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES: usize = 512 \\* 1024[\\s\\S]*ModelSourceRequest[\\s\\S]*ModelSourceResponse[\\s\\S]*WorkerModelSourceTransportValidator"
+        },
+        {
+          "name": "model-source-manifest-is-complete-path-free-and-digest-bound",
+          "path": "crates/comfy_types/src/worker_protocol.rs",
+          "pattern": "pub struct WorkerModelSourceManifest \\{[\\s\\S]*artifacts: Vec<WorkerModelSourceArtifact>[\\s\\S]*tensors: Vec<WorkerModelSourceTensor>[\\s\\S]*parser_limits: WorkerModelSourceParserLimits[\\s\\S]*model_source_opened_digest"
+        },
+        {
+          "name": "model-source-app-owner-resolves-through-assets-and-model-store",
+          "path": "crates/comfy_runtime/src/assets.rs",
+          "pattern": "fn open_model_source_session\\([\\s\\S]*resolve_source_asset_names[\\s\\S]*load_model\\([\\s\\S]*verified_stream_source[\\s\\S]*fn read_model_source_session\\([\\s\\S]*read_verified_tensor_range"
+        },
+        {
+          "name": "model-source-worker-consumes-validated-responses-without-wildcard",
+          "path": "crates/comfy_worker/src/comfy_worker.rs",
+          "pattern": "(?=[\\s\\S]*NextWorkerInput::ModelSource\\(Ok\\(call\\)\\))(?=[\\s\\S]*session.model_source_request)(?=[\\s\\S]*WorkerMessage::ModelSourceResponse)(?=[\\s\\S]*validate_response)"
+        },
+        {
+          "name": "model-source-controller-binds-generations-and-revokes-on-loss",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "NativeModelSourceWorkerBinding[\\s\\S]*attempt_generation[\\s\\S]*node_generation[\\s\\S]*service_generation[\\s\\S]*revoke_model_source_sessions[\\s\\S]*replace_model_source_service"
+        },
+        {
+          "name": "model-source-restart-oracle-streams-more-than-execute-frame",
+          "path": "crates/comfy_test_support/tests/native_worker_resilience.rs",
+          "pattern": "fn model_source_worker_bridge_restarts_without_duplicate_publication[\\s\\S]*13 \\* 1024 \\* 1024_usize[\\s\\S]*MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES[\\s\\S]*test_replace_model_source_service"
+        },
+        {
+          "name": "task399-model-source-worker-bridge-ownership-oracle",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "fn val_ownership_task399_model_source_worker_bridge_001"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-model-source-worker-bridge-foundation"
+      ],
+      "production_consumers": [
+        "the native model resource service consumes the path-free checked model-source session without receiving app authority"
+      ],
+      "requirements": [
+        "Requirement 6.3",
+        "Requirement 7.2",
+        "Requirement 18.1",
+        "Requirement 26.2",
+        "Requirement 28.2",
+        "Requirement 31.5",
+        "Requirement 34.2",
+        "Requirement 34.6",
+        "Requirement 35.2",
+        "Requirement 37.5",
+        "Requirement 38.3",
+        "Requirement 41.2",
+        "Requirement 44.1",
+        "Requirement 44.3"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeAssetResolverRegistry is the sole app-side owner of model-source session capacity, source resolution, ModelStore retention, and checked chunk service. Protocol, worker, supervisor, and controller types are identity-checking transport adapters only and cannot acquire filesystem, authorization, index, parser, store, cache, or unchecked-read authority."
+    },
+    {
       "concern": "native_model_verified_stream_source",
       "canonical_owner": "comfy_model::model_store::ModelStore",
       "owner_files": [

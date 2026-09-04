@@ -1143,6 +1143,101 @@ fn val_ownership_task398_model_store_stream_source_001() -> Result<(), Box<dyn s
     Ok(())
 }
 
+#[test]
+fn val_ownership_task399_model_source_worker_bridge_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let protocol = fs::read_to_string(root.join("crates/comfy_types/src/worker_protocol.rs"))?;
+    let worker = fs::read_to_string(root.join("crates/comfy_worker/src/comfy_worker.rs"))?;
+    let assets = fs::read_to_string(root.join("crates/comfy_runtime/src/assets.rs"))?;
+    let controller =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_execution_controller.rs"))?;
+
+    let model_source_protocol = protocol
+        .split("pub struct WorkerModelSourceContext {")
+        .nth(1)
+        .and_then(|source| source.split("pub enum WorkerMessage {").next())
+        .ok_or("model-source protocol block is missing")?;
+    for forbidden in [
+        "ArtifactKey",
+        "ArtifactIndex",
+        "ModelStore",
+        "PathBuf",
+        "authorization grant",
+        "file handle",
+    ] {
+        assert!(
+            !model_source_protocol.contains(forbidden),
+            "worker model-source protocol exposes forbidden authority {forbidden}"
+        );
+    }
+    assert!(protocol.contains("MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES: usize = 512 * 1024"));
+    assert!(protocol.contains("pub struct WorkerModelSourceTransportValidator {"));
+    assert!(worker.contains("pub struct WorkerModelSourceTransport {"));
+    assert!(worker.contains("NextWorkerInput::ModelSource(Ok(call))"));
+    assert!(worker.contains(".validate_response(call_id, &response)"));
+    assert!(assets.contains("fn open_model_source_session("));
+    assert!(assets.contains("resolve_source_asset_names("));
+    assert!(assets.contains("read_verified_tensor_range("));
+    assert!(controller.contains("pub struct NativeModelSourceWorkerBinding {"));
+    assert!(controller.contains("revoke_model_source_sessions()"));
+    assert!(controller.contains("replace_model_source_service()"));
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy["concerns"]
+        .as_array()
+        .and_then(|concerns| {
+            concerns
+                .iter()
+                .find(|concern| concern["concern"] == "native_model_verified_source_worker_bridge")
+        })
+        .ok_or("model-source worker-bridge ownership concern is missing")?;
+    assert_eq!(
+        concern["canonical_owner"].as_str(),
+        Some("comfy_runtime::assets::NativeAssetResolverRegistry")
+    );
+    assert_eq!(concern["definitions"].as_array().map(Vec::len), Some(4));
+    assert!(
+        concern["required_mappings"]
+            .as_array()
+            .is_some_and(|mappings| mappings.len() >= 7)
+    );
+    assert!(
+        concern["known_open_reasons"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+    );
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let mut records = parse_csv_records(&catalog)?.into_iter();
+    let header = records.next().ok_or("ownership catalog has no header")?;
+    let column = |name: &str| {
+        header
+            .iter()
+            .position(|candidate| candidate == name)
+            .ok_or_else(|| format!("ownership catalog has no {name} column"))
+    };
+    let concern_column = column("concern")?;
+    let status_column = column("current_status")?;
+    let competing_column = column("competing_symbols")?;
+    let definitions_column = column("definition_hits")?;
+    let row = records
+        .find(|row| row[concern_column] == "native_model_verified_source_worker_bridge")
+        .ok_or("model-source worker-bridge ownership catalog row is missing")?;
+    assert_eq!(row[status_column], "authoritative_owner_confirmed");
+    assert!(row[competing_column].is_empty());
+    assert!(
+        row[definitions_column].contains("canonical@crates/comfy_runtime/src/assets.rs"),
+        "unexpected model-source bridge definitions: {}",
+        row[definitions_column]
+    );
+    Ok(())
+}
+
 fn accounted_pending_ownership_rows(
     ownership_catalog: &str,
     policy_concerns: &[serde_json::Value],
