@@ -1,5 +1,7 @@
 use crate::{
-    artifact_index::{ArtifactAvailability, ArtifactIndex, ArtifactIndexError, ArtifactKey},
+    artifact_index::{
+        ArtifactAvailability, ArtifactIndex, ArtifactIndexError, ArtifactKey, VerifiedArtifactFile,
+    },
     formats::{
         GgufValue, ModelFormat, ModelFormatError, ParsedModel, ParsedModelPayload,
         SentencePieceVocabulary, TensorMetadata, parse_verified_embedding_archive_file,
@@ -23,11 +25,12 @@ use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, Weak},
 };
 
 const MAX_MODEL_OPERATION_RECORDS: usize = 4_096;
 const MAX_MODEL_CACHE_ENTRIES: usize = 64;
+const MODEL_STREAM_MAXIMUM_READ_BYTES: u64 = 1024 * 1024;
 
 #[cfg(unix)]
 use std::{ffi::c_void, os::fd::AsRawFd, ptr::NonNull, slice};
@@ -62,12 +65,117 @@ pub struct ModelLoadAccounting {
 #[derive(Clone, Debug)]
 pub struct LoadedModel {
     identity: String,
+    ordered_artifact_keys: Vec<ArtifactKey>,
     artifact_identities: BTreeMap<ArtifactKey, String>,
     documents: Vec<Arc<ParsedModel>>,
     tensors: BTreeMap<String, TensorMetadata>,
     tensor_sources: BTreeMap<String, ArtifactKey>,
     accounting: ModelLoadAccounting,
     store_identity: Arc<()>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ModelStreamNestedStateDisposition {
+    Flat,
+    NestedStringToParam,
+}
+
+pub struct VerifiedModelStreamArtifact {
+    key: ArtifactKey,
+    sha256: String,
+    byte_size: u64,
+    format: ModelFormat,
+    nested_state_disposition: ModelStreamNestedStateDisposition,
+}
+
+impl VerifiedModelStreamArtifact {
+    pub fn sha256(&self) -> &str {
+        &self.sha256
+    }
+
+    pub const fn byte_size(&self) -> u64 {
+        self.byte_size
+    }
+
+    pub const fn format(&self) -> &ModelFormat {
+        &self.format
+    }
+
+    pub const fn nested_state_disposition(&self) -> ModelStreamNestedStateDisposition {
+        self.nested_state_disposition
+    }
+}
+
+pub struct VerifiedModelStreamTensor {
+    name: String,
+    data_type: String,
+    shape: Vec<u64>,
+    artifact_ordinal: usize,
+    artifact_key: ArtifactKey,
+    byte_offset: u64,
+    byte_length: u64,
+}
+
+impl VerifiedModelStreamTensor {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn data_type(&self) -> &str {
+        &self.data_type
+    }
+
+    pub fn shape(&self) -> &[u64] {
+        &self.shape
+    }
+
+    pub const fn artifact_ordinal(&self) -> usize {
+        self.artifact_ordinal
+    }
+
+    pub const fn byte_offset(&self) -> u64 {
+        self.byte_offset
+    }
+
+    pub const fn byte_length(&self) -> u64 {
+        self.byte_length
+    }
+}
+
+pub struct VerifiedModelStreamSource {
+    model_identity: String,
+    artifacts: Vec<VerifiedModelStreamArtifact>,
+    tensors: Vec<VerifiedModelStreamTensor>,
+    aggregate_tensor_bytes: u64,
+    maximum_read_bytes: u64,
+    limits: ParserLimits,
+    store_identity: Weak<()>,
+}
+
+impl VerifiedModelStreamSource {
+    pub fn model_identity(&self) -> &str {
+        &self.model_identity
+    }
+
+    pub fn artifacts(&self) -> &[VerifiedModelStreamArtifact] {
+        &self.artifacts
+    }
+
+    pub fn tensors(&self) -> &[VerifiedModelStreamTensor] {
+        &self.tensors
+    }
+
+    pub const fn aggregate_tensor_bytes(&self) -> u64 {
+        self.aggregate_tensor_bytes
+    }
+
+    pub const fn maximum_read_bytes(&self) -> u64 {
+        self.maximum_read_bytes
+    }
+
+    pub const fn limits(&self) -> &ParserLimits {
+        &self.limits
+    }
 }
 
 impl LoadedModel {
@@ -560,6 +668,248 @@ impl ModelStore {
             .ok_or_else(|| ModelStoreError::UnknownTensor(tensor_name.to_owned()))
     }
 
+    pub fn verified_stream_source(
+        &self,
+        index: &ArtifactIndex,
+        model: &LoadedModel,
+        cancellation: &CancellationToken,
+    ) -> Result<VerifiedModelStreamSource, ModelStoreError> {
+        if !Arc::ptr_eq(&self.identity, &model.store_identity) {
+            return Err(ModelStoreError::ForeignModelHandle);
+        }
+        cancellation
+            .check()
+            .map_err(|_| ModelStoreError::Cancelled)?;
+        if model.ordered_artifact_keys.len() != model.documents.len() {
+            return Err(ModelStoreError::InvalidModelStreamSourceMetadata(
+                "ordered artifact and parsed document counts differ".to_owned(),
+            ));
+        }
+
+        let mut artifacts = Vec::new();
+        artifacts
+            .try_reserve_exact(model.documents.len())
+            .map_err(|_| ModelStoreError::AllocationFailed {
+                requested: u64::try_from(model.documents.len()).unwrap_or(u64::MAX),
+            })?;
+        let mut tensors = Vec::new();
+        tensors
+            .try_reserve_exact(model.tensors.len())
+            .map_err(|_| ModelStoreError::AllocationFailed {
+                requested: u64::try_from(model.tensors.len()).unwrap_or(u64::MAX),
+            })?;
+
+        for (artifact_ordinal, (key, document)) in model
+            .ordered_artifact_keys
+            .iter()
+            .zip(model.documents.iter())
+            .enumerate()
+        {
+            cancellation
+                .check()
+                .map_err(|_| ModelStoreError::Cancelled)?;
+            let expected_sha256 = model.artifact_identities.get(key).ok_or_else(|| {
+                ModelStoreError::InvalidModelStreamSourceMetadata(format!(
+                    "ordered artifact {key:?} has no loaded identity"
+                ))
+            })?;
+            if expected_sha256 != &document.source_sha256 {
+                return Err(ModelStoreError::InvalidModelStreamSourceMetadata(format!(
+                    "ordered artifact {key:?} does not match its parsed document"
+                )));
+            }
+            self.verify_stream_artifact_record(
+                index,
+                key,
+                &document.source_sha256,
+                document.source_size,
+            )?;
+            let verified = self.open_stream_artifact(index, key, cancellation)?;
+            let source_path = verified.path().to_path_buf();
+            self.verify_opened_stream_artifact(&verified, key)?;
+            let nested_state_disposition = match &document.payload {
+                ParsedModelPayload::Pytorch { root, .. }
+                    if crate::formats::has_nested_string_to_param(root) =>
+                {
+                    ModelStreamNestedStateDisposition::NestedStringToParam
+                }
+                _ => ModelStreamNestedStateDisposition::Flat,
+            };
+            artifacts.push(VerifiedModelStreamArtifact {
+                key: key.clone(),
+                sha256: document.source_sha256.clone(),
+                byte_size: document.source_size,
+                format: document.format.clone(),
+                nested_state_disposition,
+            });
+            for tensor in &document.tensors {
+                if model.tensor_sources.get(&tensor.name) != Some(key) {
+                    continue;
+                }
+                if tensor.storage.path != source_path {
+                    return Err(ModelStoreError::StorageSourceChanged { key: key.clone() });
+                }
+                tensors.push(VerifiedModelStreamTensor {
+                    name: tensor.name.clone(),
+                    data_type: tensor.data_type.clone(),
+                    shape: tensor.shape.clone(),
+                    artifact_ordinal,
+                    artifact_key: key.clone(),
+                    byte_offset: tensor.storage.offset,
+                    byte_length: tensor.storage.length,
+                });
+            }
+        }
+
+        let source = VerifiedModelStreamSource {
+            model_identity: model.identity.clone(),
+            artifacts,
+            tensors,
+            aggregate_tensor_bytes: model.accounting.tensor_bytes,
+            maximum_read_bytes: MODEL_STREAM_MAXIMUM_READ_BYTES,
+            limits: self.limits.clone(),
+            store_identity: Arc::downgrade(&self.identity),
+        };
+        self.validate_stream_source(&source)?;
+        for artifact in &source.artifacts {
+            cancellation
+                .check()
+                .map_err(|_| ModelStoreError::Cancelled)?;
+            self.verify_stream_artifact_record(
+                index,
+                &artifact.key,
+                &artifact.sha256,
+                artifact.byte_size,
+            )?;
+            drop(self.open_stream_artifact(index, &artifact.key, cancellation)?);
+        }
+        cancellation
+            .check()
+            .map_err(|_| ModelStoreError::Cancelled)?;
+        Ok(source)
+    }
+
+    pub fn read_verified_tensor_range(
+        &self,
+        index: &ArtifactIndex,
+        source: &VerifiedModelStreamSource,
+        tensor_name: &str,
+        byte_offset: u64,
+        byte_length: u64,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<u8>, ModelStoreError> {
+        self.validate_stream_source_identity(source)?;
+        cancellation
+            .check()
+            .map_err(|_| ModelStoreError::Cancelled)?;
+        self.validate_stream_source(source)?;
+        self.limits.check(
+            "model stream tensor range bytes",
+            byte_length,
+            source.maximum_read_bytes,
+        )?;
+        let tensor = source
+            .tensors
+            .iter()
+            .find(|tensor| tensor.name == tensor_name)
+            .ok_or_else(|| ModelStoreError::UnknownTensor(tensor_name.to_owned()))?;
+        let range_end = byte_offset
+            .checked_add(byte_length)
+            .ok_or(ModelStoreError::Overflow("model stream tensor range"))?;
+        if range_end > tensor.byte_length {
+            return Err(ModelStoreError::ModelStreamTensorRangeOutOfBounds {
+                tensor: tensor_name.to_owned(),
+                byte_offset,
+                byte_length,
+                tensor_byte_length: tensor.byte_length,
+            });
+        }
+
+        let mut verified_source = None;
+        for artifact in &source.artifacts {
+            cancellation
+                .check()
+                .map_err(|_| ModelStoreError::Cancelled)?;
+            self.verify_stream_artifact_record(
+                index,
+                &artifact.key,
+                &artifact.sha256,
+                artifact.byte_size,
+            )?;
+            let verified = self.open_stream_artifact(index, &artifact.key, cancellation)?;
+            if artifact.key == tensor.artifact_key {
+                verified_source = Some(verified);
+            }
+        }
+        let mut verified = verified_source.ok_or_else(|| {
+            ModelStoreError::InvalidModelStreamSourceMetadata(format!(
+                "tensor {tensor_name:?} has no ordered artifact"
+            ))
+        })?;
+        let absolute_offset = tensor
+            .byte_offset
+            .checked_add(byte_offset)
+            .ok_or(ModelStoreError::Overflow("model stream source range"))?;
+        let length = usize::try_from(byte_length)
+            .map_err(|_| ModelStoreError::Overflow("model stream tensor range length"))?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(length)
+            .map_err(|_| ModelStoreError::AllocationFailed {
+                requested: byte_length,
+            })?;
+        cancellation
+            .check()
+            .map_err(|_| ModelStoreError::Cancelled)?;
+        bytes.resize(length, 0);
+        verified
+            .file_mut()
+            .seek(SeekFrom::Start(absolute_offset))
+            .map_err(|error| ModelStoreError::ModelStreamIo {
+                key: tensor.artifact_key.clone(),
+                message: error.to_string(),
+            })?;
+        const STREAM_CHUNK_BYTES: usize = 1024 * 1024;
+        let mut position = 0_usize;
+        while position < bytes.len() {
+            cancellation
+                .check()
+                .map_err(|_| ModelStoreError::Cancelled)?;
+            let end = position.saturating_add(STREAM_CHUNK_BYTES).min(bytes.len());
+            let chunk = bytes
+                .get_mut(position..end)
+                .ok_or(ModelStoreError::Overflow("model stream tensor range chunk"))?;
+            verified.file_mut().read_exact(chunk).map_err(|error| {
+                ModelStoreError::ModelStreamIo {
+                    key: tensor.artifact_key.clone(),
+                    message: error.to_string(),
+                }
+            })?;
+            position = end;
+        }
+        cancellation
+            .check()
+            .map_err(|_| ModelStoreError::Cancelled)?;
+        self.verify_opened_stream_artifact(&verified, &tensor.artifact_key)?;
+        drop(verified);
+        for artifact in &source.artifacts {
+            cancellation
+                .check()
+                .map_err(|_| ModelStoreError::Cancelled)?;
+            self.verify_stream_artifact_record(
+                index,
+                &artifact.key,
+                &artifact.sha256,
+                artifact.byte_size,
+            )?;
+            drop(self.open_stream_artifact(index, &artifact.key, cancellation)?);
+        }
+        cancellation
+            .check()
+            .map_err(|_| ModelStoreError::Cancelled)?;
+        Ok(bytes)
+    }
+
     pub fn verified_tensor_payload(
         &self,
         index: &ArtifactIndex,
@@ -856,6 +1206,7 @@ impl ModelStore {
         let accounting = accounting(std::slice::from_ref(&parsed), &tensors, &self.limits)?;
         Ok(Arc::new(LoadedModel {
             identity: parsed.source_sha256.clone(),
+            ordered_artifact_keys: vec![key.clone()],
             artifact_identities: BTreeMap::from([(key.clone(), parsed.source_sha256.clone())]),
             tensor_sources: parsed
                 .tensors
@@ -936,6 +1287,7 @@ impl ModelStore {
             .unwrap_or_else(|| std::path::Path::new(""));
         let mut documents = Vec::new();
         documents.push(index_document.clone());
+        let mut ordered_artifact_keys = vec![key.clone()];
         let mut tensor_sources = BTreeMap::new();
         let mut artifact_identities =
             BTreeMap::from([(key.clone(), index_document.source_sha256.clone())]);
@@ -983,7 +1335,8 @@ impl ModelStore {
             for tensor_name in actual_names {
                 tensor_sources.insert(tensor_name, shard_key.clone());
             }
-            artifact_identities.insert(shard_key, parsed.source_sha256.clone());
+            artifact_identities.insert(shard_key.clone(), parsed.source_sha256.clone());
+            ordered_artifact_keys.push(shard_key);
             identity.push(':');
             identity.push_str(&parsed.source_sha256);
             documents.push(parsed);
@@ -1002,6 +1355,7 @@ impl ModelStore {
         let accounting = accounting(&documents, &tensors, &self.limits)?;
         Ok(Arc::new(LoadedModel {
             identity,
+            ordered_artifact_keys,
             artifact_identities,
             documents,
             tensors,
@@ -1069,6 +1423,193 @@ impl ModelStore {
             });
         }
         Ok(())
+    }
+
+    fn validate_stream_source_identity(
+        &self,
+        source: &VerifiedModelStreamSource,
+    ) -> Result<(), ModelStoreError> {
+        let Some(identity) = source.store_identity.upgrade() else {
+            return Err(ModelStoreError::StaleModelStreamSource);
+        };
+        if !Arc::ptr_eq(&self.identity, &identity) {
+            return Err(ModelStoreError::ForeignModelStreamSource);
+        }
+        Ok(())
+    }
+
+    fn validate_stream_source(
+        &self,
+        source: &VerifiedModelStreamSource,
+    ) -> Result<(), ModelStoreError> {
+        self.validate_stream_source_identity(source)?;
+        if source.model_identity.is_empty() || source.artifacts.is_empty() {
+            return Err(ModelStoreError::InvalidModelStreamSourceMetadata(
+                "model or artifact identity is empty".to_owned(),
+            ));
+        }
+        if source.limits != self.limits {
+            return Err(ModelStoreError::InvalidModelStreamSourceMetadata(
+                "parser limits differ from the owning model store".to_owned(),
+            ));
+        }
+        if source.maximum_read_bytes != MODEL_STREAM_MAXIMUM_READ_BYTES {
+            return Err(ModelStoreError::InvalidModelStreamSourceMetadata(
+                "per-call read limit differs from the model-store stream contract".to_owned(),
+            ));
+        }
+        self.limits.check(
+            "model stream artifact count",
+            u64::try_from(source.artifacts.len()).unwrap_or(u64::MAX),
+            self.limits.maximum_archive_entries,
+        )?;
+        self.limits.check(
+            "model stream tensor count",
+            u64::try_from(source.tensors.len()).unwrap_or(u64::MAX),
+            self.limits.maximum_tensors,
+        )?;
+
+        let mut artifact_keys = BTreeSet::new();
+        for artifact in &source.artifacts {
+            if !artifact_keys.insert(artifact.key.clone())
+                || artifact.sha256.len() != 64
+                || !artifact.sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+            {
+                return Err(ModelStoreError::InvalidModelStreamSourceMetadata(format!(
+                    "artifact {:?} has a duplicate key or malformed identity",
+                    artifact.key
+                )));
+            }
+        }
+
+        let mut tensor_names = BTreeSet::new();
+        let mut aggregate_tensor_bytes = 0_u64;
+        let mut ranges = BTreeMap::<ArtifactKey, Vec<(&str, u64, u64)>>::new();
+        for tensor in &source.tensors {
+            if tensor.name.is_empty()
+                || tensor.data_type.is_empty()
+                || !tensor_names.insert(tensor.name.as_str())
+                || !artifact_keys.contains(&tensor.artifact_key)
+                || source
+                    .artifacts
+                    .get(tensor.artifact_ordinal)
+                    .map(|artifact| &artifact.key)
+                    != Some(&tensor.artifact_key)
+            {
+                return Err(ModelStoreError::InvalidModelStreamSourceMetadata(format!(
+                    "tensor {:?} has malformed or duplicate metadata",
+                    tensor.name
+                )));
+            }
+            self.limits.check(
+                "model stream tensor bytes",
+                tensor.byte_length,
+                self.limits.maximum_tensor_bytes,
+            )?;
+            let end = tensor
+                .byte_offset
+                .checked_add(tensor.byte_length)
+                .ok_or_else(|| {
+                    ModelStoreError::InvalidModelStreamSourceMetadata(format!(
+                        "tensor {:?} range overflows",
+                        tensor.name
+                    ))
+                })?;
+            let artifact = source
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.key == tensor.artifact_key)
+                .ok_or_else(|| {
+                    ModelStoreError::InvalidModelStreamSourceMetadata(format!(
+                        "tensor {:?} has no source artifact",
+                        tensor.name
+                    ))
+                })?;
+            if end > artifact.byte_size {
+                return Err(ModelStoreError::InvalidModelStreamSourceMetadata(format!(
+                    "tensor {:?} exceeds its source artifact",
+                    tensor.name
+                )));
+            }
+            aggregate_tensor_bytes = aggregate_tensor_bytes
+                .checked_add(tensor.byte_length)
+                .ok_or(ModelStoreError::Overflow(
+                    "model stream aggregate tensor bytes",
+                ))?;
+            ranges
+                .entry(tensor.artifact_key.clone())
+                .or_default()
+                .push((tensor.name.as_str(), tensor.byte_offset, end));
+        }
+        self.limits.check(
+            "model stream aggregate tensor bytes",
+            aggregate_tensor_bytes,
+            self.limits.maximum_aggregate_tensor_bytes,
+        )?;
+        if aggregate_tensor_bytes != source.aggregate_tensor_bytes {
+            return Err(ModelStoreError::InvalidModelStreamSourceMetadata(
+                "aggregate tensor bytes do not match the manifest".to_owned(),
+            ));
+        }
+        for (key, mut source_ranges) in ranges {
+            source_ranges.sort_unstable_by_key(|(_, start, end)| (*start, *end));
+            for ranges in source_ranges.windows(2) {
+                let [first, second] = ranges else {
+                    continue;
+                };
+                if second.1 < first.2 {
+                    return Err(ModelStoreError::OverlappingModelStreamTensorRanges {
+                        key,
+                        first_tensor: first.0.to_owned(),
+                        second_tensor: second.0.to_owned(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn verify_stream_artifact_record<'index>(
+        &self,
+        index: &'index ArtifactIndex,
+        key: &ArtifactKey,
+        expected_sha256: &str,
+        expected_byte_size: u64,
+    ) -> Result<&'index crate::artifact_index::ArtifactRecord, ModelStoreError> {
+        let record = index
+            .record(key)
+            .filter(|record| record.availability == ArtifactAvailability::Present)
+            .ok_or_else(|| ModelStoreError::MissingArtifact(key.clone()))?;
+        if record.sha256 != expected_sha256 || record.byte_size != expected_byte_size {
+            return Err(ModelStoreError::ArtifactChanged { key: key.clone() });
+        }
+        Ok(record)
+    }
+
+    fn open_stream_artifact(
+        &self,
+        index: &ArtifactIndex,
+        key: &ArtifactKey,
+        cancellation: &CancellationToken,
+    ) -> Result<VerifiedArtifactFile, ModelStoreError> {
+        index
+            .open_verified(key, cancellation)
+            .map_err(|error| match error {
+                ArtifactIndexError::Cancelled => ModelStoreError::Cancelled,
+                ArtifactIndexError::Missing(_) => ModelStoreError::MissingArtifact(key.clone()),
+                ArtifactIndexError::Limit(error) => ModelStoreError::Limit(error),
+                _ => ModelStoreError::ArtifactChanged { key: key.clone() },
+            })
+    }
+
+    fn verify_opened_stream_artifact(
+        &self,
+        verified: &VerifiedArtifactFile,
+        key: &ArtifactKey,
+    ) -> Result<(), ModelStoreError> {
+        verified
+            .verify_unchanged()
+            .map_err(|_| ModelStoreError::ArtifactChanged { key: key.clone() })
     }
 }
 
@@ -1143,6 +1684,29 @@ pub enum ModelStoreError {
     ArtifactChanged { key: ArtifactKey },
     #[error("model handle belongs to another model store")]
     ForeignModelHandle,
+    #[error("verified model stream source belongs to another model store")]
+    ForeignModelStreamSource,
+    #[error("verified model stream source belongs to a model store that no longer exists")]
+    StaleModelStreamSource,
+    #[error("verified model stream source metadata is invalid: {0}")]
+    InvalidModelStreamSourceMetadata(String),
+    #[error(
+        "verified model stream source has overlapping tensor ranges in {key:?}: {first_tensor:?} and {second_tensor:?}"
+    )]
+    OverlappingModelStreamTensorRanges {
+        key: ArtifactKey,
+        first_tensor: String,
+        second_tensor: String,
+    },
+    #[error(
+        "model stream tensor {tensor:?} range {byte_offset}+{byte_length} exceeds {tensor_byte_length} bytes"
+    )]
+    ModelStreamTensorRangeOutOfBounds {
+        tensor: String,
+        byte_offset: u64,
+        byte_length: u64,
+        tensor_byte_length: u64,
+    },
     #[error(
         "loaded model artifact {key:?} identity mismatch: expected {expected_sha256}, actual {actual_sha256:?}"
     )]
@@ -1173,6 +1737,8 @@ pub enum ModelStoreError {
     DuplicateTensor(String),
     #[error("model I/O failed for {path}: {message}")]
     Io { path: PathBuf, message: String },
+    #[error("model stream I/O failed for {key:?}: {message}")]
+    ModelStreamIo { key: ArtifactKey, message: String },
     #[error("model allocation of {requested} bytes failed")]
     AllocationFailed { requested: u64 },
     #[error("model byte arithmetic overflowed while computing {0}")]
@@ -1473,6 +2039,384 @@ mod tests {
         file.write_all(&u64::try_from(header.len())?.to_le_bytes())?;
         file.write_all(header.as_bytes())?;
         file.write_all(&[7])?;
+        Ok(())
+    }
+
+    fn write_stream_safetensors(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+        let header = r#"{"first":{"dtype":"U8","shape":[4],"data_offsets":[0,4]},"second":{"dtype":"U8","shape":[4],"data_offsets":[4,8]}}"#;
+        let mut file = File::create(path)?;
+        file.write_all(&u64::try_from(header.len())?.to_le_bytes())?;
+        file.write_all(header.as_bytes())?;
+        file.write_all(&[1, 2, 3, 4, 5, 6, 7, 8])?;
+        Ok(())
+    }
+
+    fn write_maximum_stream_safetensors(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+        let header = format!(
+            r#"{{"maximum":{{"dtype":"U8","shape":[{MODEL_STREAM_MAXIMUM_READ_BYTES}],"data_offsets":[0,{MODEL_STREAM_MAXIMUM_READ_BYTES}]}}}}"#
+        );
+        let mut file = File::create(path)?;
+        file.write_all(&u64::try_from(header.len())?.to_le_bytes())?;
+        file.write_all(header.as_bytes())?;
+        let length = usize::try_from(MODEL_STREAM_MAXIMUM_READ_BYTES)?;
+        file.write_all(&vec![0x5a; length])?;
+        Ok(())
+    }
+
+    fn stream_source_fixture() -> Result<
+        (
+            tempfile::TempDir,
+            ArtifactIndex,
+            ArtifactKey,
+            ModelStore,
+            Arc<LoadedModel>,
+            VerifiedModelStreamSource,
+        ),
+        Box<dyn std::error::Error>,
+    > {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("stream.safetensors");
+        write_stream_safetensors(&path)?;
+        let mut index = ArtifactIndex::default();
+        index.add_root(ArtifactRoot::canonical(
+            "models",
+            "checkpoints",
+            directory.path(),
+            ["safetensors"],
+        )?)?;
+        let cancellation = CancellationToken::default();
+        index.refresh(&cancellation)?;
+        let key = ArtifactKey::new("models", "stream.safetensors")?;
+        let mut store = ModelStore::new(ParserLimits::default())?;
+        let model = store.load(&index, &key, &cancellation)?;
+        let source = store.verified_stream_source(&index, &model, &cancellation)?;
+        Ok((directory, index, key, store, model, source))
+    }
+
+    #[test]
+    fn model_store_stream_source_reads_only_checked_tensor_ranges()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_directory, index, _key, store, _model, source) = stream_source_fixture()?;
+        assert_eq!(source.artifacts().len(), 1);
+        assert_eq!(source.artifacts()[0].format(), &ModelFormat::Safetensors);
+        assert_eq!(
+            source.artifacts()[0].nested_state_disposition(),
+            ModelStreamNestedStateDisposition::Flat
+        );
+        assert_eq!(source.artifacts()[0].byte_size(), 130);
+        assert_eq!(source.artifacts()[0].sha256().len(), 64);
+        assert_eq!(source.tensors().len(), 2);
+        assert_eq!(source.aggregate_tensor_bytes(), 8);
+        assert_eq!(source.tensors()[0].name(), "first");
+        assert_eq!(source.tensors()[0].data_type(), "U8");
+        assert_eq!(source.tensors()[0].shape(), &[4]);
+        assert_eq!(source.tensors()[0].artifact_ordinal(), 0);
+        assert_eq!(source.tensors()[0].byte_length(), 4);
+        assert_eq!(source.maximum_read_bytes(), MODEL_STREAM_MAXIMUM_READ_BYTES);
+        assert_eq!(
+            store.read_verified_tensor_range(
+                &index,
+                &source,
+                "first",
+                1,
+                2,
+                &CancellationToken::default(),
+            )?,
+            vec![2, 3]
+        );
+        assert_eq!(store.cache.models.len(), 1);
+
+        assert!(matches!(
+            store.read_verified_tensor_range(
+                &index,
+                &source,
+                "unknown",
+                0,
+                1,
+                &CancellationToken::default(),
+            ),
+            Err(ModelStoreError::UnknownTensor(name)) if name == "unknown"
+        ));
+        assert!(matches!(
+            store.read_verified_tensor_range(
+                &index,
+                &source,
+                "first",
+                4,
+                1,
+                &CancellationToken::default(),
+            ),
+            Err(ModelStoreError::ModelStreamTensorRangeOutOfBounds {
+                byte_offset: 4,
+                byte_length: 1,
+                tensor_byte_length: 4,
+                ..
+            })
+        ));
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        assert!(matches!(
+            store.read_verified_tensor_range(&index, &source, "first", 0, 1, &cancelled),
+            Err(ModelStoreError::Cancelled)
+        ));
+        let other_store = ModelStore::new(ParserLimits::default())?;
+        assert!(matches!(
+            other_store.read_verified_tensor_range(
+                &index,
+                &source,
+                "first",
+                0,
+                1,
+                &CancellationToken::default(),
+            ),
+            Err(ModelStoreError::ForeignModelStreamSource)
+        ));
+        assert!(matches!(
+            store.read_verified_tensor_range(
+                &index,
+                &source,
+                "first",
+                0,
+                store.limits.maximum_tensor_bytes + 1,
+                &CancellationToken::default(),
+            ),
+            Err(ModelStoreError::Limit(_))
+        ));
+        assert_eq!(store.cache.models.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn model_store_stream_source_rejects_changed_and_stale_sources()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (directory, mut index, key, store, model, source) = stream_source_fixture()?;
+        write_stream_safetensors(&directory.path().join("replacement.safetensors"))?;
+        fs::write(directory.path().join("stream.safetensors"), vec![0_u8; 130])?;
+        assert!(matches!(
+            store.read_verified_tensor_range(
+                &index,
+                &source,
+                "first",
+                0,
+                1,
+                &CancellationToken::default(),
+            ),
+            Err(ModelStoreError::ArtifactChanged { key: changed }) if changed == key
+        ));
+        index.refresh(&CancellationToken::default())?;
+        assert!(matches!(
+            store.read_verified_tensor_range(
+                &index,
+                &source,
+                "first",
+                0,
+                1,
+                &CancellationToken::default(),
+            ),
+            Err(ModelStoreError::ArtifactChanged { key: changed }) if changed == key
+        ));
+        drop(model);
+        drop(store);
+        let other_store = ModelStore::new(ParserLimits::default())?;
+        assert!(matches!(
+            other_store.read_verified_tensor_range(
+                &index,
+                &source,
+                "first",
+                0,
+                1,
+                &CancellationToken::default(),
+            ),
+            Err(ModelStoreError::StaleModelStreamSource)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn model_store_stream_source_rejects_malformed_overlap_and_aggregate_limits()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_directory, index, _key, store, _model, mut source) = stream_source_fixture()?;
+        source.tensors[1].byte_offset = source.tensors[0].byte_offset + 1;
+        assert!(matches!(
+            store.read_verified_tensor_range(
+                &index,
+                &source,
+                "first",
+                0,
+                1,
+                &CancellationToken::default(),
+            ),
+            Err(ModelStoreError::OverlappingModelStreamTensorRanges { .. })
+        ));
+        source.tensors[1].byte_offset = source.tensors[0].byte_offset + 4;
+        source.tensors[0].data_type.clear();
+        assert!(matches!(
+            store.read_verified_tensor_range(
+                &index,
+                &source,
+                "first",
+                0,
+                1,
+                &CancellationToken::default(),
+            ),
+            Err(ModelStoreError::InvalidModelStreamSourceMetadata(_))
+        ));
+
+        let limits = ParserLimits {
+            maximum_tensor_bytes: 4,
+            maximum_aggregate_tensor_bytes: 7,
+            ..ParserLimits::default()
+        };
+        let limited_store = ModelStore::new(limits.clone())?;
+        let key = ArtifactKey::new("models", "aggregate.safetensors")?;
+        let synthetic = VerifiedModelStreamSource {
+            model_identity: "synthetic".to_owned(),
+            artifacts: vec![VerifiedModelStreamArtifact {
+                key: key.clone(),
+                sha256: "0".repeat(64),
+                byte_size: 8,
+                format: ModelFormat::Safetensors,
+                nested_state_disposition: ModelStreamNestedStateDisposition::Flat,
+            }],
+            tensors: vec![
+                VerifiedModelStreamTensor {
+                    name: "first".to_owned(),
+                    data_type: "U8".to_owned(),
+                    shape: vec![4],
+                    artifact_ordinal: 0,
+                    artifact_key: key.clone(),
+                    byte_offset: 0,
+                    byte_length: 4,
+                },
+                VerifiedModelStreamTensor {
+                    name: "second".to_owned(),
+                    data_type: "U8".to_owned(),
+                    shape: vec![4],
+                    artifact_ordinal: 0,
+                    artifact_key: key,
+                    byte_offset: 4,
+                    byte_length: 4,
+                },
+            ],
+            aggregate_tensor_bytes: 8,
+            maximum_read_bytes: MODEL_STREAM_MAXIMUM_READ_BYTES,
+            limits,
+            store_identity: Arc::downgrade(&limited_store.identity),
+        };
+        assert!(matches!(
+            limited_store.validate_stream_source(&synthetic),
+            Err(ModelStoreError::Limit(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn model_store_stream_source_preserves_ordered_shard_identity()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        write_safetensors(&directory.path().join("one.safetensors"), "first")?;
+        write_safetensors(&directory.path().join("two.safetensors"), "second")?;
+        fs::write(
+            directory.path().join("model.safetensors.index.json"),
+            br#"{"metadata":{},"weight_map":{"first":"one.safetensors","second":"two.safetensors"}}"#,
+        )?;
+        let mut index = ArtifactIndex::default();
+        index.add_root(ArtifactRoot::canonical(
+            "models",
+            "checkpoints",
+            directory.path(),
+            ["safetensors", "json"],
+        )?)?;
+        let cancellation = CancellationToken::default();
+        index.refresh(&cancellation)?;
+        let mut store = ModelStore::new(ParserLimits::default())?;
+        let model = store.load(
+            &index,
+            &ArtifactKey::new("models", "model.safetensors.index.json")?,
+            &cancellation,
+        )?;
+        let source = store.verified_stream_source(&index, &model, &cancellation)?;
+        assert_eq!(
+            source
+                .artifacts()
+                .iter()
+                .map(|artifact| artifact.key.relative_path.as_path())
+                .collect::<Vec<_>>(),
+            vec![
+                std::path::Path::new("model.safetensors.index.json"),
+                std::path::Path::new("one.safetensors"),
+                std::path::Path::new("two.safetensors"),
+            ]
+        );
+        assert_eq!(source.artifacts()[0].format(), &ModelFormat::JsonConfig);
+        assert_eq!(source.tensors()[0].name(), "first");
+        assert_eq!(
+            source.tensors()[0].artifact_key.relative_path,
+            PathBuf::from("one.safetensors")
+        );
+        assert_eq!(
+            store.read_verified_tensor_range(&index, &source, "second", 0, 1, &cancellation)?,
+            vec![7]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn model_store_stream_source_enforces_exact_per_call_ceiling()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        write_maximum_stream_safetensors(&directory.path().join("maximum.safetensors"))?;
+        let mut index = ArtifactIndex::default();
+        index.add_root(ArtifactRoot::canonical(
+            "models",
+            "checkpoints",
+            directory.path(),
+            ["safetensors"],
+        )?)?;
+        let cancellation = CancellationToken::default();
+        index.refresh(&cancellation)?;
+        let mut store = ModelStore::new(ParserLimits::default())?;
+        let model = store.load(
+            &index,
+            &ArtifactKey::new("models", "maximum.safetensors")?,
+            &cancellation,
+        )?;
+        let source = store.verified_stream_source(&index, &model, &cancellation)?;
+        assert_eq!(source.maximum_read_bytes(), 1024 * 1024);
+        let bytes = store.read_verified_tensor_range(
+            &index,
+            &source,
+            "maximum",
+            0,
+            source.maximum_read_bytes(),
+            &cancellation,
+        )?;
+        assert_eq!(bytes.len(), usize::try_from(source.maximum_read_bytes())?);
+        assert!(bytes.iter().all(|byte| *byte == 0x5a));
+        assert!(matches!(
+            store.read_verified_tensor_range(
+                &index,
+                &source,
+                "maximum",
+                0,
+                source.maximum_read_bytes() + 1,
+                &cancellation,
+            ),
+            Err(ModelStoreError::Limit(_))
+        ));
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        assert!(matches!(
+            store.read_verified_tensor_range(
+                &index,
+                &source,
+                "maximum",
+                0,
+                source.maximum_read_bytes(),
+                &cancelled,
+            ),
+            Err(ModelStoreError::Cancelled)
+        ));
         Ok(())
     }
 

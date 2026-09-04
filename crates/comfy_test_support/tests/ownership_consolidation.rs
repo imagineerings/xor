@@ -1003,6 +1003,146 @@ fn val_ownership_task397_conditioning_auxiliary_resources_001()
     Ok(())
 }
 
+#[test]
+fn val_ownership_task398_model_store_stream_source_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model_store = fs::read_to_string(root.join("crates/comfy_model/src/model_store.rs"))?;
+    let crate_root = fs::read_to_string(root.join("crates/comfy_model/src/comfy_model.rs"))?;
+
+    assert_eq!(
+        model_store
+            .matches("pub struct VerifiedModelStreamSource {")
+            .count(),
+        1
+    );
+    assert!(!model_store.contains("#[derive(Clone)]\npub struct VerifiedModelStreamSource {"));
+    assert!(
+        !model_store.contains("#[derive(Clone, Debug)]\npub struct VerifiedModelStreamSource {")
+    );
+    for boundary_type in [
+        "pub struct VerifiedModelStreamArtifact {",
+        "pub struct VerifiedModelStreamTensor {",
+        "pub enum ModelStreamNestedStateDisposition {",
+    ] {
+        assert_eq!(
+            model_store.matches(boundary_type).count(),
+            1,
+            "stream boundary type {boundary_type:?} must have one definition"
+        );
+    }
+    let stream_boundary = model_store
+        .split("pub enum ModelStreamNestedStateDisposition {")
+        .nth(1)
+        .and_then(|source| source.split("impl LoadedModel {").next())
+        .ok_or("model stream boundary block is missing")?;
+    assert!(!stream_boundary.contains("pub fn key("));
+    assert!(!stream_boundary.contains("pub fn artifact_key("));
+    assert!(!stream_boundary.contains("PathBuf"));
+    assert!(stream_boundary.contains("pub const fn artifact_ordinal("));
+    assert!(stream_boundary.contains("pub const fn maximum_read_bytes("));
+    assert!(model_store.contains("MODEL_STREAM_MAXIMUM_READ_BYTES: u64 = 1024 * 1024"));
+    assert!(model_store.contains("model_store_stream_source_enforces_exact_per_call_ceiling"));
+    assert_eq!(model_store.matches("pub fn load(").count(), 1);
+    for api in [
+        "pub fn verified_stream_source(",
+        "pub fn read_verified_tensor_range(",
+    ] {
+        assert!(
+            model_store.contains(api),
+            "missing checked stream API {api}"
+        );
+    }
+    for typed_error in [
+        "ForeignModelStreamSource",
+        "StaleModelStreamSource",
+        "InvalidModelStreamSourceMetadata",
+        "OverlappingModelStreamTensorRanges",
+        "ModelStreamTensorRangeOutOfBounds",
+    ] {
+        assert!(
+            model_store.contains(typed_error),
+            "missing stream-source rejection {typed_error}"
+        );
+    }
+    for forbidden in [
+        "pub fn artifact_index(",
+        "pub fn index(&self)",
+        "pub fn read_unchecked(",
+        "pub fn open_unchecked(",
+        "pub fn cache_mut(",
+    ] {
+        assert!(
+            !model_store.contains(forbidden),
+            "model stream API exposes forbidden capability {forbidden}"
+        );
+    }
+    for exported in [
+        "ModelStreamNestedStateDisposition",
+        "VerifiedModelStreamArtifact",
+        "VerifiedModelStreamSource",
+        "VerifiedModelStreamTensor",
+    ] {
+        assert!(
+            crate_root.contains(exported),
+            "missing stream export {exported}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy["concerns"]
+        .as_array()
+        .and_then(|concerns| {
+            concerns
+                .iter()
+                .find(|concern| concern["concern"] == "native_model_verified_stream_source")
+        })
+        .ok_or("model-store stream-source ownership concern is missing")?;
+    assert_eq!(
+        concern["canonical_owner"].as_str(),
+        Some("comfy_model::model_store::ModelStore")
+    );
+    assert_eq!(concern["definitions"].as_array().map(Vec::len), Some(5));
+    assert!(
+        concern["required_mappings"]
+            .as_array()
+            .is_some_and(|mappings| mappings.len() >= 6)
+    );
+    assert!(
+        concern["known_open_reasons"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+    );
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let mut records = parse_csv_records(&catalog)?.into_iter();
+    let header = records.next().ok_or("ownership catalog has no header")?;
+    let column = |name: &str| {
+        header
+            .iter()
+            .position(|candidate| candidate == name)
+            .ok_or_else(|| format!("ownership catalog has no {name} column"))
+    };
+    let concern_column = column("concern")?;
+    let status_column = column("current_status")?;
+    let competing_column = column("competing_symbols")?;
+    let definitions_column = column("definition_hits")?;
+    let row = records
+        .find(|row| row[concern_column] == "native_model_verified_stream_source")
+        .ok_or("model-store stream-source ownership catalog row is missing")?;
+    assert_eq!(row[status_column], "authoritative_owner_confirmed");
+    assert!(row[competing_column].is_empty());
+    assert!(
+        row[definitions_column].contains("canonical@crates/comfy_model/src/model_store.rs"),
+        "unexpected model-store stream-source definitions: {}",
+        row[definitions_column]
+    );
+    Ok(())
+}
+
 fn accounted_pending_ownership_rows(
     ownership_catalog: &str,
     policy_concerns: &[serde_json::Value],

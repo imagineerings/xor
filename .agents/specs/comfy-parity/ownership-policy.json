@@ -11050,6 +11050,152 @@
       "decision_reason": "comfy_model::vae is the single authoritative VAE domain: it owns profile compatibility, persisted identity admission, descriptors, model binding, generic and typed structured execution boundaries, cancellation, and publication. The pinned-source vae_architecture module only recognizes and normalizes source checkpoint forms, then maps them through the canonical ModelStore, latent registry, VAE profile, descriptor, and NativeModule contracts. vae_structured owns only Hunyuan3D and TripoSplat source topology, exact state manifests, and equations; it consumes canonical Tensor handles plus caller workspace, RNG, and cancellation and does not create a 3D media, asset, path, index, plan, retry, queue, cache, persistence, or transaction owner."
     },
     {
+      "concern": "native_model_verified_stream_source",
+      "canonical_owner": "comfy_model::model_store::ModelStore",
+      "owner_files": [
+        "crates/comfy_model/src/model_store.rs",
+        "crates/comfy_model/src/comfy_model.rs"
+      ],
+      "owner_symbols": [
+        "ModelStore",
+        "VerifiedModelStreamSource",
+        "VerifiedModelStreamArtifact",
+        "VerifiedModelStreamTensor",
+        "ModelStreamNestedStateDisposition"
+      ],
+      "allowed_adapters": [
+        "ArtifactIndex retains root, path containment, verified-file opening, hashing, change detection, availability, refresh, and snapshot authority",
+        "ModelStore alone derives the opaque stream manifest from an already loaded verified model and reopens only exact indexed sources for bounded tensor-range reads",
+        "the public manifest binds ordered ArtifactKeys privately and projects only source identities, parsed formats, tensor metadata, opaque artifact ordinals, nested-state disposition, and limits without exposing paths, file handles, parsers, ArtifactIndex access, or cache mutation",
+        "each returned byte vector is capped by the manifest-bound one MiB ModelStore stream-read ceiling before allocation and remains cancellation-checked around allocation and chunk reads",
+        "the later private-worker bridge may transport checked manifest metadata and returned bytes but cannot acquire ModelStore, ArtifactIndex, path, parser, cache, or unchecked-read authority"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/model_store.rs",
+          "qualified": "comfy_model::model_store::ModelStore",
+          "role": "canonical",
+          "symbol": "ModelStore",
+          "pattern": "^pub struct ModelStore \\{"
+        },
+        {
+          "path": "crates/comfy_model/src/model_store.rs",
+          "qualified": "comfy_model::model_store::VerifiedModelStreamSource",
+          "role": "boundary_dto",
+          "symbol": "VerifiedModelStreamSource",
+          "pattern": "^pub struct VerifiedModelStreamSource \\{"
+        },
+        {
+          "path": "crates/comfy_model/src/model_store.rs",
+          "qualified": "comfy_model::model_store::VerifiedModelStreamArtifact",
+          "role": "boundary_dto",
+          "symbol": "VerifiedModelStreamArtifact",
+          "pattern": "^pub struct VerifiedModelStreamArtifact \\{"
+        },
+        {
+          "path": "crates/comfy_model/src/model_store.rs",
+          "qualified": "comfy_model::model_store::VerifiedModelStreamTensor",
+          "role": "boundary_dto",
+          "symbol": "VerifiedModelStreamTensor",
+          "pattern": "^pub struct VerifiedModelStreamTensor \\{"
+        },
+        {
+          "path": "crates/comfy_model/src/model_store.rs",
+          "qualified": "comfy_model::model_store::ModelStreamNestedStateDisposition",
+          "role": "boundary_dto",
+          "symbol": "ModelStreamNestedStateDisposition",
+          "pattern": "^pub enum ModelStreamNestedStateDisposition \\{"
+        }
+      ],
+      "call_symbols": [
+        "ModelStore::verified_stream_source",
+        "ModelStore::read_verified_tensor_range"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "model-store-stream-manifest-is-opaque-non-clone-and-store-bound",
+          "path": "crates/comfy_model/src/model_store.rs",
+          "pattern": "pub struct VerifiedModelStreamSource \\{[\\s\\S]*store_identity: Weak<\\(\\)>[\\s\\S]*pub fn verified_stream_source\\("
+        },
+        {
+          "name": "model-store-stream-manifest-binds-ordered-artifacts-formats-tensors-ranges-and-limits",
+          "path": "crates/comfy_model/src/model_store.rs",
+          "pattern": "pub enum ModelStreamNestedStateDisposition \\{[\\s\\S]*pub struct VerifiedModelStreamArtifact \\{[\\s\\S]*pub struct VerifiedModelStreamTensor \\{[\\s\\S]*maximum_tensor_bytes[\\s\\S]*maximum_aggregate_tensor_bytes"
+        },
+        {
+          "name": "model-store-stream-range-reader-revalidates-index-source-and-cancellation",
+          "path": "crates/comfy_model/src/model_store.rs",
+          "pattern": "(?=[\\s\\S]*pub fn read_verified_tensor_range\\()(?=[\\s\\S]*fn validate_stream_source_identity[\\s\\S]*Arc::ptr_eq)(?=[\\s\\S]*open_verified)(?=[\\s\\S]*read_exact)(?=[\\s\\S]*verify_unchanged)"
+        },
+        {
+          "name": "model-store-stream-range-reader-has-a-manifest-bound-small-allocation-ceiling",
+          "path": "crates/comfy_model/src/model_store.rs",
+          "pattern": "MODEL_STREAM_MAXIMUM_READ_BYTES: u64 = 1024 \\* 1024[\\s\\S]*maximum_read_bytes[\\s\\S]*model stream tensor range bytes[\\s\\S]*try_reserve_exact"
+        },
+        {
+          "name": "model-store-stream-range-errors-are-typed-and-fail-closed",
+          "path": "crates/comfy_model/src/model_store.rs",
+          "pattern": "ForeignModelStreamSource[\\s\\S]*StaleModelStreamSource[\\s\\S]*InvalidModelStreamSourceMetadata[\\s\\S]*OverlappingModelStreamTensorRanges[\\s\\S]*ModelStreamTensorRangeOutOfBounds"
+        },
+        {
+          "name": "model-store-stream-source-api-is-exported-without-index-or-path-capability",
+          "path": "crates/comfy_model/src/comfy_model.rs",
+          "pattern": "pub use model_store::\\{[\\s\\S]*ModelStreamNestedStateDisposition[\\s\\S]*VerifiedModelStreamArtifact[\\s\\S]*VerifiedModelStreamSource[\\s\\S]*VerifiedModelStreamTensor"
+        },
+        {
+          "name": "task398-model-store-stream-source-ownership-oracle",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "fn val_ownership_task398_model_store_stream_source_001"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-model-store-stream-source-foundation"
+      ],
+      "production_consumers": [
+        "the later private-worker model-source bridge through the opaque verified ModelStore stream API"
+      ],
+      "requirements": [
+        "Requirement 6.3",
+        "Requirement 7.2",
+        "Requirement 18.1",
+        "Requirement 26.2",
+        "Requirement 28.2",
+        "Requirement 31.5",
+        "Requirement 34.2",
+        "Requirement 34.6",
+        "Requirement 35.2",
+        "Requirement 37.5",
+        "Requirement 38.3",
+        "Requirement 41.2",
+        "Requirement 44.1",
+        "Requirement 44.3"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "ModelStore remains the sole verified model parser and parse-cache owner and adds only an opaque store-bound manifest plus checked range adapter over ArtifactIndex-verified files. ArtifactIndex retains every root, path, handle, hash, refresh, and change-detection capability; the manifest and reader expose no parser, index, cache mutation, resource, or unchecked byte authority."
+    },
+    {
       "concern": "native_moge_model_resource",
       "canonical_owner": "comfy_model::moge::NativeMogeResource",
       "owner_files": [

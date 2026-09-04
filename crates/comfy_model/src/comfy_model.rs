@@ -449,8 +449,9 @@ pub use model_store::ReadOnlyTensorMapping;
 pub use model_store::{
     LoadedModel, ModelFamilyProbeError, ModelFamilyProbeErrorKind, ModelLoadAccounting,
     ModelOperationRecord, ModelOperationStage, ModelStore, ModelStoreError,
-    VerifiedEmbeddingArchivePayload, VerifiedModelTensor, VerifiedModelTensorPayload,
-    VerifiedSentencePieceVocabulary,
+    ModelStreamNestedStateDisposition, VerifiedEmbeddingArchivePayload,
+    VerifiedModelStreamArtifact, VerifiedModelStreamSource, VerifiedModelStreamTensor,
+    VerifiedModelTensor, VerifiedModelTensorPayload, VerifiedSentencePieceVocabulary,
 };
 pub use moge::{
     MOGE_DINO2_SOURCE_SHA256, MOGE_GEOMETRY_SOURCE_SHA256, MOGE_MODEL_SOURCE_SHA256,

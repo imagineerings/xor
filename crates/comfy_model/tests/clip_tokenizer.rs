@@ -39,7 +39,7 @@ const TOKENIZER_IMPLEMENTATION_CLOSURE: [(&str, &str); 7] = [
     ),
     (
         "crates/comfy_model/src/model_store.rs",
-        "14b0e402258deeac17086235833a8e43c47c8be85ce074b2fa5d0e7120d4591c",
+        "1feaf075c643d25ea6d22684132ea50ce4dcdbf099e6bdb0109a69e41f2d5ef3",
     ),
     (
         "crates/comfy_model/src/slices/native_diffusion.rs",
