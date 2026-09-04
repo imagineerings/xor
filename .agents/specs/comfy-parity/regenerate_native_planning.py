@@ -9995,6 +9995,7 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_model/src/model_store.rs",
             "crates/comfy_model/src/artifact_index.rs",
             "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_tokenizer.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
@@ -10002,6 +10003,7 @@ def native_model_resource_precursor_tasks(
         [
             "crates/comfy_model/src/model_store.rs",
             "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_tokenizer.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
