@@ -33,15 +33,36 @@ def main():
     parser.add_argument("--product", required=True)
     parser.add_argument("--platform", choices=["linux", "macos", "windows"], required=True)
     parser.add_argument("--target", required=True)
+    parser.add_argument("--plan", type=Path)
+    parser.add_argument("--commit-sha")
     arguments = parser.parse_args()
     version = os.environ["RELEASE_VERSION"]
-    output = run(
-        ["cargo", "xtask", "bundle", "--product", arguments.product,
-         "--platform", arguments.platform, "--target", arguments.target, "--dry-run"],
-        capture_output=True,
-    )
-    plan = json.loads(output.stdout)
-    artifact = (Path(plan["target_dir"]) / "release" / plan["artifact_name"]).resolve(strict=True)
+    if arguments.plan:
+        if not arguments.commit_sha:
+            parser.error("--commit-sha is required with --plan")
+        plan = json.loads(arguments.plan.read_text())
+        expected = {
+            "commit_sha": arguments.commit_sha,
+            "product_id": arguments.product,
+            "platform": arguments.platform,
+            "target": arguments.target,
+            "channel": "stable",
+            "application_features": os.environ["ZED_PRODUCT_APP_FEATURES"].split(","),
+            "remote_server_features": os.environ["ZED_PRODUCT_REMOTE_FEATURES"].split(","),
+            "artifact_name": os.environ["ZED_PRODUCT_ARTIFACT_NAME"],
+        }
+        for key, value in expected.items():
+            if plan.get(key) != value:
+                raise RuntimeError(f"Bundle plan {key} mismatch: {plan.get(key)!r} != {value!r}")
+    else:
+        output = run(
+            ["cargo", "xtask", "bundle", "--product", arguments.product,
+             "--platform", arguments.platform, "--target", arguments.target, "--dry-run"],
+            capture_output=True,
+        )
+        plan = json.loads(output.stdout)
+    target_dir = Path(os.environ.get("CARGO_TARGET_DIR", plan["target_dir"]))
+    artifact = (target_dir / "release" / plan["artifact_name"]).resolve(strict=True)
     executable = plan["executable_name"]
 
     with tempfile.TemporaryDirectory(prefix="product-bundle-smoke-") as directory:
