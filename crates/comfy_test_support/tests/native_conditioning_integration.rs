@@ -3,7 +3,7 @@ use comfy_model::{
     GLIGEN_ATTENTION_SOURCE_SHA256, GLIGEN_OPENAIMODEL_SOURCE_SHA256,
     GLIGEN_SAMPLERS_SOURCE_SHA256, GLIGEN_SOURCE_SHA256, MappedModelWeights,
     NativeGligenCheckpoint, NativeGligenError, NativeGligenPositionParameter, NativeGligenRegion,
-    NativeGligenResource, NativeModelPayload, NativePhotoMakerCheckpoint,
+    NativeGligenResource, NativeModelPayload, NativeModelPayloadError, NativePhotoMakerCheckpoint,
     NativePhotoMakerCheckpointEntry, NativePhotoMakerError, NativePhotoMakerResource,
     NativeStyleModelCheckpoint, NativeStyleModelError, NativeStyleModelResource,
     PHOTOMAKER_CLIP_VISION_SOURCE_SHA256, PHOTOMAKER_SOURCE_SHA256, PatchGraph, PatchPayload,
@@ -3701,6 +3701,241 @@ fn photomaker_resource() -> Result<(), Box<dyn Error>> {
         Err(NativePhotoMakerError::Cancelled)
     ));
     assert_eq!(cancelled_workspace.in_use_bytes(), 0);
+    assert_eq!(workspace.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn conditioning_auxiliary_resource_roles() -> Result<(), Box<dyn Error>> {
+    let oracle = style_model_oracle()?;
+    let cancellation = CancellationToken::default();
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(MEMORY_LIMIT)?;
+    let workspace = authority.authorize_workspace(MEMORY_LIMIT)?;
+    let context = backend.execution_context(StreamId::DEFAULT, workspace.clone(), &cancellation);
+
+    let manifest: serde_json::Value = serde_json::from_slice(STYLE_MODEL_MANIFEST)?;
+    assert_eq!(
+        manifest["profiles"],
+        json!(["style", "redux", "photomaker", "gligen"])
+    );
+    for (bytes, expected) in [
+        (
+            STYLE_MODEL_MANIFEST,
+            "2c38283c6f54a76077cafd56dd653e4f1f9f7f943110db4c632ed7486e57c405",
+        ),
+        (
+            STYLE_MODEL_PROVENANCE,
+            "7149301049024767c50963bc25d7b00abd7e69979d532e28e788e6ac59e08c22",
+        ),
+        (
+            STYLE_MODEL_ORACLE,
+            "c4d20e79b630efea4917ba7416831596cd9756e6ce9d72e0ac51fdf064a0eb6e",
+        ),
+        (
+            STYLE_MODEL_GENERATOR,
+            "c7622869a2d8abf441dc45a8f147a9d7d73548dfcd652343405eb8f757aa249c",
+        ),
+        (
+            STYLE_MODEL_SOURCE_GRAPH,
+            "9663b57984f7fc64e8c4b5f6edf3a165894bf591c6eb7d56dea5ee1c6d6f364f",
+        ),
+    ] {
+        assert_eq!(format!("{:x}", Sha256::digest(bytes)), expected);
+    }
+
+    let style_fixture = &oracle.style.dtypes["float32"];
+    let style_resource = Arc::new(NativeStyleModelResource::from_reduced_fixture(
+        &backend,
+        style_checkpoint(
+            "style",
+            upload_style_state(&backend, &context, style_fixture, "float32")?,
+            STYLE_MODEL_FIXTURE_MEMORY,
+        ),
+        &context,
+    )?);
+    let style_payload =
+        NativeModelPayload::style_model_test_fixture(style_resource.clone(), &cancellation)?;
+
+    let photomaker_fixture = &oracle.photomaker.dtypes["float32"];
+    let photomaker_resource = Arc::new(NativePhotoMakerResource::from_reduced_fixture(
+        &backend,
+        photomaker_checkpoint(
+            upload_photomaker_state(&backend, &context, photomaker_fixture, "float32")?,
+            false,
+            STYLE_MODEL_FIXTURE_MEMORY,
+        ),
+        &context,
+    )?);
+    let photomaker_payload =
+        NativeModelPayload::photomaker_test_fixture(photomaker_resource.clone(), &cancellation)?;
+
+    let gligen_resource = Arc::new(NativeGligenResource::from_reduced_fixture(
+        &backend,
+        gligen_checkpoint(
+            upload_gligen_state(&backend, &context, &oracle.gligen.state, "float32")?,
+            GLIGEN_FIXTURE_MEMORY,
+        ),
+        &context,
+    )?);
+    let gligen_payload =
+        NativeModelPayload::gligen_test_fixture(gligen_resource.clone(), &cancellation)?;
+
+    assert!(Arc::ptr_eq(
+        style_payload
+            .style_model_resource()
+            .ok_or("STYLE_MODEL role is missing")?,
+        &style_resource,
+    ));
+    assert!(style_payload.photomaker_resource().is_none());
+    assert!(style_payload.gligen_resource().is_none());
+    assert!(Arc::ptr_eq(
+        photomaker_payload
+            .photomaker_resource()
+            .ok_or("PHOTOMAKER role is missing")?,
+        &photomaker_resource,
+    ));
+    assert!(photomaker_payload.style_model_resource().is_none());
+    assert!(photomaker_payload.gligen_resource().is_none());
+    assert!(Arc::ptr_eq(
+        gligen_payload
+            .gligen_resource()
+            .ok_or("GLIGEN role is missing")?,
+        &gligen_resource,
+    ));
+    assert!(gligen_payload.style_model_resource().is_none());
+    assert!(gligen_payload.photomaker_resource().is_none());
+
+    assert!(matches!(
+        NativeModelPayload::style_model(style_resource.clone(), &cancellation),
+        Err(NativeModelPayloadError::ResourceMismatch(
+            "STYLE_MODEL production source-exact profile"
+        ))
+    ));
+    assert!(matches!(
+        NativeModelPayload::photomaker(photomaker_resource.clone(), &cancellation),
+        Err(NativeModelPayloadError::ResourceMismatch(
+            "PHOTOMAKER production source-exact profile"
+        ))
+    ));
+    assert!(matches!(
+        NativeModelPayload::gligen(gligen_resource.clone(), &cancellation),
+        Err(NativeModelPayloadError::ResourceMismatch(
+            "GLIGEN production source-exact profile"
+        ))
+    ));
+
+    let style_reconstructed = Arc::new(NativeStyleModelResource::from_reduced_fixture(
+        &backend,
+        style_payload
+            .style_model_resource()
+            .ok_or("STYLE_MODEL role is missing")?
+            .reconstruct_checkpoint(&cancellation)?,
+        &context,
+    )?);
+    let style_reconstructed_payload =
+        NativeModelPayload::style_model_test_fixture(style_reconstructed.clone(), &cancellation)?;
+    assert_eq!(
+        style_reconstructed_payload.identity(),
+        style_payload.identity()
+    );
+    assert_eq!(
+        style_reconstructed_payload.resident_bytes(),
+        style_payload.resident_bytes()
+    );
+    let style_input = fixture_clip_output(&backend, &context, &oracle.style)?;
+    assert_eq!(
+        style_resource
+            .get_cond(&backend, &style_input, &context)?
+            .contiguous_bytes()?,
+        style_reconstructed
+            .get_cond(&backend, &style_input, &context)?
+            .contiguous_bytes()?,
+    );
+
+    let photomaker_reconstructed = Arc::new(NativePhotoMakerResource::from_reduced_fixture(
+        &backend,
+        photomaker_payload
+            .photomaker_resource()
+            .ok_or("PHOTOMAKER role is missing")?
+            .reconstruct_checkpoint(&cancellation)?,
+        &context,
+    )?);
+    let photomaker_reconstructed_payload = NativeModelPayload::photomaker_test_fixture(
+        photomaker_reconstructed.clone(),
+        &cancellation,
+    )?;
+    assert_eq!(
+        photomaker_reconstructed_payload.identity(),
+        photomaker_payload.identity()
+    );
+    assert_eq!(
+        photomaker_reconstructed_payload.resident_bytes(),
+        photomaker_payload.resident_bytes()
+    );
+    let (image, prompt, mask) = photomaker_inputs(&backend, &context, &oracle.photomaker)?;
+    assert_eq!(
+        photomaker_resource
+            .fuse_conditioning(&backend, &image, &prompt, &mask, &context)?
+            .contiguous_bytes()?,
+        photomaker_reconstructed
+            .fuse_conditioning(&backend, &image, &prompt, &mask, &context)?
+            .contiguous_bytes()?,
+    );
+
+    let gligen_reconstructed = Arc::new(NativeGligenResource::from_reduced_fixture(
+        &backend,
+        gligen_payload
+            .gligen_resource()
+            .ok_or("GLIGEN role is missing")?
+            .reconstruct_checkpoint(&cancellation)?,
+        &context,
+    )?);
+    let gligen_reconstructed_payload =
+        NativeModelPayload::gligen_test_fixture(gligen_reconstructed.clone(), &cancellation)?;
+    assert_eq!(
+        gligen_reconstructed_payload.identity(),
+        gligen_payload.identity()
+    );
+    assert_eq!(
+        gligen_reconstructed_payload.resident_bytes(),
+        gligen_payload.resident_bytes()
+    );
+    let positions = gligen_positions(&backend, &context, &oracle.gligen)?;
+    let prepared = gligen_resource.prepare_positions(
+        &backend,
+        oracle.gligen.latent_shape,
+        &positions,
+        &context,
+    )?;
+    let reconstructed_prepared = gligen_reconstructed.prepare_positions(
+        &backend,
+        oracle.gligen.latent_shape,
+        &positions,
+        &context,
+    )?;
+    let gligen_fixture = &oracle.gligen.dtypes["float32"];
+    let visual = tensor_from_f32(
+        &backend,
+        &gligen_fixture.visual_shape,
+        &gligen_fixture
+            .visual_bits
+            .iter()
+            .map(|value| f32::from_bits(*value))
+            .collect::<Vec<_>>(),
+        &context,
+    )?;
+    assert_eq!(
+        gligen_resource
+            .apply_fuser(&backend, 0, &visual, &prepared, &context)?
+            .contiguous_bytes()?,
+        gligen_reconstructed
+            .apply_fuser(&backend, 0, &visual, &reconstructed_prepared, &context)?
+            .contiguous_bytes()?,
+    );
+
+    for payload in [style_payload, photomaker_payload, gligen_payload] {
+        payload.clone().validate()?;
+    }
     assert_eq!(workspace.in_use_bytes(), 0);
     Ok(())
 }

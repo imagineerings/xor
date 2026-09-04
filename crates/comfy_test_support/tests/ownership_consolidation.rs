@@ -859,6 +859,150 @@ fn val_ownership_task393_style_model_resource_001() -> Result<(), Box<dyn std::e
     Ok(())
 }
 
+#[test]
+fn val_ownership_task397_conditioning_auxiliary_resources_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let resource =
+        fs::read_to_string(root.join("crates/comfy_model/src/conditioning_resources.rs"))?;
+    let payload = fs::read_to_string(root.join("crates/comfy_model/src/native_node_payload.rs"))?;
+    let integration = fs::read_to_string(
+        root.join("crates/comfy_test_support/tests/native_conditioning_integration.rs"),
+    )?;
+
+    for resource_name in [
+        "NativeGligenResource",
+        "NativePhotoMakerResource",
+        "NativeStyleModelResource",
+    ] {
+        assert_eq!(
+            resource
+                .matches(&format!("pub struct {resource_name} {{"))
+                .count(),
+            1,
+            "{resource_name} must have one concrete owner"
+        );
+        assert!(resource.contains(&format!("#[derive(Debug)]\npub struct {resource_name} {{")));
+        assert!(!resource.contains(&format!("#[derive(Clone)]\npub struct {resource_name} {{")));
+        assert!(!resource.contains(&format!(
+            "#[derive(Clone, Debug)]\npub struct {resource_name} {{"
+        )));
+    }
+    assert!(payload.contains("#[derive(Clone)]\npub struct NativeModelPayload {"));
+    assert!(payload.contains("NativeModelResource::Gligen { resource }"));
+    assert!(payload.contains("NativeModelResource::PhotoMaker { resource }"));
+    assert!(payload.contains("NativeModelResource::StyleModel { resource }"));
+    for forbidden in ["as_any", "raw_role_selector", "ConditioningResourceFacade"] {
+        assert!(
+            !payload.contains(forbidden),
+            "payload exposes forbidden role facade {forbidden}"
+        );
+    }
+    assert!(integration.contains("fn conditioning_auxiliary_resource_roles("));
+    for constructor in [
+        "NativeModelPayload::gligen_test_fixture",
+        "NativeModelPayload::photomaker_test_fixture",
+        "NativeModelPayload::style_model_test_fixture",
+    ] {
+        assert!(integration.contains(constructor));
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concerns = policy["concerns"]
+        .as_array()
+        .ok_or("ownership policy has no concerns")?;
+    assert!(
+        concerns
+            .iter()
+            .all(|concern| concern["concern"] != "native_conditioning_auxiliary_resource")
+    );
+    let expected = [
+        (
+            "native_gligen_model_resource",
+            "comfy_model::conditioning_resources::NativeGligenResource",
+            "GLIGEN",
+        ),
+        (
+            "native_photomaker_model_resource",
+            "comfy_model::conditioning_resources::NativePhotoMakerResource",
+            "PHOTOMAKER",
+        ),
+        (
+            "native_style_model_resource",
+            "comfy_model::conditioning_resources::NativeStyleModelResource",
+            "STYLE_MODEL",
+        ),
+    ];
+    for (concern_name, owner, role) in expected {
+        let concern = concerns
+            .iter()
+            .find(|concern| concern["concern"].as_str() == Some(concern_name))
+            .ok_or_else(|| format!("ownership concern {concern_name} is missing"))?;
+        assert_eq!(concern["canonical_owner"].as_str(), Some(owner));
+        assert_eq!(concern["definitions"].as_array().map(Vec::len), Some(1));
+        assert!(
+            concern["required_mappings"]
+                .as_array()
+                .is_some_and(|mappings| mappings.len() >= 6)
+        );
+        assert_eq!(
+            concern["production_consumers"].as_array().map(Vec::len),
+            Some(1)
+        );
+        assert!(
+            concern["known_open_reasons"]
+                .as_array()
+                .is_some_and(Vec::is_empty)
+        );
+        assert!(serde_json::to_string(concern)?.contains(role));
+    }
+    let style_concern = concerns
+        .iter()
+        .find(|concern| concern["concern"] == "native_style_model_resource")
+        .ok_or("STYLE_MODEL ownership concern is missing")?;
+    assert_eq!(
+        format!("{:x}", Sha256::digest(serde_json::to_vec(style_concern)?)),
+        "99dcdc8147873af5190bf3db75279634c0c1ddf854ea0ed1c16955b5ffbe102b"
+    );
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let mut records = parse_csv_records(&catalog)?.into_iter();
+    let header = records.next().ok_or("ownership catalog has no header")?;
+    let column = |name: &str| {
+        header
+            .iter()
+            .position(|candidate| candidate == name)
+            .ok_or_else(|| format!("ownership catalog has no {name} column"))
+    };
+    let concern_column = column("concern")?;
+    let status_column = column("current_status")?;
+    let competing_column = column("competing_symbols")?;
+    let definitions_column = column("definition_hits")?;
+    let consumers_column = column("production_consumers")?;
+    let rows = records
+        .map(|row| (row[concern_column].clone(), row))
+        .collect::<BTreeMap<_, _>>();
+    for (concern_name, _owner, role) in expected {
+        let row = rows
+            .get(concern_name)
+            .ok_or_else(|| format!("ownership catalog row {concern_name} is missing"))?;
+        assert_eq!(row[status_column], "authoritative_owner_confirmed");
+        assert!(row[competing_column].is_empty());
+        assert!(
+            row[definitions_column]
+                .contains("canonical@crates/comfy_model/src/conditioning_resources.rs"),
+            "ownership catalog row {concern_name} has unexpected definitions: {}",
+            row[definitions_column]
+        );
+        assert!(row[consumers_column].contains(role));
+    }
+    Ok(())
+}
+
 fn accounted_pending_ownership_rows(
     ownership_catalog: &str,
     policy_concerns: &[serde_json::Value],

@@ -9763,6 +9763,119 @@
       "decision_reason": "The retained model owns one source-fingerprinted fallback scheduler over existing FILM and RIFE equations. It branches only on the canonical typed exhaustion variant, preserves cancellation and the pinned FILM scalarization failure, keeps reduced RIFE batch state invocation-local, and introduces no parallel model, tensor, allocator, cache, handle, codec, effect, or publication owner."
     },
     {
+      "concern": "native_gligen_model_resource",
+      "canonical_owner": "comfy_model::conditioning_resources::NativeGligenResource",
+      "owner_files": [
+        "crates/comfy_model/src/conditioning_resources.rs",
+        "crates/comfy_model/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeGligenResource"
+      ],
+      "allowed_adapters": [
+        "canonical comfy_model::attention retains the sole scaled-dot-product attention equation and policy while NativeGligenResource owns source-exact GLIGEN fuser choreography",
+        "canonical comfy_model native_ops and comfy_tensor operators retain linear, layer-normalization, activation, reshape, concatenation, storage, allocation, cancellation, and workspace authority",
+        "NativeModelPayload seals the GLIGEN role, identity, alias-aware residency, reconstruction, and borrowed selector-free gligen_resource view without creating handle, cache, persistence, restart, or stale-generation authority",
+        "the pure-standard-library reduced GLIGEN fixture is a development-reference equation oracle and confers no production model, tensor, attention, or publication authority",
+        "NativePhotoMakerResource and NativeStyleModelResource retain their separate checkpoint, reconstruction, invocation, and payload roles"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "qualified": "comfy_model::conditioning_resources::NativeGligenResource",
+          "role": "canonical",
+          "symbol": "NativeGligenResource",
+          "pattern": "^pub struct NativeGligenResource \\{"
+        }
+      ],
+      "call_symbols": [
+        "NativeGligenResource::from_checkpoint",
+        "NativeGligenResource::reconstruct_checkpoint",
+        "NativeGligenResource::prepare_positions",
+        "NativeGligenResource::apply_fuser",
+        "NativeModelPayload::gligen",
+        "gligen_resource"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "gligen-admission-binds-strict-state-and-structural-fuser-order",
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "pattern": "pub fn from_checkpoint\\([\\s\\S]*gligen_discover_state[\\s\\S]*gligen_validate_ordered_keys[\\s\\S]*gligen_semantic_digest[\\s\\S]*pub fn reconstruct_checkpoint"
+        },
+        {
+          "name": "gligen-position-and-fuser-execution-delegate-canonical-operators",
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "pattern": "pub fn prepare_positions\\([\\s\\S]*GLIGEN_FOURIER_TEMPERATURE[\\s\\S]*pub fn apply_fuser\\([\\s\\S]*scaled_dot_product_attention_tensor_with_context"
+        },
+        {
+          "name": "gligen-payload-seals-role-identity-and-residency",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "pub fn gligen\\([\\s\\S]*NativeModelResourceRole::Gligen[\\s\\S]*zed-native-gligen-v1[\\s\\S]*NativeModelResource::Gligen[\\s\\S]*NativeModelBackingKind::NativeGligenResource[\\s\\S]*pub fn gligen_resource"
+        },
+        {
+          "name": "gligen-fixture-is-source-pinned-independent-and-bounded",
+          "path": "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation/provenance.json",
+          "pattern": "Pure Python standard-library source equations[\\s\\S]*gligen_state_count[\\s\\S]*reduced_profiles_are_source_exact"
+        },
+        {
+          "name": "conditioning-auxiliary-role-closure-reconstructs-gligen-without-cross-role-access",
+          "path": "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+          "pattern": "fn conditioning_auxiliary_resource_roles\\([\\s\\S]*NativeModelPayload::gligen_test_fixture[\\s\\S]*gligen_resource\\(\\)[\\s\\S]*reconstruct_checkpoint"
+        },
+        {
+          "name": "task397-gligen-ownership-oracle",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "fn val_ownership_task397_conditioning_auxiliary_resources_001"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-conditioning-auxiliary-resource-foundation"
+      ],
+      "production_consumers": [
+        "native GLIGEN payload admission and typed position preparation and fuser invocation"
+      ],
+      "requirements": [
+        "Requirement 6.3",
+        "Requirement 7.2",
+        "Requirement 18.1",
+        "Requirement 26.2",
+        "Requirement 28.2",
+        "Requirement 31.5",
+        "Requirement 34.2",
+        "Requirement 34.6",
+        "Requirement 35.2",
+        "Requirement 37.5",
+        "Requirement 38.3",
+        "Requirement 41.2",
+        "Requirement 44.1",
+        "Requirement 44.3"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeGligenResource is the sole retained owner of strict GLIGEN checkpoint identity, source-ordered reconstruction, position preparation, and indexed fuser choreography. It delegates shared tensor equations and scaled-dot-product attention to canonical owners and exposes only the sealed GLIGEN payload projection without claiming PhotoMaker, style-model, handle, cache, persistence, restart, or stale-generation authority."
+    },
+    {
       "concern": "native_image_to_tensor_conversion",
       "canonical_owner": "comfy_tensor::generated_external_tensor_kernel_01::to_tensor_with_context_exact_native",
       "owner_files": [
@@ -12117,6 +12230,118 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "NativeNodeRegistry alone owns runtime binding identity, dispatch, provider activation, and unavailable state. NativeHandleStoreGeneration and its concrete canonical session, active-attempt claim, staging, lease, and resolved-retention types alone own attempt staging, committed objects, generation checks, and alias-aware resident-byte accounting; production NativeResolvedPayload construction is restricted by ownership validation to that store implementation. NodeRegistry owns built-in catalog metadata and its checked source-module projection; NativeSourceTypeProjection owns the exhaustive case-sensitive socket mapping; TypeRegistry validates every built-in plugin type against that source projection; the verified PluginNode owns signed component metadata. NativeStoredPayload is the only closed store sum over explicit tensor, model through the role-checked NativeStoredModelPayload and NativeDiffusionPayload, conditioning, control, executable noise/guider/sampler, model-derived output, explicit audio/video/artifact/File3D/camera/splat/mesh/voxel media values, media annotations, and ProviderTask-only payload variants, with handle type, semantic digest, and resident bytes derived from each concrete lower-domain object. NativePayloadResidency projects exact process-local shared allocation identities for model Arcs, conditioning-set Arcs, tensor StorageIds, and sealed payload Arcs; the store reference-counts those identities atomically, while addresses and residency placement never enter semantic digests or persisted handles. NativeNodeComputeSession and NativeNodeServices bind the attempt's exact backend and scratch reservation below the runtime dependency boundary. NativePrimitive::String preserves bounded NUL-safe multiline workflow text through its dedicated admission seam, while identifiers and path-like fields retain strict control-character rejection. NativeTextRegex is the sole bounded source-compatible text regex engine and exposes checked capture, replacement-template, result, backtracking, and cancellation limits; NativeTextFormatter is the sole checked source-compatible named-field formatting owner with bounded item/attribute lookup, conversions, nested format specs, results, and cancellation. Generated leaves cannot introduce a second parser, interpreter, regex engine, formatter, or unbounded text path. Structured-compute socket identities authorize no public generic record, wrapper, raw Any, or downcast path. The portable NativeHandleType, NativeHandleStoreIdentity, NativeOpaqueHandle, NativeNodeBinding, NativeNodeContext, NativeNodePresentation, NativeValue, and NativeHandleStore DTOs live below the runtime dependency boundary. Plugin interoperability uses truthful checked neutral views or exact imported handles; an unrepresentable explicit variant fails before mutation, and metadata or ABI bytes cannot mint canonical executable payloads or a parallel store. Production consumers use the comprehensive generated registry, while the early image projection remains compatibility-only."
+    },
+    {
+      "concern": "native_photomaker_model_resource",
+      "canonical_owner": "comfy_model::conditioning_resources::NativePhotoMakerResource",
+      "owner_files": [
+        "crates/comfy_model/src/conditioning_resources.rs",
+        "crates/comfy_model/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativePhotoMakerResource"
+      ],
+      "allowed_adapters": [
+        "NativeClipVision retains the sole CLIP image graph, reconstruction, pooled-hidden, post-layer-normalization, projection, and semantic identity ownership; NativePhotoMakerResource consumes only its checked projections",
+        "canonical comfy_model native_ops and comfy_tensor operators retain linear, layer-normalization, activation, reshape, concatenation, scatter, storage, allocation, cancellation, and workspace authority",
+        "NativeModelPayload seals the PHOTOMAKER role, identity, alias-aware residency, reconstruction, and borrowed selector-free photomaker_resource view without creating handle, cache, persistence, restart, or stale-generation authority",
+        "the pure-standard-library reduced PhotoMaker fixture is a development-reference equation oracle and confers no production model, tensor, CLIP, or publication authority",
+        "NativeGligenResource and NativeStyleModelResource retain their separate checkpoint, reconstruction, invocation, and payload roles"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "qualified": "comfy_model::conditioning_resources::NativePhotoMakerResource",
+          "role": "canonical",
+          "symbol": "NativePhotoMakerResource",
+          "pattern": "^pub struct NativePhotoMakerResource \\{"
+        }
+      ],
+      "call_symbols": [
+        "NativePhotoMakerResource::from_checkpoint",
+        "NativePhotoMakerResource::reconstruct_checkpoint",
+        "NativePhotoMakerResource::fuse_conditioning",
+        "NativeModelPayload::photomaker",
+        "photomaker_resource"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "photomaker-admission-binds-strict-state-and-delegated-clip",
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "pattern": "pub fn from_checkpoint\\([\\s\\S]*photo_normalize_checkpoint[\\s\\S]*photo_validate_ordered_keys[\\s\\S]*NativeClipVision::new_with_cancellation[\\s\\S]*photo_semantic_digest[\\s\\S]*pub fn reconstruct_checkpoint"
+        },
+        {
+          "name": "photomaker-invocation-uses-canonical-clip-and-bounded-fusion",
+          "path": "crates/comfy_model/src/conditioning_resources.rs",
+          "pattern": "pub fn fuse_conditioning\\([\\s\\S]*forward_checked[\\s\\S]*pooled_hidden[\\s\\S]*NativePhotoMakerPhase::Scatter[\\s\\S]*Ok\\(output\\)"
+        },
+        {
+          "name": "photomaker-payload-seals-role-identity-and-residency",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "pub fn photomaker\\([\\s\\S]*NativeModelResourceRole::Photomaker[\\s\\S]*zed-native-photomaker-v1[\\s\\S]*NativeModelResource::PhotoMaker[\\s\\S]*NativeModelBackingKind::NativePhotoMakerResource[\\s\\S]*pub fn photomaker_resource"
+        },
+        {
+          "name": "photomaker-fixture-is-source-pinned-independent-and-bounded",
+          "path": "crates/comfy_test_support/fixtures/models/conditioning-auxiliary-resource-foundation/provenance.json",
+          "pattern": "Pure Python standard-library source equations[\\s\\S]*photomaker_state_count[\\s\\S]*reduced_profiles_are_source_exact"
+        },
+        {
+          "name": "conditioning-auxiliary-role-closure-reconstructs-photomaker-without-cross-role-access",
+          "path": "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+          "pattern": "fn conditioning_auxiliary_resource_roles\\([\\s\\S]*NativeModelPayload::photomaker_test_fixture[\\s\\S]*photomaker_resource\\(\\)[\\s\\S]*reconstruct_checkpoint"
+        },
+        {
+          "name": "task397-photomaker-ownership-oracle",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "fn val_ownership_task397_conditioning_auxiliary_resources_001"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-conditioning-auxiliary-resource-foundation"
+      ],
+      "production_consumers": [
+        "native PHOTOMAKER payload admission and typed masked conditioning fusion"
+      ],
+      "requirements": [
+        "Requirement 6.3",
+        "Requirement 7.2",
+        "Requirement 18.1",
+        "Requirement 26.2",
+        "Requirement 28.2",
+        "Requirement 31.5",
+        "Requirement 34.2",
+        "Requirement 34.6",
+        "Requirement 35.2",
+        "Requirement 37.5",
+        "Requirement 38.3",
+        "Requirement 41.2",
+        "Requirement 44.1",
+        "Requirement 44.3"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-MEMORY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativePhotoMakerResource is the sole retained owner of strict PhotoMaker checkpoint identity, wrapper disposition, source-ordered reconstruction, and masked conditioning fusion. It delegates the complete CLIP image graph and pooled-hidden projection to NativeClipVision and shared tensor equations to canonical owners, and exposes only the sealed PHOTOMAKER payload projection without claiming GLIGEN, style-model, handle, cache, persistence, restart, or stale-generation authority."
     },
     {
       "concern": "native_rgb8_tensor_conversion",
