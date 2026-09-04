@@ -265,16 +265,18 @@ fn release_licenses(prepare: &NamedJob, prepared: &PreparedRelease) -> NamedJob 
         sha256_file() {
             sha256sum "$1" | awk '{print $1}'
         }
+        test "$(git rev-parse HEAD)" = "$COMMIT_SHA"
+        git diff --quiet "$COMMIT_SHA" -- Cargo.lock
         script/generate-licenses
         mkdir -p release-licenses
         cp assets/licenses.md release-licenses/licenses.md
-        CARGO_LOCK_HASH="$(sha256_file Cargo.lock)"
+        CARGO_LOCK_BLOB="$(git rev-parse "${COMMIT_SHA}:Cargo.lock")"
         LICENSES_HASH="$(sha256_file release-licenses/licenses.md)"
         jq -n \
             --arg commit_sha "$COMMIT_SHA" \
-            --arg cargo_lock_hash "$CARGO_LOCK_HASH" \
+            --arg cargo_lock_blob "$CARGO_LOCK_BLOB" \
             --arg licenses_hash "$LICENSES_HASH" \
-            '{commit_sha: $commit_sha, cargo_lock_hash: $cargo_lock_hash, licenses_hash: $licenses_hash}' \
+            '{commit_sha: $commit_sha, cargo_lock_blob: $cargo_lock_blob, licenses_hash: $licenses_hash}' \
             > release-licenses/metadata.json
     "#})
     .add_env(("COMMIT_SHA", prepared.commit_sha.to_string()));
@@ -306,13 +308,15 @@ fn verify_release_licenses() -> Step<Run> {
         }
         test -s release-licenses/licenses.md
         test -s release-licenses/metadata.json
-        CARGO_LOCK_HASH="$(sha256_file Cargo.lock)"
+        test "$(git rev-parse HEAD)" = "$COMMIT_SHA"
+        git diff --quiet "$COMMIT_SHA" -- Cargo.lock
+        CARGO_LOCK_BLOB="$(git rev-parse "${COMMIT_SHA}:Cargo.lock")"
         LICENSES_HASH="$(sha256_file release-licenses/licenses.md)"
         jq -e \
             --arg commit_sha "$COMMIT_SHA" \
-            --arg cargo_lock_hash "$CARGO_LOCK_HASH" \
+            --arg cargo_lock_blob "$CARGO_LOCK_BLOB" \
             --arg licenses_hash "$LICENSES_HASH" \
-            '.commit_sha == $commit_sha and .cargo_lock_hash == $cargo_lock_hash and .licenses_hash == $licenses_hash' \
+            '.commit_sha == $commit_sha and .cargo_lock_blob == $cargo_lock_blob and .licenses_hash == $licenses_hash' \
             release-licenses/metadata.json >/dev/null
         cp release-licenses/licenses.md assets/licenses.md
     "#})
@@ -906,6 +910,10 @@ mod release_workflow_tests {
         assert!(yaml.contains("fallback: none"));
         assert!(yaml.contains("sha256sum \"$1\""));
         assert!(yaml.contains("shasum -a 256 \"$1\""));
+        assert!(yaml.contains("git diff --quiet \"$COMMIT_SHA\" -- Cargo.lock"));
+        assert!(yaml.contains("git rev-parse \"${COMMIT_SHA}:Cargo.lock\""));
+        assert!(yaml.contains("cargo_lock_blob"));
+        assert!(!yaml.contains("CARGO_LOCK_HASH=\"$(sha256_file Cargo.lock)\""));
         assert!(!yaml.contains("LICENSES_HASH=\"$(git hash-object"));
         assert!(yaml.contains("export ZED_BUNDLE_PHASE=application"));
         assert!(yaml.contains("export ZED_BUNDLE_PHASE=remote-server"));
