@@ -136,7 +136,7 @@ jobs:
       ZED_PRODUCT_EXECUTABLE: ${{ matrix.executable_name }}
       ZED_PRODUCT_BUNDLE_ID: ${{ matrix.bundle_identifier }}
       ZED_PRODUCT_URL_SCHEME: ${{ matrix.url_scheme }}
-      ZED_PRODUCT_ICON_SET: ${{ matrix.icon_set }}
+      ZED_PRODUCT_ICON_SET: ${{ github.workspace }}/${{ matrix.icon_set }}
       ZED_PRODUCT_DATA_NAMESPACE: ${{ matrix.data_namespace }}
       ZED_PRODUCT_UPDATE_NAMESPACE: ${{ matrix.update_namespace }}
       ZED_PRODUCT_WINDOWS_INSTALLER_ID: ${{ matrix.windows_installer_id }}
@@ -374,7 +374,7 @@ jobs:
       ZED_PRODUCT_EXECUTABLE: ${{ matrix.executable_name }}
       ZED_PRODUCT_BUNDLE_ID: ${{ matrix.bundle_identifier }}
       ZED_PRODUCT_URL_SCHEME: ${{ matrix.url_scheme }}
-      ZED_PRODUCT_ICON_SET: ${{ matrix.icon_set }}
+      ZED_PRODUCT_ICON_SET: ${{ github.workspace }}/${{ matrix.icon_set }}
       ZED_PRODUCT_DATA_NAMESPACE: ${{ matrix.data_namespace }}
       ZED_PRODUCT_UPDATE_NAMESPACE: ${{ matrix.update_namespace }}
       ZED_PRODUCT_WINDOWS_INSTALLER_ID: ${{ matrix.windows_installer_id }}
@@ -583,7 +583,7 @@ jobs:
       ZED_PRODUCT_EXECUTABLE: ${{ matrix.executable_name }}
       ZED_PRODUCT_BUNDLE_ID: ${{ matrix.bundle_identifier }}
       ZED_PRODUCT_URL_SCHEME: ${{ matrix.url_scheme }}
-      ZED_PRODUCT_ICON_SET: ${{ matrix.icon_set }}
+      ZED_PRODUCT_ICON_SET: ${{ github.workspace }}/${{ matrix.icon_set }}
       ZED_PRODUCT_DATA_NAMESPACE: ${{ matrix.data_namespace }}
       ZED_PRODUCT_UPDATE_NAMESPACE: ${{ matrix.update_namespace }}
       ZED_PRODUCT_WINDOWS_INSTALLER_ID: ${{ matrix.windows_installer_id }}

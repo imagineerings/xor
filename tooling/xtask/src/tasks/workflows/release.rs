@@ -231,7 +231,10 @@ fn release_bundle_environment(job: Job) -> Job {
         .add_env(("ZED_PRODUCT_EXECUTABLE", "${{ matrix.executable_name }}"))
         .add_env(("ZED_PRODUCT_BUNDLE_ID", "${{ matrix.bundle_identifier }}"))
         .add_env(("ZED_PRODUCT_URL_SCHEME", "${{ matrix.url_scheme }}"))
-        .add_env(("ZED_PRODUCT_ICON_SET", "${{ matrix.icon_set }}"))
+        .add_env((
+            "ZED_PRODUCT_ICON_SET",
+            "${{ github.workspace }}/${{ matrix.icon_set }}",
+        ))
         .add_env(("ZED_PRODUCT_DATA_NAMESPACE", "${{ matrix.data_namespace }}"))
         .add_env((
             "ZED_PRODUCT_UPDATE_NAMESPACE",
@@ -913,6 +916,9 @@ mod release_workflow_tests {
         assert!(yaml.contains("git diff --quiet \"$COMMIT_SHA\" -- Cargo.lock"));
         assert!(yaml.contains("git rev-parse \"${COMMIT_SHA}:Cargo.lock\""));
         assert!(yaml.contains("cargo_lock_blob"));
+        assert!(
+            yaml.contains("ZED_PRODUCT_ICON_SET: ${{ github.workspace }}/${{ matrix.icon_set }}")
+        );
         assert!(!yaml.contains("CARGO_LOCK_HASH=\"$(sha256_file Cargo.lock)\""));
         assert!(!yaml.contains("LICENSES_HASH=\"$(git hash-object"));
         assert!(yaml.contains("export ZED_BUNDLE_PHASE=application"));
