@@ -20,6 +20,7 @@ use comfy_tensor::{
     TensorError,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::File,
@@ -762,7 +763,7 @@ impl ModelStore {
         }
 
         let source = VerifiedModelStreamSource {
-            model_identity: model.identity.clone(),
+            model_identity: verified_model_stream_source_identity(&artifacts)?,
             artifacts,
             tensors,
             aggregate_tensor_bytes: model.accounting.tensor_bytes,
@@ -903,6 +904,138 @@ impl ModelStore {
                 artifact.byte_size,
             )?;
             drop(self.open_stream_artifact(index, &artifact.key, cancellation)?);
+        }
+        cancellation
+            .check()
+            .map_err(|_| ModelStoreError::Cancelled)?;
+        Ok(bytes)
+    }
+
+    pub fn read_verified_artifact_range(
+        &self,
+        index: &ArtifactIndex,
+        source: &VerifiedModelStreamSource,
+        artifact_ordinal: usize,
+        expected_sha256: &str,
+        byte_offset: u64,
+        byte_length: u64,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<u8>, ModelStoreError> {
+        self.validate_stream_source_identity(source)?;
+        cancellation
+            .check()
+            .map_err(|_| ModelStoreError::Cancelled)?;
+        self.validate_stream_source(source)?;
+        self.limits.check(
+            "model stream artifact range bytes",
+            byte_length,
+            source.maximum_read_bytes,
+        )?;
+        let artifact = source.artifacts.get(artifact_ordinal).ok_or(
+            ModelStoreError::UnknownModelStreamArtifactOrdinal(artifact_ordinal),
+        )?;
+        if artifact.sha256 != expected_sha256 {
+            return Err(ModelStoreError::ModelStreamArtifactIdentityMismatch { artifact_ordinal });
+        }
+        if !matches!(
+            artifact.format,
+            ModelFormat::JsonConfig
+                | ModelFormat::JsonTokenizer
+                | ModelFormat::YamlConfig
+                | ModelFormat::SentencePiece
+                | ModelFormat::Tiktoken
+        ) {
+            return Err(ModelStoreError::UnsupportedModelStreamArtifactFormat {
+                artifact_ordinal,
+                format: artifact.format.clone(),
+            });
+        }
+        let range_end = byte_offset
+            .checked_add(byte_length)
+            .ok_or(ModelStoreError::Overflow("model stream artifact range"))?;
+        if byte_length == 0 || range_end > artifact.byte_size {
+            return Err(ModelStoreError::ModelStreamArtifactRangeOutOfBounds {
+                artifact_ordinal,
+                byte_offset,
+                byte_length,
+                artifact_byte_length: artifact.byte_size,
+            });
+        }
+
+        let mut verified_source = None;
+        for (ordinal, candidate) in source.artifacts.iter().enumerate() {
+            cancellation
+                .check()
+                .map_err(|_| ModelStoreError::Cancelled)?;
+            self.verify_stream_artifact_record(
+                index,
+                &candidate.key,
+                &candidate.sha256,
+                candidate.byte_size,
+            )?;
+            let verified = self.open_stream_artifact(index, &candidate.key, cancellation)?;
+            if ordinal == artifact_ordinal {
+                verified_source = Some(verified);
+            }
+        }
+        let mut verified = verified_source.ok_or(
+            ModelStoreError::UnknownModelStreamArtifactOrdinal(artifact_ordinal),
+        )?;
+        let length = usize::try_from(byte_length)
+            .map_err(|_| ModelStoreError::Overflow("model stream artifact range length"))?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(length)
+            .map_err(|_| ModelStoreError::AllocationFailed {
+                requested: byte_length,
+            })?;
+        cancellation
+            .check()
+            .map_err(|_| ModelStoreError::Cancelled)?;
+        bytes.resize(length, 0);
+        verified
+            .file_mut()
+            .seek(SeekFrom::Start(byte_offset))
+            .map_err(|error| ModelStoreError::ModelStreamIo {
+                key: artifact.key.clone(),
+                message: error.to_string(),
+            })?;
+        const STREAM_CHUNK_BYTES: usize = 1024 * 1024;
+        let mut position = 0_usize;
+        while position < bytes.len() {
+            cancellation
+                .check()
+                .map_err(|_| ModelStoreError::Cancelled)?;
+            let end = position.saturating_add(STREAM_CHUNK_BYTES).min(bytes.len());
+            let chunk = bytes
+                .get_mut(position..end)
+                .ok_or(ModelStoreError::Overflow(
+                    "model stream artifact range chunk",
+                ))?;
+            verified.file_mut().read_exact(chunk).map_err(|error| {
+                ModelStoreError::ModelStreamIo {
+                    key: artifact.key.clone(),
+                    message: error.to_string(),
+                }
+            })?;
+            position = end;
+        }
+        cancellation
+            .check()
+            .map_err(|_| ModelStoreError::Cancelled)?;
+        self.verify_opened_stream_artifact(&verified, &artifact.key)?;
+        drop(verified);
+        for candidate in &source.artifacts {
+            cancellation
+                .check()
+                .map_err(|_| ModelStoreError::Cancelled)?;
+            self.verify_stream_artifact_record(
+                index,
+                &candidate.key,
+                &candidate.sha256,
+                candidate.byte_size,
+            )?;
+            drop(self.open_stream_artifact(index, &candidate.key, cancellation)?);
         }
         cancellation
             .check()
@@ -1613,6 +1746,42 @@ impl ModelStore {
     }
 }
 
+fn verified_model_stream_source_identity(
+    artifacts: &[VerifiedModelStreamArtifact],
+) -> Result<String, ModelStoreError> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"zed-comfy-verified-model-stream-source-v1");
+    hasher.update(
+        u64::try_from(artifacts.len())
+            .map_err(|_| ModelStoreError::Overflow("model stream artifact count"))?
+            .to_le_bytes(),
+    );
+    for (ordinal, artifact) in artifacts.iter().enumerate() {
+        hasher.update(
+            u64::try_from(ordinal)
+                .map_err(|_| ModelStoreError::Overflow("model stream artifact ordinal"))?
+                .to_le_bytes(),
+        );
+        hasher.update(artifact.sha256.as_bytes());
+        hasher.update(artifact.byte_size.to_le_bytes());
+        hasher.update([match artifact.format {
+            ModelFormat::Safetensors => 0,
+            ModelFormat::PytorchArchive => 1,
+            ModelFormat::Gguf => 2,
+            ModelFormat::JsonConfig => 3,
+            ModelFormat::JsonTokenizer => 4,
+            ModelFormat::YamlConfig => 5,
+            ModelFormat::SentencePiece => 6,
+            ModelFormat::Tiktoken => 7,
+        }]);
+        hasher.update([match artifact.nested_state_disposition {
+            ModelStreamNestedStateDisposition::Flat => 0,
+            ModelStreamNestedStateDisposition::NestedStringToParam => 1,
+        }]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
 fn model_weight_statistic_native_bytes(
     backend: &CpuBackend,
     context: &ExecutionContext<'_>,
@@ -1706,6 +1875,26 @@ pub enum ModelStoreError {
         byte_offset: u64,
         byte_length: u64,
         tensor_byte_length: u64,
+    },
+    #[error("model stream artifact ordinal {0} is unknown")]
+    UnknownModelStreamArtifactOrdinal(usize),
+    #[error("model stream artifact {artifact_ordinal} identity does not match the opened source")]
+    ModelStreamArtifactIdentityMismatch { artifact_ordinal: usize },
+    #[error(
+        "model stream artifact {artifact_ordinal} format {format:?} cannot be streamed as auxiliary bytes"
+    )]
+    UnsupportedModelStreamArtifactFormat {
+        artifact_ordinal: usize,
+        format: ModelFormat,
+    },
+    #[error(
+        "model stream artifact {artifact_ordinal} range {byte_offset}+{byte_length} exceeds {artifact_byte_length} bytes"
+    )]
+    ModelStreamArtifactRangeOutOfBounds {
+        artifact_ordinal: usize,
+        byte_offset: u64,
+        byte_length: u64,
+        artifact_byte_length: u64,
     },
     #[error(
         "loaded model artifact {key:?} identity mismatch: expected {expected_sha256}, actual {actual_sha256:?}"
@@ -2358,6 +2547,160 @@ mod tests {
             store.read_verified_tensor_range(&index, &source, "second", 0, 1, &cancellation)?,
             vec![7]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn model_source_auxiliary_artifact_stream_is_verified_and_bounded()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        write_safetensors(&directory.path().join("one.safetensors"), "first")?;
+        let config = br#"{"metadata":{},"weight_map":{"first":"one.safetensors"}}"#.to_vec();
+        fs::write(
+            directory.path().join("model.safetensors.index.json"),
+            &config,
+        )?;
+        let mut index = ArtifactIndex::default();
+        index.add_root(ArtifactRoot::canonical(
+            "models",
+            "checkpoints",
+            directory.path(),
+            ["safetensors", "json"],
+        )?)?;
+        let cancellation = CancellationToken::default();
+        index.refresh(&cancellation)?;
+        let mut store = ModelStore::new(ParserLimits::default())?;
+        let model = store.load(
+            &index,
+            &ArtifactKey::new("models", "model.safetensors.index.json")?,
+            &cancellation,
+        )?;
+        let source = store.verified_stream_source(&index, &model, &cancellation)?;
+        assert!(model.identity().contains(':'));
+        assert_eq!(source.model_identity().len(), 64);
+        assert!(!source.model_identity().contains(':'));
+        assert_ne!(source.model_identity(), model.identity());
+        assert_eq!(
+            source
+                .artifacts()
+                .iter()
+                .map(VerifiedModelStreamArtifact::sha256)
+                .collect::<Vec<_>>(),
+            model
+                .documents()
+                .iter()
+                .map(|document| document.source_sha256.as_str())
+                .collect::<Vec<_>>()
+        );
+        let artifact_sha256 = source.artifacts()[0].sha256().to_owned();
+        let split = 17_u64;
+        let first = store.read_verified_artifact_range(
+            &index,
+            &source,
+            0,
+            &artifact_sha256,
+            0,
+            split,
+            &cancellation,
+        )?;
+        let second = store.read_verified_artifact_range(
+            &index,
+            &source,
+            0,
+            &artifact_sha256,
+            split,
+            u64::try_from(config.len())? - split,
+            &cancellation,
+        )?;
+        assert_eq!([first, second].concat(), config);
+        assert!(matches!(
+            store.read_verified_artifact_range(
+                &index,
+                &source,
+                2,
+                &artifact_sha256,
+                0,
+                1,
+                &cancellation,
+            ),
+            Err(ModelStoreError::UnknownModelStreamArtifactOrdinal(2))
+        ));
+        assert!(matches!(
+            store.read_verified_artifact_range(
+                &index,
+                &source,
+                0,
+                &"f".repeat(64),
+                0,
+                1,
+                &cancellation,
+            ),
+            Err(ModelStoreError::ModelStreamArtifactIdentityMismatch {
+                artifact_ordinal: 0
+            })
+        ));
+        assert!(matches!(
+            store.read_verified_artifact_range(
+                &index,
+                &source,
+                1,
+                source.artifacts()[1].sha256(),
+                0,
+                1,
+                &cancellation,
+            ),
+            Err(ModelStoreError::UnsupportedModelStreamArtifactFormat {
+                artifact_ordinal: 1,
+                format: ModelFormat::Safetensors,
+            })
+        ));
+        assert!(matches!(
+            store.read_verified_artifact_range(
+                &index,
+                &source,
+                0,
+                &artifact_sha256,
+                u64::try_from(config.len())?,
+                1,
+                &cancellation,
+            ),
+            Err(ModelStoreError::ModelStreamArtifactRangeOutOfBounds { .. })
+        ));
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        assert!(matches!(
+            store.read_verified_artifact_range(
+                &index,
+                &source,
+                0,
+                &artifact_sha256,
+                0,
+                1,
+                &cancelled,
+            ),
+            Err(ModelStoreError::Cancelled)
+        ));
+        let mut changed = config.clone();
+        let first = changed
+            .first_mut()
+            .ok_or("auxiliary artifact fixture is empty")?;
+        *first ^= 1;
+        fs::write(
+            directory.path().join("model.safetensors.index.json"),
+            changed,
+        )?;
+        assert!(matches!(
+            store.read_verified_artifact_range(
+                &index,
+                &source,
+                0,
+                &artifact_sha256,
+                0,
+                1,
+                &cancellation,
+            ),
+            Err(ModelStoreError::ArtifactChanged { .. })
+        ));
         Ok(())
     }
 

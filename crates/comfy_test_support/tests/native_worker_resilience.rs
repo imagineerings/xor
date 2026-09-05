@@ -22,8 +22,8 @@ use comfy_tensor::{
 };
 use comfy_types::{
     AttemptId, MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES, ProfileId, WorkerId, WorkerModelSourceContext,
-    WorkerModelSourceError, WorkerModelSourceOperation, WorkerModelSourceRequest,
-    WorkerModelSourceResponse, worker_model_source_selection_sha256,
+    WorkerModelSourceError, WorkerModelSourceFormat, WorkerModelSourceOperation,
+    WorkerModelSourceRequest, WorkerModelSourceResponse, worker_model_source_selection_sha256,
 };
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -266,6 +266,248 @@ fn val_recovery_005() -> Result<(), Box<dyn Error>> {
 fn model_source_worker_bridge_restarts_without_duplicate_publication() -> Result<(), Box<dyn Error>>
 {
     val_recovery_005()
+}
+
+#[test]
+fn model_source_auxiliary_artifact_stream_restarts_atomically() -> Result<(), Box<dyn Error>> {
+    let directory = tempfile::tempdir()?;
+    let profile_id = "model-source-artifact-restart";
+    let roots = [
+        AssetNamespace::Input,
+        AssetNamespace::Output,
+        AssetNamespace::Temporary,
+        AssetNamespace::Model,
+        AssetNamespace::Plugin,
+    ]
+    .into_iter()
+    .map(|namespace| {
+        let root = directory.path().join(namespace.locator_type());
+        fs::create_dir_all(&root)?;
+        Ok((namespace, root))
+    })
+    .collect::<Result<Vec<_>, std::io::Error>>()?;
+    let roots = AssetRoots::new(profile_id, roots)?;
+    let model_root = roots
+        .test_root_path(AssetNamespace::Model)?
+        .join("checkpoints");
+    fs::create_dir_all(&model_root)?;
+    let shard_header = r#"{"weight":{"dtype":"U8","shape":[4],"data_offsets":[0,4]}}"#;
+    let mut shard = fs::File::create(model_root.join("weights.safetensors"))?;
+    shard.write_all(&u64::try_from(shard_header.len())?.to_le_bytes())?;
+    shard.write_all(shard_header.as_bytes())?;
+    shard.write_all(&[1, 2, 3, 4])?;
+    shard.sync_all()?;
+    let metadata = (0..40_000)
+        .map(|ordinal| {
+            (
+                format!("token-{ordinal:05}"),
+                serde_json::Value::String(format!("fixture-{ordinal:05}")),
+            )
+        })
+        .collect::<serde_json::Map<_, _>>();
+    let config = serde_json::to_vec(&json!({
+        "metadata": metadata,
+        "weight_map": { "weight": "weights.safetensors" }
+    }))?;
+    assert!(config.len() > MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES);
+    fs::write(model_root.join("model.safetensors.index.json"), &config)?;
+
+    let policy = PermissionPolicy::native_runtime_services(profile_id)?;
+    let authorization = authorize_native_api_asset_reader(&policy)?;
+    let assets = Arc::new(Mutex::new(AssetService::open(roots)?));
+    let registry = NativeAssetResolverRegistry::new(assets, authorization);
+    let attempt_id = AttemptId(Uuid::from_u128(0x73321));
+    let source_names = vec!["model.safetensors.index.json".to_owned()];
+    let selection = worker_model_source_selection_sha256("checkpoints", &source_names)?;
+    let context = |session_id, service_generation| WorkerModelSourceContext {
+        session_id,
+        attempt_id,
+        attempt_generation: 1,
+        node_id: "checkpoint-config-loader".to_owned(),
+        node_generation: 1,
+        service_id: Uuid::from_u128(0x73322),
+        service_generation,
+        ordered_source_identity_sha256: selection.clone(),
+    };
+    let open_request = |context: WorkerModelSourceContext| WorkerModelSourceRequest {
+        context,
+        call_ordinal: 1,
+        operation: WorkerModelSourceOperation::Open {
+            folder_category: "checkpoints".to_owned(),
+            source_names: source_names.clone(),
+        },
+    };
+    let cancellation = CancellationToken::default();
+    let (transport, host) = NativeModelSourceTestTransport::channel();
+
+    let lost_context = context(Uuid::from_u128(0x73323), 1);
+    let lost_session = transport.open_session(lost_context.clone())?;
+    let lost_open_response = bridge_model_source_call(
+        &host,
+        &lost_session,
+        &registry,
+        &lost_context,
+        open_request(lost_context.clone()),
+        &cancellation,
+    )?;
+    let WorkerModelSourceResponse::Opened(lost_opened) = lost_open_response else {
+        return Err(format!(
+            "model-source artifact open did not return a manifest: {lost_open_response:?}"
+        )
+        .into());
+    };
+    let lost_source = lost_opened
+        .sources
+        .first()
+        .ok_or("model-source artifact manifest is empty")?;
+    let lost_artifact = lost_source
+        .artifacts
+        .first()
+        .ok_or("model-source config artifact is missing")?
+        .clone();
+    assert_eq!(lost_artifact.format, WorkerModelSourceFormat::JsonConfig);
+    assert_eq!(
+        lost_source.artifacts.get(1).map(|artifact| artifact.format),
+        Some(WorkerModelSourceFormat::Safetensors)
+    );
+    assert_eq!(lost_source.tensors.len(), 1);
+    assert_eq!(lost_source.aggregate_tensor_bytes, 4);
+    let lost_tensor = lost_source
+        .tensors
+        .first()
+        .ok_or("model-source shard tensor is missing")?;
+    assert_eq!(lost_tensor.artifact_ordinal, 1);
+    assert_eq!(lost_tensor.byte_length, 4);
+    assert_eq!(lost_source.model_identity_sha256.as_str().len(), 64);
+    assert!(!lost_source.model_identity_sha256.as_str().contains(':'));
+    assert_ne!(lost_source.model_identity_sha256, lost_artifact.sha256);
+    let first_read = WorkerModelSourceRequest {
+        context: lost_context.clone(),
+        call_ordinal: 2,
+        operation: WorkerModelSourceOperation::ReadArtifact {
+            source_ordinal: 0,
+            artifact_ordinal: 0,
+            artifact_sha256: lost_artifact.sha256.clone(),
+            byte_offset: 0,
+            byte_length: u32::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)?,
+        },
+    };
+    assert!(matches!(
+        bridge_model_source_call(
+            &host,
+            &lost_session,
+            &registry,
+            &lost_context,
+            first_read.clone(),
+            &cancellation,
+        )?,
+        WorkerModelSourceResponse::ArtifactChunk(_)
+    ));
+    registry.test_replace_model_source_service();
+    let late_read = WorkerModelSourceRequest {
+        call_ordinal: 3,
+        ..first_read
+    };
+    assert!(matches!(
+        bridge_model_source_call(
+            &host,
+            &lost_session,
+            &registry,
+            &lost_context,
+            late_read,
+            &cancellation,
+        )?,
+        WorkerModelSourceResponse::Rejected {
+            error: WorkerModelSourceError::Closed,
+            ..
+        }
+    ));
+
+    let retry_context = context(Uuid::from_u128(0x73324), 2);
+    let retry_session = transport.open_session(retry_context.clone())?;
+    let retry_open_response = bridge_model_source_call(
+        &host,
+        &retry_session,
+        &registry,
+        &retry_context,
+        open_request(retry_context.clone()),
+        &cancellation,
+    )?;
+    let WorkerModelSourceResponse::Opened(retry_opened) = retry_open_response else {
+        return Err(format!(
+            "model-source artifact retry did not return a manifest: {retry_open_response:?}"
+        )
+        .into());
+    };
+    let retry_source = retry_opened
+        .sources
+        .first()
+        .ok_or("model-source retry manifest is empty")?;
+    let retry_artifact = retry_source
+        .artifacts
+        .first()
+        .ok_or("model-source retry config artifact is missing")?
+        .clone();
+    assert_eq!(retry_artifact.sha256, lost_artifact.sha256);
+    assert_eq!(
+        retry_source.model_identity_sha256,
+        lost_source.model_identity_sha256
+    );
+    let mut bridged = Vec::new();
+    let mut byte_offset = 0_usize;
+    let mut call_ordinal = 2_u64;
+    while byte_offset < config.len() {
+        let byte_length = (config.len() - byte_offset).min(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES);
+        let request = WorkerModelSourceRequest {
+            context: retry_context.clone(),
+            call_ordinal,
+            operation: WorkerModelSourceOperation::ReadArtifact {
+                source_ordinal: 0,
+                artifact_ordinal: 0,
+                artifact_sha256: retry_artifact.sha256.clone(),
+                byte_offset: u64::try_from(byte_offset)?,
+                byte_length: u32::try_from(byte_length)?,
+            },
+        };
+        let WorkerModelSourceResponse::ArtifactChunk(chunk) = bridge_model_source_call(
+            &host,
+            &retry_session,
+            &registry,
+            &retry_context,
+            request,
+            &cancellation,
+        )?
+        else {
+            return Err("model-source artifact read did not return a chunk".into());
+        };
+        assert_eq!(chunk.artifact_sha256, retry_artifact.sha256);
+        bridged.extend_from_slice(&chunk.bytes);
+        byte_offset = byte_offset
+            .checked_add(byte_length)
+            .ok_or("artifact bridge offset overflowed")?;
+        call_ordinal = call_ordinal
+            .checked_add(1)
+            .ok_or("artifact bridge call ordinal overflowed")?;
+    }
+    assert_eq!(bridged, config);
+    let close = WorkerModelSourceRequest {
+        context: retry_context.clone(),
+        call_ordinal,
+        operation: WorkerModelSourceOperation::Close,
+    };
+    assert!(matches!(
+        bridge_model_source_call(
+            &host,
+            &retry_session,
+            &registry,
+            &retry_context,
+            close,
+            &cancellation,
+        )?,
+        WorkerModelSourceResponse::Closed(_)
+    ));
+    registry.retire_attempt(attempt_id);
+    Ok(())
 }
 
 #[test]

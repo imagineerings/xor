@@ -1253,6 +1253,218 @@ fn val_ownership_task399_model_source_worker_bridge_001() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn val_ownership_task733_model_source_auxiliary_artifact_stream_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let protocol = fs::read_to_string(root.join("crates/comfy_types/src/worker_protocol.rs"))?;
+    let model_store = fs::read_to_string(root.join("crates/comfy_model/src/model_store.rs"))?;
+    let assets = fs::read_to_string(root.join("crates/comfy_runtime/src/assets.rs"))?;
+    let resilience = fs::read_to_string(
+        root.join("crates/comfy_test_support/tests/native_worker_resilience.rs"),
+    )?;
+
+    let operation = protocol
+        .split_once("pub enum WorkerModelSourceOperation {")
+        .and_then(|(_, source)| source.split_once("pub struct WorkerModelSourceRequest"))
+        .map(|(source, _)| source)
+        .ok_or("model-source operation block is missing")?;
+    assert!(
+        operation.find("Close,") < operation.find("ReadArtifact {")
+            && operation.contains("artifact_sha256: WorkerSha256Digest")
+            && operation.contains("artifact_ordinal: u32")
+            && operation.contains("byte_offset: u64")
+            && operation.contains("byte_length: u32"),
+        "auxiliary artifact request is not append-only and fully bound"
+    );
+    let response = protocol
+        .split_once("pub enum WorkerModelSourceResponse {")
+        .and_then(|(_, source)| source.split_once("impl WorkerModelSourceOpened"))
+        .map(|(source, _)| source)
+        .ok_or("model-source response block is missing")?;
+    assert!(
+        response.find("Rejected {")
+            < response.find("ArtifactChunk(WorkerModelSourceArtifactChunk)")
+            && protocol.contains("zed-comfy-model-source-artifact-chunk-v1")
+            && protocol.contains("chunk.artifact_sha256 == *artifact_sha256")
+            && protocol.contains("Some(chunk.bytes.len())"),
+        "auxiliary artifact response is not append-only, digest-bound, and length-bound"
+    );
+    for supported in [
+        "Self::JsonConfig",
+        "Self::JsonTokenizer",
+        "Self::YamlConfig",
+        "Self::SentencePiece",
+        "Self::Tiktoken",
+    ] {
+        assert!(
+            protocol.contains(supported),
+            "auxiliary stream is missing supported format {supported}"
+        );
+    }
+    assert!(protocol.contains("source.tensors.is_empty()"));
+    assert!(protocol.contains("!artifact.format.supports_auxiliary_artifact_stream()"));
+
+    let model_source_protocol = protocol
+        .split_once("pub struct WorkerModelSourceContext {")
+        .and_then(|(_, source)| source.split_once("pub enum WorkerMessage {"))
+        .map(|(source, _)| source)
+        .ok_or("model-source protocol block is missing")?;
+    for forbidden in [
+        "ArtifactKey",
+        "ArtifactIndex",
+        "ModelStore",
+        "AssetService",
+        "PathBuf",
+        "std::path",
+        "std::fs",
+        "File",
+        "authorization",
+        "grant",
+        "handle",
+    ] {
+        assert!(
+            !model_source_protocol.contains(forbidden),
+            "worker auxiliary-artifact protocol exposes forbidden authority {forbidden}"
+        );
+    }
+
+    let verified_read = model_store
+        .split_once("pub fn read_verified_artifact_range(")
+        .and_then(|(_, source)| source.split_once("pub fn verified_tensor_payload("))
+        .map(|(source, _)| source)
+        .ok_or("ModelStore verified auxiliary-artifact read is missing")?;
+    let read_position = verified_read
+        .find(".read_exact(chunk)")
+        .ok_or("verified auxiliary-artifact read loop is missing")?;
+    for prerequisite in [
+        "validate_stream_source_identity(source)",
+        "validate_stream_source(source)",
+        "artifact.sha256 != expected_sha256",
+        "UnsupportedModelStreamArtifactFormat",
+        "range_end > artifact.byte_size",
+        "verify_stream_artifact_record(",
+        "open_stream_artifact(",
+    ] {
+        assert!(
+            verified_read
+                .find(prerequisite)
+                .is_some_and(|position| position < read_position),
+            "ModelStore does not check {prerequisite} before reading auxiliary bytes"
+        );
+    }
+    assert!(verified_read.contains("verify_opened_stream_artifact(&verified, &artifact.key)"));
+    assert!(verified_read.contains("source.maximum_read_bytes"));
+
+    let host_read = assets
+        .split_once("fn read_model_source_artifact_session(")
+        .and_then(|(_, source)| source.split_once("fn close_model_source_session("))
+        .map(|(source, _)| source)
+        .ok_or("app-side auxiliary-artifact session handler is missing")?;
+    for required in [
+        ".sessions\n            .remove(&request.context.session_id)",
+        "validate_model_source_host_context",
+        ".artifacts()",
+        "artifact.sha256() != artifact_sha256.as_str()",
+        "MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES",
+        "read_verified_artifact_range(",
+        "WorkerModelSourceArtifactChunk::checked(",
+        "WorkerModelSourceResponse::ArtifactChunk(chunk)",
+    ] {
+        assert!(
+            host_read.contains(required),
+            "app-side auxiliary-artifact handler is missing {required}"
+        );
+    }
+    assert!(resilience.contains("fn model_source_auxiliary_artifact_stream_restarts_atomically"));
+    assert!(resilience.contains("config.len() > MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES"));
+    assert!(resilience.contains("test_replace_model_source_service()"));
+    assert!(resilience.contains("WorkerModelSourceResponse::ArtifactChunk"));
+    assert!(resilience.contains("assert_eq!(bridged, config)"));
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let matching_concerns = policy["concerns"]
+        .as_array()
+        .ok_or("ownership concerns are missing")?
+        .iter()
+        .filter(|concern| concern["concern"] == "native_model_verified_source_worker_bridge")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        matching_concerns.len(),
+        1,
+        "bridge ownership was duplicated"
+    );
+    let concern = matching_concerns
+        .first()
+        .copied()
+        .ok_or("bridge ownership concern is missing")?;
+    assert_eq!(
+        concern["canonical_owner"].as_str(),
+        Some("comfy_runtime::assets::NativeAssetResolverRegistry")
+    );
+    assert!(concern["owner_files"].as_array().is_some_and(|files| {
+        files
+            .iter()
+            .any(|path| path == "crates/comfy_model/src/model_store.rs")
+    }));
+    for mapping in [
+        "model-source-auxiliary-artifact-wire-is-append-only-and-digest-bound",
+        "model-source-auxiliary-artifact-read-remains-model-store-owned",
+        "model-source-app-owner-serves-only-opened-verified-artifacts",
+        "model-source-auxiliary-artifact-restart-oracle",
+        "task733-model-source-auxiliary-artifact-stream-ownership-oracle",
+    ] {
+        assert!(
+            concern["required_mappings"]
+                .as_array()
+                .is_some_and(|mappings| {
+                    mappings
+                        .iter()
+                        .any(|candidate| candidate["name"] == mapping)
+                })
+        );
+    }
+    assert!(
+        concern["consolidation_tasks"]
+            .as_array()
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task == "comfy-parity-native-model-source-auxiliary-artifact-stream"
+            }))
+    );
+
+    let catalog = fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"),
+    )?;
+    let mut records = parse_csv_records(&catalog)?.into_iter();
+    let header = records.next().ok_or("ownership catalog has no header")?;
+    let column = |name: &str| {
+        header
+            .iter()
+            .position(|candidate| candidate == name)
+            .ok_or_else(|| format!("ownership catalog has no {name} column"))
+    };
+    let concern_column = column("concern")?;
+    let owner_files_column = column("owner_file")?;
+    let tasks_column = column("consolidation_tasks")?;
+    let adapters_column = column("allowed_adapters")?;
+    let competing_column = column("competing_symbols")?;
+    let status_column = column("current_status")?;
+    let row = records
+        .find(|row| row[concern_column] == "native_model_verified_source_worker_bridge")
+        .ok_or("model-source worker-bridge ownership catalog row is missing")?;
+    assert!(row[owner_files_column].contains("crates/comfy_model/src/model_store.rs"));
+    assert!(
+        row[tasks_column].contains("comfy-parity-native-model-source-auxiliary-artifact-stream")
+    );
+    assert!(row[adapters_column].contains("auxiliary-artifact-read"));
+    assert!(row[adapters_column].contains("no authorization grant"));
+    assert!(row[competing_column].is_empty());
+    assert_eq!(row[status_column], "authoritative_owner_confirmed");
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task400_native_model_resource_service_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

@@ -32,15 +32,15 @@ use comfy_types::DeviceKind;
 use comfy_types::{
     ApiPrompt, AttemptId, MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES, NodeId, ProfileId, PromptId,
     PromptNode, PromptSubmission, RequestId, WorkerEnvelope, WorkerId, WorkerMessage,
-    WorkerModelSourceArtifact, WorkerModelSourceClosed, WorkerModelSourceContext,
-    WorkerModelSourceError, WorkerModelSourceFormat, WorkerModelSourceManifest,
-    WorkerModelSourceNestedStateDisposition, WorkerModelSourceOpened, WorkerModelSourceOperation,
-    WorkerModelSourceParserLimits, WorkerModelSourceRequest, WorkerModelSourceResponse,
-    WorkerModelSourceTensor, WorkerModelSourceTransportValidator, WorkerOutputProposal,
-    WorkerProviderInvocationContext, WorkerProviderStreamHandle, WorkerProviderStreamRequest,
-    WorkerProviderStreamResponse, WorkerProviderV2ProposalFinalization,
-    WorkerProviderV2ProposalFinalizationAck, WorkerSha256Digest,
-    worker_model_source_selection_sha256,
+    WorkerModelSourceArtifact, WorkerModelSourceArtifactChunk, WorkerModelSourceClosed,
+    WorkerModelSourceContext, WorkerModelSourceError, WorkerModelSourceFormat,
+    WorkerModelSourceManifest, WorkerModelSourceNestedStateDisposition, WorkerModelSourceOpened,
+    WorkerModelSourceOperation, WorkerModelSourceParserLimits, WorkerModelSourceRequest,
+    WorkerModelSourceResponse, WorkerModelSourceTensor, WorkerModelSourceTransportValidator,
+    WorkerOutputProposal, WorkerProviderInvocationContext, WorkerProviderStreamHandle,
+    WorkerProviderStreamRequest, WorkerProviderStreamResponse,
+    WorkerProviderV2ProposalFinalization, WorkerProviderV2ProposalFinalizationAck,
+    WorkerSha256Digest, worker_model_source_selection_sha256,
 };
 use comfy_worker::{FrameError, read_frame};
 use serde_json::json;
@@ -337,6 +337,278 @@ fn model_source_worker_bridge() -> Result<(), Box<dyn std::error::Error>> {
     };
     let mut oversized_validator = WorkerModelSourceTransportValidator::checked(context)?;
     assert!(oversized_validator.validate_request(2, &oversized).is_err());
+    Ok(())
+}
+
+#[test]
+fn model_source_auxiliary_artifact_stream() -> Result<(), Box<dyn std::error::Error>> {
+    let source_names = vec!["tokenizer.json".to_owned()];
+    let selection = worker_model_source_selection_sha256("clip", &source_names)?;
+    let context = WorkerModelSourceContext {
+        session_id: uuid::Uuid::from_u128(0x73301),
+        attempt_id: AttemptId(uuid::Uuid::from_u128(0x73302)),
+        attempt_generation: 2,
+        node_id: "clip-loader".to_owned(),
+        node_generation: 4,
+        service_id: uuid::Uuid::from_u128(0x73303),
+        service_generation: 6,
+        ordered_source_identity_sha256: selection.clone(),
+    };
+    let artifact_sha256 = WorkerSha256Digest::new("c".repeat(64))?;
+    let artifact_byte_size = u64::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)? + 7;
+    let manifest = WorkerModelSourceManifest {
+        source_ordinal: 0,
+        model_identity_sha256: WorkerSha256Digest::new("d".repeat(64))?,
+        artifacts: vec![WorkerModelSourceArtifact {
+            sha256: artifact_sha256.clone(),
+            byte_size: artifact_byte_size,
+            format: WorkerModelSourceFormat::JsonTokenizer,
+            nested_state_disposition: WorkerModelSourceNestedStateDisposition::Flat,
+        }],
+        tensors: Vec::new(),
+        aggregate_tensor_bytes: 0,
+        maximum_read_bytes: 1024 * 1024,
+        parser_limits: WorkerModelSourceParserLimits {
+            version: 1,
+            manifest_bytes: 1024 * 1024,
+            maximum_depth: 16,
+            maximum_tensors: 1024,
+            maximum_tensor_bytes: 1024 * 1024,
+            maximum_aggregate_tensor_bytes: 1024 * 1024,
+            maximum_name_bytes: 4096,
+            maximum_archive_entries: 1024,
+            maximum_metadata_values: 1024,
+        },
+    };
+    let open = WorkerModelSourceRequest {
+        context: context.clone(),
+        call_ordinal: 1,
+        operation: WorkerModelSourceOperation::Open {
+            folder_category: "clip".to_owned(),
+            source_names,
+        },
+    };
+    let opened = WorkerModelSourceResponse::Opened(WorkerModelSourceOpened::checked(
+        context.session_id,
+        1,
+        selection,
+        vec![manifest],
+    )?);
+    let mut validator = WorkerModelSourceTransportValidator::checked(context.clone())?;
+    validator.validate_request(1, &open)?;
+    validator.validate_response(1, &opened)?;
+
+    let first_read = WorkerModelSourceRequest {
+        context: context.clone(),
+        call_ordinal: 2,
+        operation: WorkerModelSourceOperation::ReadArtifact {
+            source_ordinal: 0,
+            artifact_ordinal: 0,
+            artifact_sha256: artifact_sha256.clone(),
+            byte_offset: 0,
+            byte_length: u32::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)?,
+        },
+    };
+    validator.validate_request(2, &first_read)?;
+    let first_chunk = WorkerModelSourceArtifactChunk::checked(
+        context.session_id,
+        2,
+        0,
+        0,
+        artifact_sha256.clone(),
+        0,
+        vec![0x74; MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES],
+    )?;
+    validator.validate_response(
+        2,
+        &WorkerModelSourceResponse::ArtifactChunk(first_chunk.clone()),
+    )?;
+
+    let second_read = WorkerModelSourceRequest {
+        context: context.clone(),
+        call_ordinal: 3,
+        operation: WorkerModelSourceOperation::ReadArtifact {
+            source_ordinal: 0,
+            artifact_ordinal: 0,
+            artifact_sha256: artifact_sha256.clone(),
+            byte_offset: u64::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)?,
+            byte_length: 7,
+        },
+    };
+    validator.validate_request(3, &second_read)?;
+    validator.validate_response(
+        3,
+        &WorkerModelSourceResponse::ArtifactChunk(WorkerModelSourceArtifactChunk::checked(
+            context.session_id,
+            3,
+            0,
+            0,
+            artifact_sha256.clone(),
+            u64::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)?,
+            b"-config".to_vec(),
+        )?),
+    )?;
+
+    let mut truncated_validator = WorkerModelSourceTransportValidator::checked(context.clone())?;
+    truncated_validator.validate_request(1, &open)?;
+    truncated_validator.validate_response(1, &opened)?;
+    truncated_validator.validate_request(2, &first_read)?;
+    let truncated = WorkerModelSourceArtifactChunk::checked(
+        context.session_id,
+        2,
+        0,
+        0,
+        artifact_sha256.clone(),
+        0,
+        vec![0x74; MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES - 1],
+    )?;
+    assert_eq!(
+        truncated_validator
+            .validate_response(2, &WorkerModelSourceResponse::ArtifactChunk(truncated),),
+        Err(WorkerModelSourceError::InvalidOrder)
+    );
+    assert!(truncated_validator.is_closed());
+
+    let mut digest_validator = WorkerModelSourceTransportValidator::checked(context.clone())?;
+    digest_validator.validate_request(1, &open)?;
+    digest_validator.validate_response(1, &opened)?;
+    digest_validator.validate_request(2, &first_read)?;
+    let mut forged = first_chunk;
+    forged.response_sha256 = WorkerSha256Digest::new("f".repeat(64))?;
+    assert_eq!(
+        digest_validator.validate_response(2, &WorkerModelSourceResponse::ArtifactChunk(forged),),
+        Err(WorkerModelSourceError::DigestMismatch)
+    );
+    assert!(digest_validator.is_closed());
+
+    let mut identity_validator = WorkerModelSourceTransportValidator::checked(context.clone())?;
+    identity_validator.validate_request(1, &open)?;
+    identity_validator.validate_response(1, &opened)?;
+    identity_validator.validate_request(2, &first_read)?;
+    let foreign_artifact = WorkerModelSourceArtifactChunk::checked(
+        context.session_id,
+        2,
+        0,
+        0,
+        WorkerSha256Digest::new("e".repeat(64))?,
+        0,
+        vec![0x74; MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES],
+    )?;
+    assert_eq!(
+        identity_validator.validate_response(
+            2,
+            &WorkerModelSourceResponse::ArtifactChunk(foreign_artifact),
+        ),
+        Err(WorkerModelSourceError::InvalidOrder)
+    );
+    assert!(identity_validator.is_closed());
+
+    let mut direction_validator = WorkerModelSourceTransportValidator::checked(context.clone())?;
+    direction_validator.validate_request(1, &open)?;
+    direction_validator.validate_response(1, &opened)?;
+    direction_validator.validate_request(2, &first_read)?;
+    let tensor_chunk = comfy_types::WorkerModelSourceChunk::checked(
+        context.session_id,
+        2,
+        0,
+        0,
+        0,
+        vec![0x74; MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES],
+    )?;
+    assert_eq!(
+        direction_validator.validate_response(2, &WorkerModelSourceResponse::Chunk(tensor_chunk)),
+        Err(WorkerModelSourceError::InvalidOrder)
+    );
+    assert!(direction_validator.is_closed());
+
+    let mut replay_validator = WorkerModelSourceTransportValidator::checked(context.clone())?;
+    replay_validator.validate_request(1, &open)?;
+    replay_validator.validate_response(1, &opened)?;
+    let mut replayed = first_read.clone();
+    replayed.call_ordinal = 1;
+    assert_eq!(
+        replay_validator.validate_request(2, &replayed),
+        Err(WorkerModelSourceError::Replay)
+    );
+    assert!(replay_validator.is_closed());
+
+    let mut oversized_validator = WorkerModelSourceTransportValidator::checked(context.clone())?;
+    let mut oversized = first_read.clone();
+    oversized.call_ordinal = 1;
+    if let WorkerModelSourceOperation::ReadArtifact { byte_length, .. } = &mut oversized.operation {
+        *byte_length = u32::try_from(MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES)? + 1;
+    }
+    assert_eq!(
+        oversized_validator.validate_request(1, &oversized),
+        Err(WorkerModelSourceError::RangeLimit)
+    );
+    assert!(oversized_validator.is_closed());
+
+    let operation_discriminants = [
+        (
+            WorkerModelSourceOperation::Open {
+                folder_category: "clip".to_owned(),
+                source_names: vec!["tokenizer.json".to_owned()],
+            },
+            0,
+        ),
+        (
+            WorkerModelSourceOperation::Read {
+                source_ordinal: 0,
+                tensor_ordinal: 0,
+                byte_offset: 0,
+                byte_length: 1,
+            },
+            1,
+        ),
+        (WorkerModelSourceOperation::Close, 2),
+        (first_read.operation, 3),
+    ];
+    for (operation, discriminant) in operation_discriminants {
+        assert_eq!(
+            postcard::to_stdvec(&operation)?.first(),
+            Some(&discriminant)
+        );
+    }
+    assert_eq!(postcard::to_stdvec(&opened)?.first(), Some(&0));
+    assert_eq!(
+        postcard::to_stdvec(&WorkerModelSourceResponse::Chunk(
+            comfy_types::WorkerModelSourceChunk::checked(context.session_id, 2, 0, 0, 0, vec![1])?
+        ))?
+        .first(),
+        Some(&1)
+    );
+    assert_eq!(
+        postcard::to_stdvec(&WorkerModelSourceResponse::Closed(
+            WorkerModelSourceClosed::checked(context.session_id, 2)?
+        ))?
+        .first(),
+        Some(&2)
+    );
+    assert_eq!(
+        postcard::to_stdvec(&WorkerModelSourceResponse::rejected(
+            context.session_id,
+            2,
+            WorkerModelSourceError::HostFailure,
+        )?)?
+        .first(),
+        Some(&3)
+    );
+    assert_eq!(
+        postcard::to_stdvec(&WorkerModelSourceResponse::ArtifactChunk(
+            WorkerModelSourceArtifactChunk::checked(
+                context.session_id,
+                2,
+                0,
+                0,
+                artifact_sha256,
+                0,
+                vec![1],
+            )?
+        ))?
+        .first(),
+        Some(&4)
+    );
     Ok(())
 }
 

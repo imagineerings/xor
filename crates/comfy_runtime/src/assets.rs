@@ -23,12 +23,12 @@ use comfy_nodes::{
 };
 use comfy_tensor::{CancellationToken, CpuBackend, ExecutionContext, Tensor};
 use comfy_types::{
-    WorkerModelSourceArtifact, WorkerModelSourceChunk, WorkerModelSourceClosed,
-    WorkerModelSourceContext, WorkerModelSourceError, WorkerModelSourceFormat,
-    WorkerModelSourceManifest, WorkerModelSourceNestedStateDisposition, WorkerModelSourceOpened,
-    WorkerModelSourceOperation, WorkerModelSourceParserLimits, WorkerModelSourceRequest,
-    WorkerModelSourceResponse, WorkerModelSourceTensor, WorkerSha256Digest,
-    worker_model_source_selection_sha256,
+    WorkerModelSourceArtifact, WorkerModelSourceArtifactChunk, WorkerModelSourceChunk,
+    WorkerModelSourceClosed, WorkerModelSourceContext, WorkerModelSourceError,
+    WorkerModelSourceFormat, WorkerModelSourceManifest, WorkerModelSourceNestedStateDisposition,
+    WorkerModelSourceOpened, WorkerModelSourceOperation, WorkerModelSourceParserLimits,
+    WorkerModelSourceRequest, WorkerModelSourceResponse, WorkerModelSourceTensor,
+    WorkerSha256Digest, worker_model_source_selection_sha256,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -61,6 +61,11 @@ const SOURCE_MODEL_EXTENSIONS: &[&str] = &[
     ".pth",
     ".safetensors",
     ".sft",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".model",
+    ".tiktoken",
 ];
 
 #[derive(Clone, Copy)]
@@ -96,7 +101,7 @@ fn source_asset_folder_spec(category: &str) -> Option<SourceAssetFolderSpec> {
         "configs" => Some(SourceAssetFolderSpec {
             namespace: AssetNamespace::Model,
             prefixes: &["configs"],
-            extensions: &[".yaml"],
+            extensions: &[".json", ".yaml", ".yml"],
         }),
         "loras" => Some(model(&["loras"])),
         "vae" => Some(model(&["vae"])),
@@ -1078,6 +1083,21 @@ impl NativeAssetResolverRegistry {
             WorkerModelSourceOperation::Close => {
                 self.close_model_source_session(request, cancellation)
             }
+            WorkerModelSourceOperation::ReadArtifact {
+                source_ordinal,
+                artifact_ordinal,
+                artifact_sha256,
+                byte_offset,
+                byte_length,
+            } => self.read_model_source_artifact_session(
+                request,
+                *source_ordinal,
+                *artifact_ordinal,
+                artifact_sha256,
+                *byte_offset,
+                *byte_length,
+                cancellation,
+            ),
         }
     }
 
@@ -1273,6 +1293,101 @@ impl NativeAssetResolverRegistry {
             .ok_or(WorkerModelSourceError::InvalidOrder)?;
         state.sessions.insert(request.context.session_id, session);
         Ok(WorkerModelSourceResponse::Chunk(chunk))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn read_model_source_artifact_session(
+        &self,
+        request: &WorkerModelSourceRequest,
+        source_ordinal: u32,
+        artifact_ordinal: u32,
+        artifact_sha256: &WorkerSha256Digest,
+        byte_offset: u64,
+        byte_length: u32,
+        cancellation: &CancellationToken,
+    ) -> Result<WorkerModelSourceResponse, WorkerModelSourceError> {
+        let mut state = self
+            .model_sources
+            .lock()
+            .map_err(|_| WorkerModelSourceError::HostFailure)?;
+        let mut session = state
+            .sessions
+            .remove(&request.context.session_id)
+            .ok_or(WorkerModelSourceError::Closed)?;
+        validate_model_source_host_context(&session.context, &request.context)?;
+        if request.call_ordinal < session.next_call_ordinal {
+            return Err(WorkerModelSourceError::Replay);
+        }
+        if request.call_ordinal != session.next_call_ordinal {
+            return Err(WorkerModelSourceError::InvalidOrder);
+        }
+        let source = session
+            .sources
+            .get(
+                usize::try_from(source_ordinal)
+                    .map_err(|_| WorkerModelSourceError::InvalidSourceOrdinal)?,
+            )
+            .ok_or(WorkerModelSourceError::InvalidSourceOrdinal)?;
+        let artifact_ordinal_usize = usize::try_from(artifact_ordinal)
+            .map_err(|_| WorkerModelSourceError::InvalidSourceSelection)?;
+        let artifact = source
+            .source
+            .artifacts()
+            .get(artifact_ordinal_usize)
+            .ok_or(WorkerModelSourceError::InvalidSourceSelection)?;
+        if artifact.sha256() != artifact_sha256.as_str() {
+            return Err(WorkerModelSourceError::SourceChanged);
+        }
+        let byte_length_u64 = u64::from(byte_length);
+        if byte_length == 0
+            || usize::try_from(byte_length).map_or(true, |length| {
+                length > comfy_types::MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES
+            })
+            || byte_offset
+                .checked_add(byte_length_u64)
+                .is_none_or(|end| end > artifact.byte_size())
+        {
+            return Err(WorkerModelSourceError::RangeLimit);
+        }
+        let model_store = state
+            .model_store
+            .take()
+            .ok_or(WorkerModelSourceError::HostFailure)?;
+        let result = (|| {
+            let assets = self
+                .assets
+                .lock()
+                .map_err(|_| WorkerModelSourceError::HostFailure)?;
+            model_store
+                .read_verified_artifact_range(
+                    &assets.artifact_index,
+                    &source.source,
+                    artifact_ordinal_usize,
+                    artifact_sha256.as_str(),
+                    byte_offset,
+                    byte_length_u64,
+                    cancellation,
+                )
+                .map_err(map_model_source_store_error)
+        })();
+        state.model_store = Some(model_store);
+        let bytes = result?;
+        check_model_source_cancellation(cancellation)?;
+        let chunk = WorkerModelSourceArtifactChunk::checked(
+            request.context.session_id,
+            request.call_ordinal,
+            source_ordinal,
+            artifact_ordinal,
+            artifact_sha256.clone(),
+            byte_offset,
+            bytes,
+        )?;
+        session.next_call_ordinal = session
+            .next_call_ordinal
+            .checked_add(1)
+            .ok_or(WorkerModelSourceError::InvalidOrder)?;
+        state.sessions.insert(request.context.session_id, session);
+        Ok(WorkerModelSourceResponse::ArtifactChunk(chunk))
     }
 
     fn close_model_source_session(
@@ -1492,7 +1607,14 @@ fn map_model_source_store_error(error: ModelStoreError) -> WorkerModelSourceErro
     match error {
         ModelStoreError::Cancelled => WorkerModelSourceError::Cancelled,
         ModelStoreError::UnknownTensor(_) => WorkerModelSourceError::InvalidTensorOrdinal,
+        ModelStoreError::UnknownModelStreamArtifactOrdinal(_) => {
+            WorkerModelSourceError::InvalidSourceSelection
+        }
+        ModelStoreError::UnsupportedModelStreamArtifactFormat { .. } => {
+            WorkerModelSourceError::InvalidSourceSelection
+        }
         ModelStoreError::ModelStreamTensorRangeOutOfBounds { .. }
+        | ModelStoreError::ModelStreamArtifactRangeOutOfBounds { .. }
         | ModelStoreError::Limit(_)
         | ModelStoreError::Overflow(_)
         | ModelStoreError::AllocationFailed { .. } => WorkerModelSourceError::RangeLimit,
@@ -1502,6 +1624,7 @@ fn map_model_source_store_error(error: ModelStoreError) -> WorkerModelSourceErro
         | ModelStoreError::StorageSourceChanged { .. }
         | ModelStoreError::StorageRangeChanged(_)
         | ModelStoreError::ModelStreamIo { .. }
+        | ModelStoreError::ModelStreamArtifactIdentityMismatch { .. }
         | ModelStoreError::StaleModelStreamSource => WorkerModelSourceError::SourceChanged,
         ModelStoreError::ForeignModelHandle | ModelStoreError::ForeignModelStreamSource => {
             WorkerModelSourceError::StaleService

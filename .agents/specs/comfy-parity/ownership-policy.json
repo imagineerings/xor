@@ -11174,6 +11174,7 @@
       "concern": "native_model_verified_source_worker_bridge",
       "canonical_owner": "comfy_runtime::assets::NativeAssetResolverRegistry",
       "owner_files": [
+        "crates/comfy_model/src/model_store.rs",
         "crates/comfy_runtime/src/assets.rs",
         "crates/comfy_runtime/src/executor.rs",
         "crates/comfy_runtime/src/native_execution_controller.rs",
@@ -11190,13 +11191,14 @@
         "NativeModelSourceWorkerBinding"
       ],
       "allowed_adapters": [
-        "WorkerModelSourceTransportValidator owns the worker-side capacity-one open, read, and close ordering state and validates exact response identity, length, bounds, and digest",
+        "WorkerModelSourceTransportValidator owns the worker-side capacity-one open, tensor-read, auxiliary-artifact-read, and close ordering state and validates exact response identity, source and artifact ordinals, artifact identity, range, length, bounds, and digest",
         "NativeModelSourceTransport owns the crate-private concrete capacity-one validated session used by the runtime loader; NativeImageExecutor creates it internally and exposes only the worker-loop host endpoint",
         "WorkerSession adapts validated calls to distinct append-only WorkerMessage model-source request and response variants without using provider streaming",
         "RuntimeSupervisor and NativeImageExecutionController transport exact attempt, node, service, session, selection, and call identities between one active worker and the app resolver",
-        "NativeAssetResolverRegistry alone resolves source names through AssetService, retains the canonical ModelStore and verified stream sources, and serves bounded revalidated tensor chunks",
-        "the worker protocol projects only path-free verified manifest metadata and fixed-size chunks and exposes no authorization grant, ArtifactIndex, ArtifactKey, ModelStore, raw service, file handle, or filesystem path",
-        "worker loss, cancellation, shutdown, controller replacement, invalid ordering, stale identity, source change, oversized traffic, and digest failure revoke the exact session before retry"
+        "NativeAssetResolverRegistry alone resolves source names through AssetService, retains the canonical ModelStore and verified stream sources, and serves bounded revalidated tensor and auxiliary-artifact chunks",
+        "ModelStore remains the sole parser and verified-source owner and revalidates artifact format, size, digest, containment, and range before each auxiliary-artifact read",
+        "the worker protocol projects only path-free verified manifest metadata and fixed-size tensor or auxiliary-artifact chunks and exposes no authorization grant, ArtifactIndex, ArtifactKey, ModelStore, raw service, file handle, or filesystem path",
+        "worker loss, cancellation, shutdown, controller replacement, invalid ordering, stale identity, source change, unsupported artifact format, out-of-range or oversized traffic, and digest failure revoke the exact session before retry"
       ],
       "definitions": [
         {
@@ -11237,6 +11239,7 @@
       ],
       "call_symbols": [
         "NativeAssetResolverRegistry::serve_model_source_request",
+        "ModelStore::read_verified_artifact_range",
         "WorkerModelSourceTransportValidator::validate_request",
         "WorkerModelSourceTransportValidator::validate_response",
         "WorkerSession::model_source_request"
@@ -11277,11 +11280,37 @@
           "name": "task399-model-source-worker-bridge-ownership-oracle",
           "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
           "pattern": "fn val_ownership_task399_model_source_worker_bridge_001"
+        },
+        {
+          "name": "model-source-auxiliary-artifact-wire-is-append-only-and-digest-bound",
+          "path": "crates/comfy_types/src/worker_protocol.rs",
+          "pattern": "pub enum WorkerModelSourceOperation \\{[\\s\\S]*Close,[\\s\\S]*ReadArtifact \\{[\\s\\S]*artifact_sha256: WorkerSha256Digest[\\s\\S]*pub enum WorkerModelSourceResponse \\{[\\s\\S]*Rejected \\{[\\s\\S]*ArtifactChunk\\(WorkerModelSourceArtifactChunk\\)[\\s\\S]*zed-comfy-model-source-artifact-chunk-v1"
+        },
+        {
+          "name": "model-source-auxiliary-artifact-read-remains-model-store-owned",
+          "path": "crates/comfy_model/src/model_store.rs",
+          "pattern": "pub fn read_verified_artifact_range\\([\\s\\S]*validate_stream_source_identity[\\s\\S]*validate_stream_source[\\s\\S]*UnsupportedModelStreamArtifactFormat[\\s\\S]*verify_stream_artifact_record[\\s\\S]*open_stream_artifact[\\s\\S]*verify_opened_stream_artifact"
+        },
+        {
+          "name": "model-source-app-owner-serves-only-opened-verified-artifacts",
+          "path": "crates/comfy_runtime/src/assets.rs",
+          "pattern": "WorkerModelSourceOperation::ReadArtifact[\\s\\S]*fn read_model_source_artifact_session\\([\\s\\S]*artifacts\\(\\)[\\s\\S]*artifact.sha256\\(\\)[\\s\\S]*read_verified_artifact_range"
+        },
+        {
+          "name": "model-source-auxiliary-artifact-restart-oracle",
+          "path": "crates/comfy_test_support/tests/native_worker_resilience.rs",
+          "pattern": "fn model_source_auxiliary_artifact_stream_restarts_atomically[\\s\\S]*MAX_WORKER_MODEL_SOURCE_CHUNK_BYTES[\\s\\S]*WorkerModelSourceOperation::ReadArtifact[\\s\\S]*test_replace_model_source_service[\\s\\S]*WorkerModelSourceResponse::ArtifactChunk"
+        },
+        {
+          "name": "task733-model-source-auxiliary-artifact-stream-ownership-oracle",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "fn val_ownership_task733_model_source_auxiliary_artifact_stream_001"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
-        "comfy-parity-native-model-source-worker-bridge-foundation"
+        "comfy-parity-native-model-source-worker-bridge-foundation",
+        "comfy-parity-native-model-source-auxiliary-artifact-stream"
       ],
       "production_consumers": [
         "the native model resource service consumes the path-free checked model-source session without receiving app authority"
@@ -11323,7 +11352,7 @@
         "VAL-CANCEL-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "NativeAssetResolverRegistry is the sole app-side owner of model-source session capacity, source resolution, ModelStore retention, and checked chunk service. Protocol, worker, supervisor, and controller types are identity-checking transport adapters only and cannot acquire filesystem, authorization, index, parser, store, cache, or unchecked-read authority."
+      "decision_reason": "NativeAssetResolverRegistry is the sole app-side owner of model-source session capacity, source resolution, ModelStore retention, and checked tensor or auxiliary-artifact chunk service. ModelStore alone parses sources and revalidates exact artifact identity, format, size, containment, and ranges. Protocol, worker, supervisor, and controller types are identity-checking transport adapters only and cannot acquire filesystem, authorization, index, parser, store, cache, or unchecked-read authority."
     },
     {
       "concern": "native_model_verified_stream_source",
