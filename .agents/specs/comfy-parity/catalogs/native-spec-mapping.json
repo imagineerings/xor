@@ -2628,7 +2628,8 @@
       "comfy-parity-native-multigpu-guidance-execution-foundation",
       "comfy-parity-native-detection-execution-foundation",
       "comfy-parity-gpui-persistence",
-      "comfy-parity-performance"
+      "comfy-parity-performance",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "18.2": [
       "comfy-parity-execution-ui",
@@ -3113,7 +3114,8 @@
       "comfy-parity-desktop-native-ui",
       "comfy-parity-security-platform",
       "comfy-parity-gpui-persistence",
-      "comfy-parity-performance"
+      "comfy-parity-performance",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "26.3": [
       "comfy-parity-native-worker",
@@ -3418,7 +3420,8 @@
       "comfy-parity-updates-snapshots",
       "comfy-parity-desktop-native-ui",
       "comfy-parity-security-platform",
-      "comfy-parity-final-validation"
+      "comfy-parity-final-validation",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "28.3": [
       "comfy-parity-settings-persistence-foundation",
@@ -5024,7 +5027,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
-      "comfy-parity-probe-derived-model-state-plan-selector"
+      "comfy-parity-probe-derived-model-state-plan-selector",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "31.6": [
       "comfy-parity-native-memory-planner",
@@ -6732,7 +6736,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "34.3": [
       "comfy-parity-tensor-core",
@@ -8178,7 +8183,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "35.1": [
       "comfy-parity-native-cpu-backend",
@@ -8801,7 +8807,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
-      "comfy-parity-probe-derived-model-state-plan-selector"
+      "comfy-parity-probe-derived-model-state-plan-selector",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "35.3": [
       "comfy-parity-native-cpu-backend",
@@ -13420,7 +13427,8 @@
       "comfy-parity-weight-adapter-runtime-bypass",
       "comfy-parity-patch-loading-merge-quantized-adapter",
       "comfy-parity-sd1-tokenizer-owner-consolidation",
-      "comfy-parity-backend-catalog-provenance-reconciliation"
+      "comfy-parity-backend-catalog-provenance-reconciliation",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "37.6": [
       "comfy-parity-native-diffusion-foundation",
@@ -14885,7 +14893,8 @@
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
-      "comfy-parity-probe-derived-model-state-plan-selector"
+      "comfy-parity-probe-derived-model-state-plan-selector",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "38.4": [
       "comfy-parity-protocol-foundation",
@@ -18083,7 +18092,8 @@
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
       "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
-      "comfy-parity-probe-derived-model-state-plan-selector"
+      "comfy-parity-probe-derived-model-state-plan-selector",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "41.3": [
       "comfy-parity-trust-foundation",
@@ -20145,7 +20155,8 @@
       "comfy-parity-three-d-latent-content",
       "comfy-parity-backward-compatibility",
       "comfy-parity-performance",
-      "comfy-parity-final-validation"
+      "comfy-parity-final-validation",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "44.2": [
       "comfy-parity-node-model-registry",
@@ -20520,7 +20531,8 @@
       "comfy-parity-three-d-latent-content",
       "comfy-parity-backward-compatibility",
       "comfy-parity-performance",
-      "comfy-parity-final-validation"
+      "comfy-parity-final-validation",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "44.4": [
       "comfy-parity-native-execution-e2e",
@@ -21341,7 +21353,8 @@
       "comfy-parity-native-nodes-video-preprocessors-comfy-node-0372",
       "comfy-parity-native-registry-integration",
       "comfy-parity-backward-compatibility",
-      "comfy-parity-final-validation"
+      "comfy-parity-final-validation",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "6.4": [
       "comfy-parity-extension-host-plugin-adapter",
@@ -22703,7 +22716,8 @@
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
       "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
-      "comfy-parity-probe-derived-model-state-plan-selector"
+      "comfy-parity-probe-derived-model-state-plan-selector",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "7.3": [
       "comfy-parity-native-cpu-backend",
@@ -34103,6 +34117,7 @@
     "comfy-parity-native-model-resource-execution-foundation",
     "comfy-parity-native-model-resource-service-foundation",
     "comfy-parity-native-model-resource-service-recipe-closure",
+    "comfy-parity-native-model-source-auxiliary-artifact-stream",
     "comfy-parity-native-model-source-worker-bridge-foundation",
     "comfy-parity-native-model-store-stream-source-foundation",
     "comfy-parity-native-model-training-foundation",
@@ -38524,7 +38539,8 @@
       "comfy-parity-native-multigpu-guidance-execution-foundation",
       "comfy-parity-native-detection-execution-foundation",
       "comfy-parity-gpui-persistence",
-      "comfy-parity-performance"
+      "comfy-parity-performance",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "19": [
       "comfy-parity-file-asset-runtime",
@@ -38656,7 +38672,8 @@
       "comfy-parity-desktop-native-ui",
       "comfy-parity-security-platform",
       "comfy-parity-gpui-persistence",
-      "comfy-parity-performance"
+      "comfy-parity-performance",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "27": [
       "comfy-parity-settings-localization-ui",
@@ -38843,7 +38860,8 @@
       "comfy-parity-updates-snapshots",
       "comfy-parity-desktop-native-ui",
       "comfy-parity-security-platform",
-      "comfy-parity-final-validation"
+      "comfy-parity-final-validation",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "29": [
       "comfy-parity-settings-persistence-foundation",
@@ -39092,7 +39110,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
-      "comfy-parity-probe-derived-model-state-plan-selector"
+      "comfy-parity-probe-derived-model-state-plan-selector",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "32": [
       "comfy-parity-catalog-ledgers",
@@ -39443,7 +39462,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "35": [
       "comfy-parity-native-cpu-backend",
@@ -39595,7 +39615,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
-      "comfy-parity-probe-derived-model-state-plan-selector"
+      "comfy-parity-probe-derived-model-state-plan-selector",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "36": [
       "comfy-parity-trust-foundation",
@@ -39893,7 +39914,8 @@
       "comfy-parity-weight-adapter-runtime-bypass",
       "comfy-parity-patch-loading-merge-quantized-adapter",
       "comfy-parity-sd1-tokenizer-owner-consolidation",
-      "comfy-parity-backend-catalog-provenance-reconciliation"
+      "comfy-parity-backend-catalog-provenance-reconciliation",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "38": [
       "comfy-parity-protocol-foundation",
@@ -40021,7 +40043,8 @@
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
-      "comfy-parity-probe-derived-model-state-plan-selector"
+      "comfy-parity-probe-derived-model-state-plan-selector",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "39": [
       "comfy-parity-settings-persistence-foundation",
@@ -40450,7 +40473,8 @@
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
       "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
-      "comfy-parity-probe-derived-model-state-plan-selector"
+      "comfy-parity-probe-derived-model-state-plan-selector",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "42": [
       "comfy-parity-catalog-ledgers",
@@ -40668,7 +40692,8 @@
       "comfy-parity-three-d-latent-content",
       "comfy-parity-backward-compatibility",
       "comfy-parity-performance",
-      "comfy-parity-final-validation"
+      "comfy-parity-final-validation",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "45": [
       "comfy-parity-opt-in-product-build-boundary"
@@ -40789,7 +40814,8 @@
       "comfy-parity-native-multigpu-guidance-execution-foundation",
       "comfy-parity-native-registry-integration",
       "comfy-parity-backward-compatibility",
-      "comfy-parity-final-validation"
+      "comfy-parity-final-validation",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "7": [
       "comfy-parity-native-cpu-backend",
@@ -40948,7 +40974,8 @@
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
       "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
-      "comfy-parity-probe-derived-model-state-plan-selector"
+      "comfy-parity-probe-derived-model-state-plan-selector",
+      "comfy-parity-native-model-source-auxiliary-artifact-stream"
     ],
     "8": [
       "comfy-parity-protocol-foundation",
@@ -74839,6 +74866,22 @@
       "44.1",
       "44.3"
     ],
+    "comfy-parity-native-model-source-auxiliary-artifact-stream": [
+      "6.3",
+      "7.2",
+      "18.1",
+      "26.2",
+      "28.2",
+      "31.5",
+      "34.2",
+      "34.6",
+      "35.2",
+      "37.5",
+      "38.3",
+      "41.2",
+      "44.1",
+      "44.3"
+    ],
     "comfy-parity-native-model-source-worker-bridge-foundation": [
       "6.3",
       "7.2",
@@ -89869,7 +89912,8 @@
     "comfy-parity-model-detection-any-of-key-selector-consolidation",
     "comfy-parity-appledouble-source-scan-portability",
     "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
-    "comfy-parity-probe-derived-model-state-plan-selector"
+    "comfy-parity-probe-derived-model-state-plan-selector",
+    "comfy-parity-native-model-source-auxiliary-artifact-stream"
   ],
   "validation_ids": [
     "VAL-CATALOG-001",

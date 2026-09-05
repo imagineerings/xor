@@ -7410,8 +7410,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 371. Refresh the native backend dependency ledger lock identity
   - _id: comfy-parity-native-backend-dependency-ledger-current-lock-repair
   - Outcome: Refresh the canonical native-backend dependency ledger after serialized upstream workspace dependency changes without changing any Comfy adapter dependency, feature, source, target, or availability claim.
-  - Wave: 277
-  - _Wave: 277
+  - Wave: 278
+  - _Wave: 278
   - Dependencies: comfy-parity-provider-runtime-component-activation-preflight-foundation
   - _Blocked_by: comfy-parity-provider-runtime-component-activation-preflight-foundation
   - Reads: Cargo.lock, .agents/specs/comfy-parity/catalogs/native-backend-dependencies.json, .agents/specs/comfy-parity/validate_backend_dependencies.py, crates/comfy_test_support/tests/native_foundation.rs
@@ -8010,10 +8010,10 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 401. Close native model resource service recipes
   - _id: comfy-parity-native-model-resource-service-recipe-closure
   - Outcome: Extend the existing loader service's private role dispatch with the complete source-valid one-, two-, three-, and four-source recipe matrix for every concrete NativeModelPayload loader role, without publishing handles or moving invocation or lifecycle authority into the service.
-  - Wave: 221
-  - _Wave: 221
-  - Dependencies: comfy-parity-native-model-resource-service-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
-  - _Blocked_by: comfy-parity-native-model-resource-service-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
+  - Wave: 222
+  - _Wave: 222
+  - Dependencies: comfy-parity-native-model-source-auxiliary-artifact-stream, comfy-parity-model-detection-any-of-key-selector-consolidation
+  - _Blocked_by: comfy-parity-native-model-source-auxiliary-artifact-stream, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: projects/comfy/ComfyUI/nodes.py, projects/comfy/ComfyUI/folder_paths.py, projects/comfy/ComfyUI/comfy_extras/nodes_audio_encoder.py, projects/comfy/ComfyUI/comfy_extras/nodes_bg_removal.py, projects/comfy/ComfyUI/comfy_extras/nodes_depth_anything_3.py, projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/nodes_hidream.py, projects/comfy/ComfyUI/comfy_extras/nodes_hunyuan.py, projects/comfy/ComfyUI/comfy_extras/nodes_moge.py, projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py, projects/comfy/ComfyUI/comfy_extras/nodes_void.py, projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py, crates/comfy_model/src/model_store.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_model/src/audio_encoder.rs, crates/comfy_model/src/background_removal.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/clip_vision.rs, crates/comfy_model/src/conditioning_resources.rs, crates/comfy_model/src/depth_anything_3.rs, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/latent_upscale_model.rs, crates/comfy_model/src/moge.rs, crates/comfy_model/src/sdpose.rs, crates/comfy_model/src/vision_models.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_test_support/tests/native_node_family_e2e.rs, crates/comfy_test_support/tests/native_worker_resilience.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs
   - _Reads: projects/comfy/ComfyUI/nodes.py, projects/comfy/ComfyUI/folder_paths.py, projects/comfy/ComfyUI/comfy_extras/nodes_audio_encoder.py, projects/comfy/ComfyUI/comfy_extras/nodes_bg_removal.py, projects/comfy/ComfyUI/comfy_extras/nodes_depth_anything_3.py, projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/nodes_hidream.py, projects/comfy/ComfyUI/comfy_extras/nodes_hunyuan.py, projects/comfy/ComfyUI/comfy_extras/nodes_moge.py, projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py, projects/comfy/ComfyUI/comfy_extras/nodes_void.py, projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py, crates/comfy_model/src/model_store.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_model/src/audio_encoder.rs, crates/comfy_model/src/background_removal.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/clip_vision.rs, crates/comfy_model/src/conditioning_resources.rs, crates/comfy_model/src/depth_anything_3.rs, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/latent_upscale_model.rs, crates/comfy_model/src/moge.rs, crates/comfy_model/src/sdpose.rs, crates/comfy_model/src/vision_models.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_test_support/tests/native_node_family_e2e.rs, crates/comfy_test_support/tests/native_worker_resilience.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs
   - Writes: crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/clip_vision.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_model/src/vision_models.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_test_support/tests/native_node_family_e2e.rs, crates/comfy_test_support/tests/native_worker_resilience.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs
@@ -8021,15 +8021,15 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Requirements: 6.3, 7.2, 18.1, 26.2, 28.2, 31.5, 34.2, 34.6, 35.2, 37.5, 38.3, 41.2, 44.1, 44.3
   - _Requirements: 6.3, 7.2, 18.1, 26.2, 28.2, 31.5, 34.2, 34.6, 35.2, 37.5, 38.3, 41.2, 44.1, 44.3
   - Design: D8, D20, D25, D26, D28, D29, D31, D32, D33, D34, D39, D41
-  - Validation: VAL-MODEL-FAMILY-001, VAL-NODE-001, VAL-MEMORY-001, VAL-CANCEL-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_nodes -p comfy_runtime -p comfy_worker -p comfy_test_support; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_runtime -p comfy_worker -p comfy_test_support; cargo fmt --all -- --check; cargo test --locked -p comfy_nodes native_model_resource_service_recipes -- --nocapture; cargo test --locked -p comfy_runtime native_model_resource_service_recipes -- --nocapture; cargo test --locked -p comfy_test_support --test native_node_family_e2e native_model_resource_service_recipe_matrix -- --exact --nocapture; cargo test --locked -p comfy_test_support --test native_worker_resilience model_resource_recipe_restart_is_atomic -- --exact --nocapture; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/generate_ownership_catalog.py; cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task401_native_model_resource_service_recipes_001 -- --exact --nocapture; cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice; python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete; git diff --check
-  - _Validation: VAL-MODEL-FAMILY-001, VAL-NODE-001, VAL-MEMORY-001, VAL-CANCEL-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_nodes -p comfy_runtime -p comfy_worker -p comfy_test_support; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_runtime -p comfy_worker -p comfy_test_support; cargo fmt --all -- --check; cargo test --locked -p comfy_nodes native_model_resource_service_recipes -- --nocapture; cargo test --locked -p comfy_runtime native_model_resource_service_recipes -- --nocapture; cargo test --locked -p comfy_test_support --test native_node_family_e2e native_model_resource_service_recipe_matrix -- --exact --nocapture; cargo test --locked -p comfy_test_support --test native_worker_resilience model_resource_recipe_restart_is_atomic -- --exact --nocapture; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/generate_ownership_catalog.py; cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task401_native_model_resource_service_recipes_001 -- --exact --nocapture; cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice; python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete; git diff --check
+  - Validation: VAL-MODEL-FAMILY-001, VAL-NODE-001, VAL-MEMORY-001, VAL-CANCEL-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_nodes -p comfy_runtime -p comfy_worker -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_nodes -p comfy_runtime -p comfy_worker -p comfy_test_support; cargo fmt --all -- --check; cargo test --locked -p comfy_nodes native_model_resource_service_recipes -- --nocapture; cargo test --locked -p comfy_runtime native_model_resource_service_recipes -- --nocapture; cargo test --locked -p comfy_test_support --test native_node_family_e2e native_model_resource_service_recipe_matrix -- --exact --nocapture; cargo test --locked -p comfy_test_support --test native_worker_resilience model_resource_recipe_restart_is_atomic -- --exact --nocapture; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/generate_ownership_catalog.py; cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task401_native_model_resource_service_recipes_001 -- --exact --nocapture; cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice; python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete; git diff --check
+  - _Validation: VAL-MODEL-FAMILY-001, VAL-NODE-001, VAL-MEMORY-001, VAL-CANCEL-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_nodes -p comfy_runtime -p comfy_worker -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_nodes -p comfy_runtime -p comfy_worker -p comfy_test_support; cargo fmt --all -- --check; cargo test --locked -p comfy_nodes native_model_resource_service_recipes -- --nocapture; cargo test --locked -p comfy_runtime native_model_resource_service_recipes -- --nocapture; cargo test --locked -p comfy_test_support --test native_node_family_e2e native_model_resource_service_recipe_matrix -- --exact --nocapture; cargo test --locked -p comfy_test_support --test native_worker_resilience model_resource_recipe_restart_is_atomic -- --exact --nocapture; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/generate_ownership_catalog.py; cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task401_native_model_resource_service_recipes_001 -- --exact --nocapture; cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice; python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete; git diff --check
   - Done when: The existing NativeModelResourceService request and opaque runtime implementation remain the sole loader-service port and owner. Exact source/category recipes are: one checkpoints source selected as MODEL, CLIP, or VAE; one diffusion_models source as MODEL; one through four ordered text_encoders sources as CLIP, preserving single, dual, SD3 triple, and HiDream quadruple order; one vae source as VAE; one audio_encoders source as AUDIO_ENCODER; one clip_vision source as CLIP_VISION; one style_models source as STYLE_MODEL; one photomaker source as PHOTOMAKER; one gligen source as GLIGEN; one latent_upscale_models source as LATENT_UPSCALE_MODEL; one background_removal source as BACKGROUND_REMOVAL; one frame_interpolation source as INTERP_MODEL; one geometry_estimation source selected as DA3_MODEL or MOGE_MODEL; and one optical_flow source as OPTICAL_FLOW. Each admitted recipe delegates exactly once to its canonical typed resource owner and returns Arc<NativeModelPayload>. Ordered-source count, category, role, source identity, and detected architecture are checked as one matrix; zero, five, swapped, duplicate, partial, wrong-category, wrong-role, ambiguous, unsupported, changed-source, OOM, cancellation, worker-loss, and replacement cases return typed unavailable or the exact owner error before any stored payload, handle, cache record, effect, or durable success. CONTROL_NET remains NativeControlPayload-owned, UPSCALE_MODEL remains typed unavailable while its resource is uninhabited, FACE_DETECTION remains unavailable until a concrete owner exists, and HOOKS, HOOK_KEYFRAMES, LATENT_OPERATION, LORA_MODEL, and MODEL_PATCH remain assigned to transform leaves. This closure adds no parser, store, bridge, path, grant, invocation, handle, cache, persistence, restart, or stale-generation authority. native_model_resource_service remains the sole service concern, while native_node_registry remains the sole handle lifecycle, lease, cache, and generation owner; publication and restart reconstruction remain assigned to comfy-parity-native-model-resource-execution-foundation.
 
 - [ ] 402. Admit and execute source model resources through one native boundary
   - _id: comfy-parity-native-model-resource-execution-foundation
   - Outcome: Integrate the recipe-closed loader service through the single native handle-store boundary with an exact payload and typed-unavailable matrix. NativeDiffusionPayload remains the only transport for diffusion MODEL, SD1 CLIP, and VAE. Direct concrete NativeModelPayload resources use checked NativeStoredModelPayload admission. NativeControlPayload remains the sole CONTROL_NET transport; uninhabited, ownerless, and transform roles remain typed unavailable. Restart reconstructs resources from canonical persisted source selections into fresh-generation handles without serializing process-local handles, payloads, tensors, stores, or caches.
-  - Wave: 222
-  - _Wave: 222
+  - Wave: 223
+  - _Wave: 223
   - Dependencies: comfy-parity-native-model-resource-service-recipe-closure, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-model-resource-service-recipe-closure, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, projects/comfy/ComfyUI/nodes.py, projects/comfy/ComfyUI/comfy_extras/nodes_audio_encoder.py, projects/comfy/ComfyUI/comfy_extras/nodes_upscale_model.py, projects/comfy/ComfyUI/comfy_extras/nodes_bg_removal.py, projects/comfy/ComfyUI/comfy_extras/nodes_depth_anything_3.py, projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/nodes_moge.py, projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py, projects/comfy/ComfyUI/comfy_extras/nodes_void.py, crates/comfy_model/src/native_node_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/audio_encoder.rs, crates/comfy_model/src/background_removal.rs, crates/comfy_model/src/clip_vision.rs, crates/comfy_model/src/conditioning_resources.rs, crates/comfy_model/src/depth_anything_3.rs, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/latent_upscale_model.rs, crates/comfy_model/src/moge.rs, crates/comfy_model/src/sdpose.rs, crates/comfy_model/src/upscale_model.rs, crates/comfy_model/src/vision_models.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_runtime/src/cache.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/persistence.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_worker/src/comfy_worker.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/native_node_family_e2e.rs, crates/comfy_test_support/tests/native_worker_resilience.rs, crates/comfy_test_support/tests/ownership_consolidation.rs
@@ -8046,8 +8046,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 403. Preserve source conditioning metadata and immutable ControlNet rebinding
   - _id: comfy-parity-native-conditioning-control-foundation
   - Outcome: Add a sealed, sampler-consumed per-entry conditioning metadata map and one canonical immutable ControlNet clone/rebind operation. Metadata admits only cataloged bounded typed keys and tensor/list shapes used by source conditioning nodes; ControlNet rebinding preserves executor identity while replacing hint, strength, timestep window, optional VAE, extra concat or mask, union control type, and predecessor chain. Source-valid zero-size percentage regions and unordered timestep metadata remain representable without weakening sampler validation.
-  - Wave: 223
-  - _Wave: 223
+  - Wave: 224
+  - _Wave: 224
   - Dependencies: comfy-parity-native-node-compute-value-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-model-resource-execution-foundation
   - _Blocked_by: comfy-parity-native-node-compute-value-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-model-resource-execution-foundation
   - Reads: projects/comfy/ComfyUI/nodes.py, projects/comfy/ComfyUI/comfy_extras/nodes_controlnet.py, projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py, projects/comfy/ComfyUI/comfy_extras/nodes_wan.py, projects/comfy/ComfyUI/comfy_extras/nodes_scail.py, crates/comfy_model/src/conditioning.rs, crates/comfy_model/src/controlnet.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -8064,8 +8064,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 404. Clone, merge, patch, and export executable native models
   - _id: comfy-parity-native-model-transform-foundation
   - Outcome: Create one canonical immutable model transformation boundary over retained family resources. It supports keyed state enumeration, source prefix-routed two-model merges, explicit scale-only MODEL and CLIP operations, LoRA and hypernetwork application, exact MODEL/CLIP/VAE/LoRA safetensors export, and a serializable execution-hook graph for CFG, post-CFG, attention, context-window, output-block, sampling-profile, ROPE, model-function, and diffusion wrappers. Rebinding returns a new NativeDiffusionPayload while preserving compatible conditioning and patch identities; family leaves only project parameters into this owner.
-  - Wave: 224
-  - _Wave: 224
+  - Wave: 225
+  - _Wave: 225
   - Dependencies: comfy-parity-native-conditioning-control-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-conditioning-control-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_model_merging.py, projects/comfy/ComfyUI/comfy_extras/nodes_model_merging_model_specific.py, projects/comfy/ComfyUI/comfy_extras/nodes_model_advanced.py, projects/comfy/ComfyUI/comfy_extras/nodes_context_windows.py, projects/comfy/ComfyUI/comfy_extras/nodes_attention_multiply.py, projects/comfy/ComfyUI/comfy/model_patcher.py, projects/comfy/ComfyUI/comfy/lora.py, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/execution.rs
@@ -8082,8 +8082,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 405. Train retained native LoRA resources through one bounded service
   - _id: comfy-parity-native-model-training-foundation
   - Outcome: Expose one runtime-injected training service over retained diffusion family models and canonical dataset payloads. It owns LoRA adapter initialization or reload, trainable parameter selection, model forward and autograd, optimizer and loss selection, dtype and offload policy, gradient accumulation, seeded sampling, checkpoint cadence, cancellation, and publication of a concrete retained LORA_MODEL plus LOSS_MAP and step count; family leaves only validate and project source options.
-  - Wave: 225
-  - _Wave: 225
+  - Wave: 226
+  - _Wave: 226
   - Dependencies: comfy-parity-native-model-transform-foundation, comfy-parity-native-model-resource-execution-foundation
   - _Blocked_by: comfy-parity-native-model-transform-foundation, comfy-parity-native-model-resource-execution-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_train.py, projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, crates/comfy_model/src/native_node_payload.rs, crates/comfy_model/src/patches.rs, crates/comfy_tensor/src/autograd.rs, crates/comfy_tensor/src/autograd/breadth.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs
@@ -8100,8 +8100,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 406. Admit exact executable sampler algorithms as native payloads
   - _id: comfy-parity-native-sampler-payload-algorithm-foundation
   - Outcome: Replace the Euler-only native sampler payload boundary with a sealed exhaustive algorithm identity and checked invocation contract for every sampler-producing node required by the pending leaves. Admit the already-implemented native algorithms plus source-exact VOID DDIM alpha-space updates, LCM-upscale, and every cataloged option; preserve VOID's no-standard-noise-scaling rule and LMS order 1 through 100. Algorithm parameters, schedules, callback shapes, RNG domains, cancellation, cache identity, and persistence stay owned by comfy_sampler rather than node families.
-  - Wave: 226
-  - _Wave: 226
+  - Wave: 227
+  - _Wave: 227
   - Dependencies: comfy-parity-native-model-training-foundation
   - _Blocked_by: comfy-parity-native-model-training-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_void.py, projects/comfy/ComfyUI/comfy_extras/nodes_custom_sampler.py, projects/comfy/ComfyUI/comfy_extras/nodes_advanced_samplers.py, projects/comfy/ComfyUI/comfy/k_diffusion/sampling.py, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/sampler.rs, crates/comfy_sampler/src/algorithms, crates/comfy_nodes/src/stored_payload.rs
@@ -8118,8 +8118,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 407. Attach exact sampling profiles, guiders, and modifiers to native models
   - _id: comfy-parity-native-sampling-profile-guidance-foundation
   - Outcome: Attach a sealed immutable sampling policy and ordered modifier chain to every native diffusion model. Profiles cover exact discrete, continuous EDM, continuous V, flow, Stable Cascade, SD3, Flux, LTXV, Cosmos RFlow, and model-family sigma behavior; the model exposes checked percent-to-sigma, sigma-at-timestep, noise scaling, and latent in/out transforms. Guiders include basic, CFG, dual-CFG, and dual-model execution, while modifiers cover stateful APG, CFG override ordering, video CFG schedules, and model-attached guidance hooks without cross-attempt mutable state.
-  - Wave: 227
-  - _Wave: 227
+  - Wave: 228
+  - _Wave: 228
   - Dependencies: comfy-parity-native-node-compute-value-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation
   - _Blocked_by: comfy-parity-native-node-compute-value-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_model_advanced.py, projects/comfy/ComfyUI/comfy_extras/nodes_custom_sampler.py, projects/comfy/ComfyUI/comfy_extras/nodes_apg.py, projects/comfy/ComfyUI/comfy_extras/nodes_video_model.py, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -8136,8 +8136,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 408. Bridge exact model compilation policy into native node services
   - _id: comfy-parity-native-compile-policy-bridge-foundation
   - Outcome: Expose a cycle-free identity-checked native node service whose runtime implementation delegates exactly once to the canonical NativeCompilePolicy and exact compilation wrapper. The service clones and rebinds the model transformation graph with the selected backend and guard policy; no option is accepted and ignored, and node families cannot own compilation, backend selection, guards, or cache identity.
-  - Wave: 228
-  - _Wave: 228
+  - Wave: 229
+  - _Wave: 229
   - Dependencies: comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-native-model-transform-foundation
   - _Blocked_by: comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-native-model-transform-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_torch_compile.py, crates/comfy_runtime/src/executor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_sampler/src/native_diffusion_payload.rs
@@ -8154,8 +8154,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 409. Execute native model resources on certified accelerators
   - _id: comfy-parity-native-model-accelerator-execution-foundation
   - Outcome: Extend the canonical NativeModule and model-family execution boundary so every MODEL, CLIP, and VAE profile advertised for a certified accelerator executes its complete equations through that actual TensorBackend. Profiles whose required operation set is not certified remain typed unavailable; no CPU execution may be relabeled as accelerator parity.
-  - Wave: 229
-  - _Wave: 229
+  - Wave: 230
+  - _Wave: 230
   - Dependencies: comfy-parity-native-compile-policy-bridge-foundation, comfy-parity-native-compute-breadth-integration, comfy-parity-native-module-backend-target-admission-consolidation, comfy-parity-native-memory-planner, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-compile-policy-bridge-foundation, comfy-parity-native-compute-breadth-integration, comfy-parity-native-module-backend-target-admission-consolidation, comfy-parity-native-memory-planner, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-models.csv, .agents/specs/comfy-parity/catalogs/native-device-certification, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/families
@@ -8172,8 +8172,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 410. Represent source-valid zero-sample native audio segments
   - _id: comfy-parity-native-audio-empty-segment-foundation
   - Outcome: Extend the canonical audio payload to admit finite contiguous F32 waveform tensors whose sample axis is zero and source-valid sample rates from 1 through 384000 while preserving nonzero batch and channel axes, semantic digest, residency, persistence, and downstream safety. Every audio consumer must either process that expanded domain exactly or return a typed source-compatible unsupported-domain failure before indexing or allocation.
-  - Wave: 230
-  - _Wave: 230
+  - Wave: 231
+  - _Wave: 231
   - Dependencies: comfy-parity-native-model-accelerator-execution-foundation, comfy-parity-native-audio-encoder-resource-foundation
   - _Blocked_by: comfy-parity-native-model-accelerator-execution-foundation, comfy-parity-native-audio-encoder-resource-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_wandancer.py, projects/comfy/ComfyUI/comfy_extras/nodes_audio.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_model/src/audio_encoder.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -8190,8 +8190,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 411. Make the Comfy product integration compile-time opt-in
   - _id: comfy-parity-opt-in-product-build-boundary
   - Outcome: Exclude Comfy from Zed's default compile, link, runtime, test-support, asset, and package graphs while retaining the complete CPU and explicitly selected accelerator integration behind one compile-time feature and one explicit packaging option.
-  - Wave: 231
-  - _Wave: 231
+  - Wave: 232
+  - _Wave: 232
   - Dependencies: comfy-parity-native-audio-empty-segment-foundation
   - _Blocked_by: comfy-parity-native-audio-empty-segment-foundation
   - Reads: Cargo.toml, crates/zed/Cargo.toml, crates/zed/src/main.rs, crates/zed/src/zed.rs, crates/zed/src/zed/app_menus.rs, crates/extension_host/Cargo.toml, crates/extension_host/src/extension_host.rs, assets/settings/default.json, assets/keymaps/default-comfy.json, script/bundle-mac, script/bundle-linux, script/bundle-windows.ps1, crates/zed/resources/windows/zed.iss, crates/comfy_test_support/tests/native_release_boundary.rs, crates/comfy_test_support/tests/ownership_consolidation.rs
@@ -8210,8 +8210,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 412. Implement native workflow text values and bounded regex
   - _id: comfy-parity-native-text-value-regex-foundation
   - Outcome: One native workflow-text owner preserves bounded NUL-safe multiline primitive strings while identifier and path-like fields retain strict control-character rejection. One source-compatible regex owner wraps the workspace-pinned bounded backtracking engine for RegexMatch and RegexExtract without a leaf-local parser, substring fallback, unbounded backtracking path, or production Python dependency.
-  - Wave: 232
-  - _Wave: 232
+  - Wave: 233
+  - _Wave: 233
   - Dependencies: comfy-parity-opt-in-product-build-boundary
   - _Blocked_by: comfy-parity-opt-in-product-build-boundary
   - Reads: Cargo.toml, crates/comfy_nodes/Cargo.toml, crates/comfy_types/src/cancellation.rs, projects/comfy/ComfyUI/comfy_extras/nodes_string.py, projects/comfy/ComfyUI/comfy_extras/nodes_primitive.py
@@ -8230,8 +8230,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 413. Implement bounded native regex replacement and source string formatting
   - _id: comfy-parity-native-text-transform-foundation
   - Outcome: The canonical text owner exposes bounded, cancellation-aware Python-compatible regex substitution and Python str.format projection for source-declared named autogrow inputs. Regex replacement preserves match spans, zero-width behavior, numbered and named replacement templates, escapes, count, and flags without a second regex engine; formatting has one checked parser/evaluator and exact source schema names.
-  - Wave: 233
-  - _Wave: 233
+  - Wave: 234
+  - _Wave: 234
   - Dependencies: comfy-parity-native-text-value-regex-foundation
   - _Blocked_by: comfy-parity-native-text-value-regex-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_string.py, crates/comfy_nodes/src/text_regex.rs, crates/comfy_nodes/src/registry_generator.rs, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json
@@ -8250,8 +8250,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 414. Implement source-compatible native image transforms and previews
   - _id: comfy-parity-native-image-source-compatibility-foundation
   - Outcome: One canonical image compatibility boundary owns Pillow-compatible byte quantization, adaptive palette selection and dithering, exact NumPy legacy bounded-integer sampling, and prepared PreviewImage encoding and UI projection. Image-family leaves delegate these source semantics through the existing tensor, media, RNG, effect, cancellation, and attempt-store owners instead of copying host loops or output staging.
-  - Wave: 234
-  - _Wave: 234
+  - Wave: 235
+  - _Wave: 235
   - Dependencies: comfy-parity-native-text-transform-foundation
   - _Blocked_by: comfy-parity-native-text-transform-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_images.py, projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, projects/comfy/ComfyUI/comfy_extras/nodes.py, projects/comfy/ComfyUI/comfy_api/latest/_ui.py, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/rng.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -8270,8 +8270,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 415. Implement source-compatible native media text rendering
   - _id: comfy-parity-native-media-text-rendering-foundation
   - Outcome: One shared worker-safe media owner provides the exact pinned scalable default font, text measurement and wrapping, glyph rasterization, and RGBA alpha composition used by source image-preview nodes. Generated leaves supply checked text, layout, colors, and canonical image tensors but cannot embed a second font, bitmap alphabet, rasterizer, or host UI text path.
-  - Wave: 371
-  - _Wave: 371
+  - Wave: 372
+  - _Wave: 372
   - Dependencies: comfy-parity-native-nodes-image-detection-comfy-node-0136
   - _Blocked_by: comfy-parity-native-nodes-image-detection-comfy-node-0136
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_bounding_boxes.py, crates/comfy_media/Cargo.toml, crates/comfy_media/src/comfy_media.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_nodes/src/execution.rs
@@ -8288,8 +8288,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 416. Resolve links nested in source-typed structured inputs
   - _id: comfy-parity-native-structured-input-link-foundation
   - Outcome: The canonical prompt compiler admits active source-declared DynamicCombo V3, MultiType, list, and structured fields through their flat dotted prompt keys, resolves each link as an ordinary typed binding, and assembles the resolved values into one checked structure for node execution. It records exact dependency, lazy-demand, cardinality, cache-identity, cancellation, persistence, and stale-handle semantics without interpreting handle-shaped JSON or adding a leaf-specific decoder.
-  - Wave: 235
-  - _Wave: 235
+  - Wave: 236
+  - _Wave: 236
   - Dependencies: comfy-parity-native-image-source-compatibility-foundation
   - _Blocked_by: comfy-parity-native-image-source-compatibility-foundation
   - Reads: projects/comfy/ComfyUI/comfy_api/latest/_io.py, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/prompt_compiler.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/cache.rs
@@ -8308,8 +8308,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 417. Implement bounded native GLSL image-shader execution
   - _id: comfy-parity-native-shader-execution-foundation
   - Outcome: One injected shader execution service owns bounded GLSL ES 3.00 compilation, link diagnostics, image and scalar uniforms, curve inputs, four render targets, multipass ping-pong execution, float readback, cancellation, and intermediate UI projection. Node leaves cannot create hidden device owners, reinterpret WGSL, or replace source shaders with passthrough behavior.
-  - Wave: 236
-  - _Wave: 236
+  - Wave: 237
+  - _Wave: 237
   - Dependencies: comfy-parity-native-structured-input-link-foundation
   - _Blocked_by: comfy-parity-native-structured-input-link-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_glsl.py, .agents/specs/comfy-parity/catalogs/native-backend-dependencies.json, .agents/specs/comfy-parity/validate_backend_dependencies.py, Cargo.toml, crates/comfy_tensor/Cargo.toml, crates/comfy_media/src/png.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/comfy_worker.rs
@@ -8328,8 +8328,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 418. Bridge verified native node provider invocation
   - _id: comfy-parity-native-node-provider-invocation-foundation
   - Outcome: Adapt provider-required generated bindings through a versioned verified Rust/WASM provider ABI so an admitted signed complete binding set can materialize canonical native payloads under explicit provider, secret, upload, cost, and cancellation grants while offline, disabled, denied, stale, or absent providers preserve descriptors and make zero request.
-  - Wave: 237
-  - _Wave: 237
+  - Wave: 238
+  - _Wave: 238
   - Dependencies: comfy-parity-native-audio-empty-segment-foundation, comfy-parity-extension-host-plugin-adapter, comfy-parity-opt-in-product-build-boundary, comfy-parity-native-shader-execution-foundation
   - _Blocked_by: comfy-parity-native-audio-empty-segment-foundation, comfy-parity-extension-host-plugin-adapter, comfy-parity-opt-in-product-build-boundary, comfy-parity-native-shader-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_sdk/src/type_ids.rs, crates/comfy_plugin_sdk/wit/comfy-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json, crates/comfy_plugin_host, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/permissions.rs, crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_runtime/src/prompt_compiler.rs, crates/comfy_worker, crates/comfy_api/src/services.rs, crates/comfy_api/src/http.rs, crates/comfy_api/src/security.rs, crates/zed/src/comfy_plugin_services.rs
@@ -8348,8 +8348,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 419. Close provider routes and vendor namespaces
   - _id: comfy-parity-provider-contract-catalog-closure
   - Outcome: Generate one source-fingerprinted provider component contract catalog from the 224 provider-required nodes and current 217 external-service rows. Resolve every currently UNKNOWN HTTP method from pinned source, map every node and route exactly once to one of 33 logical vendor namespaces, preserve reviewed aliases, and require explicit source evidence before any future route or tombstone addition.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-text-generation-node-bridge, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-text-generation-node-bridge, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/backend-external-services.csv, .agents/specs/comfy-parity/catalogs/source-snapshot-manifest.json, projects/comfy/ComfyUI/comfy_api_nodes
@@ -8368,8 +8368,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 420. Project authoritative provider namespaces
   - _id: comfy-parity-provider-namespace-binding-projection
   - Outcome: Compile the checked provider component catalog into one comfy_nodes projection and make generated bindings plus runtime activation consume that sole namespace owner. Replace per-node placeholder and legacy `comfy-api` namespaces without runtime string rewriting or mixed-vendor activation.
-  - Wave: 269
-  - _Wave: 269
+  - Wave: 270
+  - _Wave: 270
   - Dependencies: comfy-parity-provider-contract-catalog-closure
   - _Blocked_by: comfy-parity-provider-contract-catalog-closure
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/families/partner_three_d_02.rs, crates/comfy_nodes/src/families/partner_three_d_03.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_plugin_host/src/registry_adapter.rs, crates/comfy_worker/src/plugin_runtime.rs
@@ -8388,8 +8388,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 421. Version the streaming provider component ABI
   - _id: comfy-parity-provider-streaming-component-abi-v2
   - Outcome: Add a v2 provider WIT and manifest schema for exact HTTP methods, ordered bounded headers, request streaming, response heads and incremental binary/text/NDJSON chunks, cancellation-aware waits, uploads, host cost requests, and monotonic progress. Preserve the existing v1 ABI and schema unchanged as an independently tested compatibility surface.
-  - Wave: 270
-  - _Wave: 270
+  - Wave: 271
+  - _Wave: 271
   - Dependencies: comfy-parity-provider-namespace-binding-projection
   - _Blocked_by: comfy-parity-provider-namespace-binding-projection
   - Reads: crates/comfy_plugin_sdk/wit/comfy-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs
@@ -8408,8 +8408,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 422. Bind provider request target authority in the streaming component ABI
   - _id: comfy-parity-provider-streaming-component-abi-v2-request-authority-repair
   - Outcome: Amend only the separately versioned provider-v2 request head so every streamed request carries the exact endpoint and optional secret reference required by the canonical runtime authorization owner. The provider identity remains host-derived from the signed invocation and provider binding rather than component-supplied. Preserve the frozen v1 WIT, schema, and fixtures byte-for-byte and carry no secret bytes.
-  - Wave: 271
-  - _Wave: 271
+  - Wave: 272
+  - _Wave: 272
   - Dependencies: comfy-parity-provider-streaming-component-abi-v2
   - _Blocked_by: comfy-parity-provider-streaming-component-abi-v2
   - Reads: crates/comfy_plugin_sdk/wit/comfy-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_sdk/src/type_ids.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs, crates/comfy_runtime/src/trust.rs
@@ -8428,8 +8428,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 423. Transport provider streams over the worker protocol
   - _id: comfy-parity-provider-worker-stream-protocol
   - Outcome: Extend the private worker protocol with bounded response heads, chunks, waits, progress, stream and session identities, preserving strict version rejection and keeping native handles, paths, and secret bytes outside the wire.
-  - Wave: 272
-  - _Wave: 272
+  - Wave: 273
+  - _Wave: 273
   - Dependencies: comfy-parity-provider-streaming-component-abi-v2-request-authority-repair
   - _Blocked_by: comfy-parity-provider-streaming-component-abi-v2-request-authority-repair
   - Reads: crates/comfy_types/src/worker_protocol.rs, crates/comfy_types/Cargo.toml, Cargo.toml, Cargo.lock, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv
@@ -8448,8 +8448,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 424. Restore warning-clean provider worker protocol ownership
   - _id: comfy-parity-provider-worker-stream-protocol-clippy-correction
   - Outcome: Remove the redundant restart-time streaming contract clone while preserving the exact provider worker protocol-v8 wire and state-machine contract.
-  - Wave: 273
-  - _Wave: 273
+  - Wave: 274
+  - _Wave: 274
   - Dependencies: comfy-parity-provider-worker-stream-protocol
   - _Blocked_by: comfy-parity-provider-worker-stream-protocol
   - Reads: crates/comfy_types/src/worker_protocol.rs
@@ -8468,8 +8468,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 425. Own provider streams, receipts, and progress
   - _id: comfy-parity-provider-runtime-stream-progress-foundation
   - Outcome: Make the runtime the sole authorized provider stream/session owner. Bind provider, method, endpoint, headers, secret reference, body digest, component and binding generations, accepted cost, request ordinal, response head, chunk digest, and idempotency; project monotonic attempt-local progress without persisting it as an output or effect.
-  - Wave: 274
-  - _Wave: 274
+  - Wave: 275
+  - _Wave: 275
   - Dependencies: comfy-parity-provider-worker-stream-protocol-clippy-correction
   - _Blocked_by: comfy-parity-provider-worker-stream-protocol-clippy-correction
   - Reads: crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_host/src/capabilities.rs, crates/comfy_model/tests/clip_tokenizer.rs, crates/comfy_plugin_host/src/component_host.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_runtime/src/execution_presentation.rs, crates/comfy_runtime/src/queue_history.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/runtime_supervisor.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs
@@ -8488,8 +8488,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 426. Expose canonical invocation inputs to streaming components
   - _id: comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair
   - Outcome: Extend only provider-v2 with a least-authority typed input view so signed streaming components can consume declared node inputs without legacy provider actuation or broad host capabilities.
-  - Wave: 275
-  - _Wave: 275
+  - Wave: 276
+  - _Wave: 276
   - Dependencies: comfy-parity-provider-runtime-stream-progress-foundation
   - _Blocked_by: comfy-parity-provider-runtime-stream-progress-foundation
   - Reads: crates/comfy_plugin_sdk/wit/comfy-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json, crates/comfy_plugin_sdk/wit/provider-v2/deps/comfy-plugin/comfy-plugin.wit, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs, crates/comfy_types/src/worker_protocol.rs
@@ -8508,8 +8508,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 427. Preflight sealed provider component activations
   - _id: comfy-parity-provider-runtime-component-activation-preflight-foundation
   - Outcome: Seal and consume the full runtime activation identity before a provider-v2 component is instantiated or receives invocation context or inputs, while leaving request-head and policy authorization for the later request bind.
-  - Wave: 276
-  - _Wave: 276
+  - Wave: 277
+  - _Wave: 277
   - Dependencies: comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair
   - _Blocked_by: comfy-parity-provider-streaming-component-abi-v2-invocation-input-repair
   - Reads: crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/comfy_runtime.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_plugin_host/src/component_host.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs
@@ -8528,8 +8528,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 428. Bind app-issued provider worker contexts during preflight
   - _id: comfy-parity-provider-runtime-worker-context-preflight-repair
   - Outcome: Consume and seal the exact app-issued provider worker invocation context in the sole component-activation preflight before any provider-v2 guest, input, validator, or transport state exists.
-  - Wave: 277
-  - _Wave: 277
+  - Wave: 278
+  - _Wave: 278
   - Dependencies: comfy-parity-provider-runtime-component-activation-preflight-foundation
   - _Blocked_by: comfy-parity-provider-runtime-component-activation-preflight-foundation
   - Reads: crates/comfy_runtime/src/plugin_services.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_plugin_host/src/component_host.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs
@@ -8548,8 +8548,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 429. Adapt streaming providers through the component host
   - _id: comfy-parity-provider-component-host-stream-adapter
   - Outcome: Adapt the v2 WIT to runtime-owned provider sessions with a per-invocation checked stream table and complete capability validation before actuation. Retain v1 compatibility and keep component-host state distinct from provider authorization, materialization, and durable execution state.
-  - Wave: 278
-  - _Wave: 278
+  - Wave: 279
+  - _Wave: 279
   - Dependencies: comfy-parity-provider-runtime-worker-context-preflight-repair
   - _Blocked_by: comfy-parity-provider-runtime-worker-context-preflight-repair
   - Reads: crates/comfy_plugin_host/src/component_host.rs, crates/comfy_plugin_host/src/capabilities.rs, crates/comfy_plugin_host/src/private_worker.rs, crates/comfy_plugin_host/src/registry_adapter.rs, crates/comfy_plugin_sdk/wit/comfy-plugin.wit, crates/comfy_plugin_sdk/wit/provider-v2/deps/comfy-plugin/comfy-plugin.wit, crates/comfy_plugin_sdk/wit/provider-v2/comfy-provider-plugin.wit, crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs, crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/comfy_runtime.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_plugin_host/tests/fixtures/provider_component, crates/comfy_plugin_host/tests/fixtures/provider_component_source
@@ -8568,8 +8568,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 430. Correct the Zed and collaboration all-target baselines
   - _id: comfy-parity-zed-all-target-baseline-assertion-correction
   - Outcome: Repair two stale Zed test expectations, one redundant-clone lint baseline, and one test-support feature-coherence edge so the provider bootstrap and later native execution leaves retain executable all-target and Clippy validation boundaries without changing URL parsing, registered action behavior, remote connection behavior, or huddle rendering.
-  - Wave: 279
-  - _Wave: 279
+  - Wave: 280
+  - _Wave: 280
   - Dependencies: comfy-parity-provider-component-host-stream-adapter
   - _Blocked_by: comfy-parity-provider-component-host-stream-adapter
   - Reads: crates/zed/src/zed/open_listener.rs, crates/zed/src/zed.rs, crates/language_tools/src/language_tool_tree.rs, crates/collab_ui/src/huddle.rs, crates/collab_ui/Cargo.toml, crates/title_bar/Cargo.toml, crates/recent_projects/Cargo.toml, crates/recent_projects/src/recent_projects.rs, crates/remote_connection/Cargo.toml, crates/remote_connection/src/remote_connection.rs, Cargo.lock
@@ -8588,8 +8588,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 431. Attach the controller-owned provider bridge
   - _id: comfy-parity-provider-controller-owned-worker-bridge-bootstrap
   - Outcome: Attach exactly one live NativeExecutionController-owned provider bridge capability to the desktop private-worker executor without creating a second stream table, and keep headless provider-v2 fail-closed until the deployment lifecycle supplies the same attachment.
-  - Wave: 280
-  - _Wave: 280
+  - Wave: 281
+  - _Wave: 281
   - Dependencies: comfy-parity-zed-all-target-baseline-assertion-correction
   - _Blocked_by: comfy-parity-zed-all-target-baseline-assertion-correction
   - Reads: crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/plugin_services.rs, crates/comfy_plugin_host/src/private_worker.rs, crates/comfy_plugin_host/src/component_host.rs, crates/comfy_ui/src/execution_model.rs, crates/comfy_ui/src/comfy_ui.rs, crates/zed/src/comfy_plugin_services.rs, crates/zed/src/zed.rs, crates/zed/src/comfy_cli.rs, .agents/specs/comfy-parity/generate_ownership_catalog.py, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs
@@ -8608,8 +8608,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 432. Bridge provider streams through the private worker
   - _id: comfy-parity-provider-worker-stream-bridge
   - Outcome: Multiplex provider request, response, progress, cancellation, and terminal state over the private worker without requiring whole-response buffering. Revoke all attempt-local streams on cancellation, worker loss, replacement, or generation change.
-  - Wave: 281
-  - _Wave: 281
+  - Wave: 282
+  - _Wave: 282
   - Dependencies: comfy-parity-provider-controller-owned-worker-bridge-bootstrap
   - _Blocked_by: comfy-parity-provider-controller-owned-worker-bridge-bootstrap
   - Reads: crates/comfy_worker/src/plugin_runtime.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_plugin_host/src/component_host.rs, crates/comfy_plugin_host/src/comfy_plugin_host.rs, crates/comfy_plugin_host/src/private_worker.rs, crates/comfy_plugin_host/Cargo.toml, crates/comfy_plugin_host/tests/component_contract.rs, crates/comfy_plugin_host/tests/fixtures/provider_streaming_component, crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source/Cargo.toml, crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source/Cargo.lock, crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source/guest.rs, crates/comfy_plugin_host/tests/fixtures/provider_streaming_component_source/rebuild_fixture.rs, crates/comfy_runtime/src/plugin_services.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_ui/src/execution_model.rs, crates/zed/src/comfy_plugin_services.rs, crates/zed/src/zed.rs, crates/zed/src/comfy_cli.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/provider_worker_stream_bridge.rs, crates/comfy_test_support/tests/native_controller_e2e.rs, crates/comfy_test_support/tests/native_worker_resilience.rs, crates/comfy_test_support/tests/native_image_e2e.rs, crates/comfy_test_support/tests/support/native_controller.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, crates/comfy_test_support/Cargo.toml
@@ -8628,8 +8628,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 433. Deploy identical provider registries in desktop and headless modes
   - _id: comfy-parity-provider-deployment-lifecycle
   - Outcome: Install and replace signed provider component snapshots through one deployment lifecycle shared by desktop and headless execution. Offline, disabled, missing, stale, and rejected deployments retain provider-required descriptors and expose deterministic diagnostics without fallback.
-  - Wave: 282
-  - _Wave: 282
+  - Wave: 283
+  - _Wave: 283
   - Dependencies: comfy-parity-provider-worker-stream-bridge
   - _Blocked_by: comfy-parity-provider-worker-stream-bridge
   - Reads: crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/plugin_services.rs, crates/comfy_plugin_host/src/private_worker.rs, crates/comfy_plugin_host/src/component_host.rs, crates/zed/src/comfy_plugin_services.rs, crates/zed/src/comfy_cli.rs, crates/zed/Cargo.toml, crates/comfy_api/src/headless.rs, crates/extension_host/src/extension_host.rs, crates/extension_host/src/extension_store_test.rs, crates/extension_host/Cargo.toml, crates/comfy_api/Cargo.toml, Cargo.lock, .agents/specs/comfy-parity/catalogs/native-backend-dependencies.json, .agents/specs/comfy-parity/validate_backend_dependencies.py, crates/comfy_runtime/src/settings.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/permissions.rs, crates/paths/src/paths.rs, crates/comfy_test_support/tests/provider_worker_stream_bridge.rs, crates/comfy_test_support/tests/support/provider_worker_stream_bridge.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, crates/comfy_test_support/tests/plugin_e2e.rs, crates/comfy_plugin_host/tests/fixtures/provider_streaming_component
@@ -8648,8 +8648,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 434. Build the hermetic provider component harness
   - _id: comfy-parity-provider-hermetic-component-harness
   - Outcome: Create one reviewed nested provider-component workspace, shared bounded transport/materializer helpers, and an auto-discovering non-network conformance harness. Vendor leaves add only disjoint Rust modules and fixtures; they never touch a shared manifest, lockfile, registry, runtime, or test implementation.
-  - Wave: 283
-  - _Wave: 283
+  - Wave: 284
+  - _Wave: 284
   - Dependencies: comfy-parity-provider-deployment-lifecycle
   - _Blocked_by: comfy-parity-provider-deployment-lifecycle
   - Reads: crates/comfy_plugin_host/tests/component_contract.rs, crates/comfy_test_support/tests/plugin_e2e.rs
@@ -8666,8 +8666,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 435. Implement the anthropic provider component
   - _id: comfy-parity-provider-component-anthropic
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.anthropic`. Its exact generated claim set contains 1 provider-required node contracts and 1 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8684,8 +8684,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 436. Implement the beeble provider component
   - _id: comfy-parity-provider-component-beeble
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.beeble`. Its exact generated claim set contains 2 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8702,8 +8702,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 437. Implement the bfl provider component
   - _id: comfy-parity-provider-component-bfl
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.bfl`. Its exact generated claim set contains 10 provider-required node contracts and 9 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8720,8 +8720,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 438. Implement the bria provider component
   - _id: comfy-parity-provider-component-bria
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.bria`. Its exact generated claim set contains 6 provider-required node contracts and 6 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8738,8 +8738,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 439. Implement the bytedance provider component
   - _id: comfy-parity-provider-component-bytedance
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.bytedance`. Its exact generated claim set contains 14 provider-required node contracts and 12 current external-service rows, normalizes only the reviewed aliases (byteplus, byteplus-seedance2, seedance), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8756,8 +8756,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 440. Implement the elevenlabs provider component
   - _id: comfy-parity-provider-component-elevenlabs
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.elevenlabs`. Its exact generated claim set contains 8 provider-required node contracts and 9 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8774,8 +8774,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 441. Implement the gemini provider component
   - _id: comfy-parity-provider-component-gemini
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.gemini`. Its exact generated claim set contains 8 provider-required node contracts and 4 current external-service rows, normalizes only the reviewed aliases (vertexai), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8792,8 +8792,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 442. Implement the grok provider component
   - _id: comfy-parity-provider-component-grok
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.grok`. Its exact generated claim set contains 7 provider-required node contracts and 7 current external-service rows, normalizes only the reviewed aliases (xai), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8810,8 +8810,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 443. Implement the hitpaw provider component
   - _id: comfy-parity-provider-component-hitpaw
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.hitpaw`. Its exact generated claim set contains 2 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8828,8 +8828,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 444. Implement the hunyuan3d provider component
   - _id: comfy-parity-provider-component-hunyuan3d
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.hunyuan3d`. Its exact generated claim set contains 6 provider-required node contracts and 10 current external-service rows, normalizes only the reviewed aliases (tencent), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8846,8 +8846,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 445. Implement the ideogram provider component
   - _id: comfy-parity-provider-component-ideogram
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.ideogram`. Its exact generated claim set contains 2 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8864,8 +8864,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 446. Implement the kling provider component
   - _id: comfy-parity-provider-component-kling
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.kling`. Its exact generated claim set contains 25 provider-required node contracts and 29 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8882,8 +8882,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 447. Implement the krea provider component
   - _id: comfy-parity-provider-component-krea
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.krea`. Its exact generated claim set contains 2 provider-required node contracts and 6 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8900,8 +8900,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 448. Implement the ltxv provider component
   - _id: comfy-parity-provider-component-ltxv
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.ltxv`. Its exact generated claim set contains 2 provider-required node contracts and 2 current external-service rows, normalizes only the reviewed aliases (ltx), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8918,8 +8918,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 449. Implement the luma provider component
   - _id: comfy-parity-provider-component-luma
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.luma`. Its exact generated claim set contains 15 provider-required node contracts and 7 current external-service rows, normalizes only the reviewed aliases (luma_2), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8936,8 +8936,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 450. Implement the magnific provider component
   - _id: comfy-parity-provider-component-magnific
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.magnific`. Its exact generated claim set contains 5 provider-required node contracts and 15 current external-service rows, normalizes only the reviewed aliases (freepik), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8954,8 +8954,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 451. Implement the meshy provider component
   - _id: comfy-parity-provider-component-meshy
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.meshy`. Its exact generated claim set contains 7 provider-required node contracts and 18 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8972,8 +8972,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 452. Implement the minimax provider component
   - _id: comfy-parity-provider-component-minimax
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.minimax`. Its exact generated claim set contains 3 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -8990,8 +8990,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 453. Implement the openai provider component
   - _id: comfy-parity-provider-component-openai
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.openai`. Its exact generated claim set contains 8 provider-required node contracts and 7 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9008,8 +9008,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 454. Implement the openrouter provider component
   - _id: comfy-parity-provider-component-openrouter
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.openrouter`. Its exact generated claim set contains 1 provider-required node contracts and 1 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9026,8 +9026,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 455. Implement the pixverse provider component
   - _id: comfy-parity-provider-component-pixverse
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.pixverse`. Its exact generated claim set contains 4 provider-required node contracts and 6 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9044,8 +9044,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 456. Implement the quiver provider component
   - _id: comfy-parity-provider-component-quiver
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.quiver`. Its exact generated claim set contains 2 provider-required node contracts and 2 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9062,8 +9062,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 457. Implement the recraft provider component
   - _id: comfy-parity-provider-component-recraft
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.recraft`. Its exact generated claim set contains 18 provider-required node contracts and 9 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9080,8 +9080,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 458. Implement the reve provider component
   - _id: comfy-parity-provider-component-reve
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.reve`. Its exact generated claim set contains 3 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9098,8 +9098,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 459. Implement the rodin provider component
   - _id: comfy-parity-provider-component-rodin
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.rodin`. Its exact generated claim set contains 7 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9116,8 +9116,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 460. Implement the runway provider component
   - _id: comfy-parity-provider-component-runway
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.runway`. Its exact generated claim set contains 7 provider-required node contracts and 4 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9134,8 +9134,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 461. Implement the sonilo provider component
   - _id: comfy-parity-provider-component-sonilo
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.sonilo`. Its exact generated claim set contains 2 provider-required node contracts and 2 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9152,8 +9152,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 462. Implement the topaz provider component
   - _id: comfy-parity-provider-component-topaz
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.topaz`. Its exact generated claim set contains 3 provider-required node contracts and 9 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9170,8 +9170,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 463. Implement the tripo provider component
   - _id: comfy-parity-provider-component-tripo
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.tripo`. Its exact generated claim set contains 12 provider-required node contracts and 4 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9188,8 +9188,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 464. Implement the veo2 provider component
   - _id: comfy-parity-provider-component-veo2
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.veo2`. Its exact generated claim set contains 3 provider-required node contracts and 3 current external-service rows, normalizes only the reviewed aliases (veo), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9206,8 +9206,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 465. Implement the vidu provider component
   - _id: comfy-parity-provider-component-vidu
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.vidu`. Its exact generated claim set contains 13 provider-required node contracts and 7 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9224,8 +9224,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 466. Implement the wan provider component
   - _id: comfy-parity-provider-component-wan
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.wan`. Its exact generated claim set contains 14 provider-required node contracts and 5 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9242,8 +9242,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 467. Implement the wavespeed provider component
   - _id: comfy-parity-provider-component-wavespeed
   - Outcome: Implement the complete hermetic Rust/WASM provider component for `zed.comfy.provider.wavespeed`. Its exact generated claim set contains 2 provider-required node contracts and 5 current external-service rows, normalizes only the reviewed aliases (none), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.
-  - Wave: 284
-  - _Wave: 284
+  - Wave: 285
+  - _Wave: 285
   - Dependencies: comfy-parity-provider-hermetic-component-harness
   - _Blocked_by: comfy-parity-provider-hermetic-component-harness
   - Reads: .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, projects/comfy/ComfyUI/comfy_api_nodes, crates/comfy_plugin_host/provider_components/src/common, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9260,8 +9260,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 468. Admit externally signed provider deployments
   - _id: comfy-parity-provider-signed-deployment-registry-user-authority-gate
   - Outcome: Obtain user-approved public verification-key configuration, detached signatures over the exact reproducible component and manifest digests, and a signed deployment-registry record for all 33 complete vendor namespaces. This is an external user-authority gate: repository code may import and verify supplied public artifacts but never generate, request, persist, infer, or check in the production private signing key.
-  - Wave: 285
-  - _Wave: 285
+  - Wave: 286
+  - _Wave: 286
   - Dependencies: comfy-parity-provider-component-anthropic, comfy-parity-provider-component-beeble, comfy-parity-provider-component-bfl, comfy-parity-provider-component-bria, comfy-parity-provider-component-bytedance, comfy-parity-provider-component-elevenlabs, comfy-parity-provider-component-gemini, comfy-parity-provider-component-grok, comfy-parity-provider-component-hitpaw, comfy-parity-provider-component-hunyuan3d, comfy-parity-provider-component-ideogram, comfy-parity-provider-component-kling, comfy-parity-provider-component-krea, comfy-parity-provider-component-ltxv, comfy-parity-provider-component-luma, comfy-parity-provider-component-magnific, comfy-parity-provider-component-meshy, comfy-parity-provider-component-minimax, comfy-parity-provider-component-openai, comfy-parity-provider-component-openrouter, comfy-parity-provider-component-pixverse, comfy-parity-provider-component-quiver, comfy-parity-provider-component-recraft, comfy-parity-provider-component-reve, comfy-parity-provider-component-rodin, comfy-parity-provider-component-runway, comfy-parity-provider-component-sonilo, comfy-parity-provider-component-topaz, comfy-parity-provider-component-tripo, comfy-parity-provider-component-veo2, comfy-parity-provider-component-vidu, comfy-parity-provider-component-wan, comfy-parity-provider-component-wavespeed
   - _Blocked_by: comfy-parity-provider-component-anthropic, comfy-parity-provider-component-beeble, comfy-parity-provider-component-bfl, comfy-parity-provider-component-bria, comfy-parity-provider-component-bytedance, comfy-parity-provider-component-elevenlabs, comfy-parity-provider-component-gemini, comfy-parity-provider-component-grok, comfy-parity-provider-component-hitpaw, comfy-parity-provider-component-hunyuan3d, comfy-parity-provider-component-ideogram, comfy-parity-provider-component-kling, comfy-parity-provider-component-krea, comfy-parity-provider-component-ltxv, comfy-parity-provider-component-luma, comfy-parity-provider-component-magnific, comfy-parity-provider-component-meshy, comfy-parity-provider-component-minimax, comfy-parity-provider-component-openai, comfy-parity-provider-component-openrouter, comfy-parity-provider-component-pixverse, comfy-parity-provider-component-quiver, comfy-parity-provider-component-recraft, comfy-parity-provider-component-reve, comfy-parity-provider-component-rodin, comfy-parity-provider-component-runway, comfy-parity-provider-component-sonilo, comfy-parity-provider-component-topaz, comfy-parity-provider-component-tripo, comfy-parity-provider-component-veo2, comfy-parity-provider-component-vidu, comfy-parity-provider-component-wan, comfy-parity-provider-component-wavespeed
   - Reads: crates/comfy_plugin_host/provider_components/src/vendors, crates/comfy_test_support/fixtures/providers, crates/comfy_runtime/src/trust.rs
@@ -9278,8 +9278,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 469. Close signed provider component coverage
   - _id: comfy-parity-native-partner-provider-components-foundation
   - Outcome: Close the complete provider component implementation after the authoritative catalog, namespace projection, streaming ABI/protocol/runtime/host/worker/deployment foundations, all 33 hermetic vendor components, and the external signed-registry authority gate are complete. This task owns only final validation and authoritative ownership evidence, not another provider transport, namespace map, component registry, materializer, trust store, or deployment owner.
-  - Wave: 286
-  - _Wave: 286
+  - Wave: 287
+  - _Wave: 287
   - Dependencies: comfy-parity-provider-signed-deployment-registry-user-authority-gate
   - _Blocked_by: comfy-parity-provider-signed-deployment-registry-user-authority-gate
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/backend-external-services.csv, projects/comfy/ComfyUI/comfy_api_nodes, .agents/specs/comfy-parity/catalogs/provider-component-contracts.json, crates/comfy_plugin_host/provider_components, crates/comfy_runtime/src/trust.rs, crates/comfy_test_support/tests/provider_component_conformance.rs
@@ -9296,8 +9296,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 470. Implement retained decoder text generation
   - _id: comfy-parity-native-decoder-text-generation-foundation
   - Outcome: One canonical native scalar text-generation boundary retains an exact decoder and tokenizer as a concrete CLIP resource, admits only checked attempt-local handles, opens the addressed text-generation RNG transaction, executes source-compatible bounded sampling, and decodes only newly generated tokens. It cannot introduce a metadata-only model, global generator, second tokenizer, template facade, or pretend that media marker IDs are equivalent to multimodal embeddings.
-  - Wave: 238
-  - _Wave: 238
+  - Wave: 239
+  - _Wave: 239
   - Dependencies: comfy-parity-native-node-provider-invocation-foundation
   - _Blocked_by: comfy-parity-native-node-provider-invocation-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_textgen.py, projects/comfy/ComfyUI/comfy/text_encoders/llama.py, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/clip_tokenizer.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_tensor/src/rng.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -9316,8 +9316,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 471. Implement prepared decoder generation
   - _id: comfy-parity-native-prepared-decoder-generation-foundation
   - Outcome: The canonical retained decoder accepts one checked prepared-prefill representation beside numeric token IDs, including joined embeddings, source sampling-history IDs, optional attention masks, and scalar or multidimensional positions. Both scalar and prepared execution delegate to one bounded generation loop and one KV/RNG transaction; prepared state remains attempt-local and cannot create a second sampler, tokenizer, cache, or persistence form.
-  - Wave: 239
-  - _Wave: 239
+  - Wave: 240
+  - _Wave: 240
   - Dependencies: comfy-parity-native-decoder-text-generation-foundation
   - _Blocked_by: comfy-parity-native-decoder-text-generation-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/llama.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen_vl.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py, projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs, crates/comfy_model/src/clip_tokenizer.rs, crates/comfy_tensor/src/rng.rs
@@ -9336,8 +9336,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 472. Implement exact Qwen multimodal image preparation
   - _id: comfy-parity-native-qwen-image-preparation-foundation
   - Outcome: The canonical multimodal owner implements source-exact Qwen3-VL chat formatting, image-batch splitting, bounded factor-32 bilinear resizing, RGB normalization, temporal duplication, spatial-merge patch ordering, image-marker replacement planning, three-axis MRoPE positions, visual masks, and deepstack joins. Preparation is checked and cancellation-aware, produces attempt-local tensors only, and cannot run a decoder, retain model weights, open RNG, publish outputs, or substitute marker IDs for image embeddings.
-  - Wave: 240
-  - _Wave: 240
+  - Wave: 241
+  - _Wave: 241
   - Dependencies: comfy-parity-native-prepared-decoder-generation-foundation
   - _Blocked_by: comfy-parity-native-prepared-decoder-generation-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen_vl.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json, projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json, projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt, crates/comfy_model/src/clip_text_encoder_multimodal.rs, crates/comfy_model/src/clip_tokenizer.rs, crates/comfy_tensor/src/image_ops.rs
@@ -9356,8 +9356,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 473. Implement prepared decoder deepstack injection
   - _id: comfy-parity-native-prepared-decoder-deepstack-foundation
   - Outcome: NativeDecoderTextEncoder accepts one optional borrowed and fully checked prepared deepstack plan only for uncached prefill. After decoder layer i and before intermediate capture, layer i's projected visual values are added at exactly the true visual-mask positions; continuation receives no deepstack. This extends one canonical decoder graph, KV transition, and borrowed RNG transaction without retaining vision weights, preprocessing images, tokenizing, opening RNG, caching, persisting, or publishing.
-  - Wave: 241
-  - _Wave: 241
+  - Wave: 242
+  - _Wave: 242
   - Dependencies: comfy-parity-native-qwen-image-preparation-foundation
   - _Blocked_by: comfy-parity-native-qwen-image-preparation-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/llama.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs, crates/comfy_tensor/src/rng.rs
@@ -9376,8 +9376,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 474. Implement exact Qwen2 byte-BPE tokenization
   - _id: comfy-parity-native-qwen2-tokenizer-foundation
   - Outcome: NativePromptTokenizer gains one exact Qwen2 byte-BPE family backed by the pinned Qwen3-VL and Qwen3.5 vocabularies, ordered merges, and atomic added-token configurations. It applies NFC, the checked Qwen2 or Qwen3.5 declared regex profile, reversible Unicode byte encoding, no end-of-word suffix, no automatic BOS/EOS, source min-one pad behavior, case/whitespace preservation, added-token special classification, skip-special decode, replacement-error decode, no cleanup-spaces behavior, semantic identity, bounded allocation, and cancellation without creating a second tokenizer owner.
-  - Wave: 242
-  - _Wave: 242
+  - Wave: 243
+  - _Wave: 243
   - Dependencies: comfy-parity-native-prepared-decoder-deepstack-foundation
   - _Blocked_by: comfy-parity-native-prepared-decoder-deepstack-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy/sd1_clip.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json, projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json, projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt, projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json, projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/vocab.json, projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/merges.txt, crates/comfy_model/src/clip_tokenizer.rs, crates/comfy_model/src/clip.rs
@@ -9396,8 +9396,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 475. Implement exact Qwen3 decoder attention
   - _id: comfy-parity-native-qwen3-decoder-exactness-foundation
   - Outcome: The canonical decoder owner admits and executes checkpoint-backed Qwen3/Qwen3-VL attention with exact per-head query/key RMS normalization, grouped-query projection, multidimensional RoPE, causal masking, output projection, KV staging, semantic identity, and residency. It extends the existing decoder graph and cache only; it cannot add another generation loop, tokenizer, RNG owner, vision graph, cache, persistence form, or publication path.
-  - Wave: 243
-  - _Wave: 243
+  - Wave: 244
+  - _Wave: 244
   - Dependencies: comfy-parity-native-qwen2-tokenizer-foundation
   - _Blocked_by: comfy-parity-native-qwen2-tokenizer-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/llama.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/native_ops.rs
@@ -9416,8 +9416,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 476. Implement exact Qwen3.5 hybrid decoder execution
   - _id: comfy-parity-native-qwen35-decoder-exactness-foundation
   - Outcome: The canonical decoder owner replaces Qwen3.5 profile facades with complete checkpoint-backed full-attention and linear-attention variants: Q/K normalization, attention output gating, DeltaNet projections and parameters, depthwise causal convolution, gated normalization, recurrent state, and exact cache step tracking. It preserves one decoder loop, KV/cache representation, prepared-prefill path, semantic identity, and residency and introduces no tokenizer, vision, RNG, durable cache, persistence, or publication owner.
-  - Wave: 244
-  - _Wave: 244
+  - Wave: 245
+  - _Wave: 245
   - Dependencies: comfy-parity-native-qwen3-decoder-exactness-foundation
   - _Blocked_by: comfy-parity-native-qwen3-decoder-exactness-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py, projects/comfy/ComfyUI/comfy/text_encoders/llama.py, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/native_ops.rs
@@ -9436,8 +9436,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 477. Implement retained Qwen vision projection
   - _id: comfy-parity-native-qwen-vision-projection-foundation
   - Outcome: One retained Qwen3-VL/Qwen3.5 vision owner extends canonical preparation with a closed family profile for the correct marker ID and RGB normalization, then consumes checked patches and executes the complete checkpoint-backed patch projection, learned 48-by-48 positional interpolation, vision RoPE, per-image attention blocks, exact learned normalization and merger graph, and Qwen3-VL-only deepstack captures. It returns checked projected embeddings and optional deepstack tensors only; it cannot tokenize, decode, generate, open RNG, resolve handles, cache, persist, or publish.
-  - Wave: 245
-  - _Wave: 245
+  - Wave: 246
+  - _Wave: 246
   - Dependencies: comfy-parity-native-qwen35-decoder-exactness-foundation
   - _Blocked_by: comfy-parity-native-qwen35-decoder-exactness-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen_vl.py, crates/comfy_model/src/clip_text_encoder_multimodal.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_model/src/clip_vision.rs
@@ -9456,8 +9456,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 478. Retain concrete Qwen multimodal CLIP resources
   - _id: comfy-parity-native-qwen-multimodal-resource-foundation
   - Outcome: One concrete Qwen multimodal CLIP resource inseparably retains the canonical Qwen2 tokenizer, exact Qwen decoder, and retained Qwen vision owner with closed family/configuration admission. Tokenizer, decoder, vision, deepstack, and source execution identities participate in one semantic digest and StorageId-aware alias residency; the resource remains a sealed CLIP-role model payload and stores no prepared embeddings, KV, RNG, cache, persistence, workflow, or output state.
-  - Wave: 246
-  - _Wave: 246
+  - Wave: 247
+  - _Wave: 247
   - Dependencies: comfy-parity-native-qwen-vision-projection-foundation
   - _Blocked_by: comfy-parity-native-qwen-vision-projection-foundation
   - Reads: projects/comfy/ComfyUI/comfy/sd.py, projects/comfy/ComfyUI/comfy/text_encoders/llama.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen_vl.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json, projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json, projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt, projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json, projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/vocab.json, projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/merges.txt, crates/comfy_model/src/clip_tokenizer.rs, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -9476,8 +9476,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 479. Implement retained Qwen multimodal generation
   - _id: comfy-parity-native-qwen-multimodal-generation-foundation
   - Outcome: The retained Qwen3-VL/Qwen3.5 vision-text owner consumes only canonical checked image preparation, projects every image through its retained graph, replaces every admitted marker span with real embeddings, and delegates generated-suffix sampling and cleanup to the canonical prepared decoder and Qwen2 tokenizer. Qwen3-VL alone carries three-axis positions, visual masks, and prefill-only deepstack; Qwen3.5 preserves its source scalar generation route. Marker/media mismatches fail without consuming or returning an advanced borrowed RNG transaction.
-  - Wave: 247
-  - _Wave: 247
+  - Wave: 248
+  - _Wave: 248
   - Dependencies: comfy-parity-native-qwen-multimodal-resource-foundation
   - _Blocked_by: comfy-parity-native-qwen-multimodal-resource-foundation
   - Reads: projects/comfy/ComfyUI/comfy/sd1_clip.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen_vl.py, projects/comfy/ComfyUI/comfy/text_encoders/llama.py, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs, crates/comfy_model/src/clip_tokenizer.rs, crates/comfy_tensor/src/rng.rs
@@ -9496,8 +9496,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 480. Implement Gemma image and video preparation
   - _id: comfy-parity-native-gemma-image-video-preparation-foundation
   - Outcome: One canonical Gemma visual preparation owner performs Gemma3 area projection and Gemma4 image/video source selection, video precedence, 24-to-1 FPS frame selection, source-compatible byte quantization, bicubic-antialiased resizing, RGB projection, soft-token budgets, and timestamp planning without executing or retaining a model.
-  - Wave: 248
-  - _Wave: 248
+  - Wave: 249
+  - _Wave: 249
   - Dependencies: comfy-parity-native-qwen-multimodal-generation-foundation
   - _Blocked_by: comfy-parity-native-qwen-multimodal-generation-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py, projects/comfy/ComfyUI/comfy/text_encoders/lt.py, projects/comfy/ComfyUI/comfy/utils.py, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs
@@ -9516,8 +9516,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 481. Implement Gemma4 audio preparation
   - _id: comfy-parity-native-gemma-audio-preparation-foundation
   - Outcome: The canonical Gemma4 audio preparation owner mixes checked AUDIO to mono, resamples to 16 kHz, applies source semicausal padding, exact 320-sample periodic-Hann/512-FFT/128-bin HTK log-mel projection and frame masks, and computes the bounded post-subsample marker count without retaining encoder state.
-  - Wave: 249
-  - _Wave: 249
+  - Wave: 250
+  - _Wave: 250
   - Dependencies: comfy-parity-native-gemma-image-video-preparation-foundation
   - _Blocked_by: comfy-parity-native-gemma-image-video-preparation-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs, crates/comfy_tensor/src/ops/spectral_transform_01.rs, crates/comfy_tensor/src/ops/native_diffusion.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs
@@ -9536,8 +9536,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 482. Implement Gemma tokenizer admission
   - _id: comfy-parity-native-gemma-tokenizer-foundation
   - Outcome: NativePromptTokenizer admits exact Gemma3 SentencePiece and Gemma4 checkpoint tokenizer-json artifacts with their start, pad, control, image, video, audio, turn, and thinking-token classifications, bounded padding rules, canonical encode/decode, semantic identity, and owned residency.
-  - Wave: 250
-  - _Wave: 250
+  - Wave: 251
+  - _Wave: 251
   - Dependencies: comfy-parity-native-gemma-audio-preparation-foundation
   - _Blocked_by: comfy-parity-native-gemma-audio-preparation-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py, projects/comfy/ComfyUI/comfy/text_encoders/lt.py, projects/comfy/ComfyUI/comfy/text_encoders/spiece_tokenizer.py, crates/comfy_model/src/clip_tokenizer.rs
@@ -9556,8 +9556,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 483. Implement exact Gemma3 decoder execution
   - _id: comfy-parity-native-gemma3-decoder-exactness-foundation
   - Outcome: NativeDecoderTextEncoder admits and executes exact Gemma3 4B-vision and 12B decoder profiles, including alternating global/local RoPE, Q/K normalization, Gemma RMS normalization and scaling, sliding attention, tied output, stop tokens, staged KV, and borrowed RNG generation.
-  - Wave: 251
-  - _Wave: 251
+  - Wave: 252
+  - _Wave: 252
   - Dependencies: comfy-parity-native-gemma-tokenizer-foundation
   - _Blocked_by: comfy-parity-native-gemma-tokenizer-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/llama.py, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs
@@ -9576,8 +9576,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 484. Implement exact Gemma4 decoder execution
   - _id: comfy-parity-native-gemma4-decoder-exactness-foundation
   - Outcome: NativeDecoderTextEncoder admits and executes exact Gemma4 E2B, E4B, and 31B profiles, including global-head geometry, shared key/value layers, double-wide MLPs, hidden per-layer token embeddings from expanded initial IDs, partial rotary attention, logit softcap, staged KV, and borrowed RNG generation.
-  - Wave: 252
-  - _Wave: 252
+  - Wave: 253
+  - _Wave: 253
   - Dependencies: comfy-parity-native-gemma3-decoder-exactness-foundation
   - _Blocked_by: comfy-parity-native-gemma3-decoder-exactness-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py, projects/comfy/ComfyUI/comfy/text_encoders/llama.py, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs
@@ -9596,8 +9596,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 485. Implement retained Gemma3 vision projection
   - _id: comfy-parity-native-gemma3-vision-projection-foundation
   - Outcome: A retained Gemma3 vision owner admits the exact CLIP-vision and multimodal-projector tensors, consumes canonical Gemma3 visual preparation, executes the 896-square projection and 256-token replacement, and exposes content identity and StorageId-aware residency without retaining invocation state.
-  - Wave: 253
-  - _Wave: 253
+  - Wave: 254
+  - _Wave: 254
   - Dependencies: comfy-parity-native-gemma4-decoder-exactness-foundation
   - _Blocked_by: comfy-parity-native-gemma4-decoder-exactness-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/llama.py, projects/comfy/ComfyUI/comfy/text_encoders/lt.py, crates/comfy_model/src/clip_vision.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs
@@ -9616,8 +9616,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 486. Implement retained Gemma4 vision projection
   - _id: comfy-parity-native-gemma4-vision-projection-foundation
   - Outcome: A retained Gemma4 vision owner admits and executes exact patch projection, learned positions, two-axis RoPE, attention, pooling, and multimodal projector tensors for E2B, E4B, and 31B while consuming canonical image/video preparation and exposing content identity and alias-aware residency.
-  - Wave: 254
-  - _Wave: 254
+  - Wave: 255
+  - _Wave: 255
   - Dependencies: comfy-parity-native-gemma3-vision-projection-foundation
   - _Blocked_by: comfy-parity-native-gemma3-vision-projection-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py, projects/comfy/ComfyUI/comfy/text_encoders/llama.py, crates/comfy_model/src/attention.rs, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs, crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/image_video/manifest.json
@@ -9636,8 +9636,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 487. Implement retained Gemma4 audio execution
   - _id: comfy-parity-native-gemma4-audio-execution-foundation
   - Outcome: A retained Gemma4 audio owner admits and executes exact convolutional subsampling, relative-position chunk attention, conformer feed-forward and causal convolution layers, masks, output projection, and multimodal projector for audio-capable E2B/E4B profiles; 31B rejects audio.
-  - Wave: 255
-  - _Wave: 255
+  - Wave: 256
+  - _Wave: 256
   - Dependencies: comfy-parity-native-gemma4-vision-projection-foundation
   - _Blocked_by: comfy-parity-native-gemma4-vision-projection-foundation
   - Reads: projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs, crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/audio_preparation/manifest.json
@@ -9656,8 +9656,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 488. Implement retained Gemma multimodal resources
   - _id: comfy-parity-native-gemma-multimodal-resource-foundation
   - Outcome: One sealed Gemma multimodal CLIP resource inseparably retains the exact tokenizer, decoder, required vision owner, and optional admitted audio owner for each closed Gemma3/Gemma4 family, with source-bound semantic identity and size-consistent StorageId-deduplicated residency.
-  - Wave: 256
-  - _Wave: 256
+  - Wave: 257
+  - _Wave: 257
   - Dependencies: comfy-parity-native-gemma4-audio-execution-foundation
   - _Blocked_by: comfy-parity-native-gemma4-audio-execution-foundation
   - Reads: projects/comfy/ComfyUI/comfy/sd.py, projects/comfy/ComfyUI/comfy/sd1_clip.py, projects/comfy/ComfyUI/comfy/ldm/lumina/model/lumina2.py, projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py, projects/comfy/ComfyUI/comfy/text_encoders/lt.py, projects/comfy/ComfyUI/comfy/text_encoders/llama.py, projects/comfy/ComfyUI/comfy/text_encoders/spiece_tokenizer.py, crates/comfy_model/src/clip_text_encoder_multimodal.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/tokenizer/manifest.json, crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma3_decoder/manifest.json, crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma4_decoder/manifest.json, crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma3_vision/manifest.json, crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma4_vision/manifest.json, crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma4_audio/manifest.json
@@ -9676,8 +9676,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 489. Implement retained Gemma multimodal generation
   - _id: comfy-parity-native-gemma-multimodal-generation-foundation
   - Outcome: Concrete retained Gemma3 and Gemma4 vision/audio owners implement exact family templates, image projection, Gemma4 video-over-image preprocessing, 24-to-1 FPS timestamp projection, 16 kHz audio features, marker replacement, expanded initial IDs, and family cleanup through the prepared decoder foundation. Family capability gates, model configuration, projectors, and encoder tensors participate in semantic identity and alias-aware residency.
-  - Wave: 257
-  - _Wave: 257
+  - Wave: 258
+  - _Wave: 258
   - Dependencies: comfy-parity-native-gemma-multimodal-resource-foundation
   - _Blocked_by: comfy-parity-native-gemma-multimodal-resource-foundation
   - Reads: projects/comfy/ComfyUI/comfy/sd.py, projects/comfy/ComfyUI/comfy/sd1_clip.py, projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py, projects/comfy/ComfyUI/comfy/text_encoders/lt.py, projects/comfy/ComfyUI/comfy/text_encoders/llama.py, projects/comfy/ComfyUI/comfy/text_encoders/spiece_tokenizer.py, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs, crates/comfy_model/src/clip_tokenizer.rs, crates/comfy_tensor/src/rng.rs
@@ -9696,8 +9696,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 490. Implement native multimodal text generation
   - _id: comfy-parity-native-text-generation-foundation
   - Outcome: One canonical native multimodal embedding boundary preprocesses source template text with optional image, video, and audio inputs, joins the resulting token, embedding, position, mask, and deep-stack state, and delegates bounded seeded generation to the retained decoder foundation. Generated text leaves receive only checked CLIP handles and attempt-scoped RNG transactions; they cannot insert marker IDs in place of media embeddings, ignore supported media, or introduce a second tokenizer or generation loop.
-  - Wave: 258
-  - _Wave: 258
+  - Wave: 259
+  - _Wave: 259
   - Dependencies: comfy-parity-native-gemma-multimodal-generation-foundation
   - _Blocked_by: comfy-parity-native-gemma-multimodal-generation-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_textgen.py, projects/comfy/ComfyUI/comfy/sd.py, projects/comfy/ComfyUI/comfy/sd1_clip.py, projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py, projects/comfy/ComfyUI/comfy/text_encoders/llama.py, projects/comfy/ComfyUI/comfy/text_encoders/lt.py, projects/comfy/ComfyUI/comfy/text_encoders/lumina2.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen_vl.py, projects/comfy/ComfyUI/comfy/text_encoders/spiece_tokenizer.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs, crates/comfy_model/src/clip_tokenizer.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_tensor/src/rng.rs, crates/comfy_runtime/src/executor.rs
@@ -9716,8 +9716,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 491. Bridge generated text nodes to the canonical runtime generator
   - _id: comfy-parity-native-text-generation-node-bridge
   - Outcome: Add a cycle-free identity-checked native node service and request projection for multimodal text generation. comfy_nodes validates and projects leaf inputs only; the runtime implementation delegates exactly once to execute_native_multimodal_text_generation, which remains the sole resource resolution, media preparation, RNG, generation, cache, cancellation, and atomic publication owner.
-  - Wave: 259
-  - _Wave: 259
+  - Wave: 260
+  - _Wave: 260
   - Dependencies: comfy-parity-native-text-generation-foundation
   - _Blocked_by: comfy-parity-native-text-generation-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_textgen.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/executor.rs
@@ -9736,8 +9736,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 492. Implement exact SDPose heatmap and OpenPose projection
   - _id: comfy-parity-native-sdpose-heatmap-projection-foundation
   - Outcome: One canonical SDPose projection owner decodes fixed 133-channel heatmaps with source-exact row-major argmax, max-preserving Gaussian DARK refinement, checked Hessian correction, input-canvas scaling, and 133-to-134 OpenPose whole-body projection. The canonical pose payload admits finite raw heatmap confidence rather than incorrectly constraining SDPose scores to probabilities.
-  - Wave: 260
-  - _Wave: 260
+  - Wave: 261
+  - _Wave: 261
   - Dependencies: comfy-parity-native-text-generation-node-bridge
   - _Blocked_by: comfy-parity-native-text-generation-node-bridge
   - Reads: projects/comfy/ComfyUI/comfy/ldm/modules/sdpose.py, projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_types/src/cancellation.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_tensor/src/cpu_backend.rs
@@ -9756,8 +9756,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 493. Implement immutable dtype-preserving dense inference and attention primitives
   - _id: comfy-parity-native-immutable-dense-inference-attention-foundation
   - Outcome: The canonical NativeModule owner exposes one immutable forward_dense_inference_with_context entry point for loaded Linear, ordinary Conv2d, LayerNorm, GroupNorm, SiLU, and GELU modules, while comfy_model::attention exposes one tensor-returning scaled-dot-product-attention entry point over the retained checked tensor kernel. Both preserve F16, BF16, or F32 dtype, device, and stream, accumulate deterministically in f32 where the source does, return fresh backend-accounted Tensor results, and account every data-sized decode, encoded-output, result-staging, and score temporary through the caller's ExecutionContext without changing module generation, prefetch, semantic state, or parameter ownership.
-  - Wave: 261
-  - _Wave: 261
+  - Wave: 262
+  - _Wave: 262
   - Dependencies: comfy-parity-native-sdpose-heatmap-projection-foundation, comfy-parity-tensor-ops-accelerated-attention-kernel-comfy-tensor-op-1354ac34a777, comfy-parity-workspace-final-ownership-audit, comfy-parity-cpu-low-precision-bmm-model-execution-closure
   - _Blocked_by: comfy-parity-native-sdpose-heatmap-projection-foundation, comfy-parity-tensor-ops-accelerated-attention-kernel-comfy-tensor-op-1354ac34a777, comfy-parity-workspace-final-ownership-audit, comfy-parity-cpu-low-precision-bmm-model-execution-closure
   - Reads: projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py, projects/comfy/ComfyUI/comfy/ldm/modules/attention.py, projects/comfy/ComfyUI/comfy/ops.py, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/ops/accelerated_attention_kernel_01.rs, crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs, crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs, crates/comfy_model/src/attention.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, .agents/specs/comfy-parity/ownership-policy.json
@@ -9776,8 +9776,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 494. Implement full SD2 denoiser execution and SDPose feature capture
   - _id: comfy-parity-native-sdpose-sd2-capture-foundation
   - Outcome: The canonical production SD2/OpenAI U-Net owner loads and executes the complete checked SDPose denoiser topology and returns an attempt-local clone of the last output-block input whose channel count is 640. It does not route production through the reduced NativeFamilyModel conformance graph or Sd15TinyModel.
-  - Wave: 262
-  - _Wave: 262
+  - Wave: 263
+  - _Wave: 263
   - Dependencies: comfy-parity-native-immutable-dense-inference-attention-foundation, comfy-parity-native-model-family-lotusd-comfy-model-0106, comfy-parity-native-model-family-sd20-comfy-model-0119, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-immutable-dense-inference-attention-foundation, comfy-parity-native-model-family-lotusd-comfy-model-0106, comfy-parity-native-model-family-sd20-comfy-model-0119, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py, projects/comfy/ComfyUI/comfy/ldm/modules/attention.py, projects/comfy/ComfyUI/comfy/ops.py, projects/comfy/ComfyUI/comfy/model_base.py, projects/comfy/ComfyUI/comfy/supported_models.py, projects/comfy/ComfyUI/comfy/supported_models_base.py, crates/comfy_model/src/attention.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_model/src/sd2_family.rs, crates/comfy_model/src/families/lotusd_comfy_model_0106.rs, crates/comfy_model/src/families/sd20_comfy_model_0119.rs, crates/comfy_model/src/slices/native_diffusion.rs, crates/comfy_model/src/sdpose.rs, crates/comfy_model/tests/families/lotusd_comfy_model_0106.rs, crates/comfy_model/tests/families/sd20_comfy_model_0119.rs
@@ -9796,8 +9796,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 495. Implement the retained SDPose model and heatmap-head resource
   - _id: comfy-parity-native-sdpose-model-resource-foundation
   - Outcome: One sealed MODEL-role NativeSdPoseModel retains the exact full LotusD SD2 denoiser and complete five-tensor 640-to-133 heatmap head from one bound mapped checkpoint, then projects source- and content-sensitive identity plus size-consistent StorageId-aware residency through NativeModelPayload and NativeStoredPayload without retaining invocation capture, heatmaps, sampler state, or output payloads.
-  - Wave: 263
-  - _Wave: 263
+  - Wave: 264
+  - _Wave: 264
   - Dependencies: comfy-parity-native-sdpose-sd2-capture-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-sdpose-sd2-capture-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: projects/comfy/ComfyUI/comfy/ldm/modules/sdpose.py, projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py, projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py, projects/comfy/ComfyUI/comfy/model_detection.py, projects/comfy/ComfyUI/comfy/supported_models.py, projects/comfy/ComfyUI/comfy/ops.py, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_model/src/sd2_family.rs, crates/comfy_model/src/families/lotusd_comfy_model_0106.rs, crates/comfy_model/src/sdpose.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/src/ops/neural_network_module_02.rs, crates/comfy_test_support/fixtures/sdpose/sd2_capture/production_manifest/manifest.json, crates/comfy_test_support/fixtures/sdpose/sd2_capture/reduced_numeric/manifest.json, crates/comfy_test_support/tests/native_node_family_e2e.rs, crates/comfy_test_support/tests/ownership_consolidation.rs
@@ -9816,8 +9816,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 496. Implement bounded tensor-returning dense spatial inference
   - _id: comfy-parity-native-bounded-dense-spatial-inference-foundation
   - Outcome: The canonical tensor and NativeModule owners expose immutable tensor-returning zero-padded ordinary Conv2d, ConvTranspose2d, parameterless InstanceNorm2d, and SiLU execution. Every data-sized temporary or result buffer is caller-authorized or backend-accounted; fixed scalar encoding and shape metadata remain bounded implementation details. The APIs preserve F16, BF16, or F32 dtype, device, stream, semantic state, parameters, generation, and prefetch state and return fresh backend-accounted Tensor results.
-  - Wave: 264
-  - _Wave: 264
+  - Wave: 265
+  - _Wave: 265
   - Dependencies: comfy-parity-native-sdpose-model-resource-foundation
   - _Blocked_by: comfy-parity-native-sdpose-model-resource-foundation
   - Reads: projects/comfy/ComfyUI/comfy/ldm/modules/sdpose.py, projects/comfy/ComfyUI/comfy/ops.py, crates/comfy_model/src/native_ops.rs, crates/comfy_model/tests/native_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/src/ops/neural_network_module_02.rs, crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs, crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/tests/ops/neural_network_module_02.rs, crates/comfy_tensor/tests/ops/activation_normalization_functional_01.rs, crates/comfy_test_support/tests/ownership_consolidation.rs, .agents/specs/comfy-parity/ownership-policy.json
@@ -9836,8 +9836,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 497. Implement deterministic LotusD sampling
   - _id: comfy-parity-native-lotusd-sampling-foundation
   - Outcome: The canonical sampling-profile and Euler owners expose one distinct LotusD IMG_TO_IMG/X0 profile over the established one-thousand-step linear sigma grid and one typed-error-preserving no-churn Euler invocation. The invocation uses the canonical simple one-step schedule, treats model output as denoised state, opens no RNG transaction, and retains no model, image, capture, or output state.
-  - Wave: 265
-  - _Wave: 265
+  - Wave: 266
+  - _Wave: 266
   - Dependencies: comfy-parity-native-bounded-dense-spatial-inference-foundation
   - _Blocked_by: comfy-parity-native-bounded-dense-spatial-inference-foundation
   - Reads: projects/comfy/ComfyUI/comfy/model_base.py, projects/comfy/ComfyUI/comfy/model_sampling.py, projects/comfy/ComfyUI/comfy/sample.py, projects/comfy/ComfyUI/comfy/samplers.py, projects/comfy/ComfyUI/comfy/k_diffusion/sampling.py, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/algorithms/native_diffusion.rs, crates/comfy_sampler/src/schedulers/simple_comfy_model_0211.rs, crates/comfy_sampler/tests/sampling_foundation.rs, crates/comfy_test_support/tests/ownership_consolidation.rs
@@ -9856,8 +9856,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 498. Execute the retained SDPose head and conditioning projection
   - _id: comfy-parity-native-sdpose-head-projection-foundation
   - Outcome: The retained SDPose model owner executes its exact seven-stage heatmap head through the bounded immutable dense-spatial operators, prepares the source-exact attempt-local Lotus cross-attention and ADM tensors, and decodes heatmaps plane-by-plane through the canonical DARK and OpenPose projection without creating another model, head, allocator, or retained invocation state.
-  - Wave: 266
-  - _Wave: 266
+  - Wave: 267
+  - _Wave: 267
   - Dependencies: comfy-parity-native-lotusd-sampling-foundation
   - _Blocked_by: comfy-parity-native-lotusd-sampling-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_lotus.py, projects/comfy/ComfyUI/comfy/ldm/modules/sdpose.py, projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py, crates/comfy_model/src/sdpose.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_model/tests/sdpose.rs, crates/comfy_test_support/fixtures/sdpose/projection/manifest.json, crates/comfy_test_support/tests/ownership_consolidation.rs
@@ -9876,8 +9876,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 499. Implement the native SDPose model and execution foundation
   - _id: comfy-parity-native-sdpose-execution-foundation
   - Outcome: One canonical shared SDPose runtime composition owner resolves the sealed SDPose model, VAE, image, and optional bounding boxes and delegates exact resize, Lotus conditioning, one-step Euler sampling, last-640 capture, heatmap-head execution, and OpenPose projection through the established model, VAE, sampler, tensor, media, and attempt-publication boundaries.
-  - Wave: 267
-  - _Wave: 267
+  - Wave: 268
+  - _Wave: 268
   - Dependencies: comfy-parity-native-sdpose-head-projection-foundation
   - _Blocked_by: comfy-parity-native-sdpose-head-projection-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py, projects/comfy/ComfyUI/comfy_extras/nodes_lotus.py, projects/comfy/ComfyUI/comfy/sample.py, projects/comfy/ComfyUI/comfy/samplers.py, projects/comfy/ComfyUI/comfy/k_diffusion/sampling.py, projects/comfy/ComfyUI/comfy/utils.py, crates/comfy_model/src/native_node_payload.rs, crates/comfy_model/src/sdpose.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_image.rs, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/algorithms/native_diffusion.rs, crates/comfy_sampler/src/schedulers/simple_comfy_model_0211.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/ops/indexing_masking_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_03.rs, crates/comfy_tensor/src/ops/storage_dtype_device_01.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -9896,8 +9896,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 500. Admit safe nested native video output prefixes
   - _id: comfy-parity-native-video-output-prefix-foundation
   - Outcome: The portable native output-effect request admits source-compatible nested relative prefixes such as video/ComfyUI while the authoritative OutputCommitter retains final path normalization, containment, collision, journal, and publication ownership.
-  - Wave: 294
-  - _Wave: 294
+  - Wave: 295
+  - _Wave: 295
   - Dependencies: comfy-parity-native-nodes-advanced-hooks-comfy-node-0119
   - _Blocked_by: comfy-parity-native-nodes-advanced-hooks-comfy-node-0119
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/output_committer.rs
@@ -9916,8 +9916,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 501. Implement native video component and bit-depth identity
   - _id: comfy-parity-native-video-component-foundation
   - Outcome: The canonical NativeVideoPayload owns exact in-memory VIDEO component identity: checked 8-bit or 10-bit depth, rational frame rate, frames, optional audio and separate alpha, bounded metadata, duration and dimensions. Provider transport preserves that identity without quantization, codec work, path state, or a second video value owner.
-  - Wave: 295
-  - _Wave: 295
+  - Wave: 296
+  - _Wave: 296
   - Dependencies: comfy-parity-native-video-output-prefix-foundation
   - _Blocked_by: comfy-parity-native-video-output-prefix-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, projects/comfy/ComfyUI/tests-unit/comfy_api_test/video_bit_depth_test.py, projects/comfy/ComfyUI/tests-unit/comfy_api_test/video_types_test.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_runtime/src/provider_materialization.rs
@@ -9936,8 +9936,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 502. Bind typed media identity into native video output effects
   - _id: comfy-parity-native-video-output-media-foundation
   - Outcome: The portable NativeOutputEffectRequest carries a checked media kind and canonical media type in its semantic identity, so VIDEO output bytes cannot be projected as image/png while the runtime output service and OutputCommitter retain effect and publication ownership.
-  - Wave: 296
-  - _Wave: 296
+  - Wave: 297
+  - _Wave: 297
   - Dependencies: comfy-parity-native-video-component-foundation
   - _Blocked_by: comfy-parity-native-video-component-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_runtime/src/queue_history.rs
@@ -9956,8 +9956,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 503. Project typed native video output commits and recovery
   - _id: comfy-parity-native-video-output-projection-foundation
   - Outcome: The native prepared-output boundary carries checked media kind and type through worker proposals, OutputCommitter projection metadata, preview/output events, and committed-receipt recovery. Versioned metadata upgrades legacy v1 PNG receipts without weakening the authoritative output transaction or path owner.
-  - Wave: 297
-  - _Wave: 297
+  - Wave: 298
+  - _Wave: 298
   - Dependencies: comfy-parity-native-video-output-media-foundation
   - _Blocked_by: comfy-parity-native-video-output-media-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_runtime/src/queue_history.rs, crates/comfy_runtime/src/recovery.rs
@@ -9976,8 +9976,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 504. Admit retained FILM and RIFE checkpoint state
   - _id: comfy-parity-native-frame-interpolation-model-foundation
   - Outcome: One immutable NativeFrameInterpolationModel owns source-order FILM/RIFE detection, collision-safe RIFE checkpoint normalization, complete closed state manifests, artifact/content semantic identity, and alias-aware residency. It retains weights only and does not execute interpolation, cache pair features, resolve handles, or publish output.
-  - Wave: 298
-  - _Wave: 298
+  - Wave: 299
+  - _Wave: 299
   - Dependencies: comfy-parity-native-video-output-projection-foundation
   - _Blocked_by: comfy-parity-native-video-output-projection-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, crates/comfy_model/src/model_store.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs
@@ -9996,8 +9996,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 505. Seal retained FILM and RIFE resources behind INTERP_MODEL handles
   - _id: comfy-parity-native-frame-interpolation-resource-foundation
   - Outcome: NativeModelPayload is the sole sealed INTERP_MODEL resource adapter for NativeFrameInterpolationModel. NativeStoredModelPayload admits that role only through the concrete accessor while preserving exact artifact/execution identity, backing/tensor residency, and every existing non-interpolation role boundary.
-  - Wave: 299
-  - _Wave: 299
+  - Wave: 300
+  - _Wave: 300
   - Dependencies: comfy-parity-native-frame-interpolation-model-foundation
   - _Blocked_by: comfy-parity-native-frame-interpolation-model-foundation
   - Reads: crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/admission/manifest.json
@@ -10016,8 +10016,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 506. Plan bounded FILM and RIFE interpolation invocations
   - _id: comfy-parity-native-frame-interpolation-invocation-foundation
   - Outcome: FrameInterpolationInvocationPlan is the sole checked owner of source endpoint/midpoint counts, exact timestep order, FILM/RIFE alignment, reflection-padding admission, result-size overflow protection, bypass semantics, and attempt-local fallback state. The state can disable FILM multi-timestep execution and carries the source RIFE single-timestep batch with persistent floor halving; it does not promise recovery from FILM's pinned multi-element scalarization failure. It executes no model equations and retains no image, feature, grid, cache, handle, or output state.
-  - Wave: 300
-  - _Wave: 300
+  - Wave: 301
+  - _Wave: 301
   - Dependencies: comfy-parity-native-frame-interpolation-resource-foundation
   - _Blocked_by: comfy-parity-native-frame-interpolation-resource-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy/ldm/common_dit.py, crates/comfy_model/src/frame_interpolation.rs
@@ -10036,8 +10036,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 507. Publish bounded tensor grid sampling for model execution
   - _id: comfy-parity-native-tensor-grid-sample-foundation
   - Outcome: The canonical spatial functional owner exposes one tensor-returning grid-sample adapter over its existing normalized-coordinate, padding, and interpolation equations. The CPU path decodes F16/BF16/F32 input and F32 grids into caller-authorized workspace, publishes one fresh backend-accounted tensor in the input dtype, and adds no second sampling equation, allocator, workspace, cancellation, model, cache, or publication owner.
-  - Wave: 301
-  - _Wave: 301
+  - Wave: 302
+  - _Wave: 302
   - Dependencies: comfy-parity-native-frame-interpolation-invocation-foundation
   - _Blocked_by: comfy-parity-native-frame-interpolation-invocation-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/dtypes.rs, crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs
@@ -10056,8 +10056,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 508. Publish bounded tensor interpolation for model execution
   - _id: comfy-parity-native-tensor-interpolate-foundation
   - Outcome: The canonical spatial functional owner exposes one tensor-returning interpolation adapter over its existing size, scale, rank, coordinate, and separable-weight plan. The CPU path decodes F16/BF16/F32 input and accumulates output in caller-authorized F32 workspace before publishing one fresh backend-accounted tensor in the input dtype, without a second interpolation equation, allocator, workspace, cancellation, model, cache, or publication owner.
-  - Wave: 302
-  - _Wave: 302
+  - Wave: 303
+  - _Wave: 303
   - Dependencies: comfy-parity-native-tensor-grid-sample-foundation
   - _Blocked_by: comfy-parity-native-tensor-grid-sample-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/dtypes.rs, crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs
@@ -10076,8 +10076,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 509. Publish bounded low-precision tensor arithmetic for RIFE execution
   - _id: comfy-parity-native-rife-tensor-arithmetic-foundation
   - Outcome: The canonical elementwise and activation owners expose bounded F16/BF16/F32 broadcast add, multiply, tensor-weighted lerp, and LeakyReLU Tensor adapters needed by RIFE. NativeModule routes immutable LeakyReLU through that activation owner without changing parameters, generation, prefetch, or semantic identity; no model-local equation, host-result Vec, allocator, workspace, cache, or publication owner is introduced.
-  - Wave: 303
-  - _Wave: 303
+  - Wave: 304
+  - _Wave: 304
   - Dependencies: comfy-parity-native-tensor-interpolate-foundation
   - _Blocked_by: comfy-parity-native-tensor-interpolate-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/dtypes.rs, crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs, crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_tensor/tests/ops/activation_normalization_functional_01.rs, crates/comfy_tensor/tests/ops/elementwise_or_runtime_operation_03.rs, crates/comfy_model/tests/native_ops.rs
@@ -10096,8 +10096,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 510. Execute retained RIFE interpolation pairs
   - _id: comfy-parity-native-rife-execution-foundation
   - Outcome: NativeFrameInterpolationModel is the sole retained RIFE execution owner. It composes the admitted head and five IFBlocks from immutable checkpoint tensors, delegates convolution, interpolation, grid sampling, concatenation, pixel shuffle, residual arithmetic, sigmoid, and lerp to their canonical Tensor owners, and returns only a fresh attempt-local interpolated pair without retaining features, flows, grids, output, cache, handles, or publication state.
-  - Wave: 304
-  - _Wave: 304
+  - Wave: 305
+  - _Wave: 305
   - Dependencies: comfy-parity-native-rife-tensor-arithmetic-foundation
   - _Blocked_by: comfy-parity-native-rife-tensor-arithmetic-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs, crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs, crates/comfy_tensor/src/ops/indexing_masking_01.rs, crates/comfy_tensor/src/ops/neural_network_functional_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_02.rs, crates/comfy_tensor/src/ops/shape_layout_transform_03.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/src/ops/storage_dtype_device_01.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/admission/manifest.json
@@ -10116,8 +10116,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 511. Execute bounded RIFE frame sequences
   - _id: comfy-parity-native-rife-sequence-execution-foundation
   - Outcome: NativeFrameInterpolationModel remains the sole retained RIFE owner while one sequence method plans BHWC endpoints and source timesteps, applies canonical reflection padding, reuses each adjacent frame head projection attempt-locally, delegates every midpoint to the retained pair graph, crops and clamps through canonical Tensor owners, and returns one fresh ordered BHWC sequence without retaining features, grids, outputs, cache, handles, codec state, or publication state.
-  - Wave: 305
-  - _Wave: 305
+  - Wave: 306
+  - _Wave: 306
   - Dependencies: comfy-parity-native-rife-execution-foundation
   - _Blocked_by: comfy-parity-native-rife-execution-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, projects/comfy/ComfyUI/comfy/ldm/common_dit.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs, crates/comfy_tensor/src/ops/indexing_masking_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_02.rs, crates/comfy_tensor/src/ops/shape_layout_transform_03.rs, crates/comfy_tensor/src/ops/storage_dtype_device_01.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/rife-execution/manifest.json
@@ -10136,8 +10136,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 512. Publish bounded tensor average pooling for FILM pyramids
   - _id: comfy-parity-native-film-tensor-average-pool-foundation
   - Outcome: The canonical spatial functional owner exposes one tensor-returning AvgPool2d adapter over its existing AveragePoolGeometry traversal. It decodes F16, BF16, or F32 input and accumulates the FILM pyramid result in caller-authorized F32 workspace before publishing one fresh backend-accounted tensor in the input dtype, without adding a second pooling equation, allocator, workspace, model, cache, codec, or publication owner.
-  - Wave: 306
-  - _Wave: 306
+  - Wave: 307
+  - _Wave: 307
   - Dependencies: comfy-parity-native-rife-sequence-execution-foundation
   - _Blocked_by: comfy-parity-native-rife-sequence-execution-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/dtypes.rs, crates/comfy_tensor/src/ops/neural_network_module_01.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs
@@ -10156,8 +10156,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 513. Execute bounded FILM pixel-center warps
   - _id: comfy-parity-native-film-warp-foundation
   - Outcome: The frame-interpolation owner constructs FILM's F32 pixel-center base grid and source flow normalization in caller-authorized workspace, then delegates bilinear border sampling with align_corners false to the canonical tensor grid-sample owner. It preserves F16, BF16, or F32 input dtype and publishes one fresh attempt-local tensor without adding a second sampler, retained graph, allocator, workspace, codec, cache, handle, or publication owner.
-  - Wave: 307
-  - _Wave: 307
+  - Wave: 308
+  - _Wave: 308
   - Dependencies: comfy-parity-native-film-tensor-average-pool-foundation
   - _Blocked_by: comfy-parity-native-film-tensor-average-pool-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs, crates/comfy_tensor/src/ops/indexing_masking_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_02.rs, crates/comfy_tensor/src/ops/shape_layout_transform_03.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/src/ops/storage_dtype_device_01.rs, crates/comfy_test_support/fixtures/tensor_operations/spatial_functional_kernel_01/film-average-pool/manifest.json
@@ -10176,8 +10176,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 514. Execute bounded FILM padded convolutions
   - _id: comfy-parity-native-film-padded-convolution-foundation
   - Outcome: The frame-interpolation owner exposes one borrowed-weight FILM convolution adapter. It applies source-specific right and bottom zero padding before even kernels, symmetric convolution padding for odd kernels, optional LeakyReLU with slope 0.2, and delegates all padding, convolution, activation, allocation, storage, stream, workspace, and cancellation mechanics to their canonical owners without retaining invocation state or adding a second graph, codec, cache, handle, or publication owner.
-  - Wave: 308
-  - _Wave: 308
+  - Wave: 309
+  - _Wave: 309
   - Dependencies: comfy-parity-native-film-warp-foundation
   - _Blocked_by: comfy-parity-native-film-warp-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs, crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_03.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-warp/manifest.json
@@ -10196,8 +10196,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 515. Execute bounded FILM image pyramids
   - _id: comfy-parity-native-film-image-pyramid-foundation
   - Outcome: The frame-interpolation owner composes FILM's bounded image pyramid by preserving level zero as the borrowed input and repeatedly delegating two-by-two stride-two average pooling to the canonical tensor owner. The helper returns only attempt-local tensor views and fresh pooled levels, validates the production seven-level extent before allocation, and adds no second pooling equation, retained graph, allocator, workspace, codec, cache, handle, or publication owner.
-  - Wave: 309
-  - _Wave: 309
+  - Wave: 310
+  - _Wave: 310
   - Dependencies: comfy-parity-native-film-padded-convolution-foundation
   - _Blocked_by: comfy-parity-native-film-padded-convolution-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-convolution/manifest.json
@@ -10216,8 +10216,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 516. Execute retained FILM subtree features
   - _id: comfy-parity-native-film-subtree-foundation
   - Outcome: The sole retained frame-interpolation model executes FILM SubTreeExtractor features from its admitted checkpoint tensors. Each of four levels applies the source's two padded three-by-three convolutions with LeakyReLU, doubles channels from the closed base width, and conditionally delegates two-by-two average pooling through the requested subtree depth without copying weights or retaining features, workspace, cache, handles, codecs, effects, or publication state.
-  - Wave: 310
-  - _Wave: 310
+  - Wave: 311
+  - _Wave: 311
   - Dependencies: comfy-parity-native-film-image-pyramid-foundation
   - _Blocked_by: comfy-parity-native-film-image-pyramid-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-image-pyramid/manifest.json
@@ -10236,8 +10236,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 517. Compose retained FILM feature pyramids
   - _id: comfy-parity-native-film-feature-pyramid-foundation
   - Outcome: The sole retained frame-interpolation model composes FILM FeatureExtractor output from the canonical seven-level image pyramid and retained SubTreeExtractor. Each output preserves the current subtree root and concatenates older diagonal subtree levels in source order through the canonical tensor concatenation owner, releases obsolete sub-pyramids after their final consumer, and retains no features, workspace, cache, handles, codecs, effects, or publication state.
-  - Wave: 311
-  - _Wave: 311
+  - Wave: 312
+  - _Wave: 312
   - Dependencies: comfy-parity-native-film-subtree-foundation
   - _Blocked_by: comfy-parity-native-film-subtree-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_tensor/src/ops/shape_layout_transform_02.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-subtree/manifest.json
@@ -10256,8 +10256,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 518. Synthesize bounded FILM flow pyramids
   - _id: comfy-parity-native-film-flow-pyramid-synthesis-foundation
   - Outcome: The frame-interpolation owner synthesizes FILM accumulated flow pyramids from borrowed residual flows in source fine-to-coarse order. It aliases the coarsest residual, repeatedly delegates exact-size bilinear interpolation, doubles the upsampled flow, adds the next residual through canonical tensor arithmetic, reverses the attempt-local outputs back to fine-to-coarse order, and creates no predictor, retained graph, allocator, cache, handle, codec, effect, or publication owner.
-  - Wave: 312
-  - _Wave: 312
+  - Wave: 313
+  - _Wave: 313
   - Dependencies: comfy-parity-native-film-feature-pyramid-foundation
   - _Blocked_by: comfy-parity-native-film-feature-pyramid-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-feature-pyramid/manifest.json
@@ -10276,8 +10276,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 519. Execute retained FILM flow estimators
   - _id: comfy-parity-native-film-flow-estimator-foundation
   - Outcome: The sole retained frame-interpolation model executes FILM PyramidFlowEstimator from its admitted checkpoint tensors. It validates exact seven-level feature channels and geometry, predicts the deepest residual through the shared five-convolution estimator, reuses that estimator for levels five through three, routes levels two through zero through the three specialized predictors, upsamples and doubles accumulated flow, warps the second features, and returns source-ordered attempt-local residuals without retaining flows, features, workspace, cache, handles, codecs, effects, or publication state.
-  - Wave: 313
-  - _Wave: 313
+  - Wave: 314
+  - _Wave: 314
   - Dependencies: comfy-parity-native-film-flow-pyramid-synthesis-foundation
   - _Blocked_by: comfy-parity-native-film-flow-pyramid-synthesis-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-flow-pyramid-synthesis/manifest.json
@@ -10296,8 +10296,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 520. Execute bounded FILM pyramid algebra
   - _id: comfy-parity-native-film-pyramid-algebra-foundation
   - Outcome: The frame-interpolation owner exposes FILM's three bounded pyramid adapters: pairwise image/feature channel concatenation, per-batch scalar multiplication through an unsqueezed broadcast view, and pairwise feature warping by delegated FILM flow. Every output is attempt-local and every tensor equation, allocation, storage, stream, workspace, and cancellation boundary remains owned by canonical tensor or FILM warp primitives; no retained graph, allocator, cache, handle, codec, effect, or publication owner is added.
-  - Wave: 314
-  - _Wave: 314
+  - Wave: 315
+  - _Wave: 315
   - Dependencies: comfy-parity-native-film-flow-estimator-foundation
   - _Blocked_by: comfy-parity-native-film-flow-estimator-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_tensor/src/ops/shape_layout_transform_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_02.rs, crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-flow-estimator/manifest.json
@@ -10316,8 +10316,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 521. Execute the retained FILM fusion graph
   - _id: comfy-parity-native-film-fusion-foundation
   - Outcome: The sole retained frame-interpolation model executes FILM Fusion from its admitted checkpoint tensors. It consumes five borrowed aligned pyramid levels, starts at the coarsest level, applies four source-ordered nearest-resize plus nonactivated two-by-two and activated joined three-by-three convolution stages, and finishes with the retained one-by-one RGB output projection. All intermediate pyramids and outputs remain attempt-local, while canonical interpolation, concatenation, convolution, activation, storage, workspace, stream, and cancellation owners retain their mechanics.
-  - Wave: 315
-  - _Wave: 315
+  - Wave: 316
+  - _Wave: 316
   - Dependencies: comfy-parity-native-film-pyramid-algebra-foundation
   - _Blocked_by: comfy-parity-native-film-pyramid-algebra-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-pyramid-algebra/manifest.json
@@ -10336,8 +10336,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 522. Synthesize retained FILM multi-timestep pairs
   - _id: comfy-parity-native-film-multi-timestep-synthesis-foundation
   - Outcome: The sole retained frame-interpolation model executes a batch-one FILM pair for a bounded set of timesteps. It constructs each endpoint image and feature pyramid once, predicts and synthesizes forward and backward flow once, scales backward flow by t and forward flow by one minus t, warps the source-aligned pyramids, concatenates warped targets before scaled flows in the source order, delegates every timestep to the retained fusion graph, and concatenates the attempt-local RGB results. Canonical tensor, warp, flow, fusion, storage, workspace, stream, and cancellation owners retain their mechanics; adjacent-pair sequence reuse remains a later leaf.
-  - Wave: 316
-  - _Wave: 316
+  - Wave: 317
+  - _Wave: 317
   - Dependencies: comfy-parity-native-film-fusion-foundation
   - _Blocked_by: comfy-parity-native-film-fusion-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-fusion/manifest.json
@@ -10356,8 +10356,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 523. Execute FILM sequences with adjacent feature reuse
   - _id: comfy-parity-native-film-sequence-execution-foundation
   - Outcome: The sole retained frame-interpolation model executes a bounded BHWC FILM sequence through the canonical invocation plan. It converts each endpoint to NCHW once, computes each frame's image and feature pyramids once, moves the second endpoint pyramids into the next pair's first-endpoint cache, delegates every pair to retained multi-timestep synthesis, preserves source endpoint-midpoint ordering, and emits one fresh contiguous clamped BHWC result. The cache is invocation-local Rust state, never NativeCache or retained model state; source OOM downgrade policy remains a later leaf.
-  - Wave: 317
-  - _Wave: 317
+  - Wave: 318
+  - _Wave: 318
   - Dependencies: comfy-parity-native-film-multi-timestep-synthesis-foundation
   - _Blocked_by: comfy-parity-native-film-multi-timestep-synthesis-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-multi-timestep/manifest.json
@@ -10376,8 +10376,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 524. Preserve typed frame-interpolation resource exhaustion
   - _id: comfy-parity-native-frame-interpolation-resource-exhaustion-foundation
   - Outcome: The frame-interpolation owner preserves typed tensor allocation, backend-resource, and workspace-authorization exhaustion through its execution adapter instead of erasing those failures into generic strings. Canonical spatial and shape-layout tensor adapters expose TensorError through their standard Error source chain, NativeOps preserves typed spatial tensor failures, and classification downcasts only typed errors; cancellation remains dominant, ordinary execution failures remain non-retryable, and no message matching, allocator, retry loop, cache, handle, effect, or publication owner is introduced.
-  - Wave: 318
-  - _Wave: 318
+  - Wave: 319
+  - _Wave: 319
   - Dependencies: comfy-parity-native-film-sequence-execution-foundation
   - _Blocked_by: comfy-parity-native-film-sequence-execution-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy/model_management.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/native_ops.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs, crates/comfy_tensor/src/ops/shape_layout_transform_02.rs, crates/comfy_tensor/src/ops/shape_layout_transform_03.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/film-sequence/manifest.json
@@ -10396,8 +10396,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 525. Plan bounded native video codec invocations
   - _id: comfy-parity-native-video-codec-plan-foundation
   - Outcome: The canonical media-domain codec planner converts one checked NativeVideoPayload into a closed, allocation-free MP4/H.264, WebM/VP9, or WebM/AV1 invocation contract. It binds exact source and millisecond-rounded frame rates, pixel format, bit depth, alpha, audio layout and sample cap, metadata, CRF, preset, and caller limits without loading a codec, opening native libraries, resolving paths or handles, or owning effects, caches, persistence, or publication.
-  - Wave: 319
-  - _Wave: 319
+  - Wave: 320
+  - _Wave: 320
   - Dependencies: comfy-parity-native-frame-interpolation-resource-exhaustion-foundation
   - _Blocked_by: comfy-parity-native-frame-interpolation-resource-exhaustion-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/comfy_media.rs
@@ -10416,8 +10416,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 526. Certify native video codec ABI contracts
   - _id: comfy-parity-native-video-codec-ffi-certification-foundation
   - Outcome: The canonical NativeFfiRegistry admits a signed canonical FFmpeg 7.1 five-library catalog only for the reviewed target filename, ABI-major, digest, symbol, external-encoder, license-notice, unsafe-owner, and no-runtime-compilation contract. A separate complete observation pass yields opaque registry-issued certificates; catalog verification does not load a library, probe a codec, claim availability, or create an unsafe adapter.
-  - Wave: 320
-  - _Wave: 320
+  - Wave: 321
+  - _Wave: 321
   - Dependencies: comfy-parity-native-video-codec-plan-foundation
   - _Blocked_by: comfy-parity-native-video-codec-plan-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_test_support/fixtures/video/codec-plan/manifest.json
@@ -10436,8 +10436,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 527. Capture and seal native video codec packages
   - _id: comfy-parity-native-video-codec-package-capture-foundation
   - Outcome: The canonical native-library image owner captures each exact FFmpeg catalog file without following a final symlink, rechecks stable file identity and length while hashing bounded bytes, compares filename and digest with the signed five-library contract, and seals immutable retained snapshots. This leaf does not load a library, resolve a symbol, issue an FFI certificate, probe an encoder, or execute a codec.
-  - Wave: 321
-  - _Wave: 321
+  - Wave: 322
+  - _Wave: 322
   - Dependencies: comfy-parity-native-video-codec-ffi-certification-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ffi-certification-foundation
   - Reads: crates/comfy_runtime/src/trust.rs, crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json
@@ -10456,8 +10456,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 528. Inspect sealed native video codec ELF contracts
   - _id: comfy-parity-native-video-codec-elf-inspection-foundation
   - Outcome: One canonical bounded ELF64 dynamic-contract inspector validates the loader-consumed machine, dynamic table, SONAME, exported symbols, dependency names, and absence of embedded search paths. ROCm delegates its existing certification inspection to this shared owner, while video package capture derives an inspected sealed package only when all five catalog images have the target machine, exact filename SONAME, and complete signed symbol subset. The inspected result records dependency names but does not authorize them, load a library, resolve a runtime address, issue an FFI certificate, probe an encoder, or execute a codec.
-  - Wave: 322
-  - _Wave: 322
+  - Wave: 323
+  - _Wave: 323
   - Dependencies: comfy-parity-native-video-codec-package-capture-foundation
   - _Blocked_by: comfy-parity-native-video-codec-package-capture-foundation
   - Reads: crates/comfy_runtime/src/native_ffi_rocm.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json
@@ -10476,8 +10476,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 529. Certify inspected native video codec packages
   - _id: comfy-parity-native-video-codec-inspected-certification-foundation
   - Outcome: The canonical NativeFfiRegistry converts one signed-catalog-matched, sealed, statically inspected five-library video codec package into registry-issued certificates. The result retains the inspected sealed images beside the certificates so later unsafe adapters cannot outlive their exact bytes. It does not authorize DT_NEEDED dependencies, load a library, resolve a runtime address, probe an encoder, or execute a codec.
-  - Wave: 323
-  - _Wave: 323
+  - Wave: 324
+  - _Wave: 324
   - Dependencies: comfy-parity-native-video-codec-elf-inspection-foundation
   - _Blocked_by: comfy-parity-native-video-codec-elf-inspection-foundation
   - Reads: crates/comfy_runtime/src/trust.rs, crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json, crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json
@@ -10494,8 +10494,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 530. Verify signed native video codec dependency contracts
   - _id: comfy-parity-native-video-codec-dependency-contract-foundation
   - Outcome: The canonical native trust owner verifies a separately domain-separated, target-specific FFmpeg 7.1 dependency contract against one exact signed five-library catalog. The opaque result binds source, build, license, primary-catalog, dependency SONAME/digest/ABI/sponsor, complete consumer edge, reviewed system-library, and encoder-provider identities in a non-callable dependency registry without reading a filesystem, capturing an image, issuing a dependency certificate, loading a library, resolving an address, probing an encoder, or executing a codec.
-  - Wave: 324
-  - _Wave: 324
+  - Wave: 325
+  - _Wave: 325
   - Dependencies: comfy-parity-native-video-codec-inspected-certification-foundation
   - _Blocked_by: comfy-parity-native-video-codec-inspected-certification-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/trust.rs, crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json, crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json, crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json
@@ -10514,8 +10514,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 531. Certify retained native video codec dependency closures
   - _id: comfy-parity-native-video-codec-dependency-closure-certification-foundation
   - Outcome: The canonical native trust owner consumes one exact certified inspected five-library FFmpeg package and its separately verified dependency contract, captures and seals every signed non-system dependency, requires the observed ELF DT_NEEDED graph to equal the signed graph, issues only dependency registry certificates, and retains the complete opaque package in deterministic dependency-first order. It performs no library load, symbol-address resolution, encoder probe, codec execution, media allocation, controller work, effect, cache, persistence, recovery, or publication.
-  - Wave: 325
-  - _Wave: 325
+  - Wave: 326
+  - _Wave: 326
   - Dependencies: comfy-parity-native-video-codec-dependency-contract-foundation
   - _Blocked_by: comfy-parity-native-video-codec-dependency-contract-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_ffi_elf.rs, crates/comfy_runtime/src/native_ffi_rocm.rs, crates/comfy_runtime/src/native_ffi_npu.rs, crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json, crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json, crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json
@@ -10534,8 +10534,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 532. Load certified native video codec closures
   - _id: comfy-parity-native-video-codec-retained-loader-foundation
   - Outcome: The focused native video codec FFI adapter consumes one certified retained dependency closure and loads every sealed object in its signed dependency-first order into one isolated GNU loader namespace. It proves each runtime link-map path, SONAME, DT_NEEDED edge, reviewed system object, namespace identity, and retained certificate/image lifetime before returning an opaque loaded package. The loader performs relocation-time binding and may run library constructors, but it performs no explicit dlsym or callable-address projection, probes no encoder, calls no codec ABI, allocates no media, and owns no controller, effect, cache, persistence, recovery, or publication state.
-  - Wave: 326
-  - _Wave: 326
+  - Wave: 327
+  - _Wave: 327
   - Dependencies: comfy-parity-native-video-codec-dependency-closure-certification-foundation
   - _Blocked_by: comfy-parity-native-video-codec-dependency-closure-certification-foundation
   - Reads: crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_ffi_elf.rs, crates/comfy_runtime/src/native_ffi_rocm.rs, crates/comfy_backend_rocm/src/loader.rs, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json
@@ -10554,8 +10554,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 533. Own reviewed FFmpeg 7.1 C ABI declarations
   - _id: comfy-parity-native-video-codec-reviewed-abi-foundation
   - Outcome: One private native video codec ABI owner binds the signature-verified official FFmpeg 7.1 source archive to exact x86_64 GNU C declarations, five library release versions, opaque pointer types, callback signatures, AVRational and AVChannelLayout layouts, and the complete initial 54-symbol catalog. The trust catalog delegates its name and ABI-major projection to this owner. This declaration leaf does not load a library, resolve or retain an address, invoke a version function, probe an encoder, call a codec, allocate media, or own controller, effect, cache, persistence, recovery, or publication state.
-  - Wave: 327
-  - _Wave: 327
+  - Wave: 328
+  - _Wave: 328
   - Dependencies: comfy-parity-native-video-codec-retained-loader-foundation
   - _Blocked_by: comfy-parity-native-video-codec-retained-loader-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/comfy_runtime.rs, crates/comfy_backend_rocm/src/abi.rs, crates/comfy_backend_rocm/build.rs, crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json
@@ -10574,8 +10574,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 534. Certify callable FFmpeg 7.1 ELF exports
   - _id: comfy-parity-native-video-codec-callable-symbol-certification-foundation
   - Outcome: The canonical bounded ELF inspector preserves each required FFmpeg dynamic symbol's binding, type, visibility, definition, value, executable-segment membership, and default GNU version namespace. The video trust owner certifies the reviewed 54-symbol catalog only when every name has one exact global function definition in its owning library's reviewed version namespace. Local, weak, hidden, protected, undefined, object, TLS, NOTYPE, GNU IFUNC, zero-value, non-executable, unversioned, non-default, wrong-version, duplicate, or ambiguous exports fail before a loader, dlsym, address projection, native invocation, encoder probe, codec, media, effect, cache, persistence, recovery, or publication path.
-  - Wave: 328
-  - _Wave: 328
+  - Wave: 329
+  - _Wave: 329
   - Dependencies: comfy-parity-native-video-codec-reviewed-abi-foundation
   - _Blocked_by: comfy-parity-native-video-codec-reviewed-abi-foundation
   - Reads: crates/comfy_runtime/src/native_ffi_elf.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/verify-bindings.c, crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json, crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json, crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json
@@ -10594,8 +10594,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 535. Bind retained FFmpeg 7.1 symbols and admit runtime versions
   - _id: comfy-parity-native-video-codec-symbol-binding-foundation
   - Outcome: The focused native video codec FFI owner consumes one exact retained and callable-certified FFmpeg closure, resolves all 54 reviewed symbols through their exact primary handles and GNU version namespaces, proves each defining retained image and certified load-bias-relative address, privately converts the addresses to the reviewed typed aliases, invokes only the five version functions, and admits only the exact FFmpeg 7.1 packed releases. The opaque thread-bound binding retains the complete load and exposes no handle, path, address, function pointer, encoder capability, codec/media authority, controller, effect, cache, persistence, recovery, or publication state.
-  - Wave: 329
-  - _Wave: 329
+  - Wave: 330
+  - _Wave: 330
   - Dependencies: comfy-parity-native-video-codec-callable-symbol-certification-foundation
   - _Blocked_by: comfy-parity-native-video-codec-callable-symbol-certification-foundation
   - Reads: crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_ffi_elf.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json, crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json, crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-callable-symbol-certification/manifest.json
@@ -10614,8 +10614,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 536. Own reviewed FFmpeg 7.1 video data-plane layouts
   - _id: comfy-parity-native-video-codec-data-plane-abi-foundation
   - Outcome: The private native video codec ABI owner extends the exact reviewed FFmpeg 7.1 x86_64 GNU contract with only the AVFrame, AVPacket, AVStream, AVFormatContext, and AVIOContext prefixes and constants needed by the first bounded in-memory video data plane. Every prefix remains allocation-opaque and may only describe FFmpeg-owned objects. The existing 54-symbol catalog is unchanged, and this prerequisite loads no library, resolves no address, invokes no native function, probes no codec, allocates no media, and owns no controller, effect, cache, persistence, recovery, or publication state.
-  - Wave: 330
-  - _Wave: 330
+  - Wave: 331
+  - _Wave: 331
   - Dependencies: comfy-parity-native-video-codec-symbol-binding-foundation
   - _Blocked_by: comfy-parity-native-video-codec-symbol-binding-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/verify-bindings.c, crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json
@@ -10634,8 +10634,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 537. Execute bounded retained FFmpeg memory I/O
   - _id: comfy-parity-native-video-codec-bounded-memory-avio-foundation
   - Outcome: The focused native video codec FFI owner borrows one exact retained FFmpeg binding and constructs bounded seekable in-memory AVIO input and output sessions through the certified av_malloc, av_free, avio_alloc_context, and avio_context_free functions. Stable boxed callback state, caller-authorized CPU workspace, checked BytesIO-compatible read, write, and seek callbacks, and reverse RAII cleanup keep every raw context, buffer, function pointer, and staged output private and attempt-local. This prerequisite opens no format, probes no encoder or decoder, executes no codec, and owns no media value, handle, cache, persistence, recovery, effect, or publication state.
-  - Wave: 331
-  - _Wave: 331
+  - Wave: 332
+  - _Wave: 332
   - Dependencies: comfy-parity-native-video-codec-data-plane-abi-foundation
   - _Blocked_by: comfy-parity-native-video-codec-data-plane-abi-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json
@@ -10654,8 +10654,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 538. Admit the retained LTXV H.264 codec pair
   - _id: comfy-parity-native-video-codec-ltxv-h264-admission-foundation
   - Outcome: The native video codec FFI owner consumes one exact retained FFmpeg binding, invokes the already certified registry lookups for the concrete libx264 encoder and H.264 decoder ID 27, proves both descriptors originate in the retained avcodec image, and retains the private non-null codec pair with the thread-bound binding for the following LTXV session. The signed package contract admits only concrete encoder implementation names, so the decoder-only h264 name is no longer misrepresented as an encoder. No codec context, frame, packet, format, AVIO, media value, handle, cache, persistence, recovery, effect, or publication state is created.
-  - Wave: 332
-  - _Wave: 332
+  - Wave: 333
+  - _Wave: 333
   - Dependencies: comfy-parity-native-video-codec-bounded-memory-avio-foundation
   - _Blocked_by: comfy-parity-native-video-codec-bounded-memory-avio-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json, crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json
@@ -10674,8 +10674,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 539. Encode retained LTXV H.264 frames into bounded MP4
   - _id: comfy-parity-native-video-codec-ltxv-h264-mp4-encode-foundation
   - Outcome: The retained LTXV H.264 codec owner synchronously converts one checked even RGB8 frame to YUV420P, configures the admitted libx264 encoder with source-exact CRF, veryfast preset, rate-one timing, one thread, and MP4 global headers, drains bounded packets into the canonical workspace-backed memory AVIO, and returns one opaque attempt-local encoded result. Every FFmpeg object is private, native calls are cancellation-bounded, packet and output growth are checked, reverse RAII converges scratch accounting, and no decoder, tensor adaptation, media payload, handle, cache, effect, persistence, recovery, or publication owner is introduced.
-  - Wave: 333
-  - _Wave: 333
+  - Wave: 334
+  - _Wave: 334
   - Dependencies: comfy-parity-native-video-codec-ltxv-h264-admission-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-h264-admission-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json
@@ -10694,8 +10694,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 540. Reopen retained LTXV H.264 MP4 streams
   - _id: comfy-parity-native-video-codec-ltxv-h264-mp4-demux-foundation
   - Outcome: The retained LTXV H.264 owner reopens only its own opaque staged MP4 through lifetime-bound borrowed memory AVIO, executes bounded libavformat auto-probe and header parsing, requires the exact single stream and already admitted H.264 decoder, and retains one private attempt-local demux session. The encoded allocation is never copied into an Arc, format cleanup precedes AVIO cleanup, caller scratch and cancellation bound every observable phase, and no packet decode, RGB result, media payload, cache, effect, persistence, recovery, or publication owner is introduced.
-  - Wave: 334
-  - _Wave: 334
+  - Wave: 335
+  - _Wave: 335
   - Dependencies: comfy-parity-native-video-codec-ltxv-h264-mp4-encode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-h264-mp4-encode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json
@@ -10714,8 +10714,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 541. Decode the first retained LTXV H.264 frame
   - _id: comfy-parity-native-video-codec-ltxv-h264-mp4-decode-foundation
   - Outcome: The retained LTXV H.264 demux session uses only its already admitted decoder and reviewed function table to read bounded packets, drive the send/receive and EOF flush protocol until the first yielded frame, convert that frame through swscale into caller-accounted contiguous CPU RGB8, and publish one canonical tensor only after cancellation and bounds checks. Packet, frame, codec, swscale, demux, and AVIO owners remain attempt-local and unwind in reverse order; no media payload, cache, effect, persistence, recovery, or publication owner is introduced.
-  - Wave: 335
-  - _Wave: 335
+  - Wave: 336
+  - _Wave: 336
   - Dependencies: comfy-parity-native-video-codec-ltxv-h264-mp4-demux-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-h264-mp4-demux-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-demux/manifest.json
@@ -10734,8 +10734,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 542. Apply retained LTXV H.264 preprocessing to IMAGE tensors
   - _id: comfy-parity-native-video-codec-ltxv-tensor-preprocess-foundation
   - Outcome: The retained LTXV H.264 codec composes the completed bounded encode, borrowed demux, and first-frame decode owners into one source-compatible CPU F32 BHWC IMAGE preprocessing operation. Compression zero produces the node's fresh stacked result without cropping or native calls; compression 1 through 100 processes frames serially with exact bottom-right even cropping, canonical source byte conversion, decoded RGB normalization, aggregate bounds, and one final publication after cancellation checks. No new FFI, tensor primitive, media payload, effect, cache, persistence, recovery, or publication owner is introduced.
-  - Wave: 336
-  - _Wave: 336
+  - Wave: 337
+  - _Wave: 337
   - Dependencies: comfy-parity-native-video-codec-ltxv-h264-mp4-decode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-h264-mp4-decode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-demux/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-decode/manifest.json
@@ -10754,8 +10754,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 543. Retain LTXV H.264 preprocessing on one codec thread
   - _id: comfy-parity-native-video-codec-ltxv-thread-service-foundation
   - Outcome: One bounded Send plus Sync proxy owns a named OS thread that alone consumes an already certified video dependency closure, loads and binds its isolated libraries, admits the exact LTXV H.264 codec pair, serializes caller-authorized IMAGE preprocessing, and destroys every intentionally thread-bound native object on that same thread. The source compression-zero adapter also accepts zero spatial dimensions without entering native code. No package discovery, node or executor injection, cache, media handle, effect, persistence, recovery, or publication owner is introduced.
-  - Wave: 337
-  - _Wave: 337
+  - Wave: 338
+  - _Wave: 338
   - Dependencies: comfy-parity-native-video-codec-ltxv-tensor-preprocess-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-tensor-preprocess-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/comfy_runtime.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_types/src/cancellation.rs, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json, crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-tensor-preprocess/manifest.json
@@ -10774,8 +10774,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 544. Inject retained LTXV preprocessing into native node services
   - _id: comfy-parity-native-video-codec-ltxv-node-service-foundation
   - Outcome: One domain-neutral Send plus Sync LTXV IMAGE preprocessing service port carries the retained codec-thread proxy through NativeNodeServices, ExecutionEngine, and NativeImageExecutor without moving native state across threads. The exact service configuration digest partitions runtime cache identity while every request preserves caller stream, scratch, and cancellation. No package discovery, worker startup, node implementation, codec duplication, media handle, effect, persistence, recovery, or publication owner is introduced.
-  - Wave: 338
-  - _Wave: 338
+  - Wave: 339
+  - _Wave: 339
   - Dependencies: comfy-parity-native-video-codec-ltxv-thread-service-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-thread-service-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/comfy_nodes.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/comfy_runtime.rs, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json
@@ -10794,8 +10794,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 545. Execute LTXV preprocessing as a native node
   - _id: comfy-parity-native-video-codec-ltxv-node-adapter-foundation
   - Outcome: The exact LTXVPreprocess native node resolves one canonical IMAGE handle, validates the source img_compression integer from zero through 100, invokes the injected retained LTXV service exactly once with the caller's compute authority, and publishes one fresh IMAGE handle only after service completion and cancellation checks. The node exposes no codec, package, path, pointer, media handle, effect, persistence, recovery, or output-committer authority.
-  - Wave: 339
-  - _Wave: 339
+  - Wave: 340
+  - _Wave: 340
   - Dependencies: comfy-parity-native-video-codec-ltxv-node-service-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-node-service-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_test_support/fixtures/video/codec-ltxv-node-service/manifest.json
@@ -10814,8 +10814,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 546. Create canonical video components as a native node
   - _id: comfy-parity-native-video-component-create-node-foundation
   - Outcome: The exact CreateVideo native node resolves one canonical IMAGE batch and optional AUDIO payload, converts the source fps float into its exact reduced Python-Fraction identity, admits only source bit depths 8 or 10, and publishes one canonical VIDEO payload that aliases the immutable component tensors without codec, path, effect, or persistence authority.
-  - Wave: 340
-  - _Wave: 340
+  - Wave: 341
+  - _Wave: 341
   - Dependencies: comfy-parity-native-video-codec-ltxv-node-adapter-foundation
   - _Blocked_by: comfy-parity-native-video-codec-ltxv-node-adapter-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, crates/comfy_media/src/native_node_payload.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs
@@ -10834,8 +10834,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 547. Extract canonical video components as a native node
   - _id: comfy-parity-native-video-component-extract-node-foundation
   - Outcome: The exact GetVideoComponents native node resolves one canonical materialized VIDEO, publishes IMAGE and optional AUDIO component aliases, returns the rational frame rate as a float and the exact 8/10-bit identity, and preserves source None through output-only typed Null. Contiguous F32 frames alias storage; admitted U8 or strided CPU frames materialize through canonical caller-authorized tensor operations. No codec, file demux, slice, effect, persistence, recovery, or external publication authority is introduced.
-  - Wave: 341
-  - _Wave: 341
+  - Wave: 342
+  - _Wave: 342
   - Dependencies: comfy-parity-native-video-component-create-node-foundation
   - _Blocked_by: comfy-parity-native-video-component-create-node-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, crates/comfy_media/src/native_node_payload.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/families/video_01.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_test_support/fixtures/nodes/video-comfy-node-0124/fixture.json
@@ -10854,8 +10854,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 548. Execute source-exact frame-interpolation sequence fallback
   - _id: comfy-parity-native-frame-interpolation-sequence-fallback-foundation
   - Outcome: The retained frame-interpolation model executes the pinned attempt-local sequence fallback policy over its already admitted FILM and RIFE graphs. FILM tries multi-timestep synthesis once and disables it after typed resource exhaustion; multiplier two can retry the scalar path, while larger fallback batches preserve the pinned source scalarization failure as a non-retryable execution error. RIFE starts with multiplier-minus-one timesteps, retries only typed exhaustion with floor-halved batches that persist across pairs, and propagates the original typed exhaustion at batch one. Cancellation dominates every retry, failed attempt temporaries remain local, and only a complete fresh BHWC result escapes; no node, handle, cache, allocator, effect, codec, or publication owner is introduced.
-  - Wave: 342
-  - _Wave: 342
+  - Wave: 343
+  - _Wave: 343
   - Dependencies: comfy-parity-native-video-component-extract-node-foundation, comfy-parity-native-frame-interpolation-resource-exhaustion-foundation
   - _Blocked_by: comfy-parity-native-video-component-extract-node-foundation, comfy-parity-native-frame-interpolation-resource-exhaustion-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, projects/comfy/ComfyUI/comfy/model_management.py, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/invocation/manifest.json, crates/comfy_test_support/fixtures/models/frame-interpolation/film-multi-timestep/manifest.json, crates/comfy_test_support/fixtures/models/frame-interpolation/film-sequence/manifest.json, crates/comfy_test_support/fixtures/models/frame-interpolation/rife-execution/manifest.json, crates/comfy_test_support/fixtures/models/frame-interpolation/rife-sequence/manifest.json, crates/comfy_test_support/fixtures/models/frame-interpolation/resource-exhaustion/manifest.json
@@ -10874,8 +10874,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 549. Execute the source-exact FrameInterpolate native node
   - _id: comfy-parity-native-frame-interpolate-node-foundation
   - Outcome: The exact FrameInterpolate native node resolves canonical INTERP_MODEL and IMAGE handles, preserves the source identity bypass for batches below two without compute or publication, and otherwise bridges the canonical CPU F32 BHWC IMAGE to the retained model dtype before delegating once to the completed frame-interpolation sequence owner. It converts only the complete clamped result back to canonical CPU F32 IMAGE and publishes it atomically. The adapter introduces no checkpoint loader, model equation, retry scheduler, allocator, codec, effect, progress, cache, persistence, recovery, or external publication owner.
-  - Wave: 343
-  - _Wave: 343
+  - Wave: 344
+  - _Wave: 344
   - Dependencies: comfy-parity-native-frame-interpolation-sequence-fallback-foundation
   - _Blocked_by: comfy-parity-native-frame-interpolation-sequence-fallback-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py, projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py, projects/comfy/ComfyUI/comfy/model_management.py, .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/families/video_01.rs, crates/comfy_test_support/fixtures/models/frame-interpolation/sequence-fallback/manifest.json, crates/comfy_test_support/fixtures/models/frame-interpolation/resource-exhaustion/manifest.json
@@ -10894,8 +10894,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 550. Admit the retained native video codec suite
   - _id: comfy-parity-native-video-codec-suite-admission-foundation
   - Outcome: One thread-affine NativeVideoCodecSuite retains the existing admitted libx264/H.264 pair and the same certified binding while invoking exact registry admission for AAC, SVT-AV1, and VP9 encoders plus AAC, VP9, and AV1 decoders. Every descriptor is non-null, provider-proved against the retained avcodec image, and private to the sole FFI owner. The retained LTXV codec thread now owns this suite and delegates its completed preprocessing path through it; no second loader, binding, namespace, codec context, media payload, effect, cache, persistence, recovery, or publication owner is introduced.
-  - Wave: 344
-  - _Wave: 344
+  - Wave: 345
+  - _Wave: 345
   - Dependencies: comfy-parity-native-frame-interpolate-node-foundation
   - _Blocked_by: comfy-parity-native-frame-interpolate-node-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json
@@ -10914,8 +10914,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 551. Encode one bounded RGB8 frame to VP9 WebM
   - _id: comfy-parity-native-video-codec-vp9-webm-encode-foundation
   - Outcome: NativeVideoCodecSuite consumes its provider-proved libvpx-vp9 descriptor to encode one checked contiguous CPU RGB8 frame into bounded in-memory WebM at a checked reduced frame rate and CRF. It configures RGB24 to YUV420P, zero bit rate, exact packet drain and terminal flush/trailer semantics, caller workspace-backed AVIO, cancellation around every native call, and attempt-local reverse RAII. Batch tensors, alpha, AV1, AAC/audio, metadata, paths, effects, handles, publication, persistence, and recovery remain later owners.
-  - Wave: 345
-  - _Wave: 345
+  - Wave: 346
+  - _Wave: 346
   - Dependencies: comfy-parity-native-video-codec-suite-admission-foundation
   - _Blocked_by: comfy-parity-native-video-codec-suite-admission-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_test_support/fixtures/video/codec-plan/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-suite-admission/manifest.json
@@ -10934,8 +10934,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 552. Encode bounded IMAGE sequences to VP9 WebM
   - _id: comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation
   - Outcome: NativeVideoCodecSuite encodes one checked nonempty contiguous CPU F32 BHWC three-channel IMAGE batch into a single bounded in-memory VP9 WebM session. It clamps and truncates one frame at a time to source-compatible RGB8, reuses one YUV frame, conversion context, codec, packet, stream, format, and AVIO owner, assigns increasing frame PTS, drains packets after every frame, and flushes and writes the trailer exactly once. Prompt and extra metadata, alpha, AV1, AAC/audio, the owned codec-thread byte bridge, paths, effects, handles, publication, persistence, and recovery remain later owners.
-  - Wave: 346
-  - _Wave: 346
+  - Wave: 347
+  - _Wave: 347
   - Dependencies: comfy-parity-native-video-codec-vp9-webm-encode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-vp9-webm-encode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_test_support/fixtures/video/codec-plan/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json
@@ -10954,8 +10954,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 553. Return owned VP9 WebM bytes from the retained codec thread
   - _id: comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation
   - Outcome: The sole retained native video codec actor accepts checked VP9 IMAGE-batch requests, executes the completed bounded WebM session on its codec-owning thread, copies the exact staged bytes once into a contiguous CPU U8 tensor, and drops every borrowed FFmpeg and AVIO owner before returning only portable bytes, dimensions, frame rate, frame count, and content digest. Caller scratch converges before the response; prompt and extra metadata, alpha, AV1, AAC/audio, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 347
-  - _Wave: 347
+  - Wave: 348
+  - _Wave: 348
   - Dependencies: comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json
@@ -10974,8 +10974,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 554. Preserve source VP9 WebM CRF values through retained execution
   - _id: comfy-parity-native-video-codec-vp9-webm-crf-foundation
   - Outcome: The canonical native video codec plan preserves one finite source WebM CRF value from 0 through 63 as exact f64 bits, including negative zero. The sole retained codec actor carries that checked value unchanged to the VP9 session, which renders a bounded source-compatible floating option before avcodec_open2 without widening the separate integer LTXV H.264 contract. Metadata, alpha, AV1, AAC/audio, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 348
-  - _Wave: 348
+  - Wave: 349
+  - _Wave: 349
   - Dependencies: comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation
   - _Blocked_by: comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_test_support/fixtures/video/codec-plan/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json
@@ -10994,8 +10994,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 555. Attach bounded VP9 WebM container metadata
   - _id: comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation
   - Outcome: One supplementary compiler-verified FFmpeg 7.1 projection exposes only AVFormatContext.metadata while preserving the historical 56-byte data-plane prefix. A bounded ordered pre-serialized metadata value crosses the sole retained codec actor and attaches with flags zero before VP9 WebM stream and header creation; format-context RAII owns all partial and complete native dictionaries. JSON serialization, alpha, AV1, AAC/audio, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 349
-  - _Wave: 349
+  - Wave: 350
+  - _Wave: 350
   - Dependencies: comfy-parity-native-video-codec-vp9-webm-crf-foundation
   - _Blocked_by: comfy-parity-native-video-codec-vp9-webm-crf-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c, crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-crf/manifest.json
@@ -11014,8 +11014,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 556. Preserve source VP9 WebM alpha through retained execution
   - _id: comfy-parity-native-video-codec-vp9-webm-alpha-foundation
   - Outcome: The retained VP9 WebM IMAGE-sequence session and sole codec actor accept source-compatible four-channel CPU F32 BHWC input, clamp and truncate packed RGBA bytes, select compiler-verified RGBA-to-YUVA420P conversion, preserve floating CRF and ordered metadata, and return portable encoded bytes plus a checked alpha projection. The opaque RGB profile remains unchanged. Installed codec, playable or decoded numeric evidence, AV1, AAC/audio, JSON, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 350
-  - _Wave: 350
+  - Wave: 351
+  - _Wave: 351
   - Dependencies: comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation
   - _Blocked_by: comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json, crates/comfy_runtime/abi/video-codec/verify-container-metadata-bindings.c, crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-crf/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json
@@ -11034,8 +11034,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 557. Encode bounded opaque AV1 WebM IMAGE sequences
   - _id: comfy-parity-native-video-codec-av1-webm-sequence-encode-foundation
   - Outcome: The retained native codec suite executes bounded AV1 WebM IMAGE sequences through its provider-proved libsvtav1 descriptor. It stages the first three channels of canonical CPU F32 BHWC input as packed RGB8, compiler-verifies YUV420P10LE, preserves exact floating CRF text and ordered container metadata, applies preset 6 and the required global-header contract, and returns attempt-local encoded bytes after one flush and trailer. Actor transport, installed codec or playable numeric evidence, alpha preservation, AAC/audio, JSON, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 351
-  - _Wave: 351
+  - Wave: 352
+  - _Wave: 352
   - Dependencies: comfy-parity-native-video-codec-vp9-webm-alpha-foundation
   - _Blocked_by: comfy-parity-native-video-codec-vp9-webm-alpha-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json, crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json, crates/comfy_runtime/abi/video-codec/verify-container-metadata-bindings.c, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-vp9-alpha-v1.json, crates/comfy_runtime/abi/video-codec/verify-vp9-alpha-bindings.c, crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-crf/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-alpha/manifest.json
@@ -11054,8 +11054,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 558. Carry owned AV1 WebM bytes through the retained codec actor
   - _id: comfy-parity-native-video-codec-av1-webm-thread-bridge-foundation
   - Outcome: The sole capacity-one retained codec actor carries checked AV1 IMAGE batches, exact reduced rates, CRF bits, bounded ordered metadata, caller scratch, stream, and cancellation to the native owner thread. It invokes the retained AV1 WebM sequence primitive, drops every borrowed native and AVIO owner on that thread, performs one shared exact-length CPU U8 Tensor copy, and returns portable bytes with digest, dimensions, rate, frame count, ten-bit YUV420P10LE identity, and no alpha. Installed codec or playable numeric evidence, JSON, node services, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 352
-  - _Wave: 352
+  - Wave: 353
+  - _Wave: 353
   - Dependencies: comfy-parity-native-video-codec-av1-webm-sequence-encode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-av1-webm-sequence-encode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json, crates/comfy_test_support/fixtures/video/codec-av1-webm-sequence-encode/manifest.json
@@ -11074,8 +11074,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 559. Inject retained VP9/AV1 WebM encoding into native node execution
   - _id: comfy-parity-native-video-codec-webm-node-service-foundation
   - Outcome: One checked Send+Sync WebM encoding service moves canonical IMAGE requests, VP9/AV1 codec identity, reduced frame rate, exact CRF bits, ordered serialized metadata, caller scratch, stream, and cancellation through the sole retained codec actor. NativeNodeServices, ExecutionEngine, and NativeImageExecutor carry the service without re-owning codec state; the existing exact-length CPU U8 Tensor crosses the portable boundary without another byte copy; and the actor plus all configured batch, session, and metadata limits bind execution/cache identity. JSON serialization, SaveWEBM descriptors, effects, paths, handles, persistence, recovery, and publication remain later owners.
-  - Wave: 353
-  - _Wave: 353
+  - Wave: 354
+  - _Wave: 354
   - Dependencies: comfy-parity-native-video-codec-av1-webm-thread-bridge-foundation
   - _Blocked_by: comfy-parity-native-video-codec-av1-webm-thread-bridge-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/comfy_nodes.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/comfy_runtime.rs, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-alpha/manifest.json, crates/comfy_test_support/fixtures/video/codec-av1-webm-thread-bridge/manifest.json
@@ -11092,8 +11092,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 560. Prepare and publish native SaveWEBM output
   - _id: comfy-parity-native-video-save-webm-node-foundation
   - Outcome: The source-exact experimental SaveWEBM node resolves one canonical IMAGE handle, applies Python ties-even millisecond frame-rate rounding, preserves floating CRF bits, serializes prompt then insertion-ordered extra_pnginfo metadata, and delegates VP9/AV1 encoding to the retained WebM node service. It copies the portable encoded Tensor once into one bounded Output/webm/video-webm prepared effect, returns the identical IMAGE handle with a PreviewVideo transaction projection, and reverses the prepared ticket on late cancellation or invalid completion. Codec lifetimes, output commit/recovery, paths, handles, caches, and persistence remain with their existing owners.
-  - Wave: 354
-  - _Wave: 354
+  - Wave: 355
+  - _Wave: 355
   - Dependencies: comfy-parity-native-video-codec-webm-node-service-foundation
   - _Blocked_by: comfy-parity-native-video-codec-webm-node-service-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_io.py, projects/comfy/ComfyUI/comfy_api/latest/_ui.py, crates/comfy_media/src/video.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/families/video_01.rs, crates/comfy_runtime/src/prompt_compiler.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_test_support/fixtures/video/codec-webm-node-service/manifest.json
@@ -11112,8 +11112,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 561. Encode bounded 8-bit component IMAGE sequences to H.264 MP4
   - _id: comfy-parity-native-video-codec-h264-mp4-sequence-encode-foundation
   - Outcome: The retained video codec suite encodes one bounded nonempty contiguous CPU F32 BHWC IMAGE sequence with three or four channels into one attempt-local in-memory H.264 MP4. It clamps and truncates the first three channels to packed RGB8, discards alpha, preserves the checked reduced frame rate and source order, drains packets after every frame, flushes once, and uses the ordinary provider-proved libx264 profile without LTXV-specific CRF or preset options. Ten-bit video, audio, metadata, actor transport, nodes, encoded backing, slicing, effects, handles, caches, persistence, recovery, and publication remain later owners.
-  - Wave: 355
-  - _Wave: 355
+  - Wave: 356
+  - _Wave: 356
   - Dependencies: comfy-parity-native-video-save-webm-node-foundation
   - _Blocked_by: comfy-parity-native-video-save-webm-node-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_test_support/fixtures/video/codec-plan/manifest.json, crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-suite-admission/manifest.json
@@ -11132,8 +11132,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 562. Carry owned H.264 MP4 bytes through the retained codec actor
   - _id: comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation
   - Outcome: The sole capacity-one retained codec actor carries checked H.264 IMAGE batches, exact reduced rates, bounded sequence limits, caller scratch, stream, and cancellation to the native owner thread. It invokes the retained H.264 MP4 sequence primitive, drops every borrowed native and AVIO owner on that thread, performs one shared exact-length CPU U8 Tensor copy, and returns portable bytes with digest, dimensions, rate, frame count, eight-bit YUV420P identity, and no alpha. Installed codec or playable numeric evidence, ten-bit video, AAC/audio, metadata, node services, encoded backing, slicing, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 356
-  - _Wave: 356
+  - Wave: 357
+  - _Wave: 357
   - Dependencies: comfy-parity-native-video-codec-h264-mp4-sequence-encode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-h264-mp4-sequence-encode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json, crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-av1-webm-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-h264-mp4-sequence-encode/manifest.json
@@ -11152,8 +11152,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 563. Materialize bounded H.264 MP4 backing for component VIDEO
   - _id: comfy-parity-native-video-component-h264-mp4-backing-service-foundation
   - Outcome: A checked native-node service accepts one canonical materialized component VIDEO, derives the canonical metadata-free 8-bit H.264 MP4 encode plan under fixed service limits, and carries its immutable IMAGE storage through the sole retained codec actor. It moves the actor-owned CPU U8 Tensor without another encoded-byte copy into a checked portable backing bound to the source VIDEO semantic digest, content digest, dimensions, reduced rate, frame count, MP4/H.264/YUV420P identity, and no alpha. Ten-bit video, AAC/audio, container metadata, file-backed VIDEO representation, trim windows, slicing, save effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 357
-  - _Wave: 357
+  - Wave: 358
+  - _Wave: 358
   - Dependencies: comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation
   - _Blocked_by: comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/comfy_nodes.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/comfy_runtime.rs, crates/comfy_test_support/fixtures/video/components/manifest.json, crates/comfy_test_support/fixtures/video/codec-plan/manifest.json, crates/comfy_test_support/fixtures/video/codec-h264-mp4-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/codec-h264-mp4-thread-bridge/manifest.json
@@ -11172,8 +11172,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 564. Represent component and encoded VIDEO backings canonically
   - _id: comfy-parity-native-video-backing-representation-foundation
   - Outcome: The canonical VIDEO media payload is a closed tagged representation of either materialized components or one path-free encoded backing. The completed component H.264 MP4 service moves its actor-owned CPU U8 Tensor directly into the narrow encoded variant, binding fixed MP4/H.264/YUV420P/eight-bit/no-audio/no-alpha identity, source VIDEO semantic digest, content digest, dimensions, reduced rate, and frame count without a second byte copy. The existing VIDEO handle kind remains singular, while component-only codec planning, GetVideoComponents, provider materialization, and plugin projection reject encoded backing until their later decode owners exist. Trim windows, ten-bit H.264, AAC/audio, container metadata, file/path ingest, demux/decode, VideoSlice, SaveVideo effects, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 358
-  - _Wave: 358
+  - Wave: 359
+  - _Wave: 359
   - Dependencies: comfy-parity-native-video-component-h264-mp4-backing-service-foundation
   - _Blocked_by: comfy-parity-native-video-component-h264-mp4-backing-service-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/video.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/families/video_01.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/provider_materialization.rs, crates/comfy_plugin_host/src/registry_adapter.rs, crates/comfy_test_support/fixtures/video/components/manifest.json, crates/comfy_test_support/fixtures/video/component-h264-mp4-backing-service/manifest.json
@@ -11192,8 +11192,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 565. Encode bounded ten-bit component IMAGE sequences to H.264 MP4
   - _id: comfy-parity-native-video-codec-h264-mp4-10bit-sequence-encode-foundation
   - Outcome: The retained provider-proved libx264 suite encodes bounded CPU F32 BHWC three- or four-channel component IMAGE sequences through the existing one-session H.264 MP4 state machine at ten-bit depth. It stages only the first three channels as source-compatible clamped and truncated little-endian RGB48LE, converts to compiler-reviewed YUV420P10LE, preserves exact reduced rate, frame order, packet bounds, flush, trailer, cancellation, reverse cleanup, and retry semantics, and leaves the reviewed 54-symbol table unchanged. Actor transport, canonical encoded backing, AAC/audio, metadata, trim windows, VideoSlice, SaveVideo effects, paths, handles, cache, persistence, recovery, publication, and installed/playable/numeric codec evidence remain later owners.
-  - Wave: 359
-  - _Wave: 359
+  - Wave: 360
+  - _Wave: 360
   - Dependencies: comfy-parity-native-video-backing-representation-foundation
   - _Blocked_by: comfy-parity-native-video-backing-representation-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/image_ops.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-av1-pixel-format-v1.json, crates/comfy_runtime/abi/video-codec/verify-av1-pixel-format-bindings.c, crates/comfy_test_support/fixtures/video/codec-h264-mp4-sequence-encode/manifest.json, crates/comfy_test_support/fixtures/video/encoded-video-backing-payload/manifest.json
@@ -11212,8 +11212,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 566. Carry owned ten-bit H.264 MP4 bytes through the retained codec actor
   - _id: comfy-parity-native-video-codec-h264-mp4-10bit-thread-bridge-foundation
   - Outcome: The sole capacity-one retained codec actor carries checked ten-bit H.264 IMAGE batches, exact reduced rates, bounded sequence limits, caller scratch, stream, and cancellation to the native owner thread. One closed bit-depth request selects the completed ten-bit retained session, drops every borrowed native and AVIO owner on that thread, reuses the shared exact-length CPU U8 Tensor copy, and returns portable bytes with digest, dimensions, rate, frame count, ten-bit YUV420P10LE identity, and no alpha. Eight-bit H.264, LTXV, VP9, AV1, and component-backing behavior remain unchanged; ten-bit encoded VIDEO backing, AAC/audio, metadata, slicing, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 360
-  - _Wave: 360
+  - Wave: 361
+  - _Wave: 361
   - Dependencies: comfy-parity-native-video-codec-h264-mp4-10bit-sequence-encode-foundation
   - _Blocked_by: comfy-parity-native-video-codec-h264-mp4-10bit-sequence-encode-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_test_support/fixtures/video/codec-h264-mp4-thread-bridge/manifest.json, crates/comfy_test_support/fixtures/video/codec-h264-mp4-10bit-sequence-encode/manifest.json
@@ -11232,8 +11232,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 567. Materialize ten-bit H.264 MP4 backing for component VIDEO
   - _id: comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation
   - Outcome: The existing checked component H.264 MP4 backing service admits the closed eight- and ten-bit component VIDEO profiles without a second service, actor, or payload owner. It derives depth from the canonical source, selects the matching retained actor operation, validates the actual YUV420P or YUV420P10LE projection, and moves the actor-owned CPU U8 Tensor into the canonical encoded VIDEO representation without another encoded-byte copy. Existing eight-bit semantic identity remains byte-stable; AAC/audio, metadata, trim windows, slicing, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.
-  - Wave: 361
-  - _Wave: 361
+  - Wave: 362
+  - _Wave: 362
   - Dependencies: comfy-parity-native-video-codec-h264-mp4-10bit-thread-bridge-foundation
   - _Blocked_by: comfy-parity-native-video-codec-h264-mp4-10bit-thread-bridge-foundation
   - Reads: projects/comfy/ComfyUI/requirements.txt, projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/video.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_test_support/fixtures/video/component-h264-mp4-backing-service/manifest.json, crates/comfy_test_support/fixtures/video/encoded-video-backing-payload/manifest.json, crates/comfy_test_support/fixtures/video/codec-h264-mp4-10bit-thread-bridge/manifest.json
@@ -11252,8 +11252,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 568. Review the general native video codec ABI
   - _id: comfy-parity-native-video-codec-general-abi-foundation
   - Outcome: Extend the existing reviewed FFmpeg 7.1 ABI beyond its encode and LTXV subset with the exact bounded demux, general decode, seek, remux, rotation, AAC resampling, alignment, and pre-conversion padding/filter declarations required by the pinned video source. Preserve every existing H.264 and WebM ABI identity and admit no library or availability claim from declarations alone.
-  - Wave: 362
-  - _Wave: 362
+  - Wave: 363
+  - _Wave: 363
   - Dependencies: comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation, comfy-parity-native-node-v3-presentation-catalog-closure, comfy-parity-native-backend-dependency-ledger-current-lock-repair
   - _Blocked_by: comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation, comfy-parity-native-node-v3-presentation-catalog-closure, comfy-parity-native-backend-dependency-ledger-current-lock-repair
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_ffi_elf.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/abi/video-codec
@@ -11272,8 +11272,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 569. Bootstrap the signed native video codec package
   - _id: comfy-parity-native-video-codec-package-bootstrap-foundation
   - Outcome: Add one explicit runtime-profile codec package authority, independently of compute backend selection, and use it to verify the canonical signed FFmpeg package and dependency closure before starting the sole thread-affine codec actor inside the worker. Inject the existing LTXV, WebM, and H.264 service ports through the normal executor configuration and bind the package identity into cache configuration without a downloader or private signing key.
-  - Wave: 363
-  - _Wave: 363
+  - Wave: 364
+  - _Wave: 364
   - Dependencies: comfy-parity-native-video-codec-general-abi-foundation
   - _Blocked_by: comfy-parity-native-video-codec-general-abi-foundation
   - Reads: crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-general-video-v1.json, crates/comfy_runtime/src/native_ffi_elf.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/settings.rs, crates/comfy_runtime/src/runtime_supervisor.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_model/src/artifact_index.rs, crates/comfy_media/src/video.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_worker/src/comfy_worker_main.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_worker/src/memory_modes.rs, crates/comfy_worker/src/memory_planner.rs, crates/comfy_worker/src/supervisor.rs, .agents/specs/comfy-parity/generate_ownership_catalog.py, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs, crates/comfy_test_support/tests/native_release_boundary.rs, crates/comfy_test_support/fixtures/video/codec-general-video-abi/manifest.json, crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json, crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json, crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-callable-symbol-certification/manifest.json, crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json, crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json, crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json, crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json, crates/comfy_test_support/fixtures/video/codec-suite-admission/manifest.json, crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json, crates/comfy_test_support/fixtures/video/codec-webm-node-service/manifest.json, crates/comfy_test_support/fixtures/video/component-h264-mp4-backing-service/manifest.json
@@ -11292,8 +11292,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [~] 570. Demux and decode sealed native video bytes
   - _id: comfy-parity-native-video-demux-decode-foundation
   - Outcome: Implement bounded in-memory MP4/H.264 and WebM VP9 or AV1 demux and full-sequence decode through the retained codec actor. Select the first video stream and last decodable audio stream, retain typed diagnostics for skipped unsupported streams, recover exact rate, depth, alpha, metadata, rotation, and AAC samples, and reproduce the source pre-conversion pad/smear/crop behavior without paths or subprocesses.
-  - Wave: 364
-  - _Wave: 364
+  - Wave: 365
+  - _Wave: 365
   - Dependencies: comfy-parity-native-video-codec-package-bootstrap-foundation
   - _Blocked_by: comfy-parity-native-video-codec-package-bootstrap-foundation
   - Reads: projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input/basic_types.py, projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py, projects/comfy/ComfyUI/requirements.txt, .agents/specs/comfy-parity/baseline.md, crates/comfy_model/src/artifact_index.rs, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_package.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/trust.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/video.rs, crates/comfy_tensor/src/cpu_backend.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_test_support/tests/video_codec_package_bootstrap.rs
@@ -11312,8 +11312,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 571. Retain sealed video sources and immutable slice views
   - _id: comfy-parity-native-video-source-slice-materialization-foundation
   - Outcome: Generalize canonical encoded VIDEO beyond the fixed H.264 profile while keeping its existing semantic identity byte-stable. Retain sealed bytes and checked probe identity, never a path; add alias-aware immutable trim views with source-exact negative start, nested composition, zero-duration-to-EOF, and strict-duration rules; and extend canonical worker asset collection and decode materialization for LoadVideo and encoded GetVideoComponents without a second asset owner.
-  - Wave: 365
-  - _Wave: 365
+  - Wave: 366
+  - _Wave: 366
   - Dependencies: comfy-parity-native-video-demux-decode-foundation
   - _Blocked_by: comfy-parity-native-video-demux-decode-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/families/video_01.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/comfy_worker.rs
@@ -11330,8 +11330,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 572. Save, remux, and publish native video outputs
   - _id: comfy-parity-native-video-save-remux-audio-effects-foundation
   - Outcome: Implement source-exact SaveVideo remux and transcode policy over sealed VIDEO. Packet-copy only when container, codec, depth, and no-trim constraints match; otherwise materialize and encode MP4/H.264 at the retained depth, map AAC layouts and exact sample caps, merge source and explicit metadata under the global suppression policy, and delegate nested-prefix preparation, commit, rollback, recovery, and UI projection to the existing output committer.
-  - Wave: 366
-  - _Wave: 366
+  - Wave: 367
+  - _Wave: 367
   - Dependencies: comfy-parity-native-video-source-slice-materialization-foundation
   - _Blocked_by: comfy-parity-native-video-source-slice-materialization-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/output_committer.rs
@@ -11348,8 +11348,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 573. Implement native video codecs, transforms, effects, and frame interpolation
   - _id: comfy-parity-native-video-execution-foundation
   - Outcome: Close the canonical native video foundation after the reviewed codec ABI, signed package bootstrap, full demux/decode, sealed source and slice representation, and save/remux/audio/effect phases are complete. Reuse the separately owned concrete frame-interpolation model loader and existing FrameInterpolate execution; this task is validation and ownership closure, not a second codec, model loader, node registry, output committer, or payload owner.
-  - Wave: 367
-  - _Wave: 367
+  - Wave: 368
+  - _Wave: 368
   - Dependencies: comfy-parity-native-video-save-remux-audio-effects-foundation, comfy-parity-native-nodes-model-loaders-comfy-node-0012
   - _Blocked_by: comfy-parity-native-video-save-remux-audio-effects-foundation, comfy-parity-native-nodes-model-loaders-comfy-node-0012
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_video.py, projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py, projects/comfy/ComfyUI/comfy_extras/nodes_lt.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py, crates/comfy_runtime/src/native_video_codec_abi.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_model/src/frame_interpolation.rs, crates/comfy_nodes/src/families/video_01.rs, crates/comfy_runtime/src/output_committer.rs
@@ -11366,8 +11366,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 574. Retain ordered path-free asset directory snapshots
   - _id: comfy-parity-native-asset-directory-snapshot-foundation
   - Outcome: Extend the sole authorized asset service with an immutable path-free directory snapshot that preserves source enumeration order, entry kind, nested repeat-folder identity, and caption-file references without exposing a host path or creating a second scanner.
-  - Wave: 373
-  - _Wave: 373
+  - Wave: 374
+  - _Wave: 374
   - Dependencies: comfy-parity-native-detection-execution-foundation, comfy-parity-native-media-text-rendering-foundation, comfy-parity-native-nodes-utilities-comfy-node-0077
   - _Blocked_by: comfy-parity-native-detection-execution-foundation, comfy-parity-native-media-text-rendering-foundation, comfy-parity-native-nodes-utilities-comfy-node-0077
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_runtime/src/persistence.rs
@@ -11384,8 +11384,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 575. Project bounded node progress text through execution
   - _id: comfy-parity-native-node-progress-text-foundation
   - Outcome: Add one bounded attempt- and node-scoped text progress event to the canonical execution owner, private-worker wire, API/WebSocket presentation, and GPUI projection so source nodes can publish live text without a leaf-owned event bus or an untracked side channel.
-  - Wave: 374
-  - _Wave: 374
+  - Wave: 375
+  - _Wave: 375
   - Dependencies: comfy-parity-native-asset-directory-snapshot-foundation
   - _Blocked_by: comfy-parity-native-asset-directory-snapshot-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_images.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/queue_history.rs, crates/comfy_runtime/src/execution_presentation.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_api/src/websocket.rs, crates/comfy_ui/src/execution_model.rs, crates/comfy_worker/src/comfy_worker.rs
@@ -11402,8 +11402,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 576. Decode sealed raster and visual-stream assets
   - _id: comfy-parity-native-visual-asset-decode-foundation
   - Outcome: Implement one injected path-free visual decode service over sealed asset bytes. It reuses the retained native video decoder for the first visual stream and owns bounded PNG, JPEG, static or animated WebP, EXIF orientation, RGB, raw alpha, and source frame filtering without putting codec logic in image-family leaves.
-  - Wave: 375
-  - _Wave: 375
+  - Wave: 376
+  - _Wave: 376
   - Dependencies: comfy-parity-native-node-progress-text-foundation, comfy-parity-native-image-source-compatibility-foundation, comfy-parity-native-video-execution-foundation
   - _Blocked_by: comfy-parity-native-node-progress-text-foundation, comfy-parity-native-image-source-compatibility-foundation, comfy-parity-native-video-execution-foundation
   - Reads: projects/comfy/ComfyUI/nodes.py, projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, projects/comfy/ComfyUI/comfy_extras/nodes_painter.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/png.rs, crates/comfy_media/src/video.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -11420,8 +11420,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 577. Encode and prepare native image output effects
   - _id: comfy-parity-native-image-output-codec-effect-foundation
   - Outcome: Extend the canonical image codec and prepared-effect service with source-compatible APNG, animated WebP, PNG8/PNG16, EXR32, and SVG output plans while leaving naming, collision policy, journaling, publication, and UI projection to OutputCommitter.
-  - Wave: 377
-  - _Wave: 377
+  - Wave: 378
+  - _Wave: 378
   - Dependencies: comfy-parity-native-visual-asset-decode-foundation, comfy-parity-native-nodes-image-comfy-node-0160
   - _Blocked_by: comfy-parity-native-visual-asset-decode-foundation, comfy-parity-native-nodes-image-comfy-node-0160
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_images.py, projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, projects/comfy/ComfyUI/comfy_extras/nodes_webcam.py, projects/comfy/ComfyUI/comfy_api/latest/_ui.py, crates/comfy_media/src/image_codec.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -11438,8 +11438,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 578. Journal source-compatible dataset output policies
   - _id: comfy-parity-native-dataset-output-policy-foundation
   - Outcome: Add sealed cataloged dataset publication policies to OutputCommitter. Reject-only remains the default; exact source rows may select journaled overwrite or countered publication, including atomic paired image-and-caption output, without exposing replacement authority to node leaves.
-  - Wave: 378
-  - _Wave: 378
+  - Wave: 379
+  - _Wave: 379
   - Dependencies: comfy-parity-native-image-output-codec-effect-foundation
   - _Blocked_by: comfy-parity-native-image-output-codec-effect-foundation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, projects/comfy/ComfyUI/nodes.py, crates/comfy_nodes/src/execution.rs, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_runtime/src/recovery.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -11456,8 +11456,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 579. Decode, encode, and publish native audio assets
   - _id: comfy-parity-native-audio-output-codec-effect-foundation
   - Outcome: Extend one checked retained native audio codec/effect service with source-exact first-audio-stream decoding for LoadAudio and RecordAudio and FLAC, MP3, and Opus encoding for preview and save nodes, reusing the retained codec actor and canonical output committer rather than accepting pre-encoded bytes or leaf-local containers.
-  - Wave: 380
-  - _Wave: 380
+  - Wave: 381
+  - _Wave: 381
   - Dependencies: comfy-parity-native-audio-empty-segment-foundation, comfy-parity-native-video-execution-foundation, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-native-detection-execution-foundation, comfy-parity-native-nodes-image-detection-comfy-node-0136, comfy-parity-native-media-text-rendering-foundation, comfy-parity-native-nodes-utilities-comfy-node-0077, comfy-parity-native-nodes-image-comfy-node-0586
   - _Blocked_by: comfy-parity-native-audio-empty-segment-foundation, comfy-parity-native-video-execution-foundation, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-native-detection-execution-foundation, comfy-parity-native-nodes-image-detection-comfy-node-0136, comfy-parity-native-media-text-rendering-foundation, comfy-parity-native-nodes-utilities-comfy-node-0077, comfy-parity-native-nodes-image-comfy-node-0586
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_audio.py, projects/comfy/ComfyUI/comfy_api/latest/_ui.py, crates/comfy_media/src/metadata.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/comfy_nodes.rs, crates/comfy_runtime/src/native_video_codec_ffi.rs, crates/comfy_runtime/src/native_video_codec_service.rs, crates/comfy_runtime/src/executor.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -11474,8 +11474,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 580. Retarget native diffusion resources through checked reconstruction
   - _id: comfy-parity-native-diffusion-device-retarget-foundation
   - Outcome: Add one runtime-injected, path-free native diffusion placement service that enumerates source-compatible targets and reconstructs immutable MODEL, CLIP, and VAE resources on an admitted target while preserving their artifact, patch, conditioning, execution, routing, residency, cache, and persistence identities.
-  - Wave: 382
-  - _Wave: 382
+  - Wave: 383
+  - _Wave: 383
   - Dependencies: comfy-parity-native-model-accelerator-execution-foundation, comfy-parity-native-audio-output-codec-effect-foundation, comfy-parity-native-nodes-audio-comfy-node-0009, comfy-parity-native-model-resource-service-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-memory-planner
   - _Blocked_by: comfy-parity-native-model-accelerator-execution-foundation, comfy-parity-native-audio-output-codec-effect-foundation, comfy-parity-native-nodes-audio-comfy-node-0009, comfy-parity-native-model-resource-service-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-memory-planner
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_multigpu.py, projects/comfy/ComfyUI/comfy/model_management.py, projects/comfy/ComfyUI/comfy/model_patcher.py, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_runtime/src/cache.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_worker/src/memory_modes.rs
@@ -11492,8 +11492,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 581. Execute canonical guidance across independent device clones
   - _id: comfy-parity-native-multigpu-guidance-execution-foundation
   - Outcome: Add one canonical sampler-owned multi-device guidance payload and execution path over ordered independent MODEL clone resources. Runtime and worker adapters expose checked device sessions, while comfy_sampler alone owns work distribution, transfers, concurrent invocation, synchronization, aggregation, reuse, pruning, and cleanup.
-  - Wave: 383
-  - _Wave: 383
+  - Wave: 384
+  - _Wave: 384
   - Dependencies: comfy-parity-native-diffusion-device-retarget-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-native-memory-planner
   - _Blocked_by: comfy-parity-native-diffusion-device-retarget-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-native-memory-planner
   - Reads: projects/comfy/ComfyUI/comfy/multigpu.py, projects/comfy/ComfyUI/comfy/samplers.py, projects/comfy/ComfyUI/comfy/model_patcher.py, projects/comfy/ComfyUI/comfy/sampler_helpers.py, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_worker/src/memory_modes.rs
@@ -11510,8 +11510,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 582. Implement native MediaPipe, RT-DETR, and SAM3 execution
   - _id: comfy-parity-native-detection-execution-foundation
   - Outcome: Canonical retained MediaPipe FaceLandmarker, RT-DETR, and SAM3 resources own checked model admission and native image/video execution. They publish exact face landmarks, boxes, scores, segmentation, and track state through the sealed payload boundary and delegate preview video encoding to the native video foundation without metadata-only model facades.
-  - Wave: 369
-  - _Wave: 369
+  - Wave: 370
+  - _Wave: 370
   - Dependencies: comfy-parity-native-video-execution-foundation, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-video-execution-foundation, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: projects/comfy/ComfyUI/comfy_extras/nodes_mediapipe.py, projects/comfy/ComfyUI/comfy_extras/nodes_rtdetr.py, projects/comfy/ComfyUI/comfy_extras/nodes_sam3.py, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs
@@ -11528,8 +11528,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 583. Implement native node family: (empty root category declared by source) part 1
   - _id: comfy-parity-native-nodes-empty-root-category-declared-by-source-comfy-node-0757
   - Outcome: The 1 rows assigned to this disjoint `(empty root category declared by source)` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs
@@ -11548,8 +11548,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 584. Implement native node family: 3d part 1
   - _id: comfy-parity-native-nodes-three-d-comfy-node-0115
   - Outcome: The 10 rows assigned to this disjoint `3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the missing shared native 3D execution seams required by its rows: sealed LOAD_3D and LOAD3D_MODEL_INFO payloads, prompt-to-attempt asset sealing, safe output subfolders and logical locators, deterministic GLB encoding, and bounded basic and Surface Nets voxel-to-mesh kernels.
-  - Wave: 288
-  - _Wave: 288
+  - Wave: 289
+  - _Wave: 289
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-nodes-partner-three-d-comfy-node-0408
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-nodes-partner-three-d-comfy-node-0408
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_load_3d.py, projects/comfy/ComfyUI/comfy_extras/nodes_save_3d.py, projects/comfy/ComfyUI/comfy_extras/nodes_hunyuan3d.py, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/output_committer.rs
@@ -11566,8 +11566,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 585. Implement native node family: 3d/splat part 1
   - _id: comfy-parity-native-nodes-three-d-splat-comfy-node-0172
   - Outcome: The 7 rows assigned to this disjoint `3d/splat` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the missing shared Gaussian-splat compute foundation: checked codec-to-payload conversion, variable-count/SH-aware merge, uniform and covariance-preserving nonuniform transforms, anisotropic EWA rendering, and density-grid Surface Nets meshing through the canonical media, tensor, scratch, and cancellation owners.
-  - Wave: 289
-  - _Wave: 289
+  - Wave: 290
+  - _Wave: 290
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-three-d-comfy-node-0115
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-three-d-comfy-node-0115
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_gaussian_splat.py, crates/comfy_media/src/gaussian_splat.rs, crates/comfy_tensor/src/operation.rs, crates/comfy_tensor/src/image_ops.rs
@@ -11584,8 +11584,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 586. Implement native node family: advanced/debug part 1
   - _id: comfy-parity-native-nodes-advanced-debug-comfy-node-0140
   - Outcome: The 3 rows assigned to this disjoint `advanced/debug` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the missing shared immutable model-execution modifier boundary for EasyCache, LazyCache, and ModelComputeDtype: checked dtype policy, source-exact cache policy, attempt-local sampler state, canonical execution identity and residency, and runtime reset on every exit.
-  - Wave: 290
-  - _Wave: 290
+  - Wave: 291
+  - _Wave: 291
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-three-d-splat-comfy-node-0172
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-three-d-splat-comfy-node-0172
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_easycache.py, projects/comfy/ComfyUI/comfy_extras/nodes_model_advanced.py, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -11602,8 +11602,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 587. Implement native node family: advanced/guidance part 1
   - _id: comfy-parity-native-nodes-advanced-guidance-comfy-node-0049
   - Outcome: The 7 rows assigned to this disjoint `advanced/guidance` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the guidance extension of the shared immutable model-execution modifier boundary: CFG normalization and zero-star transforms, normalized-attention guidance, per-layer DiT/SD3 skip guidance, and TCFG are checked immutable MODEL modifiers consumed by the canonical sampler and model-forward paths.
-  - Wave: 291
-  - _Wave: 291
+  - Wave: 292
+  - _Wave: 292
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-advanced-debug-comfy-node-0140
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-advanced-debug-comfy-node-0140
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_cfg.py, projects/comfy/ComfyUI/comfy_extras/nodes_nag.py, projects/comfy/ComfyUI/comfy_extras/nodes_slg.py, projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py, projects/comfy/ComfyUI/comfy_extras/nodes_tcfg.py, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/model_execution_modifiers.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -11620,8 +11620,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 588. Implement native node family: advanced/hooks part 1
   - _id: comfy-parity-native-nodes-advanced-hooks-comfy-node-0079
   - Outcome: The 10 rows assigned to this disjoint `advanced/hooks` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the missing shared canonical HOOKS and HOOK_KEYFRAMES payload boundary, including ordered immutable hook composition, checked keyframe schedules, conditioning hook-property application, exact handle identity, semantic digest, alias-aware residency, and attempt-store admission.
-  - Wave: 292
-  - _Wave: 292
+  - Wave: 293
+  - _Wave: 293
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-advanced-guidance-comfy-node-0049
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-advanced-guidance-comfy-node-0049
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_hooks.py, crates/comfy_model/src/conditioning.rs, crates/comfy_sampler/src/native_diffusion_payload.rs
@@ -11638,8 +11638,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 589. Implement native node family: advanced/hooks part 2
   - _id: comfy-parity-native-nodes-advanced-hooks-comfy-node-0119
   - Outcome: The 10 rows assigned to this disjoint `advanced/hooks` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the asset-backed and CLIP-consuming extension of the canonical hook boundary: attempt-scoped selectors seal verified LoRA/checkpoint inputs, hook creation clones immutable model facts, SetHookKeyframes applies canonical schedules, and SetClipHooks publishes a checked modified CLIP payload without exposing paths or inventing a second model owner.
-  - Wave: 293
-  - _Wave: 293
+  - Wave: 294
+  - _Wave: 294
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-advanced-hooks-comfy-node-0079
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-advanced-hooks-comfy-node-0079
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_hooks.py, crates/comfy_model/src/clip.rs, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/prompt_compiler.rs
@@ -11656,8 +11656,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 590. Implement native node family: advanced/multigpu part 1
   - _id: comfy-parity-native-nodes-advanced-multigpu-comfy-node-0454
   - Outcome: The 4 rows assigned to this disjoint `advanced/multigpu` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 384
-  - _Wave: 384
+  - Wave: 385
+  - _Wave: 385
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-diffusion-device-retarget-foundation, comfy-parity-native-multigpu-guidance-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-diffusion-device-retarget-foundation, comfy-parity-native-multigpu-guidance-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_multigpu.py, projects/comfy/ComfyUI/comfy/multigpu.py, projects/comfy/ComfyUI/comfy/model_management.py, projects/comfy/ComfyUI/comfy/model_patcher.py, projects/comfy/ComfyUI/comfy/samplers.py, projects/comfy/ComfyUI/comfy/sampler_helpers.py, crates/comfy_sampler/src/guidance.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/supervisor.rs
@@ -11674,8 +11674,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 591. Implement native node family: audio part 1
   - _id: comfy-parity-native-nodes-audio-comfy-node-0009
   - Outcome: The 10 rows assigned to this disjoint `audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 381
-  - _Wave: 381
+  - Wave: 382
+  - _Wave: 382
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-audio-empty-segment-foundation, comfy-parity-native-audio-output-codec-effect-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-audio-empty-segment-foundation, comfy-parity-native-audio-output-codec-effect-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/audio.rs, crates/comfy_runtime/src/native_audio_codec_service.rs
@@ -11692,8 +11692,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 592. Implement native node family: audio part 2
   - _id: comfy-parity-native-nodes-audio-comfy-node-0589
   - Outcome: The 5 rows assigned to this disjoint `audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 381
-  - _Wave: 381
+  - Wave: 382
+  - _Wave: 382
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-audio-empty-segment-foundation, comfy-parity-native-audio-output-codec-effect-foundation, comfy-parity-native-detection-execution-foundation, comfy-parity-native-media-text-rendering-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-audio-empty-segment-foundation, comfy-parity-native-audio-output-codec-effect-foundation, comfy-parity-native-detection-execution-foundation, comfy-parity-native-media-text-rendering-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/audio.rs, crates/comfy_runtime/src/native_audio_codec_service.rs
@@ -11710,8 +11710,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 593. Implement native node family: experimental part 1
   - _id: comfy-parity-native-nodes-experimental-comfy-node-0133
   - Outcome: The 10 rows assigned to this disjoint `experimental` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_differential_diffusion.py, projects/comfy/ComfyUI/comfy_extras/nodes_flux.py, projects/comfy/ComfyUI/comfy_extras/nodes_fresca.py, projects/comfy/ComfyUI/nodes.py, projects/comfy/ComfyUI/comfy_extras/nodes_lora_extract.py, projects/comfy/ComfyUI/comfy_extras/nodes_mahiro.py, projects/comfy/ComfyUI/comfy_extras/nodes_perpneg.py, projects/comfy/ComfyUI/comfy_extras/nodes_advanced_samplers.py, projects/comfy/ComfyUI/comfy_extras/nodes_sag.py, crates/comfy_model/src/hooks.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/sampling_profile.rs
@@ -11728,8 +11728,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 594. Implement native node family: experimental part 2
   - _id: comfy-parity-native-nodes-experimental-comfy-node-0680
   - Outcome: The 1 rows assigned to this disjoint `experimental` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-compile-policy-bridge-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-compile-policy-bridge-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_torch_compile.py, projects/comfy/ComfyUI/comfy_api/torch_helpers/torch_compile.py, crates/comfy_runtime/src/executor.rs
@@ -11746,8 +11746,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 595. Implement native node family: experimental/attention_experiments part 1
   - _id: comfy-parity-native-nodes-experimental-attention-experiments-comfy-node-0057
   - Outcome: The 4 rows assigned to this disjoint `experimental/attention_experiments` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, projects/comfy/ComfyUI/comfy_extras/nodes_attention_multiply.py, projects/comfy/ComfyUI/comfy/model_patcher.py, projects/comfy/ComfyUI/comfy/lora.py, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs
@@ -11764,8 +11764,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 596. Implement native node family: experimental/stable cascade part 1
   - _id: comfy-parity-native-nodes-experimental-stable-cascade-comfy-node-0638
   - Outcome: The 1 rows assigned to this disjoint `experimental/stable cascade` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs
@@ -11784,8 +11784,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 597. Implement native node family: image part 1
   - _id: comfy-parity-native-nodes-image-comfy-node-0160
   - Outcome: The 10 rows assigned to this disjoint `image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 376
-  - _Wave: 376
+  - Wave: 377
+  - _Wave: 377
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-directory-snapshot-foundation, comfy-parity-native-node-progress-text-foundation, comfy-parity-native-visual-asset-decode-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-directory-snapshot-foundation, comfy-parity-native-node-progress-text-foundation, comfy-parity-native-visual-asset-decode-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, projects/comfy/ComfyUI/nodes.py, projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, projects/comfy/ComfyUI/comfy_extras/nodes_images.py, projects/comfy/ComfyUI/comfy_extras/nodes_image_compare.py, projects/comfy/ComfyUI/comfy_extras/nodes_painter.py, projects/comfy/ComfyUI/comfy_api/latest/_ui.py, projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py, crates/comfy_media/src/image_codec.rs, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/native_image_codec_service.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_nodes/src/slices/native_image.rs
@@ -11802,8 +11802,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 598. Implement native node family: image part 2
   - _id: comfy-parity-native-nodes-image-comfy-node-0586
   - Outcome: The 8 rows assigned to this disjoint `image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 379
-  - _Wave: 379
+  - Wave: 380
+  - _Wave: 380
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-image-comfy-node-0160, comfy-parity-native-image-output-codec-effect-foundation, comfy-parity-native-dataset-output-policy-foundation, comfy-parity-native-structured-input-link-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-nodes-image-comfy-node-0160, comfy-parity-native-image-output-codec-effect-foundation, comfy-parity-native-dataset-output-policy-foundation, comfy-parity-native-structured-input-link-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, projects/comfy/ComfyUI/nodes.py, projects/comfy/ComfyUI/comfy_extras/nodes_images.py, projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py, projects/comfy/ComfyUI/comfy_extras/nodes_webcam.py, projects/comfy/ComfyUI/comfy_api/latest/_ui.py, crates/comfy_media/src/image_codec.rs, crates/comfy_runtime/src/output_committer.rs, crates/comfy_runtime/src/native_image_codec_service.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_nodes/src/slices/native_image.rs, crates/comfy_runtime/src/prompt_compiler.rs
@@ -11820,8 +11820,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 599. Implement native node family: image/adjustments part 1
   - _id: comfy-parity-native-nodes-image-adjustments-comfy-node-0004
   - Outcome: The 2 rows assigned to this disjoint `image/adjustments` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -11840,8 +11840,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 600. Implement native node family: image/background removal part 1
   - _id: comfy-parity-native-nodes-image-background-removal-comfy-node-0532
   - Outcome: The 1 rows assigned to this disjoint `image/background removal` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -11858,8 +11858,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 601. Implement native node family: image/batch part 1
   - _id: comfy-parity-native-nodes-image-batch-comfy-node-0017
   - Outcome: The 10 rows assigned to this disjoint `image/batch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -11878,8 +11878,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 602. Implement native node family: image/batch part 2
   - _id: comfy-parity-native-nodes-image-batch-comfy-node-0621
   - Outcome: The 2 rows assigned to this disjoint `image/batch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -11898,8 +11898,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 603. Implement native node family: image/color part 1
   - _id: comfy-parity-native-nodes-image-color-comfy-node-0254
   - Outcome: The 4 rows assigned to this disjoint `image/color` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -11918,8 +11918,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 604. Implement native node family: image/compositing part 1
   - _id: comfy-parity-native-nodes-image-compositing-comfy-node-0246
   - Outcome: The 4 rows assigned to this disjoint `image/compositing` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -11938,8 +11938,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 605. Implement native node family: image/detection part 1
   - _id: comfy-parity-native-nodes-image-detection-comfy-node-0136
   - Outcome: The 10 rows assigned to this disjoint `image/detection` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 370
-  - _Wave: 370
+  - Wave: 371
+  - _Wave: 371
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-c5a306eb73fd, comfy-parity-native-detection-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-c5a306eb73fd, comfy-parity-native-detection-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_model/src/families/rt_detr_v4_comfy_model_0114.rs, crates/comfy_tensor/src/ops/external_tensor_kernel_03.rs, crates/comfy_model/src/detection.rs, crates/comfy_media/src/video.rs
@@ -11956,8 +11956,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 606. Implement native node family: image/detection part 2
   - _id: comfy-parity-native-nodes-image-detection-comfy-node-0607
   - Outcome: The 2 rows assigned to this disjoint `image/detection` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task consumes the canonical native SDPose execution foundation for exact face bounding-box and keypoint extraction behavior.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py, crates/comfy_model/src/sdpose.rs
@@ -11974,8 +11974,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 607. Implement native node family: image/filters part 1
   - _id: comfy-parity-native-nodes-image-filters-comfy-node-0045
   - Outcome: The 8 rows assigned to this disjoint `image/filters` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-image-source-compatibility-foundation, comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-fd729b8a5363
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-image-source-compatibility-foundation, comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-fd729b8a5363
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/image_quantization.rs, crates/comfy_tensor/src/rng.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_tensor/src/ops/random_number_generation_01.rs, crates/comfy_tensor/src/ops/random_number_generation_02.rs, crates/comfy_tensor/src/ops/shape_layout_transform_03.rs, crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs
@@ -11994,8 +11994,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 608. Implement native node family: image/geometry estimation part 1
   - _id: comfy-parity-native-nodes-image-geometry-estimation-comfy-node-0129
   - Outcome: The 7 rows assigned to this disjoint `image/geometry estimation` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12012,8 +12012,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 609. Implement native node family: image/mask part 1
   - _id: comfy-parity-native-nodes-image-mask-comfy-node-0019
   - Outcome: The 10 rows assigned to this disjoint `image/mask` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12032,8 +12032,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 610. Implement native node family: image/mask part 2
   - _id: comfy-parity-native-nodes-image-mask-comfy-node-0625
   - Outcome: The 3 rows assigned to this disjoint `image/mask` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12052,8 +12052,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 611. Implement native node family: image/shader part 1
   - _id: comfy-parity-native-nodes-image-shader-comfy-node-0211
   - Outcome: The 1 rows assigned to this disjoint `image/shader` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-shader-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-shader-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_tensor/src/shader.rs, projects/comfy/ComfyUI/comfy_extras/nodes_glsl.py
@@ -12072,8 +12072,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 612. Implement native node family: image/transform part 1
   - _id: comfy-parity-native-nodes-image-transform-comfy-node-0047
   - Outcome: The 10 rows assigned to this disjoint `image/transform` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-image-source-compatibility-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-image-source-compatibility-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/image_quantization.rs, crates/comfy_tensor/src/rng.rs, crates/comfy_runtime/src/native_execution_controller.rs
@@ -12092,8 +12092,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 613. Implement native node family: image/transform part 2
   - _id: comfy-parity-native-nodes-image-transform-comfy-node-0541
   - Outcome: The 3 rows assigned to this disjoint `image/transform` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-node-inherited-v3-presentation-catalog-correction, comfy-parity-native-structured-input-link-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-node-inherited-v3-presentation-catalog-correction, comfy-parity-native-structured-input-link-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_runtime/src/prompt_compiler.rs, crates/comfy_runtime/src/executor.rs
@@ -12112,8 +12112,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 614. Implement native node family: image/upscaling part 1
   - _id: comfy-parity-native-nodes-image-upscaling-comfy-node-0262
   - Outcome: The 5 rows assigned to this disjoint `image/upscaling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12130,8 +12130,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 615. Implement native node family: image/video part 1
   - _id: comfy-parity-native-nodes-image-video-comfy-node-0762
   - Outcome: The 2 rows assigned to this disjoint `image/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-audio-empty-segment-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-audio-empty-segment-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12148,8 +12148,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 616. Implement native node family: model/conditioning part 1
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0008
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/conditioning.rs, crates/comfy_model/src/controlnet.rs
@@ -12166,8 +12166,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 617. Implement native node family: model/conditioning part 2
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0070
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/conditioning.rs, crates/comfy_model/src/controlnet.rs
@@ -12184,8 +12184,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 618. Implement native node family: model/conditioning part 3
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0092
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/conditioning.rs, crates/comfy_model/src/controlnet.rs
@@ -12202,8 +12202,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 619. Implement native node family: model/conditioning part 4
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0107
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/conditioning.rs, crates/comfy_model/src/controlnet.rs
@@ -12220,8 +12220,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 620. Implement native node family: model/conditioning part 5
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0210
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-hidream-o1-family-conditioning-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-hidream-o1-family-conditioning-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/conditioning.rs, crates/comfy_model/src/controlnet.rs, crates/comfy_model/src/hidream_o1_family.rs
@@ -12238,8 +12238,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 621. Implement native node family: model/conditioning part 6
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0277
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/conditioning.rs, crates/comfy_model/src/controlnet.rs
@@ -12256,8 +12256,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 622. Implement native node family: model/conditioning part 7
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0480
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-pixeldit-pid-family-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-pixeldit-pid-family-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/conditioning.rs, crates/comfy_model/src/controlnet.rs, crates/comfy_model/src/pixeldit_pid_family.rs
@@ -12274,8 +12274,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 623. Implement native node family: model/conditioning part 8
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0653
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/conditioning.rs, crates/comfy_model/src/controlnet.rs
@@ -12292,8 +12292,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 624. Implement native node family: model/conditioning part 9
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0696
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/conditioning.rs, crates/comfy_model/src/controlnet.rs
@@ -12310,8 +12310,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 625. Implement native node family: model/conditioning part 10
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0764
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/conditioning.rs, crates/comfy_model/src/controlnet.rs
@@ -12328,8 +12328,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 626. Implement native node family: model/conditioning part 11
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0776
   - Outcome: The 7 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-conditioning-control-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/conditioning.rs, crates/comfy_model/src/controlnet.rs
@@ -12346,8 +12346,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 627. Implement native node family: model/latent part 1
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0018
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-hidream-o1-family-conditioning-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-hidream-o1-family-conditioning-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/hidream_o1_family.rs
@@ -12364,8 +12364,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 628. Implement native node family: model/latent part 2
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0159
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-qwen-image-family-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-qwen-image-family-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/qwen_image_family.rs
@@ -12382,8 +12382,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 629. Implement native node family: model/latent part 3
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0311
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs
@@ -12400,8 +12400,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 630. Implement native node family: model/latent part 4
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0322
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs
@@ -12418,8 +12418,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 631. Implement native node family: model/latent part 5
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0344
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12436,8 +12436,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 632. Implement native node family: model/latent part 6
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0597
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12454,8 +12454,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 633. Implement native node family: model/latent part 7
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0714
   - Outcome: The 8 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-latent-bundle-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs
@@ -12472,8 +12472,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 634. Implement native node family: model/loaders part 1
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0012
   - Outcome: The 10 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12490,8 +12490,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 635. Implement native node family: model/loaders part 2
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0209
   - Outcome: The 10 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12508,8 +12508,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 636. Implement native node family: model/loaders part 3
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0351
   - Outcome: The 10 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12526,8 +12526,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 637. Implement native node family: model/loaders part 4
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0685
   - Outcome: The 5 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12544,8 +12544,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 638. Implement native node family: model/merging part 1
   - _id: comfy-parity-native-nodes-model-merging-comfy-node-0054
   - Outcome: The 10 rows assigned to this disjoint `model/merging` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12562,8 +12562,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 639. Implement native node family: model/merging part 2
   - _id: comfy-parity-native-nodes-model-merging-comfy-node-0423
   - Outcome: The 10 rows assigned to this disjoint `model/merging` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-qwen-image-family-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-qwen-image-family-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_model/src/qwen_image_family.rs
@@ -12580,8 +12580,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 640. Implement native node family: model/merging part 3
   - _id: comfy-parity-native-nodes-model-merging-comfy-node-0433
   - Outcome: The 8 rows assigned to this disjoint `model/merging` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12598,8 +12598,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 641. Implement native node family: model/patch part 1
   - _id: comfy-parity-native-nodes-model-patch-comfy-node-0055
   - Outcome: The 10 rows assigned to this disjoint `model/patch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-hidream-o1-family-conditioning-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-hidream-o1-family-conditioning-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_model/src/hidream_o1_family.rs
@@ -12616,8 +12616,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 642. Implement native node family: model/patch part 2
   - _id: comfy-parity-native-nodes-model-patch-comfy-node-0441
   - Outcome: The 10 rows assigned to this disjoint `model/patch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-qwen-image-family-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-qwen-image-family-adapter-consolidation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_model/src/qwen_image_family.rs
@@ -12634,8 +12634,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 643. Implement native node family: model/patch part 3
   - _id: comfy-parity-native-nodes-model-patch-comfy-node-0534
   - Outcome: The 9 rows assigned to this disjoint `model/patch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/guidance.rs
@@ -12652,8 +12652,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 644. Implement native node family: model/sampling part 1
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0001
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/guidance.rs
@@ -12670,8 +12670,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 645. Implement native node family: model/sampling part 2
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0139
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/guidance.rs
@@ -12688,8 +12688,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 646. Implement native node family: model/sampling part 3
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0308
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/guidance.rs
@@ -12706,8 +12706,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 647. Implement native node family: model/sampling part 4
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0571
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/guidance.rs
@@ -12724,8 +12724,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 648. Implement native node family: model/sampling part 5
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0582
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/guidance.rs
@@ -12742,8 +12742,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 649. Implement native node family: model/sampling part 6
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0743
   - Outcome: The 2 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-sampler-payload-algorithm-foundation, comfy-parity-native-sampling-profile-guidance-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_sampler/src/sampling_profile.rs, crates/comfy_sampler/src/native_node_payload.rs, crates/comfy_sampler/src/guidance.rs
@@ -12760,8 +12760,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 650. Implement native node family: model/training part 1
   - _id: comfy-parity-native-nodes-model-training-comfy-node-0347
   - Outcome: The 6 rows assigned to this disjoint `model/training` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-model-training-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-model-transform-foundation, comfy-parity-native-model-training-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/patches.rs, crates/comfy_sampler/src/guidance.rs, crates/comfy_tensor/src/autograd.rs, crates/comfy_tensor/src/autograd/breadth.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs
@@ -12778,8 +12778,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 651. Implement native node family: partner/3d part 1
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0408
   - Outcome: The 10 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12796,8 +12796,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 652. Implement native node family: partner/3d part 2
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0552
   - Outcome: The 10 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12814,8 +12814,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 653. Implement native node family: partner/3d part 3
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0686
   - Outcome: The 10 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12832,8 +12832,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 654. Implement native node family: partner/3d part 4
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0699
   - Outcome: The 2 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12850,8 +12850,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 655. Implement native node family: partner/audio part 1
   - _id: comfy-parity-native-nodes-partner-audio-comfy-node-0040
   - Outcome: The 10 rows assigned to this disjoint `partner/audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12868,8 +12868,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 656. Implement native node family: partner/audio part 2
   - _id: comfy-parity-native-nodes-partner-audio-comfy-node-0627
   - Outcome: The 1 rows assigned to this disjoint `partner/audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12886,8 +12886,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 657. Implement native node family: partner/image part 1
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0020
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12904,8 +12904,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 658. Implement native node family: partner/image part 2
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0179
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12922,8 +12922,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 659. Implement native node family: partner/image part 3
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0199
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12940,8 +12940,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 660. Implement native node family: partner/image part 4
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0304
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12958,8 +12958,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 661. Implement native node family: partner/image part 5
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0394
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12976,8 +12976,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 662. Implement native node family: partner/image part 6
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0511
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -12994,8 +12994,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 663. Implement native node family: partner/image part 7
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0521
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13012,8 +13012,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 664. Implement native node family: partner/image part 8
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0677
   - Outcome: The 4 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13030,8 +13030,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 665. Implement native node family: partner/text part 1
   - _id: comfy-parity-native-nodes-partner-text-comfy-node-0041
   - Outcome: The 9 rows assigned to this disjoint `partner/text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13048,8 +13048,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 666. Implement native node family: partner/video part 1
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0021
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13066,8 +13066,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 667. Implement native node family: partner/video part 2
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0038
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13084,8 +13084,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 668. Implement native node family: partner/video part 3
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0222
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13102,8 +13102,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 669. Implement native node family: partner/video part 4
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0287
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13120,8 +13120,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 670. Implement native node family: partner/video part 5
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0298
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13138,8 +13138,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 671. Implement native node family: partner/video part 6
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0383
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13156,8 +13156,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 672. Implement native node family: partner/video part 7
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0465
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13174,8 +13174,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 673. Implement native node family: partner/video part 8
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0562
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13192,8 +13192,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 674. Implement native node family: partner/video part 9
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0732
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13210,8 +13210,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 675. Implement native node family: partner/video part 10
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0752
   - Outcome: The 8 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 287
-  - _Wave: 287
+  - Wave: 288
+  - _Wave: 288
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-provider-invocation-foundation, comfy-parity-native-partner-provider-components-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/provider_contracts.rs, crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs
@@ -13228,8 +13228,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 676. Implement native node family: text part 1
   - _id: comfy-parity-native-nodes-text-comfy-node-0002
   - Outcome: The 10 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task owns the source-compatible text-regex adapter over the workspace-pinned bounded backtracking engine; no leaf-local parser or substring fallback is permitted.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-text-value-regex-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-text-value-regex-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_nodes/src/text_regex.rs, projects/comfy/ComfyUI/comfy_extras/nodes_string.py
@@ -13248,8 +13248,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 677. Implement native node family: text part 2
   - _id: comfy-parity-native-nodes-text-comfy-node-0531
   - Outcome: The 10 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-text-transform-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-text-transform-foundation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_nodes/src/text_regex.rs, crates/comfy_nodes/src/text_format.rs, projects/comfy/ComfyUI/comfy_extras/nodes_string.py
@@ -13268,8 +13268,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 678. Implement native node family: text part 3
   - _id: comfy-parity-native-nodes-text-comfy-node-0649
   - Outcome: The 6 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-text-generation-node-bridge, comfy-parity-model-detection-any-of-key-selector-consolidation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-asset-name-resolution-foundation, comfy-parity-native-model-resource-execution-foundation, comfy-parity-native-text-generation-node-bridge, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/clip.rs, crates/comfy_model/src/vae.rs, crates/comfy_model/src/vae_structured.rs, crates/comfy_runtime/src/artifact_index.rs, crates/comfy_model/src/clip_text_encoder_decoder.rs, crates/comfy_model/src/clip_text_encoder_multimodal.rs, crates/comfy_model/src/native_node_payload.rs, projects/comfy/ComfyUI/comfy_extras/nodes_textgen.py
@@ -13286,8 +13286,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 679. Implement native node family: utilities part 1
   - _id: comfy-parity-native-nodes-utilities-comfy-node-0077
   - Outcome: The 10 rows assigned to this disjoint `utilities` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 372
-  - _Wave: 372
+  - Wave: 373
+  - _Wave: 373
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-media-text-rendering-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-media-text-rendering-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/text_rendering.rs, projects/comfy/ComfyUI/comfy_extras/nodes_bounding_boxes.py
@@ -13304,8 +13304,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 680. Implement native node family: utilities part 2
   - _id: comfy-parity-native-nodes-utilities-comfy-node-0610
   - Outcome: The 1 rows assigned to this disjoint `utilities` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs
@@ -13324,8 +13324,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 681. Implement native node family: utilities/logic part 1
   - _id: comfy-parity-native-nodes-utilities-logic-comfy-node-0082
   - Outcome: The 4 rows assigned to this disjoint `utilities/logic` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs
@@ -13344,8 +13344,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [x] 682. Implement native node family: utilities/primitive part 1
   - _id: comfy-parity-native-nodes-utilities-primitive-comfy-node-0494
   - Outcome: The 6 rows assigned to this disjoint `utilities/primitive` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 268
-  - _Wave: 268
+  - Wave: 269
+  - _Wave: 269
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-text-value-regex-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-text-value-regex-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_nodes/src/execution.rs, projects/comfy/ComfyUI/comfy_extras/nodes_primitive.py
@@ -13364,8 +13364,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 683. Implement native node family: video part 1
   - _id: comfy-parity-native-nodes-video-comfy-node-0124
   - Outcome: The 7 rows assigned to this disjoint `video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 368
-  - _Wave: 368
+  - Wave: 369
+  - _Wave: 369
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-video-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-video-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/video.rs, crates/comfy_model/src/frame_interpolation.rs
@@ -13382,8 +13382,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 684. Implement native node family: video/preprocessors part 1
   - _id: comfy-parity-native-nodes-video-preprocessors-comfy-node-0372
   - Outcome: The 1 rows assigned to this disjoint `video/preprocessors` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 368
-  - _Wave: 368
+  - Wave: 369
+  - _Wave: 369
   - Dependencies: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-video-execution-foundation
   - _Blocked_by: comfy-parity-native-node-schema-metadata-foundation, comfy-parity-native-node-compute-value-foundation, comfy-parity-native-node-asset-effect-foundation, comfy-parity-native-sdpose-execution-foundation, comfy-parity-native-video-execution-foundation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-node-contracts.json, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/execution.rs, crates/comfy_nodes/src/source_type.rs, crates/comfy_nodes/src/stored_payload.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_tensor/src/comfy_tensor.rs, crates/comfy_tensor/src/native_node_payload.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/native_node_payload.rs, crates/comfy_sampler/src/comfy_sampler.rs, crates/comfy_sampler/src/native_diffusion_payload.rs, crates/comfy_media/src/comfy_media.rs, crates/comfy_media/src/native_node_payload.rs, crates/comfy_media/src/video.rs, crates/comfy_model/src/frame_interpolation.rs
@@ -13400,8 +13400,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 685. Generate the final native implementation registry and closure report
   - _id: comfy-parity-native-registry-integration
   - Outcome: A serialized generator consumes disjoint node/model/provider bindings after all family tasks and emits the central implementation registry, object-info and production runtime projections, and zero-delta closure report.
-  - Wave: 385
-  - _Wave: 385
+  - Wave: 386
+  - _Wave: 386
   - Dependencies: comfy-parity-native-nodes-empty-root-category-declared-by-source-comfy-node-0757, comfy-parity-native-nodes-three-d-comfy-node-0115, comfy-parity-native-nodes-three-d-splat-comfy-node-0172, comfy-parity-native-nodes-advanced-debug-comfy-node-0140, comfy-parity-native-nodes-advanced-guidance-comfy-node-0049, comfy-parity-native-nodes-advanced-hooks-comfy-node-0079, comfy-parity-native-nodes-advanced-hooks-comfy-node-0119, comfy-parity-native-nodes-advanced-multigpu-comfy-node-0454, comfy-parity-native-nodes-audio-comfy-node-0009, comfy-parity-native-nodes-audio-comfy-node-0589, comfy-parity-native-nodes-experimental-comfy-node-0133, comfy-parity-native-nodes-experimental-comfy-node-0680, comfy-parity-native-nodes-experimental-attention-experiments-comfy-node-0057, comfy-parity-native-nodes-experimental-stable-cascade-comfy-node-0638, comfy-parity-native-nodes-image-comfy-node-0160, comfy-parity-native-nodes-image-comfy-node-0586, comfy-parity-native-nodes-image-adjustments-comfy-node-0004, comfy-parity-native-nodes-image-background-removal-comfy-node-0532, comfy-parity-native-nodes-image-batch-comfy-node-0017, comfy-parity-native-nodes-image-batch-comfy-node-0621, comfy-parity-native-nodes-image-color-comfy-node-0254, comfy-parity-native-nodes-image-compositing-comfy-node-0246, comfy-parity-native-nodes-image-detection-comfy-node-0136, comfy-parity-native-nodes-image-detection-comfy-node-0607, comfy-parity-native-nodes-image-filters-comfy-node-0045, comfy-parity-native-nodes-image-geometry-estimation-comfy-node-0129, comfy-parity-native-nodes-image-mask-comfy-node-0019, comfy-parity-native-nodes-image-mask-comfy-node-0625, comfy-parity-native-nodes-image-shader-comfy-node-0211, comfy-parity-native-nodes-image-transform-comfy-node-0047, comfy-parity-native-nodes-image-transform-comfy-node-0541, comfy-parity-native-nodes-image-upscaling-comfy-node-0262, comfy-parity-native-nodes-image-video-comfy-node-0762, comfy-parity-native-nodes-model-conditioning-comfy-node-0008, comfy-parity-native-nodes-model-conditioning-comfy-node-0070, comfy-parity-native-nodes-model-conditioning-comfy-node-0092, comfy-parity-native-nodes-model-conditioning-comfy-node-0107, comfy-parity-native-nodes-model-conditioning-comfy-node-0210, comfy-parity-native-nodes-model-conditioning-comfy-node-0277, comfy-parity-native-nodes-model-conditioning-comfy-node-0480, comfy-parity-native-nodes-model-conditioning-comfy-node-0653, comfy-parity-native-nodes-model-conditioning-comfy-node-0696, comfy-parity-native-nodes-model-conditioning-comfy-node-0764, comfy-parity-native-nodes-model-conditioning-comfy-node-0776, comfy-parity-native-nodes-model-latent-comfy-node-0018, comfy-parity-native-nodes-model-latent-comfy-node-0159, comfy-parity-native-nodes-model-latent-comfy-node-0311, comfy-parity-native-nodes-model-latent-comfy-node-0322, comfy-parity-native-nodes-model-latent-comfy-node-0344, comfy-parity-native-nodes-model-latent-comfy-node-0597, comfy-parity-native-nodes-model-latent-comfy-node-0714, comfy-parity-native-nodes-model-loaders-comfy-node-0012, comfy-parity-native-nodes-model-loaders-comfy-node-0209, comfy-parity-native-nodes-model-loaders-comfy-node-0351, comfy-parity-native-nodes-model-loaders-comfy-node-0685, comfy-parity-native-nodes-model-merging-comfy-node-0054, comfy-parity-native-nodes-model-merging-comfy-node-0423, comfy-parity-native-nodes-model-merging-comfy-node-0433, comfy-parity-native-nodes-model-patch-comfy-node-0055, comfy-parity-native-nodes-model-patch-comfy-node-0441, comfy-parity-native-nodes-model-patch-comfy-node-0534, comfy-parity-native-nodes-model-sampling-comfy-node-0001, comfy-parity-native-nodes-model-sampling-comfy-node-0139, comfy-parity-native-nodes-model-sampling-comfy-node-0308, comfy-parity-native-nodes-model-sampling-comfy-node-0571, comfy-parity-native-nodes-model-sampling-comfy-node-0582, comfy-parity-native-nodes-model-sampling-comfy-node-0743, comfy-parity-native-nodes-model-training-comfy-node-0347, comfy-parity-native-nodes-partner-three-d-comfy-node-0408, comfy-parity-native-nodes-partner-three-d-comfy-node-0552, comfy-parity-native-nodes-partner-three-d-comfy-node-0686, comfy-parity-native-nodes-partner-three-d-comfy-node-0699, comfy-parity-native-nodes-partner-audio-comfy-node-0040, comfy-parity-native-nodes-partner-audio-comfy-node-0627, comfy-parity-native-nodes-partner-image-comfy-node-0020, comfy-parity-native-nodes-partner-image-comfy-node-0179, comfy-parity-native-nodes-partner-image-comfy-node-0199, comfy-parity-native-nodes-partner-image-comfy-node-0304, comfy-parity-native-nodes-partner-image-comfy-node-0394, comfy-parity-native-nodes-partner-image-comfy-node-0511, comfy-parity-native-nodes-partner-image-comfy-node-0521, comfy-parity-native-nodes-partner-image-comfy-node-0677, comfy-parity-native-nodes-partner-text-comfy-node-0041, comfy-parity-native-nodes-partner-video-comfy-node-0021, comfy-parity-native-nodes-partner-video-comfy-node-0038, comfy-parity-native-nodes-partner-video-comfy-node-0222, comfy-parity-native-nodes-partner-video-comfy-node-0287, comfy-parity-native-nodes-partner-video-comfy-node-0298, comfy-parity-native-nodes-partner-video-comfy-node-0383, comfy-parity-native-nodes-partner-video-comfy-node-0465, comfy-parity-native-nodes-partner-video-comfy-node-0562, comfy-parity-native-nodes-partner-video-comfy-node-0732, comfy-parity-native-nodes-partner-video-comfy-node-0752, comfy-parity-native-nodes-text-comfy-node-0002, comfy-parity-native-nodes-text-comfy-node-0531, comfy-parity-native-nodes-text-comfy-node-0649, comfy-parity-native-nodes-utilities-comfy-node-0077, comfy-parity-native-nodes-utilities-comfy-node-0610, comfy-parity-native-nodes-utilities-logic-comfy-node-0082, comfy-parity-native-nodes-utilities-primitive-comfy-node-0494, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-native-nodes-video-preprocessors-comfy-node-0372
   - _Blocked_by: comfy-parity-native-nodes-empty-root-category-declared-by-source-comfy-node-0757, comfy-parity-native-nodes-three-d-comfy-node-0115, comfy-parity-native-nodes-three-d-splat-comfy-node-0172, comfy-parity-native-nodes-advanced-debug-comfy-node-0140, comfy-parity-native-nodes-advanced-guidance-comfy-node-0049, comfy-parity-native-nodes-advanced-hooks-comfy-node-0079, comfy-parity-native-nodes-advanced-hooks-comfy-node-0119, comfy-parity-native-nodes-advanced-multigpu-comfy-node-0454, comfy-parity-native-nodes-audio-comfy-node-0009, comfy-parity-native-nodes-audio-comfy-node-0589, comfy-parity-native-nodes-experimental-comfy-node-0133, comfy-parity-native-nodes-experimental-comfy-node-0680, comfy-parity-native-nodes-experimental-attention-experiments-comfy-node-0057, comfy-parity-native-nodes-experimental-stable-cascade-comfy-node-0638, comfy-parity-native-nodes-image-comfy-node-0160, comfy-parity-native-nodes-image-comfy-node-0586, comfy-parity-native-nodes-image-adjustments-comfy-node-0004, comfy-parity-native-nodes-image-background-removal-comfy-node-0532, comfy-parity-native-nodes-image-batch-comfy-node-0017, comfy-parity-native-nodes-image-batch-comfy-node-0621, comfy-parity-native-nodes-image-color-comfy-node-0254, comfy-parity-native-nodes-image-compositing-comfy-node-0246, comfy-parity-native-nodes-image-detection-comfy-node-0136, comfy-parity-native-nodes-image-detection-comfy-node-0607, comfy-parity-native-nodes-image-filters-comfy-node-0045, comfy-parity-native-nodes-image-geometry-estimation-comfy-node-0129, comfy-parity-native-nodes-image-mask-comfy-node-0019, comfy-parity-native-nodes-image-mask-comfy-node-0625, comfy-parity-native-nodes-image-shader-comfy-node-0211, comfy-parity-native-nodes-image-transform-comfy-node-0047, comfy-parity-native-nodes-image-transform-comfy-node-0541, comfy-parity-native-nodes-image-upscaling-comfy-node-0262, comfy-parity-native-nodes-image-video-comfy-node-0762, comfy-parity-native-nodes-model-conditioning-comfy-node-0008, comfy-parity-native-nodes-model-conditioning-comfy-node-0070, comfy-parity-native-nodes-model-conditioning-comfy-node-0092, comfy-parity-native-nodes-model-conditioning-comfy-node-0107, comfy-parity-native-nodes-model-conditioning-comfy-node-0210, comfy-parity-native-nodes-model-conditioning-comfy-node-0277, comfy-parity-native-nodes-model-conditioning-comfy-node-0480, comfy-parity-native-nodes-model-conditioning-comfy-node-0653, comfy-parity-native-nodes-model-conditioning-comfy-node-0696, comfy-parity-native-nodes-model-conditioning-comfy-node-0764, comfy-parity-native-nodes-model-conditioning-comfy-node-0776, comfy-parity-native-nodes-model-latent-comfy-node-0018, comfy-parity-native-nodes-model-latent-comfy-node-0159, comfy-parity-native-nodes-model-latent-comfy-node-0311, comfy-parity-native-nodes-model-latent-comfy-node-0322, comfy-parity-native-nodes-model-latent-comfy-node-0344, comfy-parity-native-nodes-model-latent-comfy-node-0597, comfy-parity-native-nodes-model-latent-comfy-node-0714, comfy-parity-native-nodes-model-loaders-comfy-node-0012, comfy-parity-native-nodes-model-loaders-comfy-node-0209, comfy-parity-native-nodes-model-loaders-comfy-node-0351, comfy-parity-native-nodes-model-loaders-comfy-node-0685, comfy-parity-native-nodes-model-merging-comfy-node-0054, comfy-parity-native-nodes-model-merging-comfy-node-0423, comfy-parity-native-nodes-model-merging-comfy-node-0433, comfy-parity-native-nodes-model-patch-comfy-node-0055, comfy-parity-native-nodes-model-patch-comfy-node-0441, comfy-parity-native-nodes-model-patch-comfy-node-0534, comfy-parity-native-nodes-model-sampling-comfy-node-0001, comfy-parity-native-nodes-model-sampling-comfy-node-0139, comfy-parity-native-nodes-model-sampling-comfy-node-0308, comfy-parity-native-nodes-model-sampling-comfy-node-0571, comfy-parity-native-nodes-model-sampling-comfy-node-0582, comfy-parity-native-nodes-model-sampling-comfy-node-0743, comfy-parity-native-nodes-model-training-comfy-node-0347, comfy-parity-native-nodes-partner-three-d-comfy-node-0408, comfy-parity-native-nodes-partner-three-d-comfy-node-0552, comfy-parity-native-nodes-partner-three-d-comfy-node-0686, comfy-parity-native-nodes-partner-three-d-comfy-node-0699, comfy-parity-native-nodes-partner-audio-comfy-node-0040, comfy-parity-native-nodes-partner-audio-comfy-node-0627, comfy-parity-native-nodes-partner-image-comfy-node-0020, comfy-parity-native-nodes-partner-image-comfy-node-0179, comfy-parity-native-nodes-partner-image-comfy-node-0199, comfy-parity-native-nodes-partner-image-comfy-node-0304, comfy-parity-native-nodes-partner-image-comfy-node-0394, comfy-parity-native-nodes-partner-image-comfy-node-0511, comfy-parity-native-nodes-partner-image-comfy-node-0521, comfy-parity-native-nodes-partner-image-comfy-node-0677, comfy-parity-native-nodes-partner-text-comfy-node-0041, comfy-parity-native-nodes-partner-video-comfy-node-0021, comfy-parity-native-nodes-partner-video-comfy-node-0038, comfy-parity-native-nodes-partner-video-comfy-node-0222, comfy-parity-native-nodes-partner-video-comfy-node-0287, comfy-parity-native-nodes-partner-video-comfy-node-0298, comfy-parity-native-nodes-partner-video-comfy-node-0383, comfy-parity-native-nodes-partner-video-comfy-node-0465, comfy-parity-native-nodes-partner-video-comfy-node-0562, comfy-parity-native-nodes-partner-video-comfy-node-0732, comfy-parity-native-nodes-partner-video-comfy-node-0752, comfy-parity-native-nodes-text-comfy-node-0002, comfy-parity-native-nodes-text-comfy-node-0531, comfy-parity-native-nodes-text-comfy-node-0649, comfy-parity-native-nodes-utilities-comfy-node-0077, comfy-parity-native-nodes-utilities-comfy-node-0610, comfy-parity-native-nodes-utilities-logic-comfy-node-0082, comfy-parity-native-nodes-utilities-primitive-comfy-node-0494, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-native-nodes-video-preprocessors-comfy-node-0372
   - Reads: crates/comfy_nodes/src/families, crates/comfy_model/src/families, crates/comfy_plugin_host, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_api/src/services.rs, crates/zed/src/zed.rs, .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-models.csv
@@ -13418,8 +13418,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 686. Implement templates, App Mode, sharing, tabs, and workflow recovery
   - _id: comfy-parity-workflow-experience
   - Outcome: Native workflow tabs, recents, autosave/drafts, local/bundled/provider/plugin templates, App Mode projections, and approved sharing preserve provenance, dirty state, permissions, and lossless documents.
-  - Wave: 386
-  - _Wave: 386
+  - Wave: 387
+  - _Wave: 387
   - Dependencies: comfy-parity-native-registry-integration
   - _Blocked_by: comfy-parity-native-registry-integration
   - Reads: crates/comfy_ui/src/workflow_item.rs, crates/comfy_runtime/src/workflow_formats.rs, .agents/specs/comfy-parity/catalogs/frontend-features.csv
@@ -13436,8 +13436,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 687. Build node library, asset panels, missing-dependency flows, and content dispatch
   - _id: comfy-parity-assets-editors-viewers
   - Outcome: Node library/search/replacement and native asset browsing dispatch typed outputs to specialized GPUI editors/viewers while preserving missing node/model/media/plugin state.
-  - Wave: 387
-  - _Wave: 387
+  - Wave: 388
+  - _Wave: 388
   - Dependencies: comfy-parity-workflow-experience
   - _Blocked_by: comfy-parity-workflow-experience
   - Reads: crates/comfy_ui, crates/comfy_runtime/src/assets.rs, .agents/specs/comfy-parity/catalogs/frontend-component-surfaces.csv
@@ -13454,8 +13454,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 688. Implement native image, HDR, mask, crop, paint, and bounding-box content
   - _id: comfy-parity-image-mask-content
   - Outcome: Bounded native codecs and GPUI surfaces cover image/HDR/depth/mask/crop/painter/bounding-box load, view, edit, undo, metadata, output, and external changes.
-  - Wave: 388
-  - _Wave: 388
+  - Wave: 389
+  - _Wave: 389
   - Dependencies: comfy-parity-assets-editors-viewers
   - _Blocked_by: comfy-parity-assets-editors-viewers
   - Reads: crates/comfy_media, crates/comfy_ui/src/content_registry.rs, .agents/specs/comfy-parity/catalogs/frontend-component-surfaces.csv
@@ -13472,8 +13472,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 689. Implement native audio and video codecs, widgets, players, and output inspection
   - _id: comfy-parity-audio-video-content
   - Outcome: Native readers/writers and GPUI controls cover cataloged audio/video samples, frames, timing, metadata, playback, previews, edits, outputs, and platform codec availability without command subprocesses.
-  - Wave: 389
-  - _Wave: 389
+  - Wave: 390
+  - _Wave: 390
   - Dependencies: comfy-parity-image-mask-content
   - _Blocked_by: comfy-parity-image-mask-content
   - Reads: crates/comfy_media/src/comfy_media.rs, crates/comfy_ui/src/content_registry.rs
@@ -13490,8 +13490,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 690. Implement native 3D, latent, text, JSON, file, and unknown-output inspection
   - _id: comfy-parity-three-d-latent-content
   - Outcome: Typed GPUI content covers mesh/point/splat/animation, latent channels, text/JSON/files, and preserved unknown outputs with bounded parsing and exact serialization.
-  - Wave: 390
-  - _Wave: 390
+  - Wave: 391
+  - _Wave: 391
   - Dependencies: comfy-parity-audio-video-content
   - _Blocked_by: comfy-parity-audio-video-content
   - Reads: crates/comfy_media, crates/comfy_ui/src/content_registry.rs, crates/comfy_model/src/latent_formats, .agents/specs/comfy-parity/catalogs/native-compute-closure.json
@@ -13508,8 +13508,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 691. Implement profile-scoped providers, secrets, cloud gates, telemetry, and tasks
   - _id: comfy-parity-auth-cloud-telemetry
   - Outcome: Native provider services isolate auth, secrets, entitlements, costs, uploads, polling, cancellation, tasks, feature flags, surveys, and consented telemetry by profile and plugin grants.
-  - Wave: 391
-  - _Wave: 391
+  - Wave: 392
+  - _Wave: 392
   - Dependencies: comfy-parity-three-d-latent-content
   - _Blocked_by: comfy-parity-three-d-latent-content
   - Reads: crates/credentials_provider, crates/comfy_runtime/src/trust.rs, .agents/specs/comfy-parity/catalogs/backend-external-services.csv
@@ -13526,8 +13526,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 692. Expose native settings, themes, localization, onboarding, help, and docs
   - _id: comfy-parity-settings-localization-ui
   - Outcome: GPUI surfaces expose native runtime/backend/memory/plugin/API/provider/update settings plus themes, palettes, shortcuts, locales, onboarding, help, evidence-linked docs, and the exact public-help navigation commands assigned by the native menu ledger through Zed's central Settings Editor registration. This task owns the visible help command surfaces and destinations; `comfy-parity-desktop-native-ui` and `comfy-parity-security-platform` retain the platform adapter and ExternalNavigationPolicy enforcement, so the UI never owns a second URL-security decision.
-  - Wave: 392
-  - _Wave: 392
+  - Wave: 393
+  - _Wave: 393
   - Dependencies: comfy-parity-auth-cloud-telemetry
   - _Blocked_by: comfy-parity-auth-cloud-telemetry
   - Reads: crates/settings, crates/settings_content, crates/settings_ui/src/page_data.rs, crates/comfy_runtime/src/settings.rs, .agents/specs/comfy-parity/catalogs/frontend-settings.csv, .agents/specs/comfy-parity/catalogs/docs-pages.csv, .agents/specs/comfy-parity/catalogs/native-menu-dispositions.csv, crates/comfy_runtime/src/trust.rs
@@ -13544,8 +13544,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 693. Map Desktop onboarding, adoption, migration, and profiles to native data
   - _id: comfy-parity-desktop-installations
   - Outcome: Desktop-visible lifecycle becomes native profile/backend/model/plugin/workflow/output adoption with preview, isolation, cancellation, journals, and read-only legacy Python metadata.
-  - Wave: 393
-  - _Wave: 393
+  - Wave: 394
+  - _Wave: 394
   - Dependencies: comfy-parity-settings-localization-ui
   - _Blocked_by: comfy-parity-settings-localization-ui
   - Reads: .agents/specs/comfy-parity/catalogs/desktop-features.csv, crates/comfy_runtime/src/legacy_installations.rs, crates/comfy_ui/src/onboarding.rs
@@ -13562,8 +13562,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 694. Implement native downloads, updates, snapshots, rollback, and auto-update mapping
   - _id: comfy-parity-updates-snapshots
   - Outcome: Application/backend/codec/model/registry/plugin operations use staged downloads, integrity/signature checks, pause/resume/cancel, snapshots, quiescence, verification, atomic commit, rollback, and relaunch guards.
-  - Wave: 394
-  - _Wave: 394
+  - Wave: 395
+  - _Wave: 395
   - Dependencies: comfy-parity-desktop-installations
   - _Blocked_by: comfy-parity-desktop-installations
   - Reads: crates/auto_update, crates/comfy_runtime/src/profile_operations.rs, .agents/specs/comfy-parity/catalogs/desktop-features.csv
@@ -13580,8 +13580,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 695. Implement worker health, logs, terminal, diagnostics, feedback, and crash recovery
   - _id: comfy-parity-process-diagnostics
   - Outcome: Native worker/backend/device/model/plugin/API health and bounded sanitized logs drive diagnostic panels, terminal-like read-only streams, popouts, feedback artifacts, and recovery without arbitrary shell execution.
-  - Wave: 395
-  - _Wave: 395
+  - Wave: 396
+  - _Wave: 396
   - Dependencies: comfy-parity-updates-snapshots
   - _Blocked_by: comfy-parity-updates-snapshots
   - Reads: crates/comfy_worker, crates/comfy_runtime/src/updates.rs, .agents/specs/comfy-parity/catalogs/desktop-renderer-surfaces.csv
@@ -13598,8 +13598,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 696. Map Desktop IPC, preload, menus, windows, choosers, and OS integration
   - _id: comfy-parity-desktop-native-ui
   - Outcome: Every Desktop bridge/channel/menu/window/chooser/navigation/OS contract receives a Rust service, GPUI action/event, native lifecycle mapping, inactive legacy response, or explicit defer and is registered in Zed's existing application module.
-  - Wave: 396
-  - _Wave: 396
+  - Wave: 397
+  - _Wave: 397
   - Dependencies: comfy-parity-process-diagnostics
   - _Blocked_by: comfy-parity-process-diagnostics
   - Reads: .agents/specs/comfy-parity/catalogs/desktop-ipc.csv, .agents/specs/comfy-parity/catalogs/desktop-preload-apis.csv, .agents/specs/comfy-parity/catalogs/desktop-menu-actions.csv, crates/zed/src/main.rs, crates/zed/src/zed.rs
@@ -13616,8 +13616,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 697. Harden native runtime security and platform packaging
   - _id: comfy-parity-security-platform
   - Outcome: Windows/macOS/Linux packages define backend/vendor/codec/plugin trust, signatures, sandbox/permissions, typed locations, remote API policy, secrets, model parser bounds, worker isolation, and native-only contents.
-  - Wave: 397
-  - _Wave: 397
+  - Wave: 398
+  - _Wave: 398
   - Dependencies: comfy-parity-desktop-native-ui
   - _Blocked_by: comfy-parity-desktop-native-ui
   - Reads: crates/comfy_runtime, crates/comfy_worker, crates/comfy_plugin_host, crates/comfy_media, nix, script
@@ -13634,8 +13634,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 698. Audit GPUI ownership, registered persistence, cancellation, and error propagation
   - _id: comfy-parity-gpui-persistence
   - Outcome: Every entity/service/task/subscription/profile handle and persisted model has explicit ownership, lifetime, cancellation, migration, watcher, error-to-UI, and accessibility behavior.
-  - Wave: 398
-  - _Wave: 398
+  - Wave: 399
+  - _Wave: 399
   - Dependencies: comfy-parity-security-platform
   - _Blocked_by: comfy-parity-security-platform
   - Reads: crates/comfy_ui, crates/comfy_runtime, crates/comfy_worker, crates/workspace, crates/db, crates/settings
@@ -13652,8 +13652,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 699. Enforce format, identifier, plugin, availability, and deprecation policy
   - _id: comfy-parity-backward-compatibility
   - Outcome: Legacy/current workflow and protocol versions, node/plugin IDs, Desktop/CLI state, unknown fields, deprecations, flags, docs-only claims, and inactive source behaviors preserve data and use explicit mappings or gates.
-  - Wave: 399
-  - _Wave: 399
+  - Wave: 400
+  - _Wave: 400
   - Dependencies: comfy-parity-gpui-persistence
   - _Blocked_by: comfy-parity-gpui-persistence
   - Reads: crates/comfy_runtime/src/legacy_connections.rs, crates/comfy_plugin_host/src/legacy_mapping.rs, .agents/specs/comfy-parity/parity-matrix.md
@@ -13670,8 +13670,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 700. Meet native graph, tensor, model, sampler, media, API, and recovery budgets
   - _id: comfy-parity-performance
   - Outcome: Benchmark the numeric budgets in validation.md: image ≤2 s, tiny diffusion ≤5 s, 1,000-node input p95 ≤8 ms and frame p95 ≤16.7 ms, 10,000-node interaction p95 <50 ms, worker readiness ≤2/5 s, API events ≤50 ms, preview ≤250 ms, visible cancellation ≤100 ms, bounded terminal cancellation, and ten-second resource convergence.
-  - Wave: 400
-  - _Wave: 400
+  - Wave: 401
+  - _Wave: 401
   - Dependencies: comfy-parity-backward-compatibility
   - _Blocked_by: comfy-parity-backward-compatibility
   - Reads: crates/comfy_tensor, crates/comfy_model, crates/comfy_sampler, crates/comfy_runtime, crates/comfy_ui, .agents/specs/comfy-parity/validation.md
@@ -13688,8 +13688,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 701. Run parity, closure, platform, accessibility, security, and readiness audits
   - _id: comfy-parity-final-validation
   - Outcome: All deterministic source/oracle, native unit/contract/GPUI/E2E/restart/failure/accessibility/platform/security/performance tests and forward/reverse coverage gates produce an auditable implementation-closure report for the CPU and Apple Metal certified baseline plus fail-closed optional adapters.
-  - Wave: 401
-  - _Wave: 401
+  - Wave: 402
+  - _Wave: 402
   - Dependencies: comfy-parity-performance, comfy-parity-certify-device-apple-metal-mps-comfy-model-0015, comfy-parity-certify-device-cpu-comfy-model-0016, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation
   - _Blocked_by: comfy-parity-performance, comfy-parity-certify-device-apple-metal-mps-comfy-model-0015, comfy-parity-certify-device-cpu-comfy-model-0016, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation
   - Reads: .agents/specs/comfy-parity, crates/comfy_test_support, crates/comfy_ui, script
@@ -14322,3 +14322,21 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Done when: The checked selector accepts only an immutable function pointer from a compiled row, receives only the bounded validated ModelProbe, and returns an owned ModelStateTransformPlan. Registry resolution revalidates the returned plan against the selected family's declared components and rejects malformed or undeclared output typed before any transaction. Foundation tests prove dynamic/static equivalence and invalid-output rejection. PixArtAlpha native and depth-derived Diffusers plans resolve and execute through ResolvedModelFamily::state_plan and the canonical transaction boundary, with partial, ambiguous, wrong-variant, cancellation, memory, and ownership failures remaining atomic. The exact focused and aggregate model/support, formatting, clippy, strict-generation, and spec-validation gates pass. Evidence marker: POST-PROBE-DERIVED-STATE-PLAN-SELECTOR.
 
   - _validation_evidence: POST-PROBE-DERIVED-STATE-PLAN-SELECTOR 2026-08-06 independent implementation and validation PASS. `ModelFamilyStatePlanSelector::Probe` accepts only an immutable compiled function pointer over the already bounded `ModelProbe`, returns an owned `ModelStateTransformPlan`, and is invoked solely during canonical registry resolution. `ModelFamilyRegistry::resolve` recursively revalidates the result against the selected definition before binding it into `ResolvedModelFamily`; a foundation selector equivalent to the static plan passed, while a probe selector targeting undeclared component `vae` failed typed before any transaction. PixArtAlpha's public alternate helper was removed and native plus depth-derived Diffusers plans execute only through the resolved-plan boundary. The exact foundation test passed 1/1 and corrected PixArtAlpha filter passed 2/2. Locked all-target compile passed; the permissioned complete model matrix passed 229 library, 215 generated-family, 21 foundation, and 9 native-vision cases plus every other integration target, with the long native vision case finishing in 145.28s. The complete support matrix passed 29 library tests, deterministic native diffusion E2E in 173.55s, four checkpoints in 78.44s, native foundation/image/recovery/release/no-external-Comfy/no-Python/plugin/workflow gates, and 23/23 ownership tests in 179.74s. Focused VAL-MEMORY-001, canonical cancellation, and ownership passed; formatting and diff integrity passed; warnings-denied release/all-target/all-feature Clippy passed; strict double regeneration completed with 516 tasks, 87 validations, 155 ownership rows, and 13,295 trace rows; standalone spec validation exited 0. Canonical registry/reexport/generator/design SHA-256 values are `40845944fbda4bd1666bea9973ddc93e6277a224d1988eab38cc7af1557ef0f3`, `4ace56ff391a133adb7d718fcf22d571318ea57892378bc1e92f53d2d32dbf89`, `e3131f1dfbd873dd4ad0b4057ab506a3fb8a709f5b3346d7b4f971e5612e0587`, and `4afba2a839445d9aa6313c34f8050cba68d6108c8871c46a4de0d08bf4b0a6e6`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed and no production Python/JavaScript or external Comfy process exists._
+
+- [ ] 733. Stream verified model configuration artifacts to the native worker
+  - _id: comfy-parity-native-model-source-auxiliary-artifact-stream
+  - Outcome: Extend the existing path-free model-source bridge with one bounded, digest-bound auxiliary-artifact range operation so canonical model, CLIP, vision, and VAE owners can consume the verified tokenizer and configuration bytes required to construct real executable resources.
+  - Wave: 221
+  - _Wave: 221
+  - Dependencies: comfy-parity-native-model-resource-service-foundation
+  - _Blocked_by: comfy-parity-native-model-resource-service-foundation
+  - Reads: crates/comfy_model/src/model_store.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_worker/tests/ipc_framing.rs, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/native_worker_resilience.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs
+  - _Reads: crates/comfy_model/src/model_store.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_worker/tests/ipc_framing.rs, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/native_worker_resilience.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs
+  - Writes: crates/comfy_model/src/model_store.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_worker/tests/ipc_framing.rs, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/native_worker_resilience.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs, crates/comfy_types/src/comfy_types.rs
+  - _Writes: crates/comfy_model/src/model_store.rs, crates/comfy_types/src/worker_protocol.rs, crates/comfy_worker/src/comfy_worker.rs, crates/comfy_worker/src/supervisor.rs, crates/comfy_worker/tests/ipc_framing.rs, crates/comfy_runtime/src/assets.rs, crates/comfy_runtime/src/native_execution_controller.rs, crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs, crates/comfy_test_support/tests/native_worker_resilience.rs, .agents/specs/comfy-parity/ownership-policy.json, .agents/specs/comfy-parity/catalogs/authoritative-ownership.csv, crates/comfy_test_support/tests/ownership_consolidation.rs, crates/comfy_types/src/comfy_types.rs
+  - Requirements: 6.3, 7.2, 18.1, 26.2, 28.2, 31.5, 34.2, 34.6, 35.2, 37.5, 38.3, 41.2, 44.1, 44.3
+  - _Requirements: 6.3, 7.2, 18.1, 26.2, 28.2, 31.5, 34.2, 34.6, 35.2, 37.5, 38.3, 41.2, 44.1, 44.3
+  - Design: D8, D20, D25, D26, D28, D29, D31, D32, D33, D34, D39, D41
+  - Validation: VAL-MODEL-FAMILY-001, VAL-NODE-001, VAL-MEMORY-001, VAL-CANCEL-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_types -p comfy_worker -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_types --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_types -p comfy_worker -p comfy_runtime -p comfy_test_support; cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_types -p comfy_worker -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_model model_source_auxiliary_artifact_stream -- --nocapture; cargo test --locked -p comfy_worker model_source_auxiliary_artifact_stream -- --nocapture; cargo test --locked -p comfy_worker --test ipc_framing model_source_auxiliary_artifact_stream -- --exact --nocapture; cargo test --locked -p comfy_test_support --test native_worker_resilience model_source_auxiliary_artifact_stream_restarts_atomically -- --exact --nocapture; cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task733_model_source_auxiliary_artifact_stream_001 -- --exact --nocapture; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice; python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete; git diff --check
+  - _Validation: VAL-MODEL-FAMILY-001, VAL-NODE-001, VAL-MEMORY-001, VAL-CANCEL-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_types -p comfy_worker -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_types --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_types -p comfy_worker -p comfy_runtime -p comfy_test_support; cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_types -p comfy_worker -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_model model_source_auxiliary_artifact_stream -- --nocapture; cargo test --locked -p comfy_worker model_source_auxiliary_artifact_stream -- --nocapture; cargo test --locked -p comfy_worker --test ipc_framing model_source_auxiliary_artifact_stream -- --exact --nocapture; cargo test --locked -p comfy_test_support --test native_worker_resilience model_source_auxiliary_artifact_stream_restarts_atomically -- --exact --nocapture; cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task733_model_source_auxiliary_artifact_stream_001 -- --exact --nocapture; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice; python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete; git diff --check
+  - Done when: The existing capacity-one NativeModelSourceTransport remains the only worker model-source bridge. An append-only checked artifact-range request binds the exact session, call ordinal, source ordinal, artifact ordinal, offset, length, and verified artifact identity; the matching response binds those fields, a fixed chunk ceiling below the worker frame maximum, and an exact response digest. ModelStore remains the sole parser and verified-source owner and revalidates source identity, artifact format, size, digest, containment, and range immediately before every read. Only the bounded bytes of artifacts already present in the opened verified source may cross the private bridge; no path, file handle, ArtifactIndex, ModelStore, authorization grant, service getter, or ambient filesystem capability reaches the worker. Wrong direction, replay, stale identity or generation, changed bytes, unsupported format, out-of-range or oversized reads, digest mismatch, cancellation, close, replacement, and worker loss revoke the exact session without publication. Exhaustive protocol consumers and frozen legacy discriminants remain checked, and a hermetic tokenizer/config fixture crosses multiple chunks and restarts cleanly without duplicating model-resource publication.

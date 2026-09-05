@@ -195,7 +195,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 732)
+        self.assertEqual(len(tasks), 733)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -357,6 +357,9 @@ class ValidationGenerationTests(unittest.TestCase):
         model_resource_service_task = tasks_by_id[
             "comfy-parity-native-model-resource-service-foundation"
         ]
+        model_source_artifact_task = tasks_by_id[
+            "comfy-parity-native-model-source-auxiliary-artifact-stream"
+        ]
         model_resource_recipe_task = tasks_by_id[
             "comfy-parity-native-model-resource-service-recipe-closure"
         ]
@@ -380,12 +383,17 @@ class ValidationGenerationTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
+            model_source_artifact_task["dependencies"],
+            ["comfy-parity-native-model-resource-service-foundation"],
+        )
+        self.assertEqual(
             model_resource_recipe_task["dependencies"],
             [
-                "comfy-parity-native-model-resource-service-foundation",
+                "comfy-parity-native-model-source-auxiliary-artifact-stream",
                 "comfy-parity-model-detection-any-of-key-selector-consolidation",
             ],
         )
+        self.assertEqual(tasks[-1]["id"], model_source_artifact_task["id"])
         clip_task = tasks_by_id["comfy-parity-native-clip-resource-foundation"]
         self.assertIn("crates/comfy_model/src/clip_tokenizer.rs", clip_task["writes"])
         self.assertIn(

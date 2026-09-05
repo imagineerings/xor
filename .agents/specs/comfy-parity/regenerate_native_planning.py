@@ -10111,9 +10111,11 @@ def native_model_resource_precursor_tasks(
             "projects/comfy/ComfyUI/comfy_extras/nodes_void.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py",
             "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_model/src/model_family.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/audio_encoder.rs",
             "crates/comfy_model/src/background_removal.rs",
+            "crates/comfy_model/src/clip.rs",
             "crates/comfy_model/src/clip_vision.rs",
             "crates/comfy_model/src/conditioning_resources.rs",
             "crates/comfy_model/src/depth_anything_3.rs",
@@ -10135,6 +10137,12 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/clip.rs",
+            "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_model/src/vae_structured.rs",
+            "crates/comfy_model/src/vision_models.rs",
             "crates/comfy_nodes/src/execution.rs",
             "crates/comfy_runtime/src/executor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
@@ -10208,10 +10216,48 @@ def native_model_resource_precursor_tasks(
     tasks_by_id["comfy-parity-native-model-resource-service-recipe-closure"][
         "dependencies"
     ] = [
-        "comfy-parity-native-model-resource-service-foundation",
+        "comfy-parity-native-model-source-auxiliary-artifact-stream",
         "comfy-parity-model-detection-any-of-key-selector-consolidation",
     ]
     return ordered
+
+
+def native_model_source_auxiliary_artifact_stream_task() -> dict[str, object]:
+    return native_model_resource_precursor_task(
+        "comfy-parity-native-model-source-auxiliary-artifact-stream",
+        "Stream verified model configuration artifacts to the native worker",
+        "Extend the existing path-free model-source bridge with one bounded, digest-bound auxiliary-artifact range operation so canonical model, CLIP, vision, and VAE owners can consume the verified tokenizer and configuration bytes required to construct real executable resources.",
+        [
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_worker/tests/ipc_framing.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        [
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_worker/tests/ipc_framing.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/src/bin/comfy_test_worker_fixture.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "The existing capacity-one NativeModelSourceTransport remains the only worker model-source bridge. An append-only checked artifact-range request binds the exact session, call ordinal, source ordinal, artifact ordinal, offset, length, and verified artifact identity; the matching response binds those fields, a fixed chunk ceiling below the worker frame maximum, and an exact response digest. ModelStore remains the sole parser and verified-source owner and revalidates source identity, artifact format, size, digest, containment, and range immediately before every read. Only the bounded bytes of artifacts already present in the opened verified source may cross the private bridge; no path, file handle, ArtifactIndex, ModelStore, authorization grant, service getter, or ambient filesystem capability reaches the worker. Wrong direction, replay, stale identity or generation, changed bytes, unsupported format, out-of-range or oversized reads, digest mismatch, cancellation, close, replacement, and worker loss revoke the exact session without publication. Exhaustive protocol consumers and frozen legacy discriminants remain checked, and a hermetic tokenizer/config fixture crosses multiple chunks and restarts cleanly without duplicating model-resource publication.",
+        ["comfy-parity-native-model-resource-service-foundation"],
+    )
 
 
 def native_model_resource_execution_foundation_task(
@@ -19545,6 +19591,8 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
                 dict.fromkeys(item["dependencies"] + [backend_catalog_provenance_task])
             )
 
+    tasks.append(native_model_source_auxiliary_artifact_stream_task())
+
     removed_task_ids = (
         MOVED_COREX_ENABLEMENT_TASK_IDS | EXTERNAL_HARDWARE_CERTIFICATION_TASK_IDS
     )
@@ -21998,6 +22046,20 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "cargo test --locked -p comfy_test_support --test native_worker_resilience val_recovery_005 -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task400_native_model_resource_service_001 -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+            "git diff --check",
+        ])
+    if identifier == "comfy-parity-native-model-source-auxiliary-artifact-stream":
+        commands.extend([
+            "cargo fmt --all -- --check",
+            "cargo check --locked -p comfy_model -p comfy_types -p comfy_worker -p comfy_runtime -p comfy_test_support",
+            "cargo test --locked -p comfy_model model_source_auxiliary_artifact_stream -- --nocapture",
+            "cargo test --locked -p comfy_worker model_source_auxiliary_artifact_stream -- --nocapture",
+            "cargo test --locked -p comfy_worker --test ipc_framing model_source_auxiliary_artifact_stream -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_worker_resilience model_source_auxiliary_artifact_stream_restarts_atomically -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_task733_model_source_auxiliary_artifact_stream_001 -- --exact --nocapture",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/feature-spec/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
